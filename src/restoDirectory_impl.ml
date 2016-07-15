@@ -43,12 +43,37 @@ let descr x = x.Arg.descr
 
 module Answer = struct
 
+  type 'a stream = {
+    next: unit -> 'a option Lwt.t ;
+    shutdown: unit -> unit ;
+  }
+
+  type 'a output =
+    | Empty
+    | Single of 'a
+    | Stream of 'a stream
+
   type 'a answer =
     { code : int ;
-      body : 'a option }
+      body : 'a output ;
+    }
 
-  let ok json = { code = 200 ; body = Some json }
-  let return json = Lwt.return { code = 200 ; body = Some json }
+  let ok json = { code = 200 ; body = Single json }
+  let return json = Lwt.return { code = 200 ; body = Single json }
+
+  let ok_stream st = { code = 200 ; body = Stream st }
+  let return_stream st = Lwt.return { code = 200 ; body = Stream st }
+
+  let map (type a) (type b) (f:a -> b) (({ code ; body } as ans) : a answer) : b answer =
+    match ans.body with
+    | Empty -> { code ; body = Empty }
+    | Single body -> { code ; body = Single (f body) }
+    | Stream { next ; shutdown } ->
+        let next () =
+          next () >>= function
+          | None -> Lwt.return_none
+          | Some x -> Lwt.return (Some (f x)) in
+        { code ; body = Stream { next ; shutdown } }
 
 end
 
@@ -327,12 +352,10 @@ module Make(Repr : Json_repr.Repr) = struct
                            `String "input has wrong JSON structure" ;
                            "msg", Repr.repr @@
                            `String msg ] in
-                    Lwt.return { code = 400 ; body = Some body }
+                    Lwt.return { code = 400 ; body = Single body }
                 | input ->
                     Lwt.map
-                      (fun ans ->
-                         let body = map_option (construct output) ans.body in
-                         { ans with body })
+                      (Answer.map (fun x -> construct output x))
                       (handler args input) in
               Lwt.return call
         end
@@ -516,25 +539,25 @@ let describe_service
     : type pr.
       pr directory -> (pr, pr, bool option, Description.directory_descr) service ->
       pr directory
-  = fun root { description ; path ; output ; input } ->
-    let descr : Description.service_descr = {
-      description ;
-      input = Json_encoding.schema input ;
-      output = Json_encoding.schema output ;
-    } in
-    let dir = ref root in
-    let lookup args path =
-      let handler json =
-        let recurse =
-          match destruct input json with
-          | exception _ -> false
-          | None -> false
-          | Some b -> b in
-        describe_directory ~recurse !dir args path >>= fun d ->
-        return (construct output d) in
-      Lwt.return (CustomService (descr, handler)) in
-    dir := register_custom_lookup root path lookup ;
-    !dir
+    = fun root { description ; path ; output ; input } ->
+      let descr : Description.service_descr = {
+        description ;
+        input = Json_encoding.schema input ;
+        output = Json_encoding.schema output ;
+      } in
+      let dir = ref root in
+      let lookup args path =
+        let handler json =
+          let recurse =
+            match destruct input json with
+            | exception _ -> false
+            | None -> false
+            | Some b -> b in
+          describe_directory ~recurse !dir args path >>= fun d ->
+          return (construct output d) in
+        Lwt.return (CustomService (descr, handler)) in
+      dir := register_custom_lookup root path lookup ;
+      !dir
 
 
   (****************************************************************************

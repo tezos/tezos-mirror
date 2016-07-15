@@ -123,7 +123,7 @@ let request service args arg =
   match Lwt.state (Directory.lookup dir () args) with
   | Lwt.Return handler -> begin
     match Lwt.state (handler arg) with
-      | Lwt.Return { code = 200 ; body = Some x } -> begin
+      | Lwt.Return { code = 200 ; body = Single x } -> begin
           match read_answer service x with
           | Ok x -> x
           | Error msg -> failwith ("Parse error: " ^ msg)

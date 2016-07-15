@@ -15,7 +15,18 @@ module Answer : sig
   (** Return type for service handler *)
   type 'a answer =
     { code : int ;
-      body : 'a option }
+      body : 'a output ;
+    }
+
+  and 'a output =
+    | Empty
+    | Single of 'a
+    | Stream of 'a stream
+
+  and 'a stream = {
+    next: unit -> 'a option Lwt.t ;
+    shutdown: unit -> unit ;
+  }
 
   val ok: 'a -> 'a answer
   val return: 'a -> 'a answer Lwt.t
