@@ -9,12 +9,14 @@ lib: [
   "src/resto.mli"
   "src/resto.ml"
   "_obuild/ocplib-resto/resto.cmi"
+  "_obuild/ocplib-resto/resto.cmx"
   "?_obuild/ocplib-resto/resto.cmti"
   "?_obuild/ocplib-resto/resto.cmt"
 
   "src/ezResto.mli"
   "src/ezResto.ml"
   "_obuild/ocplib-resto/ezResto.cmi"
+  "_obuild/ocplib-resto/ezResto.cmx"
   "?_obuild/ocplib-resto/ezResto.cmti"
   "?_obuild/ocplib-resto/ezResto.cmt"
 
@@ -27,6 +29,8 @@ lib: [
     { "directory/functor/restoDirectory_impl.ml" }
   "_obuild/ocplib-resto-directory/restoDirectory_impl.cmi"
     { "directory/functor/restoDirectory_impl.cmi" }
+  "_obuild/ocplib-resto-directory/restoDirectory_impl.cmx"
+    { "directory/functor/restoDirectory_impl.cmx" }
   "?_obuild/ocplib-resto-directory/restoDirectory_impl.cmt"
     { "directory/functor/restoDirectory_impl.cmt" }
 
@@ -34,6 +38,8 @@ lib: [
   "src/restoDirectory.ml" { "directory/restoDirectory.ml" }
   "_obuild/ocplib-resto-directory/restoDirectory.cmi"
      { "directory/restoDirectory.cmi" }
+  "_obuild/ocplib-resto-directory/restoDirectory.cmx"
+     { "directory/restoDirectory.cmx" }
   "?_obuild/ocplib-resto-directory/restoDirectory.cmti"
      { "directory/restoDirectory.cmti" }
   "?_obuild/ocplib-resto-directory/restoDirectory.cmt"
@@ -45,6 +51,8 @@ lib: [
      { "directory/ezRestoDirectory.ml" }
   "_obuild/ocplib-resto-directory/ezRestoDirectory.cmi"
      { "directory/ezRestoDirectory.cmi" }
+  "_obuild/ocplib-resto-directory/ezRestoDirectory.cmx"
+     { "directory/ezRestoDirectory.cmx" }
   "?_obuild/ocplib-resto-directory/ezRestoDirectory.cmti"
      { "directory/ezRestoDirectory.cmti" }
   "?_obuild/ocplib-resto-directory/ezRestoDirectory.cmt"
