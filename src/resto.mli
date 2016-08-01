@@ -64,8 +64,8 @@ end
 
 
 (** Services. *)
-type nonrec ('prefix, 'params, 'input, 'output) service =
-  ('prefix, 'params, 'input, 'output) service
+type ('prefix, 'params, 'input, 'output) service =
+  ('prefix, 'params, 'input, 'output) Resto_impl.service
 
 val service:
   ?description: string ->

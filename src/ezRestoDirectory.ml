@@ -32,7 +32,7 @@ module Make(Repr : Json_repr.Repr) = struct
   module Impl = RestoDirectory_impl.Make(Repr)
   open Impl
 
-  type nonrec directory = unit directory
+  type directory = unit Impl.directory
   let empty = empty
   let prefix path dir = (prefix path (map (fun _ -> ()) dir))
   let merge = merge
