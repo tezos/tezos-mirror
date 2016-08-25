@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "ocplib-resto"
-version: "0.1"
+version: "dev"
 maintainer: "Grégoire Henry <gregoire.henry@ocamlpro.com>"
 authors: "Grégoire Henry <gregoire.henry@ocamlpro.com>"
 license: "LGPL-2.1-with-OCaml-exception"
