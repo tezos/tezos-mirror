@@ -8,12 +8,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Resto_impl
-
 (** Typed path argument. *)
 module Arg : sig
 
-  type 'a arg = 'a Arg.arg
+  type 'a arg = 'a Resto.Arg.arg
   val make:
     ?descr:string ->
     name:string ->
@@ -21,7 +19,7 @@ module Arg : sig
     construct:('a -> string) ->
     'a arg
 
-  type descr = Arg.descr = {
+  type descr = Resto.Arg.descr = {
     name: string ;
     descr: string option ;
   }
@@ -38,7 +36,7 @@ end
 (** Parametrized path to services. *)
 module Path : sig
 
-  type 'params path = (unit, 'params) Path.path
+  type 'params path = (unit, 'params) Resto.Path.path
 
   val root: unit path
 
@@ -55,7 +53,7 @@ end
 
 (** Services. *)
 type ('params, 'input, 'output) service =
-  (unit, 'params, 'input, 'output) Resto_impl.service
+  (unit, 'params, 'input, 'output) Resto.service
 
 val service:
   ?description: string ->
@@ -90,25 +88,25 @@ end
 module Description : sig
 
   type service_descr =
-    Description.service_descr = {
+    Resto.Description.service_descr = {
     description: string option ;
     input: Json_schema.schema ;
     output: Json_schema.schema ;
   }
 
   type directory_descr =
-    Description.directory_descr =
+    Resto.Description.directory_descr =
     | Static of static_directory_descr
     | Dynamic of string option
 
   and static_directory_descr =
-    Description.static_directory_descr = {
+    Resto.Description.static_directory_descr = {
     service: service_descr option ;
     subdirs: static_subdirectories_descr option ;
   }
 
   and static_subdirectories_descr =
-    Description.static_subdirectories_descr =
+    Resto.Description.static_subdirectories_descr =
     | Suffixes of directory_descr Map.Make(String).t
     | Arg of Arg.descr * directory_descr
 

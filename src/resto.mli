@@ -8,12 +8,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Resto_impl
-
 (** Typed path argument. *)
 module Arg : sig
 
-  type 'a arg = 'a Arg.arg
+  type 'a arg
   val make:
     ?descr:string ->
     name:string ->
@@ -21,7 +19,7 @@ module Arg : sig
     construct:('a -> string) ->
     'a arg
 
-  type descr = Arg.descr = {
+  type descr = {
     name: string ;
     descr: string option ;
   }
@@ -38,8 +36,7 @@ end
 (** Parametrized path to services. *)
 module Path : sig
 
-  type ('prefix, 'params) path =
-    ('prefix, 'params) Path.path
+  type ('prefix, 'params) path
   type 'prefix context = ('prefix, 'prefix) path
 
   val root: 'a context
@@ -64,8 +61,7 @@ end
 
 
 (** Services. *)
-type ('prefix, 'params, 'input, 'output) service =
-  ('prefix, 'params, 'input, 'output) Resto_impl.service
+type ('prefix, 'params, 'input, 'output) service
 
 val service:
   ?description: string ->
@@ -105,26 +101,22 @@ end
 (** Service directory description *)
 module Description : sig
 
-  type service_descr =
-    Description.service_descr = {
+  type service_descr = {
     description: string option ;
     input: Json_schema.schema ;
     output: Json_schema.schema ;
   }
 
   type directory_descr =
-    Description.directory_descr =
     | Static of static_directory_descr
     | Dynamic of string option
 
-  and static_directory_descr =
-    Description.static_directory_descr = {
+  and static_directory_descr = {
     service: service_descr option ;
     subdirs: static_subdirectories_descr option ;
   }
 
   and static_subdirectories_descr =
-    Description.static_subdirectories_descr =
     | Suffixes of directory_descr Map.Make(String).t
     | Arg of Arg.descr * directory_descr
 
@@ -138,3 +130,59 @@ module Description : sig
 
 end
 
+
+(**/**)
+
+module Internal : sig
+
+  module Ty : sig
+
+    exception Not_equal
+    type (_, _) eq = Eq : ('a, 'a) eq
+
+    type 'a id
+    val eq : 'a id -> 'b id -> ('a, 'b) eq
+
+  end
+
+  type 'a arg = {
+    id: 'a Ty.id;
+    destruct: string -> ('a, string) result ;
+    construct: 'a -> string ;
+    descr: Arg.descr ;
+  }
+
+  val from_arg : 'a arg -> 'a Arg.arg
+  val to_arg : 'a Arg.arg -> 'a arg
+
+  type (_, _) rpath =
+    | Root : ('rkey, 'rkey) rpath
+    | Static : ('rkey, 'key) rpath * string -> ('rkey, 'key) rpath
+    | Dynamic : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a) rpath
+
+  type (_, _) path =
+    | Path: ('prefix, 'params) rpath -> ('prefix, 'params) path
+    | MappedPath:
+        ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
+      ('prefix, 'params) path
+
+  val from_path : ('a, 'b) path -> ('a, 'b) Path.path
+  val to_path : ('a, 'b) Path.path -> ('a, 'b) path
+
+  type ('prefix, 'params, 'input, 'output) iservice = {
+    description : string option ;
+    path : ('prefix, 'params) path ;
+    input : 'input Json_encoding.encoding ;
+    output : 'output Json_encoding.encoding ;
+  }
+
+  val from_service:
+    ('prefix, 'params, 'input, 'output) iservice ->
+     ('prefix, 'params, 'input, 'output) service
+  val to_service:
+    ('prefix, 'params, 'input, 'output) service ->
+    ('prefix, 'params, 'input, 'output) iservice
+
+end
+
+(**/**)

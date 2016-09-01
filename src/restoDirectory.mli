@@ -183,3 +183,13 @@ module Make (Repr : Json_repr.Repr) : sig
 end
 
 include (module type of Make (Json_repr.Ezjsonm))
+
+module Internal : sig
+
+  type (_,_,_,_,_,_) conv =
+    | Z : (unit, 'g, 'g, unit, 'f, 'f) conv
+    | S : ('t, 'g, 'b * 's, 'rt, 'f, 'r) conv ->
+      ('t * 'b, 'g, 's, 'a * 'rt, 'a -> 'f, 'r) conv
+  val curry : ('a, 'b, unit, 'b, 'c, 'd) conv -> 'c -> 'a -> 'd
+
+end

@@ -11,7 +11,6 @@ begin library "ocplib-resto"
     "ocplib-json-typed"
   ]
   files = [
-    "resto_impl.ml"
     "resto.ml"
     "ezResto.ml"
   ]
@@ -22,7 +21,6 @@ begin library "ocplib-resto-directory"
     "ocplib-resto"
   ]
   files = [
-    "restoDirectory_impl.ml"
     "restoDirectory.ml"
     "ezRestoDirectory.ml"
   ]

@@ -2,10 +2,6 @@ lib: [
 
   "src/META"
 
-  "src/resto_impl.ml" { "functor/resto_impl.ml" }
-  "_obuild/ocplib-resto/resto_impl.cmi" { "functor/resto_impl.cmi" }
-  "?_obuild/ocplib-resto/resto_impl.cmt" { "functor/resto_impl.cmt" }
-
   "src/resto.mli"
   "src/resto.ml"
   "_obuild/ocplib-resto/resto.cmi"
@@ -24,15 +20,6 @@ lib: [
   "?_obuild/ocplib-resto/ocplib-resto.cmxa"
   "?_obuild/ocplib-resto/ocplib-resto.cmxs"
   "?_obuild/ocplib-resto/ocplib-resto.a"
-
-  "src/restoDirectory_impl.ml"
-    { "directory/functor/restoDirectory_impl.ml" }
-  "_obuild/ocplib-resto-directory/restoDirectory_impl.cmi"
-    { "directory/functor/restoDirectory_impl.cmi" }
-  "_obuild/ocplib-resto-directory/restoDirectory_impl.cmx"
-    { "directory/functor/restoDirectory_impl.cmx" }
-  "?_obuild/ocplib-resto-directory/restoDirectory_impl.cmt"
-    { "directory/functor/restoDirectory_impl.cmt" }
 
   "src/restoDirectory.mli" { "directory/restoDirectory.mli" }
   "src/restoDirectory.ml" { "directory/restoDirectory.ml" }

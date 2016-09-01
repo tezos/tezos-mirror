@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Resto_impl
+open Resto
 
 type json = Json_repr.Ezjsonm.value
 module Arg = Arg
@@ -22,7 +22,7 @@ module Path = struct
   let map = Path.map
 end
 type ('params, 'input, 'output) service =
-  (unit, 'params, 'input, 'output) Resto_impl.service
+  (unit, 'params, 'input, 'output) Resto.service
 let service = service
 let forge_request = forge_request
 let read_answer = read_answer

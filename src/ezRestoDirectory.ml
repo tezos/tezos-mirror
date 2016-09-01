@@ -8,28 +8,29 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Resto_impl
-open RestoDirectory_impl
+open Resto
+open RestoDirectory
+open Lwt
 
-module Answer = RestoDirectory_impl.Answer
+module Answer = RestoDirectory.Answer
 
-open RestoDirectory_impl.Answer
+open RestoDirectory.Answer
 
-exception Cannot_parse = RestoDirectory_impl.Cannot_parse
-type step = RestoDirectory_impl.step =
+exception Cannot_parse = RestoDirectory.Cannot_parse
+type step = RestoDirectory.step =
   | Static of string
   | Dynamic of Arg.descr
 
-type conflict = RestoDirectory_impl.conflict =
+type conflict = RestoDirectory.conflict =
   | CService | CDir | CBuilder | CCustom
   | CTypes of Arg.descr * Arg.descr
   | CType of Arg.descr * string list
 
-exception Conflict = RestoDirectory_impl.Conflict
+exception Conflict = RestoDirectory.Conflict
 
 module Make(Repr : Json_repr.Repr) = struct
 
-  module Impl = RestoDirectory_impl.Make(Repr)
+  module Impl = RestoDirectory.Make(Repr)
   open Impl
 
   type directory = unit Impl.directory
@@ -52,11 +53,11 @@ module Make(Repr : Json_repr.Repr) = struct
       (fun p -> builder p >>= fun dir -> Lwt.return (map (fun _ -> ()) dir))
 
   let register_dynamic_directory1 ?descr root s f =
-    register_dynamic_directory ?descr root s (curry (S Z) f)
+    register_dynamic_directory ?descr root s Internal.(curry (S Z) f)
   let register_dynamic_directory2 ?descr root s f =
-    register_dynamic_directory ?descr root s (curry (S (S Z)) f)
+    register_dynamic_directory ?descr root s Internal.(curry (S (S Z)) f)
   let register_dynamic_directory3 ?descr root s f =
-    register_dynamic_directory ?descr root s (curry (S (S (S Z))) f)
+    register_dynamic_directory ?descr root s Internal.(curry (S (S (S Z))) f)
 
   type custom_lookup = Impl.custom_lookup =
     | CustomService of Description.service_descr *
