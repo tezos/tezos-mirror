@@ -262,35 +262,58 @@ module Make(Repr : Json_repr.Repr) = struct
   let merge x y = merge [] x y
 
   let rec describe_directory
-    : type a p. ?recurse:bool -> a directory -> Description.directory_descr
-    = fun ?(recurse = true) dir ->
+    : type a p. ?recurse:bool -> ?arg:a -> a directory -> Description.directory_descr Lwt.t
+    = fun ?(recurse = true) ?arg dir ->
       match dir with
       | Map (_, dir) -> describe_directory ~recurse dir
-      | Dynamic (descr,_) -> Dynamic descr
-      | Custom (descr,_) -> Dynamic descr
-      | Static dir -> Static (describe_static_directory recurse dir)
+      | Dynamic (descr, builder) -> begin
+          match arg with
+          | None ->
+              Lwt.return (Dynamic descr : Description.directory_descr)
+          | Some arg ->
+              builder arg >>= fun dir -> describe_directory ~recurse dir
+        end
+      | Custom (descr, lookup) ->
+          Lwt.return (Dynamic descr : Description.directory_descr)
+      | Static dir ->
+          describe_static_directory recurse arg dir >>= fun dir ->
+          Lwt.return (Static dir : Description.directory_descr)
 
   and describe_static_directory
     : type a p.
-      bool -> a static_directory -> Description.static_directory_descr
-    = fun recurse dir ->
+      bool -> a option -> a static_directory ->
+      Description.static_directory_descr Lwt.t
+    = fun recurse arg dir ->
       let service = map_option describe_service dir.service in
       if not recurse && service = None then raise Not_found ;
-      let subdirs =
+      begin
         if recurse
-        then map_option describe_static_subdirectories dir.subdirs
-        else None in
-      { service ; subdirs }
+        then match dir.subdirs with
+          | None -> Lwt.return_none
+          | Some subdirs ->
+              describe_static_subdirectories arg subdirs >>= fun dirs ->
+              Lwt.return (Some dirs)
+        else Lwt.return_none
+      end >>= fun subdirs ->
+      Lwt.return ({ service ; subdirs } : Description.static_directory_descr)
 
   and describe_static_subdirectories
     : type a p.
-      a static_subdirectories -> Description.static_subdirectories_descr
-    = fun dir ->
+      a option -> a static_subdirectories ->
+      Description.static_subdirectories_descr Lwt.t
+    = fun arg dir ->
       match dir with
       | Suffixes map ->
-          Suffixes (StringMap.map describe_directory map)
-      | Arg (arg,dir) ->
-          Arg (arg.descr, describe_directory dir)
+          StringMap.fold (fun key dir map ->
+              map >>= fun map ->
+              describe_directory ~recurse:true ?arg dir >>= fun dir ->
+              Lwt.return (StringMap.add key dir map))
+            map (Lwt.return StringMap.empty) >>= fun map ->
+          Lwt.return (Suffixes map : Description.static_subdirectories_descr)
+      | Arg (arg, dir) ->
+          describe_directory ~recurse:true dir >>= fun dir ->
+          Lwt.return (Arg (arg.descr, dir)
+                      : Description.static_subdirectories_descr)
 
   and describe_service
     : type a p.
@@ -302,9 +325,9 @@ module Make(Repr : Json_repr.Repr) = struct
             input = Json_encoding.schema input ;
             output = Json_encoding.schema output }
 
-  let pp_print_directory ppf dir =
-    Format.fprintf ppf "%a@."
-      Description.pp_print_directory_descr (describe_directory dir)
+  (* let pp_print_directory ppf dir = *)
+    (* Format.fprintf ppf "%a@." *)
+      (* Description.pp_print_directory_descr (describe_directory dir) *)
 
 
   (****************************************************************************
@@ -386,31 +409,12 @@ module Make(Repr : Json_repr.Repr) = struct
           | CustomDirectory _ -> Lwt.fail Not_found
         end
 
-(*
-let describe_service
-  : type a p. a directory -> a -> string list -> Description.service_descr
-  = fun dir args path ->
-    let Dir (dir, args) = resolve [] dir args path in
-    match dir with
-    | Static dir -> begin
-        match dir.service with
-        | None -> raise Not_found
-        | Some (RegistredService (descr,_,_)) -> descr
-      end
-    | Dynamic (_,_) -> assert false
-    | Custom (_,lookup) -> begin
-        match lookup args [] with
-        | CustomService (descr, _) -> descr
-        | CustomDirectory _ -> raise Not_found
-      end
-*)
-
   let describe_directory
     : type a p.
       ?recurse:bool -> a directory -> a -> string list -> Description.directory_descr Lwt.t
     = fun ?recurse dir args path ->
-      resolve [] dir args path >|= fun (Dir (dir, _)) ->
-      describe_directory ?recurse dir
+      resolve [] dir args path >>= fun (Dir (dir, arg)) ->
+      describe_directory ?recurse ~arg dir
 
 
 
