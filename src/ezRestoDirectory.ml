@@ -60,7 +60,7 @@ module Make(Repr : Json_repr.Repr) = struct
 
   type custom_lookup = Impl.custom_lookup =
     | CustomService of Description.service_descr *
-                       (Repr.value -> Repr.value answer Lwt.t)
+                       (Repr.value option -> Repr.value answer Lwt.t)
     | CustomDirectory of Description.directory_descr
 
   let register_custom_lookup = register_custom_lookup

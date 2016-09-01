@@ -63,7 +63,7 @@ module Make (Repr : Json_repr.Repr) : sig
   (** Resolve a service. *)
   val lookup:
     'prefix directory -> 'prefix -> string list ->
-    (Repr.value -> Repr.value Answer.answer Lwt.t) Lwt.t
+    (Repr.value option -> Repr.value Answer.answer Lwt.t) Lwt.t
 
 
   (** Registring handler in service tree. *)
@@ -142,7 +142,7 @@ module Make (Repr : Json_repr.Repr) : sig
   (** Registring custom directory lookup. *)
   type custom_lookup =
     | CustomService of Description.service_descr *
-                       (Repr.value -> Repr.value Answer.answer Lwt.t)
+                       (Repr.value option -> Repr.value Answer.answer Lwt.t)
     | CustomDirectory of Description.directory_descr
 
   val register_custom_lookup:

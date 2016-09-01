@@ -126,7 +126,7 @@ module Make(Repr : Json_repr.Repr) = struct
 
   and custom_lookup =
     | CustomService of Description.service_descr *
-                       (Repr.value -> Repr.value answer Lwt.t)
+                       (Repr.value option -> Repr.value answer Lwt.t)
     | CustomDirectory of Description.directory_descr
 
   let empty = Static { service = None ; subdirs = None }
@@ -331,7 +331,7 @@ module Make(Repr : Json_repr.Repr) = struct
   let lookup
     : type a p.
       a directory -> a -> string list ->
-      (Repr.value -> Repr.value answer Lwt.t) Lwt.t
+      (Repr.value option -> Repr.value answer Lwt.t) Lwt.t
     = fun dir args path ->
       resolve [] dir args path >>= fun (Dir (dir, args)) ->
       match dir with
@@ -339,24 +339,36 @@ module Make(Repr : Json_repr.Repr) = struct
           match dir.service with
           | None -> raise Not_found
           | Some (RegistredService (_, input, output, handler)) ->
-              let call (json: Repr.value) : Repr.value answer Lwt.t =
-                match destruct input json with
-                | exception exn ->
-                    let body =
-                      let msg =
-                        Format.asprintf "%a"
-                          (fun ppf -> Json_encoding.print_error ppf) exn in
-                      Repr.repr @@
-                      `O [ "error",
-                           Repr.repr @@
-                           `String "input has wrong JSON structure" ;
-                           "msg", Repr.repr @@
-                           `String msg ] in
-                    Lwt.return { code = 400 ; body = Single body }
-                | input ->
-                    Lwt.map
-                      (Answer.map (fun x -> construct output x))
-                      (handler args input) in
+              let call (json: Repr.value option) : Repr.value answer Lwt.t =
+                match json with
+                | None -> begin
+                    match destruct input (Repr.repr (`O [])) with
+                    | exception exn ->
+                        Lwt.return { code = 405 ; body = Empty }
+                    | input ->
+                        Lwt.map
+                          (Answer.map (fun x -> construct output x))
+                          (handler args input)
+                  end
+                | Some json -> begin
+                    match destruct input json with
+                    | exception exn ->
+                        let body =
+                          let msg =
+                            Format.asprintf "%a"
+                              (fun ppf -> Json_encoding.print_error ppf) exn in
+                          Repr.repr @@
+                          `O [ "error",
+                               Repr.repr @@
+                               `String "input has wrong JSON structure" ;
+                               "msg", Repr.repr @@
+                               `String msg ] in
+                        Lwt.return { code = 400 ; body = Single body }
+                    | input ->
+                        Lwt.map
+                          (Answer.map (fun x -> construct output x))
+                          (handler args input)
+                  end in
               Lwt.return call
         end
       | Map _ | Dynamic (_,_) -> assert false
@@ -549,10 +561,13 @@ let describe_service
       let lookup args path =
         let handler json =
           let recurse =
-            match destruct input json with
-            | exception _ -> false
+            match json with
             | None -> false
-            | Some b -> b in
+            | Some json ->
+                match destruct input json with
+                | exception _ -> false
+                | None -> false
+                | Some b -> b in
           describe_directory ~recurse !dir args path >>= fun d ->
           return (construct output d) in
         Lwt.return (CustomService (descr, handler)) in
