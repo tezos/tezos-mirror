@@ -96,7 +96,7 @@ module Arg = struct
 
   let eq a b = Ty.eq a.id b.id
 
-  let make ?descr ~name ~destruct ~construct =
+  let make ?descr ~name ~destruct ~construct () =
     let id = Ty.new_id () in
     let descr = { name ; descr } in
     { descr ; id ; construct ; destruct }
@@ -115,25 +115,25 @@ module Arg = struct
       try Ok (int_of_string s)
       with Failure _ ->
         Error (Printf.sprintf "Cannot parse integer value: %S." s) in
-    make "int" int_of_string string_of_int
+    make "int" int_of_string string_of_int ()
   let float =
     let float_of_string s =
       try Ok (float_of_string s)
       with Failure _ ->
         Error (Printf.sprintf "Cannot parse float value: %S." s) in
-    make "float" float_of_string string_of_float
+    make "float" float_of_string string_of_float ()
   let int32 =
     let int32_of_string s =
       try Ok (Int32.of_string s)
       with Failure _ ->
         Error (Printf.sprintf "Cannot parse int32 value: %S." s) in
-    make "int32" int32_of_string Int32.to_string
+    make "int32" int32_of_string Int32.to_string ()
   let int64 =
     let int64_of_string s =
       try Ok (Int64.of_string s)
       with Failure _ ->
         Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
-    make "int64" int64_of_string Int64.to_string
+    make "int64" int64_of_string Int64.to_string ()
 
 end
 
