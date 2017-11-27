@@ -9,69 +9,73 @@
 (**************************************************************************)
 
 open Resto
+open Lwt.Infix
+
 open RestoDirectory
-open Lwt
+module Directory = RestoDirectory.MakeDirectory(RestoJson.Encoding)
+open Directory
 
-module Answer = RestoDirectory.Answer
+module Answer = Answer
 
-open RestoDirectory.Answer
-
-exception Cannot_parse = RestoDirectory.Cannot_parse
-type step = RestoDirectory.step =
+type step = Directory.step =
   | Static of string
   | Dynamic of Arg.descr
+  | DynamicTail of Arg.descr
 
-type conflict = RestoDirectory.conflict =
-  | CService | CDir | CBuilder | CCustom
+type conflict = Directory.conflict =
+  | CService of meth | CDir | CBuilder | CTail
   | CTypes of Arg.descr * Arg.descr
   | CType of Arg.descr * string list
 
-exception Conflict = RestoDirectory.Conflict
+exception Conflict = Directory.Conflict
 
-module Make(Repr : Json_repr.Repr) = struct
+type directory = unit Directory.directory
+let empty = empty
+let prefix path dir = (prefix path (map (fun _ -> ()) dir))
+let merge = merge
 
-  module Impl = RestoDirectory.Make(Repr)
-  open Impl
+let register d s h = register d s h
+let register0 d s h = register0 d s h
+let register1 d s h = register1 d s h
+let register2 d s h = register2 d s h
+let register3 d s h = register3 d s h
+let register4 d s h = register4 d s h
+let register5 d s h = register5 d s h
 
-  type directory = unit Impl.directory
-  let empty = empty
-  let prefix path dir = (prefix path (map (fun _ -> ()) dir))
-  let merge = merge
+let register_dynamic_directory ?descr dir path builder =
+  register_dynamic_directory ?descr dir path
+    (fun p -> builder p >>= fun dir -> Lwt.return (map (fun _ -> ()) dir))
 
-  let lookup tree = lookup tree ()
+let register_dynamic_directory1 ?descr root s f =
+  register_dynamic_directory ?descr root s Curry.(curry (S Z) f)
+let register_dynamic_directory2 ?descr root s f =
+  register_dynamic_directory ?descr root s Curry.(curry (S (S Z)) f)
+let register_dynamic_directory3 ?descr root s f =
+  register_dynamic_directory ?descr root s Curry.(curry (S (S (S Z))) f)
 
-  let register d s h = register d s h
-  let register0 d s h = register0 d s h
-  let register1 d s h = register1 d s h
-  let register2 d s h = register2 d s h
-  let register3 d s h = register3 d s h
-  let register4 d s h = register4 d s h
-  let register5 d s h = register5 d s h
+let register_describe_directory_service =
+  register_describe_directory_service
 
-  let register_dynamic_directory ?descr dir path builder =
-    register_dynamic_directory ?descr dir path
-      (fun p -> builder p >>= fun dir -> Lwt.return (map (fun _ -> ()) dir))
+type 'input input = 'input Service.input =
+  | No_input : unit input
+  | Input : 'input Json_encoding.encoding -> 'input input
 
-  let register_dynamic_directory1 ?descr root s f =
-    register_dynamic_directory ?descr root s Internal.(curry (S Z) f)
-  let register_dynamic_directory2 ?descr root s f =
-    register_dynamic_directory ?descr root s Internal.(curry (S (S Z)) f)
-  let register_dynamic_directory3 ?descr root s f =
-    register_dynamic_directory ?descr root s Internal.(curry (S (S (S Z))) f)
+type ('q, 'i, 'o, 'e) types = ('q, 'i, 'o, 'e) Directory.types = {
+  query : 'q Resto.Query.t ;
+  input : 'i Service.input ;
+  output : 'o Json_encoding.encoding ;
+  error : 'e Json_encoding.encoding ;
+}
 
-  type custom_lookup = Impl.custom_lookup =
-    | CustomService of Description.service_descr *
-                       (Repr.value option -> Repr.value answer Lwt.t)
-    | CustomDirectory of Description.directory_descr
+type registred_service = Directory.registred_service =
+  | Service :
+      { types : ('q, 'i, 'o, 'e) types ;
+        handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
+      } -> registred_service
 
-  let register_custom_lookup = register_custom_lookup
-  let register_custom_lookup1 = register_custom_lookup1
-  let register_custom_lookup2 = register_custom_lookup2
-  let register_custom_lookup3 = register_custom_lookup3
+type lookup_error = Directory.lookup_error
 
-  let register_describe_directory_service =
-    register_describe_directory_service
-
-end
-
-include Make(Json_repr.Ezjsonm)
+let lookup directory args query =
+  Directory.lookup directory () args query
+let allowed_methods dir path = Directory.allowed_methods dir () path
+let transparent_lookup = Directory.transparent_lookup

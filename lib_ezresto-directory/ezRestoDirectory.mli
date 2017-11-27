@@ -13,23 +13,22 @@ open EzResto
 module Answer : sig
 
   (** Return type for service handler *)
-  type 'a answer =
-    { code : int ;
-      body : 'a output ;
-    }
-
-  and 'a output =
-    | Empty
-    | Single of 'a
-    | Stream of 'a stream
+  type ('o, 'e) t =
+    [ `Ok of 'o (* 200 *)
+    | `OkStream of 'o stream (* 200 *)
+    | `Created of string option (* 201 *)
+    | `No_content (* 204 *)
+    | `Unauthorized of 'e option (* 401 *)
+    | `Forbidden of 'e option (* 403 *)
+    | `Not_found of 'e option (* 404 *)
+    | `Conflict of 'e option (* 409 *)
+    | `Error of 'e option (* 500 *)
+    ]
 
   and 'a stream = {
     next: unit -> 'a option Lwt.t ;
     shutdown: unit -> unit ;
   }
-
-  val ok: 'a -> 'a answer
-  val return: 'a -> 'a answer Lwt.t
 
 end
 
@@ -37,150 +36,135 @@ end
 type step =
   | Static of string
   | Dynamic of Arg.descr
+  | DynamicTail of Arg.descr
+
 type conflict =
-  | CService | CDir | CBuilder | CCustom
+  | CService of meth | CDir | CBuilder | CTail
   | CTypes of Arg.descr * Arg.descr
   | CType of Arg.descr * string list
+
 exception Conflict of step list * conflict
 
-exception Cannot_parse of Arg.descr * string * string list
+(** Dispatch tree *)
+type directory
 
-module Make (Repr : Json_repr.Repr) : sig
+(** Empty tree *)
+val empty: directory
 
-  (** Dispatch tree *)
-  type directory
+val prefix: 'a Path.t -> directory -> directory
+val merge: directory -> directory -> directory
 
-  (** Empty tree *)
-  val empty: directory
+type 'input input =
+  | No_input : unit input
+  | Input : 'input Json_encoding.encoding -> 'input input
 
-  val prefix: 'a Path.path -> directory -> directory
-  val merge: directory -> directory -> directory
+type ('q, 'i, 'o, 'e) types = {
+  query : 'q Resto.Query.t ;
+  input : 'i input ;
+  output : 'o Json_encoding.encoding ;
+  error : 'e Json_encoding.encoding ;
+}
 
-  (** Resolve a service. *)
-  val lookup:
-    directory -> string list ->
-    (Repr.value option -> Repr.value Answer.answer Lwt.t) Lwt.t
+type registred_service =
+  | Service :
+      { types : ('q, 'i, 'o, 'e) types ;
+        handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
+      } -> registred_service
 
+type lookup_error =
+  [ `Not_found (* 404 *)
+  | `Method_not_allowed of meth list (* 405 *)
+  | `Cannot_parse_path of string list * Arg.descr * string (* 400 *)
+  ]
 
-  (** Registring handler in service tree. *)
-  val register:
-    directory ->
-    ('params, 'input, 'output) service ->
-    ('params -> 'input -> 'output Answer.answer Lwt.t) ->
-    directory
+(** Resolve a service. *)
+val lookup: directory -> meth -> string list -> (registred_service, [> lookup_error ]) result Lwt.t
 
-  (** Registring handler in service tree. Curryfied variant.  *)
-  val register0:
-    directory ->
-    (unit, 'i, 'o) service ->
-    ('i -> 'o Answer.answer Lwt.t) ->
-    directory
+val allowed_methods:
+  directory -> string list ->
+  (meth list, [> lookup_error ]) result Lwt.t
 
-  val register1:
-    directory ->
-    (unit * 'a, 'i, 'o) service ->
-    ('a -> 'i -> 'o Answer.answer Lwt.t) ->
-    directory
-
-  val register2:
-    directory ->
-    ((unit * 'a) * 'b, 'i, 'o) service ->
-    ('a -> 'b -> 'i -> 'o Answer.answer Lwt.t) ->
-    directory
-
-  val register3:
-    directory ->
-    (((unit * 'a) * 'b) * 'c, 'i, 'o) service ->
-    ('a -> 'b -> 'c -> 'i -> 'o Answer.answer Lwt.t) ->
-    directory
-
-  val register4:
-    directory ->
-    ((((unit * 'a) * 'b) * 'c) * 'd, 'i, 'o) service ->
-    ('a -> 'b -> 'c -> 'd -> 'i -> 'o Answer.answer Lwt.t) ->
-    directory
-
-  val register5:
-    directory ->
-    (((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'i, 'o) service ->
-    ('a -> 'b -> 'c -> 'd -> 'e -> 'i -> 'o Answer.answer Lwt.t) ->
-    directory
-
-  (** Registring dynamic subtree. *)
-  val register_dynamic_directory:
-    ?descr:string ->
-    directory ->
-    'params Path.path ->
-    ('params -> directory Lwt.t) ->
-    directory
-
-  (** Registring dynamic subtree. (Curryfied variant) *)
-  val register_dynamic_directory1:
-    ?descr:string ->
-    directory ->
-    (unit * 'a) Path.path ->
-    ('a -> directory Lwt.t) ->
-    directory
-
-  val register_dynamic_directory2:
-    ?descr:string ->
-    directory ->
-    ((unit * 'a) * 'b) Path.path ->
-    ('a -> 'b -> directory Lwt.t) ->
-    directory
-
-  val register_dynamic_directory3:
-    ?descr:string ->
-    directory ->
-    (((unit * 'a) * 'b) * 'c) Path.path ->
-    ('a -> 'b -> 'c -> directory Lwt.t) ->
-    directory
-
-  (** Registring dynamic subtree. (Curryfied variant) *)
+val transparent_lookup:
+  directory ->
+  ('meth, 'params, 'query, 'input, 'output, 'error) EzResto.service ->
+  'params -> 'query -> 'input -> [> ('output, 'error) Answer.t ] Lwt.t
 
 
-  (** Registring custom directory lookup. *)
-  type custom_lookup =
-    | CustomService of Description.service_descr *
-                       (Repr.value option -> Repr.value Answer.answer Lwt.t)
-    | CustomDirectory of Description.directory_descr
+(** Registring handler in service tree. *)
+val register:
+  directory ->
+  ('meth, 'params, 'query, 'input, 'output, 'error) EzResto.service ->
+  ('params -> 'query -> 'input -> ('output, 'error) Answer.t Lwt.t) ->
+  directory
 
-  val register_custom_lookup:
-    ?descr:string ->
-    directory ->
-    ('params) Path.path ->
-    ('params -> string list -> custom_lookup Lwt.t) ->
-    directory
+(** Registring handler in service tree. Curryfied variant.  *)
+val register0:
+  directory ->
+  ('meth, unit, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
-  val register_custom_lookup1:
-    ?descr:string ->
-    directory ->
-    (unit * 'a) Path.path ->
-    ('a -> string list -> custom_lookup Lwt.t) ->
-    directory
+val register1:
+  directory ->
+  ('meth, unit * 'a, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('a -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
-  val register_custom_lookup2:
-    ?descr:string ->
-    directory ->
-    ((unit * 'a) * 'b) Path.path ->
-    ('a -> 'b -> string list -> custom_lookup Lwt.t) ->
-    directory
+val register2:
+  directory ->
+  ('meth, (unit * 'a) * 'b, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('a -> 'b -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
-  val register_custom_lookup3:
-    ?descr:string ->
-    directory ->
-    (((unit * 'a) * 'b) * 'c) Path.path ->
-    ('a -> 'b -> 'c -> string list -> custom_lookup Lwt.t) ->
-    directory
+val register3:
+  directory ->
+  ('meth, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('a -> 'b -> 'c -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
+val register4:
+  directory ->
+  ('meth, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
-  (** Registring a description service. *)
-  val register_describe_directory_service:
-    directory ->
-    (unit, bool option, Description.directory_descr) service ->
-    directory
+val register5:
+  directory ->
+  ('meth, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o, 'e) EzResto.service ->
+  ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
+  directory
 
-end
+(** Registring dynamic subtree. *)
+val register_dynamic_directory:
+  ?descr:string ->
+  directory ->
+  'params Path.t ->
+  ('params -> directory Lwt.t) ->
+  directory
 
-include (module type of Make (Json_repr.Ezjsonm))
+(** Registring dynamic subtree. (Curryfied variant) *)
+val register_dynamic_directory1:
+  ?descr:string ->
+  directory ->
+  (unit * 'a) Path.t ->
+  ('a -> directory Lwt.t) ->
+  directory
+
+val register_dynamic_directory2:
+  ?descr:string ->
+  directory ->
+  ((unit * 'a) * 'b) Path.t ->
+  ('a -> 'b -> directory Lwt.t) ->
+  directory
+
+val register_dynamic_directory3:
+  ?descr:string ->
+  directory ->
+  (((unit * 'a) * 'b) * 'c) Path.t ->
+  ('a -> 'b -> 'c -> directory Lwt.t) ->
+  directory
+
+(** Registring a description service. *)
+val register_describe_directory_service:
+  directory -> EzResto.description_service -> directory
 

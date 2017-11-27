@@ -8,143 +8,105 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Resto
+open Services
+open Directory
+open RestoDirectory
+open Lwt.Infix
 
-(** Shared part *)
+let () =
+  Lwt_main.run begin
+    allowed_methods dir () ["foo";"3";"repeat"] >>= function
+    | Ok [`POST] -> Lwt.return_unit
+    | _ -> assert false
+  end
 
-let repeat_service =
-  service
-    ~input:Json_encoding.any_ezjson_value
-    ~output:Json_encoding.any_ezjson_value
-    Path.(root / "foo" /: Arg.int / "repeat")
+let () =
+  Lwt_main.run begin
+    allowed_methods dir () ["bar";"3";"4";"add"] >>= function
+    | Ok [`GET;`POST] -> Lwt.return_unit
+    | _ -> assert false
+  end
 
-let add_service =
-  service
-    ~input:Json_encoding.int
-    ~output:Json_encoding.int
-    Path.(root / "foo" /: Arg.int / "add")
+module Test(Request : sig
+    val request:
+      ('meth, unit, 'params, 'query, 'input, 'output, 'error) Service.t ->
+      'params  -> 'query -> 'input -> [> ('output, 'error) Answer.t ] Lwt.t
+  end) = struct
 
-let alternate_add_service =
-  service
-    ~input:Json_encoding.null
-    ~output:Json_encoding.float
-    Path.(root / "bar" /: Arg.int /: Arg.float / "add")
-
-let alternate_add_service' =
-  service
-    ~input:Json_encoding.null
-    ~output:Json_encoding.int
-    Path.(map
-       (fun (((),i),f) -> (i,int_of_float f))
-       (fun (i,f) -> (((),i),float_of_int f))
-       (root / "bar" /: Arg.int /: Arg.float / "add'"))
-
-let minus_service custom_root =
-  service
-    ~input:Json_encoding.null
-    ~output:Json_encoding.float
-    Path.(custom_root /: Arg.int / "minus")
-
-let describe_service =
-  Description.service Path.(root / "describe")
-
-let dummy_service =
-  service
-    ~input:Json_encoding.null
-    ~output:Json_encoding.null
-    Path.(root / "a" / "path" / "long" / "enough" /
-          "for" / "<hov>" / "to" / "trigger"
-          /: Arg.float /: Arg.float /: Arg.float /: Arg.float
-          /: Arg.float /: Arg.float /: Arg.float)
-
-let prefix_dir1 = Path.(root / "tartine" /: Arg.float / "chaussure")
-let prefix_dir2 = Path.(root / "epice" /: Arg.int)
-
-
-(** Client only *)
-
-let real_minus_service1 = minus_service prefix_dir1
-let real_minus_service2 = minus_service prefix_dir2
-
-
-(** Server only *)
-
-module Directory = RestoDirectory
-open Directory.Answer
-
-let rec repeat i json =
-  if i <= 0 then []
-  else json :: repeat (i-1) json
-
-let dir = Directory.empty
-let dir =
-  Directory.register1 dir repeat_service
-    (fun i json -> return (`A (repeat i json)))
-let dir =
-  Directory.register1 dir add_service
-    (fun i j -> return (i+j))
-let dir =
-  Directory.register2 dir alternate_add_service
-    (fun i j () -> return (float_of_int i+.j))
-let dir =
-  Directory.register dir alternate_add_service'
-    (fun (i,j) () -> return (i+j))
-let dir =
-  Directory.register dir dummy_service
-    (fun ((((((((),a), b), c), d), e), f), g) () -> return ())
-
-let prefixed_dir = Directory.empty
-let prefixed_dir =
-  Directory.register2 prefixed_dir (minus_service Path.root)
-    (fun i j () -> return (i -. float_of_int j))
-
-let dir =
-  Directory.register_dynamic_directory1 dir prefix_dir1
-    (fun _ -> Lwt.return prefixed_dir)
-let dir =
-  Directory.register_dynamic_directory1 dir
-    prefix_dir2
-    (fun _ ->
-       Lwt.return
-         (Directory.map
-            (fun ((), x) -> ((), float_of_int x))
-            prefixed_dir))
-
-let dir =
-  Directory.register_describe_directory_service
-    dir describe_service
-
-
-(** Testing faked client/server communication. *)
-
-
-let request service args arg =
-  let args, arg = forge_request service args arg in
-  match Lwt.state (Directory.lookup dir () args) with
-  | Lwt.Return handler -> begin
-    match Lwt.state (handler arg) with
-      | Lwt.Return { code = 200 ; body = Single x } -> begin
-          match read_answer service x with
-          | Ok x -> x
-          | Error msg -> failwith ("Parse error: " ^ msg)
-        end
-      | _ -> failwith "Unexpected lwt result"
+  let () =
+    Lwt_main.run begin
+      Request.request describe_service
+        ((), ["foo"; "3"]) { recurse = true } () >>= function
+      | `Ok dir ->
+          Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+          Lwt.return_unit
+      | _ -> assert false
     end
-  | _ -> failwith "Unexpected lwt result"
 
-let () =
-  let dir = request describe_service () (Some true) in
-  Format.printf "@[<v>%a@]@." Description.pp_print_directory_descr dir
+  let () =
+    Lwt_main.run begin
+      Request.request describe_service
+        ((), ["bar"; "3" ; "2." ; "add"]) { recurse = false } () >>= function
+      | `Ok dir ->
+          Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+          Lwt.return_unit ;
+      | _ -> assert false
+    end
 
-let () =
-  let test service args arg expected = request service args arg = expected in
-  assert (test repeat_service ((), 3) (`A []) (`A (repeat 3 (`A [])))) ;
-  assert (test add_service ((), 2) 3 5) ;
-  assert (test alternate_add_service (((), 1), 2.5) () 3.5) ;
-  assert (test real_minus_service1 (((), 2.5), 1) () 1.5) ;
-  assert (test real_minus_service2 (((), 2), 1) () 1.) ;
-  assert (test alternate_add_service' (1, 2) () 3) ;
-  ()
+  let () =
+    Lwt_main.run begin
+      Request.request describe_service ((), []) { recurse = true } () >>= function
+      | `Ok dir ->
+          Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+          Lwt.return_unit ;
+      | _ -> assert false
+    end
+
+  let () =
+    let test service args arg expected =
+      Lwt_main.run (Request.request service args () arg) = (`Ok expected) in
+    assert (test repeat_service ((), 3) (`A []) (`A (repeat 3 (`A [])))) ;
+    assert (test add_service ((), 2) 3 5) ;
+    assert (test alternate_add_service (((), 1), 2.5) () 3.5) ;
+    assert (test real_minus_service1 (((), 2.5), 1) () 1.5) ;
+    assert (test alternate_add_service' (1, 2) () 3) ;
+    ()
+
+end
+
+module Faked = Test(struct
+    (** Testing faked client/server communication. *)
+    let request (type i) (service: (_,_,_,_,i,_,_) Service.t) params query arg =
+      let { Service.meth ; path ; query ; input } = Service.forge_request service params query in
+      let uri =
+        Uri.make
+          ~path:(String.concat "/" path)
+          ~query:(List.map (fun (k,v) -> k, [v]) query) () in
+      Format.eprintf "\nREQUEST: %a@." Uri.pp_hum uri ;
+      let json =
+        match input with
+        | Service.No_input -> `O []
+        | Service.Input input -> Json_encoding.construct input arg in
+      lookup dir () meth path >>= function
+      | Ok (Service s) -> begin
+          let query = Resto.Query.parse s.types.query query in
+          begin
+            match s.types.input with
+            | Service.No_input -> s.handler query ()
+            | Service.Input input ->
+                s.handler query @@ Json_encoding.destruct input json
+          end >>= function
+          | `Ok res ->
+              let json = Json_encoding.construct s.types.output res in
+              Lwt.return (`Ok (Json_encoding.destruct (Service.output_encoding service) json))
+          | _ -> failwith "Unexpected lwt result (1)"
+        end
+      | _ -> failwith "Unexpected lwt result (2)"
+  end)
+
+module Transparent = Test(struct
+    let request x = transparent_lookup dir x
+  end)
 
 let () =
   Printf.printf "\n### OK Resto ###\n\n%!"

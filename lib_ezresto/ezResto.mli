@@ -8,10 +8,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
+
 (** Typed path argument. *)
 module Arg : sig
 
-  type 'a arg = 'a Resto.Arg.arg
+  type 'a t = 'a Resto.Arg.arg
+  type 'a arg = 'a t
   val make:
     ?descr:string ->
     name:string ->
@@ -32,11 +35,11 @@ module Arg : sig
 
 end
 
-
 (** Parametrized path to services. *)
 module Path : sig
 
-  type 'params path = (unit, 'params) Resto.Path.path
+  type 'params t = (unit, 'params) Resto.Path.path
+  type 'params path = 'params t
 
   val root: unit path
 
@@ -50,72 +53,116 @@ module Path : sig
 
 end
 
+module Query : sig
+
+  type 'a t
+  type 'a query = 'a t
+
+  val empty: unit query
+
+  type ('a, 'b) field
+  val field:
+    ?descr: string ->
+    string -> 'a Arg.t -> 'a -> ('b -> 'a) -> ('b, 'a) field
+
+  type ('a, 'b, 'c) open_query
+  val query: 'b -> ('a, 'b, 'b) open_query
+  val (|+):
+    ('a, 'b, 'c -> 'd) open_query ->
+    ('a, 'c) field -> ('a, 'b, 'd) open_query
+  val seal: ('a, 'b, 'a) open_query -> 'a t
+
+  type untyped = (string * string) list
+  exception Invalid of string
+  val parse: 'a query -> untyped -> 'a
+
+end
 
 (** Services. *)
-type ('params, 'input, 'output) service =
-  (unit, 'params, 'input, 'output) Resto.service
+type ('meth, 'params, 'query, 'input, 'output, 'error) service =
+  ('meth, unit, 'params, 'query, 'input, 'output, 'error) Resto.MakeService(RestoJson.Encoding).service
 
-val service:
+val get_service:
   ?description: string ->
+  query: 'query Query.t ->
+  output: 'output Json_encoding.encoding ->
+  error: 'error Json_encoding.encoding ->
+  'params Path.t ->
+  ([ `GET ], 'params, 'query, unit, 'output, 'error) service
+
+val post_service:
+  ?description: string ->
+  query: 'query Query.t ->
   input: 'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
-  'params Path.path ->
-  ('params, 'input, 'output) service
+  error: 'error Json_encoding.encoding ->
+  'params Path.t ->
+  ([ `POST ], 'params, 'query, 'input, 'output, 'error) service
 
-type json = Json_repr.Ezjsonm.value
+val delete_service:
+  ?description: string ->
+  query: 'query Query.t ->
+  output: 'output Json_encoding.encoding ->
+  error: 'error Json_encoding.encoding ->
+  'params Path.t ->
+  ([ `DELETE ], 'params, 'query, unit, 'output, 'error) service
+
+
+val put_service:
+  ?description: string ->
+  query: 'query Query.t ->
+  input: 'input Json_encoding.encoding ->
+  output: 'output Json_encoding.encoding ->
+  error: 'error Json_encoding.encoding ->
+  'params Path.t ->
+  ([ `PUT ], 'params, 'query, 'input, 'output, 'error) service
+
+val patch_service:
+  ?description: string ->
+  query: 'query Query.t ->
+  input: 'input Json_encoding.encoding ->
+  output: 'output Json_encoding.encoding ->
+  error: 'error Json_encoding.encoding ->
+  'params Path.t ->
+  ([ `PATCH ], 'params, 'query, 'input, 'output, 'error) service
+
+type 'input input =
+  | No_input : unit input
+  | Input : 'input Json_encoding.encoding -> 'input input
+
+type 'input request = {
+  meth: meth ;
+  path: string list ;
+  query: (string * string) list ;
+  input: 'input input ;
+}
 
 val forge_request:
-  ('params, 'input, 'output) service ->
-  'params -> 'input -> string list * json
+  ('meth, 'params, 'query, 'input, 'output, 'error) service ->
+  'params -> 'query -> 'input request
 
-val read_answer:
-  ('params, 'input, 'output) service ->
-  json -> ('output, string) result
+val query:
+  ('meth, 'params, 'query, 'input, 'output, 'error) service ->
+  'query Query.t
 
-module Make (Repr : Json_repr.Repr) : sig
+val input_encoding:
+  ('meth, 'params, 'query, 'input, 'output, 'error) service ->
+  'input input
 
-  val forge_request:
-    ('params, 'input, 'output) service ->
-    'params -> 'input -> string list * Repr.value
+val output_encoding:
+  ('meth, 'params, 'query, 'input, 'output, 'error) service ->
+  'output Json_encoding.encoding
 
-  val read_answer:
-    ('params, 'input, 'output) service ->
-    Repr.value -> ('output, string) result
+val error_encoding:
+  ('meth, 'params, 'query, 'input, 'output, 'error) service ->
+  'error Json_encoding.encoding
 
-end
+module Description = Resto.Description
 
-(** Service directory description *)
-module Description : sig
+type description_service =
+  ([`GET], unit * string list, Description.request,
+   unit, Json_schema.schema Description.directory, unit) service
 
-  type service_descr =
-    Resto.Description.service_descr = {
-    description: string option ;
-    input: Json_schema.schema ;
-    output: Json_schema.schema ;
-  }
+val description_service:
+  ?description:string -> unit Path.path -> description_service
 
-  type directory_descr =
-    Resto.Description.directory_descr =
-    | Static of static_directory_descr
-    | Dynamic of string option
-
-  and static_directory_descr =
-    Resto.Description.static_directory_descr = {
-    service: service_descr option ;
-    subdirs: static_subdirectories_descr option ;
-  }
-
-  and static_subdirectories_descr =
-    Resto.Description.static_subdirectories_descr =
-    | Suffixes of directory_descr Map.Make(String).t
-    | Arg of Arg.descr * directory_descr
-
-  val service:
-    ?description:string ->
-    'params Path.path ->
-    ('params, bool option, directory_descr) service
-
-  val pp_print_directory_descr:
-    Format.formatter -> directory_descr -> unit
-
-end

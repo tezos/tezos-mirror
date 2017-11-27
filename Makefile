@@ -1,17 +1,13 @@
 
 all:
-	ocp-build init
-	ocp-build build ocplib-resto ocplib-resto-directory
+	jbuilder build --dev
 
+.PHONY: test
 test:
-	ocp-build init
-	ocp-build build test
-	./_obuild/test/test.byte
+	jbuilder runtest --dev
+
+doc-html:
+	jbuilder build @doc --dev
 
 clean:
-	[ ! -d _obuild ] || ocp-build clean
-
-distclean:
-	-rm -rf _obuild
-	-rm -rf */*~ *~
-
+	jbuilder clean

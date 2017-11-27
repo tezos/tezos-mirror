@@ -1,6 +1,6 @@
 version: "dev"
 opam-version: "1.2"
-name: "ocplib-resto"
+name: "ocplib-resto-directory"
 maintainer: "Grégoire Henry <gregoire.henry@tezos.com>"
 authors: "Grégoire Henry <gregoire.henry@tezos.com>"
 license: "LGPL-2.1-with-OCaml-exception"
@@ -19,4 +19,6 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
+  "ocplib-ezresto"
+  "ocplib-resto-directory"
 ]
