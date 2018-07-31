@@ -326,17 +326,27 @@ let broadcast_head w ~previous block =
       Lwt.return_unit )
     else Distributed_db.Advertise.current_branch nv.parameters.chain_db
 
-let safe_get_protocol hash =
-  match Registered_protocol.get hash with
-  | None ->
-      (* FIXME. *)
-      (* This should not happen: it should be handled in the validator. *)
-      failwith
-        "chain_validator: missing protocol '%a' for the current block."
-        Protocol_hash.pp_short
-        hash
-  | Some protocol ->
-      return protocol
+let safe_get_prevalidator_filter hash =
+  match Prevalidator_filters.find hash with
+  | Some filter ->
+      return filter
+  | None -> (
+    match Registered_protocol.get hash with
+    | None ->
+        (* FIXME. *)
+        (* This should not happen: it should be handled in the validator. *)
+        failwith
+          "chain_validator: missing protocol '%a' for the current block."
+          Protocol_hash.pp_short
+          hash
+    | Some protocol ->
+        Log.log_notice
+          "no prevalidator filter found for protocol '%a'"
+          Protocol_hash.pp_short
+          hash ;
+        let (module Proto) = protocol in
+        let module Filter = Prevalidator_filters.No_filter (Proto) in
+        return (module Filter : Prevalidator_filters.FILTER) )
 
 let on_request (type a) w start_testchain active_chains spawn_child
     (req : a Request.t) : a tzresult Lwt.t =
@@ -375,12 +385,12 @@ let on_request (type a) w start_testchain active_chains spawn_child
         >>=? fun new_protocol ->
         let old_protocol = Prevalidator.protocol_hash old_prevalidator in
         if not (Protocol_hash.equal old_protocol new_protocol) then (
-          safe_get_protocol new_protocol
-          >>=? fun (module Proto) ->
+          safe_get_prevalidator_filter new_protocol
+          >>=? fun (module Filter) ->
           let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
           (* TODO inject in the new prevalidator the operation
                  from the previous one. *)
-          Prevalidator.create limits (module Proto) chain_db
+          Prevalidator.create limits (module Filter) chain_db
           >>= function
           | Error errs ->
               Log.lwt_log_error
@@ -447,7 +457,7 @@ let on_launch start_prevalidator w _ parameters =
     >>= fun head ->
     State.Block.protocol_hash head
     >>=? fun head_hash ->
-    safe_get_protocol head_hash
+    safe_get_prevalidator_filter head_hash
     >>= function
     | Ok (module Proto) -> (
         Prevalidator.create

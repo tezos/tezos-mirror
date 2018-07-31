@@ -68,6 +68,8 @@ module type T = sig
 
   val status : t -> status tzresult Lwt.t
 
+  val validation_state : t -> Proto.validation_state
+
   val pp_result : Format.formatter -> result -> unit
 end
 
@@ -211,6 +213,8 @@ struct
     Proto.finalize_block pv.state
     >>=? fun (block_result, block_metadata) ->
     return {block_metadata; block_result; applied_operations = pv.applied}
+
+  let validation_state {state; _} = state
 
   let pp_result ppf =
     let open Format in

@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () =
+  Prevalidator_filters.register (module Tezos_mempool_005_PsBabyM1.Filter)
+
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =

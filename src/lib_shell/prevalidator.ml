@@ -38,6 +38,8 @@ type name_t = Chain_id.t * Protocol_hash.t
 module type T = sig
   module Proto : Registered_protocol.T
 
+  module Filter : Prevalidator_filters.FILTER with module Proto = Proto
+
   val name : name_t
 
   val parameters : limits * Distributed_db.chain_db
@@ -71,6 +73,7 @@ module type T = sig
       Lwt_watcher.input;
     mutable advertisement : [`Pending of Mempool.t | `None];
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   }
 
   module Name : Worker.NAME with type t = name_t
@@ -113,8 +116,9 @@ end
 
 type t = (module T)
 
-module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
-  module Proto = Proto
+module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
+  module Filter = Filter
+  module Proto = Filter.Proto
 
   let name = (Arg.chain_id, Proto.hash)
 
@@ -151,6 +155,7 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
       Lwt_watcher.input;
     mutable advertisement : [`Pending of Mempool.t | `None];
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   }
 
   module Name = struct
@@ -336,6 +341,36 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
     | Error _ ->
         false
 
+  let filter_config w pv =
+    try
+      match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+      | Some config ->
+          Data_encoding.Json.destruct Filter.config_encoding config
+      | None ->
+          Filter.default_config
+    with _ ->
+      debug w "invalid mempool filter configuration" ;
+      Filter.default_config
+
+  let pre_filter w pv op =
+    let protocol_data =
+      Data_encoding.Binary.of_bytes
+        Proto.operation_data_encoding
+        op.Operation.proto
+    in
+    match protocol_data with
+    | None ->
+        debug w "unparsable operation %a" Operation_hash.pp (Operation.hash op) ;
+        false
+    | Some protocol_data ->
+        let op = {Filter.Proto.shell = op.shell; protocol_data} in
+        let config = filter_config w pv in
+        Filter.pre_filter config op.Filter.Proto.protocol_data
+
+  let post_filter w pv op receipt =
+    let config = filter_config w pv in
+    Filter.post_filter config (op, receipt)
+
   let handle_unprocessed w pv =
     ( match pv.validation_state with
     | Error err ->
@@ -389,9 +424,20 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
               | Ok op -> (
                   Prevalidation.apply_operation state op
                   >>= function
-                  | Applied (new_acc_validation_state, _) ->
+                  | Applied (new_acc_validation_state, receipt) ->
+                      post_filter
+                        w
+                        pv
+                        ~validation_state_before:
+                          (Prevalidation.validation_state acc_validation_state)
+                        ~validation_state_after:
+                          (Prevalidation.validation_state
+                             new_acc_validation_state)
+                        op.protocol_data
+                        receipt
+                      >>= fun accept ->
                       if
-                        pv.applied_count <= 2000
+                        (accept && pv.applied_count <= 2000)
                         (* this test is a quick fix while we wait for the new mempool *)
                         || is_endorsement op
                       then (
@@ -543,6 +589,33 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
        dir :=
          RPC_directory.register
            !dir
+           (Proto_services.S.Mempool.get_filter RPC_path.open_root)
+           (fun pv () () ->
+             match Protocol_hash.Map.find_opt Proto.hash pv.filter_config with
+             | Some obj ->
+                 return obj
+             | None -> (
+               match Prevalidator_filters.find Proto.hash with
+               | None ->
+                   return (`O [])
+               | Some (module Filter) ->
+                   let default =
+                     Data_encoding.Json.construct
+                       Filter.config_encoding
+                       Filter.default_config
+                   in
+                   return default )) ;
+       dir :=
+         RPC_directory.register
+           !dir
+           (Proto_services.S.Mempool.set_filter RPC_path.open_root)
+           (fun pv () obj ->
+             pv.filter_config <-
+               Protocol_hash.Map.add Proto.hash obj pv.filter_config ;
+             return ()) ;
+       dir :=
+         RPC_directory.register
+           !dir
            (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
            (fun pv () () ->
              let map_op op =
@@ -625,16 +698,23 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
              (* Convert ops *)
              let map_op op =
                let protocol_data =
-                 Data_encoding.Binary.of_bytes_exn
+                 Data_encoding.Binary.of_bytes
                    Proto.operation_data_encoding
                    op.Operation.proto
                in
-               Proto.{shell = op.shell; protocol_data}
+               match protocol_data with
+               | None ->
+                   None
+               | Some protocol_data ->
+                   Some Proto.{shell = op.shell; protocol_data}
              in
-             let fold_op _k (op, _error) acc = map_op op :: acc in
+             let fold_op _k (op, _error) acc =
+               match map_op op with Some op -> op :: acc | None -> acc
+             in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
-               if params#applied then List.map map_op (List.map snd applied)
+               if params#applied then
+                 List.filter_map map_op (List.map snd applied)
                else []
              in
              let refused =
@@ -675,20 +755,26 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
                    Lwt_stream.get op_stream
                    >>= function
                    | Some (kind, shell, protocol_data) when filter_result kind
-                     ->
-                       (* NOTE: Should the protocol change, a new Prevalidation
-                        * context would be created. Thus, we use the same Proto. *)
-                       let bytes =
-                         Data_encoding.Binary.to_bytes_exn
-                           Proto.operation_data_encoding
-                           protocol_data
-                       in
-                       let protocol_data =
-                         Data_encoding.Binary.of_bytes_exn
+                     -> (
+                     (* NOTE: Should the protocol change, a new Prevalidation
+                      * context would  be created. Thus, we use the same Proto. *)
+                     match
+                       Data_encoding.Binary.to_bytes
+                         Proto.operation_data_encoding
+                         protocol_data
+                     with
+                     | None ->
+                         Lwt.return_none
+                     | Some bytes -> (
+                       match
+                         Data_encoding.Binary.of_bytes
                            Proto.operation_data_encoding
                            bytes
-                       in
-                       Lwt.return_some [{Proto.shell; protocol_data}]
+                       with
+                       | None ->
+                           Lwt.return_none
+                       | Some protocol_data ->
+                           Lwt.return_some [{Proto.shell; protocol_data}] ) )
                    | Some _ ->
                        next ()
                    | None ->
@@ -701,16 +787,22 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
   module Handlers = struct
     type self = worker
 
-    let on_operation_arrived (pv : state) oph op =
+    let on_operation_arrived w (pv : state) oph op =
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
-      if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then
-        Distributed_db.Operation.clear_or_cancel pv.chain_db oph
+      if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then (
+        Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
         (* TODO: put in a specific delayed map ? *)
+        return_unit )
       else if
         not (already_handled pv oph) (* prevent double inclusion on flush *)
-      then pv.pending <- Operation_hash.Map.add oph op pv.pending
+      then (
+        if pre_filter w pv op then
+          (* TODO: should this have an influence on the peer's score ? *)
+          pv.pending <- Operation_hash.Map.add oph op pv.pending ;
+        return_unit )
+      else return_unit
 
-    let on_inject pv op =
+    let on_inject _w pv op =
       let oph = Operation.hash op in
       if already_handled pv oph then return_unit
         (* FIXME : is this an error ? *)
@@ -817,10 +909,9 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject op ->
-          on_inject pv op
+          on_inject w pv op
       | Request.Arrived (oph, op) ->
-          on_operation_arrived pv oph op ;
-          return_unit
+          on_operation_arrived w pv oph op
       | Request.Advertise ->
           on_advertise pv ; return_unit )
       >>=? fun r -> handle_unprocessed w pv >>= fun () -> return r
@@ -874,6 +965,8 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
           operation_stream = Lwt_watcher.create_input ();
           advertisement = `None;
           rpc_directory;
+          filter_config =
+            Protocol_hash.Map.empty (* TODO: initialize from config file *);
         }
       in
       List.iter
@@ -944,14 +1037,14 @@ module ChainProto_registry = Registry.Make (struct
     if pc = 0 then Chain_id.compare c1 c2 else pc
 end)
 
-let create limits (module Proto : Registered_protocol.T) chain_db =
+let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
   let chain_state = Distributed_db.chain_state chain_db in
   let chain_id = State.Chain.id chain_state in
-  match ChainProto_registry.query (chain_id, Proto.hash) with
+  match ChainProto_registry.query (chain_id, Filter.Proto.hash) with
   | None ->
       let module Prevalidator =
         Make
-          (Proto)
+          (Filter)
           (struct
             let limits = limits
 
