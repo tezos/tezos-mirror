@@ -38,6 +38,9 @@ val run :
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
+  ?source:Contract.t ->
+  ?payer:Contract.t ->
+  ?gas:Z.t ->
   unit ->
   (Script.expr *
    packed_internal_operation list *
@@ -51,6 +54,9 @@ val trace :
   program:Michelson_v1_parser.parsed ->
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
+  ?source:Contract.t ->
+  ?payer:Contract.t ->
+  ?gas:Z.t ->
   unit ->
   (Script.expr *
    packed_internal_operation list *

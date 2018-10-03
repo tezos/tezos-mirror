@@ -88,36 +88,47 @@ module ContractAlias = struct
            (fun cctxt p -> get_contract cctxt p))
         next)
 
+  let destination_parameter () =
+    Clic.parameter
+      ~autocomplete:(fun cctxt ->
+          autocomplete cctxt >>=? fun list1 ->
+          Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
+          return (list1 @ list2))
+      (fun cctxt s ->
+         begin
+           match String.split ~limit:1 ':' s with
+           | [ "alias" ; alias ]->
+               find cctxt alias
+           | [ "key" ; text ] ->
+               Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+               return (s, Contract.implicit_contract v)
+           | _ ->
+               find cctxt s >>= function
+               | Ok v -> return v
+               | Error k_errs ->
+                   ContractEntity.of_source s >>= function
+                   | Ok v -> return (s, v)
+                   | Error c_errs ->
+                       Lwt.return (Error (k_errs @ c_errs))
+         end)
+
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
-      desc ^ "\n"
-      ^ "Can be an alias, a key, or a literal (autodetected in order).\n\
-         Use 'text:literal', 'alias:name', 'key:name' to force." in
-    Clic.(
-      param ~name ~desc
-        (parameter
-           ~autocomplete:(fun cctxt ->
-               autocomplete cctxt >>=? fun list1 ->
-               Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
-               return (list1 @ list2))
-           (fun cctxt s ->
-              begin
-                match String.split ~limit:1 ':' s with
-                | [ "alias" ; alias ]->
-                    find cctxt alias
-                | [ "key" ; text ] ->
-                    Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-                    return (s, Contract.implicit_contract v)
-                | _ ->
-                    find cctxt s >>= function
-                    | Ok v -> return v
-                    | Error k_errs ->
-                        ContractEntity.of_source s >>= function
-                        | Ok v -> return (s, v)
-                        | Error c_errs ->
-                            Lwt.return (Error (k_errs @ c_errs))
-              end)))
-      next
+      String.concat "\n" [
+        desc ;
+        "Can be an alias, a key, or a literal (autodetected in order).\n\
+         Use 'text:literal', 'alias:name', 'key:name' to force."
+      ] in
+    Clic.param ~name ~desc (destination_parameter ()) next
+
+  let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
+    let doc =
+      String.concat "\n" [
+        doc ;
+        "Can be an alias, a key, or a literal (autodetected in order).\n\
+         Use 'text:literal', 'alias:name', 'key:name' to force."
+      ] in
+    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 
   let name cctxt contract =
     rev_find cctxt contract >>=? function

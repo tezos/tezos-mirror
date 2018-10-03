@@ -44,6 +44,11 @@ module ContractAlias : sig
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (string * Contract.t -> 'a, 'wallet) params
+  val destination_arg:
+    ?name:string ->
+    ?doc:string ->
+    unit ->
+    ((Lwt_io.file_name * Contract.t) option, #Client_context.wallet) Clic.arg
   val rev_find:
     #Client_context.wallet ->
     Contract.t -> string option tzresult Lwt.t

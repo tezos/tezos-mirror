@@ -102,10 +102,14 @@ let run
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
+    ?source
+    ?payer
+    ?gas
     () =
   Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount)
+    program.expanded
+    (storage.expanded, input.expanded, amount, source, payer, gas)
 
 let trace
     (cctxt : #Proto_alpha.rpc_context)
@@ -115,10 +119,14 @@ let trace
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
+    ?source
+    ?payer
+    ?gas
     () =
   Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount)
+    program.expanded
+    (storage.expanded, input.expanded, amount, source, payer, gas)
 
 let typecheck_data
     cctxt

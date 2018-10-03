@@ -59,11 +59,14 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj4
+      (obj7
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
-         (req "amount" Tez.encoding))
+         (req "amount" Tez.encoding)
+         (opt "source" Contract.encoding)
+         (opt "payer" Contract.encoding)
+         (opt "gas" z))
 
     let trace_encoding =
       def "scripted.trace" @@
@@ -167,30 +170,46 @@ module Scripts = struct
         ~script: (script, None) >>=? fun ctxt ->
       return (ctxt, dummy_contract) in
     register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount) ->
+      (code, storage, parameter, amount, source, payer, gas) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
+      let source, payer = match source, payer with
+        | Some source, Some payer -> source, payer
+        | Some source, None -> source, source
+        | None, Some payer -> payer, payer
+        | None, None -> dummy_contract, dummy_contract in
+      let gas = match gas with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt in
+      let ctxt = Gas.set_limit ctxt gas in
       Script_interpreter.execute
         ctxt Readable
-        ~source:dummy_contract
-        ~payer:dummy_contract
+        ~source
+        ~payer
         ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount) ->
+      (code, storage, parameter, amount, source, payer, gas) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
+      let source, payer = match source, payer with
+        | Some source, Some payer -> source, payer
+        | Some source, None -> source, source
+        | None, Some payer -> payer, payer
+        | None, None -> dummy_contract, dummy_contract in
+      let gas = match gas with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt in
+      let ctxt = Gas.set_limit ctxt gas in
       Script_interpreter.trace
         ctxt Readable
-        ~source:dummy_contract
-        ~payer:dummy_contract
+        ~source
+        ~payer
         ~self:(dummy_contract, { storage ; code })
         ~amount ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
@@ -305,13 +324,13 @@ module Scripts = struct
 
     end
 
-  let run_code ctxt block code (storage, input, amount) =
+  let run_code ctxt block code (storage, input, amount, source, payer, gas) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount)
+      block () (code, storage, input, amount, source, payer, gas)
 
-  let trace_code ctxt block code (storage, input, amount) =
+  let trace_code ctxt block code (storage, input, amount, source, payer, gas) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount)
+      block () (code, storage, input, amount, source, payer, gas)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()

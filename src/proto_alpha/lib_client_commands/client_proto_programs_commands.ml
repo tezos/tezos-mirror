@@ -33,6 +33,7 @@ let group =
 open Tezos_micheline
 open Client_proto_programs
 open Client_proto_args
+open Client_proto_contracts
 
 let commands () =
   let open Clic in
@@ -58,6 +59,16 @@ let commands () =
       ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
+  let source_arg =
+    ContractAlias.destination_arg
+      ~name: "source"
+      ~doc: "name of the source (i.e. SENDER) contract for the transaction"
+      () in
+  let payer_arg =
+    ContractAlias.destination_arg
+      ~name: "payer"
+      ~doc: "name of the payer (i.e. SOURCE) contract for the transaction"
+      () in
   let custom_gas_flag =
     arg
       ~long:"gas"
@@ -129,25 +140,31 @@ let commands () =
          return_unit) ;
 
     command ~group ~desc: "Ask the node to run a script."
-      (args3 trace_stack_switch amount_arg no_print_source_flag)
+      (args6 trace_stack_switch amount_arg source_arg payer_arg no_print_source_flag custom_gas_flag)
       (prefixes [ "run" ; "script" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
        @@ Clic.param ~name:"storage" ~desc:"the storage data"
          data_parameter
        @@ prefixes [ "and" ; "input" ]
-       @@ Clic.param ~name:"storage" ~desc:"the input data"
+       @@ Clic.param ~name:"input" ~desc:"the input data"
          data_parameter
        @@ stop)
-      (fun (trace_exec, amount, no_print_source) program storage input cctxt ->
-         Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
-         let show_source = not no_print_source in
-         (if trace_exec then
-            trace cctxt ~chain:cctxt#chain ~block:cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
-            print_trace_result cctxt ~show_source ~parsed:program res
-          else
-            run cctxt ~chain:cctxt#chain ~block:cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
-            print_run_result cctxt ~show_source ~parsed:program res)) ;
+      (fun
+        (trace_exec, amount, source, payer, no_print_source, gas)
+        program storage input cctxt ->
+        let source = Option.map ~f:snd source in
+        let payer = Option.map ~f:snd payer in
+        Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
+        let show_source = not no_print_source in
+        (if trace_exec then
+           trace cctxt ~chain:cctxt#chain ~block:cctxt#block
+             ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
+           print_trace_result cctxt ~show_source ~parsed:program res
+         else
+           run cctxt ~chain:cctxt#chain ~block:cctxt#block
+             ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
+           print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
       (prefixes [ "typecheck" ; "script" ]
