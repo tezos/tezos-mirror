@@ -285,6 +285,7 @@ end
 val on_new_connection:
   ('msg, 'peer_meta,'conn_meta) pool ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta,'conn_meta) connection -> unit) -> unit
+(** [on_new_connection pool f] installs [f] as a hook for new connections in [pool].   *)
 
 (** {1 I/O on connections} *)
 

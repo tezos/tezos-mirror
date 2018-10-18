@@ -54,7 +54,7 @@ type 'meta t = {
 
 (** Select [expected] points among the disconnected known points.
     It ignores points which are greylisted, or for which a connection
-    failed after [start_time] and the pointes that are banned. It
+    failed after [start_time] and the points that are banned. It
     first selects points with the oldest last tentative.
     Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
