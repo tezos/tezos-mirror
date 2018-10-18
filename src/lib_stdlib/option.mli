@@ -39,7 +39,7 @@ val iter: f:('a -> unit) -> 'a option -> unit
 (** [x] if input is [Some x], default if it's [None] **)
 val unopt: default:'a -> 'a option -> 'a
 
-(** [unopt_map f d x] is [y] if [x] is [Some y], [d] if [x] is [None] **)
+(** [unopt_map f d x] is [f y] if [x] is [Some y], [d] if [x] is [None] **)
 val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
 (** [unopt_exn exn x] is [y] if [x] is [Some y], or raises [exn] if [x] is [None] *)
