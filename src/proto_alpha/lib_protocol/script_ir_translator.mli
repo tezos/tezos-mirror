@@ -131,6 +131,6 @@ val diff_of_big_map :
   context -> unparsing_mode -> Script_typed_ir.ex_big_map ->
   (Contract.big_map_diff * context) tzresult Lwt.t
 
-val erase_big_map_initialization :
-  context -> unparsing_mode -> Script.t ->
-  (Script.t * Contract.big_map_diff option * context) tzresult Lwt.t
+val big_map_initialization :
+  context -> unparsing_mode -> ex_script ->
+  (Contract.big_map_diff option * context) tzresult Lwt.t

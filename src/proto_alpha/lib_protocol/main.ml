@@ -298,8 +298,9 @@ let init ctxt block_header =
   let fitness = block_header.fitness in
   let timestamp = block_header.timestamp in
   let typecheck (ctxt:Alpha_context.context) (script:Alpha_context.Script.t) =
-    Script_ir_translator.parse_script ctxt script >>=? fun (_ex_script, ctxt) ->
-    return ctxt
+    Script_ir_translator.parse_script ctxt script >>=? fun (ex_script, ctxt) ->
+    Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
+    return ((script, big_map_diff), ctxt)
   in
   Alpha_context.prepare_first_block
     ~typecheck

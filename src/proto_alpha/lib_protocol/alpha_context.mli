@@ -1118,7 +1118,8 @@ end
 
 val prepare_first_block:
   Context.t ->
-  typecheck:(context -> Script.t -> context tzresult Lwt.t) ->
+  typecheck:(context -> Script.t ->
+             ((Script.t * Contract.big_map_diff option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->

@@ -3229,19 +3229,8 @@ let extract_big_map : type a. a ty -> a -> ex_big_map option = fun ty x ->
   | Pair_t ((Big_map_t (_, _, _), _, _), _, _), (map, _) -> Some (Ex_bm map)
   | _, _ -> None
 
-let erase_big_map_initialization ctxt mode ({ code ; storage } : Script.t) =
-  Script.force_decode ctxt code >>=? fun (code, ctxt) ->
-  Script.force_decode ctxt storage >>=? fun (storage, ctxt) ->
-  Lwt.return @@ parse_toplevel code >>=? fun (_, storage_type, _) ->
-  Lwt.return @@ parse_storage_ty ctxt storage_type >>=? fun (Ex_ty ty, ctxt) ->
-  parse_data ctxt ty
-    (Micheline.root storage) >>=? fun (storage, ctxt) ->
-  begin
-    match extract_big_map ty storage with
-    | None -> return (None, ctxt)
-    | Some bm -> diff_of_big_map ctxt mode bm >>=? fun (bm, ctxt) ->
-        return (Some bm, ctxt)
-  end >>=? fun (bm, ctxt) ->
-  unparse_data ctxt mode ty storage >>=? fun (storage, ctxt) ->
-  return ({ code = Script.lazy_expr code ;
-            storage = Script.lazy_expr (Micheline.strip_locations storage) }, bm, ctxt)
+let big_map_initialization ctxt mode (Ex_script { storage ; storage_type; _ }) =
+  match extract_big_map storage_type storage with
+  | None -> return (None, ctxt)
+  | Some bm ->
+      diff_of_big_map ctxt mode bm >>=? fun (bm, ctxt) -> return (Some bm, ctxt)

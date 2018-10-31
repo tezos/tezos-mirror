@@ -39,12 +39,12 @@ let init_account ctxt
 let init_contract ~typecheck ctxt
     ({ delegate ; amount ; script }: Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
-  typecheck ctxt script >>=? fun ctxt ->
+  typecheck ctxt script >>=? fun (script, ctxt) ->
   Contract_storage.originate ctxt contract
     ~balance:amount
     ~prepaid_bootstrap_storage:true
     ~manager:Signature.Public_key_hash.zero
-    ~script:(script, None)
+    ~script
     ~delegate:(Some delegate)
     ~spendable:false
     ~delegatable:false >>=? fun ctxt ->
