@@ -1020,7 +1020,7 @@ let finalize_application ctxt protocol_data delegate =
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
   may_start_new_cycle ctxt >>=? fun (ctxt, balance_updates, deactivated) ->
-  Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
+  Amendment.may_start_new_voting_period ctxt >>=? fun ctxt ->
   let cycle = (Level.current ctxt).cycle in
   let balance_updates =
     Delegate.(cleanup_balance_updates

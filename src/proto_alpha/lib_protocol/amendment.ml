@@ -25,8 +25,8 @@
 
 open Alpha_context
 
-let () = ()
-
+(** Returns the proposal submitted by the most delegates.
+    Returns None in case of a tie or if there are no proposals. *)
 let select_winning_proposal proposals =
   let merge proposal vote winners =
     match winners with
@@ -43,6 +43,14 @@ let select_winning_proposal proposals =
   | Some ([proposal], _) -> Some proposal
   | Some _ -> None (* in case of a tie, lets do nothing. *)
 
+(** A proposal is approved if it has supermajority and the participation reaches
+    the current quorum.
+    Supermajority means the yays are more 8/10 of casted votes.
+    The participation is the ratio of all received votes, including passes, with
+    respect to the number of possible votes. The quorum starts at 80% and at
+    each vote is updated using the last expected quorum and the current
+    participation with the following weights:
+    newQ = oldQ * 8/10 + participation * 2/10 *)
 let check_approval_and_update_quorum ctxt =
   Vote.get_ballots ctxt >>=? fun ballots ->
   Vote.listing_size ctxt >>=? fun maximum_vote ->
@@ -64,7 +72,11 @@ let check_approval_and_update_quorum ctxt =
      Compare.Int32.(actual_quorum >= expected_quorum
                     && ballots.yay >= supermajority))
 
-let start_new_voting_cycle ctxt =
+(** Implements the state machine of the amendment procedure.
+    Note that [freeze_listings], that computes the vote weight of each delegate,
+    is run at the beginning of each voting period.
+*)
+let start_new_voting_period ctxt =
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal -> begin
       Vote.get_proposals ctxt >>=? fun proposals ->
@@ -252,9 +264,9 @@ let last_of_a_voting_period ctxt l =
   Compare.Int32.(Int32.succ l.Level.voting_period_position =
                  Constants.blocks_per_voting_period ctxt )
 
-let may_start_new_voting_cycle ctxt =
+let may_start_new_voting_period ctxt =
   let level = Level.current ctxt in
   if last_of_a_voting_period ctxt level then
-    start_new_voting_cycle ctxt
+    start_new_voting_period ctxt
   else
     return ctxt

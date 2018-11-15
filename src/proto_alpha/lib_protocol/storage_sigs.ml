@@ -50,11 +50,11 @@ module type Single_data_storage = sig
   val get_option: context -> value option tzresult Lwt.t
 
   (** Allocates the storage bucket and initializes it ; returns a
-      {!Storage_error Missing_key} if the bucket exists *)
+      {!Storage_error Existing_key} if the bucket exists *)
   val init: context -> value -> Raw_context.t tzresult Lwt.t
 
   (** Updates the content of the bucket ; returns a {!Storage_Error
-      Existing_key} if the value does not exists *)
+      Missing_key} if the value does not exists *)
   val set: context -> value -> Raw_context.t tzresult Lwt.t
 
   (** Allocates the data and initializes it with a value ; just

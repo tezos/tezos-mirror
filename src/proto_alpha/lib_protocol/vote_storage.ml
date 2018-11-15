@@ -132,6 +132,7 @@ let init_current_proposal = Storage.Vote.Current_proposal.init
 let clear_current_proposal = Storage.Vote.Current_proposal.delete
 
 let init ctxt =
+  (* quorum is in centile of a percentage *)
   Storage.Vote.Current_quorum.init ctxt 80_00l >>=? fun ctxt ->
   Storage.Vote.Current_period_kind.init ctxt Proposal >>=? fun ctxt ->
   return ctxt

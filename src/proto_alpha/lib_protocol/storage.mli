@@ -234,32 +234,38 @@ module Vote : sig
     with type value = Voting_period_repr.kind
      and type t := Raw_context.t
 
+  (** Expected quorum, in centile of percentage *)
   module Current_quorum : Single_data_storage
-    with type value = int32 (* in centile of percentage *)
+    with type value = int32
      and type t := Raw_context.t
 
   module Current_proposal : Single_data_storage
     with type value = Protocol_hash.t
      and type t := Raw_context.t
 
+  (** Sum of all rolls of all delegates. *)
   module Listings_size : Single_data_storage
-    with type value = int32 (* total number of rolls in the listing. *)
+    with type value = int32
      and type t := Raw_context.t
 
+  (** Contains all delegates with their assigned number of rolls. *)
   module Listings : Indexed_data_storage
     with type key = Signature.Public_key_hash.t
-     and type value = int32 (* number of rolls for the key. *)
+     and type value = int32
      and type t := Raw_context.t
 
+  (** Set of protocol proposal with corresponding proposer delegate *)
   module Proposals : Data_set_storage
     with type elt = Protocol_hash.t * Signature.Public_key_hash.t
      and type t := Raw_context.t
 
+  (** Keeps for each delegate the number of proposed protocols *)
   module Proposals_count : Indexed_data_storage
     with type key = Signature.Public_key_hash.t
      and type value = int
      and type t := Raw_context.t
 
+  (** Contains for each delegate its ballot *)
   module Ballots : Indexed_data_storage
     with type key = Signature.Public_key_hash.t
      and type value = Vote_repr.ballot
