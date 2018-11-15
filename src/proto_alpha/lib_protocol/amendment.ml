@@ -55,22 +55,25 @@ let check_approval_and_update_quorum ctxt =
   Vote.get_ballots ctxt >>=? fun ballots ->
   Vote.listing_size ctxt >>=? fun maximum_vote ->
   Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
-  (* FIXME check overflow ??? *)
-  let casted_vote = Int32.add ballots.yay ballots.nay in
-  let actual_vote = Int32.add casted_vote ballots.pass in
-  let actual_quorum =
-    Int32.div (Int32.mul actual_vote 100_00l) maximum_vote in
-  let supermajority = Int32.div (Int32.mul 8l casted_vote) 10l in
+  (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
+     small as 1e3, there is a maximum of 8e5 rolls and thus votes.
+     In 'participation' an Int64 is used because in the worst case 'all_votes is
+     8e5 and after the multiplication is 8e9, making it potentially overflow a
+     signed Int32 which is 2e9. *)
+  let casted_votes = Int32.add ballots.yay ballots.nay in
+  let all_votes = Int32.add casted_votes ballots.pass in
+  let supermajority = Int32.div (Int32.mul 8l casted_votes) 10l in
+  let participation = (* in centile of percentage *)
+    Int64.to_int32
+      (Int64.div
+         (Int64.mul (Int64.of_int32 all_votes) 100_00L)
+         (Int64.of_int32 maximum_vote)) in
+  let outcome = Compare.Int32.(participation >= expected_quorum &&
+                               ballots.yay >= supermajority) in
   let updated_quorum =
-    Int32.div
-      (Int32.add (Int32.mul 8l expected_quorum)
-         (Int32.mul 2l actual_quorum))
-      10l in
+    Int32.div (Int32.add (Int32.mul 8l expected_quorum) (Int32.mul 2l participation)) 10l in
   Vote.set_current_quorum ctxt updated_quorum >>=? fun ctxt ->
-  return
-    (ctxt,
-     Compare.Int32.(actual_quorum >= expected_quorum
-                    && ballots.yay >= supermajority))
+  return (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
     Note that [freeze_listings], that computes the vote weight of each delegate,
