@@ -46,7 +46,7 @@ let balance_encoding =
            (req "kind" (constant "freezer"))
            (req "category" (constant "rewards"))
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle_repr.encoding))
+           (req "cycle" Cycle_repr.encoding))
         (function Rewards (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Rewards (d, l)) ;
       case (Tag 2)
@@ -55,7 +55,7 @@ let balance_encoding =
            (req "kind" (constant "freezer"))
            (req "category" (constant "fees"))
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle_repr.encoding))
+           (req "cycle" Cycle_repr.encoding))
         (function Fees (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Fees (d, l)) ;
       case (Tag 3)
@@ -64,7 +64,7 @@ let balance_encoding =
            (req "kind" (constant "freezer"))
            (req "category" (constant "deposits"))
            (req "delegate" Signature.Public_key_hash.encoding)
-           (req "level" Cycle_repr.encoding))
+           (req "cycle" Cycle_repr.encoding))
         (function Deposits (d, l) -> Some ((), (), d, l) | _ -> None)
         (fun ((), (), d, l) -> Deposits (d, l)) ]
 
@@ -624,4 +624,3 @@ let delegated_balance ctxt delegate =
 
 let fold = Storage.Delegates.fold
 let list = Storage.Delegates.elements
-
