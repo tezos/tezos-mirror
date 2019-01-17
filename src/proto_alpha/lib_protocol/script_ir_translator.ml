@@ -1210,9 +1210,9 @@ and parse_ty :
                  | T_key | T_key_hash
                  | T_timestamp | T_address as prim), l, _) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
-    | Prim (loc, (T_set | T_list | T_option as prim), l, _) ->
+    | Prim (loc, (T_set | T_list | T_option | T_contract as prim), l, _) ->
         error (Invalid_arity (loc, prim, 1, List.length l))
-    | Prim (loc, (T_pair | T_or | T_map | T_lambda | T_contract as prim), l, _) ->
+    | Prim (loc, (T_pair | T_or | T_map | T_lambda as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
     | expr ->
         error @@ unexpected expr [] Type_namespace
