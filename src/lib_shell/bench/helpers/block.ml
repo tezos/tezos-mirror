@@ -314,6 +314,7 @@ let genesis
     ?(endorsement_reward = default.endorsement_reward)
     ?(cost_per_byte = default.cost_per_byte)
     ?(hard_storage_limit_per_operation = default.hard_storage_limit_per_operation)
+    ?(test_chain_duration = default.test_chain_duration)
     (initial_accounts : (Account.t * Tez_repr.t) list) =
   let constants : Constants_repr.parametric = {
     default with
@@ -337,6 +338,7 @@ let genesis
     endorsement_reward ;
     cost_per_byte ;
     hard_storage_limit_per_operation ;
+    test_chain_duration ;
   } in
   genesis_with_parameters constants initial_accounts
 

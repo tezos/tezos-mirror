@@ -117,6 +117,7 @@ val genesis:
   ?endorsement_reward:Tez_repr.tez ->
   ?cost_per_byte: Tez_repr.t ->
   ?hard_storage_limit_per_operation: Z.t ->
+  ?test_chain_duration: Int64.t ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

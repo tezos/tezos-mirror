@@ -379,6 +379,7 @@ module Constants : sig
     endorsement_reward: Tez.t ;
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
+    test_chain_duration: int64;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -402,6 +403,7 @@ module Constants : sig
   val origination_size: context -> int
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
+  val test_chain_duration: context -> int64
 
   (** All constants: fixed and parametric *)
   type t = {

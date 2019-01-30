@@ -94,6 +94,7 @@ type parametric = {
   endorsement_reward: Tez_repr.t ;
   cost_per_byte: Tez_repr.t ;
   hard_storage_limit_per_operation: Z.t ;
+  test_chain_duration: int64 ;  (* in seconds *)
 }
 
 let default = {
@@ -124,6 +125,7 @@ let default = {
   endorsement_reward = Tez_repr.(mul_exn one 2) ;
   hard_storage_limit_per_operation = Z.of_int 60_000 ;
   cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
+  test_chain_duration = Int64.mul 32768L 60L;
 }
 
 let parametric_encoding =
@@ -149,7 +151,8 @@ let parametric_encoding =
           c.block_reward),
          (c.endorsement_reward,
           c.cost_per_byte,
-          c.hard_storage_limit_per_operation))) )
+          c.hard_storage_limit_per_operation,
+          c.test_chain_duration))) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -169,7 +172,8 @@ let parametric_encoding =
             block_reward),
            (endorsement_reward,
             cost_per_byte,
-            hard_storage_limit_per_operation))) ->
+            hard_storage_limit_per_operation,
+            test_chain_duration))) ->
       { preserved_cycles ;
         blocks_per_cycle ;
         blocks_per_commitment ;
@@ -190,6 +194,7 @@ let parametric_encoding =
         endorsement_reward ;
         cost_per_byte ;
         hard_storage_limit_per_operation ;
+        test_chain_duration ;
       } )
     (merge_objs
        (obj9
@@ -212,10 +217,11 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj3
+          (obj4
              (req "endorsement_reward" Tez_repr.encoding)
              (req "cost_per_byte" Tez_repr.encoding)
-             (req "hard_storage_limit_per_operation" z))))
+             (req "hard_storage_limit_per_operation" z)
+             (req "test_chain_duration" int64))))
 
 type t = {
   fixed : fixed ;
