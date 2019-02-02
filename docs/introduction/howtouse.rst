@@ -228,9 +228,7 @@ system, on Zeronet and Alphanet you can obtain free tez from a
 
 This will provide a wallet in the form of a JSON file
 ``tz1__xxxxxxxxx__.json``, that can be activated with the following
-command:
-
-::
+command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
@@ -238,9 +236,7 @@ If you use the ``alphanet.sh`` script, you should prefix the file
 with ``container:`` in order to copy it into the docker image:
 ``./alphanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
 
-Let's check the balance of the new account with:
-
-::
+Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
@@ -248,31 +244,114 @@ Please preserve the JSON file, after each reset of Zeronet or
 Alphanet, you will have to reactivate the wallet.
 
 Please drink carefully and don't abuse the faucet: it only contains
-30,000 wallets for a total amount of 760,000,000ꜩ.
+30,000 wallets for a total amount of ꜩ760,000,000.
 
 
-Transactions
-~~~~~~~~~~~~
+Transfers and receipts
+~~~~~~~~~~~~~~~~~~~~~~
 
-Let's transfer some tez to the new account:
+In order to fund our newly created account we need to transfer some
+tez using the `transfer` operation.
+Every operation returns a `receipt` that ricapitulates all the effects
+of the operation on the blockchain.
+A useful option for any operation is ``--dry-run``, which instructs
+the client to simulate the operation without actually sending it to
+the network, so that we can inspect its receipt.
 
-::
+Let's try::
 
-   tezos-client transfer 1 from alice to bob --fee 0.05
+  tezos-client transfer 1 from alice to bob --dry-run
 
-The ``transfer`` command returns a receipt with all the details of the
-transaction, including its hash, and then waits for the operation to
-be included in one block.
-If you want to simulate a transaction without actually sending it to
-the network you can use the ``--dry-run`` option.
-As in any blockchain it is advisable to wait several blocks to
-consider the transaction as final, for an important operation we
-advice to wait 60 blocks.
-We can do that with:
+  Fatal error:
+    The operation will burn ꜩ0.257 which is higher than the configured burn cap (ꜩ0).
+     Use `--burn-cap 0.257` to emit this operation.
 
-::
+The client asks the node to validate the operation (without sending
+it) and obtains an error.
+The reason is that when we fund a new address we are also creating it
+on the blockchain.
+Any storage on chain has a cost associated to it which should be
+accounted for either by paying a fee to a baker or by destroying
+(`burning`) some tez.
+This is particularly important to protect the system from spam.
+Because creating an address requires burning ꜩ0.257 and the client has
+a default of 0, we need to explicitly set a cap on the amount that we
+allow to burn::
 
-   tezos-client wait for <operation hash> to be included
+  tezos-client transfer 1 from alice to bob --dry-run --burn-cap 0.257
+
+This should do it and you should see a rather long receipt being
+produced, here's an excerpt::
+
+  ...
+  Simulation result:
+    Manager signed operations:
+      From: tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w
+      Fee to the baker: ꜩ0.001259
+      ...
+      Balance updates:
+        tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ............ -ꜩ0.001259
+        fees(tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU,72) ... +ꜩ0.001259
+      Revelation of manager public key:
+        Contract: tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w
+        Key: edpkuK4o4ZGyNHKrQqAox7hELeKEceg5isH18CCYUaQ3tF7xZ8HW3X
+        ...
+    Manager signed operations:
+      From: tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w
+      Fee to the baker: ꜩ0.001179
+      ...
+      Balance updates:
+        tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ............ -ꜩ0.001179
+        fees(tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU,72) ... +ꜩ0.001179
+      Transaction:
+        Amount: ꜩ1
+        From: tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w
+        To: tz1Rk5HA9SANn3bjo4qMXTZettPjjKMG14Ph
+        ...
+        Balance updates:
+          tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ... -ꜩ1
+          tz1Rk5HA9SANn3bjo4qMXTZettPjjKMG14Ph ... +ꜩ1
+          tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ... -ꜩ0.257
+
+The client does a bit of magic to simplify our life and here we see
+that many details were automatically set for us.
+Surprisingly, our transfer operation resulted in `two` operations,
+first a `revelation` and then a transfer.
+Alice's address, obtained from the faucet, is already present on the
+blockchain, but only in the form of a `public key hash`
+``tz1Rj...5w``.
+In order to sign operations Alice needs to first reveal the `public
+key` ``edpkuk...3X`` behind the hash, so that other users can verify
+her signatures.
+The client is kind enough to prepend a reveal operation before the
+first transfer of a new address, this has to be done only once, future
+transfers will consist of a single operation as expected.
+
+Another interesting thing we learn from the receipt is that there are
+more costs being added on top of the transfer and the burn: `fees`.
+In order to encourage a baker to include our operation, and in general
+to pay for the cost of running the blockchain, each operation usually
+includes a fee that goes to the baker.
+Fees are variable over time and depend on many factors but the tezos
+client selects a default for us.
+
+The last important bit of our receipt are the balance updates which
+resume which address is being debited or credit of a certain amount.
+We see in this case that baker ``tz1Ke...yU`` is being credited one
+fee for each operation, that Bob's address ``tz1Rk...Ph`` gets 1 tez
+and that Alice pays the two fees, the transfer and the burn.
+
+Now that we have a clear picture of what we are going to pay we can
+execute the transfer for real, without the dry-run option.
+You will notice that the client hangs for a few seconds before
+producing the receipt because after injecting the operation in your
+local node it is waiting for it to be included by some baker on the
+network.
+Once it receives a block with the operation inside it will return the
+receipt.
+
+It is advisable to wait several blocks to consider the transaction as
+final, for an important operation we advice to wait 60 blocks.
 
 In the rare case when an operation is lost, how can we be sure that it
 will not be included in any future block and re-emit it?
@@ -281,70 +360,6 @@ included anymore in a block.
 Furthermore each operation has a counter (explained in more detail
 later) that prevents replays so it is usually safe to re-emit an
 operation that seems lost.
-
-
-Receipts for operations and blocks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-After an operation succeeds, the client prints a `receipt` of the propagation
-of the operation to the blockchain. It is possible to review the receipt of a
-transaction with:
-
-::
-
-    tezos-client get receipt for <operation hash>
-
-Alternatively, the operations stored in the head block can be inspected via
-an RPC call:
-
-::
-
-    tezos-client rpc get /chains/main/blocks/head/operations
-
-A manager operation, such as a transaction, has 3 important
-parameters: counter, gas and storage limit.
-The counter belongs to each account, it increases at each operation
-signed by that account and enforces some good intuitive properties:
-
-- each operation is unique: for example if we perform twice the same
-  transfer from *alice* to *bob*, even if all the data are the
-  same the counter will be different.
-- each operation is applied once: for example if the transfer above
-  reaches two peers and they both send it to a third peer, it will not
-  apply the transaction twice.
-- operations are applied in order.
-- all previous operations have been applied: if we emit operation *n*
-  and *n+1*, and *n* gets lost then *n+1* cannot be applied.
-
-Additionally each operation needs to declare a gas and storage limit,
-if an operation consumes more than these limits it will fail.
-Later we'll learn more about the gas and storage model.
-
-Another interesting field of the receipts are the `balance updates`
-showing which account was credited or debited.
-For the transaction above the updates are symmetrical, *alice* is
-debited 1ꜩ and *bob* is credited the same amount.
-The same is true for the fees with the difference that the baker is
-credited and, more importantly, it is not credited immediately on its
-main account but on its frozen fees account, hence the category
-`freezer`.
-Each delegate has 3 frozen accounts: `deposits`, `fees` and `rewards`.
-They are frozen because the delegate can't use them for now, but only
-after a number cycles.
-
-It is also possible to review the receipt of the whole block:
-
-::
-
-   tezos-client rpc get /chains/main/blocks/head/metadata
-
-Here we always see the deposit that the baker had to put down to bake
-the block, which is again a debit on its main account paired with a
-credit on its `deposits` account, and the creation of a reward, which
-is a single credit to its `rewards` account.
-
-An interesting block receipt is the one produced at the end of a
-cycle as many delegates receive back part of their unfrozen accounts.
 
 
 .. _originated-accounts:
@@ -376,7 +391,7 @@ Let's originate our first contract and call it *id*:
                  --init '"hello"' --burn-cap 0.4
 
 The contract manager is the implicit account ``alice``. The initial balance
-is 1ꜩ, generously provided by implicit account *alice* (but it could be from
+is ꜩ1, generously provided by implicit account *alice* (but it could be from
 another contract managed by ``alice`` too). The contract stores a Michelson
 program ``id.tz``, with Michelson value ``"hello"`` as initial storage (the
 extra quotes are needed to avoid shell expansion). The parameter ``--burn-cap``
@@ -405,7 +420,7 @@ Gas and storage cost model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A quick look at the balance updates on the receipt shows that on top of
-funding the contract with 1ꜩ, *alice* was also charged an extra cost
+funding the contract with ꜩ1, *alice* was also charged an extra cost
 that is burnt.
 This cost comes from the *storage* and is shown in the line
 ``Paid storage size diff: 46 bytes``, 41 for the contract and 5 for
@@ -415,9 +430,7 @@ every node stores, it is necessary to charge a fee per byte to avoid
 abuse and encourage lean programs.
 
 Let's see what calling a program with a new argument would look like
-with the ``--dry-run`` option:
-
-::
+with the ``--dry-run`` option::
 
    tezos-client transfer 0 from alice to id --arg '"world"' --dry-run
 
@@ -439,8 +452,8 @@ This means that there is an implicit cost for gas that is related to
 the fee offered versus the gas and fees of other transactions.
 
 If you are happy with the gas and storage of your transaction you can
-run it for real, however it is always a good idea to set explicit
-limit for both. The transaction fails if the limits are passed.
+run it for real, however it is always a good idea to set an explicit
+limit for both. The transaction fails if any of the two limits are passed.
 
 ::
 
@@ -487,15 +500,14 @@ this limits, they were computed for us.
 
 More information on validation can be found :ref:`here. <validation>`
 
+
 It's RPCs all the way down
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The client communicates with the node uniquely through RPC calls so
 make sure that the node is listening and that the ports are
 correct.
-For example the ``get timestamp`` command above is a shortcut for:
-
-::
+For example the ``get timestamp`` command above is a shortcut for::
 
    tezos-client rpc get /chains/main/blocks/head/header/shell
 
@@ -503,9 +515,7 @@ The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific informations you'll
 have to resort to RPCs.
 For example to check the value of important constants in Tezos, which
-may differ between Mainnet, Alphanet and Zeronet, you can use:
-
-::
+may differ between Mainnet, Alphanet and Zeronet, you can use::
 
    tezos-client rpc get /chains/main/blocks/head/context/constants | jq
    {
@@ -537,5 +547,18 @@ may differ between Mainnet, Alphanet and Zeronet, you can use:
      "cost_per_byte": "1000",
      "hard_storage_limit_per_operation": "60000"
    }
+
+Another interesting use of RPCs is to inspect the receipts of the
+operations of a block::
+
+  tezos-client rpc get /chains/main/blocks/head/operations
+
+It is also possible to review the receipt of the whole block::
+
+  tezos-client rpc get /chains/main/blocks/head/metadata
+
+An interesting block receipt is the one produced at the end of a
+cycle as many delegates receive back part of their unfrozen accounts.
+
 
 You can find more info in the :ref:`RPCs' page. <rpc>`
