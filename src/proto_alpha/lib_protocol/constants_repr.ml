@@ -111,7 +111,7 @@ let default = {
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 46) 1L) ;
   tokens_per_roll =
-    Tez_repr.(mul_exn one 10_000) ;
+    Tez_repr.(mul_exn one 8_000) ;
   michelson_maximum_type_size = 1000 ;
   seed_nonce_revelation_tip = begin
     match Tez_repr.(one /? 8L) with
