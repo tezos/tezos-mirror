@@ -535,22 +535,6 @@ let add_the_same_operation_twice () =
   end
 
 (********************)
-(** Do the transfer from an "unspendable" contract *)
-(********************)
-
-let unspendable_contract () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
-  Op.origination ~spendable:false (I b) contract_1 >>=? fun (operation, unspendable_contract) ->
-  Incremental.add_operation b operation >>=? fun b ->
-  Op.transaction (I b) unspendable_contract contract_2 Alpha_context.Tez.one_cent >>=? fun operation ->
-  Incremental.add_operation b operation >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res begin function
-    | Contract_storage.Unspendable_contract _ -> true
-    | _ -> false
-  end
-
-(********************)
 (** check ownership *)
 (********************)
 
@@ -658,7 +642,6 @@ let tests = [
   Test.tztest "balance too low with two transfers" `Quick (balance_too_low_two_transfers Tez.one);
   Test.tztest "invalid_counter" `Quick invalid_counter ;
   Test.tztest "add the same operation twice" `Quick  add_the_same_operation_twice ;
-  Test.tztest "unspendable contract" `Quick unspendable_contract ;
 
   Test.tztest "ownership sender" `Quick  ownership_sender ;
   (* Random tests *)

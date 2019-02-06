@@ -33,6 +33,8 @@ type error += Duplicate_endorsement of Signature.Public_key_hash.t (* `Branch *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
+type error += Cannot_originate_spendable_smart_contract (* `Permanent *)
+type error += Cannot_originate_non_spendable_account (* `Permanent *)
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -133,6 +135,30 @@ let () =
     Operation.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
+  register_error_kind
+    `Permanent
+    ~id:"cannot_originate_non_spendable_account"
+    ~title:"Cannot originate non spendable account"
+    ~description:"An origination was attempted \
+                  that would create a non spendable, non scripted contract"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "It is not possible anymore to originate \
+                            a non scripted contract that is not spendable.")
+    Data_encoding.empty
+    (function Cannot_originate_non_spendable_account -> Some () | _ -> None)
+    (fun () -> Cannot_originate_non_spendable_account) ;
+  register_error_kind
+    `Permanent
+    ~id:"cannot_originate_spendable_smart_contract"
+    ~title:"Cannot originate spendable smart contract"
+    ~description:"An origination was attempted \
+                  that would create a spendable scripted contract"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "It is not possible anymore to originate \
+                            a scripted contract that is spendable.")
+    Data_encoding.empty
+    (function Cannot_originate_spendable_smart_contract -> Some () | _ -> None)
+    (fun () -> Cannot_originate_spendable_smart_contract) ;
   register_error_kind
     `Permanent
     ~id:"block.invalid_double_endorsement_evidence"
@@ -460,15 +486,22 @@ let apply_manager_operation_content :
     | Origination { manager ; delegate ; script ; preorigination ;
                     spendable ; delegatable ; credit } ->
         begin match script with
-          | None -> return (None, ctxt)
+          | None ->
+              if spendable then
+                return (None, ctxt)
+              else
+                fail Cannot_originate_non_spendable_account
           | Some script ->
-              Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
-              Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
-              Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
-              Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
-              Script_ir_translator.parse_script ctxt script >>=? fun (ex_script, ctxt) ->
-              Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
-              return (Some (script, big_map_diff), ctxt)
+              if spendable then
+                fail Cannot_originate_spendable_smart_contract
+              else
+                Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
+                Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
+                Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
+                Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
+                Script_ir_translator.parse_script ctxt script >>=? fun (ex_script, ctxt) ->
+                Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
+                return (Some (script, big_map_diff), ctxt)
         end >>=? fun (script, ctxt) ->
         spend ctxt source credit >>=? fun ctxt ->
         begin match preorigination with

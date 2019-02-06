@@ -61,16 +61,22 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
 
 
 (* [test_origination_balances fee credit spendable delegatable]
-   takes four optional parameter: fee is the fee that pay if require to create an originated contract; credit is the amount of tez that will send to this contract; spendable default is set to true meaning that this contract is spendable; delegatable default is set to true meaning that this contract is able to delegate.
-   This function will create a contract, get the balance of this contract, call the origination operation to create a new originated contract from this contract with all the possible fees; and check the balance before/after originated operation valid.
+   takes four optional parameter: fee is the fee that pay if require to create
+   an originated contract; credit is the amount of tez that will send to this
+   contract; delegatable default is set to true meaning that this contract is
+   able to delegate.
+   This function will create a contract, get the balance of this contract, call
+   the origination operation to create a new originated contract from this
+   contract with all the possible fees; and check the balance before/after
+   originated operation valid.
    - the source contract has payed all the fees
    - the originated has been credited correctly *)
 let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
-    ?spendable ?delegatable () =
+    ?delegatable () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.hd contracts in
   Context.Contract.balance (B b) contract >>=? fun balance ->
-  Op.origination (B b) contract ~fee ~credit ?spendable ?delegatable >>=? fun (operation, new_contract) ->
+  Op.origination (B b) contract ~fee ~credit ?delegatable >>=? fun (operation, new_contract) ->
   (* The possible fees are: a given credit, an origination burn fee
      (constants_repr.default.origination_burn = 257 mtez),
      a fee that is paid when creating an originate contract.
@@ -132,9 +138,6 @@ let balances_credit () =
 let balances_credit_fee () =
   test_origination_balances ~loc:__LOC__ ~credit:(Tez.of_int 2) ~fee:ten_tez ()
 
-let balances_credit_unspendable () =
-  test_origination_balances ~loc:__LOC__ ~credit:Tez.one ~spendable:false ()
-
 let balances_undelegatable () =
   test_origination_balances ~loc:__LOC__ ~delegatable:false ()
 
@@ -168,18 +171,20 @@ let pay_fee () =
 (******************************************************)
 
 (*******************)
-(** The originate contract is marked as unspendable. Then ask this
-    contract to transfer, it will raise an error *)
+(** Originating an unspendable contract w/o code reises an error. *)
 (*******************)
 
 let unspendable () =
-  register_origination ~credit:Tez.one ~spendable:false () >>=? fun (b, contract, new_contract) ->
-  Op.transaction (B b) new_contract contract Tez.one_cent >>=? fun operation ->
-  Block.bake ~operation b >>= fun e ->
-  let unspendable = function
-    | Proto_alpha.Contract_storage.Unspendable_contract _ -> true
-    | _ -> false in
-  Assert.proto_error ~loc:__LOC__ e unspendable
+  Context.init 1 >>=? fun (b, contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let source = List.hd contracts in
+  Op.origination (I i) source ~fee:Tez.zero ~credit:Tez.one ~spendable:false >>=? fun (operation, _contract) ->
+  Incremental.add_operation i operation >>= fun res ->
+  let cannot_originate = function
+    | Apply.Cannot_originate_non_spendable_account -> true
+    | _ -> false
+  in
+  Assert.proto_error ~loc:__LOC__ res cannot_originate
 
 (*******************)
 (** The originate contract is marked as undelegatable. Then do the delegation
@@ -410,7 +415,6 @@ let tests = [
   Test.tztest "balances_simple" `Quick balances_simple ;
   Test.tztest "balances_credit" `Quick balances_credit ;
   Test.tztest "balances_credit_fee" `Quick balances_credit_fee ;
-  Test.tztest "balances_credit_unspendable" `Quick balances_credit_unspendable ;
   Test.tztest "balances_undelegatable" `Quick balances_undelegatable ;
 
   Test.tztest "regular" `Quick regular ;
