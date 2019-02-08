@@ -7,11 +7,16 @@ type client = t
 val of_node : exec:Tezos_executable.t -> Tezos_node.t -> t
 (** Create a client which is meant to communicate with a given node. *)
 
+val no_node_client : exec:Tezos_executable.t -> t
+(** Create a client not connected to a node (e.g. for ledger interaction). *)
+
 val base_dir : t -> state:< paths: Paths.t ; .. > -> string
+(** Get the path to the ["--base-dir"] option of the client. *)
+
+(** {3 Build Scripts } *)
 
 val client_command :
   t -> state:< paths: Paths.t ; .. > -> string list -> unit Genspio.EDSL.t
-(** {3 Build Scripts } *)
 
 val bootstrapped_script :
   t -> state:< paths: Paths.t ; .. > -> unit Genspio.EDSL.t
@@ -134,6 +139,76 @@ val get_block_header :
      , [> Command_error.t | `Lwt_exn of exn] )
      Asynchronous_result.t
 (** Call the RPC ["/chains/main/blocks/<block>/header"]. *)
+
+val list_known_addresses :
+     < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; .. >
+  -> client:t
+  -> ( (string * string) list
+     , [> Command_error.t | `Lwt_exn of exn] )
+     Asynchronous_result.t
+
+module Ledger : sig
+  type hwm = {main: int; test: int; chain: Tezos_crypto.Chain_id.t option}
+
+  val get_hwm :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> client:t
+    -> uri:string
+    -> (hwm, [> Command_error.t | `Lwt_exn of exn]) Asynchronous_result.t
+
+  val set_hwm :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> client:t
+    -> uri:string
+    -> level:int
+    -> (unit, [> Command_error.t | `Lwt_exn of exn]) Asynchronous_result.t
+
+  val show_ledger :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> client:t
+    -> uri:string
+    -> ( Tezos_protocol.Account.t
+       , [> Command_error.t | `Lwt_exn of exn] )
+       Asynchronous_result.t
+
+  val deauthorize_baking :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> client:t
+    -> uri:string
+    -> (unit, [> Command_error.t | `Lwt_exn of exn]) Asynchronous_result.t
+
+  val get_authorized_key :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> client:t
+    -> uri:string
+    -> ( string option
+       , [> Command_error.t | `Lwt_exn of exn] )
+       Asynchronous_result.t
+end
 
 module Keyed : sig
   type t = {client: client; key_name: string; secret_key: string}

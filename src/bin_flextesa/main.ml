@@ -81,4 +81,5 @@ let () =
          ; Command_daemons_protocol_change.cmd () ~pp_error
          ; Command_voting.cmd () ~pp_error
          ; Command_accusations.cmd () ~pp_error
-         ; Command_prevalidation.cmd () ~pp_error ] )
+         ; Command_prevalidation.cmd () ~pp_error
+         ; Command_ledger_baking.cmd () ~pp_error ] )
