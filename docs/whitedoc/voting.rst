@@ -86,6 +86,16 @@ identifier of each voting period and proposals is a non-empty list of
 maximum 20 protocol hashes.
 The operation can be submitted more than once but only as long as the
 cumulative length of the proposals lists is less than 20.
+Duplicate proposals from the same delegate are accounted for in the
+maximum number of proposals for that delegate.
+However duplicates from the same delegate are not tallied at the end
+of the proposal period.
+
+For example, a delegate submits a proposals operation for protocol A
+and B early in the proposal period, later a new protocol C is revealed
+and the delegate submits another proposals operation for protocol B
+and C.
+The list of submissions that will be tallied is [A,B,C] and the
 
 A ballot operation can only be submitted during one of the voting
 periods, and only once per period.
