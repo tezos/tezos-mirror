@@ -126,8 +126,6 @@ let default = {
   cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
 }
 
-module CompareListInt = Compare.List (Compare.Int)
-
 let parametric_encoding =
   let open Data_encoding in
   conv
