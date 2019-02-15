@@ -48,7 +48,7 @@ The full documentation is also available online :ref:`client_manual`.
 Node
 ----
 
-The node is effectively the Tezos blockchain and it has two main
+The node is the main actor of the Tezos blockchain and it has two main
 functions: running the gossip network and updating the context.
 The gossip network is where all Tezos nodes exchange blocks and
 operations with each other (see :ref:`tezos-admin-client` to monitor
@@ -252,7 +252,7 @@ Transfers and receipts
 
 In order to fund our newly created account we need to transfer some
 tez using the `transfer` operation.
-Every operation returns a `receipt` that ricapitulates all the effects
+Every operation returns a `receipt` that recapitulates all the effects
 of the operation on the blockchain.
 A useful option for any operation is ``--dry-run``, which instructs
 the client to simulate the operation without actually sending it to
@@ -416,6 +416,7 @@ It specifies the types for the parameter and storage, and implements a
 function which ignores the parameter and returns the storage unchanged together
 with an empty list of operations.
 
+
 Gas and storage cost model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -458,13 +459,16 @@ limit for both. The transaction fails if any of the two limits are passed.
 ::
 
    tezos-client transfer 0 from alice to id --arg '"world"' \
-                                            --gas-limit 1475 \
+                                            --gas-limit 11375 \
                                             --storage-limit 46
 
 A baker is more likely to include an operation with lower gas and
 storage limits because it takes less resources to execute so it is in
 the best interest of the user to pick limits that are as close as
-possible to the actual use.
+possible to the actual use. In this case, you may have to specify some
+fees as the baker is expecting some for the resources
+usage. Otherwise, you can force a low fee operation using the
+`--force-low-fee`, with the risk that no baker will include it.
 
 More test contracts can be found in directory
 :src:`src/bin_client/test/contracts/`.
@@ -512,7 +516,7 @@ For example the ``get timestamp`` command above is a shortcut for::
    tezos-client rpc get /chains/main/blocks/head/header/shell
 
 The client tries to simplify common tasks as much as possible, however
-if you want to query the node for more specific informations you'll
+if you want to query the node for more specific information you'll
 have to resort to RPCs.
 For example to check the value of important constants in Tezos, which
 may differ between Mainnet, Alphanet and Zeronet, you can use::
