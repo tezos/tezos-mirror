@@ -194,6 +194,16 @@ let get_rolls ctxt delegate =
   | None -> return_nil
   | Some head_roll -> traverse_rolls ctxt head_roll
 
+let count_rolls ctxt delegate =
+  Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
+  | None -> return 0
+  | Some head_roll ->
+      let rec loop acc roll =
+        Storage.Roll.Successor.get_option ctxt roll >>=? function
+        | None -> return acc
+        | Some next -> loop (succ acc) next in
+      loop 1 head_roll
+
 let get_change c delegate =
   Storage.Roll.Delegate_change.get_option c delegate >>=? function
   | None -> return Tez_repr.zero
@@ -480,3 +490,26 @@ let cycle_end ctxt last_cycle =
   Storage.Roll.Snapshot_for_cycle.init
     ctxt (Cycle_repr.succ (Cycle_repr.succ frozen_roll_cycle)) 0 >>=? fun ctxt ->
   return ctxt
+
+let update_tokens_per_roll ctxt new_tokens_per_roll =
+  let constants = Raw_context.constants ctxt in
+  let old_tokens_per_roll = constants.tokens_per_roll in
+  Raw_context.patch_constants ctxt begin fun constants ->
+    { constants with Constants_repr.tokens_per_roll = new_tokens_per_roll }
+  end >>= fun ctxt ->
+  let decrease = Tez_repr.(new_tokens_per_roll < old_tokens_per_roll) in
+  begin
+    if decrease then
+      Lwt.return Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
+    else
+      Lwt.return Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll)
+  end >>=? fun abs_diff ->
+  Storage.Delegates.fold ctxt (Ok ctxt) begin fun pkh ctxt ->
+    Lwt.return ctxt >>=? fun ctxt ->
+    count_rolls ctxt pkh >>=? fun rolls ->
+    Lwt.return Tez_repr.(abs_diff *? Int64.of_int rolls) >>=? fun amount ->
+    if decrease then
+      Delegate.add_amount ctxt pkh amount
+    else
+      Delegate.remove_amount ctxt pkh amount
+  end

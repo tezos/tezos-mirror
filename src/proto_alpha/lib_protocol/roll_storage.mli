@@ -95,6 +95,9 @@ val get_rolls:
 val get_change:
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
+val update_tokens_per_roll:
+  Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
 (**/**)
 
 val get_contract_delegate:
