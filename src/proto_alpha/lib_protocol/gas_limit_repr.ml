@@ -85,8 +85,8 @@ type error += Operation_quota_exceeded (* `Temporary *)
 
 let allocation_weight = Z.of_int 2
 let step_weight = Z.of_int 1
-let read_base_weight = Z.of_int 50
-let write_base_weight = Z.of_int 80
+let read_base_weight = Z.of_int 100
+let write_base_weight = Z.of_int 160
 let byte_read_weight = Z.of_int 10
 let byte_written_weight = Z.of_int 15
 
