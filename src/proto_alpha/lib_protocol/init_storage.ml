@@ -42,6 +42,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
       Vote_storage.init ctxt >>=? fun ctxt ->
       Storage.Last_block_priority.init ctxt 0 >>=? fun ctxt ->
+      Vote_storage.freeze_listings ctxt >>=? fun ctxt ->
       return ctxt
   | Alpha_previous ->
       return ctxt

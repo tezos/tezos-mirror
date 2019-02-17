@@ -14,12 +14,7 @@ sed -e 's/"blocks_per_voting_period": [0-9]*/"blocks_per_voting_period" : 4/' $p
 parameters_file=$tempdir/parameters.json
 echo params=${parameters_file}
 
-# Start a node
-start_node 1
-activate_alpha
-
-echo Alpha activated
-
+#useful RPCs
 function get_ballot_list() {
     $client rpc get /chains/main/blocks/head/votes/ballot_list
 }
@@ -43,24 +38,16 @@ function get_proposals() {
 }
 function get_period_position() {
     #TODO why offset 1?
-    $client rpc get /chains/main/blocks/head/helpers/current_level?offset=1 | jq .voting_period_position
+    $client rpc get /chains/main/blocks/head/helpers/current_level | jq .voting_period_position
 }
 
+# Start a node
+start_node 1
+activate_alpha
+
+echo Alpha activated
+
 $client show voting period
-
-[ `get_period_position` = '1' ] \
-    || { echo "strange voting_period_position" ; exit 1 ; }
-echo Checking the bug of the empty listing in the first voting period...
-[ `get_listings` = '[]' ] \
-    || { echo "empty listings bug was fixed?!" ; exit 1 ; }
-
-bake # pos=2
-
-[ `get_period_position` = '2' ] \
-    || { echo "strange voting_period_position" ; exit 1 ; }
-
-bake # pos=3
-bake # new period, pos=0
 
 echo 'Checking the current period = proposal with non empty listings'
 [ `get_period_position` = '0' ] \

@@ -93,12 +93,8 @@ let get_rolls b delegates loc =
 
 let test_successful_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,_) ->
-
-  (* Because of a minor bug in the initialization of the voting state, the
-     listings are not populated in the very first period. After that they get
-     correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* no ballots in proposal period *)
   Context.Vote.get_ballots (B b) >>=? fun v ->
@@ -111,11 +107,11 @@ let test_successful_vote num_delegates () =
     | _ -> failwith "%s - Unexpected ballot list" __LOC__
   end >>=? fun () ->
 
-  (* period 1 *)
+  (* period 0 *)
   Context.Vote.get_voting_period (B b) >>=? fun v ->
   let open Alpha_context in
   Assert.equal ~loc:__LOC__ Voting_period.equal "Unexpected period"
-    Voting_period.pp v Voting_period.(succ root)
+    Voting_period.pp v Voting_period.(root)
   >>=? fun () ->
 
   Context.Vote.get_current_period_kind (B b) >>=? begin function
@@ -196,11 +192,11 @@ let test_successful_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  (* period 2 *)
+  (* period 1 *)
   Context.Vote.get_voting_period (B b) >>=? fun v ->
   let open Alpha_context in
   Assert.equal ~loc:__LOC__ Voting_period.equal "Unexpected period"
-    Voting_period.pp v Voting_period.(succ (succ root))
+    Voting_period.pp v Voting_period.(succ root)
   >>=? fun () ->
 
   (* listings must be populated in testing_vote period *)
@@ -271,11 +267,11 @@ let test_successful_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  (* period 3 *)
+  (* period 2 *)
   Context.Vote.get_voting_period (B b) >>=? fun v ->
   let open Alpha_context in
   Assert.equal ~loc:__LOC__ Voting_period.equal "Unexpected period"
-    Voting_period.pp v Voting_period.(succ (succ (succ root)))
+    Voting_period.pp v Voting_period.(succ (succ root))
   >>=? fun () ->
 
   (* no ballots in testing period *)
@@ -298,11 +294,11 @@ let test_successful_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  (* period 4 *)
+  (* period 3 *)
   Context.Vote.get_voting_period (B b) >>=? fun v ->
   let open Alpha_context in
   Assert.equal ~loc:__LOC__ Voting_period.equal "Unexpected period"
-    Voting_period.pp v Voting_period.(succ (succ (succ (succ root))))
+    Voting_period.pp v Voting_period.(succ (succ (succ root)))
   >>=? fun () ->
 
   (* listings must be populated in promotion_vote period *)
@@ -403,12 +399,8 @@ let get_expected_quorum ?(min_participation=0) rolls voter_rolls old_quorum =
    go back to proposal period *)
 let test_not_enough_quorum_in_testing_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
-
-  (* Because of a minor bug in the initialization of the voting state, the
-     listings are not populated in the very first period. After that they get
-     correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* proposal period *)
   let open Alpha_context in
@@ -471,11 +463,8 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
    go back to proposal period *)
 let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
-  (* Because of a minor bug in the initialization of the voting state, the
-     listings are not populated in the very first period. After that they get
-     correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   Context.Vote.get_current_period_kind (B b) >>=? begin function
     | Proposal -> return_unit
@@ -569,12 +558,6 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
 let test_multiple_identical_proposals_count_as_one () =
   Context.init 1 >>=? fun (b,delegates) ->
 
-  (* Because of a minor bug in the initialization of the voting state, the
-     listings are not populated in the very first period. After that they get
-     correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
-
   Context.Vote.get_current_period_kind (B b) >>=? begin function
     | Proposal -> return_unit
     | _ -> failwith "%s - Unexpected period kind" __LOC__
@@ -667,9 +650,8 @@ let test_supermajority_in_proposal there_is_a_winner () =
 
 let test_supermajority_in_testing_vote supermajority () =
   Context.init 100 >>=? fun (b,delegates) ->
-
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   let del1 = List.nth delegates 0 in
   let proposal = protos.(0) in
@@ -733,12 +715,8 @@ let test_supermajority_in_testing_vote supermajority () =
 (* test also how the selection scales: all delegates propose max proposals *)
 let test_no_winning_proposal num_delegates () =
   Context.init num_delegates >>=? fun (b,_) ->
-
-  (* Because of a minor bug in the initialization of the voting state, the
-     listings are not populated in the very first period. After that they get
-     correctly populated. An empty listing means no proposals will be accepted. *)
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period; _ } ; _ } ->
-  Block.bake_n (Int32.to_int blocks_per_voting_period) b >>=? fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* beginning of proposal, denoted by _p1;
      take a snapshot of the active delegates and their rolls from listings *)
