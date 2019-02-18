@@ -460,40 +460,43 @@ let prepare ~level ~timestamp ~fitness ctxt =
     internal_nonces_used = Int_set.empty ;
   }
 
-type 'a previous_protocol =
-  | Genesis of 'a
+type previous_protocol =
+  | Genesis of Parameters_repr.t
   | Alpha_previous
 
-let check_first_block ctxt =
-  Context.get ctxt version_key >>= function
-  | None ->
-      failwith "Internal error: un-initialized context in check_first_block."
-  | Some bytes ->
-      let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value) then
-        failwith "Internal error: previously initialized context."
-      else if Compare.String.(s = "genesis") then
-        return (Genesis ())
-      else if Compare.String.(s = "alpha_previous") then
-        return Alpha_previous
-      else
-        storage_error (Incompatible_protocol_version s)
-
-let prepare_first_block ~level ~timestamp ~fitness ctxt =
-  check_first_block ctxt >>=? fun previous_protocol ->
+let check_and_update_protocol_version ctxt =
   begin
-    match previous_protocol with
-    | Genesis () ->
-        Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
-        get_proto_param ctxt >>=? fun (param, ctxt) ->
-        set_first_level ctxt first_level >>=? fun ctxt ->
-        set_constants ctxt param.constants >>= fun ctxt ->
-        return (Genesis param, ctxt)
-    | Alpha_previous ->
-        return (Alpha_previous, ctxt)
+    Context.get ctxt version_key >>= function
+    | None ->
+        failwith "Internal error: un-initialized context in check_first_block."
+    | Some bytes ->
+        let s = MBytes.to_string bytes in
+        if Compare.String.(s = version_value) then
+          failwith "Internal error: previously initialized context."
+        else if Compare.String.(s = "genesis") then
+          get_proto_param ctxt >>=? fun (param, ctxt) ->
+          return (Genesis param, ctxt)
+        else if Compare.String.(s = "alpha_previous") then
+          return (Alpha_previous, ctxt)
+        else
+          storage_error (Incompatible_protocol_version s)
   end >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
+  return (previous_proto, ctxt)
+
+let prepare_first_block ~level ~timestamp ~fitness ctxt =
+  check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
+  begin
+    match previous_proto with
+    | Genesis param ->
+        Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+        set_first_level ctxt first_level >>=? fun ctxt ->
+        set_constants ctxt param.constants >>= fun ctxt ->
+        return ctxt
+    | Alpha_previous ->
+        return ctxt
+  end >>=? fun ctxt ->
   prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
   return (previous_proto, ctxt)
 
