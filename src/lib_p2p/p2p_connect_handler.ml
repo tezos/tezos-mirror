@@ -253,14 +253,14 @@ let raw_authenticate t ?point_info canceler fd point =
     let active = P2p_pool.active_connections t.pool in
     max_active_conns > active
   in
-  let acceptable_point =
+  let (acceptable_point, rejection_argument) =
     Option.unopt_map
       connection_point_info
-      ~default:(not t.config.private_mode)
+      ~default:(not t.config.private_mode, "unknown point in private mode")
       ~f:(fun connection_point_info ->
         match P2p_point_state.get connection_point_info with
         | Requested _ ->
-            not incoming
+            (not incoming, "Requested status and incoming")
         | Disconnected ->
             let unexpected =
               t.config.private_mode
@@ -268,11 +268,11 @@ let raw_authenticate t ?point_info canceler fd point =
             in
             if unexpected then
               warn
-                "[private node] incoming connection from untrused peer \
+                "[private node] incoming connection from untrusted peer \
                  rejected!" ;
-            not unexpected
+            (not unexpected, "unexpected connection in private mode")
         | Accepted _ | Running _ ->
-            false)
+            (false, "already running or accepted point"))
   in
   let acceptable_peer_id =
     match P2p_peer_state.get peer_info with
@@ -366,14 +366,31 @@ let raw_authenticate t ?point_info canceler fd point =
            version)
   | _ -> (
       t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
-      lwt_debug
-        "authenticate: %a -> kick %a point: %B peer_id: %B"
-        P2p_point.Id.pp
-        point
-        P2p_peer.Id.pp
-        info.peer_id
-        acceptable_point
-        acceptable_peer_id
+      ( match acceptable_version with
+      | None ->
+          lwt_debug
+            "authenticate: %a -> kick %a,no compatible network (announced %a)"
+            P2p_point.Id.pp
+            point
+            P2p_peer.Id.pp
+            info.peer_id
+            Network_version.pp
+            info.announced_version
+      | _ ->
+          lwt_debug
+            "authenticate: %a -> kick %a enough slots:%B,point acceptable: \
+             %B%a, peer_id acceptable: %B"
+            P2p_point.Id.pp
+            point
+            P2p_peer.Id.pp
+            info.peer_id
+            acceptable_capacity
+            acceptable_point
+            (fun fmt (acceptable_point, rejection_argument) ->
+              if not acceptable_point then
+                Format.fprintf fmt "(%s)" rejection_argument)
+            (acceptable_point, rejection_argument)
+            acceptable_peer_id )
       >>= fun () ->
       P2p_socket.kick auth_fd
       >>= fun () ->
