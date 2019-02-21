@@ -157,6 +157,10 @@ let signal_name =
   in
   fun n -> List.assoc n names
 
+(** Wait for all processes to terminate.
+
+    If a node terminates with an error, all remaining processes
+    are canceled and an exception is raised *)
 let wait_all processes =
   let rec loop processes =
     match processes with

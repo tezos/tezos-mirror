@@ -24,6 +24,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing of the Pool
+
+    Each test launches nodes in separate process, each node has its own pool and is given a function to be executed.
+
+    [Simple] test: each node pings all other nodes.
+
+    [Random] test: each node pings all other nodes but at random points in time.
+
+    [Garbled] test: each node write garbled data to all peers, then it checks that connections are closed.
+
+    [Overcrowded] tests:
+    both test [run] and [run_mixed_versions] creates one target node which
+    knows all the other points  and has max_incoming_connections set
+    to zero,
+    all other clients know only the target and try to connect to it.
+
+    In [run], each client use p2p v.1 and check that they eventually
+    know all other nodes thanks to the node reply.
+
+    In [run_mixed_versions], half the clients do as in run and half of
+    the clients use p2p v.0 and check that they didn't receive new
+    nodes (meaning that [target] actually sent a Nack_v_0.
+
+*)
+
 include Internal_event.Legacy_logging.Make (struct
   let name = "test.p2p.connection-pool"
 end)
@@ -62,10 +87,14 @@ let conn_meta_config : metadata P2p_params.conn_meta_config =
     private_node = (fun _ -> false);
   }
 
-let sync ch =
+let sync iteration ch =
+  incr iteration ;
+  lwt_debug "Sync iteration %i" !iteration
+  >>= fun () ->
   Process.Channel.push ch ()
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
+(** Syncing everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
   iter_p (fun {Process.channel; _} -> Process.Channel.pop channel) nodes
   >>=? fun () ->
@@ -80,12 +109,19 @@ let sync_nodes nodes =
   | Error _ as err ->
       Lwt.return err
 
-let detach_node f points n =
-  let ((addr, port), points) = List.select n points in
+let detach_node ?timeout ?(min_connections : int option) ?max_connections
+    ?max_incoming_connections ?p2p_versions ?(msg_config = msg_config) f
+    trusted_points all_points addr port =
+  let trusted_points =
+    List.filter
+      (fun p -> not (P2p_point.Id.equal (addr, port) p))
+      trusted_points
+  in
   let proof_of_work_target = Crypto_box.make_target 0. in
   let identity = P2p_identity.generate proof_of_work_target in
-  let private_mode = true in
-  let nb_points = List.length points in
+  let private_mode = false in
+  let nb_points = List.length trusted_points in
+  let unopt = Option.unopt ~default:nb_points in
   let connect_handler_cfg =
     P2p_connect_handler.
       {
@@ -94,9 +130,9 @@ let detach_node f points n =
         listening_port = Some port;
         private_mode;
         greylisting_config = P2p_point_state.Info.default_greylisting_config;
-        min_connections = nb_points;
-        max_connections = nb_points;
-        max_incoming_connections = nb_points;
+        min_connections = unopt min_connections;
+        max_connections = unopt max_connections;
+        max_incoming_connections = unopt max_incoming_connections;
         connection_timeout = Time.System.Span.of_seconds_exn 10.;
         authentication_timeout = Time.System.Span.of_seconds_exn 2.;
         incoming_app_message_queue_size = None;
@@ -109,7 +145,7 @@ let detach_node f points n =
     P2p_pool.
       {
         identity;
-        trusted_points = points;
+        trusted_points;
         peers_file = "/dev/null";
         private_mode;
         max_known_points = None;
@@ -120,46 +156,98 @@ let detach_node f points n =
   Process.detach
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
     (fun channel ->
-      let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      let triggers = P2p_trigger.create () in
-      let log _ = () in
-      P2p_pool.create pool_config peer_meta_config ~log triggers
-      >>= fun pool ->
-      let answerer = lazy (P2p_protocol.create_private ()) in
-      let connect_handler =
-        P2p_connect_handler.create
-          connect_handler_cfg
-          pool
-          msg_config
-          conn_meta_config
-          sched
-          triggers
-          ~log
-          ~answerer
+      let canceler = Lwt_canceler.create () in
+      let timer ti =
+        Lwt_unix.sleep ti >>= fun () -> lwt_debug "Process timeout"
       in
-      P2p_welcome.create ~backlog:10 connect_handler ~addr port
-      >>= fun welcome ->
-      P2p_welcome.activate welcome ;
-      lwt_log_info "Node ready (port: %d)" port
-      >>= fun () ->
-      sync channel
-      >>=? fun () ->
-      f channel connect_handler pool points
-      >>=? fun () ->
-      lwt_log_info "Shutting down..."
-      >>= fun () ->
-      P2p_welcome.shutdown welcome
-      >>= fun () ->
-      P2p_pool.destroy pool
-      >>= fun () ->
-      P2p_connect_handler.destroy connect_handler
-      >>= fun () ->
-      P2p_io_scheduler.shutdown sched
-      >>= fun () -> lwt_log_info "Bye." >>= fun () -> return_unit)
+      with_timeout
+        ~canceler
+        (Option.unopt_map ~f:timer ~default:(Lwt_utils.never_ending ()) timeout)
+        (fun _canceler ->
+          let iteration = ref 0 in
+          let sched =
+            P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ()
+          in
+          let triggers = P2p_trigger.create () in
+          let watcher = Lwt_watcher.create_input () in
+          let stream = Lwt_watcher.create_stream watcher in
+          let log event = Lwt_watcher.notify watcher event in
+          P2p_pool.create pool_config peer_meta_config ~log triggers
+          >>= fun pool ->
+          let answerer = lazy (P2p_protocol.create_private ()) in
+          let connect_handler =
+            P2p_connect_handler.create
+              ?p2p_versions
+              connect_handler_cfg
+              pool
+              msg_config
+              conn_meta_config
+              sched
+              triggers
+              ~log
+              ~answerer
+          in
+          Lwt_list.map_p
+            (fun point ->
+              P2p_pool.Points.info pool point
+              |> Option.iter ~f:(fun info ->
+                     P2p_point_state.set_private info false) ;
+              Lwt.return_unit)
+            trusted_points
+          >>= fun _ ->
+          P2p_welcome.create ~backlog:10 connect_handler ~addr port
+          >>= fun welcome ->
+          P2p_welcome.activate welcome ;
+          lwt_log_info "Node ready (port: %d)@." port
+          >>= fun () ->
+          sync iteration channel
+          >>=? fun () ->
+          (* Sync interation 1 *)
+          f
+            iteration
+            channel
+            stream
+            connect_handler
+            pool
+            trusted_points
+            all_points
+          >>=? fun () ->
+          lwt_log_info "Shutting down...@."
+          >>= fun () ->
+          P2p_welcome.shutdown welcome
+          >>= fun () ->
+          P2p_pool.destroy pool
+          >>= fun () ->
+          P2p_io_scheduler.shutdown sched
+          >>= fun () -> lwt_log_info "Bye.@." >>= fun () -> return_unit))
 
-let detach_nodes run_node points =
+let detach_nodes ?timeout ?min_connections ?max_connections
+    ?max_incoming_connections ?p2p_versions ?msg_config run_node
+    ?(trusted = fun _ points -> points) points =
   let clients = List.length points in
-  Lwt_list.map_p (detach_node run_node points) (0 -- (clients - 1))
+  Lwt_list.map_p
+    (fun n ->
+      let p2p_versions = Option.map p2p_versions ~f:(fun f -> f n) in
+      let msg_config = Option.map msg_config ~f:(fun f -> f n) in
+      let min_connections = Option.map min_connections ~f:(fun f -> f n) in
+      let max_connections = Option.map max_connections ~f:(fun f -> f n) in
+      let max_incoming_connections =
+        Option.map max_incoming_connections ~f:(fun f -> f n)
+      in
+      let ((addr, port), other_points) = List.select n points in
+      detach_node
+        ?p2p_versions
+        ?timeout
+        ?min_connections
+        ?max_connections
+        ?max_incoming_connections
+        ?msg_config
+        (run_node n)
+        (trusted n points)
+        other_points
+        addr
+        port)
+    (0 -- (clients - 1))
   >>= fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
@@ -182,12 +270,13 @@ module Simple = struct
         (( ( P2p_errors.Connection_refused
            | P2p_errors.Pending_connection
            | P2p_errors.Rejected_socket_connection
+           | P2p_errors.Rejected_by_nack _
            | Canceled
            | Timeout
            | P2p_errors.Rejected _ ) as head_err )
         :: _) ->
         lwt_log_info
-          "Connection to %a failed (%a)"
+          "Connection to %a failed (%a)@."
           P2p_point.Id.pp
           point
           (fun ppf err ->
@@ -198,6 +287,15 @@ module Simple = struct
                 Format.fprintf ppf "pending connection"
             | P2p_errors.Rejected_socket_connection ->
                 Format.fprintf ppf "rejected"
+            | P2p_errors.Rejected_by_nack
+                {alternative_points = Some alternative_points; _} ->
+                Format.fprintf
+                  ppf
+                  "rejected (nack_v1, peer list: @[<h>%a@])"
+                  P2p_point.Id.pp_list
+                  alternative_points
+            | P2p_errors.Rejected_by_nack {alternative_points = None; _} ->
+                Format.fprintf ppf "rejected (nack_v0)"
             | Canceled ->
                 Format.fprintf ppf "canceled"
             | Timeout ->
@@ -227,35 +325,35 @@ module Simple = struct
 
   let close_all conns = Lwt_list.iter_p P2p_conn.disconnect conns
 
-  let node channel connect_handler pool points =
+  let node iteration channel _stream connect_handler pool points _ =
     connect_all
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
       connect_handler
       pool
       points
     >>=? fun conns ->
-    lwt_log_info "Bootstrap OK"
+    lwt_log_info "Bootstrap OK@."
     >>= fun () ->
-    sync channel
+    sync iteration channel
     >>=? fun () ->
     write_all conns Ping
     >>=? fun () ->
-    lwt_log_info "Sent all messages."
+    lwt_log_info "Sent all messages.@."
     >>= fun () ->
-    sync channel
+    sync iteration channel
     >>=? fun () ->
     read_all conns
     >>=? fun () ->
-    lwt_log_info "Read all messages."
+    lwt_log_info "Read all messages.@."
     >>= fun () ->
-    sync channel
+    sync iteration channel
     >>=? fun () ->
     close_all conns
     >>= fun () ->
-    lwt_log_info "All connections successfully closed."
+    lwt_log_info "All connections successfully closed.@."
     >>= fun () -> return_unit
 
-  let run points = detach_nodes node points
+  let run points = detach_nodes (fun _ -> node) points
 end
 
 module Random_connections = struct
@@ -278,7 +376,7 @@ module Random_connections = struct
     P2p_conn.disconnect conn
     >>= fun () ->
     ( decr rem ;
-      if !rem mod total = 0 then lwt_log_info "Remaining: %d." (!rem / total)
+      if !rem mod total = 0 then lwt_log_info "Remaining: %d.@." (!rem / total)
       else Lwt.return_unit )
     >>= fun () ->
     if n > 1 then connect_random connect_handler pool total rem point (pred n)
@@ -291,14 +389,14 @@ module Random_connections = struct
       (fun point -> connect_random connect_handler pool total rem point n)
       points
 
-  let node repeat _channel connect_handler pool points =
-    lwt_log_info "Begin random connections."
+  let node repeat _channel _stream connect_handler pool points _ =
+    lwt_log_info "Begin random connections.@."
     >>= fun () ->
     connect_random_all connect_handler pool points repeat
     >>=? fun () ->
-    lwt_log_info "Random connections OK." >>= fun () -> return_unit
+    lwt_log_info "Random connections OK.@." >>= fun () -> return_unit
 
-  let run points repeat = detach_nodes (node repeat) points
+  let run points repeat = detach_nodes (fun _ _ -> node repeat) points
 end
 
 module Garbled = struct
@@ -308,7 +406,7 @@ module Garbled = struct
     | Ok _ ->
         false
     | Error err ->
-        log_info "Unexpected error: %a" pp_print_error err ;
+        log_info "Unexpected error: %a@." pp_print_error err ;
         false
 
   let write_bad_all conns =
@@ -317,20 +415,447 @@ module Garbled = struct
       (fun conn -> trace Write @@ P2p_conn.raw_write_sync conn bad_msg)
       conns
 
-  let node ch connect_handler pool points =
+  let node iteration ch _stream connect_handler pool points _ =
     Simple.connect_all
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
       connect_handler
       pool
       points
     >>=? fun conns ->
-    sync ch
+    sync iteration ch
     >>=? fun () ->
     write_bad_all conns
     >>=? (fun () -> Simple.read_all conns)
     >>= fun err -> _assert (is_connection_closed err) __LOC__ ""
 
-  let run points = detach_nodes node points
+  let run points = detach_nodes (fun _ -> node) points
+end
+
+module Overcrowded = struct
+  type error += Advertisement_failure of P2p_point.Id.t list
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"test_p2p_pool.Overcrowded.advertisment_failure"
+      ~title:"Advertisment Failure"
+      ~description:"The given list of points should be known, but are not."
+      ~pp:(fun ppf lst ->
+        Format.fprintf
+          ppf
+          "The given list of points should be known, but are not : %a"
+          P2p_point.Id.pp_list
+          lst)
+      Data_encoding.(obj1 (req "value" (list P2p_point.Id.encoding)))
+      (function Advertisement_failure l -> Some l | _ -> None)
+      (fun l -> Advertisement_failure l)
+
+  let rec connect ?iter_count ~timeout connect_handler pool point =
+    lwt_log_info
+      "Connect%a to %a@."
+      (Option.pp ~default:"" (fun ppf ->
+           Format.pp_print_string ppf " to peer " ;
+           Format.pp_print_int ppf))
+      iter_count
+      P2p_point.Id.pp
+      point
+    >>= fun () ->
+    P2p_connect_handler.connect connect_handler point ~timeout
+    >>= function
+    | Error [P2p_errors.Connected] -> (
+      match P2p_pool.Connection.find_by_point pool point with
+      | Some conn ->
+          return conn
+      | None ->
+          failwith "Woops..." )
+    | Error
+        [ ( ( P2p_errors.Connection_refused
+            | P2p_errors.Pending_connection
+            | P2p_errors.Rejected_socket_connection
+            | Canceled
+            | Timeout
+            | P2p_errors.Rejected _ ) as err ) ] ->
+        lwt_log_info
+          "Connection to%a %a failed (%a)@."
+          (Option.pp ~default:"" (fun ppf ->
+               Format.pp_print_string ppf " peer " ;
+               Format.pp_print_int ppf))
+          iter_count
+          P2p_point.Id.pp
+          point
+          (fun ppf err ->
+            match err with
+            | P2p_errors.Connection_refused ->
+                Format.fprintf ppf "connection refused"
+            | P2p_errors.Pending_connection ->
+                Format.fprintf ppf "pending connection"
+            | P2p_errors.Rejected_socket_connection ->
+                Format.fprintf ppf "rejected"
+            | Canceled ->
+                Format.fprintf ppf "canceled"
+            | Timeout ->
+                Format.fprintf ppf "timeout"
+            | P2p_errors.Rejected peer ->
+                Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
+            | _ ->
+                assert false)
+          err
+        >>= fun () ->
+        Lwt_unix.sleep (0.5 +. Random.float 2.)
+        >>= fun () -> connect ~timeout connect_handler pool point
+    | (Ok _ | Error _) as res ->
+        Lwt.return res
+
+  (** Node code of nodes that will connect to the target,
+      and either get a list of pairs or have an established connection.
+  *)
+  let client_connect connect_handler pool legacy trusted_points all_points =
+    debug
+      "@[<v 2>client connects to %a in the universe @[%a@]@]@."
+      P2p_point.Id.pp_list
+      trusted_points
+      P2p_point.Id.pp_list
+      all_points ;
+    let port =
+      Option.unopt
+        ~default:0
+        (P2p_connect_handler.config connect_handler).listening_port
+    in
+    let target = List.hd trusted_points in
+    connect
+      ~iter_count:0
+      ~timeout:(Time.System.Span.of_seconds_exn 2.)
+      connect_handler
+      pool
+      target
+    >>= function
+    | Ok conn ->
+        lwt_log_info
+          "Not good: connection accepted while it should be rejected (local: \
+           %d, remote: %d).@."
+          port
+          (snd target)
+        >>= fun () -> P2p_conn.disconnect conn >>= fun () -> return_unit
+    | Error [P2p_errors.Rejected_by_nack {alternative_points = None; _}] as err
+      ->
+        if legacy then
+          lwt_log_info
+            "Good: client is rejected without point list (local: %d, remote: \
+             %d)@."
+            port
+            (snd target)
+          >>= fun () -> return_unit
+        else
+          lwt_log_info
+            "Not good: client is rejected without point list (local: %d, \
+             remote: %d)@."
+            port
+            (snd target)
+          >>= fun () -> Lwt.return err
+    | Error
+        [ P2p_errors.Rejected_by_nack
+            {alternative_points = Some alternative_points; _} ] ->
+        lwt_log_info
+          "Good: client is rejected with point list (local: %d, remote: %d) \
+           @[%a@]@."
+          port
+          (snd target)
+          P2p_point.Id.pp_list
+          alternative_points
+        >>= fun () -> return_unit
+    | Error _ as res ->
+        Lwt.return res
+
+  let client_knowledge pool all_points =
+    let (unknowns, known) =
+      P2p_pool.Points.fold_known
+        pool
+        ~init:(all_points, [])
+        ~f:(fun id _ (unknown_points, known) ->
+          let unknown_points =
+            List.filter
+              (fun unk_id -> not (P2p_point.Id.equal id unk_id))
+              unknown_points
+          in
+          (unknown_points, id :: known))
+    in
+    (unknowns, known)
+
+  let client_check pool all_points legacy =
+    let (unknowns, _known) = client_knowledge pool all_points in
+    let advert_succeed = unknowns = [] in
+    if legacy || advert_succeed then
+      log_info
+        "Good: Advertisement%s worked as intended.@."
+        (if legacy then " legacy" else "")
+    else
+      log_info
+        "@[<v 2>Not Good: advertisement failure. legacy %b. unkowns :  @[%a@]\n\
+         \t knowns : @[%a@].@."
+        legacy
+        P2p_point.Id.pp_list
+        unknowns
+        P2p_point.Id.pp_list
+        _known ;
+    fail_unless
+      (if legacy then not advert_succeed else advert_succeed)
+      (Advertisement_failure unknowns)
+
+  let client legacy iteration channel _stream connect_handler pool
+      trusted_points all_points =
+    if List.length all_points > 50 then (
+      log_error
+        "This test only works for less clients than the advertisement list \
+         length (50)@." ;
+      assert false ) ;
+    (*   *)
+    (* first connection: let advertise us as public nodes *)
+    client_connect connect_handler pool legacy trusted_points all_points
+    >>=? fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 2 *)
+    client_connect connect_handler pool legacy trusted_points all_points
+    >>=? fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 3 *)
+    client_check pool all_points legacy
+    >>=? fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 4 *)
+    lwt_log_info "client closing.@." >>= fun () -> return_unit
+
+  (** Code of the target that should be overcrowded by all the clients. *)
+  let target iteration channel stream connect_handler pool trusted_points
+      all_points =
+    let _trusted = trusted_points
+    and _all_points = all_points
+    and _pool = pool
+    and _connect_handler = connect_handler in
+    let unknowns_knowns () =
+      P2p_pool.Points.fold_known
+        _pool
+        ~init:(all_points, [])
+        ~f:(fun id _ (unknown_points, knowns) ->
+          let unknown_points =
+            List.filter
+              (fun unk_id -> not (P2p_point.Id.equal id unk_id))
+              unknown_points
+          in
+          (unknown_points, id :: knowns))
+    in
+    let (unknowns, knowns) = unknowns_knowns () in
+    let (watcher, stopper) = stream in
+    lwt_debug "trusted : %a" P2p_point.Id.pp_list trusted_points
+    >>= fun () ->
+    lwt_debug "unknown : %a" P2p_point.Id.pp_list unknowns
+    >>= fun () ->
+    lwt_debug "known : %a" P2p_point.Id.pp_list knowns
+    >>= fun () ->
+    let _pool_watcher =
+      Lwt.return_unit
+      >>= fun () ->
+      Lwt_stream.iter
+        (debug "p2p event %a" P2p_connection.P2p_event.pp)
+        watcher
+    in
+    lwt_log_info "Target waiting@."
+    >>= fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 2 *)
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 3 *)
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 4 *)
+    Lwt_watcher.shutdown stopper ;
+    lwt_log_info "Target closing.@." >>= fun () -> return_unit
+
+  let node i = if i = 0 then target else client false
+
+  let node_mixed i = if i = 0 then target else client (i mod 2 = 1)
+
+  let trusted i points = if i = 0 then points else [List.hd points]
+
+  (** Running the target and the clients.
+      All clients should have their pool populated with the list of points. *)
+  let run points =
+    (* setting connections to -1 ensure there will be no random
+       acceptance of connections *)
+    let min_connections = function 0 -> -1 | _ -> 1
+    and max_connections = function 0 -> -1 | _ -> 1
+    and max_incoming_connections = function _ -> List.length points in
+    detach_nodes
+      ~timeout:10.
+      ~min_connections
+      ~max_connections
+      ~max_incoming_connections
+      node
+      points
+      ~trusted
+
+  let run_mixed_versions points =
+    let min_connections = function 0 -> -1 | _ -> 1
+    and max_connections = function 0 -> -1 | _ -> 1
+    and max_incoming_connections = function _ -> List.length points
+    and p2p_versions i =
+      if i mod 2 = 1 then [P2p_version.zero]
+      else [P2p_version.zero; P2p_version.one]
+    in
+    detach_nodes
+      ~p2p_versions
+      ~timeout:10.
+      ~min_connections
+      ~max_connections
+      ~max_incoming_connections
+      node_mixed
+      points
+      ~trusted
+end
+
+module No_common_network = struct
+  let rec connect ?iter_count ~timeout connect_handler pool point =
+    lwt_log_info
+      "Connect%a to @[%a@]@."
+      (Option.pp ~default:"" (fun ppf ->
+           Format.pp_print_string ppf " to peer " ;
+           Format.pp_print_int ppf))
+      iter_count
+      P2p_point.Id.pp
+      point
+    >>= fun () ->
+    P2p_connect_handler.connect connect_handler point ~timeout
+    >>= function
+    | Error [P2p_errors.Connected] -> (
+      match P2p_pool.Connection.find_by_point pool point with
+      | Some conn ->
+          return conn
+      | None ->
+          failwith "Woops..." )
+    | Error
+        [ ( ( P2p_errors.Connection_refused
+            | P2p_errors.Pending_connection
+            | P2p_errors.Rejected_socket_connection
+            | Canceled
+            | Timeout
+            | P2p_errors.Rejected _ ) as err ) ] ->
+        lwt_log_info
+          "Connection to%a %a failed (%a)@."
+          (Option.pp ~default:"" (fun ppf ->
+               Format.pp_print_string ppf " peer " ;
+               Format.pp_print_int ppf))
+          iter_count
+          P2p_point.Id.pp
+          point
+          (fun ppf err ->
+            match err with
+            | P2p_errors.Connection_refused ->
+                Format.fprintf ppf "connection refused"
+            | P2p_errors.Pending_connection ->
+                Format.fprintf ppf "pending connection"
+            | P2p_errors.Rejected_socket_connection ->
+                Format.fprintf ppf "rejected"
+            | Canceled ->
+                Format.fprintf ppf "canceled"
+            | Timeout ->
+                Format.fprintf ppf "timeout"
+            | P2p_errors.Rejected peer ->
+                Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
+            | _ ->
+                assert false)
+          err
+        >>= fun () ->
+        Lwt_unix.sleep (0.5 +. Random.float 2.)
+        >>= fun () -> connect ~timeout connect_handler pool point
+    | (Ok _ | Error _) as res ->
+        Lwt.return res
+
+  (** Node code of nodes that will connect to the target,
+      and either get a list of pairs or have an established connection.
+  *)
+  let client_connect connect_handler pool trusted_points all_points =
+    debug
+      "@[<v 2>client connects to %a in the universe @[%a@]@]@."
+      P2p_point.Id.pp_list
+      trusted_points
+      P2p_point.Id.pp_list
+      all_points ;
+    connect
+      ~iter_count:0
+      ~timeout:(Time.System.Span.of_seconds_exn 2.)
+      connect_handler
+      pool
+      (List.hd trusted_points)
+    >>= function
+    | Ok conn ->
+        lwt_log_info
+          "Not good: connection accepted while it should be rejected.@."
+        >>= fun () -> P2p_conn.disconnect conn >>= fun () -> return_unit
+    | Error [P2p_errors.Rejected_no_common_protocol {announced}] ->
+        lwt_log_info
+          "Good: Connection cannot be established,no common network with \
+           @[%a@].@."
+          Network_version.pp
+          announced
+        >>= fun () -> return_unit
+    | Error _ as res ->
+        Lwt.return res
+
+  let client iteration channel _stream connect_handler pool trusted_points
+      all_points =
+    client_connect connect_handler pool trusted_points all_points
+    >>=? fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 2 *)
+    lwt_log_info "client closing.@." >>= fun () -> return_unit
+
+  (** Code of the target that should be overcrowded by all the clients. *)
+  let target iteration channel _stream connect_handler pool trusted_points
+      all_points =
+    let _trusted = trusted_points
+    and _all_points = all_points
+    and _pool = pool
+    and _connect_handler = connect_handler in
+    lwt_log_info "Target waiting.@."
+    >>= fun () ->
+    sync iteration channel
+    >>=? fun () ->
+    (* sync 2 *)
+    lwt_log_info "Target closing.@." >>= fun () -> return_unit
+
+  let node i = if i = 0 then target else client
+
+  let trusted i points = if i = 0 then points else [List.hd points]
+
+  (** Running the target and the clients.
+      All clients should have their pool populated with the list of points.
+
+  *)
+  let run points =
+    let point_count = List.length points in
+    let min_connections = function _ -> 0
+    and max_connections = function 0 -> point_count | _ -> 1
+    and max_incoming_connections = function _ -> point_count
+    and p2p_versions = function
+      | 0 ->
+          [P2p_version.zero]
+      | _ ->
+          [P2p_version.one]
+    in
+    detach_nodes
+      ~timeout:10.
+      ~min_connections
+      ~max_connections
+      ~max_incoming_connections
+      ~p2p_versions
+      node
+      points
+      ~trusted
 end
 
 let () = Random.self_init ()
@@ -376,7 +901,18 @@ let spec =
                      "test.p2p.connection-pool -> debug; p2p.connection-pool \
                       -> debug"
                    ())),
-        " Log up to debug msgs" ) ]
+        " Log up to debug msgs" );
+      ( "-vvv",
+        Unit
+          (fun () ->
+            log_config :=
+              Some
+                (Lwt_log_sink_unix.create_cfg
+                   ~rules:
+                     "test.p2p.connection-pool -> debug;p2p.connection-pool \
+                      -> debug;p2p.connection -> debug"
+                   ())),
+        " Log up to debug msgs, socket included" ) ]
 
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
@@ -404,7 +940,12 @@ let main () =
         [ wrap "simple" (fun _ -> Simple.run points);
           wrap "random" (fun _ ->
               Random_connections.run points !repeat_connections);
-          wrap "garbled" (fun _ -> Garbled.run points) ] ) ]
+          wrap "garbled" (fun _ -> Garbled.run points);
+          wrap "overcrowded" (fun _ -> Overcrowded.run points);
+          wrap "overcrowded-mixed" (fun _ ->
+              Overcrowded.run_mixed_versions points);
+          wrap "no-common-network-protocol" (fun _ ->
+              No_common_network.run points) ] ) ]
 
 let () =
   Sys.catch_break true ;

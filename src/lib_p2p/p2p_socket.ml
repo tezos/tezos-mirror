@@ -221,12 +221,18 @@ module Metadata = struct
 end
 
 module Ack = struct
-  type t = Ack | Nack
+  type t =
+    | Ack
+    | Nack_v_0
+    | Nack of {potential_peers_to_connect : P2p_point.Id.t list}
 
   let encoding =
     let open Data_encoding in
     let ack_encoding = obj1 (req "ack" empty) in
-    let nack_encoding = obj1 (req "nack" empty) in
+    let nack_v_0_encoding = obj1 (req "nack_v_0" empty) in
+    let nack_encoding =
+      obj1 (req "nack" (Data_encoding.list P2p_point.Id.encoding))
+    in
     let ack_case tag =
       case
         tag
@@ -240,10 +246,22 @@ module Ack = struct
         tag
         nack_encoding
         ~title:"Nack"
-        (function Nack -> Some () | _ -> None)
-        (fun _ -> Nack)
+        (function
+          | Nack {potential_peers_to_connect} ->
+              Some potential_peers_to_connect
+          | _ ->
+              None)
+        (fun lst -> Nack {potential_peers_to_connect = lst})
     in
-    union [ack_case (Tag 0); nack_case (Tag 255)]
+    let nack_v_0_case tag =
+      case
+        tag
+        nack_v_0_encoding
+        ~title:"Nack_v_0"
+        (function Nack_v_0 -> Some () | _ -> None)
+        (fun () -> Nack_v_0)
+    in
+    union [ack_case (Tag 0); nack_v_0_case (Tag 255); nack_case (Tag 1)]
 
   let write ?canceler fd cryptobox_data message =
     let encoded_message_len = Data_encoding.Binary.length encoding message in
@@ -275,8 +293,28 @@ type 'meta authenticated_connection = {
   cryptobox_data : Crypto.data;
 }
 
-let kick {fd; cryptobox_data; _} =
-  Ack.write fd cryptobox_data Nack
+let kick {fd; cryptobox_data; info} potential_peers_to_connect =
+  let nack =
+    if
+      P2p_version.feature_available
+        P2p_version.Nack_with_list
+        info.announced_version.p2p_version
+    then (
+      debug
+        "Nack point %a with point list %a.@."
+        P2p_connection.Id.pp
+        info.id_point
+        P2p_point.Id.pp_list
+        potential_peers_to_connect ;
+      Ack.Nack {potential_peers_to_connect} )
+    else (
+      debug
+        "Nack point %a (no point list due to p2p version)@."
+        P2p_connection.Id.pp
+        info.id_point ;
+      Ack.Nack_v_0 )
+  in
+  Ack.write fd cryptobox_data nack
   >>= fun _ -> P2p_io_scheduler.close fd >>= fun _ -> Lwt.return_unit
 
 (* First step: write and read credentials, makes no difference
@@ -624,8 +662,12 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
       Lwt_canceler.on_cancel canceler (fun () ->
           P2p_io_scheduler.close conn.conn.fd >>= fun _ -> Lwt.return_unit) ;
       return conn
-  | Nack ->
-      fail P2p_errors.Rejected_socket_connection
+  | Nack_v_0 ->
+      fail (P2p_errors.Rejected_by_nack {alternative_points = None})
+  | Nack {potential_peers_to_connect} ->
+      fail
+        (P2p_errors.Rejected_by_nack
+           {alternative_points = Some potential_peers_to_connect})
 
 let catch_closed_pipe f =
   Lwt.catch f (function

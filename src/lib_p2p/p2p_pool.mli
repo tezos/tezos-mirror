@@ -108,6 +108,21 @@ val register_new_point :
   P2p_point.Id.t ->
   ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t option
 
+(** [register_list_of_new_point ?trusted medium source pool point_list]
+o    registers all points of the list as new points.
+    [medium] and  [source] are for logging purpose. [medium] should indicate
+    through which medium the points have been acquiered (
+    advertisement, Nack, ..)  and [source] is the id of the peer which
+    sent the list.
+ *)
+val register_list_of_new_points :
+  ?trusted:bool ->
+  medium:string ->
+  source:P2p_peer.Id.t ->
+  ('msg, 'peer, 'conn) t ->
+  P2p_point.Id.t list ->
+  unit
+
 (** If [peer] doesn't belong to the table of known peers,
     [register_peer t peer] creates a [P2p_peer.Info.t], triggers a
     `New_peer` event, and signals a `new_peer` condition. If table capacity
@@ -302,10 +317,13 @@ val acl_clear : ('msg, 'peer, 'conn) t -> unit
 (** [list_known_points ~ignore_private t] returns a list of point ids,
     which are not banned, and if [ignore_private] is [true], public.
 
-    It returns at most 50 point ids based on a heuristic that selects
-    a mix of "good" and random points. *)
+    It returns at most [size] point ids (default is 50) based on a
+    heuristic that selects a mix of 3/5 "good" and 2/5 random points. *)
 val list_known_points :
-  ignore_private:bool -> ('msg, 'peer, 'coon) t -> P2p_point.Id.t list Lwt.t
+  ignore_private:bool ->
+  ?size:int ->
+  ('msg, 'peer, 'coon) t ->
+  P2p_point.Id.t list Lwt.t
 
 val connected_peer_ids :
   ('msg, 'peer, 'conn) t ->

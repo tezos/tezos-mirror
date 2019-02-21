@@ -36,3 +36,18 @@ val encoding : t Data_encoding.t
 val supported : t list
 
 val zero : t
+
+val one : t
+
+(** Features *)
+
+(** Any new network-protocol feature should be declared here, and the
+    [feature_available] function should be updated accordingly. This
+    avoid to clutter the code base with hardcoded version
+    comparisons.*)
+type feature = Nack_with_list
+
+(** [feature_available feature version] returns true if the
+    [feature] is known to be available for the given p2p protocol
+    [version]. *)
+val feature_available : feature -> t -> bool

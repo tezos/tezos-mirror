@@ -37,6 +37,9 @@ type error += Encoding_error
 
 type error += Rejected_socket_connection
 
+type error +=
+  | Rejected_by_nack of {alternative_points : P2p_point.Id.t list option}
+
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
 type error += Decoding_error

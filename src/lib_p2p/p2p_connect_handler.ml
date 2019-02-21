@@ -84,6 +84,8 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     answerer;
   }
 
+let config t = t.config
+
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
@@ -334,6 +336,25 @@ let raw_authenticate t ?point_info canceler fd point =
           if incoming then
             t.log
               (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
+          ( match err with
+          | [P2p_errors.Rejected_by_nack {alternative_points = Some points; _}]
+            ->
+              lwt_debug
+                "Connection to %a rejected. Peer list received :%a"
+                P2p_point.Id.pp
+                point
+                P2p_point.Id.pp_list
+                points
+              >>= fun () ->
+              P2p_pool.register_list_of_new_points
+                ~medium:"Nack"
+                ~source:info.peer_id
+                t.pool
+                points ;
+              Lwt.return_unit
+          | _ ->
+              Lwt.return_unit )
+          >>= fun () ->
           lwt_debug
             "authenticate: %a -> rejected %a"
             P2p_point.Id.pp
@@ -392,7 +413,9 @@ let raw_authenticate t ?point_info canceler fd point =
             (acceptable_point, rejection_argument)
             acceptable_peer_id )
       >>= fun () ->
-      P2p_socket.kick auth_fd
+      P2p_pool.list_known_points ~ignore_private:true t.pool
+      >>= fun point_list ->
+      P2p_socket.kick auth_fd point_list
       >>= fun () ->
       if not incoming then
         Option.iter

@@ -100,6 +100,10 @@ val create :
   answerer:'msg P2p_answerer.t Lazy.t ->
   ('msg, 'peer, 'conn) t
 
+(** [config t] is the [config] argument passed to [t] at
+    creation. *)
+val config : _ t -> config
+
 (** [connect ?timeout t point] tries to add a connection to [point]
     in [t] in less than [timeout]. *)
 val connect :

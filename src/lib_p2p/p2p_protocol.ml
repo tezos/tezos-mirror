@@ -80,9 +80,13 @@ end
 module Default_answerer = struct
   open P2p_connection.P2p_event
 
-  let advertise config _conn _request points =
-    let f point = P2p_pool.register_new_point config.pool point |> ignore in
-    List.iter f points ; Lwt.return_unit
+  let advertise config conn _request points =
+    P2p_pool.register_list_of_new_points
+      ~medium:"advertise"
+      ~source:conn.peer_id
+      config.pool
+      points ;
+    Lwt.return_unit
 
   let bootstrap config conn _request_info =
     if conn.is_private then

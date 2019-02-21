@@ -32,8 +32,15 @@ let encoding =
   let open Data_encoding in
   def "p2p_version" ~description:"A version number for the p2p layer." uint16
 
+let () = Data_encoding.Registration.register ~pp encoding
+
 let zero = 0
 
-let supported = [zero]
+let one = 1
 
-let () = Data_encoding.Registration.register ~pp encoding
+let supported = [zero; one]
+
+type feature = Nack_with_list
+
+let feature_available feature p2p_version =
+  match feature with Nack_with_list -> p2p_version > 0

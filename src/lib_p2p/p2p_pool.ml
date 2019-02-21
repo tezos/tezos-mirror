@@ -125,6 +125,17 @@ let register_new_point ?trusted t point =
     Some (register_point ?trusted t point)
   else None
 
+let register_list_of_new_points ?trusted ~medium ~source t point_list =
+  debug
+    "Getting points from %s of %a: %a"
+    medium
+    P2p_peer.Id.pp
+    source
+    P2p_point.Id.pp_list
+    point_list ;
+  let f point = register_new_point ?trusted t point |> ignore in
+  List.iter f point_list
+
 (* Bounded table used to garbage collect peer_id infos when needed. The
    strategy used is to remove the info of the peer_id with the lowest
    score first. In case of equality, the info of the most recent added
@@ -452,6 +463,15 @@ let create config peer_meta_config triggers ~log =
     peer_meta_config.peer_meta_encoding
   >>= function
   | Ok peer_ids ->
+      debug
+        "create pool: known points %a"
+        (fun ppf known_points ->
+          P2p_point.Table.iter
+            (fun id _ ->
+              P2p_point.Id.pp ppf id ;
+              Format.pp_print_string ppf " ")
+            known_points)
+        pool.known_points ;
       List.iter
         (fun peer_info ->
           let peer_id = P2p_peer_state.Info.peer_id peer_info in
@@ -572,7 +592,7 @@ let compare_known_point_info p1 p2 =
   | (true, true) ->
       compare_last_seen p2 p1
 
-let list_known_points ~ignore_private pool =
+let list_known_points ~ignore_private ?(size = 50) pool =
   P2p_point.Table.fold
     (fun point_id point_info acc ->
       if
@@ -583,6 +603,6 @@ let list_known_points ~ignore_private pool =
     pool.known_points
     []
   |> List.sort compare_known_point_info
-  |> sample 30 20
+  |> sample (size * 3 / 5) (size * 2 / 5)
   |> List.map P2p_point_state.Info.point
   |> Lwt.return

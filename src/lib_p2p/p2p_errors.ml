@@ -50,6 +50,9 @@ type error += Encoding_error
 
 type error += Rejected_socket_connection
 
+type error +=
+  | Rejected_by_nack of {alternative_points : P2p_point.Id.t list option}
+
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
 type error += Decoding_error
@@ -108,6 +111,27 @@ let () =
     Data_encoding.empty
     (function Rejected_socket_connection -> Some () | _ -> None)
     (fun () -> Rejected_socket_connection) ;
+  (* Rejected socket connection, peer gave us with alternative points *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_socket.rejected_by_nack"
+    ~title:"Rejected socket connection by Nack"
+    ~description:
+      "Rejected peer connection: rejected socket connection by Nack with a \
+       list of alternative peers."
+    ~pp:(fun ppf _lst ->
+      Format.fprintf
+        ppf
+        "Rejected peer connection: rejected by Nack with a list of \
+         alternative peers.")
+    Data_encoding.(
+      obj1 (opt "alternative_points" (list P2p_point.Id.encoding)))
+    (function
+      | Rejected_by_nack {alternative_points} ->
+          Some alternative_points
+      | _ ->
+          None)
+    (fun alternative_points -> Rejected_by_nack {alternative_points}) ;
   (* Rejected socket connection, no common network protocol *)
   register_error_kind
     `Permanent
@@ -146,7 +170,7 @@ let () =
         "Remote peer %a cannot be authenticated: peer is actually yourself."
         P2p_connection.Id.pp
         id)
-    Data_encoding.(obj1 (req "connection id" P2p_connection.Id.encoding))
+    Data_encoding.(obj1 (req "connection_id" P2p_connection.Id.encoding))
     (function Myself id -> Some id | _ -> None)
     (fun id -> Myself id) ;
   (* Not enough proof of work *)
@@ -162,7 +186,7 @@ let () =
         "Remote peer %a cannot be authenticated: not enough proof of work."
         P2p_peer.Id.pp
         id)
-    Data_encoding.(obj1 (req "peer id" P2p_peer.Id.encoding))
+    Data_encoding.(obj1 (req "peer_id" P2p_peer.Id.encoding))
     (function Not_enough_proof_of_work id -> Some id | _ -> None)
     (fun id -> Not_enough_proof_of_work id) ;
   (* Invalid authentication *)
@@ -267,7 +291,7 @@ let () =
         "Connection to peer %a was rejected."
         P2p_peer.Id.pp
         id)
-    Data_encoding.(obj1 (req "peer id" P2p_peer.Id.encoding))
+    Data_encoding.(obj1 (req "peer_id" P2p_peer.Id.encoding))
     (function Rejected id -> Some id | _ -> None)
     (fun id -> Rejected id) ;
   (* Too many connections *)

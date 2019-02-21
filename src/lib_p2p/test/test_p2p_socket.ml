@@ -310,7 +310,7 @@ module Kick = struct
   let encoding = Data_encoding.bytes
 
   let is_rejected = function
-    | Error (P2p_errors.Rejected_socket_connection :: _) ->
+    | Error (P2p_errors.Rejected_by_nack _ :: _) ->
         true
     | Ok _ ->
         false
@@ -324,7 +324,7 @@ module Kick = struct
     _assert info.incoming __LOC__ ""
     >>=? fun () ->
     _assert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __LOC__ ""
-    >>=? fun () -> P2p_socket.kick auth_fd >>= fun () -> return_unit
+    >>=? fun () -> P2p_socket.kick auth_fd [] >>= fun () -> return_unit
 
   let client _ch sched addr port =
     connect sched addr port id2
@@ -348,7 +348,7 @@ module Kicked = struct
 
   let client _ch sched addr port =
     connect sched addr port id2
-    >>=? fun auth_fd -> P2p_socket.kick auth_fd >>= fun () -> return_unit
+    >>=? fun auth_fd -> P2p_socket.kick auth_fd [] >>= fun () -> return_unit
 
   let run _dir = run_nodes client server
 end
