@@ -39,8 +39,6 @@ let name_encoding =
 
 let chain_name = "TEZOS_MAINNET"
 
-let old_chain_name = "TEZOS_BETANET_2018-06-30T16:07:32Z"
-
 let incompatible_chain_name = "INCOMPATIBLE"
 
 let sandboxed_chain_name = "SANDBOXED_TEZOS_MAINNET"

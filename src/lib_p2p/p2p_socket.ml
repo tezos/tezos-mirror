@@ -124,45 +124,31 @@ module Connection_message = struct
     version : Network_version.t;
   }
 
-  let mainnet_stage1_version_encoding =
-    (* minimal ugly hack for migrating from original mainnet.
-
-       Original node will send a singleton list containing:
-
-         [{ chain_name = "TEZOS_BETANET_2018-06-30T16:07:32Z" ;
-            distributed_db_version = 0 ;
-            p2p_version = 0 }]
-
-       Symetrically, original mainnet node will only accept us if we
-       send them a list containing this version. Their
-       version-selection algorithm will always select this one. *)
+  let mainnet_stage2_version_encoding =
+    (* minimal ugly hack for migrating from stage1 node. *)
     let open Data_encoding in
     conv
       (fun v ->
-        [ v;
-          (* always send the original announce. New nodes will ignore it,
-              and old node will select it whatever is the first version
-              in this list. *)
-          {
-            Network_version.chain_name = Distributed_db_version.old_chain_name;
-            distributed_db_version = Distributed_db_version.zero;
-            p2p_version = P2p_version.zero;
-          } ])
+        (* Only announce the singleton, we don't want to speak to original
+            node anymore. *)
+        [v])
       (function
         | [] ->
             (* Unexpected value, let the version-selection algorithm
                reject the connection by returning a dummy value. *)
             {
-              chain_name = Distributed_db_version.incompatible_chain_name;
+              Network_version.chain_name =
+                Distributed_db_version.incompatible_chain_name;
               distributed_db_version = Distributed_db_version.zero;
               p2p_version = P2p_version.zero;
             }
-        | [v] when v.chain_name = Distributed_db_version.old_chain_name ->
-            (* Incoming connection from a original mainnet node,
-               we replace the `chain_name` by the new one. *)
-            {v with chain_name = Distributed_db_version.chain_name}
+        | [v] ->
+            (* This is a announce by a stage2 node or an original node.
+               Original node will be later kicked by the
+               version-selection algorithm. *)
+            v
         | v :: _ ->
-            (* This is a announce by a upgraded node, we can safely
+            (* This is a announce by a stage1 node, we can safely
                ignore the rest of the list. *)
             v)
       (Variable.list Network_version.encoding)
@@ -181,7 +167,7 @@ module Connection_message = struct
          (req "pubkey" Crypto_box.public_key_encoding)
          (req "proof_of_work_stamp" Crypto_box.nonce_encoding)
          (req "message_nonce" Crypto_box.nonce_encoding)
-         (req "version" mainnet_stage1_version_encoding))
+         (req "version" mainnet_stage2_version_encoding))
 
   let write ~canceler fd message =
     let encoded_message_len = Data_encoding.Binary.length encoding message in
