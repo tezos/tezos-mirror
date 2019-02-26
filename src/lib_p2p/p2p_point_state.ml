@@ -169,9 +169,12 @@ let set_accepted
   point_info.state <- Accepted { current_peer_id ; cancel } ;
   Info.log point_info ~timestamp (Accepting_request current_peer_id)
 
+let set_private point_info known_private =
+  point_info.Info.known_public <- not known_private
+
 let set_running
     ?(timestamp = Systime_os.now ())
-    ~known_private point_info peer_id data  =
+    point_info peer_id data  =
   assert begin
     match point_info.Info.state with
     | Disconnected -> true (* request to unknown peer_id. *)
@@ -180,7 +183,6 @@ let set_running
     | Requested _ -> true
   end ;
   point_info.state <- Running { data ; current_peer_id = peer_id } ;
-  point_info.known_public <- not known_private ;
   point_info.last_established_connection <- Some (peer_id, timestamp) ;
   Info.log point_info ~timestamp (Connection_established peer_id)
 

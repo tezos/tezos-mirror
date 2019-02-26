@@ -885,8 +885,12 @@ and raw_authenticate pool ?point_info canceler fd point =
      incoming connections, thus giving an entry point for dos attack
      by giving late Nack.
   *)
-  if incoming then
-    P2p_point.Table.remove pool.incoming point ;
+  if incoming then P2p_point.Table.remove pool.incoming point ;
+  Option.iter connection_point_info
+    ~f:(fun point_info ->
+        (* set the point to private or not, depending on the [info] gethered
+           during authentication *)
+        P2p_point_state.set_private point_info info.private_node) ;
   match acceptable_version with
   | Some version when acceptable_peer_id && acceptable_point -> begin
       log pool (Accepting_request (point, info.id_point, info.peer_id)) ;
@@ -1032,7 +1036,6 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
   Option.iter point_info ~f:begin fun point_info ->
     let point = P2p_point_state.Info.point point_info in
     P2p_point_state.set_running
-      ~known_private:(pool.conn_meta_config.private_node conn_meta)
       point_info peer_id conn;
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;

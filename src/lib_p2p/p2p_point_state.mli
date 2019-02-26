@@ -67,6 +67,8 @@ module Info : sig
       i.e. "whitelisted". *)
 
   val known_public : 'conn point_info -> bool
+  (** Points can announce themself as  either public or private.
+      Private points will not be advertized to other nodes. *)
 
   val set_trusted : 'conn point_info -> unit
   val unset_trusted : 'conn point_info -> unit
@@ -129,8 +131,9 @@ val set_accepted :
 
 val set_running :
   ?timestamp:Time.System.t ->
-  known_private: bool ->
   'conn Info.t -> P2p_peer.Id.t -> 'conn -> unit
+
+val set_private : 'conn Info.t -> bool -> unit
 
 val set_disconnected :
   ?timestamp:Time.System.t -> ?requested:bool -> 'conn Info.t -> unit
