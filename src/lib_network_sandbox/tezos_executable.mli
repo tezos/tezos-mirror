@@ -27,12 +27,12 @@ type 'kind t = private
   ; unix_files_sink: Unix_files_sink.t option
   ; environment: (string * string) list }
 
-val node :
+val make :
      ?binary:string
   -> ?unix_files_sink:Unix_files_sink.t
   -> ?environment:(string * string) list
-  -> unit
-  -> [> `Node] t
+  -> ([< kind] as 'a)
+  -> 'a t
 (** Create a ["tezos-node"] executable. *)
 
 val kind_string : [< kind] -> string

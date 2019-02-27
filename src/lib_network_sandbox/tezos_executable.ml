@@ -23,8 +23,8 @@ type 'kind t =
   ; unix_files_sink: Unix_files_sink.t option
   ; environment: (string * string) list }
 
-let node ?binary ?unix_files_sink ?(environment = []) () =
-  {kind= `Node; binary; unix_files_sink; environment}
+let make ?binary ?unix_files_sink ?(environment = []) (kind : [< kind]) =
+  {kind; binary; unix_files_sink; environment}
 
 let kind_string (kind : [< kind]) =
   match kind with
