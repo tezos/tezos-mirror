@@ -300,8 +300,14 @@ module Simple = struct
                 Format.fprintf ppf "canceled"
             | Timeout ->
                 Format.fprintf ppf "timeout"
-            | P2p_errors.Rejected peer ->
-                Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
+            | P2p_errors.Rejected {peer; motive} ->
+                Format.fprintf
+                  ppf
+                  "rejected (%a) motive:%a"
+                  P2p_peer.Id.pp
+                  peer
+                  P2p_rejection.pp
+                  motive
             | _ ->
                 assert false)
           head_err
@@ -495,8 +501,14 @@ module Overcrowded = struct
                 Format.fprintf ppf "canceled"
             | Timeout ->
                 Format.fprintf ppf "timeout"
-            | P2p_errors.Rejected peer ->
-                Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
+            | P2p_errors.Rejected {peer; motive} ->
+                Format.fprintf
+                  ppf
+                  "rejected (%a) motive:%a"
+                  P2p_peer.Id.pp
+                  peer
+                  P2p_rejection.pp
+                  motive
             | _ ->
                 assert false)
           err
@@ -763,8 +775,14 @@ module No_common_network = struct
                 Format.fprintf ppf "canceled"
             | Timeout ->
                 Format.fprintf ppf "timeout"
-            | P2p_errors.Rejected peer ->
-                Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
+            | P2p_errors.Rejected {peer; motive} ->
+                Format.fprintf
+                  ppf
+                  "rejected (%a) motive:%a"
+                  P2p_peer.Id.pp
+                  peer
+                  P2p_rejection.pp
+                  motive
             | _ ->
                 assert false)
           err

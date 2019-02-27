@@ -224,14 +224,19 @@ module Ack = struct
   type t =
     | Ack
     | Nack_v_0
-    | Nack of {potential_peers_to_connect : P2p_point.Id.t list}
+    | Nack of {
+        motive : P2p_rejection.t;
+        potential_peers_to_connect : P2p_point.Id.t list;
+      }
 
   let encoding =
     let open Data_encoding in
     let ack_encoding = obj1 (req "ack" empty) in
     let nack_v_0_encoding = obj1 (req "nack_v_0" empty) in
     let nack_encoding =
-      obj1 (req "nack" (Data_encoding.list P2p_point.Id.encoding))
+      obj2
+        (req "nack_motive" P2p_rejection.encoding)
+        (req "nack_list" (Data_encoding.list P2p_point.Id.encoding))
     in
     let ack_case tag =
       case
@@ -247,11 +252,11 @@ module Ack = struct
         nack_encoding
         ~title:"Nack"
         (function
-          | Nack {potential_peers_to_connect} ->
-              Some potential_peers_to_connect
+          | Nack {motive; potential_peers_to_connect} ->
+              Some (motive, potential_peers_to_connect)
           | _ ->
               None)
-        (fun lst -> Nack {potential_peers_to_connect = lst})
+        (fun (motive, lst) -> Nack {motive; potential_peers_to_connect = lst})
     in
     let nack_v_0_case tag =
       case
@@ -293,7 +298,7 @@ type 'meta authenticated_connection = {
   cryptobox_data : Crypto.data;
 }
 
-let kick {fd; cryptobox_data; info} potential_peers_to_connect =
+let kick {fd; cryptobox_data; info} motive potential_peers_to_connect =
   let nack =
     if
       P2p_version.feature_available
@@ -306,7 +311,7 @@ let kick {fd; cryptobox_data; info} potential_peers_to_connect =
         info.id_point
         P2p_point.Id.pp_list
         potential_peers_to_connect ;
-      Ack.Nack {potential_peers_to_connect} )
+      Ack.Nack {motive; potential_peers_to_connect} )
     else (
       debug
         "Nack point %a (no point list due to p2p version)@."
@@ -663,11 +668,13 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
           P2p_io_scheduler.close conn.conn.fd >>= fun _ -> Lwt.return_unit) ;
       return conn
   | Nack_v_0 ->
-      fail (P2p_errors.Rejected_by_nack {alternative_points = None})
-  | Nack {potential_peers_to_connect} ->
       fail
         (P2p_errors.Rejected_by_nack
-           {alternative_points = Some potential_peers_to_connect})
+           {motive = P2p_rejection.No_motive; alternative_points = None})
+  | Nack {motive; potential_peers_to_connect} ->
+      fail
+        (P2p_errors.Rejected_by_nack
+           {motive; alternative_points = Some potential_peers_to_connect})
 
 let catch_closed_pipe f =
   Lwt.catch f (function

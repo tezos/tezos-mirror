@@ -38,7 +38,10 @@ type error += Encoding_error
 type error += Rejected_socket_connection
 
 type error +=
-  | Rejected_by_nack of {alternative_points : P2p_point.Id.t list option}
+  | Rejected_by_nack of {
+      motive : P2p_rejection.t;
+      alternative_points : P2p_point.Id.t list option;
+    }
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
@@ -60,7 +63,7 @@ type error += Connected
 
 type error += Connection_refused
 
-type error += Rejected of P2p_peer.Id.t
+type error += Rejected of {peer : P2p_peer.Id.t; motive : P2p_rejection.t}
 
 type error += Too_many_connections
 

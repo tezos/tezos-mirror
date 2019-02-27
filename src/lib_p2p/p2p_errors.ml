@@ -51,7 +51,10 @@ type error += Encoding_error
 type error += Rejected_socket_connection
 
 type error +=
-  | Rejected_by_nack of {alternative_points : P2p_point.Id.t list option}
+  | Rejected_by_nack of {
+      motive : P2p_rejection.t;
+      alternative_points : P2p_point.Id.t list option;
+    }
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
@@ -117,21 +120,29 @@ let () =
     ~id:"node.p2p_socket.rejected_by_nack"
     ~title:"Rejected socket connection by Nack"
     ~description:
-      "Rejected peer connection: rejected socket connection by Nack with a \
-       list of alternative peers."
-    ~pp:(fun ppf _lst ->
+      "Rejected peer connection: The peer rejected the socket connection by \
+       Nack with a list of alternative peers."
+    ~pp:(fun ppf (motive, alt_points) ->
       Format.fprintf
         ppf
-        "Rejected peer connection: rejected by Nack with a list of \
-         alternative peers.")
+        "Rejected peer connection: Peer rejected us on motive \"%a\" and \
+         proposed %a alternative peers."
+        P2p_rejection.pp
+        motive
+        (Option.pp ~default:"no" (fun ppf l ->
+             Format.pp_print_int ppf @@ List.length l))
+        alt_points)
     Data_encoding.(
-      obj1 (opt "alternative_points" (list P2p_point.Id.encoding)))
+      obj2
+        (req "motive" P2p_rejection.encoding)
+        (opt "alternative_points" (list P2p_point.Id.encoding)))
     (function
-      | Rejected_by_nack {alternative_points} ->
-          Some alternative_points
+      | Rejected_by_nack {motive; alternative_points} ->
+          Some (motive, alternative_points)
       | _ ->
           None)
-    (fun alternative_points -> Rejected_by_nack {alternative_points}) ;
+    (fun (motive, alternative_points) ->
+      Rejected_by_nack {motive; alternative_points}) ;
   (* Rejected socket connection, no common network protocol *)
   register_error_kind
     `Permanent
@@ -230,7 +241,7 @@ type error += Connected
 
 type error += Connection_refused
 
-type error += Rejected of P2p_peer.Id.t
+type error += Rejected of {peer : P2p_peer.Id.t; motive : P2p_rejection.t}
 
 type error += Too_many_connections
 
@@ -284,16 +295,21 @@ let () =
     `Permanent
     ~id:"node.p2p_pool.rejected"
     ~title:"Rejected peer"
-    ~description:"Connection to peer was rejected."
-    ~pp:(fun ppf id ->
+    ~description:"Connection to peer was rejected by us."
+    ~pp:(fun ppf (peer, motive) ->
       Format.fprintf
         ppf
-        "Connection to peer %a was rejected."
+        "Connection to peer %a was rejected by us on motive: %a."
         P2p_peer.Id.pp
-        id)
-    Data_encoding.(obj1 (req "peer_id" P2p_peer.Id.encoding))
-    (function Rejected id -> Some id | _ -> None)
-    (fun id -> Rejected id) ;
+        peer
+        P2p_rejection.pp
+        motive)
+    Data_encoding.(
+      obj2
+        (req "peer_id" P2p_peer.Id.encoding)
+        (req "motive" P2p_rejection.encoding))
+    (function Rejected {peer; motive} -> Some (peer, motive) | _ -> None)
+    (fun (peer, motive) -> Rejected {peer; motive}) ;
   (* Too many connections *)
   register_error_kind
     `Permanent

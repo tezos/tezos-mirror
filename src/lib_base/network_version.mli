@@ -52,4 +52,4 @@ val select :
   distributed_db_versions:Distributed_db_version.t list ->
   p2p_versions:P2p_version.t list ->
   t ->
-  t option
+  t Error_monad.tzresult

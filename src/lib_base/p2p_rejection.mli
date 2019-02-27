@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,75 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of struct
-  include Tezos_stdlib
-end
+open Error_monad
 
-module Error_monad : module type of struct
-  include Tezos_error_monad.Error_monad
-end
+type error_code
 
-include module type of struct
-  include Tezos_rpc
-end
+type t =
+  | No_motive
+  | Too_many_connections
+  | Already_connected
+  | Unknown_chain_name
+  | Deprecated_distributed_db_version
+  | Deprecated_p2p_version
+  | Unknown_motive of error_code
 
-include module type of struct
-  include Tezos_clic
-end
+val pp : Format.formatter -> t -> unit
 
-include module type of struct
-  include Tezos_crypto
-end
+val encoding : t Data_encoding.t
 
-module Data_encoding = Data_encoding
+type error += Rejecting of {motive : t}
 
-module List : sig
-  include module type of struct
-    include List
-  end
-
-  include module type of struct
-    include Tezos_stdlib.TzList
-  end
-end
-
-module String : sig
-  include module type of struct
-    include String
-  end
-
-  include module type of struct
-    include Tezos_stdlib.TzString
-  end
-end
-
-module Time = Time
-module Fitness = Fitness
-module User_activated = User_activated
-module Block_header = Block_header
-module Operation = Operation
-module Protocol = Protocol
-module Test_chain_status = Test_chain_status
-module Preapply_result = Preapply_result
-module Block_locator = Block_locator
-module Mempool = Mempool
-module P2p_addr = P2p_addr
-module P2p_identity = P2p_identity
-module P2p_peer = P2p_peer
-module P2p_point = P2p_point
-module P2p_connection = P2p_connection
-module P2p_stat = P2p_stat
-module P2p_version = P2p_version
-module P2p_rejection = P2p_rejection
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
-
-include module type of struct
-  include Utils.Infix
-end
-
-include module type of struct
-  include Tezos_error_monad.Error_monad
-end
-
-module Internal_event = Internal_event
+val rejecting : t -> 'a tzresult

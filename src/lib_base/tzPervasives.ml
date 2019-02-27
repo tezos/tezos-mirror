@@ -58,6 +58,7 @@ module P2p_point = P2p_point
 module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
+module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 include Utils.Infix

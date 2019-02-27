@@ -143,6 +143,44 @@ let create_connection t p2p_conn id_point point_info peer_info
     t.log Too_few_connections ) ;
   conn
 
+let is_acceptable t connection_point_info peer_info incoming version =
+  (* Private mode only accept trusted *)
+  let unexpected =
+    t.config.private_mode
+    && (not
+          (Option.unopt_map
+             ~default:false
+             ~f:P2p_point_state.Info.trusted
+             connection_point_info))
+    && not (P2p_peer_state.Info.trusted peer_info)
+  in
+  if unexpected then (
+    warn "[private node] incoming connection from untrusted peer rejected!" ;
+    error P2p_errors.Private_mode )
+  else
+    (* checking if point is acceptable *)
+    Option.unopt_map
+      connection_point_info
+      ~default:(ok version)
+      ~f:(fun connection_point_info ->
+        match P2p_point_state.get connection_point_info with
+        | Accepted _ | Running _ ->
+            P2p_rejection.(rejecting Already_connected)
+        | Requested _ when incoming ->
+            P2p_rejection.(rejecting Already_connected)
+        | Requested _ | Disconnected ->
+            ok version)
+    >>? fun version ->
+    (* Point is acceptable, checking if peer is. *)
+    match P2p_peer_state.get peer_info with
+    | Accepted _
+    (* TODO: in some circumstances cancel and accept... *)
+    | Running _ ->
+        P2p_rejection.(rejecting Already_connected)
+    (* All right, welcome ! *)
+    | Disconnected ->
+        ok version
+
 let may_register_my_id_point pool = function
   | [P2p_errors.Myself (addr, Some port)] ->
       P2p_pool.add_to_id_points pool (addr, port)
@@ -238,53 +276,25 @@ let raw_authenticate t ?point_info canceler fd point =
         point_info
   in
   let peer_info = P2p_pool.register_peer t.pool info.peer_id in
-  let acceptable_version =
+  (* [acceptable] is either Ok with a network version, or a Rejecting
+     error with a motive  *)
+  let acceptable =
     Network_version.select
       ~chain_name:t.message_config.chain_name
       ~distributed_db_versions:t.message_config.distributed_db_versions
       ~p2p_versions:t.custom_p2p_versions
       info.announced_version
-  in
-  let acceptable_capacity =
-    let max_active_conns =
-      if Random.bool () then
-        (* randomly allow one additional incoming connection *)
-        t.config.max_connections + 1
-      else t.config.max_connections
-    in
-    let active = P2p_pool.active_connections t.pool in
-    max_active_conns > active
-  in
-  let (acceptable_point, rejection_argument) =
-    Option.unopt_map
-      connection_point_info
-      ~default:(not t.config.private_mode, "unknown point in private mode")
-      ~f:(fun connection_point_info ->
-        match P2p_point_state.get connection_point_info with
-        | Requested _ ->
-            (not incoming, "Requested status and incoming")
-        | Disconnected ->
-            let unexpected =
-              t.config.private_mode
-              && not (P2p_point_state.Info.trusted connection_point_info)
-            in
-            if unexpected then
-              warn
-                "[private node] incoming connection from untrusted peer \
-                 rejected!" ;
-            (not unexpected, "unexpected connection in private mode")
-        | Accepted _ | Running _ ->
-            (false, "already running or accepted point"))
-  in
-  let acceptable_peer_id =
-    match P2p_peer_state.get peer_info with
-    | Accepted _ ->
-        (* TODO: in some circumstances cancel and accept... *)
-        false
-    | Running _ ->
-        false
-    | Disconnected ->
-        true
+    >>? fun version ->
+    (* we have a common version, checking if there is an available slot *)
+    ( if
+      (* randomly allow one additional incoming connection *)
+      t.config.max_connections + Random.int 2
+      > P2p_pool.active_connections t.pool
+    then ok version
+    else P2p_rejection.(rejecting Too_many_connections) )
+    >>? fun version ->
+    (* we have a slot, checking if point and peer are acceptable *)
+    is_acceptable t connection_point_info peer_info incoming version
   in
   (* To Verify : the thread must ? not be interrupted between
      point removal from incoming and point registration into
@@ -300,9 +310,80 @@ let raw_authenticate t ?point_info canceler fd point =
       (* set the point to private or not, depending on the [info] gethered
            during authentication *)
       P2p_point_state.set_private point_info info.private_node) ;
-  match acceptable_version with
-  | Some version
-    when acceptable_capacity && acceptable_peer_id && acceptable_point ->
+  match acceptable with
+  | Error
+      (P2p_rejection.Rejecting
+         { motive =
+             ( Too_many_connections
+             | Unknown_chain_name
+             | Deprecated_p2p_version
+             | Deprecated_distributed_db_version
+             | Already_connected ) as motive }
+      :: _) -> (
+      (* non-acceptable point, kicking it. *)
+      t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
+      lwt_debug
+        "@[<v 2>authenticate: %a -> kick %a motive: %a@]"
+        P2p_point.Id.pp
+        point
+        P2p_peer.Id.pp
+        info.peer_id
+        P2p_rejection.pp
+        motive
+      >>= fun () ->
+      P2p_pool.list_known_points ~ignore_private:true t.pool
+      >>= fun point_list ->
+      P2p_socket.kick auth_fd motive point_list
+      >>= fun () ->
+      if not incoming then
+        Option.iter
+          ~f:
+            (P2p_point_state.set_disconnected
+               ~requested:true
+               t.config.greylisting_config)
+          point_info ;
+      match motive with
+      | Unknown_chain_name
+      | Deprecated_distributed_db_version
+      | Deprecated_p2p_version ->
+          lwt_debug
+            "@[<v 2>No common protocol with %a@,\
+             (chains: local %a - remote %a)@,\
+             @[<h>(db_versions: local [%a] - remote %a)@]@,\
+             @[<h>(p2p_versions: local [%a] - remote %a)@]@]@."
+            P2p_peer.Id.pp
+            info.peer_id
+            Distributed_db_version.Name.pp
+            t.message_config.chain_name
+            Distributed_db_version.Name.pp
+            info.announced_version.chain_name
+            (Format.pp_print_list
+               ~pp_sep:Format.pp_print_space
+               Distributed_db_version.pp)
+            t.message_config.distributed_db_versions
+            Distributed_db_version.pp
+            info.announced_version.distributed_db_version
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space P2p_version.pp)
+            t.custom_p2p_versions
+            P2p_version.pp
+            info.announced_version.p2p_version
+          >>= fun () ->
+          fail
+            (P2p_errors.Rejected_no_common_protocol
+               {announced = info.announced_version})
+      | _ ->
+          fail (P2p_errors.Rejected {peer = info.peer_id; motive}) )
+  | Error errs as err ->
+      lwt_debug
+        "@[<v 2>authenticate: %a -> reject %a: %a@]"
+        P2p_point.Id.pp
+        point
+        P2p_peer.Id.pp
+        info.peer_id
+        Error_monad.pp_print_error
+        errs
+      >>= fun () -> Lwt.return err
+  | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
       Option.iter connection_point_info ~f:(fun point_info ->
           P2p_point_state.set_accepted point_info info.peer_id canceler) ;
@@ -337,12 +418,16 @@ let raw_authenticate t ?point_info canceler fd point =
             t.log
               (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
           ( match err with
-          | [P2p_errors.Rejected_by_nack {alternative_points = Some points; _}]
-            ->
+          | P2p_errors.Rejected_by_nack
+              {alternative_points = Some points; motive}
+            :: _ ->
               lwt_debug
-                "Connection to %a rejected. Peer list received :%a"
+                "@[<v 2> Connection to %a rejected by peer. @[Motive : %a@]. \
+                 @[Peer list received :%a@]"
                 P2p_point.Id.pp
                 point
+                P2p_rejection.pp
+                motive
                 P2p_point.Id.pp_list
                 points
               >>= fun () ->
@@ -385,67 +470,6 @@ let raw_authenticate t ?point_info canceler fd point =
            connection_point_info
            peer_info
            version)
-  | _ -> (
-      t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
-      ( match acceptable_version with
-      | None ->
-          lwt_debug
-            "authenticate: %a -> kick %a,no compatible network (announced %a)"
-            P2p_point.Id.pp
-            point
-            P2p_peer.Id.pp
-            info.peer_id
-            Network_version.pp
-            info.announced_version
-      | _ ->
-          lwt_debug
-            "authenticate: %a -> kick %a enough slots:%B,point acceptable: \
-             %B%a, peer_id acceptable: %B"
-            P2p_point.Id.pp
-            point
-            P2p_peer.Id.pp
-            info.peer_id
-            acceptable_capacity
-            acceptable_point
-            (fun fmt (acceptable_point, rejection_argument) ->
-              if not acceptable_point then
-                Format.fprintf fmt "(%s)" rejection_argument)
-            (acceptable_point, rejection_argument)
-            acceptable_peer_id )
-      >>= fun () ->
-      P2p_pool.list_known_points ~ignore_private:true t.pool
-      >>= fun point_list ->
-      P2p_socket.kick auth_fd point_list
-      >>= fun () ->
-      if not incoming then
-        Option.iter
-          ~f:(P2p_point_state.set_disconnected t.config.greylisting_config)
-          point_info
-        (* FIXME P2p_peer_state.set_disconnected ~requested:true peer_info ; *) ;
-      match acceptable_version with
-      | None ->
-          lwt_debug
-            "No common protocol@.(chains: local %a - remote \
-             %a)@.(db_versions: local [%a] - remote %a)@.(p2p_versions: local \
-             [%a] - remote %a)"
-            Distributed_db_version.Name.pp
-            t.message_config.chain_name
-            Distributed_db_version.Name.pp
-            info.announced_version.chain_name
-            (Format.pp_print_list Distributed_db_version.pp)
-            t.message_config.distributed_db_versions
-            Distributed_db_version.pp
-            info.announced_version.distributed_db_version
-            (Format.pp_print_list P2p_version.pp)
-            t.custom_p2p_versions
-            P2p_version.pp
-            info.announced_version.p2p_version
-          >>= fun () ->
-          fail
-            (P2p_errors.Rejected_no_common_protocol
-               {announced = info.announced_version})
-      | Some _ ->
-          fail (P2p_errors.Rejected info.peer_id) )
 
 let authenticate t ?point_info canceler fd point =
   let fd = P2p_io_scheduler.register t.io_sched fd in
@@ -514,7 +538,12 @@ let connect ?timeout t point =
           t.log (Outgoing_connection point) ;
           P2p_fd.connect fd uaddr >>= fun () -> return_unit)
         ~on_error:(fun err ->
-          lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point
+          lwt_debug
+            "@[<v 2>connect: %a -> disconnect@[(%a)@]@]"
+            P2p_point.Id.pp
+            point
+            (Format.pp_print_list Error_monad.pp)
+            err
           >>= fun () ->
           P2p_point_state.set_disconnected
             t.config.greylisting_config
