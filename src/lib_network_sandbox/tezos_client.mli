@@ -1,7 +1,7 @@
 (** Wrapper around the main ["tezos-client"] application. *)
 open Internal_pervasives
 
-type t = private {id: string; port: int; exec: [`Client] Tezos_executable.t}
+type t = {id: string; port: int; exec: [`Client] Tezos_executable.t}
 type client = t
 
 val of_node : exec:[`Client] Tezos_executable.t -> Tezos_node.t -> t

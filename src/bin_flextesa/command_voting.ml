@@ -87,7 +87,8 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
           >>= fun () ->
           return (`Not_done (sprintf "Waiting for %S period" period_name)) )
 
-let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
+let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
+    ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
   let default_attempts = 35 in
   Helpers.clear_root state
@@ -99,8 +100,10 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
     let open Tezos_protocol in
     let d = default () in
     let baker = List.nth_exn d.bootstrap_accounts 0 in
+    let hash = current_hash in
     ( { d with
-        time_between_blocks= [1; 0]
+        hash
+      ; time_between_blocks= [1; 0]
       ; bootstrap_accounts=
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
               if fst baker = n then (n, v) else (n, 1_000L) ) }
@@ -225,21 +228,34 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
   Tezos_admin_client.successful_command admin_0 state ["list"; "protocols"]
   >>= fun res ->
   let default_protocols = res#out in
-  let make_and_inject_protocol name =
+  let make_and_inject_protocol name path =
     let tmpdir = Paths.root state // sprintf "protocol-%s" name in
     Console.say state EF.(wf "Injecting protocol from %s" tmpdir)
     >>= fun () ->
-    Running_processes.run_successful_cmdf state
-      "cp -L -r %s %s && echo '(* Protocol %s *)' >> %s/main.mli"
-      (Filename.quote (Filename.dirname demo_path)) (Filename.quote tmpdir) name
-      (Filename.quote tmpdir)
+    Running_processes.run_successful_cmdf state "cp -L -r %s %s"
+      (Filename.quote path) (Filename.quote tmpdir)
     >>= fun _ ->
     Tezos_admin_client.successful_command admin_0 state
       ["inject"; "protocol"; tmpdir]
-    >>= fun res -> return ()
+    >>= fun res ->
+    String.concat ~sep:" " res#out
+    |> String.split ~on:' ' |> List.map ~f:String.strip
+    |> (function
+         | _ :: _ :: hash :: _ when hash.[0] = 'P' -> return hash
+         | _ ->
+             failf "inject protocol: cannot parse hash of protocol: %s"
+               (String.concat ~sep:", " (List.map ~f:(sprintf "%S") res#out)))
+    >>= fun hash ->
+    Interactive_test.Pauser.generic state
+      EF.
+        [ af "Just injected %s (%s): %s" name path hash
+        ; markdown_verbatim (String.concat ~sep:"\n" res#out) ]
+    >>= fun () -> return hash
   in
-  Loop.n_times 3 (fun nth -> make_and_inject_protocol (sprintf "The%dth" nth))
-  >>= fun () ->
+  make_and_inject_protocol "winner" winner_path
+  >>= fun winner_hash ->
+  make_and_inject_protocol "demo" demo_path
+  >>= fun demo_hash ->
   Tezos_admin_client.successful_command admin_0 state ["list"; "protocols"]
   >>= fun res ->
   let after_injections_protocols = res#out in
@@ -252,7 +268,11 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
                   af "`%s` (%s)" p
                     ( if List.mem default_protocols p ~equal:String.equal then
                       "previously known"
-                    else "injected" ) )) ]
+                    else
+                      match p with
+                      | _ when p = winner_hash -> "injected winner"
+                      | _ when p = demo_hash -> "injected demo"
+                      | _ -> "injected unknown" ) )) ]
   >>= fun () ->
   let new_protocols =
     List.filter after_injections_protocols ~f:(fun ph ->
@@ -285,9 +305,10 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       List_sequential.iter new_protocols ~f:(fun one ->
           submit_proposals special_baker [one] ) )
   >>= fun () ->
-  let winner = List.hd_exn new_protocols in
+  (* let winner = "Psd1ynUBhMZAeajwcZJAeq5NrxorM6UCU4GJqxZ7Bx2e9vUWB6z" in *)
+  (* let winner = "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd" in *)
   Tezos_client.successful_client_cmd state ~client:baker_0.client
-    ["submit"; "proposals"; "for"; baker_0.key_name; winner]
+    ["submit"; "proposals"; "for"; baker_0.key_name; winner_hash]
   >>= fun res ->
   bake_until_voting_period state ~baker:baker_0
     ~attempts:protocol.blocks_per_voting_period Testing_vote
@@ -303,22 +324,23 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       Tezos_client.rpc state ~client:(client 1) `Get
         ~path:"/chains/main/blocks/head/votes/current_proposal"
       >>= fun current_proposal_json ->
-      if current_proposal_json <> `String winner then
+      if current_proposal_json <> `String winner_hash then
         return
           (`Not_done
-            (sprintf "Waiting for current_proposal_json to be %s (%s)" winner
+            (sprintf "Waiting for current_proposal_json to be %s (%s)"
+               winner_hash
                Ezjsonm.(to_string (wrap current_proposal_json))))
       else return (`Done ()) )
   >>= fun () ->
   Tezos_client.successful_client_cmd state ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner; "yay"]
+    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       ledger_prompt_notice state
-        EF.(wf "Submitting “Yes” ballot for %S" winner) )
+        EF.(wf "Submitting “Yes” ballot for %S" winner_hash) )
   >>= fun (_ : unit option) ->
   Tezos_client.successful_client_cmd state ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner; "yay"]
+    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
   >>= fun _ ->
   Interactive_test.Pauser.generic state
     EF.[af "Ballots are in (not baked though)"]
@@ -342,7 +364,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
           Jqo.field metadata_json ~k:"test_chain_status"
           |> Jqo.field ~k:"protocol"
         with
-        | `String s when s = winner -> return (`Done ())
+        | `String s when s = winner_hash -> return (`Done ())
         | other ->
             return
               (`Not_done
@@ -367,14 +389,14 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
   Interactive_test.Pauser.generic state EF.[haf "Before ballots"]
   >>= fun () ->
   Tezos_client.successful_client_cmd state ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner; "yay"]
+    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       ledger_prompt_notice state
-        EF.(wf "Submitting “Yes” ballot for %S" winner) )
+        EF.(wf "Submitting “Yes” ballot for %S" winner_hash) )
   >>= fun (_ : unit option) ->
   Tezos_client.successful_client_cmd state ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner; "yay"]
+    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
   >>= fun _ ->
   Interactive_test.Pauser.generic state
     EF.[af "Final ballot(s) are in (not baked though)"]
@@ -398,6 +420,17 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
               client_exec.binary)
           (String.concat ~sep:", " client_protocols_result#out) ]
   >>= fun () ->
+  let new_baker =
+    let open Tezos_client.Keyed in
+    {baker_0 with client= {baker_0.client with exec= winner_client_exec}}
+  in
+  Interactive_test.Pauser.add_commands state
+    Interactive_test.Commands.
+      [ arbitrary_command_on_clients state ~command_names:["nc"; "new-client"]
+          ~make_admin ~clients:[new_baker.client] ] ;
+  Interactive_test.Pauser.generic state
+    EF.[wf "You can now try the new-client"]
+  >>= fun () ->
   Helpers.wait_for state ~seconds:0.5
     ~attempts:(1 + protocol.blocks_per_voting_period) (fun nth ->
       let client = baker_0.client in
@@ -407,7 +440,7 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
       let json_string = curl_res#out |> String.concat ~sep:"\n" in
       let json_metadata = Ezjsonm.from_string json_string in
       match Jqo.field json_metadata ~k:"next_protocol" with
-      | `String p when p = winner -> return (`Done (nth - 1))
+      | `String p when p = winner_hash -> return (`Done (nth - 1))
       | other ->
           transfer state ~client ~amount:1L
             ~src:baker_0.Tezos_client.Keyed.key_name
@@ -416,33 +449,53 @@ let run state ~demo_path ~node_exec ~client_exec ~admin_exec ~size ~base_port
           ksprintf
             (Tezos_client.Keyed.bake state baker_0)
             "Baker %s bakes %d/%d waiting for next protocol: %S" client.id nth
-            attempts winner
+            attempts winner_hash
           >>= fun () ->
           return
             (`Not_done
-              (sprintf "Waiting for next_protocol: %S (≠ %s)" winner
+              (sprintf "Waiting for next_protocol: %S (≠ %s)" winner_hash
                  Ezjsonm.(to_string (wrap other)))) )
   >>= fun extra_bakes_waiting_for_next_protocol ->
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
+  Tezos_client.successful_client_cmd state ~client:new_baker.client
+    ["list"; "understood"; "protocols"]
+  >>= fun winner_client_protocols_result ->
   ( match
-      List.find client_protocols_result#out ~f:(fun prefix ->
-          String.is_prefix winner ~prefix )
+      List.find winner_client_protocols_result#out ~f:(fun prefix ->
+          String.is_prefix winner_hash ~prefix )
     with
-  | Some p -> Console.say state EF.(wf "The client knows about %s" winner)
+  | Some p -> (
+      Console.say state EF.(wf "The client knows about %s" winner_hash)
+      >>= fun () ->
+      Tezos_client.successful_client_cmd state ~client:new_baker.client
+        ["upgrade"; "baking"; "state"]
+      >>= fun _ ->
+      Tezos_client.Keyed.bake state new_baker "First bake on new protocol !!"
+      >>= fun () ->
+      Counter_log.incr level_counter "bake-on-new-protocol" ;
+      Tezos_client.rpc state ~client:new_baker.client `Get
+        ~path:"/chains/main/blocks/head/metadata"
+      >>= fun json_metadata ->
+      match Jqo.field json_metadata ~k:"protocol" with
+      | `String p when p = winner_hash -> return ()
+      | other ->
+          failf "Protocol is not `%s` but `%s`" winner_hash
+            Ezjsonm.(to_string (wrap other)) )
   (* 
      TODO:
-     - make winner a protocol that the client knows
      - bake on test chain
-     - test protocol switch
      - test ≠ not-enough-votes “failures”
  *)
   | None ->
-      Console.say state EF.(wf "The client does not know about %s" winner) )
+      if clueless_winner then
+        Console.say state
+          EF.(wf "As expected, the client does not know about %s" winner_hash)
+      else failf "The winner-client does not know about `%s`" winner_hash )
   >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
-      [ haf "End of Current WIP of the Voting test: SUCCESS \\o/"
+      [ haf "End of the Voting test: SUCCESS \\o/"
       ; desc
           (af "Estimated level: %d" (Counter_log.sum level_counter))
           (markdown_verbatim (Counter_log.to_table_string level_counter)) ]
@@ -453,11 +506,15 @@ let cmd ~pp_error () =
   let open Term in
   Test_command_line.Run_command.make ~pp_error
     ( pure
-        (fun demo_path
+        (fun winner_path
+        demo_path
         node_exec
         client_exec
         admin_exec
+        winner_client_exec
         size
+        (`Clueless_winner clueless_winner)
+        (`Hash current_hash)
         (`Base_port base_port)
         (`With_ledger with_ledger)
         (`Serialize_proposals serialize_proposals)
@@ -465,18 +522,47 @@ let cmd ~pp_error () =
         ->
           ( state
           , Interactive_test.Pauser.run_test state ~pp_error
-              (run state ~serialize_proposals ~demo_path ~node_exec ~size
-                 ~admin_exec ~base_port ~client_exec ?with_ledger) ) )
+              (run state ~serialize_proposals ~current_hash ~winner_path
+                 ~clueless_winner ~demo_path ~node_exec ~size ~admin_exec
+                 ~base_port ~client_exec ~winner_client_exec ?with_ledger) ) )
     $ Arg.(
-        required
-          (pos 0 (some string) None
-             (info [] ~docv:"PROTOCOL-PATH"
-                ~doc:
-                  "The protocol to inject, e.g. `./src/bin_client/test/demo/`.")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Admin "tezos"
+        pure Filename.dirname
+        $ required
+            (pos 0 (some string) None
+               (info [] ~docv:"WINNER-PROTOCOL-PATH"
+                  ~doc:
+                    "The protocol to inject and make win the election, e.g. \
+                     `src/proto_004_Pt24m4xi/lib_protocol/src/TEZOS_PROTOCOL`.")))
+    $ Arg.(
+        pure Filename.dirname
+        $ required
+            (pos 1 (some string) None
+               (info [] ~docv:"LOOSER-PROTOCOL-PATH"
+                  ~doc:
+                    "The protocol to inject and down-vote, e.g. \
+                     `./src/bin_client/test/demo/TEZOS_PROTOCOL`.")))
+    $ Tezos_executable.cli_term `Node "current"
+    $ Tezos_executable.cli_term `Client "current"
+    $ Tezos_executable.cli_term `Admin "current"
+    $ Tezos_executable.cli_term `Client "winner"
     $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network.")))
+    $ Arg.(
+        pure (fun b -> `Clueless_winner b)
+        $ value
+            (flag
+               (info
+                  ["winning-client-is-clueless"]
+                  ~doc:
+                    "Do not fail if the client does not know about “next” \
+                     protocol.")))
+    $ Arg.(
+        pure (fun p -> `Hash p)
+        $ value
+            (opt string "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
+               (info ["current-hash"]
+                  ~doc:
+                    "The hash to advertise as the current protocol, the \
+                     default is `proto_003_PsddFki3`.")))
     $ Arg.(
         pure (fun p -> `Base_port p)
         $ value
