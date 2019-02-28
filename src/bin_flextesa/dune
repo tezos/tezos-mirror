@@ -32,13 +32,16 @@
   (action
     (run %{exe:main.exe} voting
          %{lib:tezos-embedded-protocol-demo:raw/TEZOS_PROTOCOL}
+         %{lib:tezos-embedded-protocol-demo:raw/TEZOS_PROTOCOL}
          --root-path %{env:ROOT_PATH=/tmp/flextesa-voting-demo/}
          --base-port 30_000
          --size 3
          --with-timestamp
-         --tezos-client-binary %{bin:tezos-client}
-         --tezos-admin-client-binary %{bin:tezos-admin-client}
-         --tezos-node-binary %{bin:tezos-node}
+         --winning-client-is-clueless
+         --winner-client-binary %{bin:tezos-client}
+         --current-client-binary %{bin:tezos-client}
+         --current-admin-client-binary %{bin:tezos-admin-client}
+         --current-node-binary %{bin:tezos-node}
          )))
 
 (alias

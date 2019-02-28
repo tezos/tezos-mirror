@@ -100,7 +100,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     let open Tezos_protocol in
     let d = default () in
     let baker = List.nth_exn d.bootstrap_accounts 0 in
-    let hash = current_hash in
+    let hash = Option.value ~default:d.hash current_hash in
     ( { d with
         hash
       ; time_between_blocks= [1; 0]
@@ -228,13 +228,19 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Tezos_admin_client.successful_command admin_0 state ["list"; "protocols"]
   >>= fun res ->
   let default_protocols = res#out in
-  let make_and_inject_protocol name path =
+  let make_and_inject_protocol ?(make_different = false) name path =
     let tmpdir = Paths.root state // sprintf "protocol-%s" name in
     Console.say state EF.(wf "Injecting protocol from %s" tmpdir)
     >>= fun () ->
     Running_processes.run_successful_cmdf state "cp -L -r %s %s"
       (Filename.quote path) (Filename.quote tmpdir)
     >>= fun _ ->
+    ( if make_different then
+      Running_processes.run_successful_cmdf state
+        "echo '(* Protocol %s *)' >> %s/main.mli" name (Filename.quote tmpdir)
+      >>= fun _ -> return ()
+    else return () )
+    >>= fun () ->
     Tezos_admin_client.successful_command admin_0 state
       ["inject"; "protocol"; tmpdir]
     >>= fun res ->
@@ -254,7 +260,8 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   in
   make_and_inject_protocol "winner" winner_path
   >>= fun winner_hash ->
-  make_and_inject_protocol "demo" demo_path
+  make_and_inject_protocol ~make_different:(winner_path = demo_path) "demo"
+    demo_path
   >>= fun demo_hash ->
   Tezos_admin_client.successful_command admin_0 state ["list"; "protocols"]
   >>= fun res ->
@@ -558,11 +565,9 @@ let cmd ~pp_error () =
     $ Arg.(
         pure (fun p -> `Hash p)
         $ value
-            (opt string "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
+            (opt (some string) None
                (info ["current-hash"]
-                  ~doc:
-                    "The hash to advertise as the current protocol, the \
-                     default is `proto_003_PsddFki3`.")))
+                  ~doc:"The hash to advertise as the current protocol.")))
     $ Arg.(
         pure (fun p -> `Base_port p)
         $ value

@@ -222,9 +222,16 @@ module Process_result = struct
 
     let pp fmt = function
       | (`Wrong_status (res, msg) : [< t]) ->
-          Format.fprintf fmt "Process-error, wrong status: '%s': %s"
-            (status_to_string res#status)
-            msg
+          Format.(
+            fprintf fmt "Process-error, wrong status:@ '%s':@ %s"
+              (status_to_string res#status)
+              msg ;
+            fprintf fmt "@.```out@." ;
+            List.iter res#out ~f:(fprintf fmt "  | %s@.") ;
+            fprintf fmt "@.```@." ;
+            fprintf fmt "@.```err@." ;
+            List.iter res#err ~f:(fprintf fmt "  | %s@.") ;
+            fprintf fmt "@.```@.")
 
     let fail_if_non_zero (res : output) msg =
       if res#status <> Unix.WEXITED 0 then
