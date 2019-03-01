@@ -84,59 +84,121 @@ module Dbg = struct
   let pp_any fmt v = Dum.to_formatter fmt v
 end
 
-(** An “typed error type” based on polymorphic variants *)
-module Error = struct
-  type +'a t =
-    {error_value: 'a; attachments: (string * string) list}
-    constraint 'a = [> ]
+(** An “decorated result type” based on polymorphic variants *)
+module Attached_result = struct
+  type content = [`Text of string | `String_value of string]
 
-  let make ?(attach = []) error_value = {error_value; attachments= attach}
+  type ('ok, 'error) t =
+    {result: ('ok, 'error) result; attachments: (string * content) list}
+    constraint 'error = [> ]
 
-  let pp ~error fmt {error_value; attachments} =
-    EF.(
-      label (shout "Error: ")
-        (list
-           [ custom (fun fmt -> error fmt error_value)
-           ; ocaml_list
-               (List.map attachments ~f:(fun (k, v) ->
-                    ocaml_tuple [atom k; atom v] )) ])
-      |> Easy_format.Pretty.to_formatter fmt)
+  let ok ?(attachments = []) o = {result= Ok o; attachments}
+  let error ?(attachments = []) o = {result= Error o; attachments}
+
+  let pp ppf ?pp_ok ?pp_error {result; attachments} =
+    let open Format in
+    ( match result with
+    | Ok o ->
+        pp_open_hvbox ppf 2 ;
+        pp_open_tag ppf "success" ;
+        pp_print_string ppf "OK" ;
+        pp_close_tag ppf () ;
+        Option.iter pp_ok ~f:(fun pp -> pp ppf o) ;
+        pp_close_box ppf () ;
+        ()
+    | Error e ->
+        pp_open_hvbox ppf 2 ;
+        pp_open_tag ppf "shout" ;
+        pp_print_string ppf "ERROR" ;
+        pp_close_tag ppf () ;
+        Option.iter pp_error ~f:(fun pp -> pp ppf e) ;
+        pp_close_box ppf () ) ;
+    match attachments with
+    | [] -> ()
+    | more ->
+        pp_print_newline ppf () ;
+        pp_open_hovbox ppf 4 ;
+        List.iter more ~f:(fun (k, v) ->
+            pp_print_if_newline ppf () ;
+            pp_print_string ppf "* " ;
+            fprintf ppf "%s:@ " k ;
+            match v with
+            | `Text s -> pp_print_text ppf s
+            | `String_value s -> fprintf ppf "%S" s )
 end
 
 (** A wrapper around [('ok, 'a Error.t) result Lwt.t]. *)
 module Asynchronous_result = struct
-  type ('ok, 'a) t = ('ok, 'a Error.t) result Lwt.t
+  open Attached_result
 
-  let return o : (_, _) t = Lwt.return (Ok o)
+  type ('ok, 'error) t = ('ok, 'error) Attached_result.t Lwt.t
+
+  let return o : (_, _) t = Lwt.return (ok o)
 
   let yield () =
     (* https://github.com/ocsigen/lwt/issues/631 *)
     if false then Lwt_unix.auto_yield 0.005 () else Lwt_main.yield ()
 
   let fail ?attach error_value : (_, _) t =
-    Lwt.return (Error (Error.make ?attach error_value))
+    Lwt.return (error ?attachments:attach error_value)
 
-  let error e : (_, _) t = Lwt.return (Error e)
+  (* let error e : (_, _) t = Lwt.return (error e) *)
 
   let bind (o : (_, _) t) f : (_, _) t =
     let open Lwt.Infix in
     o
     >>= function
-    | Ok o -> yield () >>= fun () -> f o | Error _ as e -> Lwt.return e
+    | {result= Ok o; attachments= attach} ->
+        yield ()
+        >>= fun () ->
+        f o
+        >>= fun {result; attachments} ->
+        Lwt.return {result; attachments= attachments @ attach}
+    | {result= Error _; _} as e -> Lwt.return e
 
-  let bind_on_error (o : (_, _) t) ~f : (_, _) t =
-    Lwt.bind o (function Ok o -> return o | Error e -> f e)
+  let bind_on_error :
+         ('a, 'b) t
+      -> f:(   result:('c, 'b) Attached_result.t
+            -> 'b
+            -> ('a, 'd) Attached_result.t Lwt.t)
+      -> ('a, 'd) t =
+   fun o ~f ->
+    let open Lwt.Infix in
+    o
+    >>= function
+    | {result= Ok _; _} as o -> Lwt.return o
+    | {result= Error e; attachments= attach} as res ->
+        f ~result:res e
+        >>= fun {result; attachments} ->
+        Lwt.return {result; attachments= attachments @ attach}
 
   let transform_error o ~f =
-    Lwt.bind o (function
-      | Ok o -> return o
-      | Error {Error.error_value; attachments} -> f error_value attachments )
+    let open Lwt.Infix in
+    o
+    >>= function
+    | {result= Ok _; _} as o -> Lwt.return o
+    | {result= Error e; attachments} ->
+        Lwt.return {result= Error (f e); attachments}
+
+  let bind_all :
+         ('ok, 'error) t
+      -> f:(('ok, 'error) Attached_result.t -> ('ok2, 'error2) t)
+      -> ('ok2, 'error2) t =
+   fun o ~f ->
+    let open Lwt.Infix in
+    o >>= fun res -> f res
 
   let bind_on_result :
          ('ok, 'error) t
-      -> f:(('ok, 'error Error.t) result -> ('ok2, 'error2) t)
+      -> f:(('ok, 'error) result -> ('ok2, 'error2) t)
       -> ('ok2, 'error2) t =
-   fun o ~f -> Lwt.bind o f
+   fun o ~f ->
+    let open Lwt.Infix in
+    o
+    >>= fun {result; attachments= attach} ->
+    f result
+    >>= fun {result; attachments} ->
+    Lwt.return {result; attachments= attachments @ attach}
 
   (** The module opened everywhere. *)
   module Std = struct let ( >>= ) = bind let return = return let fail = fail
@@ -176,9 +238,9 @@ module Asynchronous_result = struct
   end
 
   let run_application r =
-    match Lwt_main.run (r ()) with
-    | Ok () -> exit 0
-    | Error {Error.error_value= `Die ret; _} -> exit ret
+    match Lwt_main.run (r () : (_, _) t) with
+    | {result= Ok (); _} -> exit 0
+    | {result= Error (`Die ret); _} -> exit ret
 end
 
 include Asynchronous_result.Std

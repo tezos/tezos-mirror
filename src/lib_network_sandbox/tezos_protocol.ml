@@ -289,7 +289,7 @@ let ensure t ~config =
   | 0 -> return ()
   | _other ->
       Lwt_exception.fail (Failure "sys.command non-zero")
-        ~attach:[("location", "Tezos_protocol.ensure")]
+        ~attach:[("location", `String_value "Tezos_protocol.ensure")]
 
 let cli_term () =
   let open Cmdliner in

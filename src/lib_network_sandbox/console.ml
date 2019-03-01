@@ -153,12 +153,14 @@ module Prompt = struct
               List.mem m.commands c ~equal:String.equal )
         with
         | Some {action; _} -> (
-            Asynchronous_result.bind_on_error (action more) ~f:(fun err ->
+            Asynchronous_result.bind_on_error (action more)
+              ~f:(fun ~result _ ->
                 say state
                   EF.(
                     desc (shout "Error in action:")
-                      (custom (fun fmt ->
-                           Error.pp fmt err ~error:(fun fmt -> function
+                      (custom (fun ppf ->
+                           Attached_result.pp ppf result (* Error.pp ppf err *)
+                             ~pp_error:(fun fmt -> function
                              | `Lwt_exn _ as e -> Lwt_exception.pp fmt e
                              | `Command_line s ->
                                  Format.fprintf fmt "Wrong command line: %s" s

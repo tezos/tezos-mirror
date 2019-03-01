@@ -8,9 +8,8 @@ module Inconsistency_error : sig
   val should_be_one_protocol :
        'a list
     -> ( 'a
-       , [> `Empty_protocol_list | `Too_many_protocols of 'a list] Error.t )
-       result
-       Lwt.t
+       , [> `Empty_protocol_list | `Too_many_protocols of 'a list] )
+       Asynchronous_result.t
 
   val pp :
        Format.formatter

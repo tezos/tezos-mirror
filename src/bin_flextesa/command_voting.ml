@@ -480,10 +480,9 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
         | Some p -> return `Continue
         | None when clueless_winner -> return `End_with_success
         | None -> return `End_with_failure )
-      | Error Error.{error_value= `Client_command_error _; _}
-        when clueless_winner ->
+      | Error (`Client_command_error _) when clueless_winner ->
           return `End_with_success
-      | Error e -> Asynchronous_result.error e)
+      | Error e -> fail e)
   >>= (function
         | `End_with_success ->
             Console.say state
