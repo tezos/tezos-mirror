@@ -116,6 +116,8 @@ module Asynchronous_result = struct
   let fail ?attach error_value : (_, _) t =
     Lwt.return (Error (Error.make ?attach error_value))
 
+  let error e : (_, _) t = Lwt.return (Error e)
+
   let bind (o : (_, _) t) f : (_, _) t =
     let open Lwt.Infix in
     o

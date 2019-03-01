@@ -465,14 +465,31 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= fun extra_bakes_waiting_for_next_protocol ->
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
-  Tezos_client.successful_client_cmd state ~client:new_baker.client
-    ["list"; "understood"; "protocols"]
-  >>= fun winner_client_protocols_result ->
-  ( match
-      List.find winner_client_protocols_result#out ~f:(fun prefix ->
-          String.is_prefix winner_hash ~prefix )
-    with
-  | Some p -> (
+  Asynchronous_result.bind_on_result
+    (Tezos_client.successful_client_cmd state ~client:new_baker.client
+    ["list"; "understood"; "protocols"])
+    ~f:(function
+        | Ok winner_client_protocols_result ->
+            (
+              match List.find winner_client_protocols_result#out ~f:(fun prefix ->
+                  String.is_prefix winner_hash ~prefix )
+              with
+              | Some p -> 
+                  return `Continue
+              | None when clueless_winner ->
+                  return `End_with_success
+              | None -> return `End_with_failure
+            )
+        | Error Error.{error_value = `Client_command_error _ ; _ } when clueless_winner ->
+            return `End_with_success
+        | Error e -> Asynchronous_result.error e)
+  >>= (function
+  | `End_with_success ->
+      Console.say state
+        EF.(wf "As expected, the client does not know about %s" winner_hash)
+  | `End_with_failure ->
+       failf "The winner-client does not know about `%s`" winner_hash 
+  | `Continue ->
       Console.say state EF.(wf "The client knows about %s" winner_hash)
       >>= fun () ->
       Tezos_client.successful_client_cmd state ~client:new_baker.client
@@ -489,17 +506,13 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
       | other ->
           failf "Protocol is not `%s` but `%s`" winner_hash
             Ezjsonm.(to_string (wrap other)) )
+  >>= fun () ->
   (* 
+
      TODO:
      - bake on test chain
      - test ≠ not-enough-votes “failures”
  *)
-  | None ->
-      if clueless_winner then
-        Console.say state
-          EF.(wf "As expected, the client does not know about %s" winner_hash)
-      else failf "The winner-client does not know about `%s`" winner_hash )
-  >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
       [ haf "End of the Voting test: SUCCESS \\o/"
