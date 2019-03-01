@@ -134,6 +134,18 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   in
   Tezos_client.Keyed.initialize state baker_0
   >>= fun _ ->
+  let winner_baker =
+    let open Tezos_client.Keyed in
+    {baker_0 with client= {baker_0.client with exec= winner_client_exec}}
+  in
+  Interactive_test.Pauser.add_commands state
+    Interactive_test.Commands.
+      [ arbitrary_command_on_clients state
+          ~command_names:["wc"; "winner-client"] ?make_admin:None
+          ~clients:[winner_baker.client] ] ;
+  Interactive_test.Pauser.generic state
+    EF.[wf "You can now try the new-client"]
+  >>= fun () ->
   let level_counter = Counter_log.create () in
   let first_bakes = 5 in
   Loop.n_times first_bakes (fun nth ->
@@ -362,6 +374,8 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~attempts:default_attempts ~seconds:8. nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
+  Interactive_test.Pauser.generic state EF.[wf "Testing period, have fun."]
+  >>= fun () ->
   Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun nth ->
       Tezos_client.rpc state ~client:(client 1) `Get
         ~path:"/chains/main/blocks/head/metadata"
@@ -427,17 +441,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
               client_exec.binary)
           (String.concat ~sep:", " client_protocols_result#out) ]
   >>= fun () ->
-  let new_baker =
-    let open Tezos_client.Keyed in
-    {baker_0 with client= {baker_0.client with exec= winner_client_exec}}
-  in
-  Interactive_test.Pauser.add_commands state
-    Interactive_test.Commands.
-      [ arbitrary_command_on_clients state ~command_names:["nc"; "new-client"]
-          ~make_admin ~clients:[new_baker.client] ] ;
-  Interactive_test.Pauser.generic state
-    EF.[wf "You can now try the new-client"]
-  >>= fun () ->
   Helpers.wait_for state ~seconds:0.5
     ~attempts:(1 + protocol.blocks_per_voting_period) (fun nth ->
       let client = baker_0.client in
@@ -466,46 +469,58 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
   Asynchronous_result.bind_on_result
-    (Tezos_client.successful_client_cmd state ~client:new_baker.client
-    ["list"; "understood"; "protocols"])
+    (Tezos_client.successful_client_cmd state ~client:winner_baker.client
+       ["list"; "understood"; "protocols"])
     ~f:(function
-        | Ok winner_client_protocols_result ->
-            (
-              match List.find winner_client_protocols_result#out ~f:(fun prefix ->
-                  String.is_prefix winner_hash ~prefix )
-              with
-              | Some p -> 
-                  return `Continue
-              | None when clueless_winner ->
-                  return `End_with_success
-              | None -> return `End_with_failure
-            )
-        | Error Error.{error_value = `Client_command_error _ ; _ } when clueless_winner ->
-            return `End_with_success
-        | Error e -> Asynchronous_result.error e)
+      | Ok winner_client_protocols_result -> (
+        match
+          List.find winner_client_protocols_result#out ~f:(fun prefix ->
+              String.is_prefix winner_hash ~prefix )
+        with
+        | Some p -> return `Continue
+        | None when clueless_winner -> return `End_with_success
+        | None -> return `End_with_failure )
+      | Error Error.{error_value= `Client_command_error _; _}
+        when clueless_winner ->
+          return `End_with_success
+      | Error e -> Asynchronous_result.error e)
   >>= (function
-  | `End_with_success ->
-      Console.say state
-        EF.(wf "As expected, the client does not know about %s" winner_hash)
-  | `End_with_failure ->
-       failf "The winner-client does not know about `%s`" winner_hash 
-  | `Continue ->
-      Console.say state EF.(wf "The client knows about %s" winner_hash)
-      >>= fun () ->
-      Tezos_client.successful_client_cmd state ~client:new_baker.client
-        ["upgrade"; "baking"; "state"]
-      >>= fun _ ->
-      Tezos_client.Keyed.bake state new_baker "First bake on new protocol !!"
-      >>= fun () ->
-      Counter_log.incr level_counter "bake-on-new-protocol" ;
-      Tezos_client.rpc state ~client:new_baker.client `Get
-        ~path:"/chains/main/blocks/head/metadata"
-      >>= fun json_metadata ->
-      match Jqo.field json_metadata ~k:"protocol" with
-      | `String p when p = winner_hash -> return ()
-      | other ->
-          failf "Protocol is not `%s` but `%s`" winner_hash
-            Ezjsonm.(to_string (wrap other)) )
+        | `End_with_success ->
+            Console.say state
+              EF.(
+                wf "As expected, the client does not know about %s" winner_hash)
+        | `End_with_failure ->
+            failf "The winner-client does not know about `%s`" winner_hash
+        | `Continue -> (
+            Console.say state EF.(wf "The client knows about %s" winner_hash)
+            >>= fun () ->
+            (* This actually depends on the protocol upgrade. *)
+            Asynchronous_result.bind_on_result
+              (Tezos_client.successful_client_cmd state
+                 ~client:winner_baker.client
+                 ["upgrade"; "baking"; "state"])
+              ~f:(function
+                | Ok _ -> return ()
+                | Error _ ->
+                    Console.say state
+                      EF.(
+                        desc (shout "Warning")
+                          (wf
+                             "Command `upgrade baking state` failed, but we \
+                              keep going with the baking.")))
+            >>= fun () ->
+            Tezos_client.Keyed.bake state winner_baker
+              "First bake on new protocol !!"
+            >>= fun () ->
+            Counter_log.incr level_counter "bake-on-new-protocol" ;
+            Tezos_client.rpc state ~client:winner_baker.client `Get
+              ~path:"/chains/main/blocks/head/metadata"
+            >>= fun json_metadata ->
+            match Jqo.field json_metadata ~k:"protocol" with
+            | `String p when p = winner_hash -> return ()
+            | other ->
+                failf "Protocol is not `%s` but `%s`" winner_hash
+                  Ezjsonm.(to_string (wrap other)) ))
   >>= fun () ->
   (* 
 
