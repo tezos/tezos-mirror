@@ -87,6 +87,24 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
           >>= fun () ->
           return (`Not_done (sprintf "Waiting for %S period" period_name)) )
 
+let check_understood_protocols state ~chain ~client ~protocol_hash
+    ~expect_clueless_client =
+  Asynchronous_result.bind_on_result
+    (Tezos_client.successful_client_cmd state ~client
+       ["--chain"; chain; "list"; "understood"; "protocols"])
+    ~f:(function
+      | Ok client_protocols_result -> (
+        match
+          List.find client_protocols_result#out ~f:(fun prefix ->
+              String.is_prefix protocol_hash ~prefix )
+        with
+        | Some p -> return `Proper_understanding
+        | None when expect_clueless_client -> return `Expected_misunderstanding
+        | None -> return `Failure_to_understand )
+      | Error (`Client_command_error _) when expect_clueless_client ->
+          return `Expected_misunderstanding
+      | Error e -> fail e)
+
 let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
@@ -374,7 +392,30 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~attempts:default_attempts ~seconds:8. nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  Interactive_test.Pauser.generic state EF.[wf "Testing period, have fun."]
+  check_understood_protocols state ~client:winner_baker.client ~chain:"main"
+    ~protocol_hash:winner_hash ~expect_clueless_client:clueless_winner
+  >>= (function
+        | `Proper_understanding ->
+            let chain = "test" in
+            (* TODO: bake on test chain, but with both bakers. *)
+            let testing_bakes = 5 in
+            Loop.n_times testing_bakes (fun ith ->
+                Tezos_client.Keyed.bake ~chain state winner_baker
+                  (sprintf "Baking on the test chain [%d/%d]" (ith + 1)
+                     testing_bakes) )
+            >>= fun () ->
+            Test_scenario.Queries.wait_for_all_levels_to_be state ~chain
+              ~attempts:default_attempts ~seconds:8. nodes
+              (`At_least (Counter_log.sum level_counter + testing_bakes))
+            >>= fun () ->
+            Interactive_test.Pauser.generic state
+              EF.[wf "Testing period, with proper winner-client, have fun."]
+            >>= fun () -> return ()
+        | `Expected_misunderstanding ->
+            Console.say state
+              EF.(wf "Winner-Client cannot bake on test chain (expected)")
+        | `Failure_to_understand ->
+            failf "Winner-Client cannot bake on test chain!")
   >>= fun () ->
   Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun nth ->
       Tezos_client.rpc state ~client:(client 1) `Get
@@ -468,29 +509,16 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= fun extra_bakes_waiting_for_next_protocol ->
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
-  Asynchronous_result.bind_on_result
-    (Tezos_client.successful_client_cmd state ~client:winner_baker.client
-       ["list"; "understood"; "protocols"])
-    ~f:(function
-      | Ok winner_client_protocols_result -> (
-        match
-          List.find winner_client_protocols_result#out ~f:(fun prefix ->
-              String.is_prefix winner_hash ~prefix )
-        with
-        | Some p -> return `Continue
-        | None when clueless_winner -> return `End_with_success
-        | None -> return `End_with_failure )
-      | Error (`Client_command_error _) when clueless_winner ->
-          return `End_with_success
-      | Error e -> fail e)
+  check_understood_protocols state ~client:winner_baker.client ~chain:"main"
+    ~protocol_hash:winner_hash ~expect_clueless_client:clueless_winner
   >>= (function
-        | `End_with_success ->
+        | `Expected_misunderstanding ->
             Console.say state
               EF.(
                 wf "As expected, the client does not know about %s" winner_hash)
-        | `End_with_failure ->
+        | `Failure_to_understand ->
             failf "The winner-client does not know about `%s`" winner_hash
-        | `Continue -> (
+        | `Proper_understanding -> (
             Console.say state EF.(wf "The client knows about %s" winner_hash)
             >>= fun () ->
             (* This actually depends on the protocol upgrade. *)
@@ -524,7 +552,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   (* 
 
      TODO:
-     - bake on test chain
      - test ≠ not-enough-votes “failures”
  *)
   Interactive_test.Pauser.generic state

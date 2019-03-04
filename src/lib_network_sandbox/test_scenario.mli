@@ -103,7 +103,8 @@ val network_with_protocol :
 (** Run queries on running networks. *)
 module Queries : sig
   val all_levels :
-       < application_name: string
+       ?chain:string
+    -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
@@ -117,7 +118,8 @@ module Queries : sig
       node-ID × level } values. *)
 
   val wait_for_all_levels_to_be :
-       < application_name: string
+       ?chain:string
+    -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t

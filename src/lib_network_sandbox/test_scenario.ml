@@ -253,15 +253,15 @@ let network_with_protocol ?base_port ?(size = 5) ?protocol state ~node_exec
   >>= fun () -> return (nodes, protocol)
 
 module Queries = struct
-  let all_levels state ~nodes =
+  let all_levels ?(chain = "main") state ~nodes =
     List.fold nodes ~init:(return [])
       ~f:(fun prevm {Tezos_node.id; rpc_port; _} ->
         prevm
         >>= fun prev ->
         Running_processes.run_cmdf state
-          "curl http://localhost:%d/chains/main/blocks/head/metadata | jq \
+          "curl http://localhost:%d/chains/%s/blocks/head/metadata | jq \
            .level.level"
-          rpc_port
+          rpc_port chain
         >>= fun lvl ->
         Console.display_errors_of_command state lvl ~should_output:true
         >>= function
@@ -281,7 +281,7 @@ module Queries = struct
     in
     return sorted
 
-  let wait_for_all_levels_to_be state ~attempts ~seconds nodes level =
+  let wait_for_all_levels_to_be ?chain state ~attempts ~seconds nodes level =
     let check_level =
       match level with
       | `Equal_to l -> ( = ) l
@@ -307,12 +307,13 @@ module Queries = struct
     in
     Console.say state
       EF.(
-        wf "Checking for all levels to be %s (nodes: %s)" level_string
+        wf "Checking for all levels to be %s (nodes: %s%s)" level_string
           (String.concat ~sep:", "
-             (List.map nodes ~f:(fun n -> n.Tezos_node.id))))
+             (List.map nodes ~f:(fun n -> n.Tezos_node.id)))
+          (Option.value_map chain ~default:"" ~f:(sprintf ", chain: %s")))
     >>= fun () ->
     Helpers.wait_for state ~attempts ~seconds (fun _nth ->
-        all_levels state ~nodes
+        all_levels state ~nodes ?chain
         >>= fun results ->
         let not_readys =
           List.filter_map results ~f:(function

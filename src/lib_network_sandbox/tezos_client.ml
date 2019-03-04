@@ -209,9 +209,13 @@ module Keyed = struct
     successful_client_cmd state ~client
       ["import"; "secret"; "key"; key_name; secret_key; "--force"]
 
-  let bake state baker msg =
+  let bake ?chain state baker msg =
+    let chain_arg =
+      Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c])
+    in
     successful_client_cmd state ~client:baker.client
-      ["bake"; "for"; baker.key_name; "--force"; "--minimal-timestamp"]
+      ( chain_arg
+      @ ["bake"; "for"; baker.key_name; "--force"; "--minimal-timestamp"] )
     >>= fun res ->
     Log_recorder.Operations.bake state ~client:baker.client.id ~output:res#out
       msg ;

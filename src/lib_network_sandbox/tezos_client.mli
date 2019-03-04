@@ -152,7 +152,8 @@ module Keyed : sig
        Asynchronous_result.t
 
   val bake :
-       < application_name: string
+       ?chain:string
+    -> < application_name: string
        ; console: Console.t
        ; operations_log: Log_recorder.Operations.t
        ; paths: Paths.t
