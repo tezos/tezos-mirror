@@ -400,7 +400,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= (function
         | `Proper_understanding ->
             let chain = "test" in
-            (* TODO: bake on test chain, but with both bakers. *)
             Asynchronous_result.map_option with_ledger ~f:(fun _ ->
                 Interactive_test.Pauser.generic state
                   EF.
@@ -590,10 +589,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                 failf "Protocol is not `%s` but `%s`" winner_hash
                   Ezjsonm.(to_string (wrap other)) ))
   >>= fun () ->
-  (* 
-     TODO:
-     - test ≠ not-enough-votes “failures”
- *)
   Interactive_test.Pauser.generic state
     EF.
       [ haf "End of the Voting test: SUCCESS \\o/"
@@ -686,16 +681,37 @@ let cmd ~pp_error () =
     $ Test_command_line.cli_state ~name:"voting" () )
     (let doc = "Sandbox network with a full round of voting." in
      let man : Manpage.block list =
-       let pf fmt = ksprintf (fun s -> `P s) fmt in
        [ `S "VOTING TEST"
-       ; pf
+       ; `P
            "This command provides a test which uses a network sandbox to \
-            perform a full round of protocol vote and upgrade. For now, it \
-            goes up to the last block before the protocol switch, baking on \
-            the test chain, and with the new protocol is future work."
-       ; pf
+            perform a full round of protocol vote and upgrade, including \
+            voting and baking on the test chain with or without a Ledger Nano \
+            S."; `P "There are two main test behaviors:"
+       ; `P
+           "* $(b,SIMPLE:) The simple one does as much as possible with any \
+            dummy protocol candidates and a Tezos code-base which doesn't \
+            handle them: it tests all the voting periods until baking the \
+            last block of the currently understood protocol."; `Noblank
+       ; `P
+           "To allow the test to succeed in this case, the option \
+            `--winning-client-is-clueless` is required; it is meant to signal \
+            that the “winner” `tezos-client` executable (from the \
+            `--winner-client-binary` option) is expected to not understand \
+            the winning protocol."; `Noblank
+       ; `P
+           "This is the version running in Gitlab-CI, see `bin_flextesa/dune`."
+       ; `P
+           "* $(b,FULL:) Without the `--winning-client-is-clueless` option, \
+            the test will try to bake on the test chain as well as after the \
+            protocol switch (with the winner-client). This requires the \
+            winning protocol to be a working one and, of course, the \
+            winning-client to understand it."
+       ; `P
            "The test can run fully automated unless one uses the \
             `\"--with-ledger=ledger://...\"` option in which case some steps \
-            have to be interactive." ]
+            have to be interactive. In this case, the option \
+            `--serialize-proposals` is recommended, because if it is not \
+            provided, the proposal vote will be a “Sign Unverfied” \
+            operation." ]
      in
      info ~doc ~man "voting")
