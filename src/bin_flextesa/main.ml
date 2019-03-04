@@ -34,6 +34,10 @@ module Small_utilities = struct
             , fun () ->
                 Test_scenario.Network.netstat_listening_ports state
                 >>= fun ports ->
+                let to_display =
+                  List.map ports ~f:(fun (p, _) -> p)
+                  |> List.sort ~compare:Int.compare
+                in
                 Console.sayf state
                   Fmt.(
                     hvbox ~indent:2 (fun ppf () ->
@@ -42,8 +46,8 @@ module Small_utilities = struct
                         box
                           (list
                              ~sep:(fun ppf () -> string ppf "," ; sp ppf ())
-                             (fun ppf (p, _) -> fmt "%d" ppf p))
-                          ppf ports )) ) )
+                             (fun ppf p -> fmt "%d" ppf p))
+                          ppf to_display )) ) )
       $ Test_command_line.cli_state ~disable_interactivity:true
           ~name:"netstat-ports" () )
       (info "netstat-listening-ports"
