@@ -401,6 +401,15 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
         | `Proper_understanding ->
             let chain = "test" in
             (* TODO: bake on test chain, but with both bakers. *)
+            Asynchronous_result.map_option with_ledger ~f:(fun _ ->
+                Interactive_test.Pauser.generic state
+                  EF.
+                    [ af "About to bake on the test chain."
+                    ; haf
+                        "Please switch back to the Baking app and quit (`q`) \
+                         this prompt." ]
+                  ~force:true )
+            >>= fun (_ : unit option) ->
             let testing_bakes = 5 in
             Loop.n_times testing_bakes (fun ith ->
                 let baker =
@@ -461,6 +470,14 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
+      Interactive_test.Pauser.generic state
+        EF.
+          [ af "About to cast approval ballot."
+          ; haf
+              "Please switch back to the Wallet app and quit (`q`) this prompt."
+          ]
+        ~force:true
+      >>= fun () ->
       ledger_prompt_notice state
         EF.(wf "Submitting “Yes” ballot for %S" winner_hash) )
   >>= fun (_ : unit option) ->
@@ -542,6 +559,19 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                              "Command `upgrade baking state` failed, but we \
                               keep going with the baking.")))
             >>= fun () ->
+            Asynchronous_result.map_option with_ledger ~f:(fun _ ->
+                Interactive_test.Pauser.generic state
+                  EF.
+                    [ af "About to bake on the new winning protocol."
+                    ; haf
+                        "Please switch to the Baking app and quit (`q`) this \
+                         prompt." ]
+                  ~force:true
+                >>= fun () ->
+                Console.say state EF.(wf "Sleeping for a couple of seconds…")
+                >>= fun () -> System.sleep 4.
+                (* USB thing is often slower than humans hitting `q` *) )
+            >>= fun (_ : unit option) ->
             Tezos_client.Keyed.bake state winner_baker_0
               "First bake on new protocol !!"
             >>= fun () ->
