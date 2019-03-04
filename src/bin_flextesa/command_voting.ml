@@ -108,7 +108,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
 let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
-  let default_attempts = 35 in
+  let default_attempts = 50 in
   Helpers.clear_root state
   >>= fun () ->
   Interactive_test.Pauser.generic state
@@ -152,18 +152,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   in
   Tezos_client.Keyed.initialize state baker_0
   >>= fun _ ->
-  let winner_baker =
-    let open Tezos_client.Keyed in
-    {baker_0 with client= {baker_0.client with exec= winner_client_exec}}
-  in
-  Interactive_test.Pauser.add_commands state
-    Interactive_test.Commands.
-      [ arbitrary_command_on_clients state
-          ~command_names:["wc"; "winner-client"] ?make_admin:None
-          ~clients:[winner_baker.client] ] ;
-  Interactive_test.Pauser.generic state
-    EF.[wf "You can now try the new-client"]
-  >>= fun () ->
   let level_counter = Counter_log.create () in
   let first_bakes = 5 in
   Loop.n_times first_bakes (fun nth ->
@@ -184,6 +172,23 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
       Tezos_client.Keyed.initialize state baker >>= fun _ -> return baker
   | Some uri -> setup_baking_ledger state ~client:(client 0) uri )
   >>= fun special_baker ->
+  let winner_client = {baker_0.client with exec= winner_client_exec} in
+  let winner_baker_0 =
+    let open Tezos_client.Keyed in
+    {baker_0 with client= winner_client}
+  in
+  let winner_special_baker =
+    let open Tezos_client.Keyed in
+    {special_baker with client= winner_client}
+  in
+  Interactive_test.Pauser.add_commands state
+    Interactive_test.Commands.
+      [ arbitrary_command_on_clients state
+          ~command_names:["wc"; "winner-client"] ?make_admin:None
+          ~clients:[winner_client] ] ;
+  Interactive_test.Pauser.generic state
+    EF.[wf "You can now try the new-client"]
+  >>= fun () ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.
       [ arbitrary_command_on_clients state ~command_names:["baker"] ~make_admin
@@ -342,8 +347,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
       List_sequential.iter new_protocols ~f:(fun one ->
           submit_proposals special_baker [one] ) )
   >>= fun () ->
-  (* let winner = "Psd1ynUBhMZAeajwcZJAeq5NrxorM6UCU4GJqxZ7Bx2e9vUWB6z" in *)
-  (* let winner = "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd" in *)
   Tezos_client.successful_client_cmd state ~client:baker_0.client
     ["submit"; "proposals"; "for"; baker_0.key_name; winner_hash]
   >>= fun res ->
@@ -392,7 +395,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~attempts:default_attempts ~seconds:8. nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  check_understood_protocols state ~client:winner_baker.client ~chain:"main"
+  check_understood_protocols state ~client:winner_client ~chain:"main"
     ~protocol_hash:winner_hash ~expect_clueless_client:clueless_winner
   >>= (function
         | `Proper_understanding ->
@@ -400,7 +403,11 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
             (* TODO: bake on test chain, but with both bakers. *)
             let testing_bakes = 5 in
             Loop.n_times testing_bakes (fun ith ->
-                Tezos_client.Keyed.bake ~chain state winner_baker
+                let baker =
+                  if ith mod 2 = 0 then winner_baker_0
+                  else winner_special_baker
+                in
+                Tezos_client.Keyed.bake ~chain state baker
                   (sprintf "Baking on the test chain [%d/%d]" (ith + 1)
                      testing_bakes) )
             >>= fun () ->
@@ -509,7 +516,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= fun extra_bakes_waiting_for_next_protocol ->
   Counter_log.add level_counter "wait-for-next-protocol"
     extra_bakes_waiting_for_next_protocol ;
-  check_understood_protocols state ~client:winner_baker.client ~chain:"main"
+  check_understood_protocols state ~client:winner_client ~chain:"main"
     ~protocol_hash:winner_hash ~expect_clueless_client:clueless_winner
   >>= (function
         | `Expected_misunderstanding ->
@@ -523,8 +530,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
             >>= fun () ->
             (* This actually depends on the protocol upgrade. *)
             Asynchronous_result.bind_on_result
-              (Tezos_client.successful_client_cmd state
-                 ~client:winner_baker.client
+              (Tezos_client.successful_client_cmd state ~client:winner_client
                  ["upgrade"; "baking"; "state"])
               ~f:(function
                 | Ok _ -> return ()
@@ -536,11 +542,16 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                              "Command `upgrade baking state` failed, but we \
                               keep going with the baking.")))
             >>= fun () ->
-            Tezos_client.Keyed.bake state winner_baker
+            Tezos_client.Keyed.bake state winner_baker_0
               "First bake on new protocol !!"
             >>= fun () ->
-            Counter_log.incr level_counter "bake-on-new-protocol" ;
-            Tezos_client.rpc state ~client:winner_baker.client `Get
+            Counter_log.incr level_counter "baker-0-bakes-on-new-protocol" ;
+            Tezos_client.Keyed.bake state winner_special_baker
+              "Second bake on new protocol !!"
+            >>= fun () ->
+            Counter_log.incr level_counter
+              "special-baker-bakes-on-new-protocol" ;
+            Tezos_client.rpc state ~client:winner_client `Get
               ~path:"/chains/main/blocks/head/metadata"
             >>= fun json_metadata ->
             match Jqo.field json_metadata ~k:"protocol" with
@@ -550,7 +561,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                   Ezjsonm.(to_string (wrap other)) ))
   >>= fun () ->
   (* 
-
      TODO:
      - test ≠ not-enough-votes “failures”
  *)
