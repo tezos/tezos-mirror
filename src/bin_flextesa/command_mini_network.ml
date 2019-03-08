@@ -4,6 +4,11 @@ open Console
 
 let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
     endorser_exec accuser_exec () =
+  Helpers.System_dependencies.precheck state `Or_fail
+    ~executables:
+      [node_exec; client_exec; baker_exec; endorser_exec; accuser_exec]
+    ~using_docker:(kiln <> None)
+  >>= fun () ->
   Test_scenario.network_with_protocol ~protocol ~size ~base_port state
     ~node_exec ~client_exec
   >>= fun (nodes, protocol) ->

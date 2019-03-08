@@ -111,7 +111,11 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   let default_attempts = 50 in
   Helpers.clear_root state
   >>= fun () ->
-  Interactive_test.Pauser.generic state
+  Helpers.System_dependencies.precheck state `Or_fail
+    ~executables:[node_exec; client_exec; admin_exec; winner_client_exec]
+    ~protocol_paths:[winner_path; demo_path]
+  >>= fun () ->
+  Interactive_test.Pauser.generic state ~force:true
     EF.[af "Ready to start"; af "Root path deleted."]
   >>= fun () ->
   let protocol, baker_0_account, baker_0_balance =

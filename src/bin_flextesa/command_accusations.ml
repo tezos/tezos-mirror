@@ -625,15 +625,28 @@ let cmd ~pp_error () =
         kiln
         state
         ->
-          let actual_test =
+          let checks () =
+            let acc = if test = `With_accusers then [accex] else [] in
+            Helpers.System_dependencies.precheck state `Or_fail
+              ~executables:(acc @ [bnod; bcli])
+              ~using_docker:(kiln <> None)
+          in
+          let actual_test () =
             match test with
-            | `With_accusers -> with_accusers ~state bnod accex bcli ~base_port
+            | `With_accusers ->
+                checks ()
+                >>= fun () ->
+                with_accusers ~state bnod accex bcli ~base_port ()
             | `Simple_double_baking ->
+                checks ()
+                >>= fun () ->
                 simple_double_baking ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
+                  ~starting_level ()
             | `Simple_double_endorsing ->
+                checks ()
+                >>= fun () ->
                 simple_double_endorsement ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
+                  ~starting_level ()
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
