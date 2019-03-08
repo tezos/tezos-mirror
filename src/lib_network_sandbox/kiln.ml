@@ -1,15 +1,23 @@
 open Internal_pervasives
 
-type t = {run: [`Docker of string]; port: int; postgres_port: int}
+type t =
+  { run: [`Docker of string]
+  ; port: int
+  ; postgres_port: int
+  ; pause_for_user: bool }
 
-let make ~run ~port ~postgres_port = {run; port; postgres_port}
+let make ~run ~port ~postgres_port ~pause_for_user =
+  {run; port; postgres_port; pause_for_user}
+
 let default_docker_image = "obsidiansystems/tezos-bake-monitor:0.4.0"
 
 let default =
   make ~run:(`Docker default_docker_image) ~port:8086 ~postgres_port:4_532
+    ~pause_for_user:false
 
 let start ?(network_id = "zeronet") state
-    {run= `Docker image; port; postgres_port} ~node_uris ~bakers =
+    {run= `Docker image; port; postgres_port; pause_for_user} ~node_uris
+    ~bakers =
   let name nonbase = sprintf "flxts-%s" nonbase in
   let pg_password = Tezos_protocol.Key.Of_name.pubkey "pg-password" in
   let pg_port = postgres_port in
@@ -58,17 +66,22 @@ let start ?(network_id = "zeronet") state
   Running_processes.run_cmdf state " chmod -R 777 %s" tmp
   >>= fun _ ->
   let kiln =
+    let args =
+      [ sprintf
+          "--pg-connection=host=localhost port=%d dbname=postgres \
+           user=postgres password=%s"
+          pg_port pg_password
+      ; "--nodes"
+      ; String.concat ~sep:"," node_uris
+      ; "--bakers"
+      ; String.concat ~sep:","
+          (List.map bakers ~f:(fun (n, pkh) -> sprintf "%s@%s" pkh n))
+      ; "--network"; network_id; "--"; "--port"; Int.to_string kiln_port ]
+    in
     Running_processes.Process.docker_run (name "kiln-backend") ~image
       ~options:
         ["--network"; "host"; "-v"; sprintf "%s:/var/run/bake-monitor" tmp]
-      ~args:
-        [ sprintf
-            "--pg-connection=host=localhost port=%d dbname=postgres \
-             user=postgres password=%s"
-            pg_port pg_password
-        ; "--nodes"
-        ; String.concat ~sep:"," node_uris
-        ; "--network"; network_id; "--"; "--port"; Int.to_string kiln_port ]
+      ~args
   in
   Running_processes.start state kiln
   >>= fun kiln_process ->
@@ -79,25 +92,21 @@ let start ?(network_id = "zeronet") state
         network_id)
   >>= fun () ->
   ( match bakers with
-  | [] -> return ()
+  | ([] | _) when not pause_for_user -> return ()
   | _ ->
       Interactive_test.Pauser.generic state ~force:true
         EF.
-          [ wf "Importing bakers in Kiln."
-          ; wf
-              "You should open <http://localhost:%d> and import the following \
-               bakers:"
-              kiln_port
-          ; list
-              (List.map bakers ~f:(fun (n, pkh) -> af "Baker: `%s` -> %s" n pkh))
-          ] )
+          [ wf "Started Kiln with Nodes and Bakers."
+          ; wf "You may open <http://localhost:%d> and quit this prompt (`q`)."
+              kiln_port ] )
   >>= fun () -> return (pg_process, kiln_process)
 
 let cli_term () =
   let open Cmdliner in
   Term.(
-    pure (fun run port postgres_port -> function
-      | true -> Some (make ~run ~postgres_port ~port) | false -> None )
+    pure (fun run port postgres_port pause_for_user -> function
+      | true -> Some (make ~run ~postgres_port ~port ~pause_for_user)
+      | false -> None )
     $ Arg.(
         let doc = "Set the Kiln docker image." in
         pure (fun docker_image -> `Docker docker_image)
@@ -116,4 +125,11 @@ let cli_term () =
              (info ["with-kiln"]
                 ~doc:
                   "Add Kiln to the network (may make the test partially \
-                   interactive)."))))
+                   interactive).")))
+    $ Arg.(
+        value
+          (flag
+             (info ["pause-to-display-kiln"]
+                ~doc:
+                  "Add an interactive pause to show the user the URI of \
+                   Kiln's GUI."))))

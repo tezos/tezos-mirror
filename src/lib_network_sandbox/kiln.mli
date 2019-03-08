@@ -4,9 +4,11 @@ open Internal_pervasives
 
 type t
 
-val make : run:[`Docker of string] -> port:int -> postgres_port:int -> t
+val make : run:[`Docker of string] -> port:int -> postgres_port:int -> pause_for_user:bool -> t
 (** Configure a Kiln process-to-be, running on port [~port] and
-    managing a PostgreSQL database on port [~postgres_port]. *)
+    managing a PostgreSQL database on port [~postgres_port]. If
+    [pause_for_user] is [true], !{start} will add an interactive pause
+    to show the user the URI of the WebUI. *)
 
 val default_docker_image : string
 val default : t
