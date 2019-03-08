@@ -122,14 +122,14 @@ let cli_term () =
     $ Arg.(
         value
           (flag
-             (info ["with-kiln"]
-                ~doc:
-                  "Add Kiln to the network (may make the test partially \
-                   interactive).")))
-    $ Arg.(
-        value
-          (flag
              (info ["pause-to-display-kiln"]
                 ~doc:
                   "Add an interactive pause to show the user the URI of \
-                   Kiln's GUI."))))
+                   Kiln's GUI.")))
+    $ Arg.(
+        value
+          (flag
+             (info ["with-kiln"]
+                ~doc:
+                  "Add Kiln to the network (may make the test partially \
+                   interactive)."))))

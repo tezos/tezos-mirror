@@ -115,7 +115,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~executables:[node_exec; client_exec; admin_exec; winner_client_exec]
     ~protocol_paths:[winner_path; demo_path]
   >>= fun () ->
-  Interactive_test.Pauser.generic state ~force:true
+  Interactive_test.Pauser.generic state
     EF.[af "Ready to start"; af "Root path deleted."]
   >>= fun () ->
   let protocol, baker_0_account, baker_0_balance =
