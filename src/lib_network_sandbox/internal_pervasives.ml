@@ -109,7 +109,8 @@ module Attached_result = struct
     | Error e ->
         pp_open_hvbox ppf 2 ;
         pp_open_tag ppf "shout" ;
-        pp_print_string ppf "ERROR" ;
+        pp_print_string ppf "ERROR:" ;
+        pp_print_space ppf () ;
         pp_close_tag ppf () ;
         Option.iter pp_error ~f:(fun pp -> pp ppf e) ;
         pp_close_box ppf () ) ;
@@ -248,7 +249,9 @@ module List_sequential = Asynchronous_result.List_sequential
 module Loop = Asynchronous_result.Loop
 
 module Lwt_exception = struct
-  let fail ?attach (e : exn) = fail ?attach (`Lwt_exn e)
+  type t = [`Lwt_exn of exn]
+
+  let fail ?attach (e : exn) = fail ?attach (`Lwt_exn e : [> t])
 
   let catch ?attach f x =
     Lwt.catch

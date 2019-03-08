@@ -34,7 +34,7 @@ val kill_node :
 (** Kill a node's process. *)
 
 val restart_node :
-     client_exec:[`Client] Tezos_executable.t
+     client_exec:Tezos_executable.t
   -> < application_name: string
      ; console: Console.t
      ; paths: Paths.t
@@ -55,4 +55,25 @@ module Counter_log : sig
   val incr : t -> string -> unit
   val sum : t -> int
   val to_table_string : t -> string
+end
+
+module System_dependencies : sig
+  module Error : sig
+    type t = [`Precheck_failure of string]
+
+    val pp : Format.formatter -> [< `Precheck_failure of string] -> unit
+
+  end
+
+  val precheck :
+       ?using_docker:bool
+    -> ?protocol_paths:string list
+    -> ?executables:Tezos_executable.t list
+    -> < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> [< `Or_fail]
+    -> (unit, [> Lwt_exception.t | Error.t ]) Asynchronous_result.t
 end
