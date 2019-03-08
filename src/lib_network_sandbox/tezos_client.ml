@@ -1,6 +1,6 @@
 open Internal_pervasives
 
-type t = {id: string; port: int; exec: [`Client] Tezos_executable.t}
+type t = {id: string; port: int; exec: Tezos_executable.t}
 type client = t
 
 let of_node ~exec n =

@@ -51,7 +51,7 @@ module Topology : sig
   val build :
        ?protocol:Tezos_protocol.t
     -> ?base_port:int
-    -> exec:[`Node] Tezos_executable.t
+    -> exec:Tezos_executable.t
     -> 'a network
     -> 'a
 end
@@ -72,7 +72,7 @@ module Network : sig
   val start_up :
        ?check_ports:bool
     -> < paths: Paths.t ; runner: Running_processes.State.t ; .. >
-    -> client_exec:[`Client] Tezos_executable.t
+    -> client_exec:Tezos_executable.t
     -> t
     -> ( unit
        , [> `Empty_protocol_list
@@ -88,8 +88,8 @@ val network_with_protocol :
   -> ?size:int
   -> ?protocol:Tezos_protocol.t
   -> < paths: Paths.t ; runner: Running_processes.State.t ; .. >
-  -> node_exec:[`Node] Tezos_executable.t
-  -> client_exec:[`Client] Tezos_executable.t
+  -> node_exec:Tezos_executable.t
+  -> client_exec:Tezos_executable.t
   -> ( Tezos_node.t list * Tezos_protocol.t
      , [> `Empty_protocol_list
        | `Lwt_exn of exn

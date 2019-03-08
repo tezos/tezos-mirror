@@ -2,10 +2,10 @@
 open Internal_pervasives
 
 (** [t] is very similar to {!Tezos_client.t}. *)
-type t = private {id: string; port: int; exec: [`Admin] Tezos_executable.t}
+type t = private {id: string; port: int; exec: Tezos_executable.t}
 
-val of_client : exec:[`Admin] Tezos_executable.t -> Tezos_client.t -> t
-val of_node : exec:[`Admin] Tezos_executable.t -> Tezos_node.t -> t
+val of_client : exec:Tezos_executable.t -> Tezos_client.t -> t
+val of_node : exec:Tezos_executable.t -> Tezos_node.t -> t
 
 val make_command :
   t -> < paths: Paths.t ; .. > -> string list -> unit Genspio.EDSL.t

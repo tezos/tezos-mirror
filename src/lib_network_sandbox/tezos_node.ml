@@ -7,7 +7,7 @@ type t =
   ; p2p_port: int
   ; (* Ports: *)
     peers: int list
-  ; exec: [`Node] Tezos_executable.t
+  ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t }
 
 let ef t =

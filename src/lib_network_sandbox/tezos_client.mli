@@ -1,10 +1,10 @@
 (** Wrapper around the main ["tezos-client"] application. *)
 open Internal_pervasives
 
-type t = {id: string; port: int; exec: [`Client] Tezos_executable.t}
+type t = {id: string; port: int; exec: Tezos_executable.t}
 type client = t
 
-val of_node : exec:[`Client] Tezos_executable.t -> Tezos_node.t -> t
+val of_node : exec: Tezos_executable.t -> Tezos_node.t -> t
 (** Create a client which is meant to communicate with a given node. *)
 
 val base_dir : t -> state:< paths: Paths.t ; .. > -> string

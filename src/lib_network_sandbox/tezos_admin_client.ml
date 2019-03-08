@@ -1,6 +1,6 @@
 open Internal_pervasives
 
-type t = {id: string; port: int; exec: [`Admin] Tezos_executable.t}
+type t = {id: string; port: int; exec: Tezos_executable.t}
 
 let base_dir t ~state = Paths.root state // sprintf "Admin-client-base-%s" t.id
 

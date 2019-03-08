@@ -1,7 +1,5 @@
 open Internal_pervasives
 
-type kind = [`Baker | `Endorser | `Accuser]
-
 type args =
   | Baker : string -> args
   | Endorser : string -> args
@@ -10,7 +8,7 @@ type args =
 type t =
   { node: Tezos_node.t
   ; client: Tezos_client.t
-  ; exec: kind Tezos_executable.t
+  ; exec: Tezos_executable.t
   ; args: args }
 
 let of_node node args ~exec ~client = {node; exec; client; args}
