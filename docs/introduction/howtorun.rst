@@ -187,9 +187,7 @@ Register and check your rights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to run a delegate you first need to register as one using
-your implicit account:
-
-::
+your implicit account::
 
    tezos-client register key bob as delegate
 
@@ -231,9 +229,7 @@ Note that the baker is the only program that needs direct access to
 the node data directory for performance reasons.
 
 Let's launch the daemon pointing to the standard node directory and
-baking for user *bob*:
-
-::
+baking for user *bob*::
 
    tezos-baker-alpha run with local node ~/.tezos-node bob
 
@@ -281,21 +277,15 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-To know if you baked, just run:
-
-::
+To know if you baked, just run::
 
     ./alphanet.sh baker log
     ./alphanet.sh endorser log
 
-You should see lines such as:
-
-::
+You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)
 
-Or:
-
-::
+Or::
 
     Injected endorsement for block 'BLSrg4dXzL2aqq'  (level 1381, slot 3, contract bootstrap5) 'oo524wKiEWBoPD'

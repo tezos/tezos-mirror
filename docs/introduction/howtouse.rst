@@ -80,9 +80,7 @@ Node identity
 ~~~~~~~~~~~~~
 
 First we need to generate a new identity in order for the node to
-connect to the network:
-
-::
+connect to the network::
 
     tezos-node identity generate
 
@@ -156,17 +154,13 @@ Client
 Tezos client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
 For example after starting your node you can check if it has finished
-synchronizing using
-
-::
+synchronizing using::
 
    tezos-client bootstrapped
 
 This call will hang and return only when the node is synchronized.
 We can now check what is the current timestamp of the head of the
-chain (time is in UTC so it may differ from your local):
-
-::
+chain (time is in UTC so it may differ from your local)::
 
    tezos-client get timestamp
 
@@ -190,15 +184,11 @@ An additional file ``contracts`` contains the addresses of `originated
 contracts`, which have the form *KT1…*.
 
 We can for example generate a new pair of keys, which can be used locally
-with the alias *bob*:
-
-::
+with the alias *bob*::
 
       $ tezos-client gen keys bob
 
-To check the contract has been created:
-
-::
+To check the contract has been created::
 
       $ tezos-client list known contracts
 
@@ -382,9 +372,7 @@ by an implicit account. An originated account serves two purposes.
 
 -  run Michelson code, in which case it is called a *contract*.
 
-Let's originate our first contract and call it *id*:
-
-::
+Let's originate our first contract and call it *id*::
 
     tezos-client originate contract id for alice transferring 1 from alice \
                  running ./src/bin_client/test/contracts/attic/id.tz \
@@ -404,9 +392,7 @@ be seen equivalently as an object with a single method, and a single attribute.
 The method updates the state (the storage), and submits operations as a side
 effect.
 
-For the sake of this example, here is the `id.tz` contract:
-
-::
+For the sake of this example, here is the `id.tz` contract::
 
     parameter string;
     storage string;
