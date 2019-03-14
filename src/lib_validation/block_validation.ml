@@ -79,12 +79,12 @@ let may_patch_protocol
     (validation_result : Tezos_protocol_environment.validation_result) =
   match Block_header.get_forced_protocol_upgrade ~level with
   | None ->
-      return validation_result
+      Lwt.return validation_result
   | Some hash ->
       let context = Shell_context.unwrap_disk_context validation_result.context in
       Context.set_protocol context hash >>= fun context ->
       let context = Shell_context.wrap_disk_context context in
-      return { validation_result with context }
+      Lwt.return { validation_result with context }
 
 module Make(Proto : Registered_protocol.T) = struct
 
@@ -215,7 +215,7 @@ module Make(Proto : Registered_protocol.T) = struct
     let context = Shell_context.unwrap_disk_context validation_result.context in
     is_testchain_forking context >>= fun forking_testchain ->
     may_patch_protocol
-      ~level:block_header.shell.level validation_result >>=? fun validation_result ->
+      ~level:block_header.shell.level validation_result >>= fun validation_result ->
     let context = Shell_context.unwrap_disk_context validation_result.context in
     Context.get_protocol context >>= fun new_protocol ->
     let expected_proto_level =

@@ -932,7 +932,6 @@ module Block = struct
     last_allowed_fork_level: Int32.t;
   }
 
-
   module Header = Header
 
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash

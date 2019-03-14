@@ -27,7 +27,7 @@
 val may_patch_protocol:
   level:Int32.t ->
   Tezos_protocol_environment.validation_result ->
-  Tezos_protocol_environment.validation_result tzresult Lwt.t
+  Tezos_protocol_environment.validation_result Lwt.t
 
 val update_testchain_status:
   Context.t ->
