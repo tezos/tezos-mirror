@@ -162,18 +162,21 @@ let on_request
                     block ;
                   notify_new_block block ;
                   return (Ok (Some block))
-              | Error (( Canceled
-                       | Unavailable_protocol _
-                       | Missing_test_protocol _
-                       | System_error _) :: _) as error ->
-                  return error
-              | Error error ->
-                  Worker.protect w begin fun () ->
-                    Distributed_db.commit_invalid_block
-                      chain_db hash header error
-                  end >>=? fun commited ->
-                  assert commited ;
-                  return (Error error)
+              | Error err as error ->
+                  if List.exists (function Invalid_block _ -> true | _ -> false) err
+                  then begin
+                    Worker.protect w begin fun () ->
+                      Distributed_db.commit_invalid_block
+                        chain_db hash header err
+                    end >>=? fun commited ->
+                    assert commited ;
+                    return error
+                  end else begin
+                    debug w "Error during %a block validation: %a"
+                      Block_hash.pp_short hash
+                      Error_monad.pp_print_error err ;
+                    return error
+                  end
 
 let on_launch _ _ (limits, start_testchain, db, validation_kind) =
   let protocol_validator = Protocol_validator.create db in
