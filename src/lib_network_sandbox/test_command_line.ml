@@ -8,8 +8,8 @@ module Run_command = struct
             transform_error
               ~f:(fun (`Lwt_exn _) -> `Die 3)
               (Console.say state
-                 EF.(custom (fun ppf ->
-                     Attached_result.pp ppf result ~pp_error)))
+                 EF.(
+                   custom (fun ppf -> Attached_result.pp ppf result ~pp_error)))
             >>= fun () -> die 2 ) )
 
   let term ~pp_error () =

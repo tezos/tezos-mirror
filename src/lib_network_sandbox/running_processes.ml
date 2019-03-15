@@ -109,7 +109,8 @@ let start t process =
   let date = Tezos_stdlib_unix.Systime_os.now ()
              |> Tezos_base.Time.System.to_notation in
   let open_file f =
-    Lwt_exception.catch ~attach:[("open_file", `String_value f)]
+    Lwt_exception.catch
+      ~attach:[("open_file", `String_value f)]
       Lwt.Infix.(
         fun () ->
           Tezos_stdlib_unix.Lwt_utils_unix.create_dir ~perm:0o700

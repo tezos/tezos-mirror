@@ -62,7 +62,6 @@ module System_dependencies : sig
     type t = [`Precheck_failure of string]
 
     val pp : Format.formatter -> [< `Precheck_failure of string] -> unit
-
   end
 
   val precheck :
@@ -75,5 +74,5 @@ module System_dependencies : sig
        ; runner: Running_processes.State.t
        ; .. >
     -> [< `Or_fail]
-    -> (unit, [> Lwt_exception.t | Error.t ]) Asynchronous_result.t
+    -> (unit, [> Lwt_exception.t | Error.t]) Asynchronous_result.t
 end

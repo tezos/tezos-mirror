@@ -30,10 +30,7 @@ module State : sig
 end
 
 val output_path :
-     < paths: Paths.t ; .. >
-  -> Process.t
-  -> [ `Meta | `Stderr | `Stdout]
-  -> string
+  < paths: Paths.t ; .. > -> Process.t -> [`Meta | `Stderr | `Stdout] -> string
 (** Return the path (within {!Paths}'s root-path) where the process
     writes its output or metadata. *)
 
