@@ -68,6 +68,7 @@ type ins =
   | Query_all_high_watermarks
   | Deauthorize_baking
   | Get_authorized_path_and_curve
+  | Make_deterministic_nonce
 
 let int_of_ins = function
   | Version -> 0x00
@@ -84,6 +85,7 @@ let int_of_ins = function
   | Query_all_high_watermarks -> 0x0B
   | Deauthorize_baking -> 0x0C
   | Get_authorized_path_and_curve -> 0x0D
+  | Make_deterministic_nonce -> 0x0E
 
 type curve =
   | Ed25519
@@ -119,11 +121,14 @@ let curve_of_int = function
   | _ -> None
 
 type Transport.Status.t +=
-    Tezos_invalid_curve_code of int
+  | Tezos_invalid_curve_code of int
+  | Payload_too_big of int
 
 let () = Transport.Status.register_string_f begin function
     | Tezos_invalid_curve_code curve_code ->
         Some ("Unrecognized curve code: " ^ string_of_int curve_code)
+    | Payload_too_big size ->
+        Some (Printf.sprintf "Payload too big: %d bytes" size)
     | _ -> None
   end
 
@@ -259,6 +264,28 @@ let sign ?pp ?buf ?(hash_on_ledger=true) h curve path payload =
   let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data:data_init cmd in
   let _addr = Transport.apdu ~msg ?pp ?buf h apdu in
   Transport.write_payload ~mark_last:true ?pp ?buf ~msg ~cmd h ~p1:0x01 payload
+
+let get_deterministic_nonce ?pp ?buf h curve path payload =
+  let nb_derivations = List.length path in
+  if nb_derivations > 10 then
+    invalid_arg "get_deterministic_nonce: max 10 derivations" ;
+  let path_data =
+    let lc = 1 + (4 * nb_derivations) in
+    let data = Cstruct.create lc in
+    Cstruct.set_uint8 data 0 nb_derivations ;
+    let _ = write_path (Cstruct.shift data 1) path in
+    data in
+  let data = Cstruct.append path_data payload in
+  let cmd = wrap_ins Make_deterministic_nonce in
+  let lc = Cstruct.len data in
+  if lc >= Apdu.max_data_length then
+    Transport.app_error ~msg:"get_deterministic_nonce"
+    @@ R.error (Payload_too_big (Cstruct.len payload))
+  else
+    let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data cmd in
+    let msg = "make-deterministic-nonce" in
+    Transport.apdu ~msg ?pp ?buf h apdu
+
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

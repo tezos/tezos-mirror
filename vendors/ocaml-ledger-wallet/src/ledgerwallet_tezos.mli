@@ -129,6 +129,15 @@ val sign :
     the default), signed on [ledger] with key from curve [curve] at
     [path]. *)
 
+val get_deterministic_nonce :
+  ?pp:Format.formatter ->
+  ?buf:Cstruct.t ->
+  Hidapi.t -> curve -> int32 list ->
+  Cstruct.t -> (Cstruct.t, Transport.error) result
+(** [get_deterministic_nonce ?pp ?buf h curve path payload] asks the ledger
+    for a deterministic nonce from a some given bytes (using HMAC).
+*)
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff
 

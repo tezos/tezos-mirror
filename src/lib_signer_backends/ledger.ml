@@ -241,7 +241,7 @@ module Ledger_commands = struct
       | Error _ as e -> Lwt.return e
       | Ok (path, curve) -> return (`Path_curve (path, curve))
 
-  let sign ?watermark hid curve path base_msg =
+  let sign ?watermark hid curve path (base_msg : MBytes.t) =
     let msg =
       Option.unopt_map watermark
         ~default:base_msg ~f:(fun watermark ->
@@ -281,7 +281,16 @@ module Ledger_commands = struct
         let buf = Sign.to_bytes secp256k1_ctx signature in
         let signature = P256.of_bytes_exn buf in
         return (Signature.of_p256 signature)
+
+  let get_deterministic_nonce hid curve path (msg : MBytes.t) =
+    let path = Bip32_path.tezos_root @ path in
+    wrap_ledger_cmd begin fun pp ->
+      Ledgerwallet_tezos.get_deterministic_nonce
+        ~pp hid curve path (Cstruct.of_bigarray msg)
+    end >>=? fun nonce ->
+    return (Cstruct.to_bigarray nonce : MBytes.t)
 end
+
 
 (** Identification of a ledger's root key through crouching-tigers
     (not the keys used for an account). *)
@@ -620,9 +629,21 @@ module Signer_implementation : Client_keys.SIGNER = struct
          >>=? fun bytes ->
          return_some bytes)
 
-  let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let supports_deterministic_nonces _ = return_false
+  let deterministic_nonce (sk_uri : sk_uri) msg =
+    Ledger_uri.parse (sk_uri :> Uri.t) >>=? fun ledger_uri ->
+    Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
+    use_ledger_or_fail ~ledger_uri
+      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+         Ledger_commands.get_deterministic_nonce hidapi curve path msg
+         >>=? fun bytes ->
+         return_some bytes)
+
+  let deterministic_nonce_hash (sk : sk_uri) msg =
+    deterministic_nonce sk msg
+    >>=? fun nonce ->
+    return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
+
+  let supports_deterministic_nonces _ = return_true
 end
 
 (* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)
