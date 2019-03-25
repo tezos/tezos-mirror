@@ -20,7 +20,7 @@ let assert_failure state msg f () =
   >>= fun () ->
   Asynchronous_result.bind_on_error
     (f () >>= fun _ -> return `Worked)
-    ~f:(fun _ -> return `Didn'tWork)
+    ~f:(fun ~result _ -> return `Didn'tWork)
   >>= function `Worked -> failf "%s" msg | `Didn'tWork -> return ()
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt

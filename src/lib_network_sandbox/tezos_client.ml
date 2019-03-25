@@ -352,6 +352,11 @@ module Keyed = struct
           (af "Successful bake (%s: %s):" baker.client.id msg)
           (ocaml_string_list res#out))
 
+  let generate_nonce state {client; key_name; _} data =
+    successful_client_cmd state ~client
+      ["generate"; "nonce"; "hash"; "for"; key_name; "from"; data]
+    >>= fun res -> return (List.hd_exn res#out)
+
   let forge_and_inject state {client; key_name; _} ~json =
     rpc state ~client ~path:"/chains/main/blocks/head/helpers/forge/operations"
       (`Post (Ezjsonm.to_string json))

@@ -249,6 +249,17 @@ module Keyed : sig
     -> string
     -> (unit, [> Command_error.t | `Lwt_exn of exn]) Asynchronous_result.t
 
+  val generate_nonce :
+       < application_name: string
+       ; console: Console.t
+       ; operations_log: Log_recorder.Operations.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> t
+    -> string
+    -> (string, [> Command_error.t | `Lwt_exn of exn]) Asynchronous_result.t
+
   val forge_and_inject :
        < application_name: string
        ; console: Console.t

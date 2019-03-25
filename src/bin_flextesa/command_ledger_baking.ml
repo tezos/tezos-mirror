@@ -297,6 +297,21 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
     >>= ask_assert state
           EF.(wf "Is 'Chain' = %S and 'Last Block Level' = %d" "mainnet" main)
   in
+  (* Test determinism of nonces *)
+  Tezos_client.Keyed.generate_nonce state baker "this"
+  >>= fun thisNonce1 ->
+  Tezos_client.Keyed.generate_nonce state baker "that"
+  >>= fun thatNonce1 ->
+  Tezos_client.Keyed.generate_nonce state baker "this"
+  >>= fun thisNonce2 ->
+  Tezos_client.Keyed.generate_nonce state baker "that"
+  >>= fun thatNonce2 ->
+  assert_eq (fun x -> x) ~expected:thisNonce1 ~actual:thisNonce2
+  >>= fun () ->
+  assert_eq (fun x -> x) ~expected:thatNonce1 ~actual:thatNonce2
+  >>= fun () ->
+  assert_ (thisNonce1 <> thatNonce1)
+  >>= fun () ->
   assert_failure state
     "originating an account from the Tezos Baking app should fail"
     (fun () ->
