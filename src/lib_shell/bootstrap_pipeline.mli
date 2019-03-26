@@ -36,3 +36,6 @@ val create:
 val wait: t -> unit tzresult Lwt.t
 
 val cancel: t -> unit Lwt.t
+
+
+val length : t -> Peer_validator_worker_state.Worker_state.pipeline_length

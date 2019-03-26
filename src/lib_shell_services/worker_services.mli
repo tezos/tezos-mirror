@@ -30,7 +30,12 @@ module Prevalidators : sig
   open Prevalidator_worker_state
 
   val list:
-    #simple -> (Chain_id.t * Worker_types.worker_status) list tzresult Lwt.t
+    #simple -> (
+      Chain_id.t *
+      Worker_types.worker_status *
+      Worker_types.worker_information *
+      int) list tzresult Lwt.t
+
   val state:
     #simple -> Chain_services.chain -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
 
@@ -39,7 +44,10 @@ module Prevalidators : sig
     val list :
       ([ `GET ],  unit,
        unit, unit, unit,
-       (Chain_id.t * Worker_types.worker_status) list) RPC_service.t
+       (Chain_id.t *
+        Worker_types.worker_status *
+        Worker_types.worker_information *
+        int) list) RPC_service.t
 
     val state :
       ([ `GET ], unit,
@@ -74,7 +82,10 @@ module Peer_validators : sig
 
   val list:
     #simple -> Chain_services.chain ->
-    (P2p_peer.Id.t * Worker_types.worker_status) list tzresult Lwt.t
+    (P2p_peer.Id.t *
+     Worker_types.worker_status *
+     Worker_types.worker_information *
+     Peer_validator_worker_state.Worker_state.pipeline_length) list tzresult Lwt.t
 
   val state:
     #simple ->
@@ -85,7 +96,10 @@ module Peer_validators : sig
     val list :
       ([ `GET ],  unit,
        unit * Chain_services.chain, unit, unit,
-       (P2p_peer.Id.t * Worker_types.worker_status) list) RPC_service.t
+       (P2p_peer.Id.t *
+        Worker_types.worker_status *
+        Worker_types.worker_information *
+        Peer_validator_worker_state.Worker_state.pipeline_length) list) RPC_service.t
 
     val state :
       ([ `GET ], unit,
@@ -101,16 +115,26 @@ module Chain_validators : sig
   open Chain_validator_worker_state
 
   val list:
-    #simple -> (Chain_id.t * Worker_types.worker_status) list tzresult Lwt.t
+    #simple -> (
+      Chain_id.t *
+      Worker_types.worker_status *
+      Worker_types.worker_information *
+      int) list tzresult Lwt.t
+
   val state:
-    #simple -> Chain_services.chain -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    #simple -> Chain_services.chain ->
+    (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+
 
   module S : sig
 
     val list :
       ([ `GET ],  unit,
        unit, unit, unit,
-       (Chain_id.t * Worker_types.worker_status) list) RPC_service.t
+       (Chain_id.t *
+        Worker_types.worker_status *
+        Worker_types.worker_information *
+        int ) list) RPC_service.t
 
     val state :
       ([ `GET ], unit,

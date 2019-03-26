@@ -630,10 +630,13 @@ let new_head_watcher w =
   Lwt_watcher.create_stream new_head_input
 
 let status = Worker.status
+let information = Worker.information
 
 let running_workers () = Worker.list table
 
 let pending_requests t = Worker.Queue.pending_requests t
+let pending_requests_length t = Worker.Queue.pending_requests_length t
+
 
 let current_request t = Worker.current_request t
 

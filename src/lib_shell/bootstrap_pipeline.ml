@@ -396,3 +396,9 @@ let wait pipeline =
 let cancel pipeline =
   Lwt_canceler.cancel pipeline.canceler >>= fun () ->
   wait_workers pipeline
+
+let length pipeline =
+  Peer_validator_worker_state.Worker_state.{
+    fetched_header_length = Lwt_pipe.length pipeline.fetched_headers;
+    fetched_block_length = Lwt_pipe.length pipeline.fetched_blocks ;
+  }

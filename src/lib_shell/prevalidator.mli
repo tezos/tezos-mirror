@@ -108,4 +108,8 @@ val pending_requests : t -> (Time.System.t * Prevalidator_worker_state.Request.v
 val current_request : t -> (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 
+val information : t -> Worker_types.worker_information
+
+val pipeline_length : t -> int
+
 val rpc_directory : t option RPC_directory.t
