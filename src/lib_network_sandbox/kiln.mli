@@ -5,15 +5,16 @@ open Internal_pervasives
 type t
 
 val make :
-     run:[`Docker of string]
+     run:[`Dev_mode of string * string | `Docker of string]
   -> port:int
-  -> postgres_port:int
+  -> ?postgres:[`Docker of int]
   -> pause_for_user:bool
+  -> unit
   -> t
 (** Configure a Kiln process-to-be, running on port [~port] and
-    managing a PostgreSQL database on port [~postgres_port]. If
-    [pause_for_user] is [true], !{start} will add an interactive pause
-    to show the user the URI of the WebUI. *)
+    managing a PostgreSQL database on port [~postgres:(`Docker
+    port)]. If [pause_for_user] is [true], !{start} will add an
+    interactive pause to show the user the URI of the WebUI. *)
 
 val default_docker_image : string
 val default : t
@@ -30,7 +31,7 @@ val start :
   -> t
   -> node_uris:string list
   -> bakers:(string * string) list
-  -> ( Running_processes.State.process_state
+  -> ( Running_processes.State.process_state option
        * Running_processes.State.process_state
      , [> `Lwt_exn of exn | `Waiting_for of string * [`Time_out]] )
      Asynchronous_result.t
