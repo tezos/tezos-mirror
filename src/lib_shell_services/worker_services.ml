@@ -150,10 +150,18 @@ module Chain_validators = struct
              RPC_error.encoding)
         RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg )
 
+    let ddb_state =
+      RPC_service.get_service
+        ~description:"Introspect the state of the DDB attached to a chain validator worker."
+        ~query: RPC_query.empty
+        ~output: Chain_validator_worker_state.Distributed_db_state.encoding
+        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "ddb")
+
   end
 
   open RPC_context
   let list ctxt = make_call S.list ctxt () () ()
   let state ctxt h = make_call1 S.state ctxt h () ()
+  let ddb_state ctxt h = make_call1 S.ddb_state ctxt h () ()
 
 end

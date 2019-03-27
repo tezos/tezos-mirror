@@ -54,3 +54,24 @@ module Worker_state : sig
   val encoding : view Data_encoding.encoding
   val pp : Format.formatter -> view -> unit
 end
+
+module Distributed_db_state : sig
+
+  type table_scheduler = { table_length : int;
+                           scheduler_length : int;}
+
+  type view = {
+    p2p_readers_length: int ;
+    active_chains_length: int ;
+
+    operation_db : table_scheduler ;
+    operations_db : table_scheduler ;
+    block_header_db : table_scheduler ;
+    operations_hashed_db : table_scheduler ;
+
+    active_connections_length: int ;
+    active_peers_length: int ;
+  }
+
+  val encoding : view Data_encoding.encoding
+end

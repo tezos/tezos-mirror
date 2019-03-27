@@ -122,4 +122,12 @@ let build_rpc_directory state =
         current_request = Chain_validator.current_request w }
   end ;
 
+  (* DDB *)
+  register1 Worker_services.Chain_validators.S.ddb_state begin fun chain () () ->
+    Chain_directory.get_chain_id state chain >>= fun chain_id ->
+    let w = List.assoc chain_id (Chain_validator.running_workers ()) in
+    return (Chain_validator.ddb_info w) end ;
+
+
+
   !dir

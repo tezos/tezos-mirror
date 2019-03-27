@@ -79,6 +79,7 @@ module type MEMORY_TABLE = sig
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val length : 'a t -> int
 end
 
 module type SCHEDULER_EVENTS = sig
@@ -90,6 +91,7 @@ module type SCHEDULER_EVENTS = sig
   val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
   val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
   val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
+  val memory_table_length : t -> int
 end
 
 module type PRECHECK = sig
@@ -120,6 +122,7 @@ module Make_table
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val memory_table_length : t -> int
 
 end = struct
 
@@ -325,6 +328,8 @@ end = struct
     | Some (Found _) -> false
     | Some (Pending _) -> true
 
+  let memory_table_length s = Memory_table.length s.memory
+
 end
 
 module type REQUEST = sig
@@ -351,6 +356,7 @@ module Make_request_scheduler
   val create: Request.param -> t
   val shutdown: t -> unit Lwt.t
   include SCHEDULER_EVENTS with type t := t and type key := Hash.t
+  val memory_table_length : t -> int
 
 end = struct
 
@@ -614,5 +620,7 @@ end = struct
   let shutdown s =
     Lwt_canceler.cancel s.canceler >>= fun () ->
     s.worker
+
+  let memory_table_length s = Table.length s.pending
 
 end

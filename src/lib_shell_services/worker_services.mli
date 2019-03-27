@@ -125,6 +125,9 @@ module Chain_validators : sig
     #simple -> Chain_services.chain ->
     (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
 
+  val ddb_state:
+    #simple -> Chain_services.chain -> Distributed_db_state.view tzresult Lwt.t
+
 
   module S : sig
 
@@ -140,6 +143,11 @@ module Chain_validators : sig
       ([ `GET ], unit,
        unit * Chain_services.chain, unit, unit,
        (Request.view, Event.t) Worker_types.full_status) RPC_service.t
+
+    val ddb_state :
+      ([ `GET ], unit,
+       unit * Chain_services.chain, unit, unit,
+       Distributed_db_state.view) RPC_service.t
 
   end
 
