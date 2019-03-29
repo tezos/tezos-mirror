@@ -42,7 +42,7 @@ type t = {
   rpc_listen_addrs: string list ;
   private_mode: bool ;
   disable_mempool: bool ;
-  disable_testchain: bool ;
+  enable_testchain: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;

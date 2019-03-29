@@ -54,7 +54,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  disable_testchain : bool ;
+  enable_testchain : bool ;
   greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
@@ -112,7 +112,7 @@ let default_p2p = {
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  disable_testchain = false ;
+  enable_testchain = false ;
   greylisting_config = P2p_point_state.Info.default_greylisting_config
 }
 
@@ -264,16 +264,16 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; disable_testchain ; greylisting_config } ->
+           limits ; disable_mempool ; enable_testchain ; greylisting_config } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, disable_testchain, greylisting_config))
+       disable_mempool, enable_testchain, greylisting_config))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, disable_testchain, greylisting_config) ->
+          disable_mempool, enable_testchain, greylisting_config) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; disable_testchain ; greylisting_config })
+        disable_mempool ; enable_testchain ; greylisting_config })
     (obj9
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
@@ -314,12 +314,13 @@ let p2p =
                          It can be used to decrease the memory and \
                          computation footprints of the node."
           bool false)
-       (dft "disable_testchain"
-          ~description: "If set to [true], the node will not spawn a testchain during \
-                         the protocol's testing voting period. \
-                         Default value is [false]. It may be used used to decrease the \
-                         node storage usage and computation by droping the validation \
-                         of the test network blocks."
+       (dft "enable_testchain"
+          ~description: "If set to [true], the node will spawn a \
+                         testchain during the protocol's testing \
+                         voting period. Default value is [false]. It \
+                         is disabled to decrease the node storage \
+                         usage and computation by droping the \
+                         validation of the test network blocks."
           bool false)
        (let open P2p_point_state.Info in
         dft "greylisting_config"
@@ -547,7 +548,7 @@ let update
     ?(rpc_listen_addrs = [])
     ?(private_mode = false)
     ?(disable_mempool = false)
-    ?(disable_testchain = false)
+    ?(enable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
@@ -603,7 +604,7 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
-    disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
+    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
     greylisting_config = cfg.p2p.greylisting_config ;
   }
   and rpc : rpc = {
