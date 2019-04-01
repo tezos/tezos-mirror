@@ -320,10 +320,6 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                       | _ when p = demo_hash -> "injected demo"
                       | _ -> "injected unknown" ) )) ]
   >>= fun () ->
-  let new_protocols =
-    List.filter after_injections_protocols ~f:(fun ph ->
-        not (List.mem default_protocols ph ~equal:String.equal) )
-  in
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       Interactive_test.Pauser.generic state
         EF.
@@ -345,10 +341,11 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
       (["submit"; "proposals"; "for"; baker.key_name] @ props)
     >>= fun _ -> return ()
   in
+  let to_submit_first = [winner_hash; demo_hash] in
   ( match serialize_proposals with
-  | false -> submit_proposals special_baker new_protocols
+  | false -> submit_proposals special_baker to_submit_first
   | true ->
-      List_sequential.iter new_protocols ~f:(fun one ->
+      List_sequential.iter to_submit_first ~f:(fun one ->
           submit_proposals special_baker [one] ) )
   >>= fun () ->
   Tezos_client.successful_client_cmd state ~client:baker_0.client
