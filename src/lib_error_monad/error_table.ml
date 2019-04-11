@@ -38,6 +38,9 @@ module type S = sig
   val iter_s: (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
   val iter_p: (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
   val fold: (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
+  val fold_promises: (key -> 'a tzresult Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val fold_resolved: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val fold_keys: (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
   val length: 'a t -> int
 end
 
@@ -120,6 +123,17 @@ module Make(T: Hashtbl.S)
          | Error _ -> Lwt.return acc
          | Ok a -> f k a acc)
       acc
+  let fold_promises f t acc = T.fold f t.table acc
+  let fold_resolved f t acc =
+    T.fold
+      (fun k a acc ->
+         match Lwt.state a with
+         | Lwt.Sleep | Lwt.Fail _ | Lwt.Return (Error _) -> acc
+         | Lwt.Return (Ok a) -> f k a acc)
+      t.table
+      acc
+  let fold_keys f t acc =
+    T.fold (fun k _ acc -> f k acc) t.table acc
 
   let length t = T.length t.table
 

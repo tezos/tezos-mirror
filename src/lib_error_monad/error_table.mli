@@ -76,6 +76,20 @@ module type S = sig
       successfully. *)
 
   val fold: (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
+  (** [fold f t init] folds [f] over the successfully resolving promises
+      of [t]. I.e., it goes through the promises in the table and waits for each
+      of the promise to resolve in order to fold over it. *)
+
+  val fold_promises: (key -> 'a tzresult Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  (** [fold_promises f t init] folds [f] over the promises of [t]. *)
+
+  val fold_resolved: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  (** [fold_resolved f t init] folds [f] over the successfully resolved promises
+      of [t]. *)
+
+  val fold_keys: (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  (** [fold_keys f t init] folds [f] over the keys bound in [t]. *)
+
   val length: 'a t -> int
 end
 

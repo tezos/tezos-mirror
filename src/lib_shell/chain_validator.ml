@@ -78,7 +78,7 @@ module Types = struct
     mutable child:
       (state * (unit -> unit Lwt.t (* shutdown *))) option ;
     mutable prevalidator: Prevalidator.t option ;
-    active_peers: Peer_validator.t tzresult Lwt.t P2p_peer.Table.t ;
+    active_peers: Peer_validator.t P2p_peer.InitializationTable.t ;
     bootstrapped_peers: unit P2p_peer.Table.t ;
   }
 
@@ -86,7 +86,7 @@ module Types = struct
     let { bootstrapped ; active_peers ; bootstrapped_peers ; _ } = state in
     { bootstrapped ;
       active_peers =
-        P2p_peer.Table.fold (fun id _ l -> id :: l) active_peers [] ;
+        P2p_peer.InitializationTable.fold_keys (fun id l -> id :: l) active_peers [] ;
       bootstrapped_peers =
         P2p_peer.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [] }
 end
@@ -140,36 +140,30 @@ let may_toggle_bootstrapped_chain w =
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   begin
-    match P2p_peer.Table.find_opt nv.active_peers peer_id with
-    | Some pv -> pv
-    | None ->
-        let pv =
-          Peer_validator.create
-            ~notify_new_block:(notify_new_block w)
-            ~notify_bootstrapped: begin fun () ->
-              P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
-              may_toggle_bootstrapped_chain w
-            end
-            ~notify_termination: begin fun _pv ->
-              P2p_peer.Table.remove nv.active_peers peer_id ;
-              P2p_peer.Table.remove nv.bootstrapped_peers peer_id ;
-            end
-            nv.parameters.peer_validator_limits
-            nv.parameters.block_validator
-            nv.parameters.chain_db
-            peer_id in
-        P2p_peer.Table.add nv.active_peers peer_id pv ;
-        pv
-  end >>= function
-  | Error _ as e ->
-      P2p_peer.Table.remove nv.active_peers peer_id ;
-      Lwt.return e
-  | Ok pv ->
-      match Peer_validator.status pv with
-      | Worker_types.Running _ -> f pv
-      | Worker_types.Closing (_, _)
-      | Worker_types.Closed (_, _, _)
-      | Worker_types.Launching _ -> return_unit
+    P2p_peer.InitializationTable.find_or_make
+      nv.active_peers
+      peer_id
+      (fun () ->
+         Peer_validator.create
+           ~notify_new_block:(notify_new_block w)
+           ~notify_bootstrapped: begin fun () ->
+             P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
+             may_toggle_bootstrapped_chain w
+           end
+           ~notify_termination: begin fun _pv ->
+             P2p_peer.InitializationTable.remove nv.active_peers peer_id ;
+             P2p_peer.Table.remove nv.bootstrapped_peers peer_id ;
+           end
+           nv.parameters.peer_validator_limits
+           nv.parameters.block_validator
+           nv.parameters.chain_db
+           peer_id)
+  end >>=? fun pv ->
+  match Peer_validator.status pv with
+  | Worker_types.Running _ -> f pv
+  | Worker_types.Closing (_, _)
+  | Worker_types.Closed (_, _, _)
+  | Worker_types.Launching _ -> return_unit
 
 let may_update_checkpoint chain_state new_head =
   State.Chain.checkpoint chain_state >>= fun checkpoint ->
@@ -401,17 +395,13 @@ let on_completion (type a) w  (req : a Request.t) (update : a) request_status =
 let on_close w =
   let nv = Worker.state w in
   Distributed_db.deactivate nv.parameters.chain_db >>= fun () ->
-  begin
-    P2p_peer.Table.fold
-      (fun peer_id pv acc ->
-         acc >>= fun acc ->
-         pv >|= function
-         | Ok pv -> Peer_validator.shutdown pv :: acc
-         | Error _ ->
-             P2p_peer.Table.remove nv.active_peers peer_id ;
-             acc)
-      nv.active_peers (Lwt.return_nil)
-  end >>= fun pvs ->
+  let pvs =
+    P2p_peer.InitializationTable.fold_promises
+      (fun _ pv acc ->
+         (pv >>= function
+           | Error _ -> Lwt.return_unit
+           | Ok pv -> Peer_validator.shutdown pv) :: acc)
+      nv.active_peers [] in
   Lwt.join
     (begin match nv.prevalidator with
        | Some prevalidator -> Prevalidator.shutdown prevalidator
@@ -455,7 +445,7 @@ let on_launch start_prevalidator w _ parameters =
       bootstrapped_waiter ;
       bootstrapped = (parameters.limits.bootstrap_threshold <= 0) ;
       active_peers =
-        P2p_peer.Table.create 50 ; (* TODO use `2 * max_connection` *)
+        P2p_peer.InitializationTable.create 50 ; (* TODO use `2 * max_connection` *)
       bootstrapped_peers =
         P2p_peer.Table.create 50 ; (* TODO use `2 * max_connection` *)
       child = None ;
@@ -485,16 +475,12 @@ let on_launch start_prevalidator w _ parameters =
     disconnection = begin fun peer_id ->
       Lwt.async begin fun () ->
         let nv = Worker.state w in
-        match P2p_peer.Table.find_opt nv.active_peers peer_id with
+        match P2p_peer.InitializationTable.find_opt nv.active_peers peer_id with
         | None -> return_unit
         | Some pv ->
-            pv >>= function
-            | Error _ as e ->
-                P2p_peer.Table.remove nv.active_peers peer_id ;
-                Lwt.return e
-            | Ok pv ->
-                Peer_validator.shutdown pv >>= fun () ->
-                return_unit
+            pv >>=? fun pv ->
+            Peer_validator.shutdown pv >>= fun () ->
+            return_unit
       end
     end ;
   } ;
