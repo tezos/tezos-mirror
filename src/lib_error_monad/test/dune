@@ -1,0 +1,21 @@
+(executables
+ (names test_error_tables)
+ (libraries tezos-error-monad
+            lwt.unix
+            alcotest
+            alcotest-lwt)
+ (flags (:standard -w -9-32
+                   -safe-string
+                   -open Tezos_error_monad)))
+
+(alias
+ (name buildtest)
+ (deps test_error_tables.exe))
+
+(alias
+ (name runtest_error_tables)
+ (action (run %{exe:test_error_tables.exe})))
+
+(alias
+ (name runtest)
+ (deps (alias runtest_error_tables)))
