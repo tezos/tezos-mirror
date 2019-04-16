@@ -415,6 +415,19 @@ let get_constants ctxt =
           failwith "Internal error: cannot parse constants in context."
       | Some constants -> return constants
 
+(* only for migration from 004 to 005 *)
+let get_004_constants ctxt =
+  Context.get ctxt constants_key >>= function
+  | None ->
+      failwith "Internal error: cannot read constants in context."
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Parameters_repr.Proto_004.constants_encoding bytes
+      with
+      | None ->
+          failwith "Internal error: cannot parse constants in context."
+      | Some constants -> return constants
+
 let patch_constants ctxt f =
   let constants = f ctxt.constants in
   set_constants ctxt.context constants >>= fun context ->
@@ -495,6 +508,31 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
         set_constants ctxt param.constants >>= fun ctxt ->
         return ctxt
     | Alpha_previous ->
+        get_004_constants ctxt >>=? fun c ->
+        let constants = Constants_repr.{
+            preserved_cycles = c.preserved_cycles ;
+            blocks_per_cycle = c.blocks_per_cycle ;
+            blocks_per_commitment = c.blocks_per_commitment ;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot ;
+            blocks_per_voting_period = c.blocks_per_voting_period ;
+            time_between_blocks = c.time_between_blocks ;
+            endorsers_per_block = c.endorsers_per_block ;
+            hard_gas_limit_per_operation = c.hard_gas_limit_per_operation ;
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block ;
+            proof_of_work_threshold = c.proof_of_work_threshold ;
+            tokens_per_roll = c.tokens_per_roll ;
+            michelson_maximum_type_size = c.michelson_maximum_type_size;
+            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip ;
+            origination_size = c.origination_size ;
+            block_security_deposit = c.block_security_deposit ;
+            endorsement_security_deposit = c.endorsement_security_deposit ;
+            block_reward = c.block_reward ;
+            endorsement_reward = c.endorsement_reward ;
+            cost_per_byte = c.cost_per_byte ;
+            hard_storage_limit_per_operation = c.hard_storage_limit_per_operation ;
+            test_chain_duration = c.test_chain_duration ;
+          } in
+        set_constants ctxt constants >>= fun ctxt ->
         return ctxt
   end >>=? fun ctxt ->
   prepare ctxt ~level ~timestamp ~fitness >>=? fun ctxt ->
