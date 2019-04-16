@@ -73,8 +73,14 @@ let operation op =
   op,
   Data_encoding.Binary.to_bytes Operation.encoding op
 
+let block_header_data_encoding =
+  Data_encoding.(obj1 (req "proto_block_header" string))
 
-let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.Block.t) name
+let block _state
+    ?(context = Context_hash.zero)
+    ?(operations = [])
+    (pred: State.Block.t)
+    name
   : Block_header.t =
   let operations_hash =
     Operation_list_list_hash.compute
@@ -82,13 +88,17 @@ let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.
   let pred_header = State.Block.shell_header pred in
   let fitness = incr_fitness pred_header.fitness in
   let timestamp = incr_timestamp pred_header.timestamp in
+  let protocol_data =
+    Data_encoding.Binary.to_bytes_exn
+      block_header_data_encoding
+      name in
   { shell = { level = Int32.succ pred_header.level ;
               proto_level = pred_header.proto_level ;
               predecessor = State.Block.hash pred ;
               validation_passes = 1 ;
               timestamp ; operations_hash ; fitness ;
               context } ;
-    protocol_data = MBytes.of_string name ;
+    protocol_data ;
   }
 
 let parsed_block ({ shell ; protocol_data } : Block_header.t) =
@@ -99,6 +109,7 @@ let parsed_block ({ shell ; protocol_data } : Block_header.t) =
   ({ shell ; protocol_data } : Proto.block_header)
 
 let zero = MBytes.create 0
+
 
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
