@@ -507,30 +507,6 @@ let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
 
-let register_resolvers enc resolve =
-  let resolve context str =
-    let faked_context = {
-      context ;
-      constants = Constants_repr.default ;
-      first_level = Raw_level_repr.root ;
-      level =  Level_repr.root Raw_level_repr.root ;
-      timestamp = Time.of_seconds 0L ;
-      fitness = 0L ;
-      allowed_endorsements = Signature.Public_key_hash.Map.empty ;
-      storage_space_to_pay = None ;
-      allocated_contracts = None ;
-      fees = Tez_repr.zero ;
-      rewards = Tez_repr.zero ;
-      deposits = Signature.Public_key_hash.Map.empty ;
-      block_gas = Constants_repr.default.hard_gas_limit_per_block ;
-      operation_gas = Unaccounted ;
-      origination_nonce = None ;
-      internal_nonce = 0 ;
-      internal_nonces_used = Int_set.empty ;
-    } in
-    resolve faked_context str in
-  Context.register_resolver enc  resolve
-
 (* Generic context ********************************************************)
 
 type key = string list
