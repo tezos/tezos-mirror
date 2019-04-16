@@ -400,7 +400,7 @@ let get_proto_param ctxt =
 let set_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Parameters_repr.constants_encoding constants in
+      Constants_repr.parametric_encoding constants in
   Context.set ctxt constants_key bytes
 
 let get_constants ctxt =
@@ -409,7 +409,7 @@ let get_constants ctxt =
       failwith "Internal error: cannot read constants in context."
   | Some bytes ->
       match
-        Data_encoding.Binary.of_bytes Parameters_repr.constants_encoding bytes
+        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
       with
       | None ->
           failwith "Internal error: cannot parse constants in context."
