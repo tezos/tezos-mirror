@@ -45,4 +45,3 @@ type t = {
 }
 
 val encoding: t Data_encoding.t
-val constants_encoding: Constants_repr.parametric Data_encoding.t
