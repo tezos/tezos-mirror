@@ -23,23 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let max_block_length = 100
 
-type block_header_data = MBytes.t
+let max_operation_data_length = 0
+
+let validation_passes = []
+
+let acceptable_passes _op = []
+
+type block_header_data = string
+
+let block_header_data_encoding =
+  Data_encoding.(obj1 (req "block_header_data" string))
+
 type block_header = {
   shell : Block_header.shell_header ;
   protocol_data : block_header_data ;
 }
 
-let block_header_data_encoding =
-  Data_encoding.(obj1 (req "random_data" Variable.bytes))
-
 type block_header_metadata = unit
+
 let block_header_metadata_encoding = Data_encoding.unit
 
 type operation_data = unit
+
 let operation_data_encoding = Data_encoding.unit
 
 type operation_receipt = unit
+
 let operation_receipt_encoding = Data_encoding.unit
 
 let operation_data_and_receipt_encoding =
@@ -52,11 +63,6 @@ type operation = {
   shell: Operation.shell_header ;
   protocol_data: operation_data ;
 }
-
-let max_block_length = 42
-let max_operation_data_length = 0
-let validation_passes = []
-let acceptable_passes _op = []
 
 let compare_operations _ _ = 0
 
@@ -72,9 +78,14 @@ let begin_application
     ~chain_id:_
     ~predecessor_context:context
     ~predecessor_timestamp:_
-    ~predecessor_fitness:_
+    ~predecessor_fitness
     (raw_block: block_header) =
-  return { context ; fitness = raw_block.shell.fitness }
+  let fitness = raw_block.shell.fitness in
+  Logging.log_notice "begin_application: pred_fitness = %a  block_fitness = %a%!"
+    Fitness.pp predecessor_fitness Fitness.pp fitness;
+  (* Note: Logging is only available for debugging purposes and should
+     not appear in a real protocol. *)
+  return { context ; fitness }
 
 let begin_partial_application
     ~chain_id
@@ -82,6 +93,7 @@ let begin_partial_application
     ~predecessor_timestamp
     ~predecessor_fitness
     block_header =
+  Logging.log_notice "begin_partial_application%!";
   begin_application
     ~chain_id
     ~predecessor_context:ancestor_context
@@ -89,43 +101,58 @@ let begin_partial_application
     ~predecessor_fitness
     block_header
 
+let version_number = "\001"
+
+let int64_to_bytes i =
+  let b = MBytes.create 8 in
+  MBytes.set_int64 b 0 i;
+  b
+
+let fitness_from_level level =
+  [ MBytes.of_string version_number ;
+    int64_to_bytes level ]
+
 let begin_construction
     ~chain_id:_
     ~predecessor_context:context
     ~predecessor_timestamp:_
-    ~predecessor_level:_
-    ~predecessor_fitness:pred_fitness
+    ~predecessor_level
+    ~predecessor_fitness
     ~predecessor:_
     ~timestamp:_
-    ?protocol_data:_ () =
-
-  let increase_fitness = function
-    | [ v ; b ] ->
-        let f = MBytes.get_int64 b 0 in
-        let b' = MBytes.copy b in
-        MBytes.set_int64 b' 0 (Int64.succ f) ;
-        return [ v ;  b' ]
-    | [ ] -> return MBytes.[create 0; create 0]
-    | _ -> assert false
-  in
-  increase_fitness pred_fitness >>=? fun fitness ->
+    ?protocol_data ()
+  =
+  let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
+  let mode = match protocol_data with
+    | Some _ -> "block"
+    | None -> "mempool" in
+  Logging.log_notice "begin_construction (%s): pred_fitness = %a  \
+                      constructed fitness = %a%!"
+    mode Fitness.pp predecessor_fitness Fitness.pp fitness;
   return { context ; fitness }
 
-let apply_operation ctxt _ =
-  return (ctxt, ())
+let apply_operation _state _op =
+  Lwt.return (Error [])
 
-let finalize_block ctxt =
-  let fitness = ctxt.fitness in
-  let message = Some (Format.asprintf "fitness <- %a" Fitness.pp fitness) in
-  return ({ Updater.message ; context = ctxt.context ; fitness ;
-            max_operations_ttl = 0 ; last_allowed_fork_level = 0l ;
+let finalize_block state =
+  let fitness = state.fitness in
+  Logging.log_notice "finalize_block: fitness = %a%!" Fitness.pp fitness;
+  return ({ Updater.message = None ;
+            context = state.context ;
+            fitness ;
+            max_operations_ttl = 0 ;
+            last_allowed_fork_level = 0l ;
           }, ())
 
 let init context block_header =
-  return { Updater.message = None ; context ;
-           fitness = block_header.Block_header.fitness ;
+  let open Block_header in
+  let fitness = block_header.fitness in
+  Logging.log_notice "init: fitness = %a%!" Fitness.pp fitness;
+  return { Updater.message = None ;
+           context ;
+           fitness ;
            max_operations_ttl = 0 ;
            last_allowed_fork_level = 0l ;
          }
 
-let rpc_services = Services.rpc_services
+let rpc_services = RPC_directory.empty

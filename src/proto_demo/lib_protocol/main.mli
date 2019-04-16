@@ -25,4 +25,4 @@
 
 (** Tezos Protocol Implementation - Protocol Signature Instance *)
 
-include Updater.PROTOCOL with type block_header_data = MBytes.t
+include Updater.PROTOCOL with type block_header_data = string

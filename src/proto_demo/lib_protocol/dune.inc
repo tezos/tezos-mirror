@@ -26,7 +26,7 @@
 
 (rule
  (targets functor.ml)
- (deps error.ml services.mli services.ml main.mli main.ml
+ (deps main.mli main.ml
        (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
                          (chdir %{workspace_root}
@@ -59,7 +59,7 @@
                    -open Tezos_embedded_protocol_environment_demo__Environment
                    -open Pervasives
                    -open Error_monad))
- (modules Error Services Main))
+ (modules Main))
 
 (install
  (section lib)
