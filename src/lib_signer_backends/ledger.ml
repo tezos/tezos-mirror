@@ -516,13 +516,20 @@ module Filter = struct
     | `Version (s, _) -> fprintf ppf "%s" s
 end
 
-(* Those are always valid on Ledger Nano S with latest firmware. *)
+(* Those constants are provided by the vendor (e.g. check the udev
+   rules they provide): *)
 let vendor_id = 0x2c97
-let product_id = 0x0001
+let product_id_nano_s = 0x0001
+let product_id_nano_x = 0x0004
 
 let use_ledger ?(filter : Filter.t = `None) f =
-  let ledgers = Hidapi.enumerate ~vendor_id ~product_id () in
-  log_info "Found %d Ledger(s)" (List.length ledgers) ;
+  let ledgers =
+    Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_s ()
+    @ Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_x ()
+  in
+  debug "Found %d Ledger(s) %s" (List.length ledgers)
+    (String.concat " -- " (List.map Hidapi.(fun l ->
+         Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id) ledgers)) ;
   let process_device device_info f =
     log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
     (* HID interfaces get the number 0
