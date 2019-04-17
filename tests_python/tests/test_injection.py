@@ -1,6 +1,5 @@
 import os
 import subprocess
-import time
 import pytest
 from tools import utils, paths
 
@@ -17,6 +16,7 @@ def clients(sandbox):
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
 COMPILER = (f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
             'main_native.exe')
+PARAMS = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
 
 
 @pytest.mark.incremental
@@ -52,9 +52,8 @@ class TestInjectionAndActivation:
 
     def test_check_protocol(self, clients, session):
         proto = session['proto_hash']
-        params = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
         for client in clients:
-            assert utils.check_protocol(client, proto, params=params)
+            assert utils.check_protocol(client, proto, params=PARAMS)
 
 
 @pytest.fixture(scope="class")
@@ -85,17 +84,8 @@ class TestActivation:
         assert res.block_hash
 
     def test_level1(self, client):
-        assert client.get_level() == 1
+        assert client.get_level(params=PARAMS) == 1
 
     def test_protocol_genesis(self, client):
         proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
-        assert client.get_protocol() == proto
-
-    def test_bake(self, client):
-        time.sleep(0.5)
-        # this a command of proto demo lib_client
-        res = client.run(['bake'])
-        assert res.startswith('Injected')
-
-    def test_level2(self, client):
-        assert client.get_level() == 2
+        assert client.get_protocol(params=PARAMS) == proto

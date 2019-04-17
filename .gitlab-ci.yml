@@ -342,6 +342,11 @@ integration:snapshot:
   script:
     - pytest tests_python/tests/test_multinode_snapshot.py
 
+integration:proto_demo:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_proto_demo_manual_bake.py
+
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
