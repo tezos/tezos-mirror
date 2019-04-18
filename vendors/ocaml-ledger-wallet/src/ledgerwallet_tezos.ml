@@ -69,6 +69,7 @@ type ins =
   | Deauthorize_baking
   | Get_authorized_path_and_curve
   | Make_deterministic_nonce
+  | Sign_with_hash
 
 let int_of_ins = function
   | Version -> 0x00
@@ -86,6 +87,7 @@ let int_of_ins = function
   | Deauthorize_baking -> 0x0C
   | Get_authorized_path_and_curve -> 0x0D
   | Make_deterministic_nonce -> 0x0E
+  | Sign_with_hash -> 0x0F
 
 type curve =
   | Ed25519
@@ -286,6 +288,22 @@ let get_deterministic_nonce ?pp ?buf h curve path payload =
     let msg = "make-deterministic-nonce" in
     Transport.apdu ~msg ?pp ?buf h apdu
 
+let sign_and_hash ?pp ?buf h curve path payload =
+  let nb_derivations = List.length path in
+  if nb_derivations > 10 then invalid_arg "get_public_key: max 10 derivations" ;
+  let lc = 1 + 4 * nb_derivations in
+  let data_init = Cstruct.create lc in
+  Cstruct.set_uint8 data_init 0 nb_derivations ;
+  let data = Cstruct.shift data_init 1 in
+  let _data = write_path data path in
+  let cmd = wrap_ins Sign_with_hash in
+  let msg = "sign-with-hash" in
+  let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data:data_init cmd in
+  let _addr = Transport.apdu ~msg ?pp ?buf h apdu in
+  Transport.write_payload ~mark_last:true ?pp ?buf ~msg ~cmd h ~p1:0x01 payload
+  >>= fun bytes ->
+  let hash, signature = Cstruct.split bytes 32 in
+  R.return (hash, signature)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

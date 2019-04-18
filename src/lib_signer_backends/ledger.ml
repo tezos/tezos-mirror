@@ -75,6 +75,7 @@ end
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
   | Ledger_deterministic_nonce_not_implemented
+  | Ledger_signing_hash_mismatch of string * string
 
 let error_encoding =
   let open Data_encoding in
@@ -108,6 +109,28 @@ let () =
     Data_encoding.unit
     (function Ledger_deterministic_nonce_not_implemented -> Some () | _ -> None)
     (fun () -> Ledger_deterministic_nonce_not_implemented)
+
+let () =
+  let description ledger_hash computed_hash =
+    let paren fmt hash_opt =
+      match Base.Option.bind ~f:Blake2B.of_string_opt hash_opt with
+      | None -> ()
+      | Some hash -> Format.fprintf fmt " (%a)" Blake2B.pp_short hash in
+    Format.asprintf
+      "The ledger returned a hash%a which doesn't \
+       match the independently computed hash%a."
+      paren ledger_hash paren computed_hash
+  in
+  register_error_kind
+    `Permanent
+    ~id: "signer.ledger.signing-hash-mismatch"
+    ~title: "Ledger signing-hash mismatch"
+    ~description:(description None None)
+    ~pp:(fun ppf (lh, ch) ->
+        Format.pp_print_string ppf (description (Some lh) (Some ch)))
+    Data_encoding.(obj2 (req "ledger-hash" string) (req "computed-hash" string))
+    (function Ledger_signing_hash_mismatch (lh, ch) -> Some (lh, ch) | _ -> None)
+    (fun (lh, ch) -> Ledger_signing_hash_mismatch (lh, ch))
 
 (** Wrappers around Ledger APDUs. *)
 module Ledger_commands = struct
@@ -241,7 +264,7 @@ module Ledger_commands = struct
       | Error _ as e -> Lwt.return e
       | Ok (path, curve) -> return (`Path_curve (path, curve))
 
-  let sign ?watermark hid curve path (base_msg : MBytes.t) =
+  let sign ?watermark ~version hid curve path (base_msg : MBytes.t) =
     let msg =
       Option.unopt_map watermark
         ~default:base_msg ~f:(fun watermark ->
@@ -249,14 +272,29 @@ module Ledger_commands = struct
               [Signature.bytes_of_watermark watermark ; base_msg]) in
     let path = Bip32_path.tezos_root @ path in
     wrap_ledger_cmd begin fun pp ->
-      (* if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
-       *   Ledgerwallet_tezos.sign ~hash_on_ledger:false
-       *     ~pp ledger curve path
-       *     (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
-       * else *)
-      Ledgerwallet_tezos.sign
-        ~pp hid curve path (Cstruct.of_bigarray msg)
-    end >>=? fun signature ->
+      let { Ledgerwallet_tezos.Version. major ; minor ; patch ; _ } = version in
+      let open Rresult.R.Infix in
+      if (major, minor, patch) <= (2, 0, 0) then
+        Ledgerwallet_tezos.sign
+          ~pp hid curve path (Cstruct.of_bigarray msg) >>= fun s ->
+        Ok (None, s)
+      else
+        Ledgerwallet_tezos.sign_and_hash
+          ~pp hid curve path (Cstruct.of_bigarray msg) >>= fun (h, s) ->
+        Ok (Some h, s)
+    end >>=? fun (hash_opt, signature) ->
+    begin match hash_opt with
+      | None -> return_unit
+      | Some hsh ->
+          let hash_msg = Blake2B.hash_bytes [msg] in
+          let ledger_one = Blake2B.of_bytes_exn (Cstruct.to_bigarray hsh) in
+          if Blake2B.equal hash_msg ledger_one
+          then return_unit
+          else
+            fail (Ledger_signing_hash_mismatch
+                    (Blake2B.to_string ledger_one, Blake2B.to_string hash_msg))
+    end
+    >>=? fun () ->
     match curve with
     | Ed25519 ->
         let signature = Cstruct.to_bigarray signature in
@@ -624,8 +662,8 @@ module Signer_implementation : Client_keys.SIGNER = struct
     Ledger_uri.parse (sk_uri :> Uri.t) >>=? fun ledger_uri ->
     Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
     use_ledger_or_fail ~ledger_uri
-      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
-         Ledger_commands.sign ?watermark hidapi curve path msg
+      (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+         Ledger_commands.sign ?watermark ~version hidapi curve path msg
          >>=? fun bytes ->
          return_some bytes)
 
@@ -754,7 +792,7 @@ let generic_commands group = Clic.[
                             MBytes.pp_hex pkh_bytes
                           >>= fun () ->
                           Ledger_commands.sign
-                            ~watermark:Generic_operation
+                            ~version ~watermark:Generic_operation
                             hidapi curve path pkh_bytes >>=? fun signature ->
                           begin match
                               Signature.check ~watermark:Generic_operation

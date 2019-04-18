@@ -138,6 +138,16 @@ val get_deterministic_nonce :
     for a deterministic nonce from a some given bytes (using HMAC).
 *)
 
+val sign_and_hash :
+  ?pp:Format.formatter ->
+  ?buf:Cstruct.t ->
+  Hidapi.t -> curve -> int32 list ->
+  Cstruct.t -> (Cstruct.t * Cstruct.t, Transport.error) result
+(** [sign ?pp ?buf ?hash_on_ledger h curve path payload] is the
+    signature of [payload] (or its hash if [hash_on_ledger] is [true],
+    the default), signed on [ledger] with key from curve [curve] at
+    [path]. *)
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff
 
