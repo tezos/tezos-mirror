@@ -2,8 +2,8 @@ open Tezos_network_sandbox
 open Internal_pervasives
 open Console
 
-let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
-    endorser_exec accuser_exec () =
+let run state ~protocol ~size ~base_port ~no_daemons_for ?kiln node_exec
+    client_exec baker_exec endorser_exec accuser_exec () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [node_exec; client_exec; baker_exec; endorser_exec; accuser_exec]
@@ -46,14 +46,17 @@ let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
       | None -> assert false
     in
     Tezos_protocol.bootstrap_accounts protocol
-    |> List.mapi ~f:(fun idx acc ->
+    |> List.filter_mapi ~f:(fun idx acc ->
            let node, client = pick_a_node_and_client idx in
            let key = Tezos_protocol.Account.name acc in
-           ( acc
-           , client
-           , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
-             ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client node
-                 ~key ] ) )
+           if List.mem ~equal:String.equal no_daemons_for key then None
+           else
+             Some
+               ( acc
+               , client
+               , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
+                 ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client
+                     node ~key ] ) )
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -95,9 +98,22 @@ let cmd ~pp_error () =
   let open Cmdliner in
   let open Term in
   Test_command_line.Run_command.make ~pp_error
-    ( pure (fun size base_port protocol bnod bcli bak endo accu kiln state ->
+    ( pure
+        (fun size
+        base_port
+        (`No_daemons_for no_daemons_for)
+        protocol
+        bnod
+        bcli
+        bak
+        endo
+        accu
+        kiln
+        state
+        ->
           let actual_test =
             run state ~size ~base_port ~protocol bnod bcli bak endo accu ?kiln
+              ~no_daemons_for
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -107,6 +123,12 @@ let cmd ~pp_error () =
     $ Arg.(
         value & opt int 20_000
         & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+    $ Arg.(
+        pure (fun l -> `No_daemons_for l)
+        $ value
+            (opt_all string []
+               (info ["no-daemons-for"] ~docv:"ACCOUNT-NAME"
+                  ~doc:"Do not start daemons for $(docv).")))
     $ Tezos_protocol.cli_term ()
     $ Tezos_executable.cli_term `Node "tezos"
     $ Tezos_executable.cli_term `Client "tezos"
