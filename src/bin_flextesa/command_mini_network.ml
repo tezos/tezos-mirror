@@ -2,15 +2,16 @@ open Tezos_network_sandbox
 open Internal_pervasives
 open Console
 
-let run state ~protocol ~size ~base_port ~no_daemons_for ?kiln node_exec
-    client_exec baker_exec endorser_exec accuser_exec () =
+let run state ~protocol ~size ~base_port ~no_daemons_for ?kiln
+    ?external_peer_ports node_exec client_exec baker_exec endorser_exec
+    accuser_exec () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [node_exec; client_exec; baker_exec; endorser_exec; accuser_exec]
     ~using_docker:(kiln <> None)
   >>= fun () ->
-  Test_scenario.network_with_protocol ~protocol ~size ~base_port state
-    ~node_exec ~client_exec
+  Test_scenario.network_with_protocol ?external_peer_ports ~protocol ~size
+    ~base_port state ~node_exec ~client_exec
   >>= fun (nodes, protocol) ->
   Tezos_client.rpc state
     ~client:(Tezos_client.of_node (List.hd_exn nodes) ~exec:client_exec)
@@ -101,6 +102,7 @@ let cmd ~pp_error () =
     ( pure
         (fun size
         base_port
+        (`External_peers external_peer_ports)
         (`No_daemons_for no_daemons_for)
         protocol
         bnod
@@ -113,7 +115,7 @@ let cmd ~pp_error () =
         ->
           let actual_test =
             run state ~size ~base_port ~protocol bnod bcli bak endo accu ?kiln
-              ~no_daemons_for
+              ~external_peer_ports ~no_daemons_for
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -123,6 +125,12 @@ let cmd ~pp_error () =
     $ Arg.(
         value & opt int 20_000
         & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+    $ Arg.(
+        pure (fun l -> `External_peers l)
+        $ value
+            (opt_all int []
+               (info ["add-external-peer-port"] ~docv:"PORT-NUMBER"
+                  ~doc:"Add $(docv) to the peers of the network nodes.")))
     $ Arg.(
         pure (fun l -> `No_daemons_for l)
         $ value

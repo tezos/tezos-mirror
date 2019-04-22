@@ -33,7 +33,8 @@ module EF = struct
     list ~delimiters:("(", ")") ~sep:","
       ~param:
         { default_list with
-          space_after_opening= false; space_before_closing= false }
+          space_after_opening= false
+        ; space_before_closing= false }
 
   let shout = atom ~param:{atom_style= Some "shout"}
   let prompt = atom ~param:{atom_style= Some "prompt"}
@@ -202,7 +203,8 @@ module Asynchronous_result = struct
     Lwt.return {result; attachments= attachments @ attach}
 
   (** The module opened everywhere. *)
-  module Std = struct let ( >>= ) = bind let return = return let fail = fail
+  module Std = struct
+    let ( >>= ) = bind let return = return let fail = fail
   end
 
   open Std
@@ -316,7 +318,15 @@ module Base_state = struct
 end
 
 (** Some {!Lwt_unix} functions. *)
-module System = struct let sleep f = Lwt_exception.catch Lwt_unix.sleep f
+module System = struct
+  let sleep f = Lwt_exception.catch Lwt_unix.sleep f
+
+  let write_file (_state : _ Base_state.t) ?perm path ~content =
+    Lwt_exception.catch
+      (fun () ->
+        Lwt_io.with_file ?perm ~mode:Lwt_io.output path (fun out ->
+            Lwt_io.write out content ) )
+      ()
 end
 
 (** WIP [jq]-like manipulation in pure OCaml. *)

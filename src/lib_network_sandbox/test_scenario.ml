@@ -71,7 +71,8 @@ module Topology = struct
     | Net_in_the_middle {left; right; middle} ->
         continue middle @ continue left @ continue right
 
-  let build ?protocol ?(base_port = 15_001) ~exec network =
+  let build ?(external_peer_ports = []) ?protocol ?(base_port = 15_001) ~exec
+      network =
     let all_ports = ref [] in
     let next_port = ref (base_port + (base_port mod 2)) in
     let rpc name =
@@ -87,13 +88,16 @@ module Topology = struct
     let node peers id =
       let rpc_port = rpc id in
       let p2p_port = p2p id in
-      let expected_connections = List.length peers in
+      let expected_connections =
+        List.length peers + List.length external_peer_ports
+      in
       let peers =
         List.filter_map peers ~f:(fun p ->
             if p <> id then Some (p2p p) else None )
       in
       Tezos_node.make ?protocol ~exec id ~expected_connections ~rpc_port
-        ~p2p_port peers
+        ~p2p_port
+        (external_peer_ports @ peers)
     in
     let dbgp prefx names =
       Printf.eprintf "%s:\n  %s\n%!" prefx
@@ -237,10 +241,10 @@ module Network = struct
         Tezos_client.bootstrapped client ~state )
 end
 
-let network_with_protocol ?base_port ?(size = 5) ?protocol state ~node_exec
-    ~client_exec =
+let network_with_protocol ?external_peer_ports ?base_port ?(size = 5) ?protocol
+    state ~node_exec ~client_exec =
   let nodes =
-    Topology.build ?base_port ?protocol ~exec:node_exec
+    Topology.build ?base_port ?protocol ~exec:node_exec ?external_peer_ports
       (Topology.mesh "N" size)
   in
   let protocols =

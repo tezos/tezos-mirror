@@ -60,17 +60,23 @@ let start ?(network_id = "zeronet") state {run; port; postgres; pause_for_user}
   Running_processes.run_cmdf state
     "rm -fr %s ; mkdir -p %s/config ; chmod -R 777 %s" tmp tmp tmp
   >>= fun _ ->
-  Lwt_exception.catch
-    (fun () ->
-      Lwt_io.with_file ~perm:0o777 ~mode:Lwt_io.output (tmp // "config/loggers")
-        (fun out ->
-          Lwt_io.write out
-            {json|[
-  { "logger":{"Stderr":{}} , "filters": { "SQL":"Error" , "":"Info"}},
-  { "logger":{"File":{"file":"/var/run/bake-monitor/kiln.log"}}, "filters": { "": "Debug" } }
+  System.write_file state ~perm:0o777 (tmp // "config/loggers")
+    ~content:
+      {json|[
+  { "logger":{"Stderr":{}} , "filters": { "SQL":"Error" , "":"Info"}}
 ]|json}
-      ) )
-    ()
+  >>= fun () ->
+  System.write_file state ~perm:0o777
+    (tmp // "config/kiln-node-custom-args")
+    ~content:
+      (sprintf
+         "--net-addr 0.0.0.0:10000 --private-mode --no-bootstrap-peers %s  \
+          --bootstrap-threshold 0 --connections 5 --sandbox \
+          /home/smondet/tmp/metetests//0_mininet-test-data/protocol-default-and-command-line/sandbox.json"
+         ( List.map
+             (List.init 5 ~f:(fun i -> 20_001 + (2 * i)))
+             ~f:(sprintf "--peer 127.0.0.1:%d")
+         |> String.concat ~sep:" " ))
   >>= fun () ->
   Running_processes.run_cmdf state " chmod -R 777 %s" tmp
   >>= fun _ ->
@@ -92,13 +98,23 @@ let start ?(network_id = "zeronet") state {run; port; postgres; pause_for_user}
           ~args
     | `Dev_mode (dir, cmd) ->
         Running_processes.Process.genspio (name "kiln-dev-backend")
-          Genspio.EDSL.(seq [exec ["cd"; dir]; exec (cmd :: args)])
+          Genspio.EDSL.(
+            seq
+              [ exec ["cd"; tmp]
+              ; exec ["echo"; sprintf "tmp is %s" tmp]
+              ; call [str "echo"; getenv (str "PATH")]
+              ; exec ["sh"; "-c"; sprintf "ln -sf %s/* %s" dir tmp]
+              ; exec ["ls"; "-la"]
+              ; exec (cmd :: sprintf "--kiln-data-dir=%s" tmp :: args) ])
   in
   Running_processes.start state kiln
   >>= fun kiln_process ->
   Console.say state
     EF.(
-      wf "Kiln was started with nodes: %s, and network-id: %s"
+      wf
+        "Kiln was started (cf. <http://localhost:%d>, Data-dir: %s) with \
+         nodes: %s, and network-id: %s"
+        kiln_port tmp
         (List.map node_uris ~f:(sprintf "`%s`") |> String.concat ~sep:", ")
         network_id)
   >>= fun () ->

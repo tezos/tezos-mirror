@@ -49,7 +49,8 @@ module Topology : sig
     string -> 'a network -> 'b network -> 'c network -> ('b * 'a * 'c) network
 
   val build :
-       ?protocol:Tezos_protocol.t
+       ?external_peer_ports:int list
+    -> ?protocol:Tezos_protocol.t
     -> ?base_port:int
     -> exec:Tezos_executable.t
     -> 'a network
@@ -84,7 +85,8 @@ module Network : sig
 end
 
 val network_with_protocol :
-     ?base_port:int
+     ?external_peer_ports:int list
+  -> ?base_port:int
   -> ?size:int
   -> ?protocol:Tezos_protocol.t
   -> < paths: Paths.t ; runner: Running_processes.State.t ; .. >
