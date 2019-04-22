@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "lwt" { >= "3.0.0" }
   "ptime" { >= "0.8.4" }
+  "mtime" { >= "1.0.0" }
   "conf-libev"
   "ipaddr" { >= "3.0.0" }
 ]

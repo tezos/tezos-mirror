@@ -24,7 +24,6 @@
             ptime
             ezjsonm
             lwt
-            mtime.clock.os
             ipaddr.unix))
 
 (rule

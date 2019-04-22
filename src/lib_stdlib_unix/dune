@@ -7,6 +7,8 @@
             ipaddr.unix
             ptime
             ptime.clock.os
+            mtime
+            mtime.clock.os
             str))
 
 (alias
