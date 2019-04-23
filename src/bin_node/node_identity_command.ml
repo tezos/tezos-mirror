@@ -65,12 +65,13 @@ module Animation = struct
       Format.fprintf ppf "%s%!" animation.(n mod animation_size);
       try P2p_identity.generate_with_bound ~max:!count target
       with Not_found ->
-        let time = Mtime.Span.to_ms (Mtime_clock.count start) in
-        count :=
-          if time <= 0. then
-            !count * 10
+        let time = Mtime_clock.count start in
+        begin if Mtime.Span.(equal zero time) then
+            count := !count * 10
           else
-            !count * duration / int_of_float time ;
+            let ms = int_of_float (Mtime.Span.to_ms time) in
+            count := !count * duration / ms
+        end ;
         loop (n+1)
     in
     let id = loop 0 in
