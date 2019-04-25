@@ -12,6 +12,7 @@ import base58check
 import pyblake2
 from client.client import Client
 from . import constants
+import subprocess
 
 
 def retry(timeout: float, attempts: float):  # pylint: disable=unused-argument
@@ -276,3 +277,25 @@ def sign_operation(encoded_operation: str, secret_key: str) -> str:
 
 def mutez_of_tez(tez: float):
     return int(tez*1000000)
+
+
+def check_run_failure(code, pattern, mode='stderr'):
+    """Executes [code()] and expects the code to fail and raise [subprocess.CalledProcessError].
+    If so, the [pattern] is searched in stderr. If it is found, returns True;
+    else returns False.
+    """
+    try:
+        code()
+        return False
+    except subprocess.CalledProcessError as exc:
+        stdout_output = exc.args[2]
+        stderr_output = exc.args[3]
+        data = []
+        if mode == 'stderr':
+            data = stderr_output
+        else:
+            data = stdout_output.split('\n')
+        for line in data:
+            if re.search(pattern, line):
+                return True
+        return False

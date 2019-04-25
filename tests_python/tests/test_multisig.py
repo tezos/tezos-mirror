@@ -1,6 +1,5 @@
-import subprocess
 import pytest
-from client import client_output
+from tools import utils
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
@@ -41,13 +40,17 @@ class TestMultisig:
         session['sig2'] = sign.signature
 
     def test_transfer_failure(self, client, session):
-        try:
+        def cmd():
             client.msig_transfer('msig', 10, 'bootstrap2',
                                  'bootstrap1',
                                  [session['sig2']])
-        except subprocess.CalledProcessError as exn:
-            res = client_output.extract_msig_transfer_error(exn.output)
-            assert(res[0] == '1' and res[1] == '2')
+
+        error_pattern = (r"Not enough signatures: " +
+                         r"only 1 signatures were given " +
+                         r"but the threshold is currently 2")
+
+        assert utils.check_run_failure(cmd,
+                                       error_pattern)
 
     def test_transfer_success(self, client, session):
         client.msig_transfer('msig', 10, 'bootstrap2', 'bootstrap1',

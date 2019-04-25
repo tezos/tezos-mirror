@@ -223,12 +223,3 @@ def extract_balance(client_output: str) -> float:
 def extract_protocols(client_output: str) -> List[str]:
     """Extract protocol from the output of 'get_protocols' operation."""
     return client_output.split()
-
-
-def extract_msig_transfer_error(client_output: str) -> List[str]:
-    pattern = (r"Not enough signatures: only ?(\w+) signatures were "
-               r"given but the threshold is currently ?(\w+)\n\w*")
-    match = re.search(pattern, client_output[:-1])
-    if match is None:
-        return []
-    return[match.groups()[0], match.groups()[1]]
