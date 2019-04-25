@@ -243,6 +243,16 @@ let raw_authenticate t ?point_info canceler fd point =
       ~p2p_versions:t.custom_p2p_versions
       info.announced_version
   in
+  let acceptable_capacity =
+    let max_active_conns =
+      if Random.bool () then
+        (* randomly allow one additional incoming connection *)
+        t.config.max_connections + 1
+      else t.config.max_connections
+    in
+    let active = P2p_pool.active_connections t.pool in
+    max_active_conns > active
+  in
   let acceptable_point =
     Option.unopt_map
       connection_point_info
@@ -289,7 +299,8 @@ let raw_authenticate t ?point_info canceler fd point =
            during authentication *)
       P2p_point_state.set_private point_info info.private_node) ;
   match acceptable_version with
-  | Some version when acceptable_peer_id && acceptable_point ->
+  | Some version
+    when acceptable_capacity && acceptable_peer_id && acceptable_point ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
       Option.iter connection_point_info ~f:(fun point_info ->
           P2p_point_state.set_accepted point_info info.peer_id canceler) ;
@@ -407,10 +418,8 @@ let authenticate t ?point_info canceler fd point =
 
 let accept t fd point =
   t.log (Incoming_connection point) ;
-  let max_active_conns = t.config.max_connections + Random.int 2 in
   if
     t.config.max_incoming_connections <= P2p_point.Table.length t.incoming
-    || max_active_conns <= P2p_pool.active_connections t.pool
     (* silently ignore banned points *)
     || P2p_pool.Points.banned t.pool point
   then Lwt.async (fun () -> P2p_fd.close fd)
