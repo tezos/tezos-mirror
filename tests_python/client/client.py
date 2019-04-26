@@ -179,6 +179,9 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['typecheck', 'script', contract])
 
+    def typecheck_data(self, data: str, typ: str) -> str:
+        return self.run(['typecheck', 'data', data, 'against', 'type', typ])
+
     def run_script(self,
                    contract: str,
                    storage: str,
@@ -320,9 +323,7 @@ class Client:
             args = []
         cmd += args
         res = self.run(cmd)
-        if res[:-1] == 'none':
-            return None
-        return client_output.GetDelegateResult(res).address
+        return client_output.GetDelegateResult(res)
 
     def withdraw_delegate(
             self,
@@ -335,6 +336,9 @@ class Client:
         res = self.run(cmd)
         return res
 
+    def register_delegate(self, delegate: str) -> str:
+        return self.run(['register', 'key', delegate, 'as', 'delegate'])
+
     def p2p_stat(self) -> str:
         return self.run(['p2p', 'stat'], admin=True)
 
@@ -346,8 +350,30 @@ class Client:
         res = self.run(['get', 'balance', 'for', account])
         return int(client_output.extract_balance(res)*1000000)
 
-    def register_delegate(self, delegate: str) -> str:
-        return self.run(['register', 'key', delegate, 'as', 'delegate'])
+    def get_timestamp(self) -> str:
+        res = self.run(['get', 'timestamp'])
+        return res[:-1]
+
+    def get_now(self) -> str:
+        """Returns the timestamp of next-to-last block,
+        offset by time_between_blocks"""
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
+        timestamp = self.rpc(
+            'get', f'/chains/main/blocks/head~1/header'
+            )['timestamp']
+        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
+        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        constants = self.rpc(
+            'get', f'/chains/main/blocks/head/context/constants'
+        )
+        delta = datetime.timedelta(
+            seconds=int(constants['time_between_blocks'][0])
+        )
+
+        now_date = timestamp_date + delta
+
+        return now_date.strftime(rfc3399_format)
 
     def get_receipt(self,
                     operation: str,
@@ -357,6 +383,15 @@ class Client:
             args = []
         cmd += args
         return client_output.GetReceiptResult(self.run(cmd))
+
+    def get_storage(self, contract: str) -> str:
+        cmd = ['get', 'contract', 'storage', 'for', contract]
+        res = self.run(cmd)
+        return res.rstrip()
+
+    def get_delegate(self, contract: str) -> client_output.GetDelegateResult:
+        cmd = ['get', 'delegate', 'for', contract]
+        return client_output.GetDelegateResult(self.run(cmd))
 
     def get_prevalidator(self) -> dict:
         return self.rpc('get', '/workers/prevalidators')
@@ -383,6 +418,12 @@ class Client:
 
     def get_ballots(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/ballots')
+
+    def get_contract_address(self, contract) -> str:
+        return self.run(['show', 'known', 'contract', contract]).strip()
+
+    def get_known_addresses(self) -> str:
+        return client_output.GetAddressesResult(self.run(['list', 'known', 'addresses']))
 
     def get_current_period_kind(self) -> dict:
         return self.rpc('get',

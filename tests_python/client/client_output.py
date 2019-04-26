@@ -29,6 +29,7 @@ class TransferResult:
     """Result of a 'transfer' operation."""
 
     def __init__(self, client_output: str):
+        self.client_output = client_output
         pattern = r"Operation hash is '?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
@@ -56,6 +57,17 @@ class GetReceiptResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.block_hash = match.groups()[0]
+
+
+class GetAddressesResult:
+    """Result of 'list known addresses' operation.
+
+    """
+
+    def __init__(self, client_output: str):
+
+        pattern = re.compile(r"^(\w+):\s*(\w+).*$", re.MULTILINE)
+        self.wallet = dict(re.findall(pattern, client_output))
 
 
 class RunScriptResult:
@@ -182,12 +194,16 @@ class GetDelegateResult:
     """Result of a 'get delegate' command."""
 
     def __init__(self, client_output: str):
-        pattern = r"(\w+)( \(known as (\w+)\))*"
-        match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.address = match.groups()[0]
-        self.alias = match.groups()[2]
+        if client_output == 'none\n':
+            self.delegate = None
+        else:
+            pattern = r"(\w+)( \(known as (\w+)\))*"
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.address = match.groups()[0]
+            self.alias = match.groups()[2]
+            self.delegate = self.address
 
 
 class SignBytesResult:
@@ -215,7 +231,9 @@ def extract_rpc_answer(client_output: str) -> dict:
 def extract_balance(client_output: str) -> float:
     """Extract float balance from the output of 'get_balance' operation."""
     try:
-        return float(client_output[:-3])
+        pattern= r"(\w*) ꜩ"
+        match = re.search(pattern, client_output)
+        return float(match.groups()[0])
     except Exception:
         raise InvalidClientOutput(client_output)
 
