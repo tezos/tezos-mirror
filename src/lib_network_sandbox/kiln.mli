@@ -44,3 +44,25 @@ val start :
 val cli_term : unit -> t option Cmdliner.Term.t
 (** Build a {!Cmdliner.Term.t} which provides options like
     ["--with-kiln"] or ["--kiln-docker-image"]. *)
+
+module Configuration_directory : sig
+  type t = {path: string; clean: bool; p2p_port: int}
+
+  val generate :
+       < application_name: string
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> t
+    -> peers:int list
+    -> sandbox_json:string
+    -> nodes:string list
+    -> bakers:(string * string) list
+    -> network_string:string
+    -> node_exec:Tezos_executable.t
+    -> client_exec:Tezos_executable.t
+    -> protocol_execs:(string * Tezos_executable.t * Tezos_executable.t) list
+    -> (unit, [> Lwt_exception.t]) Asynchronous_result.t
+
+  val cli_term : unit -> t option Cmdliner.Term.t
+end
