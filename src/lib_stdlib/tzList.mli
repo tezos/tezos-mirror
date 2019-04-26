@@ -87,3 +87,6 @@ val merge2 :
   'a list -> 'a list ->
   'a list
 
+(** [shuffle l] is a list that contains the same elements as [l] but in a random
+    order. *)
+val shuffle : 'a list -> 'a list

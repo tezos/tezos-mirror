@@ -187,15 +187,19 @@ and too_many_connections st n_connected =
   (* too many connections, start the russian roulette *)
   let to_kill = n_connected - st.bounds.max_target in
   lwt_log_notice "Too many connections, will kill %d" to_kill >>= fun () ->
-  snd @@ P2p_pool.Connection.fold pool
-    ~init:(to_kill, Lwt.return_unit)
-    ~f:(fun _ conn (i, t) ->
-        if i = 0 then (0, t)
-        else if (P2p_pool.Connection.private_node conn
+  let connections = TzList.rev_sub
+      (TzList.shuffle @@
+       P2p_pool.Connection.fold pool
+         ~init:[]
+         ~f:(fun _ conn acc ->
+             if (P2p_pool.Connection.private_node conn
                  && P2p_pool.Connection.trusted_node conn) then
-          (i, t)
-        else
-          (i - 1, t >>= fun () -> P2p_pool.disconnect conn))
+               acc
+             else
+               conn::acc))
+      to_kill
+  in
+  Lwt_list.iter_p P2p_pool.disconnect connections
   >>= fun () ->
   maintain st
 
