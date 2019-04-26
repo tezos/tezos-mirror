@@ -64,6 +64,16 @@ module Account : sig
   val private_key : t -> string
 end
 
+module Voting_period : sig
+  type t = Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period.kind =
+    | Proposal
+    | Testing_vote
+    | Testing
+    | Promotion_vote
+
+  val to_string : t -> string
+end
+
 (** [t] wraps bootstrap parameters for sandboxed protocols. *)
 type t =
   { id: string

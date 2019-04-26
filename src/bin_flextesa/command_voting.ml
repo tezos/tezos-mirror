@@ -43,23 +43,6 @@ let setup_baking_ledger state uri ~client =
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
-type voting_period =
-                    Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period
-                    .kind =
-  | Proposal
-  | Testing_vote
-  | Testing
-  | Promotion_vote
-
-let voting_period_to_string (p : voting_period) =
-  match
-    Tezos_data_encoding.Data_encoding.Json.construct
-      Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period.kind_encoding
-      p
-  with
-  | `String s -> s
-  | other -> assert false
-
 let transfer state ~client ~src ~dst ~amount =
   Tezos_client.successful_client_cmd state ~client
     [ "--wait"; "none"; "transfer"; sprintf "%Ld" amount; "from"; src; "to"; dst
@@ -68,7 +51,7 @@ let transfer state ~client ~src ~dst ~amount =
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
   let client = baker.Tezos_client.Keyed.client in
-  let period_name = voting_period_to_string period in
+  let period_name = Tezos_protocol.Voting_period.to_string period in
   Helpers.wait_for state ~attempts ~seconds:0.5 (fun nth ->
       Tezos_client.rpc state ~client `Get
         ~path:"/chains/main/blocks/head/votes/current_period_kind"
@@ -103,7 +86,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
         | None -> return `Failure_to_understand )
       | Error (`Client_command_error _) when expect_clueless_client ->
           return `Expected_misunderstanding
-      | Error e -> fail e)
+      | Error e -> fail e )
 
 let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
@@ -280,17 +263,8 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
       >>= fun _ -> return ()
     else return () )
     >>= fun () ->
-    Tezos_admin_client.successful_command admin_0 state
-      ["inject"; "protocol"; tmpdir]
-    >>= fun res ->
-    String.concat ~sep:" " res#out
-    |> String.split ~on:' ' |> List.map ~f:String.strip
-    |> (function
-         | _ :: _ :: hash :: _ when hash.[0] = 'P' -> return hash
-         | _ ->
-             failf "inject protocol: cannot parse hash of protocol: %s"
-               (String.concat ~sep:", " (List.map ~f:(sprintf "%S") res#out)))
-    >>= fun hash ->
+    Tezos_admin_client.inject_protocol admin_0 state ~path:tmpdir
+    >>= fun (res, hash) ->
     Interactive_test.Pauser.generic state
       EF.
         [ af "Just injected %s (%s): %s" name path hash
@@ -431,7 +405,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
             Console.say state
               EF.(wf "Winner-Client cannot bake on test chain (expected)")
         | `Failure_to_understand ->
-            failf "Winner-Client cannot bake on test chain!")
+            failf "Winner-Client cannot bake on test chain!" )
   >>= fun () ->
   Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun nth ->
       Tezos_client.rpc state ~client:(client 1) `Get
@@ -557,7 +531,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
                         desc (shout "Warning")
                           (wf
                              "Command `upgrade baking state` failed, but we \
-                              keep going with the baking.")))
+                              keep going with the baking.")) )
             >>= fun () ->
             Asynchronous_result.map_option with_ledger ~f:(fun _ ->
                 Interactive_test.Pauser.generic state
@@ -588,7 +562,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
             | `String p when p = winner_hash -> return ()
             | other ->
                 failf "Protocol is not `%s` but `%s`" winner_hash
-                  Ezjsonm.(to_string (wrap other)) ))
+                  Ezjsonm.(to_string (wrap other)) ) )
   >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.

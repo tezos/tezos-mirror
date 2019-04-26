@@ -327,6 +327,13 @@ module System = struct
         Lwt_io.with_file ?perm ~mode:Lwt_io.output path (fun out ->
             Lwt_io.write out content ) )
       ()
+
+  let read_file (_state : _ Base_state.t) path =
+    Lwt_exception.catch
+      (fun () ->
+        Lwt_io.with_file  ~mode:Lwt_io.input path (fun out ->
+            Lwt_io.read out ) )
+      ()
 end
 
 (** WIP [jq]-like manipulation in pure OCaml. *)
@@ -353,4 +360,6 @@ module Jqo = struct
     | other ->
         ksprintf failwith "Jqo.remove_field %S: No an object: %s" name
           (to_string other)
+
+  let get_string = Ezjsonm.get_string
 end

@@ -9,12 +9,15 @@ type t =
   { node: Tezos_node.t
   ; client: Tezos_client.t
   ; exec: Tezos_executable.t
-  ; args: args }
+  ; args: args
+  ; name_tag: string option }
 
-let of_node node args ~exec ~client = {node; exec; client; args}
-let baker_of_node nod ~key = of_node nod (Baker key)
-let endorser_of_node nod ~key = of_node nod (Endorser key)
-let accuser_of_node nod = of_node nod Accuser
+let of_node ?name_tag node args ~exec ~client =
+  {node; exec; client; args; name_tag}
+
+let baker_of_node ?name_tag nod ~key = of_node nod ?name_tag (Baker key)
+let endorser_of_node ?name_tag nod ~key = of_node nod ?name_tag (Endorser key)
+let accuser_of_node ?name_tag nod = of_node ?name_tag nod Accuser
 
 let arg_to_string = function
   | Baker k -> sprintf "baker-%s" k
@@ -27,8 +30,9 @@ let to_script (t : t) ~state =
     Tezos_executable.call t.exec
       ~path:
         ( base_dir
-        // sprintf "exec-%s-%d" (arg_to_string t.args)
-             t.node.Tezos_node.rpc_port )
+        // sprintf "exec-%s-%d%s" (arg_to_string t.args)
+             t.node.Tezos_node.rpc_port
+             (Option.value_map t.name_tag ~default:"" ~f:(sprintf "-%s")) )
       args
   in
   match t.args with
@@ -52,5 +56,6 @@ let to_script (t : t) ~state =
 
 let process (t : t) ~state =
   Running_processes.Process.genspio
-    (sprintf "%s-for-%s" (arg_to_string t.args) t.node.Tezos_node.id)
+    (sprintf "%s-for-%s%s" (arg_to_string t.args) t.node.Tezos_node.id
+       (Option.value_map t.name_tag ~default:"" ~f:(sprintf "-%s")))
     (to_script t ~state)

@@ -192,6 +192,23 @@ module Account = struct
     | Key_pair k -> k.private_key
 end
 
+module Voting_period = struct
+  type t = Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period.kind =
+    | Proposal
+    | Testing_vote
+    | Testing
+    | Promotion_vote
+
+  let to_string (p : t) =
+    match
+      Tezos_data_encoding.Data_encoding.Json.construct
+        Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period
+        .kind_encoding p
+    with
+    | `String s -> s
+    | _other -> assert false
+end
+
 type t =
   { id: string
   ; bootstrap_accounts: (Account.t * Int64.t) list
@@ -294,7 +311,13 @@ let ensure t ~config =
 let cli_term () =
   let open Cmdliner in
   let open Term in
-  pure (fun remove_default_bas (`Time_between_blocks tbb) add_bootstraps ->
+  pure
+    (fun remove_default_bas
+    (`Blocks_per_voting_period bpvp)
+    (`Protocol_hash hashopt)
+    (`Time_between_blocks tbb)
+    add_bootstraps
+    ->
       let d = default () in
       let id =
         if add_bootstraps = [] && remove_default_bas = false then d.id
@@ -307,12 +330,33 @@ let cli_term () =
         add_bootstraps
         @ if remove_default_bas then [] else d.bootstrap_accounts
       in
-      {d with id; bootstrap_accounts; time_between_blocks} )
+      let blocks_per_voting_period =
+        match bpvp with Some v -> v | None -> d.blocks_per_voting_period
+      in
+      let hash = Option.value hashopt ~default:d.hash in
+      { d with
+        id
+      ; hash
+      ; bootstrap_accounts
+      ; time_between_blocks
+      ; blocks_per_voting_period } )
   $ Arg.(
       value
         (flag
            (info ~doc:"Do not create any of the default bootstrap accounts."
               ["remove-default-bootstrap-accounts"])))
+  $ Arg.(
+      pure (fun x -> `Blocks_per_voting_period x)
+      $ value
+          (opt (some int) None
+             (info
+                ["blocks-per-voting-period"]
+                ~doc:"Set the length of voting periods")))
+  $ Arg.(
+      pure (fun x -> `Protocol_hash x)
+      $ value
+          (opt (some string) None
+             (info ["protocol-hash"] ~doc:"Set the (starting) protocol hash.")))
   $ Arg.(
       pure (fun x -> `Time_between_blocks x)
       $ value

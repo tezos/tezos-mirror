@@ -33,3 +33,15 @@ val successful_command :
   -> ( Process_result.t
      , [> Command_error.t | `Lwt_exn of exn] )
      Asynchronous_result.t
+
+val inject_protocol :
+     t
+  -> < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; .. >
+  -> path:string
+  -> ( Process_result.t * string
+     , [> Command_error.t | `Lwt_exn of exn] )
+     Asynchronous_result.t

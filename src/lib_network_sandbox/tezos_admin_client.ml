@@ -45,3 +45,15 @@ let successful_command admin state args =
   | true -> return res
   | false ->
       failf ~args "Admin-command failure: %s" (String.concat ~sep:" " args)
+
+let inject_protocol admin state ~path =
+  successful_command admin state ["inject"; "protocol"; path]
+  >>= fun res ->
+  String.concat ~sep:" " res#out
+  |> String.split ~on:' ' |> List.map ~f:String.strip
+  |> (function
+       | _ :: _ :: hash :: _ when hash.[0] = 'P' -> return hash
+       | _ ->
+           failf "inject protocol: cannot parse hash of protocol: %s"
+             (String.concat ~sep:", " (List.map ~f:(sprintf "%S") res#out)) )
+  >>= fun hash -> return (res, hash)
