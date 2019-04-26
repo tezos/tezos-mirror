@@ -1,3 +1,19 @@
+/*
+- param: None:
+
+  Create a contract then perform a recursive call on Some [addr] where
+  [addr] is the address of the newly created contract.
+
+  The created contract simply stores its parameter (a string).  It is
+  initialized with the storage "dummy" and has an initial balance of
+  100tz. It has no delegate so these 100tz are totally frozen.
+
+- param: Some [addr]:
+
+  Check that the sender is self, call the contract at address [addr]
+  with param "abcdefg" transferring 0tz.
+
+*/
 parameter (option address) ;
 storage unit ;
 code { CAR ;
