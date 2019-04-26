@@ -1089,9 +1089,11 @@ and list_known_points ?(ignore_private = false) pool conn =
   else
     let knowns =
       P2p_point.Table.fold
-        (fun _ point_info acc ->
-           if ignore_private &&
-              not (P2p_point_state.Info.known_public point_info) then acc
+        (fun point_id point_info acc ->
+           if (ignore_private &&
+               not (P2p_point_state.Info.known_public point_info))
+           || not (Points.banned pool point_id)
+           then acc
            else point_info :: acc)
         pool.known_points [] in
     let best_knowns =
@@ -1304,4 +1306,3 @@ let destroy ({ config ; peer_meta_config ; _ } as pool) =
 
 let on_new_connection pool f =
   pool.new_connection_hook <- f :: pool.new_connection_hook
-
