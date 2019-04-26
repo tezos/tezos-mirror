@@ -5,16 +5,8 @@
             tezos-shell-services
             tezos-protocol-environment
             tezos-protocol-alpha
-            tezos-crypto
-            tezos-data-encoding
-            tezos-rpc
-            alcotest
-            alcotest-lwt
-            lwt
-            zarith
-            ocplib-endian
-            cstruct
-            secp256k1)
+	        tezos-protocol-alpha-parameters
+            alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services)))

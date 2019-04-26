@@ -8,10 +8,7 @@
             michelson_parser
             tezos-stdlib-unix
             bip39
-            zarith
-            lwt
-            alcotest
-            bigstring)
+            tezos-protocol-alpha-parameters)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_alpha_test_helpers
@@ -22,17 +19,21 @@
  (package tezos-protocol-alpha)
  (deps main.exe))
 
+(rule
+ (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
+       protocol_parameters.json))
+
 ; runs only the `Quick tests
 (alias
  (name runtest_proto_alpha)
  (package tezos-protocol-alpha)
- (action (chdir %{workspace_root} (run %{exe:main.exe} -v -q))))
+ (action (run %{exe:main.exe} -v -q)))
 
 ; runs both `Quick and `Slow tests
 (alias
  (name runtest_slow)
  (package tezos-protocol-alpha)
- (action (chdir %{workspace_root} (run %{exe:main.exe} -v))))
+ (action (run %{exe:main.exe} -v)))
 
 (alias
  (name runtest)

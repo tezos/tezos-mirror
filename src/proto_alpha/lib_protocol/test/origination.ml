@@ -263,8 +263,11 @@ let register_origination_inc ~credit () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source_contract = List.hd contracts in
   Incremental.begin_construction b >>=? fun inc ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = { origination_size ; _ } ; _ } ->
+
   Op.origination (I inc)
-    ~storage_limit:(Z.of_int Constants_repr.default.origination_size)
+    ~storage_limit:(Z.of_int origination_size)
     ~credit source_contract >>=? fun (operation, new_contract) ->
   Incremental.add_operation inc operation >>=? fun inc ->
   return (inc, source_contract, new_contract)

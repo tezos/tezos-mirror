@@ -42,23 +42,25 @@ open Test_tez
 
 (* Generated commitments and secrets  *)
 
-let commitments =
-  List.map (fun (bpkh, a) ->
-      Commitment_repr.{
-        blinded_public_key_hash=Blinded_public_key_hash.of_b58check_exn bpkh ;
-        amount = Tez_repr.of_mutez_exn (Int64.of_string a)}
-    )
-    [ ( "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ) ;
-      ( "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ) ;
-      ( "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428349" ) ;
-      ( "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ) ;
-      ( "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ) ;
-      ( "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ) ;
-      ( "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ) ;
-      ( "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ) ;
-      ( "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ) ;
-      ( "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ) ;
-    ]
+(* Commitments are hard-coded in {Tezos_proto_alpha_parameters.Default_parameters} *)
+
+(* let commitments =
+ *   List.map (fun (bpkh, a) ->
+ *       Commitment_repr.{
+ *         blinded_public_key_hash=Blinded_public_key_hash.of_b58check_exn bpkh ;
+ *         amount = Tez_repr.of_mutez_exn (Int64.of_string a)}
+ *     )
+ *     [ ( "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ) ;
+ *       ( "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ) ;
+ *       ( "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428349" ) ;
+ *       ( "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ) ;
+ *       ( "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ) ;
+ *       ( "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ) ;
+ *       ( "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ) ;
+ *       ( "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ) ;
+ *       ( "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ) ;
+ *       ( "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ) ;
+ *     ] *)
 
 type secret_account = {
   account : public_key_hash ;
@@ -116,7 +118,7 @@ let secrets () =
       (["library"; "away"; "inside"; "paper"; "wise"; "focus"; "sweet"; "expose";
         "require"; "change"; "stove"; "planet"; "zone"; "reflect"; "finger"],
        "411dfef031eeecc506de71c9df9f8e44297cf5ba",
-       "217487035428349",
+       "217487035428348",
        "tz1SWBY7rWMutEuWS54Pt33MkzAS6eWkUuTc",
        "0AO6BzQNfN",
        "ctgnkvqm.kvtiybky@tezos.example.org"
@@ -180,7 +182,7 @@ let secrets () =
     ]
 
 let activation_init () =
-  Context.init ~commitments 1 >>=? fun (b, cs) ->
+  Context.init ~with_commitments:true 1 >>=? fun (b, cs) ->
   secrets () |> fun ss ->
   return (b, cs, ss)
 

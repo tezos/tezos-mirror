@@ -194,30 +194,24 @@ let check_constants_consistency constants =
   return
 
 let initial_context
+    ?(with_commitments = false)
     constants
     header
-    commitments
     initial_accounts
-    security_deposit_ramp_up_cycles
-    no_reward_cycles
   =
+  let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map (fun (Account.{ pk ; pkh ; _ }, amount) ->
-        Parameters_repr.{ public_key_hash = pkh ; public_key = Some pk ; amount }
+        Default_parameters.make_bootstrap_account (pkh, pk, amount)
       ) initial_accounts
   in
-  let json =
-    Data_encoding.Json.construct
-      Parameters_repr.encoding
-      Parameters_repr.{
-        bootstrap_accounts ;
-        bootstrap_contracts = [] ;
-        commitments ;
-        constants ;
-        security_deposit_ramp_up_cycles ;
-        no_reward_cycles ;
-      }
-  in
+
+  let parameters =
+    Default_parameters.parameters_of_constants
+      ~bootstrap_accounts
+      ~with_commitments
+      constants in
+  let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
@@ -231,34 +225,21 @@ let initial_context
   >|= Alpha_environment.wrap_error >>=? fun { context; _ } ->
   return context
 
+(* if no parameter file is passed we check in the current directory
+   where the test is run *)
 let genesis
-    ?(preserved_cycles = Constants_repr.default.preserved_cycles)
-    ?(blocks_per_cycle = Constants_repr.default.blocks_per_cycle)
-    ?(blocks_per_commitment = Constants_repr.default.blocks_per_commitment)
-    ?(blocks_per_roll_snapshot = Constants_repr.default.blocks_per_roll_snapshot)
-    ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
-    ?(time_between_blocks = Constants_repr.default.time_between_blocks)
-    ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
-    ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
-    ?(proof_of_work_threshold = Int64.(neg one))
-    ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
-    ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
-    ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
-    ?(origination_size = Constants_repr.default.origination_size)
-    ?(block_security_deposit = Constants_repr.default.block_security_deposit)
-    ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
-    ?(block_reward = Constants_repr.default.block_reward)
-    ?(endorsement_reward = Constants_repr.default.endorsement_reward)
-    ?(cost_per_byte = Constants_repr.default.cost_per_byte)
-    ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
-    ?(commitments = [])
-    ?(security_deposit_ramp_up_cycles = None)
-    ?(no_reward_cycles = None)
+    ?with_commitments
+    ?endorsers_per_block
     (initial_accounts : (Account.t * Tez_repr.t) list)
   =
   if initial_accounts = [] then
     Pervasives.failwith "Must have one account with a roll to bake";
+
+  let open Tezos_protocol_alpha_parameters in
+  let constants = Default_parameters.constants_test in
+  let endorsers_per_block =
+    Option.unopt ~default:constants.endorsers_per_block endorsers_per_block in
+  let constants = { constants with endorsers_per_block } in
 
   (* Check there is at least one roll *)
   begin try
@@ -266,7 +247,7 @@ let genesis
       fold_left_s (fun acc (_, amount) ->
           Alpha_environment.wrap_error @@
           Tez_repr.(+?) acc amount >>?= fun acc ->
-          if acc >= tokens_per_roll then
+          if acc >= constants.tokens_per_roll then
             raise Exit
           else return acc
         ) Tez_repr.zero initial_accounts >>=? fun _ ->
@@ -274,28 +255,6 @@ let genesis
     with Exit -> return_unit
   end >>=? fun () ->
 
-  let constants : Constants_repr.parametric = {
-    preserved_cycles ;
-    blocks_per_cycle ;
-    blocks_per_commitment ;
-    blocks_per_roll_snapshot ;
-    blocks_per_voting_period ;
-    time_between_blocks ;
-    endorsers_per_block ;
-    hard_gas_limit_per_operation ;
-    hard_gas_limit_per_block ;
-    proof_of_work_threshold ;
-    tokens_per_roll ;
-    michelson_maximum_type_size ;
-    seed_nonce_revelation_tip ;
-    origination_size ;
-    block_security_deposit ;
-    endorsement_security_deposit ;
-    block_reward ;
-    endorsement_reward ;
-    cost_per_byte ;
-    hard_storage_limit_per_operation ;
-  } in
   check_constants_consistency constants >>=? fun () ->
 
   let hash =
@@ -311,12 +270,10 @@ let genesis
       ~priority:0
       ~seed_nonce_hash:None () in
   initial_context
+    ?with_commitments
     constants
     shell
-    commitments
     initial_accounts
-    security_deposit_ramp_up_cycles
-    no_reward_cycles
   >>=? fun context ->
   let block =
     { hash ;

@@ -222,31 +222,15 @@ module Delegate = struct
 end
 
 let init
-    ?(slow=false)
-    ?preserved_cycles
     ?endorsers_per_block
-    ?commitments
+    ?with_commitments
     ?(initial_balances = [])
     n =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts = List.map (fun (a, _) ->
       Alpha_context.Contract.implicit_contract Account.(a.pkh)) accounts in
-  begin
-    if slow then
-      Block.genesis
-        ?preserved_cycles
-        ?endorsers_per_block
-        ?commitments
-        accounts
-    else
-      Block.genesis
-        ?preserved_cycles
-        ~blocks_per_cycle:32l
-        ~blocks_per_commitment:4l
-        ~blocks_per_roll_snapshot:8l
-        ~blocks_per_voting_period:(Int32.mul 32l 8l)
-        ?endorsers_per_block
-        ?commitments
-        accounts
-  end >>=? fun blk ->
+  Block.genesis
+    ?endorsers_per_block
+    ?with_commitments
+    accounts >>=? fun blk ->
   return (blk, contracts)

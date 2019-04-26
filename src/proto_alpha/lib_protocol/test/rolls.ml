@@ -104,7 +104,7 @@ let check_activate_staking_balance ~loc ~deactivated b (a, (m:Account.t)) =
   Assert.equal_tez ~loc Test_tez.Tez.(balance + deposit) info.staking_balance
 
 let run_until_deactivation () =
-  Context.init ~preserved_cycles:2 2 >>=? fun (b,accounts) ->
+  Context.init 2 >>=? fun (b,accounts) ->
   let (a1, a2) = account_pair accounts in
 
   Context.Contract.balance (B b) a1 >>=? fun balance_start ->

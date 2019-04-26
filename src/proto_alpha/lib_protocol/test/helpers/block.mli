@@ -90,29 +90,8 @@ end
     associated amounts.
 *)
 val genesis:
-  ?preserved_cycles:int ->
-  ?blocks_per_cycle:int32 ->
-  ?blocks_per_commitment:int32 ->
-  ?blocks_per_roll_snapshot:int32 ->
-  ?blocks_per_voting_period:int32 ->
-  ?time_between_blocks:Period_repr.t list ->
+  ?with_commitments:bool ->
   ?endorsers_per_block:int ->
-  ?hard_gas_limit_per_operation:Z.t ->
-  ?hard_gas_limit_per_block:Z.t ->
-  ?proof_of_work_threshold:int64 ->
-  ?tokens_per_roll:Tez_repr.tez ->
-  ?michelson_maximum_type_size:int ->
-  ?seed_nonce_revelation_tip:Tez_repr.tez ->
-  ?origination_size:int ->
-  ?block_security_deposit:Tez_repr.tez ->
-  ?endorsement_security_deposit:Tez_repr.tez ->
-  ?block_reward:Tez_repr.tez ->
-  ?endorsement_reward:Tez_repr.tez ->
-  ?cost_per_byte: Tez_repr.t ->
-  ?hard_storage_limit_per_operation: Z.t ->
-  ?commitments:Commitment_repr.t list ->
-  ?security_deposit_ramp_up_cycles: int option ->
-  ?no_reward_cycles: int option ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

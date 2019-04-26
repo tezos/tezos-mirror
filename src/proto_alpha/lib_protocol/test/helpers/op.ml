@@ -124,13 +124,18 @@ let combine_operations
 let manager_operation
     ?counter
     ?(fee = Tez.zero)
-    ?(gas_limit = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(storage_limit = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(gas_limit)
+    ?(storage_limit)
     ?public_key ~source ctxt operation =
   begin match counter with
     | Some counter -> return counter
     | None ->  Context.Contract.counter ctxt source end
   >>=? fun counter ->
+  Context.get_constants ctxt >>=? fun c ->
+  let gas_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation gas_limit in
+  let storage_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation storage_limit in
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.unopt ~default:account.pk public_key in
   let counter = Z.succ counter in
