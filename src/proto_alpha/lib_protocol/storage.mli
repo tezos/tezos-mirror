@@ -157,8 +157,9 @@ module Contract : sig
      and type value = Signature.Public_key_hash.t
      and type t := Raw_context.t
 
+  (** All contracts (implicit and originated) that are delegated, if any  *)
   module Delegated : Data_set_storage
-    with type elt = Contract_hash.t
+    with type elt = Contract_repr.t
      and type t = Raw_context.t * Contract_repr.t
 
   module Inactive_delegate : Data_set_storage

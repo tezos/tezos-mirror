@@ -159,7 +159,7 @@ module Contract = struct
       (Make_subcontext
          (Indexed_context.Raw_context)
          (struct let name = ["delegated"] end))
-      (Make_index(Contract_hash))
+      (Make_index(Contract_repr.Index))
 
   module Counter =
     Indexed_context.Make_map

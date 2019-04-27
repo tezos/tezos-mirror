@@ -30,7 +30,7 @@ type info = {
   frozen_balance: Tez.t ;
   frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
   staking_balance: Tez.t ;
-  delegated_contracts: Contract_hash.t list ;
+  delegated_contracts: Contract_repr.t list ;
   delegated_balance: Tez.t ;
   deactivated: bool ;
   grace_period: Cycle.t ;
@@ -56,7 +56,7 @@ let info_encoding =
        (req "frozen_balance" Tez.encoding)
        (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
        (req "staking_balance" Tez.encoding)
-       (req "delegated_contracts" (list Contract_hash.encoding))
+       (req "delegated_contracts" (list Contract_repr.encoding))
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding))
@@ -140,7 +140,7 @@ module S = struct
       ~description:
         "Returns the list of contracts that delegate to a given delegate."
       ~query: RPC_query.empty
-      ~output: (list Contract_hash.encoding)
+      ~output: (list Contract_repr.encoding)
       RPC_path.(path / "delegated_contracts")
 
   let delegated_balance =

@@ -215,30 +215,26 @@ let () =
 let is_delegatable c contract =
   match Contract_repr.is_implicit contract with
   | Some _ ->
-      return_false
+      (* Implicit contracts are delegatable *)
+      return_true
   | None ->
       Storage.Contract.Delegatable.mem c contract >>= return
 
-let link c contract delegate balance =
+let link c contract delegate =
+  Storage.Contract.Balance.get c contract >>=? fun balance ->
   Roll_storage.Delegate.add_amount c delegate balance >>=? fun c ->
-  match Contract_repr.is_originated contract with
-  | None -> return c
-  | Some h ->
-      Storage.Contract.Delegated.add
-        (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
-      return c
+  Storage.Contract.Delegated.add (c, Contract_repr.implicit_contract delegate) contract >>= fun c ->
+  return c
 
-let unlink c contract balance =
+let unlink c contract =
+  Storage.Contract.Balance.get c contract >>=? fun balance ->
   Storage.Contract.Delegate.get_option c contract >>=? function
   | None -> return c
   | Some delegate ->
+      (* Removes the balance of the contract from the delegate *)
       Roll_storage.Delegate.remove_amount c delegate balance >>=? fun c ->
-      match Contract_repr.is_originated contract with
-      | None -> return c
-      | Some h ->
-          Storage.Contract.Delegated.del
-            (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
-          return c
+      Storage.Contract.Delegated.del (c, Contract_repr.implicit_contract delegate) contract >>= fun c ->
+      return c
 
 let known c delegate =
   Storage.Contract.Manager.get_option
@@ -246,46 +242,54 @@ let known c delegate =
   | None | Some (Manager_repr.Hash _) -> return_false
   | Some (Manager_repr.Public_key _) -> return_true
 
-(* A delegate is registered if its "implicit account"
-   delegates to itself. *)
+(* A delegate is registered if its "implicit account" delegates to itself. *)
 let registered c delegate =
-  Storage.Contract.Delegate.mem
-    c (Contract_repr.implicit_contract delegate)
+  Storage.Contract.Delegate.get_option
+    c (Contract_repr.implicit_contract delegate) >>=? function
+  | Some current_delegate ->
+      return @@ Signature.Public_key_hash.equal delegate current_delegate
+  | None ->
+      return_false
 
 let init ctxt contract delegate =
   known ctxt delegate >>=? fun known_delegate ->
   fail_unless
     known_delegate
     (Roll_storage.Unregistered_delegate delegate) >>=? fun () ->
-  registered ctxt delegate >>= fun is_registered ->
+  registered ctxt delegate >>=? fun is_registered ->
   fail_unless
     is_registered
     (Roll_storage.Unregistered_delegate delegate) >>=? fun () ->
   Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->
-  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
-  link ctxt contract delegate balance
+  link ctxt contract delegate
 
 let get = Roll_storage.get_contract_delegate
 
 let set_base c is_delegatable contract delegate =
   match delegate with
   | None -> begin
+      let delete () =
+        unlink c contract >>=? fun c ->
+        Storage.Contract.Delegate.remove c contract >>= fun c ->
+        return c in
       match Contract_repr.is_implicit contract with
       | Some pkh ->
-          fail (No_deletion pkh)
+          (* check if contract is a registered delegate *)
+          registered c pkh >>=? fun is_registered ->
+          if is_registered then
+            fail (No_deletion pkh)
+          else
+            delete ()
       | None ->
           is_delegatable c contract >>=? fun delegatable ->
           if delegatable then
-            Storage.Contract.Balance.get c contract >>=? fun balance ->
-            unlink c contract balance >>=? fun c ->
-            Storage.Contract.Delegate.remove c contract >>= fun c ->
-            return c
+            delete ()
           else
             fail (Non_delegatable_contract contract)
     end
   | Some delegate ->
       known c delegate >>=? fun known_delegate ->
-      registered c delegate >>= fun registered_delegate ->
+      registered c delegate >>=? fun registered_delegate ->
       is_delegatable c contract >>=? fun delegatable ->
       let self_delegation =
         match Contract_repr.is_implicit contract with
@@ -308,14 +312,26 @@ let set_base c is_delegatable contract delegate =
                 fail Current_delegate
           | None | Some _ -> return_unit
         end >>=? fun () ->
+        (* check if contract is a registered delegate *)
+        begin
+          match Contract_repr.is_implicit contract with
+          | Some pkh ->
+              registered c pkh >>=? fun is_registered ->
+              (* allow self-delegation to re-activate *)
+              if not self_delegation && is_registered then
+                fail (No_deletion pkh)
+              else
+                return_unit
+          | None ->
+              return_unit
+        end >>=? fun () ->
         Storage.Contract.Balance.mem c contract >>= fun exists ->
         fail_when
           (self_delegation && not exists)
           (Empty_delegate_account delegate) >>=? fun () ->
-        Storage.Contract.Balance.get c contract >>=? fun balance ->
-        unlink c contract balance >>=? fun c ->
+        unlink c contract >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
-        link c contract delegate balance >>=? fun c ->
+        link c contract delegate >>=? fun c ->
         begin
           if self_delegation then
             Storage.Delegates.add c delegate >>= fun c ->
@@ -333,8 +349,7 @@ let set_from_script c contract delegate =
   set_base c (fun _ _ -> return_true) contract delegate
 
 let remove ctxt contract =
-  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
-  unlink ctxt contract balance
+  unlink ctxt contract
 
 let delegated_contracts ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
