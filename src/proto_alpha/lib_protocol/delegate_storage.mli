@@ -67,7 +67,7 @@ val get:
   Raw_context.t -> Contract_repr.t ->
   Signature.Public_key_hash.t option tzresult Lwt.t
 
-val registered: Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
+val registered: Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
 (** Updating the delegate of a contract.
 
@@ -169,10 +169,10 @@ val staking_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
 
-(** Returns the list of contract that delegated towards a given delegate *)
+(** Returns the list of contracts (implicit or originated) that delegated towards a given delegate *)
 val delegated_contracts:
   Raw_context.t -> Signature.Public_key_hash.t ->
-  Contract_hash.t list Lwt.t
+  Contract_repr.t list Lwt.t
 
 val delegated_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
