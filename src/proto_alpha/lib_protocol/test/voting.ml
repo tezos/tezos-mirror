@@ -83,9 +83,9 @@ let get_delegates_and_rolls_from_listings b =
 
 (* compute the rolls of each delegate *)
 let get_rolls b delegates loc =
+  Context.Vote.get_listings (B b) >>=? fun l ->
   map_s (fun delegate ->
       Context.Contract.pkh delegate >>=? fun pkh ->
-      Context.Vote.get_listings (B b) >>=? fun l ->
       match List.find_opt (fun (del,_) -> del = pkh) l with
       | None -> failwith "%s - Missing delegate" loc
       | Some (_, rolls) -> return rolls
@@ -630,15 +630,15 @@ let test_supermajority_in_proposal there_is_a_winner () =
 
   Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
 
-  (* to avoid the bug where the listings are not initialized, we let
-     one voting period pass; we make sure that the three selected
-     delegates remain active and their number of rolls do not change *)
-  let amount = let open Test_tez in Tez.of_int 10 in
+  (* we let one voting period pass; we make sure that:
+     - the three selected delegates remain active by re-registering as delegates
+     - their number of rolls do not change *)
   fold_left_s (fun b _ ->
-      Op.transaction (B b) del1 del2 amount >>=? fun op1 ->
-      Op.transaction (B b) del2 del3 amount >>=? fun op2 ->
-      Op.transaction (B b) del3 del1 amount >>=? fun op3 ->
-      Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
+      Error_monad.map_s (fun del ->
+          Context.Contract.pkh del >>=? fun pkh ->
+          Op.delegation (B b) del (Some pkh)
+        ) delegates >>=? fun ops ->
+      Block.bake ~policy ~operations:ops b >>=? fun b ->
       Block.bake_until_cycle_end ~policy b
     ) b (1 --
          (Int32.to_int (Int32.div blocks_per_voting_period blocks_per_cycle))) >>=? fun b ->
