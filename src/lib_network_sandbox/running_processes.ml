@@ -153,6 +153,17 @@ let start t process =
   in
   State.add_process t process proc >>= fun () -> return {process; lwt= proc}
 
+let start_full t process =
+  let proc_full =
+    Lwt_process.open_process_full
+      (Option.value ~default:"" process.binary, Array.of_list process.command)
+  in
+  let proc = (proc_full :> Lwt_process.process_none) in
+  State.add_process t process proc
+  >>= fun () ->
+  return {process; lwt= proc}
+  >>= fun proc_state -> return (proc_state, proc_full)
+
 let wait _t {lwt; _} =
   Lwt_exception.catch (fun () -> lwt#close) ()
   >>= fun _status -> return _status
@@ -244,6 +255,18 @@ let run_cmdf state fmt =
 
            method status = status
         end) )
+    fmt
+
+let run_async_cmdf state f fmt =
+  ksprintf
+    (fun s ->
+      let id = fresh_id state "cmd" ~seed:s in
+      let proc = Process.make_in_session id ["sh"; "-c"; s] in
+      start_full state proc
+      >>= fun (proc_state, proc) ->
+      f proc
+      >>= fun res ->
+      wait state proc_state >>= fun status -> return (status, res) )
     fmt
 
 let run_successful_cmdf state fmt =

@@ -105,13 +105,18 @@ end
 open Command_error
 open Console
 
-let successful_client_cmd state ~client args =
+let client_cmd state ~client args =
   Running_processes.run_cmdf state "sh -c %s"
     ( client_command client ~state args
     |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
-  >>= function
+  >>= fun success -> return (success, res)
+
+let successful_client_cmd state ~client args =
+  client_cmd state ~client args
+  >>= fun (success, res) ->
+  match success with
   | true -> return res
   | false ->
       failf ~args "Client-command failure: %s" (String.concat ~sep:" " args)
@@ -212,7 +217,7 @@ let list_known_addresses state ~client =
            [ group (rep1 (alt [alnum; char '_']))
            ; str ": "
            ; group (rep1 alnum)
-           ; Re.alt [space; eol; eos] ]))
+           ; alt [space; eol; eos] ]))
   in
   return
     (List.filter_map res#out
@@ -285,7 +290,8 @@ module Ledger = struct
           List.find known_addresses ~f:(fun (_, pkh) -> pkh = pubkey_hash)
         with
         | None -> ""
-        | Some (alias, _) -> alias in
+        | Some (alias, _) -> alias
+      in
       return
         (Tezos_protocol.Account.key_pair name ~pubkey ~pubkey_hash
            ~private_key:uri)

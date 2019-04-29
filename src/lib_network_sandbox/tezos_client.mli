@@ -65,6 +65,16 @@ module Command_error : sig
   val pp : Format.formatter -> t -> unit
 end
 
+val client_cmd :
+     < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; .. >
+  -> client:client
+  -> string list
+  -> (bool * Process_result.t, [> `Lwt_exn of exn]) Asynchronous_result.t
+
 val successful_client_cmd :
      < application_name: string
      ; console: Console.t

@@ -165,7 +165,7 @@ module Commands = struct
                       ]
                     :: prev) )
             >>= fun ef -> say state EF.(list ef)
-        | _other -> cmdline_fail "command expects 1 argument: name-prefix")
+        | _other -> cmdline_fail "command expects 1 argument: name-prefix" )
 
   let kill_all state =
     unit_loop_no_args
@@ -232,7 +232,7 @@ module Commands = struct
                         [ desc (af "output") (ocaml_string_list res)
                         ; desc (af "exn") (exn e) ])
                   >>= fun () -> return [] )
-              | `Error -> return [])
+              | `Error -> return [] )
         >>= fun contracts ->
         let balance block contract =
           let path =

@@ -76,6 +76,18 @@ val run_cmdf :
   -> 'a
 (** Run a shell command and wait for its end. *)
 
+val run_async_cmdf :
+     < runner: State.t ; .. >
+  -> (   Lwt_process.process_full
+      -> ('a, ([> `Lwt_exn of exn] as 'b)) Asynchronous_result.t)
+  -> ( 'c
+     , unit
+     , string
+     , (Unix.process_status * 'a, 'b) Asynchronous_result.t )
+     format4
+  -> 'c
+(** Run a shell command and run a function over the process data before waiting for its end. *)
+
 val run_successful_cmdf :
      < paths: Paths.t ; runner: State.t ; .. >
   -> ( 'a

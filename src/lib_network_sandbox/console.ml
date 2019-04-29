@@ -68,12 +68,10 @@ let cli_term () =
           value & opt (enum answers) `G & info ["color"] ~doc)))
 
 let do_output t =
-  Lwt_exception.catch
-    Lwt.(
-      fun () ->
-        Lwt_io.write t.channel (Buffer.contents t.buffer)
-        >>= fun () -> Buffer.clear t.buffer ; return_unit)
-    ()
+  Lwt.(
+    fun () ->
+      Lwt_io.write t.channel (Buffer.contents t.buffer)
+      >>= fun () -> Buffer.clear t.buffer ; return_unit)
 
 let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     (_, _) Asynchronous_result.t =
@@ -95,7 +93,7 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     pp_print_newline ppf () ;
     pp_close_box ppf () ;
     pp_print_flush ppf ()) ;
-  do_output o#console
+  Lwt_exception.catch (do_output o#console) ()
 
 let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
   let date =
@@ -111,7 +109,7 @@ let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
     fprintf fmt "%a" Easy_format.Pretty.to_formatter msg ;
     pp_print_newline fmt () ;
     pp_print_flush fmt ()) ;
-  do_output o#console
+  Lwt_exception.catch (do_output o#console) ()
 
 module Prompt = struct
   type item =

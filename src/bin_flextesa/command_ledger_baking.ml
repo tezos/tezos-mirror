@@ -77,7 +77,7 @@ let get_chain_id state ~client =
   Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id"
   >>= (function
         | `String x -> return x
-        | _ -> failf "Failed to parse chain_id JSON from node")
+        | _ -> failf "Failed to parse chain_id JSON from node" )
   >>= fun chain_id_string ->
   return (Tezos_crypto.Chain_id.of_b58check_exn chain_id_string)
 

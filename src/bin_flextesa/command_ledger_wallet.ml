@@ -3,6 +3,43 @@ open Internal_pervasives
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
+let client_async_cmd state ~client args ~f =
+  Running_processes.run_async_cmdf state f "sh -c %s"
+    ( Tezos_client.client_command client ~state args
+    |> Genspio.Compile.to_one_liner |> Filename.quote )
+  >>= fun (status, res) -> return (status = Lwt_unix.WEXITED 0, res)
+
+let ledger_hash_re () =
+  Re.(
+    compile
+      (seq
+         [ str "* Blake 2B Hash (ledger-style, with operation watermark):"
+         ; rep1 (alt [space; eol])
+         ; group (rep1 alnum)
+         ; rep1 (alt [space; eol]) ]))
+
+(* Searches a stream for an expected ledger hash from `tezos-client --verbose-signing`*)
+let find_and_print_signature_hash state stream =
+  let re = ledger_hash_re () in
+  let check lines =
+    Re.(
+      match exec_opt re lines with
+      | None -> None
+      | Some matches -> Some (Group.get matches 1))
+  in
+  Asynchronous_result.Stream.fold (Lwt_io.read_lines stream) ~init:("", false)
+    ~f:(fun (all_output_prev, showed_message_prev) line ->
+      let all_output = all_output_prev ^ "\n" ^ line in
+      ( if not showed_message_prev then
+        match check all_output with
+        | None -> return false
+        | Some x ->
+            Console.say state EF.(wf "Hash should be: %s" x)
+            >>= fun () -> return true
+      else return true )
+      >>= fun showed_message -> return (all_output, showed_message) )
+  >>= fun (output, _) -> return output
+
 let ledger_prompt_notice state ~ef ?(button = `Checkmark) () =
   let button_str =
     match button with
@@ -15,13 +52,28 @@ let ledger_prompt_notice state ~ef ?(button = `Checkmark) () =
       desc (shout "Ledger-prompt")
         (list [ef; wf "Press %s on the ledger." button_str]))
 
+let ledger_prompt_notice_expectation state message expectation =
+  ledger_prompt_notice state ()
+    ~button:(match expectation with `Succeeds -> `Checkmark | `Fails -> `X)
+    ~ef:
+      EF.(
+        list
+          [ message; wf "\n\n"
+          ; wf
+              ( match expectation with
+              | `Succeeds -> ">> ACCEPT THIS <<"
+              | `Fails -> ">> REJECT THIS <<" ) ])
+
+let run_with_status f =
+  Asynchronous_result.bind_on_error
+    (f () >>= fun x -> return (`Worked x))
+    ~f:(fun ~result x -> return (`Didn'tWork x))
+
 let assert_failure state msg f () =
   Console.say state EF.(wf "Asserting %s" msg)
   >>= fun () ->
-  Asynchronous_result.bind_on_error
-    (f () >>= fun _ -> return `Worked)
-    ~f:(fun ~result _ -> return `Didn'tWork)
-  >>= function `Worked -> failf "%s" msg | `Didn'tWork -> return ()
+  run_with_status f
+  >>= function `Worked _ -> failf "%s" msg | `Didn'tWork x -> return x
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 let assert_ a = if a then return () else failf "Assertion failed"
@@ -42,23 +94,14 @@ let rec ask state ef =
 let ask_assert state ef () = ask state ef >>= fun b -> assert_ b
 
 let with_ledger_prompt state message expectation ~f =
-  ledger_prompt_notice state ()
-    ~button:(match expectation with `Succeeds -> `Checkmark | `Fails -> `X)
-    ~ef:
-      EF.(
-        list
-          [ message; wf "\n\n"
-          ; wf
-              ( match expectation with
-              | `Succeeds -> ">> ACCEPT THIS <<"
-              | `Fails -> ">> REJECT THIS <<" ) ])
+  ledger_prompt_notice_expectation state message expectation
   >>= fun () ->
   match expectation with
   | `Succeeds ->
       f () >>= fun _ -> Console.say state EF.(wf "> Got response: ACCEPTED")
   | `Fails ->
       assert_failure state "expected failure" f ()
-      >>= fun () -> Console.say state EF.(wf "> Got response: REJECTED")
+      >>= fun _ -> Console.say state EF.(wf "> Got response: REJECTED")
 
 let with_ledger_test_reject_and_succeed state ef f =
   with_ledger_prompt state ef `Fails ~f
@@ -68,7 +111,7 @@ let get_chain_id state ~client =
   Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id"
   >>= (function
         | `String x -> return x
-        | _ -> failf "Failed to parse chain_id JSON from node")
+        | _ -> failf "Failed to parse chain_id JSON from node" )
   >>= fun chain_id_string ->
   return (Tezos_crypto.Chain_id.of_b58check_exn chain_id_string)
 
@@ -158,14 +201,58 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
     (fun () ->
       Tezos_client.Keyed.initialize state signer >>= fun _ -> return () )
   >>= fun _ ->
+  let submit_proposals () =
+    client_async_cmd state ~client:(client 0)
+      ~f:(fun proc -> find_and_print_signature_hash state proc#stdout)
+      [ "submit"; "proposals"; "for"
+      ; Tezos_protocol.Account.pubkey_hash ledger_account
+      ; "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
+      ; "Psd1ynUBhMZAeajwcZJAeq5NrxorM6UCU4GJqxZ7Bx2e9vUWB6z"; "--force"
+      ; "--verbose-signing" ]
+  in
+  ledger_prompt_notice_expectation state
+    EF.(wf "Submitting multi-protocol proposal submission")
+    `Fails
+  >>= submit_proposals
+  >>= fun (success, stdout) ->
+  assert_ (not success)
+  >>= fun () ->
+  ( match
+      String.substr_index stdout ~pattern:"Conditions of use not satisfied"
+    with
+  | None -> failf "expected rejection %s" stdout
+  | Some _ -> return () )
+  >>= fun () ->
+  ledger_prompt_notice_expectation state
+    EF.(wf "Submitting multi-protocol proposal submission")
+    `Succeeds
+  >>= submit_proposals
+  >>= fun (success, stdout) ->
+  assert_ (not success)
+  >>= fun () ->
+  ( match
+      String.substr_index stdout
+        ~pattern:"not registered as valid delegate key"
+    with
+  | None -> failf "expected error that key is not registered as valid delegate"
+  | Some _ -> return () )
+  >>= fun _ ->
   forge_batch_transactions state ~client:(client 0)
     ~src:(Tezos_protocol.Account.pubkey_hash ledger_account)
     ~dest:"tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F" ~n:50 ()
   >>= fun batch_transaction_bytes ->
+  let bytes_hash =
+    Tezos_crypto.(
+      `Hex batch_transaction_bytes |> Hex.to_bytes
+      |> Tezos_stdlib.MBytes.of_bytes
+      |> (fun x -> [x])
+      |> Blake2B.hash_bytes |> Blake2B.to_string |> Base58.raw_encode)
+  in
   with_ledger_test_reject_and_succeed state
     EF.(
-      wf
-        "Signing batch of transaction: Unrecognized Operation - Sign Unverified")
+      wf "Signing batch of transaction: Unrecognized Operation - Sign Hash %s"
+        bytes_hash)
+    (* Todo blake2b hash here *)
     (sign state ~client:signer ~bytes:batch_transaction_bytes)
 
 let cmd ~pp_error () =
