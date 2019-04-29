@@ -212,13 +212,20 @@ module Configuration_directory = struct
           |> to_string)
     >>= fun () ->
     System.write_file state ~perm:0o777
+      (path // "kiln-node-net-port")
+      ~content:(sprintf "%d" p2p_port)
+    >>= fun () ->
+    let pwd = Sys.getenv "PWD" in
+    let absolutize path =
+      if Filename.is_relative path then pwd // path else path
+    in
+    System.write_file state ~perm:0o777
       (path // "kiln-node-custom-args")
       ~content:
         (sprintf
-           "--config-file %s --net-addr 0.0.0.0:%d --private-mode \
-            --no-bootstrap-peers %s  --bootstrap-threshold 0 --connections %d \
-            --sandbox %s"
-           node_config p2p_port
+           "--config-file %s --private-mode --no-bootstrap-peers %s  \
+            --bootstrap-threshold 0 --connections %d --sandbox %s"
+           (absolutize node_config)
            ( List.map peers ~f:(sprintf "--peer 127.0.0.1:%d")
            |> String.concat ~sep:" " )
            (List.length peers - 1)
@@ -235,14 +242,13 @@ module Configuration_directory = struct
     System.write_file state ~perm:0o777 (path // "network")
       ~content:network_string
     >>= fun () ->
-    let pwd = Sys.getenv "PWD" in
-    let absolutize exec =
-      let path = Tezos_executable.get exec in
-      if Filename.is_relative path then pwd // path else path
-    in
     System.write_file state ~perm:0o777 (path // "binary-paths")
       ~content:
         Ezjsonm.(
+          let absolutize exec =
+            let path = Tezos_executable.get exec in
+            absolutize path
+          in
           dict
             [ ("node-path", string (absolutize node_exec))
             ; ("client-path", string (absolutize client_exec))
