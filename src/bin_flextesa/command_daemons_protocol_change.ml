@@ -2,26 +2,55 @@ open Tezos_network_sandbox
 open Internal_pervasives
 open Console
 
-let wait_for_voting_period state ~client ~attempts period =
+let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
+
+let wait_for_voting_period ?level_withing_period state ~client ~attempts period
+    =
   let period_name = Tezos_protocol.Voting_period.to_string period in
-  Console.sayf state
-    Fmt.(fun ppf () -> pf ppf "Waiting for voting period: `%s`" period_name)
+  let message =
+    sprintf "Waiting for voting period: `%s`%s" period_name
+      (Option.value_map level_withing_period ~default:""
+         ~f:(sprintf " (and level-within-period ≤ %d)"))
+  in
+  Console.say state EF.(wf "%s" message)
   >>= fun () ->
   Helpers.wait_for state ~attempts ~seconds:10. (fun nth ->
+      Asynchronous_result.map_option level_withing_period ~f:(fun lvl ->
+          Tezos_client.rpc state ~client `Get
+            ~path:"/chains/main/blocks/head/metadata"
+          >>= fun json ->
+          try
+            let voting_period_position =
+              Jqo.field ~k:"level" json
+              |> Jqo.field ~k:"voting_period_position"
+              |> Jqo.get_int
+            in
+            return (voting_period_position <= lvl)
+          with e ->
+            failf "Cannot get level.voting_period_position: %s"
+              (Printexc.to_string e) )
+      >>= fun lvl_ok ->
       Tezos_client.rpc state ~client `Get
         ~path:"/chains/main/blocks/head/votes/current_period_kind"
       >>= function
-      | `String p when p = period_name -> return (`Done (nth - 1))
+      | `String p when p = period_name && (lvl_ok = None || lvl_ok = Some true)
+        ->
+          return (`Done (nth - 1))
       | other ->
-          return (`Not_done (sprintf "Waiting for %S period" period_name)) )
-
-let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
+          Tezos_client.successful_client_cmd state ~client
+            ["show"; "voting"; "period"]
+          >>= fun res ->
+          Console.say state
+            EF.(
+              desc_list (wf "Voting period:")
+                [markdown_verbatim (String.concat ~sep:"\n" res#out)])
+          >>= fun () -> return (`Not_done message) )
 
 let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
     ~first_endorser_exec ~first_accuser_exec ~second_baker_exec
-    ~second_endorser_exec ~second_accuser_exec
-    ~admin_exec ~new_protocol_path () =
+    ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
+    () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [ node_exec; client_exec; first_baker_exec; first_endorser_exec
@@ -58,21 +87,21 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     in
     Tezos_protocol.bootstrap_accounts protocol
     |> List.filter_mapi ~f:(fun idx acc ->
-        let node, client = pick_a_node_and_client idx in
-        let key = Tezos_protocol.Account.name acc in
-        if List.mem ~equal:String.equal no_daemons_for key then None
-        else
-          Some
-            ( acc
-            , client
-            , [ Tezos_daemon.baker_of_node ~exec:first_baker_exec ~client
-                  node ~key ~name_tag:"first"
-              ; Tezos_daemon.baker_of_node ~exec:second_baker_exec ~client
-                  ~name_tag:"second" node ~key
-              ; Tezos_daemon.endorser_of_node ~exec:first_endorser_exec
-                  ~name_tag:"first" ~client node ~key
-              ; Tezos_daemon.endorser_of_node ~exec:second_endorser_exec
-                  ~name_tag:"second" ~client node ~key ] ) )
+           let node, client = pick_a_node_and_client idx in
+           let key = Tezos_protocol.Account.name acc in
+           if List.mem ~equal:String.equal no_daemons_for key then None
+           else
+             Some
+               ( acc
+               , client
+               , [ Tezos_daemon.baker_of_node ~exec:first_baker_exec ~client
+                     node ~key ~name_tag:"first"
+                 ; Tezos_daemon.baker_of_node ~exec:second_baker_exec ~client
+                     ~name_tag:"second" node ~key
+                 ; Tezos_daemon.endorser_of_node ~exec:first_endorser_exec
+                     ~name_tag:"first" ~client node ~key
+                 ; Tezos_daemon.endorser_of_node ~exec:second_endorser_exec
+                     ~name_tag:"second" ~client node ~key ] ) )
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -151,18 +180,18 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             ~path:new_protocol_path
           >>= fun (_, new_protocol_hash) ->
           ( if new_protocol_hash = hash then
-              Console.say state
-                EF.(
-                  wf "Injected protocol `%s` in `%s`" new_protocol_hash
-                    nod.Tezos_node.id)
-            else
-              failf "Injecting protocol %s failed (≠ %s)" new_protocol_hash
-                hash )
+            Console.say state
+              EF.(
+                wf "Injected protocol `%s` in `%s`" new_protocol_hash
+                  nod.Tezos_node.id)
+          else
+            failf "Injecting protocol %s failed (≠ %s)" new_protocol_hash
+              hash )
           >>= fun () -> return (Some hash) )
   >>= fun prot_opt ->
   ( match prot_opt with
-    | Some s -> return s
-    | None -> failf "protocol injection problem?" )
+  | Some s -> return s
+  | None -> failf "protocol injection problem?" )
   >>= fun new_protocol_hash ->
   Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
       Kiln.Configuration_directory.generate state kiln_config
@@ -174,7 +203,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         ~bakers:
           (List.map protocol.Tezos_protocol.bootstrap_accounts
              ~f:(fun (account, _) ->
-                 Tezos_protocol.Account.(name account, pubkey_hash account) ))
+               Tezos_protocol.Account.(name account, pubkey_hash account) ))
         ~network_string:network_id ~node_exec ~client_exec
         ~protocol_execs:
           [ ( protocol.Tezos_protocol.hash
@@ -192,6 +221,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ~force:true
   >>= fun () ->
   wait_for_voting_period state ~client:client_0 ~attempts:10 Proposal
+    ~level_withing_period:3
   >>= fun _ ->
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       Tezos_client.successful_client_cmd state ~client
@@ -236,14 +266,30 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (Tezos_protocol.Account.name acc)
               new_protocol_hash) )
   >>= fun () ->
-  (* wait_for_voting_period state ~client:client_0 ~attempts:50 Proposal
-   * >>= fun _ -> *)
+  wait_for_voting_period state ~client:client_0 ~attempts:50 Proposal
+  >>= fun _ ->
   Tezos_client.successful_client_cmd state ~client:client_0
     ["show"; "voting"; "period"]
   >>= fun res ->
+  Helpers.wait_for state ~attempts:3 ~seconds:4. (fun _ ->
+      Console.say state EF.(wf "Checking actual protocol transition")
+      >>= fun () ->
+      Tezos_client.rpc state ~client:client_0 `Get
+        ~path:"/chains/main/blocks/head/metadata"
+      >>= fun json ->
+      ( try Jqo.field ~k:"protocol" json |> Jqo.get_string |> return
+        with e -> failf "Cannot parse metadata: %s" (Printexc.to_string e) )
+      >>= fun proto_hash ->
+      if proto_hash <> new_protocol_hash then
+        return
+          (`Not_done
+            (sprintf "Protocol not done: %s Vs %s" proto_hash new_protocol_hash))
+      else return (`Done ()) )
+  >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
-      [ wf "Test finished, but it should keep baking."
+      [ wf "Test finished, protocol is now %s, things should keep baking."
+          new_protocol_hash
       ; markdown_verbatim (String.concat ~sep:"\n" res#out) ]
     ~force:true
 

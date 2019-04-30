@@ -362,4 +362,5 @@ module Jqo = struct
           (to_string other)
 
   let get_string = Ezjsonm.get_string
+  let get_int = Ezjsonm.get_int
 end
