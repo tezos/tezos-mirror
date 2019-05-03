@@ -115,6 +115,7 @@ let collect_error_locations errs =
         | Unmatched_branches (loc, _, _)
         | Self_in_lambda loc
         | Invalid_constant (loc, _, _)
+        | Invalid_syntactic_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
@@ -616,6 +617,16 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               print_expr
               got
               print_ty
+              exp
+        | Invalid_syntactic_constant (loc, got, exp) ->
+            Format.fprintf
+              ppf
+              "@[<hov 0>@[<hov 2>%avalue@ %a@]@ @[<hov 2>is invalid, \
+               expected@ %s@]@]"
+              print_loc
+              loc
+              print_expr
+              got
               exp
         | Invalid_contract (loc, contract) ->
             Format.fprintf

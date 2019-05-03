@@ -118,6 +118,8 @@ type prim =
   | I_ISNAT
   | I_CAST
   | I_RENAME
+  | I_DIG
+  | I_DUG
   | T_bool
   | T_contract
   | T_int

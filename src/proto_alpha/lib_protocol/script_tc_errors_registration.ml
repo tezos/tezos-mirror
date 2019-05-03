@@ -510,6 +510,22 @@ let () =
       | _ -> None)
     (fun (loc, (ty, expr)) ->
        Invalid_constant (loc, expr, ty)) ;
+  (* Invalid syntactic constant *)
+  register_error_kind
+    `Permanent
+    ~id:"invalidSyntacticConstantError"
+    ~title: "Invalid constant (parse error)"
+    ~description:
+      "A compile-time constant was invalid for its expected form."
+    (located (obj2
+                (req "expectedForm" Script.expr_encoding)
+                (req "wrongExpression" Script.expr_encoding)))
+    (function
+      | Invalid_constant (loc, expr, ty) ->
+          Some (loc, (ty, expr))
+      | _ -> None)
+    (fun (loc, (ty, expr)) ->
+       Invalid_constant (loc, expr, ty)) ;
   (* Invalid contract *)
   register_error_kind
     `Permanent

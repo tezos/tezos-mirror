@@ -123,12 +123,14 @@ and ('key, 'value) big_map = { diff : ('key, 'value option) map ;
 (* ---- Instructions --------------------------------------------------------*)
 
 (* The low-level, typed instructions, as a GADT whose parameters
-   encode the typing rules. The left parameter is the typed shape of
-   the stack before the instruction, the right one the shape
-   after. Any program whose construction is accepted by OCaml's
-   type-checker is guaranteed to be type-safe.  Overloadings of the
-   concrete syntax are already resolved in this representation, either
-   by using different constructors or type witness parameters. *)
+   encode the typing rules.
+
+   The left parameter is the typed shape of the stack before the
+   instruction, the right one the shape after. Any program whose
+   construction is accepted by OCaml's type-checker is guaranteed to
+   be type-safe. Overloadings of the concrete syntax are already
+   resolved in this representation, either by using different
+   constructors or type witness parameters. *)
 and ('bef, 'aft) instr =
   (* stack ops *)
   | Drop :
@@ -234,10 +236,7 @@ and ('bef, 'aft) instr =
   | Diff_timestamps :
       (Script_timestamp.t * (Script_timestamp.t * 'rest),
        z num * 'rest) instr
-  (* currency operations *)
-  (* TODO: we can either just have conversions to/from integers and
-     do all operations on integers, or we need more operations on
-     Tez. Also Sub_tez should return Tez.t option (if negative) and *)
+  (* tez operations *)
   | Add_tez :
       (Tez.t * (Tez.t * 'rest), Tez.t * 'rest) instr
   | Sub_tez :
@@ -347,7 +346,6 @@ and ('bef, 'aft) instr =
       (z num * 'rest, bool * 'rest) instr
   | Ge :
       (z num * 'rest, bool * 'rest) instr
-
   (* protocol *)
   | Address :
       (_ typed_contract * 'rest, address * 'rest) instr
@@ -393,6 +391,26 @@ and ('bef, 'aft) instr =
     ('rest, 'p typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
+  | Dig   : int * ('x * 'rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
+      ('bef, 'x * 'aft) instr
+  | Dug   : int * ('rest, 'x * 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
+      ('x * 'bef, 'aft) instr
+  | Dipn  : int * ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness * ('fbef, 'faft) descr ->
+      ('bef, 'aft) instr
+  | Dropn : int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness ->
+      ('bef, 'rest) instr
+
+(* Type witness for operations that work deep in the stack ignoring
+   (and preserving) a prefix.
+
+   The two right parameters are the shape of the stack with the (same)
+   prefix before and after the transformation. The two left
+   parameters are the shape of the stack without the prefix before and
+   after. The inductive definition makes it so by construction. *)
+and ('bef, 'aft, 'bef_suffix, 'aft_suffix) stack_prefix_preservation_witness =
+  | Prefix : ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness
+    -> ('fbef, 'faft, 'x * 'bef, 'x * 'aft) stack_prefix_preservation_witness
+  | Rest : ('bef, 'aft, 'bef, 'aft) stack_prefix_preservation_witness
 
 and ('bef, 'aft) descr =
   { loc : Script.location ;

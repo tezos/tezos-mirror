@@ -240,6 +240,10 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Set_delegate -> 0
   | Pack _ -> 0
   | Unpack _ -> 1
+  | Dig _ -> 0
+  | Dug _ -> 0
+  | Dipn _ -> 0
+  | Dropn _ -> 0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -347,7 +351,9 @@ let namespace = function
   | I_CONTRACT
   | I_ISNAT
   | I_CAST
-  | I_RENAME -> Instr_namespace
+  | I_RENAME
+  | I_DIG
+  | I_DUG -> Instr_namespace
   | T_bool
   | T_contract
   | T_int
@@ -955,7 +961,7 @@ let merge_types :
 
 let merge_stacks
   : type ta. legacy: bool -> Script.location -> context -> ta stack_ty -> ta stack_ty ->
-    (ta stack_ty * context) tzresult
+  (ta stack_ty * context) tzresult
   = fun ~legacy loc ->
     let rec help : type a. context -> a stack_ty -> a stack_ty ->
       (a stack_ty * context) tzresult
@@ -984,8 +990,8 @@ type ('t, 'f, 'b) branch =
 
 let merge_branches
   : type bef a b. legacy: bool -> context -> int -> a judgement -> b judgement ->
-    (a, b, bef) branch ->
-    (bef judgement * context) tzresult Lwt.t
+  (a, b, bef) branch ->
+  (bef judgement * context) tzresult Lwt.t
   = fun ~legacy ctxt loc btr bfr { branch } ->
     match btr, bfr with
     | Typed ({ aft = aftbt ; _ } as dbt), Typed ({ aft = aftbf ; _ } as dbf) ->
@@ -1287,6 +1293,34 @@ let check_packable ~legacy loc root =
   check root
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
+
+type _ dig_proof_argument =
+    Dig_proof_argument
+    : ((('x * 'rest), 'rest, 'bef, 'aft) stack_prefix_preservation_witness
+       * ('x ty * var_annot option)
+       * 'aft stack_ty)
+    -> 'bef dig_proof_argument
+
+type (_, _) dug_proof_argument =
+    Dug_proof_argument
+    : (('rest, ('x * 'rest), 'bef, 'aft) stack_prefix_preservation_witness
+       * unit
+       * 'aft stack_ty)
+    -> ('bef, 'x) dug_proof_argument
+
+type (_) dipn_proof_argument =
+    Dipn_proof_argument
+    : (('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness
+       * (context * ('fbef, 'faft) descr)
+       * 'aft stack_ty)
+    -> 'bef dipn_proof_argument
+
+type (_) dropn_proof_argument =
+    Dropn_proof_argument
+    : (('rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness
+       * 'rest stack_ty
+       * 'aft stack_ty)
+    -> 'bef dropn_proof_argument
 
 (* Lwt versions *)
 let parse_var_annot loc ?default annot =
@@ -1764,6 +1798,24 @@ and parse_returning
         return ((Lam (descr (Item_t (ret, Empty_t, None)), strip_locations script_instr)
                  : (arg, ret) lambda), ctxt)
 
+and parse_int32 (n : (location, prim) Micheline.node) : int tzresult =
+  let error' () =
+    Invalid_syntactic_constant (location n, strip_locations n,
+                                "a positive 32-bit integer (between 0 and "
+                                ^ (Int32.to_string Int32.max_int) ^ ")") in
+  match n with
+  | Micheline.Int (_, n') ->
+      begin try
+          let n'' = Z.to_int n' in
+          if (Compare.Int.(0 <= n'')) && (Compare.Int.(n'' <= Int32.to_int Int32.max_int)) then
+            ok n''
+          else
+            error @@ error' ()
+        with _ ->
+          error @@ error' ()
+      end
+  | _ -> error @@ error' ()
+
 and parse_instr
   : type bef.
     ?type_logger: type_logger ->
@@ -1813,7 +1865,8 @@ and parse_instr
           log loc stack_ty aft;
           return_unit
     in
-    let return :
+    let outer_return = return in
+    let return : type bef .
       context -> bef judgement -> (bef judgement * context) tzresult Lwt.t = fun ctxt judgement ->
       match judgement with
       | Typed { instr ; loc ; aft ; _ } ->
@@ -1836,14 +1889,83 @@ and parse_instr
     (* stack ops *)
     | Prim (loc, I_DROP, [], annot),
       Item_t (_, rest, _) ->
-        fail_unexpected_annot loc annot >>=? fun () ->
-        typed ctxt loc Drop
-          rest
+        (fail_unexpected_annot loc annot >>=? fun () ->
+         typed ctxt loc Drop rest : (bef judgement * context) tzresult Lwt.t)
+    | Prim (loc, I_DROP, [n], result_annot), whole_stack ->
+        Lwt.return (parse_int32 n) >>=? fun whole_n ->
+        let rec make_proof_argument
+          : type tstk . int -> (tstk stack_ty) -> (tstk dropn_proof_argument) tzresult Lwt.t =
+          fun n stk ->
+            match (Compare.Int.(n = 0)), stk with
+              true, rest ->
+                outer_return @@ (Dropn_proof_argument (Rest, rest, rest))
+            | false, Item_t (v, rest, annot) ->
+                make_proof_argument (n - 1) rest
+                >>=? fun (Dropn_proof_argument (n', stack_after_drops, aft')) ->
+                outer_return @@ (Dropn_proof_argument (Prefix n', stack_after_drops, Item_t (v, aft', annot)))
+            | _, _ ->
+                serialize_stack_for_error ctxt whole_stack >>=? fun (whole_stack, _ctxt) ->
+                fail (Bad_stack (loc, I_DROP, whole_n, whole_stack))
+        in
+        fail_unexpected_annot loc result_annot >>=? fun () ->
+        make_proof_argument whole_n whole_stack >>=? fun (Dropn_proof_argument (n', stack_after_drops, _aft)) ->
+        typed ctxt loc (Dropn (whole_n, n')) stack_after_drops
+    | Prim (loc, I_DROP, (_ :: _ :: _ as l), _), _ ->
+        (* Technically, the arities 0 and 1 are allowed but the error only mentions 1.
+           However, DROP is equivalent to DROP 1 so hinting at an arity of 1 makes sense. *)
+        fail (Invalid_arity (loc, I_DROP, 1, List.length l))
     | Prim (loc, I_DUP, [], annot),
       Item_t (v, rest, stack_annot) ->
         parse_var_annot loc annot ~default:stack_annot >>=? fun annot ->
         typed ctxt loc Dup
           (Item_t (v, Item_t (v, rest, stack_annot), annot))
+    | Prim (loc, I_DIG, [n], result_annot), stack ->
+        let rec make_proof_argument
+          : type tstk . int -> (tstk stack_ty) -> (tstk dig_proof_argument) tzresult Lwt.t =
+          fun n stk ->
+            match (Compare.Int.(n = 0)), stk with
+              true, Item_t (v, rest, annot) ->
+                outer_return @@ (Dig_proof_argument (Rest, (v, annot), rest))
+            | false, Item_t (v, rest, annot) ->
+                make_proof_argument (n - 1) rest
+                >>=? fun (Dig_proof_argument (n', (x, xv), aft')) ->
+                outer_return @@ (Dig_proof_argument (Prefix n', (x, xv), Item_t (v, aft', annot)))
+            | _, _ ->
+                serialize_stack_for_error ctxt stack >>=? fun (whole_stack, _ctxt) ->
+                fail (Bad_stack (loc, I_DIG, 1, whole_stack))
+        in
+        Lwt.return (parse_int32 n) >>=? fun n ->
+        fail_unexpected_annot loc result_annot >>=? fun () ->
+        make_proof_argument n stack >>=? fun (Dig_proof_argument (n', (x, stack_annot), aft)) ->
+        typed ctxt loc (Dig (n, n')) (Item_t (x, aft, stack_annot))
+    | Prim (loc, I_DIG, ([] | _ :: _ :: _ as l), _), _ ->
+        fail (Invalid_arity (loc, I_DIG, 1, List.length l))
+    | Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack, stack_annot) ->
+        Lwt.return (parse_int32 n) >>=? fun whole_n ->
+        let rec make_proof_argument
+          : type tstk x . int -> x ty -> var_annot option -> (tstk stack_ty)
+            -> ((tstk, x) dug_proof_argument) tzresult Lwt.t =
+          fun n x stack_annot stk ->
+            match (Compare.Int.(n = 0)), stk with
+              true, rest ->
+                outer_return @@ (Dug_proof_argument (Rest, (), Item_t (x, rest, stack_annot)))
+            | false, Item_t (v, rest, annot) ->
+                make_proof_argument (n - 1) x stack_annot rest
+                >>=? fun (Dug_proof_argument (n', (), aft')) ->
+                outer_return @@ (Dug_proof_argument (Prefix n', (), Item_t (v, aft', annot)))
+            | _, _ ->
+                serialize_stack_for_error ctxt whole_stack >>=? fun (whole_stack, _ctxt) ->
+                fail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
+        in
+        fail_unexpected_annot loc result_annot >>=? fun () ->
+        make_proof_argument whole_n x stack_annot whole_stack >>=? fun (Dug_proof_argument (n', (), aft)) ->
+        typed ctxt loc (Dug (whole_n, n')) aft
+    | Prim (loc, I_DUG, [_], result_annot), (Empty_t as stack) ->
+        fail_unexpected_annot loc result_annot >>=? fun () ->
+        serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->
+        fail (Bad_stack (loc, I_DUG, 1, stack))
+    | Prim (loc, I_DUG, ([] | _ :: _ :: _ as l), _), _ ->
+        fail (Invalid_arity (loc, I_DUG, 1, List.length l))
     | Prim (loc, I_SWAP, [], annot),
       Item_t (v,  Item_t (w, rest, stack_annot), cur_top_annot) ->
         fail_unexpected_annot loc annot >>=? fun () ->
@@ -2279,6 +2401,41 @@ and parse_instr
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
         end
+    | Prim (loc, I_DIP, [n; code], result_annot), stack
+      when (match parse_int32 n with Ok _ -> true | Error _ -> false) ->
+        let rec make_proof_argument
+          : type tstk . int
+            (* -> (fbef stack_ty -> (fbef judgement * context) tzresult Lwt.t) *)
+            -> tc_context
+            -> (tstk stack_ty)
+            -> (tstk dipn_proof_argument) tzresult Lwt.t =
+          fun n inner_tc_context stk ->
+            match (Compare.Int.(n = 0)), stk with
+              true, rest ->
+                (parse_instr ?type_logger inner_tc_context ctxt ~legacy code
+                   rest) >>=? begin fun (judgement, ctxt) -> match judgement with
+                  | Typed descr ->
+                      outer_return @@ (Dipn_proof_argument (Rest, (ctxt, descr), descr.aft))
+                  | Failed _ ->
+                      fail (Fail_not_in_tail_position loc)
+                end
+            | false, Item_t (v, rest, annot) ->
+                make_proof_argument (n - 1) (add_dip v annot tc_context) rest
+                >>=? fun (Dipn_proof_argument (n', descr, aft')) ->
+                outer_return @@ (Dipn_proof_argument (Prefix n', descr, Item_t (v, aft', annot)))
+            | _, _ ->
+                serialize_stack_for_error ctxt stack >>=? fun (whole_stack, _ctxt) ->
+                fail (Bad_stack (loc, I_DIP, 1, whole_stack))
+        in
+        Lwt.return (parse_int32 n) >>=? fun n ->
+        fail_unexpected_annot loc result_annot >>=? fun () ->
+        make_proof_argument n tc_context stack >>=? fun (Dipn_proof_argument (n', (new_ctxt, descr), aft)) ->
+        (* TODO: which context should be used in the next line? new_ctxt or the old ctxt? *)
+        typed new_ctxt loc (Dipn (n, n', descr)) aft
+    | Prim (loc, I_DIP, ([] | _ :: _ :: _ :: _ as l), _), _ ->
+        (* Technically, the arities 1 and 2 are allowed but the error only mentions 2.
+           However, DIP {code} is equivalent to DIP 1 {code} so hinting at an arity of 2 makes sense. *)
+        fail (Invalid_arity (loc, I_DIP, 2, List.length l))
     | Prim (loc, I_FAILWITH, [], annot),
       Item_t (v, _rest, _) ->
         fail_unexpected_annot loc annot >>=? fun () ->
@@ -2859,7 +3016,7 @@ and parse_instr
                 (Item_t (Contract_t (param_type, None), stack, annot)) in
         get_toplevel_type tc_context
     (* Primitive parsing errors *)
-    | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
+    | Prim (loc, (I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS | I_CONCAT | I_SLICE
                  | I_MEM | I_UPDATE | I_MAP
                  | I_GET | I_EXEC | I_FAILWITH | I_SIZE
@@ -2876,7 +3033,7 @@ and parse_instr
                  | I_BLAKE2B | I_SHA256 | I_SHA512 | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
-    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER | I_CREATE_CONTRACT
+    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
                  | I_EMPTY_SET | I_DIP | I_LOOP | I_LOOP_LEFT | I_CONTRACT
                  as name), ([]
                            | _ :: _ :: _ as l), _), _ ->
@@ -2939,7 +3096,8 @@ and parse_instr
     (* Generic parsing errors *)
     | expr, _ ->
         fail @@ unexpected expr [ Seq_kind ] Instr_namespace
-          [ I_DROP ; I_DUP ; I_SWAP ; I_SOME ; I_UNIT ;
+          [ I_DROP ; I_DUP; I_DIG; I_DUG;
+            I_SWAP ; I_SOME ; I_UNIT ;
             I_PAIR ; I_CAR ; I_CDR ; I_CONS ;
             I_MEM ; I_UPDATE ; I_MAP ; I_ITER ;
             I_GET ; I_EXEC ; I_FAILWITH ; I_SIZE ;
