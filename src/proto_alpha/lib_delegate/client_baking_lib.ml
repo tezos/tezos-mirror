@@ -31,7 +31,6 @@ let bake_block
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
-    ?(await_endorsements = false)
     ?force
     ?max_priority
     ?(minimal_timestamp = false)
@@ -67,7 +66,6 @@ let bake_block
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
-    ~await_endorsements
     ?timestamp
     ?seed_nonce_hash
     ?mempool

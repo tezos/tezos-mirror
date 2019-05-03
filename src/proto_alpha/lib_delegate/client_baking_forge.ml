@@ -51,7 +51,6 @@ let default_max_priority = 64
 let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
 let default_minimal_nanotez_per_gas_unit = Z.of_int 100
 let default_minimal_nanotez_per_byte = Z.of_int 1000
-let default_await_endorsements = true
 
 type state = {
   context_path: string ;
@@ -68,8 +67,6 @@ type state = {
   minimal_nanotez_per_gas_unit : Z.t ;
   (* Minimal operation fee per byte required to include an operation in a block *)
   minimal_nanotez_per_byte : Z.t ;
-  (* Await endorsements *)
-  await_endorsements: bool ;
   (* truly mutable *)
   mutable best_slot: (Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)) option ;
 }
@@ -78,7 +75,6 @@ let create_state
     ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements)
     context_path index nonces_location delegates constants =
   { context_path ;
     index ;
@@ -88,7 +84,6 @@ let create_state
     minimal_fees ;
     minimal_nanotez_per_gas_unit ;
     minimal_nanotez_per_byte ;
-    await_endorsements ;
     best_slot = None ;
   }
 
@@ -616,7 +611,6 @@ let forge_block
     ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements)
     ?timestamp
     ?mempool
     ?context_path
@@ -690,22 +684,24 @@ let forge_block
           constants ;
           delegates = [] ;
           best_slot = None ;
-          await_endorsements ;
           minimal_fees = default_minimal_fees ;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit ;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
         } in
-        filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
-        >>=? fun (final_context, (validation_result, _), operations) ->
+        filter_and_apply_operations cctxt state
+          ~chain ~block ~slot_timestamp:timestamp ~priority ~protocol_data bi (operations, overflowing_ops)
+        >>=? fun (final_context, (validation_result, _), operations, min_valid_timestamp) ->
         let current_protocol = bi.next_protocol in
         let context = Shell_context.unwrap_disk_context validation_result.context in
         Context.get_protocol context >>= fun next_protocol ->
         if Protocol_hash.equal current_protocol next_protocol then begin
-          finalize_block_header final_context.header ~timestamp
+          finalize_block_header final_context.header ~timestamp:min_valid_timestamp
             validation_result operations >>= function
           | Error [ Forking_test_chain ] ->
               Alpha_block_services.Helpers.Preapply.block
-                cctxt ~chain ~block ~timestamp ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
+                cctxt ~chain ~block
+                ~timestamp:min_valid_timestamp
+                ~sort ~protocol_data operations >>=? fun (shell_header, _result) ->
               return (shell_header, List.map (List.map forge) operations)
           | Error _ as errs -> Lwt.return errs
           | Ok shell_header -> return (shell_header, List.map (List.map forge) operations)
@@ -857,87 +853,84 @@ let fetch_operations
       count_slots_endorsements inc slot !operations >>= fun nb_arrived_endorsements ->
       (* If 100% of the endorsements arrived, we don't need to wait *)
       let endorsers_per_block = state.constants.parametric.endorsers_per_block in
-      if (not state.await_endorsements) || nb_arrived_endorsements = endorsers_per_block then
-        return_some !operations
-      else
-        next_baking_delay state priority >>=? fun next_slot_delay ->
-        let hard_delay = Int64.div next_slot_delay 2L in
-        (* The time limit is defined as 1/2 of the next baking slot's time *)
-        let limit_date = Time.Protocol.add timestamp hard_delay in
-        (* Time limits :
-           - We expect all of the endorsements until 1/3 of the time limit has passed ;
-           - We expect 2/3 of the endorsements until 2/3 of the time limit has passed ;
-           - We expect 1/3 of the endorsements until the time limit has passed ;
-           - We bake with what we have when the time limit has been reached.
-        *)
-        let limits =
-          [ (Time.Protocol.add timestamp (Int64.div hard_delay 3L), endorsers_per_block) ;
-            (Time.Protocol.add timestamp (Int64.div (Int64.mul hard_delay 2L) 3L), 2 * endorsers_per_block / 3) ;
-            (limit_date, endorsers_per_block / 3) ]
-        in
+      next_baking_delay state priority >>=? fun next_slot_delay ->
+      let hard_delay = Int64.div next_slot_delay 2L in
+      (* The time limit is defined as 1/2 of the next baking slot's time *)
+      let limit_date = Time.Protocol.add timestamp hard_delay in
+      (* Time limits :
+         - We expect all of the endorsements until 1/3 of the time limit has passed ;
+         - We expect 2/3 of the endorsements until 2/3 of the time limit has passed ;
+         - We expect 1/3 of the endorsements until the time limit has passed ;
+         - We bake with what we have when the time limit has been reached.
+      *)
+      let limits =
+        [ (Time.Protocol.add timestamp (Int64.div hard_delay 3L), endorsers_per_block) ;
+          (Time.Protocol.add timestamp (Int64.div (Int64.mul hard_delay 2L) 3L), 2 * endorsers_per_block / 3) ;
+          (limit_date, endorsers_per_block / 3) ]
+      in
+      let timespan =
         let timespan =
-          let timespan =
-            Ptime.diff
-              (Time.System.of_protocol_exn limit_date) (Systime_os.now ()) in
-          if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
-            timespan
-          else
-            Ptime.Span.zero in
-        lwt_log_notice Tag.DSL.(fun f ->
-            f "Waiting until %a (%a) for more endorsements in the \
-               mempool (%a/%a arrived)."
-            -% t event "waiting_operations"
-            -% a timestamp_tag (Time.System.of_protocol_exn limit_date)
-            -% a timespan_tag timespan
-            -% a op_count nb_arrived_endorsements
-            -% a op_count endorsers_per_block
-          ) >>= fun () ->
-        Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
-        let timeout = match Client_baking_scheduling.sleep_until limit_date with
-          | None -> Lwt.return_unit
-          | Some timeout -> timeout in
-        let last_get_event = ref None in
-        let get_event () =
-          match !last_get_event with
-          | None ->
-              let t = Lwt_stream.get operation_stream in
-              last_get_event := Some t ;
-              t
-          | Some t -> t in
-        let rec loop nb_arrived_endorsements limits =
-          Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
-                       (get_event () >|= fun e -> `Event e) ; ]
-          >>= function
-          | `Event (Some op_list) -> begin
-              last_get_event := None ;
-              operations := op_list @ !operations ;
-              count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
-              let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
-              let limits =
-                filter_limits
-                  (Time.System.to_protocol (Systime_os.now ()))
-                  limits in
-              let required =
-                match limits with
-                | [] -> 0 (* If we are late, we do not require endorsements *)
-                | (_time, required) :: _ -> required in
-              let enough = nb_arrived_endorsements >= required in
-              if enough then
-                let remaining_ops =
-                  List.flatten (Lwt_stream.get_available operation_stream) in
-                let filtered_ops =
-                  filter_outdated_endorsements head.level (remaining_ops @ !operations) in
-                return_some filtered_ops
-              else
-                loop nb_arrived_endorsements limits
-            end
-          | `Timeout -> return_some !operations
-          | `Event None ->
-              (* New head received. Should not happen : let the
-                 caller handle this case. *)
-              return_none
-        in
-        loop nb_arrived_endorsements limits
+          Ptime.diff
+            (Time.System.of_protocol_exn limit_date) (Systime_os.now ()) in
+        if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
+          timespan
+        else
+          Ptime.Span.zero in
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Waiting until %a (%a) for more endorsements in the \
+             mempool (%a/%a arrived)."
+          -% t event "waiting_operations"
+          -% a timestamp_tag (Time.System.of_protocol_exn limit_date)
+          -% a timespan_tag timespan
+          -% a op_count nb_arrived_endorsements
+          -% a op_count endorsers_per_block
+        ) >>= fun () ->
+      Shell_services.Mempool.request_operations cctxt ~chain () >>=? fun () ->
+      let timeout = match Client_baking_scheduling.sleep_until limit_date with
+        | None -> Lwt.return_unit
+        | Some timeout -> timeout in
+      let last_get_event = ref None in
+      let get_event () =
+        match !last_get_event with
+        | None ->
+            let t = Lwt_stream.get operation_stream in
+            last_get_event := Some t ;
+            t
+        | Some t -> t in
+      let rec loop nb_arrived_endorsements limits =
+        Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
+                     (get_event () >|= fun e -> `Event e) ; ]
+        >>= function
+        | `Event (Some op_list) -> begin
+            last_get_event := None ;
+            operations := op_list @ !operations ;
+            count_slots_endorsements inc slot op_list >>= fun new_endorsements ->
+            let nb_arrived_endorsements = nb_arrived_endorsements + new_endorsements in
+            let limits =
+              filter_limits
+                (Time.System.to_protocol (Systime_os.now ()))
+                limits in
+            let required =
+              match limits with
+              | [] -> 0 (* If we are late, we do not require endorsements *)
+              | (_time, required) :: _ -> required in
+            let enough = nb_arrived_endorsements >= required in
+            if enough then
+              let remaining_ops =
+                List.flatten (Lwt_stream.get_available operation_stream) in
+              let filtered_ops =
+                filter_outdated_endorsements head.level (remaining_ops @ !operations) in
+              return_some filtered_ops
+            else
+              loop nb_arrived_endorsements limits
+          end
+        | `Timeout -> return_some !operations
+        | `Event None ->
+            (* New head received. Should not happen : let the
+               caller handle this case. *)
+            return_none
+      in
+      loop nb_arrived_endorsements limits
 
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
@@ -1214,7 +1207,6 @@ let create
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
-    ?await_endorsements
     ?max_priority
     ~chain
     ~context_path
@@ -1228,7 +1220,6 @@ let create
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     let state = create_state
         ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-        ?await_endorsements
         context_path index nonces_location delegates constants in
     return state
   in
