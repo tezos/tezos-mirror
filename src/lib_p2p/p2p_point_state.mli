@@ -52,6 +52,7 @@ module Info : sig
     factor: float ;
     initial_delay: Time.System.Span.t ;
     disconnection_delay: Time.System.Span.t ;
+    increase_cap: Time.System.Span.t ;
   }
 
   val create :

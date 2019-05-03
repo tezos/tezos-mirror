@@ -50,6 +50,7 @@ module Info = struct
     factor: float ;
     initial_delay: Time.System.Span.t ;
     disconnection_delay: Time.System.Span.t ;
+    increase_cap: Time.System.Span.t ;
   }
 
   type 'data t = {
@@ -77,6 +78,7 @@ module Info = struct
     factor = 1.2 ;
     initial_delay = Ptime.Span.of_int_s 1 ;
     disconnection_delay = Ptime.Span.of_int_s 60 ;
+    increase_cap = Ptime.Span.of_int_s 172800 (* 2 days *) ;
   }
 
   let create
@@ -194,9 +196,16 @@ let set_greylisted timestamp point_info =
          timestamp
          point_info.Info.greylisting_delay) ;
   point_info.greylisting_delay <-
-    Time.System.Span.multiply_exn
-      point_info.greylisting.factor
-      point_info.greylisting_delay
+    begin
+      let new_delay =
+        Time.System.Span.multiply_exn
+          point_info.greylisting.factor
+          point_info.greylisting_delay in
+      if Ptime.Span.compare point_info.greylisting.increase_cap new_delay > 0 then
+        new_delay
+      else
+        point_info.greylisting.increase_cap
+    end
 
 let set_disconnected
     ?(timestamp = Systime_os.now ()) ?(requested = false) point_info =
