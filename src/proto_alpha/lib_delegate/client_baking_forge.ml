@@ -59,7 +59,8 @@ let default_minimal_nanotez_per_gas_unit = Z.of_int 100
 
 let default_minimal_nanotez_per_byte = Z.of_int 1000
 
-let default_await_endorsements = true
+type slot =
+  Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
 
 type state = {
   context_path : string;
@@ -76,20 +77,14 @@ type state = {
   minimal_nanotez_per_gas_unit : Z.t;
   (* Minimal operation fee per byte required to include an operation in a block *)
   minimal_nanotez_per_byte : Z.t;
-  (* Await endorsements *)
-  await_endorsements : bool;
   (* truly mutable *)
-  mutable best_slot :
-    ( Time.Protocol.t
-    * (Client_baking_blocks.block_info * int * public_key_hash) )
-    option;
+  mutable best_slot : slot option;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements) context_path index
-    nonces_location delegates constants =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) context_path
+    index nonces_location delegates constants =
   {
     context_path;
     index;
@@ -99,7 +94,6 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_fees;
     minimal_nanotez_per_gas_unit;
     minimal_nanotez_per_byte;
-    await_endorsements;
     best_slot = None;
   }
 
@@ -160,6 +154,25 @@ let assert_valid_operations_hash shell_header operations =
        operations_hash
        shell_header.Tezos_base.Block_header.operations_hash)
     (failure "Client_baking_forge.inject_block: inconsistent header.")
+
+let compute_endorsing_power cctxt ~chain ~block operations =
+  Shell_services.Chain.chain_id cctxt ~chain ()
+  >>=? fun chain_id ->
+  fold_left_s
+    (fun sum -> function
+      | {
+          Alpha_context.protocol_data =
+            Operation_data {contents = Single (Endorsement _); _};
+          _;
+        } as op ->
+          Delegate_services.Endorsing_power.get
+            cctxt
+            (chain, block)
+            op
+            chain_id
+          >>=? fun power -> return (sum + power) | _ -> return sum)
+    0
+    operations
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     ~priority ~delegate_pkh ~delegate_sk ~level operations =
@@ -448,20 +461,15 @@ let all_ops_valid (results : error Preapply_result.t list) =
       && is_empty result.branch_delayed)
     results
 
-let decode_priority cctxt chain block = function
+let decode_priority cctxt chain block ~priority ~endorsing_power =
+  match priority with
   | `Set priority ->
-      Alpha_services.Delegate.Baking_rights.get
+      Alpha_services.Delegate.Minimal_valid_time.get
         cctxt
-        ~all:true
-        ~max_priority:(priority + 1)
         (chain, block)
-      >>=? fun rights ->
-      let time =
-        Option.apply
-          ~f:(fun r -> r.Alpha_services.Delegate.Baking_rights.timestamp)
-          (List.nth_opt rights priority)
-      in
-      return (priority, time)
+        priority
+        endorsing_power
+      >>=? fun minimal_timestamp -> return (priority, minimal_timestamp)
   | `Auto (src_pkh, max_priority) -> (
       Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
@@ -473,36 +481,36 @@ let decode_priority cctxt chain block = function
         (chain, block)
       >>=? fun possibilities ->
       try
-        let {
-          Alpha_services.Delegate.Baking_rights.priority = prio;
-          timestamp = time;
-          _;
-        } =
+        let {Alpha_services.Delegate.Baking_rights.priority = prio; _} =
           List.find
             (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
             possibilities
         in
-        return (prio, time)
+        Alpha_services.Delegate.Minimal_valid_time.get
+          cctxt
+          (chain, block)
+          prio
+          endorsing_power
+        >>=? fun minimal_timestamp -> return (prio, minimal_timestamp)
       with Not_found ->
         failwith "No slot found at level %a" Raw_level.pp level )
 
-let unopt_timestamp timestamp minimal_timestamp =
-  match (timestamp, minimal_timestamp) with
-  | (None, None) ->
-      return (Time.System.to_protocol (Systime_os.now ()))
-  | (None, Some timestamp) ->
-      return timestamp
-  | (Some timestamp, None) ->
-      return timestamp
-  | (Some timestamp, Some minimal_timestamp) ->
-      if timestamp < minimal_timestamp then
-        failwith
-          "Proposed timestamp %a is earlier than minimal timestamp %a"
-          Time.Protocol.pp_hum
-          timestamp
-          Time.Protocol.pp_hum
-          minimal_timestamp
-      else return timestamp
+let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
+  let timestamp =
+    match timestamp with
+    | None ->
+        minimal_timestamp
+    | Some timestamp ->
+        timestamp
+  in
+  if (not force) && timestamp < minimal_timestamp then
+    failwith
+      "Proposed timestamp %a is earlier than minimal timestamp %a"
+      Time.Protocol.pp_hum
+      timestamp
+      Time.Protocol.pp_hum
+      minimal_timestamp
+  else return timestamp
 
 let merge_preapps (old : error Preapply_result.t)
     (neu : error Preapply_result.t) =
@@ -544,17 +552,25 @@ let error_of_op (result : error Preapply_result.t) op =
              (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
       with Not_found -> None ) )
 
-let filter_and_apply_operations state block_info ~timestamp ?protocol_data
+let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
+    ?protocol_data
     ((operations : packed_operation list list), overflowing_operations) =
+  (* Retrieve the minimal valid time for when the block can be baked with 0 endorsements *)
+  Delegate_services.Minimal_valid_time.get cctxt (chain, block) priority 0
+  >>=? fun min_valid_timestamp ->
   let open Client_baking_simulator in
   lwt_debug
     Tag.DSL.(
       fun f ->
-        f "Starting client-side validation %a"
+        f "starting client-side validation after %a"
         -% t event "baking_local_validation_start"
         -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash)
   >>= fun () ->
-  begin_construction ~timestamp ?protocol_data state.index block_info
+  begin_construction
+    ~timestamp:min_valid_timestamp
+    ?protocol_data
+    state.index
+    block_info
   >>= (function
         | Ok inc ->
             return inc
@@ -574,7 +590,11 @@ let filter_and_apply_operations state block_info ~timestamp ?protocol_data
             Client_baking_simulator.load_context
               ~context_path:state.context_path
             >>= fun index ->
-            begin_construction ~timestamp ?protocol_data index block_info
+            begin_construction
+              ~timestamp:min_valid_timestamp
+              ?protocol_data
+              index
+              block_info
             >>=? fun inc ->
             state.index <- index ;
             return inc)
@@ -612,38 +632,24 @@ let filter_and_apply_operations state block_info ~timestamp ?protocol_data
       (inc, [])
       ops
   in
-  (* Invalid endorsements are detected during block finalization *)
-  let is_valid_endorsement inc endorsement =
-    validate_operation inc endorsement
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some inc' -> (
-        finalize_construction inc'
-        >>= function
-        | Ok _ -> Lwt.return_some endorsement | Error _ -> Lwt.return_none )
-  in
-  filter_valid_operations initial_inc votes
+  (* First pass : we filter out invalid operations by applying them in the correct order *)
+  filter_valid_operations initial_inc endorsements
+  >>= fun (inc, endorsements) ->
+  filter_valid_operations inc votes
   >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous
-  >>= fun (inc, anonymous) ->
+  >>= fun (manager_inc, anonymous) ->
   (* Retrieve the correct index order *)
   let managers = List.sort Protocol.compare_operations managers in
   let overflowing_operations =
     List.sort Protocol.compare_operations overflowing_operations
   in
-  filter_valid_operations inc (managers @ overflowing_operations)
+  filter_valid_operations manager_inc (managers @ overflowing_operations)
   >>= fun (inc, managers) ->
-  (* Gives a chance to the endorser to fund their deposit in the current block *)
-  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements
-  >>= fun endorsements ->
   finalize_construction inc
   >>=? fun _ ->
   let quota : Environment.Updater.quota list = Main.validation_passes in
-  let {Constants.endorsers_per_block; hard_gas_limit_per_block; _} =
-    state.constants.parametric
-  in
-  let endorsements = List.sub (List.rev endorsements) endorsers_per_block in
+  let {Constants.hard_gas_limit_per_block; _} = state.constants.parametric in
   let votes =
     retain_operations_up_to_quota (List.rev votes) (List.nth quota votes_index)
   in
@@ -652,23 +658,6 @@ let filter_and_apply_operations state block_info ~timestamp ?protocol_data
       (List.rev anonymous)
       (List.nth quota anonymous_index)
   in
-  let is_evidence = function
-    | {
-        protocol_data =
-          Operation_data {contents = Single (Double_baking_evidence _); _};
-        _;
-      } ->
-        true
-    | {
-        protocol_data =
-          Operation_data {contents = Single (Double_endorsement_evidence _); _};
-        _;
-      } ->
-        true
-    | _ ->
-        false
-  in
-  let (evidences, anonymous) = List.partition is_evidence anonymous in
   trim_manager_operations
     ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block
@@ -678,37 +667,43 @@ let filter_and_apply_operations state block_info ~timestamp ?protocol_data
   let accepted_managers =
     List.sort Protocol.compare_operations accepted_managers
   in
-  (* Make sure we only keep valid operations *)
-  filter_valid_operations initial_inc votes
-  >>= fun (inc, votes) ->
-  filter_valid_operations inc anonymous
-  >>= fun (inc, anonymous) ->
-  filter_valid_operations inc accepted_managers
-  >>= fun (inc, accepted_managers) ->
-  Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements
-  >>= fun endorsements ->
-  (* Endorsements won't fail now *)
+  (* Second pass : make sure we only keep valid operations *)
+  filter_valid_operations manager_inc accepted_managers
+  >>= fun (_, accepted_managers) ->
+  (* Put the operations back in order *)
+  let operations =
+    List.map List.rev [endorsements; votes; anonymous; accepted_managers]
+  in
+  (* Construct a context with the valid operations and a correct timestamp *)
+  compute_endorsing_power cctxt ~chain ~block endorsements
+  >>=? fun current_endorsing_power ->
+  Delegate_services.Minimal_valid_time.get
+    cctxt
+    (chain, block)
+    priority
+    current_endorsing_power
+  >>=? fun expected_validity ->
+  (* Finally, we construct a block with the minimal possible timestamp
+     given the endorsing power *)
+  begin_construction
+    ~timestamp:expected_validity
+    ?protocol_data
+    state.index
+    block_info
+  >>=? fun inc ->
   fold_left_s
     (fun inc op -> add_operation inc op >>=? fun (inc, _receipt) -> return inc)
     inc
-    endorsements
-  >>=? fun inc ->
-  (* Endorsement and double baking/endorsement evidence do not commute:
-     we apply denunciation operations after endorsements. *)
-  filter_valid_operations inc evidences
-  >>= fun (final_inc, evidences) ->
-  let operations =
-    List.map
-      List.rev
-      [endorsements; votes; anonymous @ evidences; accepted_managers]
-  in
+    (List.flatten operations)
+  >>=? fun final_inc ->
   finalize_construction final_inc
   >>=? fun (validation_result, metadata) ->
-  return (final_inc, (validation_result, metadata), operations)
+  return
+    (final_inc, (validation_result, metadata), operations, expected_validity)
 
 (* Build the block header : mimics node prevalidation *)
-let finalize_block_header pred_shell_header ~timestamp validation_result
-    operations =
+let finalize_block_header shell_header ~timestamp validation_result operations
+    =
   let {Tezos_protocol_environment.context; fitness; message; _} =
     validation_result
   in
@@ -737,8 +732,8 @@ let finalize_block_header pred_shell_header ~timestamp validation_result
   let header =
     Tezos_base.Block_header.
       {
-        pred_shell_header with
-        level = Int32.succ pred_shell_header.level;
+        shell_header with
+        level = Int32.succ shell_header.level;
         validation_passes;
         operations_hash;
         fitness;
@@ -750,16 +745,17 @@ let finalize_block_header pred_shell_header ~timestamp validation_result
 let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
-    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(await_endorsements = default_await_endorsements) ?timestamp ?mempool
-    ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh ~delegate_sk
-    block =
+    ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
+    ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh
+    ~delegate_sk block =
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations
   >>=? fun operations_arg ->
-  decode_priority cctxt chain block priority
+  compute_endorsing_power cctxt ~chain ~block operations_arg
+  >>=? fun endorsing_power ->
+  decode_priority cctxt chain block ~priority ~endorsing_power
   >>=? fun (priority, minimal_timestamp) ->
-  unopt_timestamp timestamp minimal_timestamp
+  unopt_timestamp ?force timestamp minimal_timestamp
   >>=? fun timestamp ->
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
@@ -839,19 +835,24 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           constants;
           delegates = [];
           best_slot = None;
-          await_endorsements;
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
         }
       in
       filter_and_apply_operations
-        ~timestamp
-        ~protocol_data
+        cctxt
         state
+        ~chain
+        ~block
+        ~priority
+        ~protocol_data
         bi
         (operations, overflowing_ops)
-      >>=? fun (final_context, (validation_result, _), operations) ->
+      >>=? fun ( final_context,
+                 (validation_result, _),
+                 operations,
+                 min_valid_timestamp ) ->
       let current_protocol = bi.next_protocol in
       let context =
         Shell_context.unwrap_disk_context validation_result.context
@@ -861,16 +862,16 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       if Protocol_hash.equal current_protocol next_protocol then
         finalize_block_header
           final_context.header
-          ~timestamp
+          ~timestamp:min_valid_timestamp
           validation_result
           operations
         >>= function
-        | Error [Forking_test_chain] ->
+        | Error (Forking_test_chain :: _) ->
             Alpha_block_services.Helpers.Preapply.block
               cctxt
               ~chain
               ~block
-              ~timestamp
+              ~timestamp:min_valid_timestamp
               ~sort
               ~protocol_data
               operations
@@ -891,7 +892,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           cctxt
           ~chain
           ~block
-          ~timestamp
+          ~timestamp:min_valid_timestamp
           ~sort
           ~protocol_data
           operations
@@ -905,8 +906,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     Tag.DSL.(
       fun f ->
         f
-          "Found %d valid operations (%d refused) for timestamp %a. Computed \
-           fitness %a."
+          "found %d valid operations (%d refused) for timestamp %a (fitness %a)"
         -% t event "found_valid_operations"
         -% s valid_ops valid_op_count
         -% s refused_ops (total_op_count - valid_op_count)
@@ -920,7 +920,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       lwt_log_error
         Tag.DSL.(
           fun f ->
-            f "@[Error on raw_level conversion : %a@]"
+            f "Error on raw_level conversion : %a"
             -% t event "block_injection_failed"
             -% a errs_tag errs)
       >>= fun () -> Lwt.return err )
@@ -952,8 +952,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       >>= fun () -> Lwt.return error
 
 let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
-    seed_nonce_hash operations ((timestamp, (bi, priority, delegate)) as _slot)
-    =
+    ~timestamp seed_nonce_hash operations
+    ((_, (bi, priority, delegate)) as _slot) =
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_block_services.Helpers.Preapply.block
     cctxt
@@ -994,64 +994,11 @@ let filter_outdated_endorsements expected_level ops =
           true)
     ops
 
-let next_baking_delay state priority =
-  let {Constants.parametric = {time_between_blocks; _}; _} = state.constants in
-  let rec associated_period durations prio =
-    if List.length durations = 0 then
-      (* Mimic [Baking.minimal_time] behaviour *)
-      associated_period [Period.one_minute] prio
-    else
-      match durations with
-      | [] ->
-          assert false
-      | [last] ->
-          Period.to_seconds last
-      | first :: durations ->
-          if prio = 0 then Period.to_seconds first
-          else associated_period durations (prio - 1)
-  in
-  let span = associated_period time_between_blocks (priority + 1) in
-  return span
-
-let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate))
-    operations =
-  Lwt_list.fold_left_s
-    (fun acc -> function
-      | {
-          Alpha_context.protocol_data =
-            Operation_data {contents = Single (Endorsement {level; _}); _};
-          _;
-        } as op
-        when Raw_level.(level = head.Client_baking_blocks.level) -> (
-          let open Apply_results in
-          Client_baking_simulator.add_operation inc op
-          >>= function
-          | Ok
-              ( _inc,
-                Operation_metadata
-                  {contents = Single_result (Endorsement_result {slots; _})} )
-            ->
-              Lwt.return (acc + List.length slots)
-          | Error _ | _ ->
-              (* We do not handle errors here *)
-              Lwt.return acc ) | _ -> Lwt.return acc)
-    0
-    operations
-
-let rec filter_limits tnow limits =
-  match limits with
-  | [] ->
-      []
-  | (time, _) :: _ as limits when Time.Protocol.(tnow < time) ->
-      limits
-  | _ :: limits ->
-      filter_limits tnow limits
-
 (** [fetch_operations] retrieve the operations present in the
     mempool. If no endorsements are present in the initial set, it
-    waits until [state.max_waiting_time] seconds after its injection range start date. *)
-let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
-    ((timestamp, (head, priority, _delegate)) as slot) =
+    waits until it's able to build a valid block. *)
+let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
+    (_, (head, priority, _delegate)) =
   Alpha_block_services.Mempool.monitor_operations
     cctxt
     ~chain
@@ -1065,143 +1012,81 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
   Lwt_stream.get operation_stream
   >>= function
   | None ->
-      (* New head received : not supposed to happen. *)
+      (* New head received : aborting block construction *)
       return_none
   | Some current_mempool ->
+      let block = `Hash (head.Client_baking_blocks.hash, 0) in
       let operations =
-        ref
-          (filter_outdated_endorsements
-             head.Client_baking_blocks.level
-             current_mempool)
+        ref (filter_outdated_endorsements head.level current_mempool)
       in
-      Client_baking_simulator.begin_construction ~timestamp state.index head
-      >>=? fun inc ->
-      count_slots_endorsements inc slot !operations
-      >>= fun nb_arrived_endorsements ->
-      (* If 100% of the endorsements arrived, we don't need to wait *)
-      let endorsers_per_block =
-        state.constants.parametric.endorsers_per_block
+      (* Actively request our peers' for missing operations *)
+      Shell_services.Mempool.request_operations cctxt ~chain ()
+      >>=? fun () ->
+      let compute_minimal_valid_time () =
+        compute_endorsing_power cctxt ~chain ~block !operations
+        >>=? fun current_endorsing_power ->
+        Delegate_services.Minimal_valid_time.get
+          cctxt
+          (chain, block)
+          priority
+          current_endorsing_power
       in
-      if
-        (not state.await_endorsements)
-        || nb_arrived_endorsements = endorsers_per_block
-      then return_some !operations
-      else
-        next_baking_delay state priority
-        >>=? fun next_slot_delay ->
-        let hard_delay = Int64.div next_slot_delay 2L in
-        (* The time limit is defined as 1/2 of the next baking slot's time *)
-        let limit_date = Time.Protocol.add timestamp hard_delay in
-        (* Time limits :
-           - We expect all of the endorsements until 1/3 of the time limit has passed ;
-           - We expect 2/3 of the endorsements until 2/3 of the time limit has passed ;
-           - We expect 1/3 of the endorsements until the time limit has passed ;
-           - We bake with what we have when the time limit has been reached.
-        *)
-        let limits =
+      let compute_timeout () =
+        compute_minimal_valid_time ()
+        >>=? fun expected_validity ->
+        match Client_baking_scheduling.sleep_until expected_validity with
+        | None ->
+            return_unit
+        | Some timeout ->
+            timeout >>= fun () -> return_unit
+      in
+      let last_get_event = ref None in
+      let get_event () =
+        match !last_get_event with
+        | None ->
+            let t = Lwt_stream.get operation_stream in
+            last_get_event := Some t ;
+            t
+        | Some t ->
+            t
+      in
+      let rec loop () =
+        Lwt.choose
           [
-            ( Time.Protocol.add timestamp (Int64.div hard_delay 3L),
-              endorsers_per_block );
-            ( Time.Protocol.add
-                timestamp
-                (Int64.div (Int64.mul hard_delay 2L) 3L),
-              2 * endorsers_per_block / 3 );
-            (limit_date, endorsers_per_block / 3);
+            (compute_timeout () >|= fun _ -> `Timeout);
+            (get_event () >|= fun e -> `Event e);
           ]
-        in
-        let timespan =
-          let timespan =
-            Ptime.diff
-              (Time.System.of_protocol_exn limit_date)
-              (Systime_os.now ())
-          in
-          if Ptime.Span.compare timespan Ptime.Span.zero > 0 then timespan
-          else Ptime.Span.zero
-        in
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f
-                "Waiting until %a (%a) for more endorsements in the mempool \
-                 (%a/%a arrived)."
-              -% t event "waiting_operations"
-              -% a timestamp_tag (Time.System.of_protocol_exn limit_date)
-              -% a timespan_tag timespan
-              -% a op_count nb_arrived_endorsements
-              -% a op_count endorsers_per_block)
-        >>= fun () ->
-        Shell_services.Mempool.request_operations cctxt ~chain ()
-        >>=? fun () ->
-        let timeout =
-          match Client_baking_scheduling.sleep_until limit_date with
-          | None ->
-              Lwt.return_unit
-          | Some timeout ->
-              timeout
-        in
-        let last_get_event = ref None in
-        let get_event () =
-          match !last_get_event with
-          | None ->
-              let t = Lwt_stream.get operation_stream in
-              last_get_event := Some t ;
-              t
-          | Some t ->
-              t
-        in
-        let rec loop nb_arrived_endorsements limits =
-          Lwt.choose
-            [
-              (timeout >|= fun () -> `Timeout);
-              (get_event () >|= fun e -> `Event e);
-            ]
-          >>= function
-          | `Event (Some op_list) ->
-              last_get_event := None ;
-              operations := op_list @ !operations ;
-              count_slots_endorsements inc slot op_list
-              >>= fun new_endorsements ->
-              let nb_arrived_endorsements =
-                nb_arrived_endorsements + new_endorsements
-              in
-              let limits =
-                filter_limits
-                  (Time.System.to_protocol (Systime_os.now ()))
-                  limits
-              in
-              let required =
-                match limits with
-                | [] ->
-                    0 (* If we are late, we do not require endorsements *)
-                | (_time, required) :: _ ->
-                    required
-              in
-              let enough = nb_arrived_endorsements >= required in
-              if enough then
-                let remaining_ops =
-                  List.flatten (Lwt_stream.get_available operation_stream)
-                in
-                let filtered_ops =
-                  filter_outdated_endorsements
-                    head.level
-                    (remaining_ops @ !operations)
-                in
-                return_some filtered_ops
-              else loop nb_arrived_endorsements limits
-          | `Timeout ->
-              return_some !operations
-          | `Event None ->
-              (* New head received. Should not happen : let the
-                 caller handle this case. *)
-              return_none
-        in
-        loop nb_arrived_endorsements limits
+        >>= function
+        | `Event (Some op_list) ->
+            last_get_event := None ;
+            let op_list = filter_outdated_endorsements head.level op_list in
+            operations := op_list @ !operations ;
+            loop ()
+        | `Timeout ->
+            (* Retrieve the remaining operations present in the stream
+               before block construction *)
+            let remaining_operations =
+              filter_outdated_endorsements
+                head.level
+                (List.flatten (Lwt_stream.get_available operation_stream))
+            in
+            operations := remaining_operations @ !operations ;
+            compute_minimal_valid_time ()
+            >>=? fun expected_validity ->
+            return_some (!operations, expected_validity)
+        | `Event None ->
+            (* Got new head while waiting:
+               - not enough endorsements received ;
+               - late at baking *)
+            return_none
+      in
+      loop ()
 
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
     validation *)
 let build_block cctxt state seed_nonce_hash
-    ((timestamp, (bi, priority, delegate)) as slot) =
+    ((slot_timestamp, (bi, priority, delegate)) as slot) =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
@@ -1219,9 +1104,9 @@ let build_block cctxt state seed_nonce_hash
         -% a Block_hash.Logging.tag bi.hash
         -% s bake_priority_tag priority
         -% s Client_keys.Logging.tag name
-        -% a timestamp_tag (Time.System.of_protocol_exn timestamp))
+        -% a timestamp_tag (Time.System.of_protocol_exn slot_timestamp))
   >>= fun () ->
-  fetch_operations cctxt ~chain state slot
+  fetch_operations cctxt ~chain slot
   >>=? function
   | None ->
       lwt_log_notice
@@ -1232,7 +1117,7 @@ let build_block cctxt state seed_nonce_hash
                this block."
             -% t event "new_head_received")
       >>= fun () -> return_none
-  | Some operations -> (
+  | Some (operations, timestamp) -> (
       let hard_gas_limit_per_block =
         state.constants.parametric.hard_gas_limit_per_block
       in
@@ -1258,15 +1143,25 @@ let build_block cctxt state seed_nonce_hash
       in
       if Protocol_hash.(Protocol.hash <> next_version) then
         (* Let the shell validate this *)
-        shell_prevalidation cctxt ~chain ~block seed_nonce_hash operations slot
+        shell_prevalidation
+          cctxt
+          ~chain
+          ~block
+          ~timestamp
+          seed_nonce_hash
+          operations
+          slot
       else
         let protocol_data =
           forge_faked_protocol_data ~priority ~seed_nonce_hash
         in
         filter_and_apply_operations
-          ~timestamp
-          ~protocol_data
+          cctxt
           state
+          ~chain
+          ~block
+          ~priority
+          ~protocol_data
           bi
           (operations, overflowing_ops)
         >>= function
@@ -1291,10 +1186,33 @@ let build_block cctxt state seed_nonce_hash
               cctxt
               ~chain
               ~block
+              ~timestamp
               seed_nonce_hash
               operations
               slot
-        | Ok (final_context, (validation_result, _), operations) ->
+        | Ok
+            (final_context, (validation_result, _), operations, valid_timestamp)
+          ->
+            ( if
+              Time.System.(Systime_os.now () < of_protocol_exn valid_timestamp)
+            then
+              lwt_log_notice
+                Tag.DSL.(
+                  fun f ->
+                    f "[%a] not ready to inject yet, waiting until %a"
+                    -% a timestamp_tag (Systime_os.now ())
+                    -% a
+                         timestamp_tag
+                         (Time.System.of_protocol_exn valid_timestamp)
+                    -% t event "waiting_before_injection")
+              >>= fun () ->
+              match Client_baking_scheduling.sleep_until valid_timestamp with
+              | None ->
+                  Lwt.return_unit
+              | Some timeout ->
+                  timeout
+            else Lwt.return_unit )
+            >>= fun () ->
             lwt_debug
               Tag.DSL.(
                 fun f ->
@@ -1316,15 +1234,16 @@ let build_block cctxt state seed_nonce_hash
             if Protocol_hash.equal current_protocol next_protocol then
               finalize_block_header
                 final_context.header
-                ~timestamp
+                ~timestamp:valid_timestamp
                 validation_result
                 operations
               >>= function
-              | Error [Forking_test_chain] ->
+              | Error (Forking_test_chain :: _) ->
                   shell_prevalidation
                     cctxt
                     ~chain
                     ~block
+                    ~timestamp
                     seed_nonce_hash
                     operations
                     slot
@@ -1350,6 +1269,7 @@ let build_block cctxt state seed_nonce_hash
                 cctxt
                 ~chain
                 ~block
+                ~timestamp
                 seed_nonce_hash
                 operations
                 slot )
@@ -1589,8 +1509,8 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
     starts individual baking operations when baking-slots are available to any of
     the [delegates] *)
 let create (cctxt : #Protocol_client_context.full) ?minimal_fees
-    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?await_endorsements
-    ?max_priority ~chain ~context_path delegates block_stream =
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
+    ~chain ~context_path delegates block_stream =
   let state_maker bi =
     Alpha_services.Constants.all cctxt (chain, `Head 0)
     >>=? fun constants ->
@@ -1607,7 +1527,6 @@ let create (cctxt : #Protocol_client_context.full) ?minimal_fees
         ?minimal_fees
         ?minimal_nanotez_per_gas_unit
         ?minimal_nanotez_per_byte
-        ?await_endorsements
         context_path
         index
         nonces_location

@@ -83,12 +83,11 @@ let delegate_commands () =
     command
       ~group
       ~desc:"Forge and inject block using the delegate rights."
-      (args9
+      (args8
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
-         await_endorsements_arg
          force_switch
          minimal_timestamp_switch
          mempool_arg
@@ -102,7 +101,6 @@ let delegate_commands () =
              minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
-             await_endorsements,
              force,
              minimal_timestamp,
              mempool,
@@ -114,7 +112,6 @@ let delegate_commands () =
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
-          ~await_endorsements
           ~force
           ?max_priority
           ~minimal_timestamp
@@ -244,13 +241,12 @@ let baker_commands () =
     command
       ~group
       ~desc:"Launch the baker daemon."
-      (args6
+      (args5
          pidfile_arg
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
-         minimal_nanotez_per_byte_arg
-         no_waiting_for_endorsements_arg)
+         minimal_nanotez_per_byte_arg)
       ( prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"context_path"
@@ -261,8 +257,7 @@ let baker_commands () =
              max_priority,
              minimal_fees,
              minimal_nanotez_per_gas_unit,
-             minimal_nanotez_per_byte,
-             no_waiting_for_endorsements )
+             minimal_nanotez_per_byte )
            node_path
            delegates
            cctxt ->
@@ -279,9 +274,9 @@ let baker_commands () =
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
           ?max_priority
-          ~await_endorsements:(not no_waiting_for_endorsements)
           ~context_path:(Filename.concat node_path "context")
-          (List.map snd delegates)) ]
+          (List.map snd delegates));
+  ]
 
 let endorser_commands () =
   let open Clic in
