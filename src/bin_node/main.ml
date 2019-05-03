@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+let () =
+  let log s = Node_logging.fatal_error "%s" s in
+  Lwt_exit.exit_on ~log Sys.sigint;
+  Lwt_exit.exit_on ~log Sys.sigterm
 
 let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then begin

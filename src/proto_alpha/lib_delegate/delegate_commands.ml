@@ -177,15 +177,6 @@ let delegate_commands () =
 
   ]
 
-let init_signal () =
-  let handler name id =
-    try
-      Format.eprintf "Received the %s signal, triggering shutdown.@." name ;
-      Lwt_exit.exit id
-    with _ -> () in
-  ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
-  ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
-
 let baker_commands () =
   let open Clic in
   let group =
@@ -210,20 +201,20 @@ let baker_commands () =
       (fun (pidfile, max_priority, minimal_fees, minimal_nanotez_per_gas_unit,
             minimal_nanotez_per_byte, no_waiting_for_endorsements)
         node_path delegates cctxt ->
-        init_signal () ;
-        may_lock_pidfile pidfile >>=? fun () ->
-        Tezos_signer_backends.Encrypted.decrypt_list
-          cctxt (List.map fst delegates) >>=? fun () ->
-        Client_daemon.Baker.run cctxt
-          ~chain:cctxt#chain
-          ~minimal_fees
-          ~minimal_nanotez_per_gas_unit
-          ~minimal_nanotez_per_byte
-          ?max_priority
-          ~await_endorsements:(not no_waiting_for_endorsements)
-          ~context_path:(Filename.concat node_path "context")
-          (List.map snd delegates)
-      )
+        Lwt_exit.wrap_promise begin
+          may_lock_pidfile pidfile >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_list
+            cctxt (List.map fst delegates) >>=? fun () ->
+          Client_daemon.Baker.run cctxt
+            ~chain:cctxt#chain
+            ~minimal_fees
+            ~minimal_nanotez_per_gas_unit
+            ~minimal_nanotez_per_byte
+            ?max_priority
+            ~await_endorsements:(not no_waiting_for_endorsements)
+            ~context_path:(Filename.concat node_path "context")
+            (List.map snd delegates)
+        end)
   ]
 
 let endorser_commands () =
@@ -238,23 +229,23 @@ let endorser_commands () =
       (prefixes [ "run" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (pidfile, endorsement_delay) delegates cctxt ->
-         init_signal () ;
-         may_lock_pidfile pidfile >>=? fun () ->
-         Tezos_signer_backends.Encrypted.decrypt_list
-           cctxt (List.map fst delegates) >>=? fun () ->
-         let delegates = List.map snd delegates in
-         let delegates_no_duplicates = Signature.Public_key_hash.Set.
-                                         (delegates |> of_list |> elements) in
-         begin if List.length delegates <> List.length delegates_no_duplicates then
-             cctxt#message "Warning: the list of public key hash aliases contains \
-                            duplicate hashes, which are ignored"
-           else Lwt.return ()
-         end >>= fun () ->
-         Client_daemon.Endorser.run cctxt
-           ~chain:cctxt#chain
-           ~delay:endorsement_delay
-           delegates_no_duplicates
-      )
+         Lwt_exit.wrap_promise begin
+           may_lock_pidfile pidfile >>=? fun () ->
+           Tezos_signer_backends.Encrypted.decrypt_list
+             cctxt (List.map fst delegates) >>=? fun () ->
+           let delegates = List.map snd delegates in
+           let delegates_no_duplicates = Signature.Public_key_hash.Set.
+                                           (delegates |> of_list |> elements) in
+           begin if List.length delegates <> List.length delegates_no_duplicates then
+               cctxt#message "Warning: the list of public key hash aliases contains \
+                              duplicate hashes, which are ignored"
+             else Lwt.return ()
+           end >>= fun () ->
+           Client_daemon.Endorser.run cctxt
+             ~chain:cctxt#chain
+             ~delay:endorsement_delay
+             delegates_no_duplicates
+         end)
   ]
 
 let accuser_commands () =
@@ -269,7 +260,8 @@ let accuser_commands () =
       (prefixes [ "run" ]
        @@ stop)
       (fun (pidfile, preserved_levels) cctxt ->
-         init_signal () ;
-         may_lock_pidfile pidfile >>=? fun () ->
-         Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt) ;
+         Lwt_exit.wrap_promise begin
+           may_lock_pidfile pidfile >>=? fun () ->
+           Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt
+         end) ;
   ]

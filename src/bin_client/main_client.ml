@@ -24,6 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Log = Internal_event.Legacy_logging.Make(struct
+    let name = "client.main"
+  end)
+
+let () =
+  let log s = Log.fatal_error "%s" s in
+  Lwt_exit.exit_on ~log Sys.sigint;
+  Lwt_exit.exit_on ~log Sys.sigterm
+
 open Client_config
 
 let disable_disclaimer =
