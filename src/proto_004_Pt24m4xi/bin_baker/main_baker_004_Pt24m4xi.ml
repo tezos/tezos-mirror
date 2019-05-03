@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,15 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+module Log = Internal_event.Legacy_logging.Make(struct
+    let name = "baker.main"
+  end)
+
+let () =
+  let log s = Log.fatal_error "%s" s in
+  Lwt_exit.exit_on ~log Sys.sigint;
+  Lwt_exit.exit_on ~log Sys.sigterm
 
 let () =
   Client_commands.register Protocol.hash @@ fun _network ->

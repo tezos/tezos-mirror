@@ -61,10 +61,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet = object 
          Lwt_unix.openfile (Filename.concat base_dir "wallet_lock")
            Lwt_unix.[ O_CREAT ; O_WRONLY ] 0o644 >>= fun fd ->
          Lwt_unix.lockf fd Unix.F_LOCK 0 >>= fun () ->
-         Lwt.return (fd, (Lwt_unix.on_signal Sys.sigint
-                            (fun _s ->
-                               unlock fd ;
-                               exit 0 (* exit code? *) ))) in
+         let sighandler = Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd) in
+         Lwt.return (fd, sighandler) in
        lock () >>= fun (fd, sh) ->
        (* catch might be useless if f always uses the error monad *)
        Lwt.catch f (function e -> Lwt.return (unlock fd ; raise e)) >>= fun res ->

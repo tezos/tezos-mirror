@@ -115,8 +115,7 @@ module Endorser = struct
     Client_baking_endorsement.create cctxt
       ~delay
       delegates
-      block_stream >>=? fun () ->
-    return_unit
+      block_stream
 
 end
 
@@ -148,8 +147,7 @@ module Baker = struct
       ~chain
       ~context_path
       delegates
-      block_stream >>=? fun () ->
-    return_unit
+      block_stream
 
 end
 
@@ -165,7 +163,6 @@ module Accuser = struct
       ~next_protocols:(Some [ Protocol.hash ])
       cctxt ~chains:[ chain ] () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
-    Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
-    return_unit
+    Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream
 
 end

@@ -210,19 +210,11 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
              addrs acc)
     rpc_config.listen_addrs []
 
-let init_signal () =
-  let handler name id = try
-      fatal_error "Received the %s signal, triggering shutdown." name ;
-      Lwt_exit.exit id
-    with _ -> () in
-  ignore (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
-  ignore (Lwt_unix.on_signal Sys.sigterm (handler "TERM") : Lwt_unix.signal_handler_id)
-
 let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
-  init_signal () ;
+  (* Main loop *)
   let log_cfg =
     match verbosity with
     | None -> config.log
@@ -244,6 +236,10 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   end >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
+  Lwt_exit.wrap_promise begin
+    Lwt_utils.never_ending ()
+  end >>= fun unit_or_error ->
+  (* Clean-shutdown code *)
   Lwt_exit.termination_thread >>= fun x ->
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
@@ -251,7 +247,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Lwt_list.iter_p RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Internal_event_unix.close () >>= fun () ->
-  return_unit
+  Lwt.return unit_or_error
 
 let process sandbox verbosity checkpoint args =
   let verbosity =
