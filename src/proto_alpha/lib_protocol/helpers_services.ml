@@ -318,7 +318,7 @@ module Scripts = struct
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt ~partial:true Chain_id.zero Optimized shell.branch baker operation
+            ctxt Chain_id.zero Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 
