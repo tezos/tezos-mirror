@@ -159,6 +159,26 @@ let unparse_stack ctxt (stack, stack_ty) =
 
 module Interp_costs = Michelson_v1_gas.Cost_of
 
+let rec interp_stack_prefix_preserving_operation : type fbef bef faft aft result .
+  (fbef stack -> (faft stack * result) tzresult Lwt.t)
+  -> (fbef, faft, bef, aft) stack_prefix_preservation_witness
+  -> bef stack
+  -> (aft stack * result) tzresult Lwt.t =
+  fun f n stk ->
+    match n,stk with
+    | Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix (Prefix n))))))))))))))),
+      Item (v0, Item (v1, Item (v2, Item (v3, Item (v4, Item (v5, Item (v6, Item (v7, Item (v8, Item (v9, Item (va, Item (vb, Item (vc, Item (vd, Item (ve, Item (vf, rest)))))))))))))))) ->
+        interp_stack_prefix_preserving_operation f n rest >>=? fun (rest', result) ->
+        return (Item (v0, Item (v1, Item (v2, Item (v3, Item (v4, Item (v5, Item (v6, Item (v7, Item (v8, Item (v9, Item (va, Item (vb, Item (vc, Item (vd, Item (ve, Item (vf, rest')))))))))))))))), result)
+    | Prefix (Prefix (Prefix (Prefix n))),
+      Item (v0, Item (v1, Item (v2, Item (v3, rest)))) ->
+        interp_stack_prefix_preserving_operation f n rest >>=? fun (rest', result) ->
+        return (Item (v0, Item (v1, Item (v2, Item (v3, rest')))), result)
+    | Prefix n, Item (v, rest) ->
+        interp_stack_prefix_preserving_operation f n rest >>=? fun (rest', result) ->
+        return (Item (v, rest'), result)
+    | Rest, v -> f v
+
 let rec interp
   : type p r.
     (?log: execution_trace ref ->
@@ -847,7 +867,25 @@ let rec interp
             logged_return (Item ((t, (self, entrypoint)), rest), ctxt)
         | Amount, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.amount) >>=? fun ctxt ->
-            logged_return (Item (amount, rest), ctxt) in
+            logged_return (Item (amount, rest), ctxt)
+        | Dig (n, n'), stack ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n)) >>=? fun ctxt ->
+            interp_stack_prefix_preserving_operation (fun (Item (v, rest)) -> return (rest, v)) n' stack
+            >>=? fun (aft, x) -> logged_return (Item (x, aft), ctxt)
+        | Dug (n, n'), Item (v, rest) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n)) >>=? fun ctxt ->
+            interp_stack_prefix_preserving_operation (fun stk -> return (Item (v, stk), ())) n' rest
+            >>=? fun (aft, ()) -> logged_return (aft, ctxt)
+        | Dipn (n, n', b), stack ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n)) >>=? fun ctxt ->
+            interp_stack_prefix_preserving_operation (fun stk ->
+                step ctxt b stk >>=? fun (res, ctxt') ->
+                return (res, ctxt')) n' stack
+            >>=? fun (aft, ctxt') -> logged_return (aft, ctxt')
+        | Dropn (n, n'), stack ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n)) >>=? fun ctxt ->
+            interp_stack_prefix_preserving_operation (fun stk -> return (stk, stk)) n' stack
+            >>=? fun (_, rest) -> logged_return (rest, ctxt) in
     let stack = (Item (arg, Empty)) in
     begin match log with
       | None -> return_unit

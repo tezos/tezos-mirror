@@ -107,6 +107,7 @@ let first_error_location errs =
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
       | Invalid_constant (loc, _, _)
+      | Invalid_syntactic_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
       | Michelson_v1_primitives.Invalid_primitive_name (_, loc)) :: _ -> loc

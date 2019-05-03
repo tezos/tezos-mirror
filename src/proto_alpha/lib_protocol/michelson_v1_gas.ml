@@ -32,6 +32,10 @@ module Cost_of = struct
 
   let stack_op = step_cost 1
 
+  (* Cost of operations similar to dig which drill down the top N elements
+     of the stack without affecting them, and perform some simple operation. *)
+  let stack_n_op n = step_cost ((n + 1) / 64) (* to be customized by gas benchmarks *)
+
   let bool_binop _ _ = step_cost 1
   let bool_unop _ = step_cost 1
 
@@ -396,6 +400,10 @@ module Cost_of = struct
         | Sender -> alloc_cost 1
         | Self _ -> alloc_cost 2
         | Amount -> alloc_cost 1
+        | Dig (n,_) -> n *@ alloc_cost 1 (* _ is a unary development of n *)
+        | Dug (n,_) -> n *@ alloc_cost 1
+        | Dipn (n,_,_) -> n *@ alloc_cost 1
+        | Dropn (n,_) -> n *@ alloc_cost 1
   end
 
   module Unparse = struct

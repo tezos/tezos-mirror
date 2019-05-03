@@ -31,6 +31,7 @@ module Cost_of : sig
   val list_size : Gas.cost
   val nop : Gas.cost
   val stack_op : Gas.cost
+  val stack_n_op : int -> Gas.cost
   val bool_binop : 'a -> 'b -> Gas.cost
   val bool_unop : 'a -> Gas.cost
   val pair : Gas.cost

@@ -278,6 +278,8 @@ module Script : sig
     | I_ISNAT
     | I_CAST
     | I_RENAME
+    | I_DIG
+    | I_DUG
     | T_bool
     | T_contract
     | T_int
@@ -300,6 +302,7 @@ module Script : sig
     | T_unit
     | T_operation
     | T_address
+
 
   type location = Micheline.canonical_location
 
