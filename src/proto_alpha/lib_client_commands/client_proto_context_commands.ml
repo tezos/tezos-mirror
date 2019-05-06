@@ -534,7 +534,7 @@ let commands version () =
         | Error (Environment.Ecoproto_error Delegate_storage.Active_delegate  :: []) ->
             cctxt#message "Delegate already activated." >>= fun () ->
             return_unit
-        | Error el -> Lwt.return (Error el)
+        | Error el -> Lwt.return_error el
       end;
   ] @
   (if version = (Some `Mainnet) then [] else [

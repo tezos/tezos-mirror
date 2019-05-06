@@ -109,7 +109,7 @@ module ContractAlias = struct
                    ContractEntity.of_source s >>= function
                    | Ok v -> return (s, v)
                    | Error c_errs ->
-                       Lwt.return (Error (k_errs @ c_errs))
+                       Lwt.return_error (k_errs @ c_errs)
          end)
 
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =

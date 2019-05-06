@@ -1025,7 +1025,7 @@ let build_block
               | Error _ as errs -> Lwt.return errs
               | Ok shell_header ->
                   let raw_ops = List.map (List.map forge) operations in
-                  return (Some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash))
+                  return_some (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
             end else begin
               lwt_log_notice Tag.DSL.(fun f ->
                   f "New protocol detected: using shell validation"
