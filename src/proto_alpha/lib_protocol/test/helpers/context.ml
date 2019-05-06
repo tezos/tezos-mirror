@@ -147,6 +147,18 @@ module Vote = struct
     | None -> assert false
     | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
 
+  let get_participation_ema (b:Block.t) =
+    Environment.Context.get b.context ["votes"; "participation_ema"] >>= function
+    | None -> assert false
+    | Some bytes -> return (MBytes.get_int32 bytes 0)
+
+  let set_participation_ema (b:Block.t) ema =
+    let bytes = MBytes.make 4 '\000' in
+    MBytes.set_int32 bytes 0 ema ;
+    Environment.Context.set b.context
+      ["votes"; "participation_ema"] bytes >>= fun context ->
+    Lwt.return { b with context }
+
 end
 
 module Contract = struct

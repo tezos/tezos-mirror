@@ -56,10 +56,12 @@ module Vote : sig
   val get_voting_period_position: t -> Int32.t tzresult Lwt.t
   val get_current_period_kind: t -> Voting_period.kind tzresult Lwt.t
   val get_current_quorum: t -> Int32.t tzresult Lwt.t
+  val get_participation_ema: Block.t -> Int32.t tzresult Lwt.t
   val get_listings: t -> (Signature.Public_key_hash.t * int32) list tzresult Lwt.t
   val get_proposals: t -> Int32.t Protocol_hash.Map.t tzresult Lwt.t
   val get_current_proposal: t -> Protocol_hash.t option tzresult Lwt.t
   val get_protocol : Block.t -> Protocol_hash.t Lwt.t
+  val set_participation_ema : Block.t -> int32 -> Block.t Lwt.t
 end
 
 module Contract : sig

@@ -33,20 +33,26 @@ let ballots_equal b1 b2 =
 let ballots_pp ppf v = Alpha_context.Vote.(
     Format.fprintf ppf "{ yay = %ld ; nay = %ld ; pass = %ld" v.yay v.nay v.pass)
 
-(* constantans and ratios used in voting:
+(* constants and ratios used in voting:
    percent_mul denotes the percent multiplier
-   initial_qr is 8000 that is, 8/10 * percent_mul
-   the quorum ratio qr_num / den = 8 / 10
-   the participation ration pr_num / den = 2 / 10
-   note: we use the same denominator for both quorum and participation rate.
+   initial_participation is 7000 that is, 7/10 * percent_mul
+   the participation EMA ratio pr_ema_weight / den = 7 / 10
+   the participation ratio pr_num / den = 2 / 10
+   note: we use the same denominator for both participation EMA and participation rate.
    supermajority rate is s_num / s_den = 8 / 10 *)
 let percent_mul = 100_00
-let initial_qr = 8 * percent_mul / 10
-let qr_num = 8
+let initial_participation_num = 7
+let initial_participation = initial_participation_num * percent_mul / 10
+let pr_ema_weight = 8
 let den = 10
-let pr_num = den - qr_num
+let pr_num = den - pr_ema_weight
 let s_num = 8
 let s_den = 10
+let qr_min_num = 3
+let qr_max_num = 7
+let expected_qr_num =
+  Float.(of_int qr_min_num +.
+         of_int initial_participation_num *. (of_int qr_max_num -. of_int qr_min_num) /. of_int den)
 
 (* Protocol_hash.zero is "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i" *)
 let protos = Array.map (fun s -> Protocol_hash.of_b58check_exn s)
@@ -119,9 +125,9 @@ let test_successful_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  (* quorum starts at initial_qr *)
-  Context.Vote.get_current_quorum (B b) >>=? fun v ->
-  Assert.equal_int ~loc:__LOC__ initial_qr (Int32.to_int v) >>=? fun () ->
+  (* participation EMA starts at initial_participation *)
+  Context.Vote.get_participation_ema b >>=? fun v ->
+  Assert.equal_int ~loc:__LOC__ initial_participation (Int32.to_int v) >>=? fun () ->
 
   (* listings must be populated in proposal period *)
   Context.Vote.get_listings (B b) >>=? begin function
@@ -364,7 +370,7 @@ let test_successful_vote num_delegates () =
 
 (* given a list of active delegates,
    return the first k active delegates with which one can have quorum, that is:
-   their roll sum divided by the total roll sum is bigger than qr_num/qr_den *)
+   their roll sum divided by the total roll sum is bigger than pr_ema_weight/den *)
 let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
   fold_left_s (fun v acc -> return Int32.(add v acc))
     0l active_rolls >>=? fun active_rolls_sum ->
@@ -372,20 +378,17 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
     match delegates, rolls with
     | [], [] -> selected
     | del :: delegates, del_rolls :: rolls ->
-        if den * sum < qr_num * (Int32.to_int active_rolls_sum) then
+        if den * sum < Float.to_int (expected_qr_num *. (Int32.to_float active_rolls_sum)) then
           loop delegates rolls (sum + (Int32.to_int del_rolls)) (del :: selected)
         else selected
     | _, _ -> [] in
   return (loop active_delegates active_rolls 0 [])
 
-let get_expected_quorum ?(min_participation=0) rolls voter_rolls old_quorum =
-  (* formula to compute the updated quorum as in the whitepaper *)
-  let get_updated_quorum old_quorum participation =
-    (* if not enough participation, don't update the quorum *)
-    if participation < min_participation
-    then (Int32.to_int old_quorum)
-    else (qr_num * (Int32.to_int old_quorum) +
-          pr_num * participation) / den
+let get_expected_participation_ema rolls voter_rolls old_participation_ema =
+  (* formula to compute the updated participation_ema *)
+  let get_updated_participation_ema old_participation_ema participation =
+    (pr_ema_weight * (Int32.to_int old_participation_ema) +
+     pr_num * participation) / den
   in
   fold_left_s (fun v acc -> return Int32.(add v acc))
     0l rolls >>=? fun rolls_sum ->
@@ -393,9 +396,9 @@ let get_expected_quorum ?(min_participation=0) rolls voter_rolls old_quorum =
     0l voter_rolls >>=? fun voter_rolls_sum ->
   let participation = (Int32.to_int voter_rolls_sum) * percent_mul /
                       (Int32.to_int rolls_sum) in
-  return (get_updated_quorum old_quorum participation)
+  return (get_updated_participation_ema old_participation_ema participation)
 
-(* if not enough quorum -- get_updated_quorum < qr_num/qr_den -- in testing vote,
+(* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in testing vote,
    go back to proposal period *)
 let test_not_enough_quorum_in_testing_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
@@ -423,13 +426,13 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  Context.Vote.get_current_quorum (B b) >>=? fun initial_quorum ->
+  Context.Vote.get_participation_ema b >>=? fun initial_participation_ema ->
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b >>=? fun (delegates_p2, rolls_p2) ->
 
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 >>=? fun voters ->
-  (* take the first voter out so there cannot be quorum *)
+  (* take the first two voters out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
   get_rolls b voters_without_quorum __LOC__ >>=? fun voters_rolls_in_testing_vote ->
 
@@ -449,17 +452,17 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  (* check quorum update *)
-  get_expected_quorum rolls_p2
-    voters_rolls_in_testing_vote initial_quorum >>=? fun expected_quorum ->
-  Context.Vote.get_current_quorum (B b) >>=? fun new_quorum ->
-  (* assert the formula to calculate quorum is correct *)
-  Assert.equal_int ~loc:__LOC__ expected_quorum
-    (Int32.to_int new_quorum) >>=? fun () ->
+  (* check participation_ema update *)
+  get_expected_participation_ema rolls_p2
+    voters_rolls_in_testing_vote initial_participation_ema >>=? fun expected_participation_ema ->
+  Context.Vote.get_participation_ema b >>=? fun new_participation_ema ->
+  (* assert the formula to calculate participation_ema is correct *)
+  Assert.equal_int ~loc:__LOC__ expected_participation_ema
+    (Int32.to_int new_participation_ema) >>=? fun () ->
 
   return_unit
 
-(* if not enough quorum -- get_updated_quorum < qr_num/qr_den -- in promotion vote,
+(* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in promotion vote,
    go back to proposal period *)
 let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
@@ -518,7 +521,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
     | _ -> failwith "%s - Unexpected period kind" __LOC__
   end >>=? fun () ->
 
-  Context.Vote.get_current_quorum (B b) >>=? fun initial_quorum ->
+  Context.Vote.get_participation_ema b >>=? fun initial_participation_ema ->
   (* beginning of promotion period, denoted by _p4;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b >>=? fun (delegates_p4, rolls_p4) ->
@@ -538,14 +541,14 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   (* skip to end of promotion_vote period *)
   Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
 
-  get_expected_quorum rolls_p4 voter_rolls
-    initial_quorum >>=? fun expected_quorum ->
+  get_expected_participation_ema rolls_p4 voter_rolls
+    initial_participation_ema >>=? fun expected_participation_ema ->
 
-  Context.Vote.get_current_quorum (B b) >>=? fun new_quorum ->
+  Context.Vote.get_participation_ema b >>=? fun new_participation_ema ->
 
-  (* assert the formula to calculate quorum is correct *)
-  Assert.equal_int ~loc:__LOC__ expected_quorum
-    (Int32.to_int new_quorum) >>=? fun () ->
+  (* assert the formula to calculate participation_ema is correct *)
+  Assert.equal_int ~loc:__LOC__ expected_participation_ema
+    (Int32.to_int new_participation_ema) >>=? fun () ->
 
   (* we move back to the proposal period because not enough quorum *)
   Context.Vote.get_current_period_kind (B b) >>=? begin function
@@ -743,6 +746,116 @@ let test_no_winning_proposal num_delegates () =
 
   return_unit
 
+(** Test that for the vote to pass with maximum possible participation_ema
+    (100%), it is sufficient for the vote quorum to be equal or greater than
+    the maximum quorum cap. *)
+let test_quorum_capped_maximum num_delegates () =
+  Context.init num_delegates >>=? fun (b,delegates) ->
+  (* set the participation EMA to 100% *)
+  Context.Vote.set_participation_ema b 100_00l >>= fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = { blocks_per_voting_period ; quorum_max ; _ } ; _ } ->
+
+  (* proposal period *)
+  let open Alpha_context in
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Proposal -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  (* propose a new protocol *)
+  let protocol = Protocol_hash.zero in
+  let proposer = List.nth delegates 0 in
+  Op.proposals (B b) proposer [protocol] >>=? fun ops ->
+  Block.bake ~operations:[ops] b >>=? fun b ->
+
+  (* skip to vote_testing period
+     -1 because we already baked one block with the proposal *)
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* we moved to a testing_vote period with one proposal *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing_vote -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  (* take percentage of the delegates equal or greater than quorum_max *)
+  let minimum_to_pass =
+    Float.of_int (List.length delegates) *. Int32.(to_float quorum_max) /. 100_00.
+    |> Float.ceil
+    |> Float.to_int
+  in
+  let voters = List.take_n minimum_to_pass delegates in
+  (* all voters vote for yays; no nays, so supermajority is satisfied *)
+  map_s (fun del ->
+      Op.ballot (B b) del protocol Vote.Yay)
+    voters >>=? fun operations ->
+  Block.bake ~operations b >>=? fun b ->
+
+  (* skip to next period *)
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* expect to move to testing because we have supermajority and enough quorum *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end
+
+(** Test that for the vote to pass with minimum possible participation_ema
+    (0%), it is sufficient for the vote quorum to be equal or greater than
+    the minimum quorum cap. *)
+let test_quorum_capped_minimum num_delegates () =
+  Context.init num_delegates >>=? fun (b,delegates) ->
+  (* set the participation EMA to 0% *)
+  Context.Vote.set_participation_ema b 0l >>= fun b ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = { blocks_per_voting_period ; quorum_min ; _ } ; _ } ->
+
+  (* proposal period *)
+  let open Alpha_context in
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Proposal -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  (* propose a new protocol *)
+  let protocol = Protocol_hash.zero in
+  let proposer = List.nth delegates 0 in
+  Op.proposals (B b) proposer [protocol] >>=? fun ops ->
+  Block.bake ~operations:[ops] b >>=? fun b ->
+
+  (* skip to vote_testing period
+     -1 because we already baked one block with the proposal *)
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* we moved to a testing_vote period with one proposal *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing_vote -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  (* take percentage of the delegates equal or greater than quorum_min *)
+  let minimum_to_pass =
+    Float.of_int (List.length delegates) *. Int32.(to_float quorum_min) /. 100_00.
+    |> Float.ceil
+    |> Float.to_int
+  in
+  let voters = List.take_n minimum_to_pass delegates in
+  (* all voters vote for yays; no nays, so supermajority is satisfied *)
+  map_s (fun del ->
+      Op.ballot (B b) del protocol Vote.Yay)
+    voters >>=? fun operations ->
+  Block.bake ~operations b >>=? fun b ->
+
+  (* skip to next period *)
+  Block.bake_n ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* expect to move to testing because we have supermajority and enough quorum *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing -> return_unit
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end
+
 let tests = [
   Test.tztest "voting successful_vote" `Quick (test_successful_vote 137) ;
   Test.tztest "voting testing vote, not enough quorum" `Quick (test_not_enough_quorum_in_testing_vote 245) ;
@@ -753,4 +866,6 @@ let tests = [
   Test.tztest "voting testing vote, with supermajority" `Quick (test_supermajority_in_testing_vote true) ;
   Test.tztest "voting testing vote, without supermajority" `Quick (test_supermajority_in_testing_vote false) ;
   Test.tztest "voting proposal, no winning proposal" `Quick (test_no_winning_proposal 400) ;
+  Test.tztest "voting quorum, quorum capped maximum" `Quick (test_quorum_capped_maximum 400) ;
+  Test.tztest "voting quorum, quorum capped minimum" `Quick (test_quorum_capped_minimum 401) ;
 ]
