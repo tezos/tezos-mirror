@@ -91,6 +91,17 @@ let dispatch_policy = function
 
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
+let get_endorsing_power b =
+  fold_left_s (fun acc (op: Operation.packed) ->
+      let Operation_data data = op.protocol_data in
+      match data.contents with
+      | Single Endorsement _ ->
+          Alpha_services.Delegate.Endorsing_power.get
+            rpc_ctxt b op >>=? fun endorsement_power ->
+          return (acc + endorsement_power)
+      | _ -> return acc)
+    0 b.operations
+
 module Forge = struct
 
   type header = {
@@ -141,8 +152,12 @@ module Forge = struct
 
   let forge_header
       ?(policy = By_priority 0)
+      ?timestamp
       ?(operations = []) pred =
-    dispatch_policy policy pred >>=? fun (pkh, priority, timestamp) ->
+    dispatch_policy policy pred >>=? fun (pkh, priority, _timestamp) ->
+    Alpha_services.Delegate.Minimal_valid_time.get
+      rpc_ctxt pred priority 0 >>=? fun expected_timestamp ->
+    let timestamp = Option.unopt ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
     begin
       match Fitness_repr.to_int64 pred.header.shell.fitness with
@@ -265,6 +280,7 @@ let genesis_with_parameters parameters =
 let genesis
     ?with_commitments
     ?endorsers_per_block
+    ?initial_endorsers
     (initial_accounts : (Account.t * Tez_repr.t) list)
   =
   if initial_accounts = [] then
@@ -274,7 +290,9 @@ let genesis
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
     Option.unopt ~default:constants.endorsers_per_block endorsers_per_block in
-  let constants = { constants with endorsers_per_block } in
+  let initial_endorsers =
+    Option.unopt ~default:constants.initial_endorsers initial_endorsers in
+  let constants = { constants with endorsers_per_block ; initial_endorsers } in
 
   (* Check there is at least one roll *)
   begin try
@@ -347,7 +365,7 @@ let apply header ?(operations = []) pred =
   let hash = Block_header.hash header in
   { hash ; header ; operations ; context }
 
-let bake ?policy ?operation ?operations pred =
+let bake ?policy ?timestamp ?operation ?operations pred =
   let operations =
     match operation,operations with
     | Some op, Some ops -> Some (op::ops)
@@ -355,7 +373,7 @@ let bake ?policy ?operation ?operations pred =
     | None, Some ops -> Some ops
     | None, None -> None
   in
-  Forge.forge_header ?policy ?operations pred >>=? fun header ->
+  Forge.forge_header ?timestamp ?policy ?operations pred >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
   apply header ?operations pred
 

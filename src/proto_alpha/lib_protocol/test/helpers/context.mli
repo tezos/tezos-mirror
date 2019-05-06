@@ -49,6 +49,12 @@ val get_seed: t -> Seed.seed tzresult Lwt.t
 (** Returns all the constants of the protocol *)
 val get_constants: t -> Constants.t tzresult Lwt.t
 
+val get_minimal_valid_time: t -> priority:int -> endorsing_power:int -> Time.t tzresult Lwt.t
+
+val get_baking_reward: t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+
+val get_endorsing_reward: t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+
 module Vote : sig
   val get_ballots: t -> Vote.ballots tzresult Lwt.t
   val get_ballot_list: t -> (Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
@@ -73,7 +79,7 @@ module Contract : sig
 
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:
-      deposit, fees ot rewards. *)
+      deposit, fees or rewards. *)
   val balance: ?kind:balance_kind -> t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val counter: t -> Contract.t -> Z.t tzresult Lwt.t
@@ -105,7 +111,8 @@ end
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init:
-  ?endorsers_per_block:int ->
+  ?endorsers_per_block: int ->
   ?with_commitments: bool ->
   ?initial_balances: int64 list ->
+  ?initial_endorsers: int ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

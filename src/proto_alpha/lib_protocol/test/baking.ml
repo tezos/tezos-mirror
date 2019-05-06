@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
+open Test_utils
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =
@@ -50,6 +52,47 @@ let test_cycle () =
     (Alpha_context.Raw_level.to_int32 curr_level)
     (Int32.add (Alpha_context.Raw_level.to_int32 l) 10l)
 
+
+(** Tests the formula introduced in Emmy+ for block reward:
+    (16/(p+1)) * (0.8 + 0.2 * e / 32)
+    where p is the block priority and
+    e is the number of included endorsements *)
+let test_block_reward priority () =
+  begin match priority with
+    | 0 -> Test_tez.Tez.((of_int 128) /? Int64.of_int 10) >>?= fun min ->
+        return (Test_tez.Tez.of_int 16, min)
+    | 1 -> Test_tez.Tez.((of_int 64) /? Int64.of_int 10) >>?= fun min ->
+        return (Test_tez.Tez.of_int 8, min)
+    | 3 -> Test_tez.Tez.((of_int 32) /? Int64.of_int 10) >>?= fun min ->
+        return (Test_tez.Tez.of_int 4, min)
+    | _ -> fail (invalid_arg "prio should be 0, 1, or 3")
+  end >>=? fun (expected_reward_max_endo, expected_reward_min_endo) ->
+  let endorsers_per_block = 32 in
+  Context.init ~endorsers_per_block 32 >>=? fun (b, _) ->
+
+  Context.get_endorsers (B b) >>=? fun endorsers ->
+  fold_left_s (fun ops (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
+      let delegate = endorser.delegate in
+      Op.endorsement ~delegate:(delegate, List.hd endorser.slots) (B b) () >>=? fun op ->
+      return (Operation.pack op :: ops)
+    ) [] endorsers >>=? fun ops ->
+  Block.bake
+    ~policy:(By_priority 0)
+    ~operations:ops
+    b >>=? fun b ->
+  (* bake a block at priority 0 and 32 endorsements;
+     the reward is 16 tez *)
+  Context.get_baking_reward (B b) ~priority ~endorsing_power:32 >>=? fun baking_reward ->
+  Assert.equal_tez ~loc:__LOC__ baking_reward expected_reward_max_endo >>=? fun () ->
+  (* bake a block at priority 0 and 0 endorsements;
+     the reward is 12.8 tez *)
+  Context.get_baking_reward (B b) ~priority ~endorsing_power:0 >>=? fun baking_reward ->
+  Assert.equal_tez ~loc:__LOC__ baking_reward expected_reward_min_endo
+
+
 let tests = [
   Test.tztest "cycle" `Quick (test_cycle) ;
+  Test.tztest "block_reward for priority 0" `Quick (test_block_reward 0) ;
+  Test.tztest "block_reward for priority 1" `Quick (test_block_reward 1) ;
+  Test.tztest "block_reward for priority 3" `Quick (test_block_reward 3) ;
 ]
