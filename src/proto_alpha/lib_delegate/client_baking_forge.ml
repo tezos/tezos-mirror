@@ -1332,14 +1332,13 @@ let build_block cctxt state seed_nonce_hash
                   Lwt.return errs
               | Ok shell_header ->
                   let raw_ops = List.map (List.map forge) operations in
-                  return
-                    (Some
-                       ( bi,
-                         priority,
-                         shell_header,
-                         raw_ops,
-                         delegate,
-                         seed_nonce_hash ))
+                  return_some
+                    ( bi,
+                      priority,
+                      shell_header,
+                      raw_ops,
+                      delegate,
+                      seed_nonce_hash )
             else
               lwt_log_notice
                 Tag.DSL.(

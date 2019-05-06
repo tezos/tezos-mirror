@@ -766,7 +766,7 @@ let commands version () =
             cctxt#message "Delegate already activated."
             >>= fun () -> return_unit
         | Error el ->
-            Lwt.return (Error el));
+            Lwt.return_error el);
   ]
   @ ( if version = Some `Mainnet then []
     else
