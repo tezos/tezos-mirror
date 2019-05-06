@@ -193,8 +193,10 @@ let public_key ?interactive pk_uri =
   Signer.public_key ?interactive pk_uri
 
 let public_key_hash ?interactive pk_uri =
-  public_key ?interactive pk_uri >>=? fun pk ->
-  return (Signature.Public_key.hash pk, Some pk)
+  let scheme = Option.unopt ~default:"" (Uri.scheme pk_uri) in
+  find_signer_for_key ~scheme >>=? fun signer ->
+  let module Signer = (val signer : SIGNER) in
+  Signer.public_key_hash ?interactive pk_uri
 
 let sign cctxt ?watermark sk_uri buf =
   let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
