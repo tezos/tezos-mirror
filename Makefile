@@ -92,6 +92,10 @@ test:
 test-indent:
 	@dune build @runtest_indent
 
+test-python-lint:
+	make -C tests_python lint_all
+	make -C tests_python typecheck
+
 fix-indent:
 	@src/lib_stdlib/test-ocp-indent.sh fix
 
