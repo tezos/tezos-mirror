@@ -230,6 +230,7 @@ module Script : sig
     | I_EMPTY_SET
     | I_EQ
     | I_EXEC
+    | I_APPLY
     | I_FAILWITH
     | I_GE
     | I_GET

@@ -92,7 +92,7 @@ type ('arg, 'storage) script =
 and end_of_stack = unit
 
 and ('arg, 'ret) lambda =
-    Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
+    Lam : ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.node -> ('arg, 'ret) lambda
 
 and 'arg typed_contract = 'arg ty * address
 
@@ -344,6 +344,8 @@ and ('bef, 'aft) instr =
     ('top * 'bef, 'top * 'aft) instr
   | Exec :
       ('arg * (('arg, 'ret) lambda * 'rest), 'ret * 'rest) instr
+  | Apply : 'arg ty ->
+      ('arg * (('arg * 'remaining, 'ret) lambda * 'rest), ('remaining, 'ret) lambda * 'rest) instr
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
   | Failwith :

@@ -71,6 +71,7 @@ type prim =
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
+  | I_APPLY
   | I_FAILWITH
   | I_GE
   | I_GET
@@ -209,6 +210,7 @@ let string_of_prim = function
   | I_EMPTY_SET -> "EMPTY_SET"
   | I_EQ -> "EQ"
   | I_EXEC -> "EXEC"
+  | I_APPLY -> "APPLY"
   | I_FAILWITH -> "FAILWITH"
   | I_GE -> "GE"
   | I_GET -> "GET"
@@ -328,6 +330,7 @@ let prim_of_string = function
   | "EMPTY_SET" -> ok I_EMPTY_SET
   | "EQ" -> ok I_EQ
   | "EXEC" -> ok I_EXEC
+  | "APPLY" -> ok I_APPLY
   | "FAILWITH" -> ok I_FAILWITH
   | "GE" -> ok I_GE
   | "GET" -> ok I_GET
@@ -580,6 +583,7 @@ let prim_encoding =
     ("DIG", I_DIG) ;
     ("DUG", I_DUG) ;
     ("EMPTY_BIG_MAP", I_EMPTY_BIG_MAP) ;
+    ("APPLY", I_APPLY) ;
     ("chain_id", T_chain_id) ;
     ("CHAIN_ID", I_CHAIN_ID)
     (* New instructions must be added here, for backward compatibility of the encoding. *)

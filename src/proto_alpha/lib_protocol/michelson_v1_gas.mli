@@ -111,6 +111,7 @@ module Cost_of : sig
     val chain_id : Gas.cost
     val wrap : Gas.cost
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
+    val apply : Gas.cost
   end
 
   module Typechecking : sig

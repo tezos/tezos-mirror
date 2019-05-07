@@ -211,6 +211,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Loop_left _ -> 0
   | Dip _ -> 0
   | Exec -> 0
+  | Apply _ -> 0
   | Lambda _ -> 1
   | Failwith _ -> 1
   | Nop -> 0
@@ -307,6 +308,7 @@ let namespace = function
   | I_EMPTY_SET
   | I_EQ
   | I_EXEC
+  | I_APPLY
   | I_FAILWITH
   | I_GE
   | I_GET
@@ -1921,13 +1923,13 @@ and parse_returning
              Bad_return (loc, stack_ty, ret))
           (Lwt.return (ty_eq ctxt ty ret) >>=? fun (Eq, ctxt) ->
            Lwt.return (merge_types ~legacy ctxt loc ty ret) >>=? fun (_ret, ctxt) ->
-           return ((Lam (descr, strip_locations script_instr) : (arg, ret) lambda), ctxt))
+           return ((Lam (descr, script_instr) : (arg, ret) lambda), ctxt))
     | (Typed { loc ; aft = stack_ty ; _ }, ctxt) ->
         Lwt.return (serialize_ty_for_error ctxt ret) >>=? fun (ret, ctxt) ->
         serialize_stack_for_error ctxt stack_ty >>=? fun (stack_ty, _ctxt) ->
         fail (Bad_return (loc, stack_ty, ret))
     | (Failed { descr }, ctxt) ->
-        return ((Lam (descr (Item_t (ret, Empty_t, None)), strip_locations script_instr)
+        return ((Lam (descr (Item_t (ret, Empty_t, None)), script_instr)
                  : (arg, ret) lambda), ctxt)
 
 and parse_int32 (n : (location, prim) Micheline.node) : int tzresult =
@@ -2528,6 +2530,12 @@ and parse_instr
         check_item_ty ctxt arg param loc I_EXEC 1 2 >>=? fun (Eq, _, ctxt) ->
         parse_var_annot loc annot >>=? fun annot ->
         typed ctxt loc Exec (Item_t (ret, rest, annot))
+    | Prim (loc, I_APPLY, [], annot),
+      Item_t (capture, Item_t (Lambda_t (Pair_t ((capture_ty, _, _), (arg_ty, _, _), lam_annot, _), ret, _), rest, _), _) ->
+        Lwt.return @@ check_packable ~legacy:false loc capture_ty >>=? fun () ->
+        check_item_ty ctxt capture capture_ty loc I_APPLY 1 2 >>=? fun (Eq, capture_ty, ctxt) ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc (Apply capture_ty) (Item_t (Lambda_t (arg_ty, ret, lam_annot), rest, annot))
     | Prim (loc, I_DIP, [ code ], annot),
       Item_t (v, rest, stack_annot) ->
         fail_unexpected_annot loc annot >>=? fun () ->
@@ -3755,7 +3763,7 @@ let rec unparse_data
              must have been flushed at this point *)
           assert false
     | Lambda_t _, Lam (_, original_code) ->
-        unparse_code ctxt mode (root original_code)
+        unparse_code ctxt mode original_code
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 and unparse_code ctxt mode =
@@ -3788,7 +3796,7 @@ and unparse_code ctxt mode =
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type ; root_name } =
   let Lam (_, original_code) = code in
-  unparse_code ctxt mode (root original_code) >>=? fun (code, ctxt) ->
+  unparse_code ctxt mode original_code >>=? fun (code, ctxt) ->
   unparse_data ctxt mode storage_type storage >>=? fun (storage, ctxt) ->
   unparse_ty ctxt arg_type >>=? fun (arg_type, ctxt) ->
   unparse_ty ctxt storage_type >>=? fun (storage_type, ctxt) ->

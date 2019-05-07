@@ -652,6 +652,48 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.exec) >>=? fun ctxt ->
             interp ?log ctxt ~source ~payer ~chain_id ~self amount lam arg >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
+        | Apply capture_ty, Item (capture, Item (lam, rest)) -> (
+            Lwt.return (Gas.consume ctxt Interp_costs.apply) >>=? fun ctxt ->
+            let (Lam (descr, expr)) = lam in
+            let (Item_t (full_arg_ty , _ , _)) = descr.bef in
+            unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
+            unparse_ty ctxt capture_ty >>=? fun (ty_expr, ctxt) ->
+            match full_arg_ty with
+            | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _, _) -> (
+                let arg_stack_ty = Item_t (arg_ty, Empty_t, None) in
+                let const_descr = ({
+                    loc = descr.loc ;
+                    bef = arg_stack_ty ;
+                    aft = Item_t (capture_ty, arg_stack_ty, None) ;
+                    instr = Const capture ;
+                  } : (_, _) descr) in
+                let pair_descr = ({
+                    loc = descr.loc ;
+                    bef = Item_t (capture_ty, arg_stack_ty, None) ;
+                    aft = Item_t (full_arg_ty, Empty_t, None) ;
+                    instr = Cons_pair ;
+                  } : (_, _) descr) in
+                let seq_descr = ({
+                    loc = descr.loc ;
+                    bef = arg_stack_ty ;
+                    aft = Item_t (full_arg_ty, Empty_t, None) ;
+                    instr = Seq (const_descr, pair_descr) ;
+                  } : (_, _) descr) in
+                let full_descr = ({
+                    loc = descr.loc ;
+                    bef = arg_stack_ty ;
+                    aft = descr.aft ;
+                    instr = Seq (seq_descr, descr) ;
+                  } : (_, _) descr) in
+                let full_expr = Micheline.Seq (0, [
+                    Prim (0, I_PUSH, [ ty_expr ; const_expr ], []) ;
+                    Prim (0, I_PAIR, [], []) ;
+                    expr ]) in
+                let lam' = Lam (full_descr, full_expr) in
+                logged_return (Item (lam', rest), ctxt)
+              )
+            | _ -> assert false
+          )
         | Lambda lam, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
             logged_return (Item (lam, rest), ctxt)
@@ -788,7 +830,7 @@ let rec interp
               Micheline.strip_locations
                 (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
                            Prim (0, K_storage, [ unparsed_storage_type ], []) ;
-                           Prim (0, K_code, [ Micheline.root code ], []) ])) in
+                           Prim (0, K_code, [ code ], []) ])) in
             collect_big_maps ctxt storage_type init >>=? fun (to_duplicate, ctxt) ->
             let to_update = no_big_map_id in
             extract_big_map_diff ctxt Optimized storage_type init
@@ -830,7 +872,7 @@ let rec interp
               Micheline.strip_locations
                 (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
                            Prim (0, K_storage, [ unparsed_storage_type ], []) ;
-                           Prim (0, K_code, [ Micheline.root code ], []) ])) in
+                           Prim (0, K_code, [ code ], []) ])) in
             collect_big_maps ctxt storage_type init >>=? fun (to_duplicate, ctxt) ->
             let to_update = no_big_map_id in
             extract_big_map_diff ctxt Optimized storage_type init

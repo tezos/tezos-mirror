@@ -266,6 +266,7 @@ module Cost_of = struct
     let amount = atomic_step_cost 10
     let chain_id = step_cost 1
     let stack_n_op n = atomic_step_cost (20 + (((n lsr 1) + (n lsr 2)) + (n lsr 4)))
+    let apply = alloc_cost 8 +@ step_cost 1
 
     let rec compare : type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost = fun ty x y ->
       match ty with
@@ -415,6 +416,7 @@ module Cost_of = struct
         | Loop_left _ -> alloc_cost 5
         | Dip _ -> alloc_cost 4
         | Exec -> alloc_cost 1
+        | Apply _ -> alloc_cost 1
         | Lambda _ -> alloc_cost 2
         | Failwith _ -> alloc_cost 1
         | Nop -> alloc_cost 0
