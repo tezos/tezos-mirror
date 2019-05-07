@@ -240,6 +240,32 @@ module Asynchronous_result = struct
       loop times
   end
 
+  module Stream = struct
+    let fold :
+           'elt Lwt_stream.t
+        -> f:('b -> 'elt -> ('b, 'error) t)
+        -> init:'b
+        -> ('b, 'error) t =
+     fun stream ~f ~init ->
+      let error = ref None in
+      Lwt.catch
+        (fun () ->
+          Lwt_stream.fold_s
+            (fun elt prevm ->
+              match prevm.result with
+              | Ok x -> f x elt
+              | Error _ ->
+                  error := Some prevm ;
+                  Lwt.fail Not_found )
+            stream (Attached_result.ok init) )
+        (fun e ->
+          match !error with
+          | Some res -> Lwt.return res
+          | None ->
+              (* `f` threw a forbidden exception! *)
+              Lwt.fail e )
+  end
+
   let run_application r =
     match Lwt_main.run (r () : (_, _) t) with
     | {result= Ok (); _} -> exit 0
@@ -331,8 +357,8 @@ module System = struct
   let read_file (_state : _ Base_state.t) path =
     Lwt_exception.catch
       (fun () ->
-        Lwt_io.with_file  ~mode:Lwt_io.input path (fun out ->
-            Lwt_io.read out ) )
+        Lwt_io.with_file ~mode:Lwt_io.input path (fun out -> Lwt_io.read out)
+        )
       ()
 end
 
