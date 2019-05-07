@@ -74,7 +74,6 @@ end
 
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
-  | Ledger_deterministic_nonce_not_implemented
   | Ledger_signing_hash_mismatch of string * string
 
 let error_encoding =
@@ -95,20 +94,6 @@ let () =
     error_encoding
     (function LedgerError e -> Some e | _ -> None)
     (fun e -> LedgerError e)
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id: "signer.ledger.deterministic_nonce_not_implemented"
-    ~title: "Ledger deterministic_nonce(_hash) not implemented"
-    ~description: "The deterministic_nonce(_hash) functionality \
-                   is not implemented by the ledger"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Asked the ledger to generate a  deterministic nonce (hash), \
-                            but this functionality is not yet implemented")
-    Data_encoding.unit
-    (function Ledger_deterministic_nonce_not_implemented -> Some () | _ -> None)
-    (fun () -> Ledger_deterministic_nonce_not_implemented)
 
 let () =
   let description ledger_hash computed_hash =
