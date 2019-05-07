@@ -34,6 +34,8 @@ stages:
   before_script:
     - opam list
     - . ./scripts/version.sh
+    - sudo apk add py-pip python3 python3-dev
+    - sudo pip3 install -r tests_python/requirements.txt
   tags:
     - gitlab-org
 
@@ -67,6 +69,11 @@ build:
     - _build
     expire_in: 1 day
 
+check_python_lint:
+  <<: *build_definition
+  script:
+    - make -C tests_python lint_all
+    - make -C tests_python typecheck
 
 ############################################################
 ## Stage: test (only MR)                                  ##
@@ -264,11 +271,6 @@ test:sandboxes:acc-endorsement:
 ############################################################
 ## Stage: run python integration tests                    ##
 ############################################################
-
-integration:linter_python:
-  <<: *integration_definition
-  script:
-    - make -C tests_python lint_all
 
 ##BEGIN_INTEGRATION_PYTHON##
 integration:baker_endorser:
