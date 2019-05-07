@@ -431,17 +431,17 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
       with Not_found ->
         failwith "No slot found at level %a" Raw_level.pp level
 
-let unopt_timestamp timestamp minimal_timestamp =
-  match timestamp with
-  | None -> return minimal_timestamp
-  | Some timestamp ->
-      if timestamp < minimal_timestamp then
-        failwith
-          "Proposed timestamp %a is earlier than minimal timestamp %a"
-          Time.Protocol.pp_hum timestamp
-          Time.Protocol.pp_hum minimal_timestamp
-      else
-        return timestamp
+let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
+  let timestamp = match timestamp with
+    | None -> minimal_timestamp
+    | Some timestamp -> timestamp in
+  if (not force) && timestamp < minimal_timestamp then
+    failwith
+      "Proposed timestamp %a is earlier than minimal timestamp %a"
+      Time.Protocol.pp_hum timestamp
+      Time.Protocol.pp_hum minimal_timestamp
+  else
+    return timestamp
 
 let merge_preapps (old: error Preapply_result.t) (neu: error Preapply_result.t) =
   let merge _ a b = (* merge ops *)
@@ -618,7 +618,7 @@ let forge_block
   unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
   compute_endorsing_power cctxt ~chain ~block operations_arg >>=? fun endorsing_power ->
   decode_priority cctxt chain block ~priority ~endorsing_power >>=? fun (priority, minimal_timestamp) ->
-  unopt_timestamp timestamp minimal_timestamp >>=? fun timestamp ->
+  unopt_timestamp ?force timestamp minimal_timestamp >>=? fun timestamp ->
 
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
