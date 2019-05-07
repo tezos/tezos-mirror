@@ -48,7 +48,7 @@ let expect_non_delegatable_contract = function
   | _ ->
       failwith "Contract is not delegatable and operation should fail."
 
-let expect_no_deletion_pkh pkh = function
+let expect_no_change_registered_delegate_pkh pkh = function
   | Environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
       return_unit
   | _ ->
@@ -72,6 +72,7 @@ let bootstrap_delegate_cannot_change ~fee () =
   Context.Contract.manager (I i) bootstrap1 >>=? fun manager1 ->
   Context.Contract.balance (I i) bootstrap0 >>=? fun balance0 ->
   Context.Contract.delegate (I i) bootstrap0 >>=? fun delegate0 ->
+  (* change delegation to bootstrap1 *)
   Op.delegation ~fee (I i) bootstrap0 (Some manager1.pkh) >>=? fun set_delegate ->
   if fee > balance0 then
     Incremental.add_operation i set_delegate >>= fun err ->
@@ -80,14 +81,14 @@ let bootstrap_delegate_cannot_change ~fee () =
         | _ -> false)
   else
     Incremental.add_operation
-      ~expect_failure:expect_non_delegatable_contract i set_delegate >>=? fun i ->
+      ~expect_failure:(expect_no_change_registered_delegate_pkh delegate0)
+      i set_delegate >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     (* bootstrap0 still has same delegate *)
     Context.Contract.delegate (B b) bootstrap0 >>=? fun delegate0_after ->
-    Assert.equal_pkh ~loc:__LOC__ delegate0 delegate0_after >>=? fun () ->
+    Assert.equal_pkh ~loc:__LOC__ delegate0_after delegate0 >>=? fun () ->
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (B b) bootstrap0 balance0 fee
-
 
 (** bootstrap contracts cannot delete their delegation *)
 let bootstrap_delegate_cannot_be_removed ~fee () =
@@ -97,6 +98,7 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   Context.Contract.delegate (I i) bootstrap >>=? fun delegate ->
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
+  (* remove delegation *)
   Op.delegation ~fee (I i) bootstrap None >>=? fun set_delegate ->
   if fee > balance then
     Incremental.add_operation i set_delegate >>= fun err ->
@@ -105,12 +107,84 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
         | _ -> false)
   else
     Incremental.add_operation
-      ~expect_failure:(expect_no_deletion_pkh manager.pkh) i set_delegate >>=? fun i ->
+      ~expect_failure:(expect_no_change_registered_delegate_pkh manager.pkh)
+      i set_delegate
+    >>=? fun i ->
     (* delegate has not changed *)
     Context.Contract.delegate (I i) bootstrap >>=? fun delegate_after ->
     Assert.equal_pkh ~loc:__LOC__ delegate delegate_after >>=? fun () ->
     (* fee has been debited *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance fee
+
+(** contracts not registered as delegate can change their delegation *)
+let delegate_can_be_changed_from_unregistered_contract~fee () =
+  Context.init 2 >>=? fun (b, bootstrap_contracts) ->
+  let bootstrap0 = List.hd bootstrap_contracts in
+  let bootstrap1 = List.nth bootstrap_contracts 1 in
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let unregistered = Contract.implicit_contract unregistered_pkh in
+  Incremental.begin_construction b >>=? fun i ->
+  Context.Contract.manager (I i) bootstrap0 >>=? fun manager0 ->
+  Context.Contract.manager (I i) bootstrap1 >>=? fun manager1 ->
+  let credit = Tez.of_int 10 in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap0 unregistered credit >>=? fun credit_contract ->
+  Context.Contract.balance (I i) bootstrap0 >>=? fun balance ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  (* delegate to bootstrap0 *)
+  Op.delegation ~fee:Tez.zero (I i) unregistered (Some manager0.pkh) >>=? fun set_delegate ->
+  Incremental.add_operation i set_delegate >>=? fun i ->
+  Context.Contract.delegate (I i) unregistered >>=? fun delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegate manager0.pkh >>=? fun () ->
+  (* change delegation to bootstrap1 *)
+  Op.delegation ~fee (I i) unregistered (Some manager1.pkh) >>=? fun change_delegate ->
+  if fee > balance then
+    Incremental.add_operation i change_delegate >>= fun err ->
+    Assert.proto_error ~loc:__LOC__ err (function
+        | Contract_storage.Balance_too_low _ -> true
+        | _ -> false)
+  else
+    Incremental.add_operation i change_delegate >>=? fun i ->
+    (* delegate has changed *)
+    Context.Contract.delegate (I i) unregistered >>=? fun delegate_after ->
+    Assert.equal_pkh ~loc:__LOC__ delegate_after manager1.pkh >>=? fun () ->
+    (* fee has been debited *)
+    Assert.balance_was_debited ~loc:__LOC__ (I i) unregistered credit fee
+
+(** contracts not registered as delegate can delete their delegation *)
+let delegate_can_be_removed_from_unregistered_contract~fee () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let unregistered = Contract.implicit_contract unregistered_pkh in
+  Incremental.begin_construction b >>=? fun i ->
+  Context.Contract.manager (I i) bootstrap >>=? fun manager ->
+  let credit = Tez.of_int 10 in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap unregistered credit >>=? fun credit_contract ->
+  Context.Contract.balance (I i) bootstrap >>=? fun balance ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  (* delegate to bootstrap *)
+  Op.delegation ~fee:Tez.zero (I i) unregistered (Some manager.pkh) >>=? fun set_delegate ->
+  Incremental.add_operation i set_delegate >>=? fun i ->
+  Context.Contract.delegate (I i) unregistered >>=? fun delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun () ->
+  (* remove delegation *)
+  Op.delegation ~fee (I i) unregistered None >>=? fun delete_delegate ->
+  if fee > balance then
+    Incremental.add_operation i delete_delegate >>= fun err ->
+    Assert.proto_error ~loc:__LOC__ err (function
+        | Contract_storage.Balance_too_low _ -> true
+        | _ -> false)
+  else
+    Incremental.add_operation i delete_delegate >>=? fun i ->
+    (* the delegate has been removed *)
+    (Context.Contract.delegate_opt (I i) unregistered >>=? function
+      | None -> return_unit
+      | Some _ -> failwith "Expected delegate to be removed")
+    >>=? fun () ->
+    (* fee has been debited *)
+    Assert.balance_was_debited ~loc:__LOC__ (I i) unregistered credit fee
 
 (** bootstrap keys are already registered as delegate keys *)
 let bootstrap_manager_already_registered_delegate ~fee () =
@@ -252,10 +326,14 @@ let delegate_to_bootstrap_by_delegation_switch ~fee () =
 
 let tests_bootstrap_contracts = [
   Test.tztest "bootstrap contracts delegate to themselves" `Quick bootstrap_manager_is_bootstrap_delegate ;
-  Test.tztest "bootstrap contracts cannot change their delegate (small fee)" `Quick (bootstrap_delegate_cannot_change ~fee:Tez.one_mutez) ;
-  Test.tztest "bootstrap contracts cannot change their delegate (max fee)" `Quick (bootstrap_delegate_cannot_change ~fee:Tez.max_tez) ;
-  Test.tztest "bootstrap contracts cannot delete their delegation (small fee)" `Quick (bootstrap_delegate_cannot_be_removed ~fee:Tez.one_mutez) ;
-  Test.tztest "bootstrap contracts cannot delete their delegation (max fee)" `Quick (bootstrap_delegate_cannot_be_removed ~fee:Tez.max_tez) ;
+  Test.tztest "bootstrap contracts can change their delegate (small fee)" `Quick (bootstrap_delegate_cannot_change ~fee:Tez.one_mutez) ;
+  Test.tztest "bootstrap contracts can change their delegate (max fee)" `Quick (bootstrap_delegate_cannot_change ~fee:Tez.max_tez) ;
+  Test.tztest "bootstrap contracts cannot remove their delegation (small fee)" `Quick (bootstrap_delegate_cannot_be_removed ~fee:Tez.one_mutez) ;
+  Test.tztest "bootstrap contracts cannot remove their delegation (max fee)" `Quick (bootstrap_delegate_cannot_be_removed ~fee:Tez.max_tez) ;
+  Test.tztest "contracts not registered as delegate can remove their delegation (small fee)" `Quick (delegate_can_be_changed_from_unregistered_contract ~fee:Tez.one_mutez) ;
+  Test.tztest "contracts not registered as delegate can remove their delegation (max fee)" `Quick (delegate_can_be_changed_from_unregistered_contract ~fee:Tez.max_tez) ;
+  Test.tztest "contracts not registered as delegate can remove their delegation (small fee)" `Quick (delegate_can_be_removed_from_unregistered_contract ~fee:Tez.one_mutez) ;
+  Test.tztest "contracts not registered as delegate can remove their delegation (max fee)" `Quick (delegate_can_be_removed_from_unregistered_contract ~fee:Tez.max_tez) ;
   Test.tztest "bootstrap keys are already registered as delegate keys (small fee)" `Quick (bootstrap_manager_already_registered_delegate ~fee:Tez.one_mutez) ;
   Test.tztest "bootstrap keys are already registered as delegate keys (max fee)" `Quick (bootstrap_manager_already_registered_delegate ~fee:Tez.max_tez) ;
   Test.tztest "bootstrap manager can be delegate (init origination, small fee)" `Quick (delegate_to_bootstrap_by_origination ~fee:Tez.one_mutez) ;
