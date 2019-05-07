@@ -17,7 +17,7 @@ for test in tests_python/tests/test_*.py; do
     testname=${testname%%.py}
     cat >> $tmp <<EOF
 integration:$num:$testname:
-  <<: *integration_definition
+  <<: *test_definition
   script:
     - pytest $test
 
