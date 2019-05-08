@@ -74,4 +74,4 @@ val pending_requests_length : t -> int
 val current_request : t -> (Time.System.t * Time.System.t * Chain_validator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Chain_validator_worker_state.Event.t list) list
 
-val ddb_info: t -> Chain_validator_worker_state.Distributed_db_state.view
+val ddb_information: t -> Chain_validator_worker_state.Distributed_db_state.view

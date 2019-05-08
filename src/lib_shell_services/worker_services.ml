@@ -39,7 +39,7 @@ module Prevalidators = struct
                 (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))
                 (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipe_length" int8)
+                (req "pipeline_length" int8)
              ))
         RPC_path.(root / "workers" / "prevalidators")
 
@@ -135,7 +135,7 @@ module Chain_validators = struct
                 (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
                 (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipe_length" int8)
+                (req "pipeline_length" int8)
              ))
         RPC_path.(root / "workers" / "chain_validators")
 

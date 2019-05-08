@@ -77,7 +77,7 @@ val greylist: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 val chain_state: chain_db -> State.Chain.t
 val db: chain_db -> db
 
-val info : chain_db -> Chain_validator_worker_state.Distributed_db_state.view
+val information : chain_db -> Chain_validator_worker_state.Distributed_db_state.view
 
 (** Return the peer id of the node *)
 val my_peer_id: chain_db -> P2p_peer.Id.t

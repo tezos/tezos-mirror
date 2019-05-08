@@ -85,9 +85,7 @@ module Types = struct
   }
 
   let pipeline_length = function
-    | None ->
-        Peer_validator_worker_state.Worker_state.{ fetched_header_length = 0;
-                                                   fetched_block_length = 0;}
+    | None -> Bootstrap_pipeline.length_zero
     | Some p -> Bootstrap_pipeline.length p
 
   let view (state : state) _ : view =

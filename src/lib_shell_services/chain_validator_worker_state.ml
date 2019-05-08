@@ -136,8 +136,10 @@ end
 
 module Distributed_db_state = struct
 
-  type table_scheduler = { table_length : int;
-                           scheduler_length : int;}
+  type table_scheduler = {
+    table_length : int ;
+    scheduler_length : int ;
+  }
 
   type view = {
     p2p_readers_length: int ;

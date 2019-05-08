@@ -642,7 +642,7 @@ let current_request t = Worker.current_request t
 
 let last_events = Worker.last_events
 
-let ddb_info t =
+let ddb_information t =
   let state = Worker.state t in
   let ddb = state.parameters.chain_db in
-  Distributed_db.info ddb
+  Distributed_db.information ddb

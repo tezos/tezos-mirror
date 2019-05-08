@@ -40,7 +40,10 @@ let build_rpc_directory state =
     let workers = Prevalidator.running_workers () in
     let statuses =
       List.map
-        (fun (chain_id, _, t) -> (chain_id, Prevalidator.status t, Prevalidator.information t, Prevalidator.pipeline_length t))
+        (fun (chain_id, _, t) -> (chain_id,
+                                  Prevalidator.status t,
+                                  Prevalidator.information t,
+                                  Prevalidator.pipeline_length t))
         workers in
     return statuses
   end ;
@@ -84,7 +87,10 @@ let build_rpc_directory state =
       (List.filter_map
          (fun ((id, peer_id), w) ->
             if Chain_id.equal id chain_id then
-              Some (peer_id, Peer_validator.status w, Peer_validator.information w, Peer_validator.pipeline_length w)
+              Some (peer_id,
+                    Peer_validator.status w,
+                    Peer_validator.information w,
+                    Peer_validator.pipeline_length w)
             else None)
          (Peer_validator.running_workers ()))
   end ;
@@ -106,7 +112,8 @@ let build_rpc_directory state =
     return
       (List.map
          (fun (id, w) ->
-            (id, Chain_validator.status w,
+            (id,
+             Chain_validator.status w,
              Chain_validator.information w,
              Chain_validator.pending_requests_length w))
          (Chain_validator.running_workers ()))
@@ -122,12 +129,10 @@ let build_rpc_directory state =
         current_request = Chain_validator.current_request w }
   end ;
 
-  (* DDB *)
+  (* DistributedDB *)
   register1 Worker_services.Chain_validators.S.ddb_state begin fun chain () () ->
     Chain_directory.get_chain_id state chain >>= fun chain_id ->
     let w = List.assoc chain_id (Chain_validator.running_workers ()) in
-    return (Chain_validator.ddb_info w) end ;
-
-
+    return (Chain_validator.ddb_information w) end ;
 
   !dir

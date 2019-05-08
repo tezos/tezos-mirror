@@ -97,6 +97,12 @@ module Make_raw
     table: Table.t ;
   }
 
+  let state_of_t { scheduler ; table } =
+    let table_length = Table.memory_table_length table in
+    let scheduler_length = Scheduler.memory_table_length scheduler in
+    { Chain_validator_worker_state.Distributed_db_state.
+      table_length ; scheduler_length }
+
   let create ?global_input request_param param =
     let scheduler = Scheduler.create request_param in
     let table = Table.create ?global_input scheduler param in
@@ -367,45 +373,25 @@ let state { disk ; _ } = disk
 let chain_state { chain_state ; _ } = chain_state
 let db { global_db ; _ } = global_db
 
-let info ({ global_db = { p2p_readers ;
-                          active_chains ;  _ } ;
-            operation_db ;
-            operations_db  ;
-            block_header_db ;
-            operation_hashes_db ;
-            active_connections ;
-            active_peers ; _
-          }  : chain_db)  =
-
-  Chain_validator_worker_state.Distributed_db_state.
-    {
-      p2p_readers_length =  P2p_peer.Table.length p2p_readers ;
-      active_chains_length = Chain_id.Table.length active_chains ;
-
-      operation_db = { table_length =
-                         Raw_operation.Table.memory_table_length operation_db.table ;
-                       scheduler_length =
-                         Raw_operation.Scheduler.memory_table_length operation_db.scheduler ; } ;
-
-      operations_db = { table_length =
-                          Raw_operations.Table.memory_table_length operations_db.table ;
-                        scheduler_length =
-                          Raw_operations.Scheduler.memory_table_length operations_db.scheduler ; } ;
-
-      block_header_db = { table_length =
-                            Raw_block_header.Table.memory_table_length block_header_db.table ;
-                          scheduler_length =
-                            Raw_block_header.Scheduler.memory_table_length block_header_db.scheduler ; } ;
-
-      operations_hashed_db = { table_length =
-                                 Raw_operation_hashes.Table.memory_table_length operation_hashes_db.table ;
-                               scheduler_length =
-                                 Raw_operation_hashes.Scheduler.memory_table_length operation_hashes_db.scheduler ; } ;
-
-      active_connections_length =
-        P2p_peer.Table.length active_connections ;
-      active_peers_length = P2p_peer.Set.cardinal !active_peers ;
-    }
+let information ({ global_db = { p2p_readers ;
+                                 active_chains ;  _ } ;
+                   operation_db ;
+                   operations_db  ;
+                   block_header_db ;
+                   operation_hashes_db ;
+                   active_connections ;
+                   active_peers ; _
+                 }  : chain_db)  =
+  { Chain_validator_worker_state.Distributed_db_state.
+    p2p_readers_length =  P2p_peer.Table.length p2p_readers ;
+    active_chains_length = Chain_id.Table.length active_chains ;
+    operation_db = Raw_operation.state_of_t operation_db ;
+    operations_db = Raw_operations.state_of_t operations_db ;
+    block_header_db = Raw_block_header.state_of_t block_header_db ;
+    operations_hashed_db = Raw_operation_hashes.state_of_t operation_hashes_db ;
+    active_connections_length = P2p_peer.Table.length active_connections ;
+    active_peers_length = P2p_peer.Set.cardinal !active_peers ;
+  }
 
 
 let my_peer_id chain_db = P2p.peer_id chain_db.global_db.p2p

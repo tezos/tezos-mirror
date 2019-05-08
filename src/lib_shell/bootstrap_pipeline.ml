@@ -402,3 +402,9 @@ let length pipeline =
     fetched_header_length = Lwt_pipe.length pipeline.fetched_headers;
     fetched_block_length = Lwt_pipe.length pipeline.fetched_blocks ;
   }
+
+let length_zero =
+  Peer_validator_worker_state.Worker_state.{
+    fetched_header_length = 0 ;
+    fetched_block_length = 0 ;
+  }
