@@ -188,13 +188,16 @@ let set_running
   point_info.last_established_connection <- Some (peer_id, timestamp) ;
   Info.log point_info ~timestamp (Connection_established peer_id)
 
+let maxed_time_add t s =
+  match Ptime.add_span t s with
+  | Some t -> t
+  | None -> Ptime.max
+
 let set_greylisted timestamp point_info =
   point_info.Info.greylisting_end <-
-    Option.unopt_exn
-      (Failure "P2p_point_state.set_greylisted: overflow in time")
-      (Ptime.add_span
-         timestamp
-         point_info.Info.greylisting_delay) ;
+    maxed_time_add
+      timestamp
+      point_info.Info.greylisting_delay ;
   point_info.greylisting_delay <-
     begin
       let new_delay =
@@ -224,10 +227,9 @@ let set_disconnected
         point_info.greylisting_delay <-
           point_info.greylisting.initial_delay ;
         point_info.greylisting_end <-
-          Option.unopt_exn
-            (Failure "P2p_point_state.set_disconnected: overflow in time")
-            (Ptime.add_span timestamp
-               point_info.greylisting.disconnection_delay) ;
+          maxed_time_add
+            timestamp
+            point_info.greylisting.disconnection_delay ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested
         then Disconnection current_peer_id
