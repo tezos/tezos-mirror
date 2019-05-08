@@ -161,6 +161,10 @@ class TestRPCs:
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}')
 
+    def test_workers_chain_validator_ddb(self, sandbox):
+        sandbox.client(1).rpc('get',
+                              f'/workers/chain_validators/{CHAIN_ID}/ddb')
+
     def test_workers_chain_validator_peers_validators(self,
                                                       sandbox):
         sandbox.client(1).rpc('get',
