@@ -288,27 +288,31 @@ let genesis_with_parameters
   in
   return block
 
+open Tezos_protocol_alpha_parameters.Default_parameters
+
+let default = constants_mainnet
+
 let genesis
-    ?(preserved_cycles = Constants_repr.default.preserved_cycles)
-    ?(blocks_per_cycle = Constants_repr.default.blocks_per_cycle)
-    ?(blocks_per_commitment = Constants_repr.default.blocks_per_commitment)
-    ?(blocks_per_roll_snapshot = Constants_repr.default.blocks_per_roll_snapshot)
-    ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
-    ?(time_between_blocks = Constants_repr.default.time_between_blocks)
-    ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
-    ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
+    ?(preserved_cycles = default.preserved_cycles)
+    ?(blocks_per_cycle = default.blocks_per_cycle)
+    ?(blocks_per_commitment = default.blocks_per_commitment)
+    ?(blocks_per_roll_snapshot = default.blocks_per_roll_snapshot)
+    ?(blocks_per_voting_period = default.blocks_per_voting_period)
+    ?(time_between_blocks = default.time_between_blocks)
+    ?(endorsers_per_block = default.endorsers_per_block)
+    ?(hard_gas_limit_per_operation = default.hard_gas_limit_per_operation)
+    ?(hard_gas_limit_per_block = default.hard_gas_limit_per_block)
     ?(proof_of_work_threshold = Int64.(neg one))
-    ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
-    ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
-    ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
-    ?(origination_size = Constants_repr.default.origination_size)
-    ?(block_security_deposit = Constants_repr.default.block_security_deposit)
-    ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
-    ?(block_reward = Constants_repr.default.block_reward)
-    ?(endorsement_reward = Constants_repr.default.endorsement_reward)
-    ?(cost_per_byte = Constants_repr.default.cost_per_byte)
-    ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(tokens_per_roll = default.tokens_per_roll)
+    ?(michelson_maximum_type_size = default.michelson_maximum_type_size)
+    ?(seed_nonce_revelation_tip = default.seed_nonce_revelation_tip)
+    ?(origination_size = default.origination_size)
+    ?(block_security_deposit = default.block_security_deposit)
+    ?(endorsement_security_deposit = default.endorsement_security_deposit)
+    ?(block_reward = default.block_reward)
+    ?(endorsement_reward = default.endorsement_reward)
+    ?(cost_per_byte = default.cost_per_byte)
+    ?(hard_storage_limit_per_operation = default.hard_storage_limit_per_operation)
     (initial_accounts : (Account.t * Tez_repr.t) list) =
   let constants : Constants_repr.parametric = {
     preserved_cycles ;

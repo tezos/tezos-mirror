@@ -47,7 +47,7 @@ let default_args = {
   params = { bootstrap_accounts = [] ;
              commitments = [] ;
              bootstrap_contracts = [] ;
-             constants = default ;
+             constants = Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet ;
              security_deposit_ramp_up_cycles = None ;
              no_reward_cycles = None ;
            }

@@ -63,10 +63,12 @@ let endorsement ?delegate ?level ctxt =
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
+open Tezos_protocol_alpha_parameters.Default_parameters
+
 let manager_operation
     ?(fee = Tez.zero)
-    ?(gas_limit = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(storage_limit = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(gas_limit = constants_mainnet.Constants_repr.hard_gas_limit_per_operation)
+    ?(storage_limit = constants_mainnet.Constants_repr.hard_storage_limit_per_operation)
     ?public_key ~source ctxt operation =
   Context.Contract.counter ctxt source >>=? fun counter ->
   Context.Contract.manager ctxt source >>=? fun account ->
