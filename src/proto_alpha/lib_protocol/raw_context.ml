@@ -531,6 +531,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             cost_per_byte = c.cost_per_byte ;
             hard_storage_limit_per_operation = c.hard_storage_limit_per_operation ;
             test_chain_duration = c.test_chain_duration ;
+            quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
+            quorum_max = 70_00l ;
           } in
         set_constants ctxt constants >>= fun ctxt ->
         return ctxt

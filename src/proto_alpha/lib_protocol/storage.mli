@@ -234,6 +234,12 @@ module Vote : sig
     with type value = Voting_period_repr.kind
      and type t := Raw_context.t
 
+  (** Only for migration from 004.
+      Expected quorum, in centile of percentage *)
+  module Current_quorum_004 : Single_data_storage
+    with type value = int32
+     and type t := Raw_context.t
+
   (** Participation exponential moving average, in centile of percentage *)
   module Participation_ema : Single_data_storage
     with type value = int32

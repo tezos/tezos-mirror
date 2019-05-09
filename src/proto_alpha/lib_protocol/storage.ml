@@ -497,6 +497,12 @@ module Vote = struct
         let encoding = Voting_period_repr.kind_encoding
       end)
 
+  module Current_quorum_004 =
+    Make_single_data_storage(Ghost)
+      (Raw_context)
+      (struct let name = ["current_quorum"] end)
+      (Int32)
+
   module Participation_ema =
     Make_single_data_storage
       (Raw_context)
