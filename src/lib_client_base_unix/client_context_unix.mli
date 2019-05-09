@@ -33,6 +33,8 @@ class unix_prompter :
 class unix_logger :
   base_dir:string ->
   Client_context.printer
+class unix_ui :
+  Client_context.ui
 class unix_full :
   base_dir:string ->
   chain:Shell_services.chain ->
