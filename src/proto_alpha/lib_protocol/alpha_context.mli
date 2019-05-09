@@ -1148,6 +1148,7 @@ val prepare_first_block:
 val prepare:
   Context.t ->
   level:Int32.t ->
+  predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
   context tzresult Lwt.t

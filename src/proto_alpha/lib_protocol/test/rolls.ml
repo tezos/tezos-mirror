@@ -59,6 +59,7 @@ let check_rolls b (account : Account.t) =
   Raw_context.prepare
     b.context
     ~level:b.header.shell.level
+    ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
     ~fitness:b.header.shell.fitness
   >>= wrap
@@ -74,6 +75,7 @@ let check_no_rolls (b : Block.t) (account : Account.t) =
   Raw_context.prepare
     b.context
     ~level:b.header.shell.level
+    ~predecessor_timestamp:b.header.shell.timestamp
     ~timestamp:b.header.shell.timestamp
     ~fitness:b.header.shell.fitness
   >>= wrap
