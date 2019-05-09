@@ -380,6 +380,8 @@ module Constants : sig
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
     test_chain_duration: int64;
+    quorum_min: int32 ;
+    quorum_max: int32 ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -404,6 +406,8 @@ module Constants : sig
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
   val test_chain_duration: context -> int64
+  val quorum_min: context -> int32
+  val quorum_max: context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {
@@ -775,7 +779,9 @@ module Vote : sig
     context -> Voting_period.kind -> context tzresult Lwt.t
 
   val get_current_quorum: context -> int32 tzresult Lwt.t
-  val set_current_quorum: context -> int32 -> context tzresult Lwt.t
+
+  val get_participation_ema: context -> int32 tzresult Lwt.t
+  val set_participation_ema: context -> int32 -> context tzresult Lwt.t
 
   val get_current_proposal:
     context -> proposal tzresult Lwt.t

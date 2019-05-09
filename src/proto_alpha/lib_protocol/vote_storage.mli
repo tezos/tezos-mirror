@@ -79,7 +79,9 @@ val in_listings:
 val get_listings : Raw_context.t -> (Signature.Public_key_hash.t * int32) list Lwt.t
 
 val get_current_quorum: Raw_context.t -> int32 tzresult Lwt.t
-val set_current_quorum: Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
+
+val get_participation_ema: Raw_context.t -> int32 tzresult Lwt.t
+val set_participation_ema: Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
 
 val get_current_period_kind:
   Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
