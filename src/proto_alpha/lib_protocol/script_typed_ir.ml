@@ -362,6 +362,8 @@ and ('bef, 'aft) instr =
   | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda * string option ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
      packed_internal_operation * (address * 'rest)) instr
+  | Create_contract_2 : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda * string option  ->
+    (public_key_hash option * (Tez.t * ('g * 'rest)), packed_internal_operation * (address * 'rest)) instr
   | Set_delegate :
       (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
   | Now :

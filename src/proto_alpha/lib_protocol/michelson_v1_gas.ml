@@ -387,6 +387,12 @@ module Cost_of = struct
         | Create_account -> alloc_cost 2
         | Implicit_account -> alloc_cost 1
         | Create_contract _ -> alloc_cost 8
+        (* Deducted the cost of removed arguments manager, spendable and delegatable:
+           - manager: key_hash = 1
+           - spendable: bool = 0
+           - delegatable: bool = 0
+        *)
+        | Create_contract_2 _ -> alloc_cost 7
         | Set_delegate -> alloc_cost 1
         | Now -> alloc_cost 1
         | Balance -> alloc_cost 1

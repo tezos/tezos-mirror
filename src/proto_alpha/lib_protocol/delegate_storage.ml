@@ -123,7 +123,6 @@ let frozen_balance_encoding =
        (req "rewards" Tez_repr.encoding))
 
 type error +=
-  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
@@ -134,18 +133,6 @@ type error +=
         balance : Tez_repr.t } (* `Temporary *)
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"contract.undelegatable_contract"
-    ~title:"Non delegatable contract"
-    ~description:"Tried to delegate an implicit contract \
-                  or a non delegatable originated contract"
-    ~pp:(fun ppf contract ->
-        Format.fprintf ppf "Contract %a is not delegatable"
-          Contract_repr.pp contract)
-    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Non_delegatable_contract c -> Some c | _ -> None)
-    (fun c -> Non_delegatable_contract c) ;
   register_error_kind
     `Permanent
     ~id:"delegate.no_deletion"
@@ -212,14 +199,6 @@ let () =
        Some (delegate, balance, deposit) | _ -> None)
     (fun (delegate, balance, deposit) -> Balance_too_low_for_deposit { delegate ; balance ; deposit } )
 
-let is_delegatable c contract =
-  match Contract_repr.is_implicit contract with
-  | Some _ ->
-      (* Implicit contracts are delegatable *)
-      return_true
-  | None ->
-      Storage.Contract.Delegatable.mem c contract >>= return
-
 let link c contract delegate =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
   Roll_storage.Delegate.add_amount c delegate balance >>=? fun c ->
@@ -265,7 +244,7 @@ let init ctxt contract delegate =
 
 let get = Roll_storage.get_contract_delegate
 
-let set_base c is_delegatable contract delegate =
+let set c contract delegate =
   match delegate with
   | None -> begin
       let delete () =
@@ -280,25 +259,17 @@ let set_base c is_delegatable contract delegate =
             fail (No_deletion pkh)
           else
             delete ()
-      | None ->
-          is_delegatable c contract >>=? fun delegatable ->
-          if delegatable then
-            delete ()
-          else
-            fail (Non_delegatable_contract contract)
+      | None -> delete ()
     end
   | Some delegate ->
       known c delegate >>=? fun known_delegate ->
       registered c delegate >>=? fun registered_delegate ->
-      is_delegatable c contract >>=? fun delegatable ->
       let self_delegation =
         match Contract_repr.is_implicit contract with
         | Some pkh -> Signature.Public_key_hash.equal pkh delegate
         | None -> false in
       if not known_delegate || not (registered_delegate || self_delegation) then
         fail (Roll_storage.Unregistered_delegate delegate)
-      else if not (delegatable || self_delegation) then
-        fail (Non_delegatable_contract contract)
       else
         begin
           Storage.Contract.Delegate.get_option c contract >>=? function
@@ -341,12 +312,6 @@ let set_base c is_delegatable contract delegate =
             return c
         end >>=? fun c ->
         return c
-
-let set c contract delegate =
-  set_base c is_delegatable contract delegate
-
-let set_from_script c contract delegate =
-  set_base c (fun _ _ -> return_true) contract delegate
 
 let remove ctxt contract =
   unlink ctxt contract

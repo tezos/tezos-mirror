@@ -97,7 +97,7 @@ let burn_storage_fees c ~storage_limit ~payer =
     else
       trace Cannot_pay_storage_fee
         (Contract_storage.must_exist c payer >>=? fun () ->
-         Contract_storage.spend_from_script c payer to_burn) >>=? fun c ->
+         Contract_storage.spend c payer to_burn) >>=? fun c ->
       return c
 
 let check_storage_limit c ~storage_limit =

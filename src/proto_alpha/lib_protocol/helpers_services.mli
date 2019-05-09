@@ -91,7 +91,7 @@ module Forge : sig
     val operations:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
@@ -102,7 +102,7 @@ module Forge : sig
     val reveal:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
@@ -111,7 +111,7 @@ module Forge : sig
     val transaction:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       amount:Tez.t ->
@@ -126,15 +126,12 @@ module Forge : sig
     val origination:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
-      managerPubKey:public_key_hash ->
       balance:Tez.t ->
-      ?spendable:bool ->
-      ?delegatable:bool ->
       ?delegatePubKey: public_key_hash ->
-      ?script:Script.t ->
+      script:Script.t ->
       gas_limit:Z.t ->
       storage_limit:Z.t ->
       fee:Tez.t->
@@ -143,7 +140,7 @@ module Forge : sig
     val delegation:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->

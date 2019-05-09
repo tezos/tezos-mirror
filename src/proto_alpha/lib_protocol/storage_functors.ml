@@ -25,7 +25,6 @@
 
 open Storage_sigs
 
-module type REGISTER = sig val ghost : bool end
 module Registered = struct let ghost = false end
 module Ghost = struct let ghost = true end
 
@@ -620,7 +619,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           | false -> Lwt.return_nil in
     loop 0 [] prefix
 
-  module Make_set (N : NAME) = struct
+  module Make_set (R : REGISTER) (N : NAME) = struct
     type t = C.t
     type context = t
     type elt = I.t
@@ -658,13 +657,15 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description = if R.ghost then Storage_description.create ()
+        else Raw_context.description in
       register_value
         ~get:(fun c ->
             let (c, k) = unpack c in
             mem c k >>= function
             | true -> return_some true
             | false -> return_none)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         Data_encoding.bool
 
   end

@@ -40,7 +40,8 @@ type ex_stack_ty = Ex_stack_ty : 'a stack_ty -> ex_stack_ty
 type tc_context =
   | Lambda : tc_context
   | Dip : 'a stack_ty * tc_context -> tc_context
-  | Toplevel : { storage_type : 'sto ty ; param_type : 'param ty ; root_name : string option } -> tc_context
+  | Toplevel : { storage_type : 'sto ty ; param_type : 'param ty ; root_name : string option ;
+                 legacy_create_contract_literal : bool } -> tc_context
 
 type unparsing_mode = Optimized | Readable
 
@@ -226,6 +227,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Create_account -> 0
   | Implicit_account -> 0
   | Create_contract _ -> 1
+  | Create_contract_2 _ -> 1
   | Now -> 0
   | Balance -> 0
   | Check_signature -> 0
@@ -1388,7 +1390,7 @@ let find_entrypoint_for_type
   | "default", Some "root" ->
       begin match find_entrypoint full ~root_name entrypoint with
         | Error _ as err -> err
-        | Ok (f, Ex_ty ty) ->
+        | Ok (_, Ex_ty ty) ->
             match ty_eq ctxt expected ty with
             | Ok (Eq, ctxt) ->
                 ok (ctxt, "default", (ty : exp ty))
@@ -2945,9 +2947,16 @@ and parse_instr
            (Option_t (Key_hash_t _, _), Item_t
               (Bool_t _, Item_t
                  (Mutez_t _, rest, _), _), _), _) ->
-        parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
-        typed ctxt loc Create_account
-          (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
+        if legacy
+        then begin
+          (* For existing contracts, this instruction is still allowed *)
+          parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
+          typed ctxt loc Create_account
+            (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
+        end
+        else
+          (* For new contracts this instruction is not allowed anymore *)
+          fail (Deprecated_instruction I_CREATE_ACCOUNT)
     | Prim (loc, I_IMPLICIT_ACCOUNT, [], annot),
       Item_t (Key_hash_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->
@@ -2961,6 +2970,57 @@ and parse_instr
                  (Bool_t _, Item_t
                     (Mutez_t _, Item_t
                        (ginit, rest, _), _), _), _), _), _) ->
+        if legacy then begin
+          (* For existing contracts, this instruction is still allowed *)
+          parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
+          let cannonical_code = fst @@ Micheline.extract_locations code in
+          Lwt.return @@ parse_toplevel ~legacy cannonical_code >>=? fun (arg_type, storage_type, code_field, root_name) ->
+          trace
+            (Ill_formed_type (Some "parameter", cannonical_code, location arg_type))
+            (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
+          >>=? fun (Ex_ty arg_type, ctxt) ->
+          begin
+            if legacy then Error_monad.return () else
+              Lwt.return (well_formed_entrypoints ~root_name arg_type)
+          end >>=? fun () ->
+          trace
+            (Ill_formed_type (Some "storage", cannonical_code, location storage_type))
+            (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
+          >>=? fun (Ex_ty storage_type, ctxt) ->
+          let arg_annot = default_annot (type_to_var_annot (name_of_ty arg_type))
+              ~default:default_param_annot in
+          let storage_annot = default_annot (type_to_var_annot (name_of_ty storage_type))
+              ~default:default_storage_annot in
+          let arg_type_full = Pair_t ((arg_type, None, arg_annot),
+                                      (storage_type, None, storage_annot), None) in
+          let ret_type_full =
+            Pair_t ((List_t (Operation_t None, None), None, None),
+                    (storage_type, None, None), None) in
+          trace
+            (Ill_typed_contract (cannonical_code, []))
+            (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name ;
+                                         legacy_create_contract_literal = true })
+               ctxt ~legacy ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
+          fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
+                      aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda, ctxt) ->
+          Lwt.return @@ ty_eq ctxt arg arg_type_full >>=? fun (Eq, ctxt) ->
+          Lwt.return @@ merge_types ~legacy ctxt loc arg arg_type_full >>=? fun (_, ctxt) ->
+          Lwt.return @@ ty_eq ctxt ret ret_type_full >>=? fun (Eq, ctxt) ->
+          Lwt.return @@ merge_types ~legacy ctxt loc ret ret_type_full >>=? fun (_, ctxt) ->
+          Lwt.return @@ ty_eq ctxt storage_type ginit >>=? fun (Eq, ctxt) ->
+          Lwt.return @@ merge_types ~legacy ctxt loc storage_type ginit >>=? fun (_, ctxt) ->
+          typed ctxt loc (Create_contract (storage_type, arg_type, lambda, root_name))
+            (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
+        end
+        else
+          (* For new contracts this instruction is not allowed anymore *)
+          fail (Deprecated_instruction I_CREATE_CONTRACT)
+    | Prim (loc, I_CREATE_CONTRACT, [ (Seq _ as code)], annot),
+      (* Removed the instruction's arguments manager, spendable and delegatable *)
+      Item_t
+        (Option_t (Key_hash_t _, _), Item_t
+           (Mutez_t _, Item_t
+              (ginit, rest, _), _), _) ->
         parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
         let cannonical_code = fst @@ Micheline.extract_locations code in
         Lwt.return @@ parse_toplevel ~legacy cannonical_code >>=? fun (arg_type, storage_type, code_field, root_name) ->
@@ -2987,7 +3047,8 @@ and parse_instr
                   (storage_type, None, None), None) in
         trace
           (Ill_typed_contract (cannonical_code, []))
-          (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name })
+          (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name ;
+                                       legacy_create_contract_literal = false })
              ctxt ~legacy ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
         fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
                     aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda, ctxt) ->
@@ -2997,7 +3058,7 @@ and parse_instr
         Lwt.return @@ merge_types ~legacy ctxt loc ret ret_type_full >>=? fun (_, ctxt) ->
         Lwt.return @@ ty_eq ctxt storage_type ginit >>=? fun (Eq, ctxt) ->
         Lwt.return @@ merge_types ~legacy ctxt loc storage_type ginit >>=? fun (_, ctxt) ->
-        typed ctxt loc (Create_contract (storage_type, arg_type, lambda, root_name))
+        typed ctxt loc (Create_contract_2 (storage_type, arg_type, lambda, root_name))
           (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
     | Prim (loc, I_NOW, [], annot),
       stack ->
@@ -3066,9 +3127,12 @@ and parse_instr
         let rec get_toplevel_type : tc_context -> (bef judgement * context) tzresult Lwt.t = function
           | Lambda -> fail (Self_in_lambda loc)
           | Dip (_, prev) -> get_toplevel_type prev
-          | Toplevel { param_type ; root_name ; _ } ->
+          | Toplevel { param_type ; root_name ; legacy_create_contract_literal = false} ->
               Lwt.return (find_entrypoint param_type ~root_name entrypoint) >>=? fun (_, Ex_ty param_type) ->
               typed ctxt loc (Self (param_type, entrypoint))
+                (Item_t (Contract_t (param_type, None), stack, annot))
+          | Toplevel { param_type ; root_name = _ ; legacy_create_contract_literal = true} ->
+              typed ctxt loc (Self (param_type, "default"))
                 (Item_t (Contract_t (param_type, None), stack, annot)) in
         get_toplevel_type tc_context
     (* Primitive parsing errors *)
@@ -3362,7 +3426,8 @@ let parse_script
       (parse_data ?type_logger ctxt ~legacy storage_type (root storage)) >>=? fun (storage, ctxt) ->
     trace
       (Ill_typed_contract (code, []))
-      (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name })
+      (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name ;
+                                   legacy_create_contract_literal = false})
          ctxt ~legacy ?type_logger (arg_type_full, None) ret_type_full code_field) >>=? fun (code, ctxt) ->
     return (Ex_script { code ; arg_type ; storage ; storage_type ; root_name }, ctxt)
 
@@ -3395,7 +3460,8 @@ let typecheck_code
               (storage_type, None, None), None) in
     let result =
       parse_returning
-        (Toplevel { storage_type ; param_type = arg_type ; root_name })
+        (Toplevel { storage_type ; param_type = arg_type ; root_name ;
+                    legacy_create_contract_literal = false })
         ctxt ~legacy
         ~type_logger: (fun loc bef aft -> type_map := (loc, (bef, aft)) :: !type_map)
         (arg_type_full, None) ret_type_full code_field in

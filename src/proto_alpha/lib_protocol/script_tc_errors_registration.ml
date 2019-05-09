@@ -691,4 +691,14 @@ let () =
                   the provided gas"
     Data_encoding.empty
     (function Cannot_serialize_error -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_error)
+    (fun () -> Cannot_serialize_error) ;
+  (* Deprecated instruction *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.deprecated_instruction"
+    ~title:"Script is using a deprecated instruction"
+    ~description:
+      "A deprecated instruction usage is disallowed in newly created contracts"
+    (obj1 (req "prim" prim_encoding))
+    (function Deprecated_instruction prim -> Some prim | _ -> None)
+    (fun prim -> Deprecated_instruction prim) ;

@@ -125,21 +125,13 @@ module Contract = struct
       (struct let name = ["manager"] end)
       (Manager_repr)
 
-  module Spendable =
-    Indexed_context.Make_set
-      (struct let name = ["spendable"] end)
-
-  module Delegatable =
-    Indexed_context.Make_set
-      (struct let name = ["delegatable"] end)
-
   module Delegate =
     Indexed_context.Make_map
       (struct let name = ["delegate"] end)
       (Signature.Public_key_hash)
 
   module Inactive_delegate =
-    Indexed_context.Make_set
+    Indexed_context.Make_set(Registered)
       (struct let name = ["inactive_delegate"] end)
 
   module Delegate_desactivation =

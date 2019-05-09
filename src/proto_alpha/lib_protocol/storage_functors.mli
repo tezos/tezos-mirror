@@ -27,7 +27,6 @@
 
 open Storage_sigs
 
-module type REGISTER
 module Registered : REGISTER
 module Ghost : REGISTER
 

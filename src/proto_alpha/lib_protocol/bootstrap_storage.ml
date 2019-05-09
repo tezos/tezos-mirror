@@ -31,7 +31,7 @@ let init_account ctxt
   Contract_storage.credit ctxt contract amount >>=? fun ctxt ->
   match public_key with
   | Some public_key ->
-      Contract_storage.reveal_manager_key ctxt contract public_key >>=? fun ctxt ->
+      Contract_storage.reveal_manager_key ctxt public_key_hash public_key >>=? fun ctxt ->
       Delegate_storage.set ctxt contract (Some public_key_hash) >>=? fun ctxt ->
       return ctxt
   | None -> return ctxt
@@ -43,11 +43,8 @@ let init_contract ~typecheck ctxt
   Contract_storage.originate ctxt contract
     ~balance:amount
     ~prepaid_bootstrap_storage:true
-    ~manager:Signature.Public_key_hash.zero
     ~script
-    ~delegate:(Some delegate)
-    ~spendable:false
-    ~delegatable:false >>=? fun ctxt ->
+    ~delegate:(Some delegate) >>=? fun ctxt ->
   return ctxt
 
 let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
