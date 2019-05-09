@@ -124,15 +124,24 @@ let clear_listings ctxt =
 let get_current_period_kind = Storage.Vote.Current_period_kind.get
 let set_current_period_kind = Storage.Vote.Current_period_kind.set
 
-let get_current_quorum = Storage.Vote.Current_quorum.get
-let set_current_quorum = Storage.Vote.Current_quorum.set
+let get_current_quorum ctxt =
+  Storage.Vote.Participation_ema.get ctxt >>=? fun participation_ema ->
+  let quorum_min = Constants_storage.quorum_min ctxt in
+  let quorum_max = Constants_storage.quorum_max ctxt in
+  let quorum_diff = Int32.sub quorum_max quorum_min in
+  return Int32.(add quorum_min
+                  (div (mul participation_ema quorum_diff) 100_00l))
+
+let get_participation_ema = Storage.Vote.Participation_ema.get
+let set_participation_ema = Storage.Vote.Participation_ema.set
 
 let get_current_proposal = Storage.Vote.Current_proposal.get
 let init_current_proposal = Storage.Vote.Current_proposal.init
 let clear_current_proposal = Storage.Vote.Current_proposal.delete
 
 let init ctxt =
-  (* quorum is in centile of a percentage *)
-  Storage.Vote.Current_quorum.init ctxt 80_00l >>=? fun ctxt ->
+  (* participation EMA is in centile of a percentage *)
+  let participation_ema = Constants_storage.quorum_max ctxt in
+  Storage.Vote.Participation_ema.init ctxt participation_ema >>=? fun ctxt ->
   Storage.Vote.Current_period_kind.init ctxt Proposal >>=? fun ctxt ->
   return ctxt

@@ -47,13 +47,15 @@ let select_winning_proposal proposals =
     the current quorum.
     Supermajority means the yays are more 8/10 of casted votes.
     The participation is the ratio of all received votes, including passes, with
-    respect to the number of possible votes. The quorum starts at 80% and at
-    each vote is updated using the last expected quorum and the current
-    participation with the following weights:
-    newQ = oldQ * 8/10 + participation * 2/10 *)
-let check_approval_and_update_quorum ctxt =
+    respect to the number of possible votes.
+    The participation EMA (exponential moving average) uses the last
+    participation EMA and the current participation./
+    The expected quorum is calculated using the last participation EMA, capped
+    by the min/max quorum protocol constants. *)
+let check_approval_and_update_participation_ema ctxt =
   Vote.get_ballots ctxt >>=? fun ballots ->
   Vote.listing_size ctxt >>=? fun maximum_vote ->
+  Vote.get_participation_ema ctxt >>=? fun participation_ema ->
   Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
   (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
      small as 1e3, there is a maximum of 8e5 rolls and thus votes.
@@ -64,15 +66,18 @@ let check_approval_and_update_quorum ctxt =
   let all_votes = Int32.add casted_votes ballots.pass in
   let supermajority = Int32.div (Int32.mul 8l casted_votes) 10l in
   let participation = (* in centile of percentage *)
-    Int64.to_int32
-      (Int64.div
-         (Int64.mul (Int64.of_int32 all_votes) 100_00L)
-         (Int64.of_int32 maximum_vote)) in
+    Int64.(to_int32
+             (div
+                (mul (of_int32 all_votes) 100_00L)
+                (of_int32 maximum_vote))) in
   let outcome = Compare.Int32.(participation >= expected_quorum &&
                                ballots.yay >= supermajority) in
-  let updated_quorum =
-    Int32.div (Int32.add (Int32.mul 8l expected_quorum) (Int32.mul 2l participation)) 10l in
-  Vote.set_current_quorum ctxt updated_quorum >>=? fun ctxt ->
+  let new_participation_ema =
+    Int32.(div (add
+                  (mul 8l participation_ema)
+                  (mul 2l participation))
+             10l) in
+  Vote.set_participation_ema ctxt new_participation_ema >>=? fun ctxt ->
   return (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
@@ -96,7 +101,7 @@ let start_new_voting_period ctxt =
           return ctxt
     end
   | Testing_vote ->
-      check_approval_and_update_quorum ctxt >>=? fun (ctxt, approved) ->
+      check_approval_and_update_participation_ema ctxt >>=? fun (ctxt, approved) ->
       Vote.clear_ballots ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
       if approved then
@@ -116,7 +121,7 @@ let start_new_voting_period ctxt =
       Vote.set_current_period_kind ctxt Promotion_vote >>=? fun ctxt ->
       return ctxt
   | Promotion_vote ->
-      check_approval_and_update_quorum ctxt >>=? fun (ctxt, approved) ->
+      check_approval_and_update_participation_ema ctxt >>=? fun (ctxt, approved) ->
       begin
         if approved then
           Vote.get_current_proposal ctxt >>=? fun proposal ->
