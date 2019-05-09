@@ -24,10 +24,19 @@ printf "\n\n"
 # Assert all contracts typecheck
 if [ ! $NO_TYPECHECK ] ; then
     for contract in `ls $contract_scenarios_dir/*.tz`; do
-        printf "[Typechecking %s]\n" "$contract";
+        printf "[Type-checking %s]\n" "$contract";
         ${client} typecheck script "$contract";
     done
     printf "All contracts are well typed\n\n"
+fi
+
+# Assert deprecated contracts fail type-check
+if [ ! $NO_TYPECHECK ] ; then
+    for contract in `ls $contract_deprecated_dir/*.tz`; do
+        printf "[Expecting type-check fail %s]\n" "$contract";
+        assert_fails ${client} typecheck script "$contract";
+    done
+    printf "All deprecated contracts don't type-check\n\n"
 fi
 
 # FORMAT: assert_output contract_file storage input expected_result
@@ -40,18 +49,6 @@ fi
 # Test replay prevention
 init_with_transfer $contract_scenarios_dir/replay.tz $key2 Unit 0 bootstrap1
 assert_fails $client transfer 0 from bootstrap1 to replay --burn-cap 10
-
-# Tests create_account
-init_with_transfer $contract_scenarios_dir/create_account.tz $key2 None 1,000 bootstrap1
-assert_balance create_account "1000 ꜩ"
-created_account=\
-`$client transfer 100 from bootstrap1 to create_account -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 10 \
- | grep 'New contract' \
- | sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
- | head -1`
-bake
-assert_balance $created_account "100 ꜩ"
-assert_balance create_account "1000 ꜩ"
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_scenarios_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
@@ -106,6 +103,10 @@ $client get delegate for vote_for_delegate | assert_in_output none
 bake_after $client transfer 0 from bootstrap4 to vote_for_delegate -arg "(Some \"$b5\")" --burn-cap 10
 $client get delegate for vote_for_delegate | assert_in_output "$b5"
 
+# DEPRECATION tests
+
+# Tests create_account fails - uses deprecated instruction 'CREATE_ACCOUNT'
+assert_fails_init_with_transfer $contract_scenarios_dir/create_account.tz $key2 None 1,000 bootstrap1
 
 printf "\nEnd of test\n"
 

@@ -2945,9 +2945,16 @@ and parse_instr
            (Option_t (Key_hash_t _, _), Item_t
               (Bool_t _, Item_t
                  (Mutez_t _, rest, _), _), _), _) ->
-        parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
-        typed ctxt loc Create_account
-          (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
+        if legacy
+        then begin
+          (* For existing contracts, this instruction is still allowed *)
+          parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
+          typed ctxt loc Create_account
+            (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
+        end
+        else
+          (* For new contracts this instruction is not allowed anymore *)
+          fail (Deprecated_instruction I_CREATE_ACCOUNT)
     | Prim (loc, I_IMPLICIT_ACCOUNT, [], annot),
       Item_t (Key_hash_t _, rest, _) ->
         parse_var_annot loc annot >>=? fun annot ->

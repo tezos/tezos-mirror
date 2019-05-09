@@ -20,6 +20,7 @@ contract_op_dir="contracts/opcodes"
 contract_macros_dir="contracts/macros"
 contract_scenarios_dir="contracts/mini_scenarios"
 contract_attic_dir="contracts/attic"
+contract_deprecated_dir="contracts/deprecated"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client
@@ -152,6 +153,19 @@ init_with_transfer () {
             for ${KEY} transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
     bake
+}
+
+assert_fails_init_with_transfer () {
+    local FILE="$1"
+    local NAME=$(contract_name_of_file "${FILE}")
+    local KEY="$2"
+    local INITIAL_STORAGE="$3"
+    local TRANSFER_AMT="$4"
+    local TRANSFER_SRC=${5-bootstrap1}
+    echo "Originating [$NAME]"
+    assert_fails $client originate contract ${NAME} \
+                 for ${KEY} transferring "${TRANSFER_AMT}" \
+                 from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
 }
 
 # Takes a grep regexp and fails with an error message if command does not include
