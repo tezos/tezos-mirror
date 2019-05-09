@@ -54,7 +54,6 @@ type operation = Alpha_context.packed_operation = {
   protocol_data: operation_data ;
 }
 
-
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
 let max_block_length =
@@ -116,7 +115,7 @@ let begin_partial_application
   let level = block_header.shell.level in
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
-  Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker, _block_delay) ->
   let mode =
@@ -133,7 +132,7 @@ let begin_application
   let level = block_header.shell.level in
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
-  Alpha_context.prepare ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt chain_id block_header predecessor_timestamp >>=? fun (ctxt, baker, block_delay) ->
   let mode =
@@ -143,7 +142,7 @@ let begin_application
 let begin_construction
     ~chain_id
     ~predecessor_context:ctxt
-    ~predecessor_timestamp:pred_timestamp
+    ~predecessor_timestamp
     ~predecessor_level:pred_level
     ~predecessor_fitness:pred_fitness
     ~predecessor
@@ -152,7 +151,7 @@ let begin_construction
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
-  Alpha_context.prepare ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt >>=? fun ctxt ->
   begin
     match protocol_data with
     | None ->
@@ -161,7 +160,7 @@ let begin_construction
         return (mode, ctxt)
     | Some proto_header ->
         Apply.begin_full_construction
-          ctxt pred_timestamp
+          ctxt predecessor_timestamp
           proto_header.contents >>=? fun (ctxt, protocol_data, baker, block_delay) ->
         let mode =
           let baker = Signature.Public_key.hash baker in

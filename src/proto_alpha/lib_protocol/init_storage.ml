@@ -83,5 +83,5 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           ) >>=? fun ctxt ->
       return ctxt
 
-let prepare ctxt ~level ~timestamp ~fitness =
-  Raw_context.prepare ~level ~timestamp ~fitness ctxt
+let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
+  Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt

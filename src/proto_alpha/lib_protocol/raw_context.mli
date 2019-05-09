@@ -54,6 +54,7 @@ type root_context = t
     with this version of the protocol. *)
 val prepare:
   level: Int32.t ->
+  predecessor_timestamp: Time.t ->
   timestamp: Time.t ->
   fitness: Fitness.t ->
   Context.t -> context tzresult Lwt.t
@@ -76,6 +77,7 @@ val fork_test_chain: context -> Protocol_hash.t -> Time.t -> t Lwt.t
 val recover: context -> Context.t
 
 val current_level: context -> Level_repr.t
+val predecessor_timestamp: context -> Time.t
 val current_timestamp: context -> Time.t
 
 val current_fitness: context -> Int64.t
