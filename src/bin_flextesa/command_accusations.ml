@@ -286,8 +286,6 @@ let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
   >>= fun () ->
   Helpers.restart_node state node_1 ~client_exec
   >>= fun () ->
-  (* Tezos_client.Keyed.bake state baker_0 "baker-0 baking lonelily"
-   * >>= fun () -> *)
   Test_scenario.Queries.wait_for_all_levels_to_be state
     ~attempts:default_attempts ~seconds:8. [node_1; node_2]
     (`Equal_to (starting_level + 1))
@@ -407,9 +405,6 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
     let bak =
       Tezos_client.Keyed.make client ~key_name
         ~secret_key:(Tezos_protocol.Account.private_key (fst baker_0_account))
-      (* ~secret_key:
-         *   (Tezos_protocol.Key.Of_name.private_key
-         *      (fst baker_0 |> Tezos_protocol.name_to_string)) *)
     in
     Tezos_client.Keyed.initialize state bak >>= fun _ -> return (client, bak)
   in
