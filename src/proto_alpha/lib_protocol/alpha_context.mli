@@ -81,6 +81,7 @@ module Timestamp : sig
   include BASIC_DATA with type t = Time.t
   type time = t
   val (+?) : time -> Period.t -> time tzresult
+  val (-?) : time -> time -> Period.t tzresult
 
   val of_notation: string -> time option
   val to_notation: time -> string
@@ -382,6 +383,8 @@ module Constants : sig
     test_chain_duration: int64;
     quorum_min: int32 ;
     quorum_max: int32 ;
+    initial_endorsers: int ;
+    delay_per_missing_endorsement : Period.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
   val parametric: context -> parametric
@@ -392,6 +395,8 @@ module Constants : sig
   val blocks_per_voting_period: context -> int32
   val time_between_blocks: context -> Period.t list
   val endorsers_per_block: context -> int
+  val initial_endorsers: context -> int
+  val delay_per_missing_endorsement: context -> Period.t
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
   val cost_per_byte: context -> Tez.t
@@ -1152,6 +1157,8 @@ val init_endorsements:
   context ->
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
   context
+val included_endorsements:
+  context -> int
 
 val reset_internal_nonce: context -> context
 val fresh_internal_nonce: context -> (context * int) tzresult

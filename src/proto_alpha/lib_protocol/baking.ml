@@ -142,15 +142,16 @@ let earlier_predecessor_timestamp ctxt level =
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
   let timestamp = Alpha_context.Timestamp.current c in
-  fail_unless Timestamp.(minimal_time <= timestamp)
-    (Timestamp_too_early (minimal_time, timestamp))
+  Lwt.return
+    (record_trace (Timestamp_too_early (minimal_time, timestamp))
+       Timestamp.(timestamp -? minimal_time))
 
 let check_baking_rights c { Block_header.priority ; _ }
     pred_timestamp =
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
-  check_timestamp c priority pred_timestamp >>=? fun () ->
-  return delegate
+  check_timestamp c priority pred_timestamp >>=? fun block_delay ->
+  return (delegate, block_delay)
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -271,9 +272,7 @@ let check_signature block chain_id key =
     fail (Invalid_block_signature (Block_header.hash block,
                                    Signature.Public_key.hash key))
 
-let max_fitness_gap ctxt =
-  let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in
-  Int64.add slots 1L
+let max_fitness_gap _ctxt = 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in
@@ -294,3 +293,36 @@ let dawn_of_a_new_cycle ctxt =
     return_some level.cycle
   else
     return_none
+
+let minimum_allowed_endorsements ctxt ~block_delay =
+  let minimum = Constants.initial_endorsers ctxt in
+  let delay_per_missing_endorsement =
+    Int64.to_int
+      (Period.to_seconds
+         (Constants.delay_per_missing_endorsement ctxt))
+  in
+  let reduced_time_constraint =
+    let delay = Int64.to_int (Period.to_seconds block_delay) in
+    if Compare.Int.(delay_per_missing_endorsement = 0) then
+      delay
+    else
+      delay / delay_per_missing_endorsement
+  in
+  Compare.Int.max 0 (minimum - reduced_time_constraint)
+
+let minimal_valid_time ctxt ~priority ~endorsing_power =
+  let predecessor_timestamp = Timestamp.current ctxt in
+  minimal_time ctxt
+    priority predecessor_timestamp >>=? fun minimal_time ->
+  let minimal_required_endorsements = Constants.initial_endorsers ctxt in
+  let delay_per_missing_endorsement =
+    Constants.delay_per_missing_endorsement ctxt
+  in
+  let missing_endorsements =
+    Compare.Int.max 0 (minimal_required_endorsements - endorsing_power) in
+  match Period.mult
+          (Int32.of_int missing_endorsements)
+          delay_per_missing_endorsement with
+  | Ok delay ->
+      return (Time.add minimal_time (Period.to_seconds delay))
+  | Error _ as err -> Lwt.return err
