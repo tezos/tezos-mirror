@@ -2,13 +2,12 @@ open Tezos_network_sandbox
 open Internal_pervasives
 open Console
 
-let run state ~protocol ~size ~base_port ~no_daemons_for ?kiln
-    ?external_peer_ports ?generate_kiln_config node_exec client_exec baker_exec
-    endorser_exec accuser_exec () =
+let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
+    ?generate_kiln_config node_exec client_exec baker_exec endorser_exec
+    accuser_exec () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [node_exec; client_exec; baker_exec; endorser_exec; accuser_exec]
-    ~using_docker:(kiln <> None)
   >>= fun () ->
   Test_scenario.network_with_protocol ?external_peer_ports ~protocol ~size
     ~base_port state ~node_exec ~client_exec
@@ -20,20 +19,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?kiln
   let network_id =
     match chain_id_json with `String s -> s | _ -> assert false
   in
-  Asynchronous_result.map_option kiln ~f:(fun k ->
-      Kiln.start state ~network_id k
-        ~bakers:
-          (List.map protocol.Tezos_protocol.bootstrap_accounts
-             ~f:(fun (account, _) ->
-               Tezos_protocol.Account.(name account, pubkey_hash account) ))
-        ~node_uris:
-          (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
-               sprintf "http://localhost:%d" rpc_port ))
-      >>= fun (pg, kiln) -> return () )
-  >>= fun (_ : unit option) ->
   Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
-      Kiln.Configuration_directory.generate state
-        kiln_config
+      Kiln.Configuration_directory.generate state kiln_config
         ~peers:(List.map nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
         ~sandbox_json:(Tezos_protocol.sandbox_path ~config:state protocol)
         ~nodes:
@@ -126,12 +113,11 @@ let cmd ~pp_error () =
         bak
         endo
         accu
-        kiln
         generate_kiln_config
         state
         ->
           let actual_test =
-            run state ~size ~base_port ~protocol bnod bcli bak endo accu ?kiln
+            run state ~size ~base_port ~protocol bnod bcli bak endo accu
               ?generate_kiln_config ~external_peer_ports ~no_daemons_for
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
@@ -160,7 +146,6 @@ let cmd ~pp_error () =
     $ Tezos_executable.cli_term `Baker "tezos"
     $ Tezos_executable.cli_term `Endorser "tezos"
     $ Tezos_executable.cli_term `Accuser "tezos"
-    $ Kiln.cli_term ()
     $ Kiln.Configuration_directory.cli_term ()
     $ Test_command_line.cli_state ~name:"mininet" () )
     (let doc = "Small network sandbox with bakers, endorsers, and accusers." in
