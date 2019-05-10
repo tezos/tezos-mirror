@@ -27,6 +27,7 @@ type t
 type period = t
 include Compare.S with type t := t
 val encoding : period Data_encoding.t
+val rpc_arg : period RPC_arg.t
 val pp: Format.formatter -> period -> unit
 
 
@@ -41,6 +42,7 @@ val of_seconds_exn : int64 -> period
 
 val mult : int32 -> period -> period tzresult
 
+val zero : period
 val one_second : period
 val one_minute : period
 val one_hour : period
