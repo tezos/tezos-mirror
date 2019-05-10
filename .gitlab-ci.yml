@@ -332,7 +332,6 @@ integration:voting:
   script:
     - pytest tests_python/tests/test_voting.py
 
-
 integration:double_endorsement:
   <<: *integration_definition
   script:
@@ -342,8 +341,6 @@ integration:snapshot:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_multinode_snapshot.py
-
-
 
 ##END_INTEGRATION_PYTHON##
 
@@ -646,11 +643,6 @@ opam:52:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-alpha-commands
-
-opam:53:tezos-client-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-demo
 
 opam:54:tezos-client-genesis:
   <<: *opam_definition
