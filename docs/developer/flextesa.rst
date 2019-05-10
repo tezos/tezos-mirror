@@ -18,8 +18,7 @@ There are testing-only ``opam`` dependencies: ``dum`` and ``genspio``
 Usage
 -----
 
-See ``./tezos-sandbox --help`` (or one can use
-``_build/default/src/bin_flextesa/main.exe``).
+See ``./tezos-sandbox --help``.
 
 When running (semi-)interactive tests, it is recommended to wrap the
 call with ``rlwrap`` or ``ledit``.
@@ -37,11 +36,11 @@ endorsers:
 
     rlwrap ./tezos-sandbox mini-network \
            --root-path /tmp/zz-mininet-test \
-           --tezos-node-binary _build/default/src/bin_node/main.exe \
-           --tezos-baker-alpha-binary _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe \
-           --tezos-endorser-alpha-binary _build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe \
-           --tezos-accuser-alpha-binary _build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe \
-           --tezos-client-binary _build/default/src/bin_client/main_client.exe
+           --tezos-node-binary ./tezos-node \
+           --tezos-baker-alpha-binary ./tezos-baker-alpha \
+           --tezos-endorser-alpha-binary ./tezos-endorser-alpha \
+           --tezos-accuser-alpha-binary ./tezos-accuser-alpha \
+           --tezos-client-binary ./tezos-client
 
 Once the network is started this test scenario becomes interactive:
 
@@ -72,25 +71,12 @@ sandbox before killing all the nodes.
          --pause-at-end=true
          
 
-This test among other ones can run
+This test among other ones can generate configuration files for
 `Kiln <https://gitlab.com/obsidian.systems/tezos-bake-monitor/>`__
-alongside the *Ꜩ-sandbox*, for instance:
-
-::
-
-    rlwrap ./tezos-sandbox accusations simple-double-endorsing --with-kiln
-
-See also the options ``--kiln-*`` for configuration, and the option
-``--starting-level`` (since Kiln assumes a long-running blockchain
-adding more, e.g. 40, bakes at the beginning of the test brings us to a
-more “normal” state).
+to run alongside the *Ꜩ-sandbox*, for instance:
 
 Voting With a Ledger Nano S
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    **Note:** this requires a recent ``tezos-client`` with the changes
-    from `!848 <https://gitlab.com/tezos/tezos/merge_requests/848>`__ as
-    well as the 2.0.0 version of the ledger Baking app.
 
 The voting test tries to do a full round of voting and protocol switch,
 including baking on the test-chain, see documentation in
@@ -109,7 +95,7 @@ period.
 
 One example is this branch:
 ```obsidian.systems/tezos#zeronet-with-proto042`` <https://gitlab.com/obsidian.systems/tezos/tree/zeronet-with-proto042>`__
-which allows one to build a Zeronet-like code base with an extra
+which allows one to build an Apr2019-Zeronet-like code base with an extra
 protocol, lets assume this is built at path ``$zeronet_042``.
 
 Also, get an URI for your ledger (the test requires both the Wallet and
