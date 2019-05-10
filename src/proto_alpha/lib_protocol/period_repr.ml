@@ -28,6 +28,8 @@ type period = t
 include (Compare.Int64 : Compare.S with type t := t)
 let encoding = Data_encoding.int64
 
+let rpc_arg = RPC_arg.int64
+
 let pp ppf v = Format.fprintf ppf "%Ld" v
 
 type error += (* `Permanent *)
@@ -73,6 +75,7 @@ let mult i p =
   then error Invalid_arg
   else ok (Int64.mul (Int64.of_int32 i) p)
 
+let zero = of_seconds_exn 0L
 let one_second = of_seconds_exn 1L
 let one_minute = of_seconds_exn 60L
 let one_hour = of_seconds_exn 3600L
