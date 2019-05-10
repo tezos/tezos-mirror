@@ -60,6 +60,12 @@ type error += Outdated_double_baking_evidence
 type error += Invalid_activation of { pkh : Ed25519.Public_key_hash.t }
 type error += Multiple_revelation
 type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
+type error +=
+    Not_enough_endorsements_for_priority of
+      { required : int ;
+        priority : int ;
+        endorsements : int ;
+        timestamp: Time.t }
 
 let () =
   register_error_kind
@@ -372,7 +378,28 @@ let () =
                   parse within the provided gas bounds."
     Data_encoding.empty
     (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
-    (fun () -> Gas_quota_exceeded_init_deserialize)
+    (fun () -> Gas_quota_exceeded_init_deserialize) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.not_enought_endorsements_for_priority"
+    ~title:"Not enough endorsements for priority"
+    ~description:"The block being validated does not include the \
+                  required minimum number of endorsements for this priority."
+    ~pp:(fun ppf (required, endorsements, priority, timestamp) ->
+        Format.fprintf ppf "Wrong number of endorsements (%i) for \
+                            priority (%i), %i are expected at %a"
+          endorsements priority required Time.pp_hum timestamp)
+    Data_encoding.(obj4
+                     (req "required" int31)
+                     (req "endorsements" int31)
+                     (req "priority" int31)
+                     (req "timestamp" Time.encoding))
+    (function Not_enough_endorsements_for_priority
+        { required ; endorsements ; priority ; timestamp } ->
+        Some (required, endorsements, priority, timestamp) | _ -> None)
+    (fun (required, endorsements, priority, timestamp) ->
+       Not_enough_endorsements_for_priority
+         { required ; endorsements ; priority ; timestamp }) ;
 
 open Apply_results
 
@@ -791,7 +818,6 @@ let apply_contents_list
       else
         let ctxt = record_endorsement ctxt delegate in
         let gap = List.length slots in
-        let ctxt = Fitness.increase ~gap ctxt in
         Lwt.return
           Tez.(Constants.endorsement_security_deposit ctxt *?
                Int64.of_int gap) >>=? fun deposit ->
@@ -984,14 +1010,14 @@ let may_start_new_cycle ctxt =
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
-    ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
+    ctxt protocol_data pred_timestamp >>=? fun (delegate_pk, block_delay) ->
   let ctxt = Fitness.increase ctxt in
   match Level.pred ctxt (Level.current ctxt) with
   | None -> assert false (* genesis *)
   | Some pred_level ->
       Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      return (ctxt, protocol_data, delegate_pk)
+      return (ctxt, protocol_data, delegate_pk, block_delay)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -1007,7 +1033,8 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.protocol_data.contents pred_timestamp >>=? fun delegate_pk ->
+    ctxt block_header.protocol_data.contents pred_timestamp
+  >>=? fun (delegate_pk, block_delay) ->
   Baking.check_signature block_header chain_id delegate_pk >>=? fun () ->
   let has_commitment =
     match block_header.protocol_data.contents.seed_nonce_hash with
@@ -1023,9 +1050,23 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   | Some pred_level ->
       Baking.endorsement_rights ctxt pred_level >>=? fun rights ->
       let ctxt = init_endorsements ctxt rights in
-      return (ctxt, delegate_pk)
+      return (ctxt, delegate_pk, block_delay)
 
-let finalize_application ctxt protocol_data delegate =
+let check_minimum_endorsements ctxt protocol_data block_delay =
+  let minimum = Baking.minimum_allowed_endorsements ctxt ~block_delay in
+  let timestamp = Alpha_context.Timestamp.current ctxt in
+  if Compare.Int.(included_endorsements ctxt >= minimum) then
+    Ok ()
+  else
+    error (Not_enough_endorsements_for_priority
+             { required = minimum ;
+               priority = protocol_data.Block_header.priority ;
+               endorsements = included_endorsements ctxt ;
+               timestamp })
+
+let finalize_application ctxt protocol_data delegate ~block_delay =
+  Lwt.return
+    (check_minimum_endorsements ctxt protocol_data block_delay) >>=? fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>=? fun ctxt ->
   let reward = (Constants.block_reward ctxt) in
