@@ -93,7 +93,7 @@ class Node(subprocess.Popen):
             new_env = os.environ.copy() if new_env is None else new_env
             lwt_log = ";".join(f'{key} -> {values}' for key, values in
                                log_levels.items())
-            new_env['LWT_LOG'] = lwt_log
+            new_env['TEZOS_LOG'] = lwt_log
 
         node_config_str = utils.format_command(node_config)
         print(node_config_str)
