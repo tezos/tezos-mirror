@@ -216,16 +216,16 @@ module Distributed_db_state = struct
         }
       )
       (obj8
-         (req "p2p_readers_length" int31)
-         (req "active_chains_length" int31)
+         (req "p2p_readers" int31)
+         (req "active_chains" int31)
 
          (req "operation_db" table_scheduler_encoding)
          (req "operations_db" table_scheduler_encoding)
          (req "block_header_db" table_scheduler_encoding)
          (req "operations_hashed_db" table_scheduler_encoding)
 
-         (req "active_connections_length" int31)
-         (req "active_peers_length" int31)
+         (req "active_connections" int31)
+         (req "active_peers" int31)
       )
 
 end

@@ -41,7 +41,7 @@ module Request = struct
           (obj3
              (req "request" (constant "new_branch"))
              (req "block" Block_hash.encoding)
-             (req "locator_length" int31))
+             (req "locators" int31))
           (function New_branch (h, l) -> Some ((), h, l) | _ -> None)
           (fun ((), h, l) -> New_branch (h, l)) ]
 
@@ -122,8 +122,8 @@ module Worker_state = struct
           {fetched_header_length ;
            fetched_block_length })
       (obj2
-         (req "fetched_header_length" int31)
-         (req "fetched_block_length" int31)
+         (req "fetched_headers" int31)
+         (req "fetched_blocks" int31)
       )
 
 
@@ -145,7 +145,7 @@ module Worker_state = struct
             last_validated_head ; last_advertised_head })
       (obj4
          (req "bootstrapped" bool)
-         (req "pipeline_length" pipeline_length_encoding)
+         (req "pipelines" pipeline_length_encoding)
          (req "last_validated_head" Block_hash.encoding)
          (req "last_advertised_head" Block_hash.encoding))
 

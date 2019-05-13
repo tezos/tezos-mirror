@@ -39,7 +39,7 @@ module Prevalidators = struct
                 (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))
                 (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipeline_length" int8)
+                (req "pipelines" int8)
              ))
         RPC_path.(root / "workers" / "prevalidators")
 
@@ -98,7 +98,7 @@ module Peer_validators = struct
                 (req "peer_id" P2p_peer.Id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
                 (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipeline_length" Peer_validator_worker_state.Worker_state.pipeline_length_encoding)
+                (req "pipelines" Peer_validator_worker_state.Worker_state.pipeline_length_encoding)
              ))
         RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" )
 
@@ -135,7 +135,7 @@ module Chain_validators = struct
                 (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
                 (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipeline_length" int8)
+                (req "pipelines" int8)
              ))
         RPC_path.(root / "workers" / "chain_validators")
 
