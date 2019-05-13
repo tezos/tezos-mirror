@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -507,6 +508,22 @@ module Make(Prefix : sig val id : string end) = struct
         | Error exn1, Error exn2 -> Lwt.return_error (exn1 @ exn2)
         | Ok (), Error exn
         | Error exn, Ok () -> Lwt.return_error exn
+
+  let iteri_p f l =
+    let rec iteri_p i f l =
+      match l with
+      | [] -> return_unit
+      | x :: l ->
+          let tx = f i x and tl = iteri_p (i+1) f l in
+          tx >>= fun tx_res ->
+          tl >>= fun tl_res ->
+          match tx_res, tl_res with
+          | Ok (), Ok () -> Lwt.return (Ok ())
+          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok (), Error exn
+          | Error exn, Ok () -> Lwt.return (Error exn)
+    in
+    iteri_p 0 f l
 
   let rec iter2_p f l1 l2 =
     match l1, l2 with

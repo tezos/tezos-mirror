@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -176,6 +177,7 @@ module type S = sig
   (** A {!List.iter} in the monad *)
   val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
   val iter_p : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+  val iteri_p : (int -> 'a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
   val iter2_p : ('a -> 'b -> unit tzresult Lwt.t) -> 'a list -> 'b list -> unit tzresult Lwt.t
   val iteri2_p : (int -> 'a -> 'b -> unit tzresult Lwt.t) -> 'a list -> 'b list -> unit tzresult Lwt.t
 
