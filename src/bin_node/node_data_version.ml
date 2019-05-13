@@ -118,19 +118,37 @@ let check_data_dir_version data_dir =
     (Invalid_data_dir_version (data_version, version)) >>=? fun () ->
   return_unit
 
-let ensure_data_dir data_dir =
-  let write_version () =
-    Lwt_utils_unix.Json.write_file
-      (version_file data_dir)
-      (Data_encoding.Json.construct version_encoding data_version) in
+
+let write_version data_dir =
+  Lwt_utils_unix.Json.write_file
+    (version_file data_dir)
+    (Data_encoding.Json.construct version_encoding data_version)
+
+let ensure_data_dir bare data_dir =
   try if Sys.file_exists data_dir then
       match Sys.readdir data_dir with
-      | [||] -> write_version ()
-      | [| single |] when single = default_identity_file_name -> write_version ()
+      | [||] -> write_version data_dir
+      | [| single |] when single = default_identity_file_name -> write_version data_dir
+      | files when bare ->
+          let files =
+            List.filter
+              (fun e -> e <> default_identity_file_name)
+              (Array.to_list files) in
+          let to_delete =
+            let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) in
+            Format.asprintf "@[<v>%a@]" pp files in
+          fail
+            (Invalid_data_dir
+               (Format.asprintf
+                  "Please provide a clean directory (only %s is allowed) by deleting :@ %s"
+                  default_identity_file_name
+                  to_delete))
       | _ -> check_data_dir_version data_dir
-    else begin
+    else
       Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
-      write_version ()
-    end
+      write_version data_dir
   with Sys_error _ | Unix.Unix_error _ ->
     fail (Invalid_data_dir data_dir)
+
+let ensure_data_dir ?(bare = false) data_dir =
+  ensure_data_dir bare data_dir
