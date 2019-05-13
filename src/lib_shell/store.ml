@@ -27,6 +27,19 @@ type t = Raw_store.t
 type global_store = t
 
 (**************************************************************************
+ * Configuration setup we need to save in order to avoid wrong changes.
+ **************************************************************************)
+
+module Configuration = struct
+
+  module History_mode = Store_helpers.Make_single_store
+      (Raw_store)
+      (struct let name = ["history_mode"] end)
+      (Store_helpers.Make_value(History_mode))
+
+end
+
+(**************************************************************************
  * Net store under "chain/"
  **************************************************************************)
 

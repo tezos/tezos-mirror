@@ -43,6 +43,15 @@ val with_atomic_rw:
   (unit -> 'a Error_monad.tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
+(** {2 Configuration} **********************************************************)
+
+module Configuration : sig
+
+  module History_mode : SINGLE_STORE
+    with type t := global_store
+     and type value := History_mode.t
+end
+
 (** {2 Chain store} **********************************************************)
 
 module Chain : sig

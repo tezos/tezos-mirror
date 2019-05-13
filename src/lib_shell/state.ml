@@ -1312,6 +1312,7 @@ let init
     ?(context_mapsize=409_600_000_000L)
     ~store_root
     ~context_root
+    ?history_mode
     genesis =
   Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
   Context.init
@@ -1320,7 +1321,23 @@ let init
   let chain_id = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index chain_id >>=? fun state ->
   may_create_chain state chain_id genesis >>= fun main_chain_state ->
-  return (state, main_chain_state, context_index)
+  Store.Configuration.History_mode.read_opt global_store >>= begin function
+    | None ->
+        let mode = Option.unopt ~default:History_mode.Full history_mode in
+        Store.Configuration.History_mode.store global_store mode >>= fun () ->
+        return mode
+    | Some previous_history_mode ->
+        match history_mode with
+        | None -> return previous_history_mode
+        | Some history_mode -> return history_mode
+  end >>=? fun history_mode ->
+  return (state, main_chain_state, context_index, history_mode)
+
+let history_mode { global_data ; _ } =
+  Shared.use global_data begin fun { global_store ; _ } ->
+    Store.Configuration.History_mode.read_opt global_store >|=
+    Option.unopt_assert ~loc:__POS__
+  end
 
 let close { global_data ; _ } =
   Shared.use global_data begin fun { global_store ; _ } ->

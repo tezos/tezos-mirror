@@ -258,15 +258,17 @@ let create
     peer_validator_limits
     block_validator_limits
     prevalidator_limits
-    chain_validator_limits =
+    chain_validator_limits
+    history_mode
+  =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some (config, _limits) -> not config.P2p.disable_mempool, not config.P2p.disable_testchain
     | None -> true, true in
   init_p2p ~sandboxed p2p_params >>=? fun p2p ->
   State.init
-    ~store_root ~context_root ?patch_context
-    genesis >>=? fun (state, mainchain_state, context_index) ->
+    ~store_root ~context_root ?history_mode ?patch_context
+    genesis >>=? fun (state, mainchain_state, context_index, _history_mode) ->
   may_update_checkpoint mainchain_state checkpoint >>= fun () ->
   let distributed_db = Distributed_db.create state p2p in
   store_known_protocols state >>= fun () ->

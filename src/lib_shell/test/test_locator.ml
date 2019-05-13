@@ -73,7 +73,7 @@ let init_chain base_dir : State.Chain.t Lwt.t =
   State.init
     ~store_root ~context_root state_genesis_block >>= function
   | Error _ -> Pervasives.failwith "read err"
-  | Ok (_state, chain, _index) ->
+  | Ok (_state, chain, _index, _history_mode) ->
       Lwt.return chain
 
 
