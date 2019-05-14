@@ -1570,6 +1570,66 @@ let read
   Chain.read_all state >>=? fun () ->
   return state
 
+type error += Incorrect_history_mode_switch of
+    { previous_mode: History_mode.t ; next_mode: History_mode.t }
+
+let () =
+  register_error_kind `Permanent
+    ~id:"node_config_file.incorrect_history_mode_switch"
+    ~title:"Incorrect history mode switch"
+    ~description:"Incorrect history mode switch."
+    ~pp:(fun ppf (hm1, hm2) ->
+        Format.fprintf ppf
+          "@[cannot switch from history mode %a mode to %a mode.@]"
+          History_mode.pp hm1 History_mode.pp hm2
+      )
+    (Data_encoding.obj2
+       (Data_encoding.req "previous_mode" History_mode.encoding)
+       (Data_encoding.req "next_mode" History_mode.encoding))
+    (function
+      | Incorrect_history_mode_switch x -> Some (x.previous_mode, x.next_mode)
+      | _ -> None)
+    (fun (previous_mode, next_mode) ->
+       Incorrect_history_mode_switch { previous_mode ; next_mode })
+
+let check_and_save_history_mode
+    ~previous_mode
+    ~next_mode
+    global_store
+    state
+  =
+  let open History_mode in
+  match (previous_mode, next_mode) with
+  | (Archive, Archive) | (Full, Full) | (Rolling, Rolling) ->
+      return_unit
+  | (Full, Archive) | (Rolling, Archive) | (Rolling, Full) ->
+      fail (Incorrect_history_mode_switch { previous_mode ; next_mode })
+  | Archive, (Full as new_history_mode)
+  | (Archive | Full), (Rolling as new_history_mode) ->
+      lwt_log_notice Tag.DSL.(fun f ->
+          f "Cleaning up the state to switch to %a mode..."
+          -% t event "cleanup_state"
+          -% a History_mode.tag new_history_mode) >>= fun () ->
+      Store.Configuration.History_mode.store
+        global_store new_history_mode >>= fun () ->
+      Chain.all state >>= fun chains ->
+      Lwt_list.iter_s (fun chain_state ->
+          Chain.checkpoint chain_state >>= fun checkpoint ->
+          let hash = Block_header.hash checkpoint in
+          let faked_genesis_hash = Chain.faked_genesis_hash chain_state in
+          if Block_hash.equal hash faked_genesis_hash then
+            Lwt.return_unit
+          else
+            let lvl = checkpoint.shell.level in
+            if new_history_mode = Full then
+              Chain.purge_full chain_state (lvl, hash)
+            else begin
+              assert (new_history_mode = Rolling) ;
+              Chain.purge_rolling chain_state (lvl, hash)
+            end
+        ) chains >>= fun () ->
+      return_unit
+
 let init
     ?patch_context
     ?(store_mapsize=40_960_000_000L)
@@ -1593,7 +1653,11 @@ let init
     | Some previous_history_mode ->
         match history_mode with
         | None -> return previous_history_mode
-        | Some history_mode -> return history_mode
+        | Some history_mode ->
+            check_and_save_history_mode
+              ~previous_mode:previous_history_mode
+              ~next_mode:history_mode global_store state >>=? fun () ->
+            return history_mode
   end >>=? fun history_mode ->
   return (state, main_chain_state, context_index, history_mode)
 

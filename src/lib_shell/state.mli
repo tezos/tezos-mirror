@@ -343,6 +343,9 @@ module Current_mempool : sig
 
 end
 
+type error += Incorrect_history_mode_switch of
+    { previous_mode: History_mode.t ; next_mode: History_mode.t }
+
 val history_mode: global_state -> History_mode.t Lwt.t
 
 (** Read the internal state of the node and initialize
