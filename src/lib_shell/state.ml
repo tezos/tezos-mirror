@@ -250,7 +250,8 @@ module Locked_block = struct
     let header : Block_header.t = { shell ; protocol_data = MBytes.create 0 } in
     Store.Block.Header.store  (store, genesis.block) header >>= fun () ->
     Store.Block.Contents.store (store, genesis.block)
-      { Store.Block.message = Some "Genesis" ;
+      { header ;
+        Store.Block.message = Some "Genesis" ;
         max_operations_ttl = 0 ; context ;
         metadata = MBytes.create 0 ;
         last_allowed_fork_level = 0l ;
@@ -896,6 +897,7 @@ module Block = struct
             block_header
         in
         let contents = {
+          header ;
           Store.Block.message ;
           max_operations_ttl ;
           last_allowed_fork_level ;
@@ -1132,9 +1134,9 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
     let block_store = Store.Block.get chain_store in
     Store.Block.Header.store (block_store, genesis_hash) genesis_header >>= fun () ->
     Store.Block.Contents.store (block_store, genesis_hash)
-      { Store.Block.message = Some "Genesis" ;
-        max_operations_ttl = 0 ;
-        context = genesis_header.shell.context ;
+      { header = genesis_header ;
+        Store.Block.message = Some "Genesis" ;
+        max_operations_ttl = 0 ; context = genesis_header.shell.context ;
         metadata = MBytes.create 0 ;
         last_allowed_fork_level = 0l ;
       } >>= fun () ->

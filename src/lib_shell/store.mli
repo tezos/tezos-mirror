@@ -124,6 +124,7 @@ module Block : sig
   val get: Chain.store -> store
 
   type contents = {
+    header: Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;

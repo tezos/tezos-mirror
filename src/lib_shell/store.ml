@@ -122,6 +122,7 @@ module Block = struct
       (Block_hash)
 
   type contents = {
+    header : Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
@@ -144,22 +145,23 @@ module Block = struct
          let encoding =
            let open Data_encoding in
            conv
-             (fun { message ; max_operations_ttl ;
+             (fun { header ; message ; max_operations_ttl ;
                     last_allowed_fork_level ;
                     context ; metadata } ->
                (message, max_operations_ttl, last_allowed_fork_level,
-                context, metadata ))
+                context, metadata, header ))
              (fun (message, max_operations_ttl, last_allowed_fork_level,
-                   context, metadata ) ->
-               { message ; max_operations_ttl ;
+                   context, metadata, header ) ->
+               { header ; message ; max_operations_ttl ;
                  last_allowed_fork_level ;
                  context ; metadata })
-             (obj5
+             (obj6
                 (opt "message" string)
                 (req "max_operations_ttl" uint16)
                 (req "last_allowed_fork_level" int32)
                 (req "context" Context_hash.encoding)
-                (req "metadata" bytes))
+                (req "metadata" bytes)
+                (req "header" Block_header.encoding))
        end))
 
   type pruned_contents = {
