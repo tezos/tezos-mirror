@@ -113,6 +113,14 @@ module Chain_data : sig
     with type t := store
      and type value := Block_header.t
 
+  module Save_point : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Caboose : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
 end
 
 
