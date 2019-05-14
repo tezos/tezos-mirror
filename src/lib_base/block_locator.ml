@@ -158,31 +158,54 @@ let to_steps seed locator =
       { block ; predecessor = pred ; step ; strict_step } :: acc
     end
 
-let compute ~predecessor ~genesis block_hash header seed ~size =
-  let rec loop acc size state block =
+let fold_truncate ~f ~init ~save_point ~limit (head, hist) seed =
+  let rec loop state step_sum acc = function
+    | [] | [_] -> acc
+    | block :: (pred :: rem as hist) ->
+        let step, state = Step.next state in
+        let new_step_sum = step + step_sum in
+        if new_step_sum >= limit then
+          f acc ~block ~pred:save_point ~step ~strict_step:false
+        else
+          let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
+          loop state new_step_sum acc hist in
+  let hash = Block_header.hash head in
+  let initial_state = Step.init seed hash in
+  loop initial_state 0 init (hash :: hist)
+
+let to_steps_truncate ~limit ~save_point seed locator =
+  fold_truncate locator seed
+    ~init:[] ~save_point ~limit
+    ~f: begin fun acc ~block ~pred ~step ~strict_step ->
+      { block ; predecessor = pred ; step ; strict_step } :: acc
+    end
+
+let compute
+    ~get_predecessor
+    ~caboose
+    ~size
+    block_hash
+    header
+    seed =
+  let rec loop acc size state current_block_hash =
     if size = 0 then
-      Lwt.return (List.rev acc)
+      Lwt.return acc
     else
-      let step, state = Step.next state in
-      predecessor block step >>= function
+      let (step, state) = Step.next state in
+      get_predecessor current_block_hash step >>= function
       | None ->
-          (* We reached genesis before size *)
-          if Block_hash.equal block genesis then
-            Lwt.return (List.rev acc)
+          if Block_hash.equal caboose current_block_hash then
+            Lwt.return acc
           else
-            Lwt.return (List.rev (genesis :: acc))
-      | Some pred ->
-          loop (pred :: acc) (size - 1) state pred in
+            Lwt.return (caboose :: acc)
+      | Some predecessor ->
+          loop (predecessor :: acc) (pred size) state predecessor in
   if size <= 0 then
     Lwt.return (header, [])
   else
-    let state = Step.init seed block_hash in
-    let step, state = Step.next state in
-    predecessor block_hash step >>= function
-    | None -> Lwt.return (header, [])
-    | Some p ->
-        loop [p] (size-1) state p >>= fun hist ->
-        Lwt.return (header, hist)
+    let initial_state = Step.init seed block_hash in
+    loop [] size initial_state block_hash >>= fun hist ->
+    Lwt.return (header, List.rev hist)
 
 type validity =
   | Unknown

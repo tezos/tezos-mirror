@@ -184,15 +184,14 @@ let store_predecessors (store: Store.Block.store) (b: Block_hash.t) : unit Lwt.t
     loop pred 1
 
 (**
-   [predecessor s b d] returns the hash of the node at distance [d] from [b].
+   [predecessor_n_raw s b d] returns the hash of the block at distance [d] from [b].
    Returns [None] if [d] is greater than the distance of [b] from genesis or
    if [b] is genesis.
    Works in O(log|chain|) if the chain is shorter than 2^[stored_predecessors_size]
    and in O(|chain|) after that.
    @raise Invalid_argument "State.predecessors: negative distance"
 *)
-let predecessor_n (store: Store.Block.store) (block_hash: Block_hash.t) (distance: int)
-  : Block_hash.t option Lwt.t =
+let predecessor_n_raw store block_hash distance =
   (* helper functions *)
   (* computes power of 2 w/o floats *)
   let power_of_2 n =
@@ -217,7 +216,7 @@ let predecessor_n (store: Store.Block.store) (block_hash: Block_hash.t) (distanc
 
   (* actual predecessor function *)
   if distance < 0 then
-    invalid_arg ("State.predecessor: distance <= 0"^(string_of_int distance))
+    invalid_arg ("State.predecessor: distance < 0 " ^ string_of_int distance)
   else if distance = 0 then
     Lwt.return_some block_hash
   else
@@ -242,11 +241,30 @@ let predecessor_n (store: Store.Block.store) (block_hash: Block_hash.t) (distanc
     in
     loop block_hash distance
 
-let compute_locator_from_hash (chain : chain_state) ?(size = 200) head_hash seed =
-  Shared.use chain.block_store begin fun block_store ->
-    Header.read_opt (block_store, head_hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun  header ->
-    Block_locator.compute ~predecessor:(predecessor_n block_store)
-      ~genesis:chain.genesis.block head_hash header seed ~size
+let predecessor_n ?(below_save_point = false) block_store block_hash distance =
+  predecessor_n_raw block_store block_hash distance >>= function
+  | None -> Lwt.return_none
+  | Some predecessor ->
+      begin if below_save_point then
+          Header.known (block_store, predecessor)
+        else
+          Store.Block.Contents.known (block_store, predecessor)
+      end >>= function
+      | false -> Lwt.return_none
+      | true -> Lwt.return_some predecessor
+
+let compute_locator_from_hash chain_state ?(size = 200) head_hash seed =
+  Shared.use chain_state.chain_data begin fun state ->
+    Lwt.return state.data.caboose
+  end >>= fun (_lvl, caboose) ->
+  Shared.use chain_state.block_store begin fun block_store ->
+    Header.read_opt (block_store, head_hash) >|=
+    Option.unopt_assert ~loc:__POS__ >>= fun header ->
+    Block_locator.compute
+      ~get_predecessor:(predecessor_n ~below_save_point:true block_store)
+      ~caboose
+      ~size
+      head_hash header seed
   end
 
 let compute_locator chain ?size head seed =
@@ -299,8 +317,9 @@ module Locked_block = struct
     else
       predecessor_n block_store hash
         (Int32.to_int @@
-         Int32.sub header.shell.level checkpoint.shell.level) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred ->
-      if Block_hash.equal pred (Block_header.hash checkpoint) then
+         Int32.sub header.shell.level checkpoint.shell.level) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun predecessor ->
+      if Block_hash.equal predecessor (Block_header.hash checkpoint) then
         Lwt.return_true
       else
         Lwt.return_false
