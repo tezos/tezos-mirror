@@ -57,6 +57,8 @@ type data = State.chain_data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 let data chain_state =
@@ -107,11 +109,10 @@ let locked_set_head chain_store data block =
   State.Block.max_operations_ttl block >>= fun max_op_ttl ->
   Chain_traversal.live_blocks block max_op_ttl >>=
   fun (live_blocks, live_operations) ->
-  Lwt.return { current_head = block  ;
-               current_mempool = Mempool.empty ;
-               live_blocks ;
-               live_operations ;
-               test_chain = data.test_chain ;
+  Lwt.return { data with current_head = block  ;
+                         current_mempool = Mempool.empty ;
+                         live_blocks ;
+                         live_operations ;
              }
 
 let set_head chain_state block =

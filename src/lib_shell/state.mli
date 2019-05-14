@@ -91,6 +91,9 @@ module Chain : sig
 
   val checkpoint: chain_state -> Block_header.t Lwt.t
 
+  val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+  val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
+
   (** Update the current checkpoint. The current head should be
       consistent (i.e. it should either have a lower level or pass
       through the checkpoint). In the process all the blocks from
@@ -245,6 +248,8 @@ type chain_data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 val read_chain_data:

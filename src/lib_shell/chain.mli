@@ -40,6 +40,8 @@ type data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t ;
+  caboose: Int32.t * Block_hash.t ;
 }
 
 (** Reading atomically all the chain data. *)

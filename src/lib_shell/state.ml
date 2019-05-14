@@ -87,6 +87,8 @@ and chain_data = {
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   test_chain: Chain_id.t option ;
+  save_point: Int32.t * Block_hash.t  ;
+  caboose: Int32.t * Block_hash.t  ;
 }
 
 and block = {
@@ -406,13 +408,22 @@ module Chain = struct
     end
 
   let allocate
-      ~genesis ~faked_genesis_hash ~expiration ~allow_forked_chain
-      ~current_head ~checkpoint ~chain_id
+      ~genesis
+      ~faked_genesis_hash
+      ~save_point
+      ~caboose
+      ~expiration
+      ~allow_forked_chain
+      ~current_head
+      ~checkpoint
+      ~chain_id
       global_state context_index chain_data_store block_store =
     Header.read_opt
       (block_store, current_head) >|= Option.unopt_assert ~loc:__POS__ >>= fun current_block_head ->
     let rec chain_data = {
       data = {
+        save_point ;
+        caboose ;
         current_head = {
           chain_state ;
           hash = current_head ;
@@ -446,12 +457,16 @@ module Chain = struct
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
+    let save_point = genesis_header.shell.level, genesis.block in
+    let caboose = genesis_header.shell.level, genesis.block in
     Store.Chain.Genesis_hash.store chain_store genesis.block >>= fun () ->
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
     Store.Chain_data.Current_head.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Known_heads.store chain_data_store genesis.block >>= fun () ->
     Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
+    Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
+    Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -471,6 +486,8 @@ module Chain = struct
       ~allow_forked_chain
       ~checkpoint:genesis_header
       ~chain_id
+      ~save_point
+      ~caboose
       global_state
       data.context_index
       chain_data_store
@@ -516,6 +533,8 @@ module Chain = struct
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
     Store.Chain_data.Checkpoint.read chain_data_store >>=? fun checkpoint ->
+    Store.Chain_data.Save_point.read chain_data_store >>=? fun save_point ->
+    Store.Chain_data.Caboose.read chain_data_store >>=? fun caboose ->
     try
       allocate
         ~genesis
@@ -525,6 +544,8 @@ module Chain = struct
         ~allow_forked_chain
         ~checkpoint
         ~chain_id
+        ~save_point
+        ~caboose
         global_state
         data.context_index
         chain_data_store
@@ -574,6 +595,15 @@ module Chain = struct
     Shared.use chain_state.chain_data begin fun { checkpoint ; _ } ->
       Lwt.return checkpoint
     end
+  let save_point chain_state =
+    Shared.use chain_state.chain_data begin fun state ->
+      Lwt.return state.data.save_point
+    end
+  let caboose chain_state =
+    Shared.use chain_state.chain_data begin fun state ->
+      Lwt.return state.data.caboose
+    end
+
 
   let set_checkpoint chain_state checkpoint =
     Shared.use chain_state.block_store begin fun store ->
