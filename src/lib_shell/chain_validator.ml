@@ -415,29 +415,28 @@ let on_close w =
   Lwt.return_unit
 
 let on_launch start_prevalidator w _ parameters =
-  Chain.init_head parameters.chain_state >>=? fun () ->
-  (if start_prevalidator then
-     State.read_chain_data parameters.chain_state
-       (fun _ { State.current_head ; _ } -> Lwt.return current_head) >>= fun head ->
-     State.Block.protocol_hash head >>= fun head_hash ->
-     safe_get_protocol head_hash >>= function
-     | Ok (module Proto) -> begin
-         Prevalidator.create
-           parameters.prevalidator_limits
-           (module Proto)
-           parameters.chain_db >>= function
-         | Error err ->
-             Log.lwt_log_error "@[Failed to instantiate prevalidator:@ %a@]"
-               pp_print_error err >>= fun () ->
-             return_none
-         | Ok prevalidator ->
-             return_some prevalidator
-       end
-     | Error err ->
-         Log.lwt_log_error "@[Failed to instantiate prevalidator:@ %a@]"
-           pp_print_error err >>= fun () ->
-         return_none
-   else return_none) >>=? fun prevalidator ->
+  begin if start_prevalidator then
+      State.read_chain_data parameters.chain_state
+        (fun _ { State.current_head ; _ } -> Lwt.return current_head) >>= fun head ->
+      State.Block.protocol_hash head >>= fun head_hash ->
+      safe_get_protocol head_hash >>= function
+      | Ok (module Proto) -> begin
+          Prevalidator.create
+            parameters.prevalidator_limits
+            (module Proto)
+            parameters.chain_db >>= function
+          | Error err ->
+              Log.lwt_log_error "@[Failed to instantiate prevalidator:@ %a@]"
+                pp_print_error err >>= fun () ->
+              return_none
+          | Ok prevalidator ->
+              return_some prevalidator
+        end
+      | Error err ->
+          Log.lwt_log_error "@[Failed to instantiate prevalidator:@ %a@]"
+            pp_print_error err >>= fun () ->
+          return_none
+    else return_none end >>=? fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
@@ -524,6 +523,7 @@ let rec create
       chain_db = Distributed_db.activate db chain_state ;
       chain_state ;
       limits } in
+  Chain.init_head chain_state >>=? fun () ->
   Worker.launch table
     prevalidator_limits.worker_limits
     (State.Chain.id chain_state)
