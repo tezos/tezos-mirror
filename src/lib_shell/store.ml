@@ -130,12 +130,6 @@ module Block = struct
     metadata: MBytes.t ;
   }
 
-  module Header =
-    Store_helpers.Make_single_store
-      (Indexed_store.Store)
-      (struct let name = ["header"] end)
-      (Store_helpers.Make_value(Block_header))
-
   module Contents =
     Store_helpers.Make_single_store
       (Indexed_store.Store)

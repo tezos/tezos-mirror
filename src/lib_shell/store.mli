@@ -132,10 +132,6 @@ module Block : sig
     metadata: MBytes.t ;
   }
 
-  module Header : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := Block_header.t
-
   module Contents : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := contents
