@@ -686,6 +686,21 @@ module Chain = struct
 
 end
 
+type error += Missing_block of Block_hash.t
+
+let () = register_error_kind `Permanent
+    ~id:"state.block.missing"
+    ~title:"Missing block"
+    ~description:"Missing block while looking for predecessor."
+    ~pp:(fun ppf block_hash ->
+        Format.fprintf ppf
+          "@[Cannot find block %a]"
+          Block_hash.pp block_hash)
+    Data_encoding.(obj1 (req "missing_block" @@ Block_hash.encoding ) )
+    (function Missing_block block_header -> Some block_header
+            | _ -> None)
+    (fun block_header -> Missing_block block_header)
+
 module Block = struct
 
   type t = block = {
@@ -712,9 +727,8 @@ module Block = struct
   let header { header ; _ } = header
   let metadata b =
     Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read_opt (store, b.hash) >|=
-      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-      Lwt.return contents.metadata
+      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
+      return contents.metadata
     end
 
   let chain_state { chain_state ; _ } = chain_state
@@ -726,22 +740,19 @@ module Block = struct
   let validation_passes b = (shell_header b).validation_passes
   let message b =
     Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read_opt (store, b.hash) >|=
-      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-      Lwt.return contents.message
+      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
+      return contents.message
     end
 
   let max_operations_ttl b =
     Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read_opt (store, b.hash) >|=
-      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-      Lwt.return contents.max_operations_ttl
+      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
+      return contents.max_operations_ttl
     end
   let last_allowed_fork_level b =
     Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read_opt (store, b.hash) >|=
-      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-      Lwt.return contents.last_allowed_fork_level
+      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
+      return contents.last_allowed_fork_level
     end
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block

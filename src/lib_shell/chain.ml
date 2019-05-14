@@ -71,7 +71,7 @@ let locator chain_state seed =
   data chain_state >>= fun data ->
   State.compute_locator chain_state data.current_head seed
 
-let locked_set_head chain_store data block =
+let locked_set_head chain_store data block live_blocks live_operations =
   let rec pop_blocks ancestor block =
     let hash = State.Block.hash block in
     if Block_hash.equal hash ancestor then
@@ -107,9 +107,6 @@ let locked_set_head chain_store data block =
      new head is a direct successor of the current head...
      Make sure to do the live blocks computation in `init_head`
      when this TODO is resolved. *)
-  State.Block.max_operations_ttl block >>= fun max_op_ttl ->
-  Chain_traversal.live_blocks block max_op_ttl >>=
-  fun (live_blocks, live_operations) ->
   Lwt.return { data with current_head = block  ;
                          current_mempool = Mempool.empty ;
                          live_blocks ;
@@ -117,22 +114,32 @@ let locked_set_head chain_store data block =
              }
 
 let set_head chain_state block =
+  State.Block.max_operations_ttl block >>=? fun max_op_ttl ->
+  Chain_traversal.live_blocks
+    block max_op_ttl >>=? fun (live_blocks,
+                               live_operations) ->
   State.update_chain_data chain_state begin fun chain_store data ->
-    locked_set_head chain_store data block >>= fun new_chain_data ->
-    Lwt.return (Some new_chain_data,
-                data.current_head)
-  end
+    locked_set_head
+      chain_store data block live_blocks live_operations >>= fun new_chain_data ->
+    Lwt.return (Some new_chain_data, data.current_head)
+  end >>= fun chain_state ->
+  return chain_state
 
 let test_and_set_head chain_state ~old block =
+  State.Block.max_operations_ttl block >>=? fun max_op_ttl ->
+  Chain_traversal.live_blocks
+    block max_op_ttl >>=? fun (live_blocks, live_operations) ->
   State.update_chain_data chain_state begin fun chain_store data ->
     if not (State.Block.equal data.current_head old) then
       Lwt.return (None, false)
     else
-      locked_set_head chain_store data block >>= fun new_chain_data ->
+      locked_set_head
+        chain_store data block live_blocks live_operations >>= fun new_chain_data ->
       Lwt.return (Some new_chain_data, true)
-  end
+  end >>= fun chain_state ->
+  return chain_state
 
 let init_head chain_state =
   head chain_state >>= fun block ->
-  set_head chain_state block >>= fun _ ->
-  Lwt.return_unit
+  set_head chain_state block >>=? fun (_ : State.Block.t) ->
+  return_unit

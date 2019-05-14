@@ -173,7 +173,7 @@ let with_activated_peer_validator w peer_id f =
 
 let may_update_checkpoint chain_state new_head =
   State.Chain.checkpoint chain_state >>= fun checkpoint ->
-  State.Block.last_allowed_fork_level new_head >>= fun new_level ->
+  State.Block.last_allowed_fork_level new_head >>=? fun new_level ->
   if new_level <= checkpoint.shell.level then
     return_unit
   else
@@ -341,7 +341,7 @@ let on_request (type a) w
   if not accepted_head then
     return Event.Ignored_head
   else begin
-    Chain.set_head nv.parameters.chain_state block >>= fun previous ->
+    Chain.set_head nv.parameters.chain_state block >>=? fun previous ->
     may_update_checkpoint nv.parameters.chain_state block >>=? fun () ->
     broadcast_head w ~previous block >>= fun () ->
     begin match nv.prevalidator with
@@ -415,7 +415,7 @@ let on_close w =
   Lwt.return_unit
 
 let on_launch start_prevalidator w _ parameters =
-  Chain.init_head parameters.chain_state >>= fun () ->
+  Chain.init_head parameters.chain_state >>=? fun () ->
   (if start_prevalidator then
      State.read_chain_data parameters.chain_state
        (fun _ { State.current_head ; _ } -> Lwt.return current_head) >>= fun head ->
