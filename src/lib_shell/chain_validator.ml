@@ -191,8 +191,14 @@ let may_update_checkpoint chain_state new_head =
               Block_hash.pp (State.Block.hash new_checkpoint)
               History_mode.pp history_mode ;
             let new_checkpoint = State.Block.header new_checkpoint in
-            State.Chain.set_checkpoint chain_state new_checkpoint >>= fun () ->
-            return_unit
+            begin match history_mode with
+              | History_mode.Archive ->
+                  State.Chain.set_checkpoint chain_state new_checkpoint
+              | Full ->
+                  State.Chain.set_checkpoint_then_purge_full chain_state new_checkpoint
+              | Rolling ->
+                  State.Chain.set_checkpoint_then_purge_rolling chain_state new_checkpoint
+            end >>= fun () -> return_unit
 
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in

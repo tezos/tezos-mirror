@@ -379,6 +379,33 @@ let tag_invalid_heads block_store chain_store heads level =
     heads >>= fun () ->
   Lwt_list.filter_map_s tag_invalid_head heads
 
+let prune_block store block_hash =
+  let st = (store, block_hash) in
+  Store.Block.Contents.remove st >>= fun () ->
+  Store.Block.Invalid_block.remove store block_hash >>= fun () ->
+  Store.Block.Operations_metadata.remove_all st
+
+let store_header_and_prune_block store block_hash =
+  let st = (store, block_hash) in
+  Store.Block.Contents.read_opt st >>= begin function
+    | Some { header ; _ } ->
+        Store.Block.Pruned_contents.store st { header }
+    | None ->
+        Store.Block.Pruned_contents.known st >>= fun content_known ->
+        assert content_known;
+        Lwt.return_unit
+  end >>= fun () ->
+  prune_block store block_hash
+
+let delete_block store block_hash =
+  prune_block store block_hash >>= fun () ->
+  let st = (store, block_hash) in
+  Store.Block.Pruned_contents.remove st >>= fun () ->
+  Store.Block.Operations.remove_all st >>= fun () ->
+  Store.Block.Operation_hashes.remove_all st >>= fun () ->
+  Store.Block.Predecessors.remove_all st
+
+
 (* Remove all blocks that are not in the chain. *)
 let cut_alternate_heads block_store chain_store heads =
   let rec cut_alternate_head hash header =
@@ -648,6 +675,117 @@ module Chain = struct
       Lwt.return state.data.caboose
     end
 
+  let purge_loop_full
+      ?(chunk_size = 4000)
+      global_store store
+      ~genesis_hash block_hash
+      caboose_level =
+    let do_prune blocks =
+      Store.with_atomic_rw global_store @@ fun () ->
+      Lwt_list.iter_s (store_header_and_prune_block store) blocks in
+    let rec loop block_hash (n_blocks, blocks) =
+      begin if n_blocks >= chunk_size then
+          do_prune blocks >>= fun () ->
+          Lwt.return (0, [])
+        else
+          Lwt.return (n_blocks, blocks)
+      end >>= fun (n_blocks, blocks) ->
+      Header.read_opt (store, block_hash) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun header ->
+      if Block_hash.equal block_hash genesis_hash then
+        do_prune blocks
+      else if header.shell.level = caboose_level then
+        do_prune (block_hash :: blocks)
+      else
+        loop header.shell.predecessor (n_blocks + 1, block_hash :: blocks) in
+    Header.read_opt (store, block_hash) >|=
+    Option.unopt_assert ~loc:__POS__ >>= fun header ->
+    loop header.shell.predecessor (0, [])
+
+  let purge_full chain_state (lvl, hash) =
+    Shared.use chain_state.global_state.global_data begin fun global_data ->
+      Shared.use chain_state.block_store begin fun store ->
+        update_chain_data chain_state begin fun _ data ->
+          purge_loop_full
+            global_data.global_store store
+            ~genesis_hash:chain_state.genesis.block hash
+            (fst data.save_point) >>= fun () ->
+          let new_data = { data with save_point = (lvl, hash) ; } in
+          Lwt.return (Some new_data, ())
+        end >>= fun () ->
+        Shared.use chain_state.chain_data begin fun data ->
+          Store.Chain_data.Save_point.store data.chain_data_store (lvl, hash)
+        end
+      end
+    end
+
+  let purge_loop_rolling global_store store ~genesis_hash block_hash limit =
+    let do_delete blocks =
+      Store.with_atomic_rw global_store @@ fun () ->
+      Lwt_list.iter_s (delete_block store) blocks in
+    let rec prune_loop block_hash limit =
+      if Block_hash.equal genesis_hash block_hash then
+        Lwt.return block_hash
+      else if limit = 1 then
+        Header.read_opt (store, block_hash) >>= function
+        | None -> assert false (* Should not happen. *)
+        | Some header ->
+            begin
+              store_header_and_prune_block store block_hash >>= fun () ->
+              delete_loop header.shell.predecessor (0, []) >>= fun () ->
+              Lwt.return block_hash end
+      else
+        Header.read_opt (store, block_hash) >>= function
+        | None -> assert false (* Should not happen. *)
+        | Some header ->
+            store_header_and_prune_block store block_hash >>= fun () ->
+            prune_loop header.shell.predecessor (limit - 1)
+    and delete_loop block_hash (n_blocks, blocks) =
+      begin if n_blocks >= 4000 then
+          do_delete blocks >>= fun () ->
+          Lwt.return (0, [])
+        else Lwt.return (n_blocks, blocks)
+      end >>= fun (n_blocks, blocks) ->
+      Header.read_opt (store, block_hash) >>= function
+      | None -> do_delete blocks
+      | Some header ->
+          if Block_hash.equal genesis_hash block_hash then
+            do_delete blocks
+          else
+            delete_loop header.shell.predecessor
+              (n_blocks + 1, block_hash :: blocks)
+    in
+    Header.read_opt (store, block_hash) >|=
+    Option.unopt_assert ~loc:__POS__ >>= fun header ->
+    if limit = 0 then
+      delete_loop header.shell.predecessor (0, []) >>= fun () ->
+      Lwt.return block_hash
+    else
+      prune_loop header.shell.predecessor limit
+
+  let purge_rolling chain_state ((lvl, hash) as checkpoint) =
+    Shared.use chain_state.global_state.global_data begin fun global_data ->
+      Shared.use chain_state.block_store begin fun store ->
+        Store.Block.Contents.read_opt (store, hash) >|=
+        Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+        let max_op_ttl = contents.max_operations_ttl in
+        let limit = max_op_ttl in
+        purge_loop_rolling ~genesis_hash:chain_state.genesis.block
+          global_data.global_store store hash limit >>= fun caboose_hash ->
+        let caboose_level = Int32.sub lvl (Int32.of_int max_op_ttl) in
+        let caboose = (caboose_level, caboose_hash) in
+        update_chain_data chain_state begin fun _ data ->
+          let new_data = { data with save_point = checkpoint ; caboose } in
+          Lwt.return (Some new_data, ())
+        end >>= fun () ->
+        Shared.use chain_state.chain_data begin fun data ->
+          Store.Chain_data.Save_point.store data.chain_data_store checkpoint >>= fun () ->
+          Store.Chain_data.Caboose.store data.chain_data_store caboose >>= fun () ->
+          Lwt.return_unit
+        end
+
+      end
+    end
 
   let set_checkpoint chain_state checkpoint =
     Shared.use chain_state.block_store begin fun store ->
@@ -693,6 +831,20 @@ module Chain = struct
         Lwt.return_unit
       end
     end
+
+  let set_checkpoint_then_purge_full chain_state checkpoint =
+    set_checkpoint chain_state checkpoint >>= fun () ->
+    let lvl = checkpoint.shell.level in
+    let hash = Block_header.hash checkpoint in
+    purge_full chain_state (lvl, hash) >>= fun () ->
+    Lwt.return_unit
+
+  let set_checkpoint_then_purge_rolling chain_state checkpoint =
+    set_checkpoint chain_state checkpoint >>= fun () ->
+    let lvl = checkpoint.shell.level in
+    let hash = Block_header.hash checkpoint in
+    purge_rolling chain_state (lvl, hash) >>= fun () ->
+    Lwt.return_unit
 
   let acceptable_block chain_state (header : Block_header.t) =
     Shared.use chain_state.chain_data begin fun chain_data ->

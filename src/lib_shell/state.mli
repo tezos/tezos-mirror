@@ -105,6 +105,14 @@ module Chain : sig
   val set_checkpoint:
     chain_state -> Block_header.t -> unit Lwt.t
 
+  (** Apply [set_checkpoint] then [purge_full] (see {!History_mode.t}). *)
+  val set_checkpoint_then_purge_full: chain_state -> Block_header.t ->
+    unit Lwt.t
+
+  (** Apply [set_checkpoint] then [purge_rolling] (see {!History_mode.t}). *)
+  val set_checkpoint_then_purge_rolling: chain_state -> Block_header.t ->
+    unit Lwt.t
+
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
   val acceptable_block: chain_state -> Block_header.t -> bool Lwt.t
