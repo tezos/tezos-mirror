@@ -731,8 +731,7 @@ let check_threshold ~threshold ~keys () =
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ~delegate
-    ?(delegatable = false) ?(spendable = false) ~threshold ~keys ~manager
-    ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
+    ~threshold ~keys ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
   Lwt.return multisig_script
   >>=? fun code ->
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
@@ -750,10 +749,7 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?gas_limit
     ?storage_limit
     ~delegate
-    ~delegatable
-    ~spendable
     ~initial_storage
-    ~manager
     ~balance
     ~source
     ~src_pk

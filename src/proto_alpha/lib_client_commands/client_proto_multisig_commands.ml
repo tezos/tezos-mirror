@@ -86,15 +86,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:"Originate a new multisig contract."
-        (args15
+        (args13
            Client_proto_args.fee_arg
            Client_proto_context_commands.dry_run_switch
            Client_proto_args.gas_limit_arg
            Client_proto_args.storage_limit_arg
            Client_proto_args.delegate_arg
            (Client_keys.force_switch ())
-           Client_proto_args.delegatable_switch
-           Client_proto_args.spendable_switch
            Client_proto_args.no_print_source_flag
            Client_proto_args.minimal_fees_arg
            Client_proto_args.minimal_nanotez_per_byte_arg
@@ -106,10 +104,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
              ~name:"new_multisig"
              ~desc:"name of the new multisig contract"
-        @@ prefix "for"
-        @@ Client_keys.Public_key_hash.source_param
-             ~name:"mgr"
-             ~desc:"manager of the new multisig contract"
         @@ prefix "transferring"
         @@ Client_proto_args.tez_param
              ~name:"qty"
@@ -128,8 +122,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                storage_limit,
                delegate,
                force,
-               delegatable,
-               spendable,
                no_print_source,
                minimal_fees,
                minimal_nanotez_per_byte,
@@ -138,7 +130,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                fee_cap,
                burn_cap )
              alias_name
-             manager
              balance
              (_, source)
              threshold
@@ -149,63 +140,61 @@ let commands () : #Protocol_client_context.full Clic.command list =
             force
             alias_name
           >>=? fun alias_name ->
-          Client_proto_context.source_to_keys
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            source
-          >>=? fun (src_pk, src_sk) ->
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) keys
-          >>=? fun keys ->
-          Client_proto_multisig.originate_multisig
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ?fee
-            ?gas_limit
-            ?storage_limit
-            ~delegate
-            ~delegatable
-            ~spendable
-            ~threshold:(Z.of_int threshold)
-            ~keys
-            ~manager
-            ~balance
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ()
-          >>= fun errors ->
-          Client_proto_context_commands.report_michelson_errors
-            ~no_print_source
-            ~msg:"multisig origination simulation failed"
-            cctxt
-            errors
-          >>= function
+          match Contract.is_implicit source with
           | None ->
-              return_unit
-          | Some (_res, contract) ->
-              if dry_run then return_unit
-              else
-                Client_proto_context.save_contract
-                  ~force
-                  cctxt
-                  alias_name
-                  contract
-                >>=? fun () -> return_unit);
+              failwith
+                "only implicit accounts can be the source of an origination"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) keys
+              >>=? fun keys ->
+              Client_proto_multisig.originate_multisig
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ?fee
+                ?gas_limit
+                ?storage_limit
+                ~delegate
+                ~threshold:(Z.of_int threshold)
+                ~keys
+                ~balance
+                ~source
+                ~src_pk
+                ~src_sk
+                ~fee_parameter
+                ()
+              >>= fun errors ->
+              Client_proto_context_commands.report_michelson_errors
+                ~no_print_source
+                ~msg:"multisig origination simulation failed"
+                cctxt
+                errors
+              >>= function
+              | None ->
+                  return_unit
+              | Some (_res, contract) ->
+                  if dry_run then return_unit
+                  else
+                    Client_proto_context.save_contract
+                      ~force
+                      cctxt
+                      alias_name
+                      contract
+                    >>=? fun () -> return_unit ));
       command
         ~group
         ~desc:
@@ -608,47 +597,48 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          Client_proto_context.source_to_keys
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            source
-          >>=? fun (src_pk, src_sk) ->
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_multisig.call_multisig
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~source
-            ?fee
-            ~src_pk
-            ~src_sk
-            ~multisig_contract
-            ~action:(Client_proto_multisig.Transfer (amount, destination))
-            ~signatures
-            ~amount:Tez.zero
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
+          match Contract.is_implicit source with
+          | None ->
+              failwith
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Client_proto_multisig.call_multisig
                 cctxt
-          >>= function
-          | None -> return_unit | Some (_res, _contracts) -> return_unit);
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~multisig_contract
+                ~action:(Client_proto_multisig.Transfer (amount, destination))
+                ~signatures
+                ~amount:Tez.zero
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
       command
         ~group
         ~desc:"Change the delegate of a multisig contract."
@@ -684,47 +674,48 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          Client_proto_context.source_to_keys
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            source
-          >>=? fun (src_pk, src_sk) ->
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_multisig.call_multisig
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~source
-            ?fee
-            ~src_pk
-            ~src_sk
-            ~multisig_contract
-            ~action:(Client_proto_multisig.Change_delegate (Some delegate))
-            ~signatures
-            ~amount:Tez.zero
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
+          match Contract.is_implicit source with
+          | None ->
+              failwith
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Client_proto_multisig.call_multisig
                 cctxt
-          >>= function
-          | None -> return_unit | Some (_res, _contracts) -> return_unit);
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~multisig_contract
+                ~action:(Client_proto_multisig.Change_delegate (Some delegate))
+                ~signatures
+                ~amount:Tez.zero
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
       command
         ~group
         ~desc:"Withdrow the delegate of a multisig contract."
@@ -755,47 +746,48 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          Client_proto_context.source_to_keys
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            source
-          >>=? fun (src_pk, src_sk) ->
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_multisig.call_multisig
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~source
-            ?fee
-            ~src_pk
-            ~src_sk
-            ~multisig_contract
-            ~action:(Client_proto_multisig.Change_delegate None)
-            ~signatures
-            ~amount:Tez.zero
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
+          match Contract.is_implicit source with
+          | None ->
+              failwith
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              Client_proto_multisig.call_multisig
                 cctxt
-          >>= function
-          | None -> return_unit | Some (_res, _contracts) -> return_unit);
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~dry_run
+                ~fee_parameter
+                ~source
+                ?fee
+                ~src_pk
+                ~src_sk
+                ~multisig_contract
+                ~action:(Client_proto_multisig.Change_delegate None)
+                ~signatures
+                ~amount:Tez.zero
+                ?gas_limit
+                ?storage_limit
+                ?counter
+                ()
+              >>= Client_proto_context_commands.report_michelson_errors
+                    ~no_print_source
+                    ~msg:"transfer simulation failed"
+                    cctxt
+              >>= function
+              | None -> return_unit | Some (_res, _contracts) -> return_unit ));
       (* Unfortunately, Clic does not support non terminal lists of
        parameters so we cannot pass both a list of public keys and a
        list of signatures on the command line. This would permit a
@@ -843,47 +835,49 @@ let commands () : #Protocol_client_context.full Clic.command list =
                (_, source)
                signatures
                (cctxt : #Protocol_client_context.full) ->
-            Client_proto_context.source_to_keys
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              source
-            >>=? fun (src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
-            Client_proto_multisig.call_multisig_on_bytes
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ?confirmations:cctxt#confirmations
-              ~dry_run
-              ~fee_parameter
-              ~source
-              ?fee
-              ~src_pk
-              ~src_sk
-              ~multisig_contract
-              ~bytes
-              ~signatures
-              ~amount:Tez.zero
-              ?gas_limit
-              ?storage_limit
-              ?counter
-              ()
-            >>= Client_proto_context_commands.report_michelson_errors
-                  ~no_print_source
-                  ~msg:"transfer simulation failed"
+            match Contract.is_implicit source with
+            | None ->
+                failwith
+                  "only implicit accounts can be the source of a contract call"
+            | Some source -> (
+                Client_keys.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) ->
+                let fee_parameter =
+                  {
+                    Injection.minimal_fees;
+                    minimal_nanotez_per_byte;
+                    minimal_nanotez_per_gas_unit;
+                    force_low_fee;
+                    fee_cap;
+                    burn_cap;
+                  }
+                in
+                Client_proto_multisig.call_multisig_on_bytes
                   cctxt
-            >>= function
-            | None -> return_unit | Some (_res, _contracts) -> return_unit);
+                  ~chain:cctxt#chain
+                  ~block:cctxt#block
+                  ?confirmations:cctxt#confirmations
+                  ~dry_run
+                  ~fee_parameter
+                  ~source
+                  ?fee
+                  ~src_pk
+                  ~src_sk
+                  ~multisig_contract
+                  ~bytes
+                  ~signatures
+                  ~amount:Tez.zero
+                  ?gas_limit
+                  ?storage_limit
+                  ?counter
+                  ()
+                >>= Client_proto_context_commands.report_michelson_errors
+                      ~no_print_source
+                      ~msg:"transfer simulation failed"
+                      cctxt
+                >>= function
+                | None -> return_unit | Some (_res, _contracts) -> return_unit
+                ));
       command
         ~group
         ~desc:"Show the hashes of the supported multisig contracts."

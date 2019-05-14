@@ -94,7 +94,7 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
   >>=? fun pcounter ->
   let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key cctxt (chain, block) source
-  >>=? fun (_, key) ->
+  >>=? fun key ->
   match key with
   | Some _ ->
       failwith "The manager key was previously revealed."
@@ -128,65 +128,6 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
       | Apply_results.Single_and_result ((Manager_operation _ as op), result)
         ->
           return (oph, op, result) )
-
-let originate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee ?gas_limit ?storage_limit
-    ~fee_parameter contents =
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?branch
-    ~source
-    ?fee
-    ?gas_limit
-    ?storage_limit
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>=? fun ((_oph, _op, result) as res) ->
-  Lwt.return (Injection.originated_contracts (Single_result result))
-  >>=? function
-  | [contract] ->
-      return (res, contract)
-  | contracts ->
-      failwith
-        "The origination introduced %d contracts instead of one."
-        (List.length contracts)
-
-let originate_account cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~manager_pkh
-    ?(delegatable = false) ?delegate ~balance ?fee ~fee_parameter () =
-  let origination =
-    Origination
-      {
-        manager = manager_pkh;
-        delegate;
-        script = None;
-        spendable = true;
-        delegatable;
-        credit = balance;
-        preorigination = None;
-      }
-  in
-  originate
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ?branch
-    ~source
-    ~src_pk
-    ~src_sk
-    ?fee
-    ~fee_parameter
-    origination
 
 let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ~source ~src_pk ~src_sk ?fee ~fee_parameter delegate_opt =
@@ -247,13 +188,6 @@ let list_contract_labels cctxt ~chain ~block =
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager (cctxt : #full) ~chain ~block source =
-  Client_proto_contracts.get_manager cctxt ~chain ~block source
-  >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh
-  >>=? fun (src_name, src_pk, src_sk) ->
-  return (src_name, src_pkh, src_pk, src_sk)
-
 let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ?fee contract ~src_pk ~manager_sk ~fee_parameter opt_delegate =
   delegate_contract
@@ -280,16 +214,12 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?confirmations
     ?dry_run
     ?verbose_signing
-    ~source:(Contract.implicit_contract source)
+    ~source
     ~src_pk
     ~src_sk:manager_sk
     ?fee
     ~fee_parameter
     (Some source)
-
-let source_to_keys (wallet : #full) ~chain ~block source =
-  get_manager wallet ~chain ~block source
-  >>=? fun (_src_name, _src_pkh, src_pk, src_sk) -> return (src_pk, src_sk)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract
@@ -298,8 +228,9 @@ let save_contract ~force cctxt alias_name contract =
 
 let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
-    ?(delegatable = true) ?(spendable = false) ~initial_storage ~manager
-    ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
+    ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
+  (* With the change of making implicit accounts delegatable, the following
+     3 arguments are being defaulted before they can be safely removed. *)
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
   >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result)
@@ -308,16 +239,13 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   let origination =
     Origination
       {
-        manager;
         delegate;
-        script = Some {code; storage};
-        spendable;
-        delegatable;
+        script = {code; storage};
         credit = balance;
         preorigination = None;
       }
   in
-  originate
+  Injection.inject_manager_operation
     cctxt
     ~chain
     ~block
@@ -326,13 +254,22 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ~src_pk
-    ~src_sk
     ?fee
     ?gas_limit
     ?storage_limit
+    ~src_pk
+    ~src_sk
     ~fee_parameter
     origination
+  >>=? fun ((_oph, _op, result) as res) ->
+  Lwt.return (Injection.originated_contracts (Single_result result))
+  >>=? function
+  | [contract] ->
+      return (res, contract)
+  | contracts ->
+      failwith
+        "The origination introduced %d contracts instead of one."
+        (List.length contracts)
 
 type activation_key = {
   pkh : Ed25519.Public_key_hash.t;
