@@ -182,6 +182,7 @@ module Block : sig
 
   val hash: t -> Block_hash.t
   val header: t -> Block_header.t
+  val header_of_hash: Chain.t -> Block_hash.t -> Block_header.t option Lwt.t
   val shell_header: t -> Block_header.shell_header
   val timestamp: t -> Time.Protocol.t
   val fitness: t -> Fitness.t
@@ -238,8 +239,13 @@ module Block : sig
     Chain.t -> Block_locator.t ->
     Block_locator.t option Lwt.t
 
-  val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
-  val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
+  val get_rpc_directory: t -> t RPC_directory.t option Lwt.t
+  val set_rpc_directory: t -> t RPC_directory.t -> unit Lwt.t
+
+  val get_header_rpc_directory: Chain.t -> Block_header.t ->
+    (Chain.t * Block_hash.t * Block_header.t) RPC_directory.t option Lwt.t
+  val set_header_rpc_directory: Chain.t -> Block_header.t ->
+    (Chain.t * Block_hash.t * Block_header.t) RPC_directory.t -> unit Lwt.t
 
 end
 
