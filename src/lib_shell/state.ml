@@ -709,6 +709,12 @@ module Chain = struct
       Store.Chain.destroy global_store (id chain)
     end
 
+  let store chain_state =
+    Shared.use chain_state.global_state.global_data
+      begin fun global_data ->
+        Lwt.return global_data.global_store
+      end
+
 end
 
 type error += Block_not_found of Block_hash.t
