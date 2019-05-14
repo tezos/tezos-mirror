@@ -307,16 +307,16 @@ assert_storage $contract_op_dir/diff_timestamps.tz 111 '(Pair 1 0)' 1
 assert_storage $contract_op_dir/diff_timestamps.tz 111 '(Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z")' 200
 
 # Tests TRANSFER_TOKENS
-bake_after $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1 --burn-cap 10
-bake_after $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1 --burn-cap 10
+bake_after $client originate contract "test_transfer_contract1" for $key1 transferring 100 from bootstrap1 running file:contracts/opcodes/noop.tz --burn-cap 10
+bake_after $client originate contract "test_transfer_contract2" for $key1 transferring 20 from bootstrap1 running file:contracts/opcodes/noop.tz --burn-cap 10
 init_with_transfer $contract_op_dir/transfer_tokens.tz $key2 Unit 1,000 bootstrap1
-assert_balance test_transfer_account1 "100 ꜩ"
+assert_balance test_transfer_contract1 "100 ꜩ"
 bake_after $client transfer 100 from bootstrap1 to transfer_tokens \
-           -arg "\"$(get_contract_addr test_transfer_account1)\"" --burn-cap 10
-assert_balance test_transfer_account1 "200 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
+           -arg "\"$(get_contract_addr test_transfer_contract1)\"" --burn-cap 10
+assert_balance test_transfer_contract1 "200 ꜩ"
 bake_after $client transfer 100 from bootstrap1 to transfer_tokens \
-            -arg "\"$(get_contract_addr test_transfer_account2)\"" --burn-cap 10
-assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
+            -arg "\"$(get_contract_addr test_transfer_contract2)\"" --burn-cap 10
+assert_balance test_transfer_contract2 "120 ꜩ"
 
 # Test SELF
 init_with_transfer $contract_op_dir/self.tz $key1 \

@@ -104,25 +104,6 @@ val source_to_keys:
   Contract.t ->
   (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
-val originate_account :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?branch:int ->
-  source:Contract.t ->
-  src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
-  manager_pkh:public_key_hash ->
-  ?delegatable:bool ->
-  ?delegate:public_key_hash ->
-  balance:Tez.tez ->
-  ?fee:Tez.tez ->
-  fee_parameter:Injection.fee_parameter ->
-  unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
-
 val save_contract :
   force:bool ->
   #Protocol_client_context.full ->

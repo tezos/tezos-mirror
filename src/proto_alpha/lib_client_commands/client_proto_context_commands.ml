@@ -306,57 +306,6 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc:"Open a new account."
-      (args12 fee_arg dry_run_switch verbose_signing_switch
-         delegate_arg delegatable_switch (Client_keys.force_switch ())
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
-      (prefixes [ "originate" ; "account" ]
-       @@ RawContractAlias.fresh_alias_param
-         ~name: "new" ~desc: "name of the new contract"
-       @@ prefix "for"
-       @@ Public_key_hash.source_param
-         ~name: "mgr" ~desc: "manager of the new contract"
-       @@ prefix "transferring"
-       @@ tez_param
-         ~name: "qty" ~desc: "amount taken from source"
-       @@ prefix "from"
-       @@ ContractAlias.destination_param
-         ~name:"src" ~desc: "name of the source contract"
-       @@ stop)
-      begin fun (fee, dry_run, verbose_signing, delegate, delegatable, force,
-                 minimal_fees, minimal_nanotez_per_byte,
-                 minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        new_contract manager_pkh balance (_, source) (cctxt : Protocol_client_context.full) ->
-        RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_pk, src_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        originate_account cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ?fee ?delegate ~delegatable ~manager_pkh ~balance
-          ~fee_parameter
-          ~source ~src_pk ~src_sk () >>=? fun (_res, contract) ->
-        if dry_run then
-          return_unit
-        else
-          save_contract ~force cctxt alias_name contract >>=? fun () ->
-          return_unit
-      end ;
-
     command ~group ~desc: "Launch a smart contract on the blockchain."
       (args17
          fee_arg

@@ -74,14 +74,6 @@ bake_after $client originate contract hardlimit \
 bake_after $client transfer 10 from bootstrap1 to hardlimit --arg "Unit"
 bake_after $client transfer 10 from bootstrap1 to hardlimit --arg "Unit"
 
-bake_after $client originate account free_account for $key1 \
-        transferring 1,000 from bootstrap1 --delegatable --burn-cap 0.257
-$client get delegate for free_account
-
-bake_after $client register key $key2 as delegate
-bake_after $client set delegate for free_account to $key2
-$client get delegate for free_account
-
 $client get balance for bootstrap5 | assert "4000000 ꜩ"
 bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 --fee 0 --force-low-fee
 bake_after $client transfer 400,000 from bootstrap1 to bootstrap5 --fee 0 --force-low-fee

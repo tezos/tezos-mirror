@@ -108,50 +108,6 @@ let reveal cctxt
           return (oph, op, result)
     end
 
-let originate
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee
-    ?gas_limit ?storage_limit
-    ~fee_parameter
-    contents =
-  Injection.inject_manager_operation
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ?fee ?gas_limit ?storage_limit
-    ~src_pk ~src_sk
-    ~fee_parameter
-    contents >>=? fun (_oph, _op, result as res) ->
-  Lwt.return
-    (Injection.originated_contracts (Single_result result)) >>=? function
-  | [ contract ] -> return (res, contract)
-  | contracts ->
-      failwith
-        "The origination introduced %d contracts instead of one."
-        (List.length contracts)
-
-let originate_account
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ~manager_pkh
-    ?(delegatable = false) ?delegate ~balance ?fee
-    ~fee_parameter
-    () =
-  let origination =
-    Origination { manager = manager_pkh ;
-                  delegate ;
-                  script = None ;
-                  spendable = true ;
-                  delegatable ;
-                  credit = balance ;
-                  preorigination = None } in
-  originate
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee
-    ~fee_parameter
-    origination
-
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
     ?dry_run ?verbose_signing
@@ -276,11 +232,20 @@ let originate_contract
                   delegatable ;
                   credit = balance ;
                   preorigination = None } in
-  originate cctxt ~chain ~block ?confirmations
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee ?gas_limit ?storage_limit
+    ?branch ~source ?fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk
     ~fee_parameter
-    origination
+    origination >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? function
+  | [ contract ] -> return (res, contract)
+  | contracts ->
+      failwith
+        "The origination introduced %d contracts instead of one."
+        (List.length contracts)
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
