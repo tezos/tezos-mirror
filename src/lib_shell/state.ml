@@ -95,11 +95,6 @@ and block = {
   header: Block_header.t ;
 }
 
-and hashed_header = {
-  chain_state: chain_state ;
-  hash: Block_hash.t ;
-  header: Block_header.t ;
-}
 
 let read_chain_data { chain_data ; _ } f =
   Shared.use chain_data begin fun state ->
