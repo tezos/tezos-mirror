@@ -364,6 +364,7 @@ let tag_invalid_heads block_store chain_store heads level =
         { level = header.shell.level ; errors } >>= fun () ->
       Store.Block.Contents.remove (block_store, hash) >>= fun () ->
       Store.Block.Operation_hashes.remove_all (block_store, hash) >>= fun () ->
+      Store.Block.Operations_metadata.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
       Store.Block.Predecessors.remove_all (block_store, hash) >>= fun () ->
       Header.read_opt
