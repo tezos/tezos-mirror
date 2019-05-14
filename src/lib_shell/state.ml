@@ -417,15 +417,13 @@ let cut_alternate_heads block_store chain_store heads =
     if in_chain then
       Lwt.return_unit
     else
-      Store.Block.Contents.remove (block_store, hash) >>= fun () ->
-      Store.Block.Operation_hashes.remove_all (block_store, hash) >>= fun () ->
-      Store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
-      Store.Block.Predecessors.remove_all (block_store, hash) >>= fun () ->
       Header.read_opt
         (block_store, header.Block_header.shell.predecessor) >>= function
       | None ->
+          delete_block block_store hash >>= fun () ->
           Lwt.return_unit
       | Some header ->
+          delete_block block_store hash >>= fun () ->
           cut_alternate_head (Block_header.hash header) header in
   Lwt_list.iter_p
     (fun (hash, header) ->
