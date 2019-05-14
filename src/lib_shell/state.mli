@@ -195,10 +195,10 @@ module Block : sig
   val chain_id: t -> Chain_id.t
   val chain_state: t -> Chain.t
   val level: t -> Int32.t
-  val message: t -> string option
-  val max_operations_ttl: t -> int
-  val metadata: t -> MBytes.t
-  val last_allowed_fork_level: t -> Int32.t
+  val message: t -> string option Lwt.t
+  val max_operations_ttl: t -> int Lwt.t
+  val metadata: t -> MBytes.t Lwt.t
+  val last_allowed_fork_level: t -> Int32.t Lwt.t
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t

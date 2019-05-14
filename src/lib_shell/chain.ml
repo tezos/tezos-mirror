@@ -104,9 +104,9 @@ let locked_set_head chain_store data block =
      new head is a direct successor of the current head...
      Make sure to do the live blocks computation in `init_head`
      when this TODO is resolved. *)
-  Chain_traversal.live_blocks
-    block (State.Block.max_operations_ttl block) >>= fun (live_blocks,
-                                                          live_operations) ->
+  State.Block.max_operations_ttl block >>= fun max_op_ttl ->
+  Chain_traversal.live_blocks block max_op_ttl >>=
+  fun (live_blocks, live_operations) ->
   Lwt.return { current_head = block  ;
                current_mempool = Mempool.empty ;
                live_blocks ;

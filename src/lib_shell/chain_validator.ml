@@ -173,7 +173,7 @@ let with_activated_peer_validator w peer_id f =
 
 let may_update_checkpoint chain_state new_head =
   State.Chain.checkpoint chain_state >>= fun old_checkpoint ->
-  let new_level = State.Block.last_allowed_fork_level new_head in
+  State.Block.last_allowed_fork_level new_head >>= fun new_level ->
   if new_level <= old_checkpoint.shell.level then
     Lwt.return_unit
   else

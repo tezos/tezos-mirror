@@ -92,7 +92,6 @@ and chain_data = {
 and block = {
   chain_state: chain_state ;
   hash: Block_hash.t ;
-  contents: Store.Block.contents ;
   header: Block_header.t ;
 }
 
@@ -115,8 +114,9 @@ let update_chain_data { chain_id ; context_index ; chain_data ; _ } f =
         state.data <- data ;
         Shared.use context_index begin fun context_index ->
           Context.set_head context_index chain_id
-            data.current_head.contents.context
-        end
+            data.current_head.header.shell.context
+        end >>= fun () ->
+        Lwt.return_unit
       end >>= fun () ->
     Lwt.return res
   end
@@ -392,8 +392,6 @@ module Chain = struct
       ~genesis ~faked_genesis_hash ~expiration ~allow_forked_chain
       ~current_head ~checkpoint ~chain_id
       global_state context_index chain_data_store block_store =
-    Store.Block.Contents.read_opt
-      (block_store, current_head) >|= Option.unopt_assert ~loc:__POS__ >>= fun current_block ->
     Store.Block.Header.read_opt
       (block_store, current_head) >|= Option.unopt_assert ~loc:__POS__ >>= fun current_block_head ->
     let rec chain_data = {
@@ -401,7 +399,6 @@ module Chain = struct
         current_head = {
           chain_state ;
           hash = current_head ;
-          contents = current_block ;
           header = current_block_head ;
         } ;
         current_mempool = Mempool.empty ;
@@ -628,7 +625,6 @@ module Block = struct
   type t = block = {
     chain_state: Chain.t ;
     hash: Block_hash.t ;
-    contents: Store.Block.contents ;
     header: Block_header.t ;
   }
   type block = t
@@ -696,21 +692,16 @@ module Block = struct
         Lwt.return { chain_state ; hash ; header }
       end
 
-    let of_block ( { chain_state ; hash ; header ; _ } : block ) : t =
+    let of_block ( { chain_state ; hash ; header } : block ) : t =
       { chain_state ; header ; hash }
     let to_block ( { chain_state ; hash ; header } : t ) : block option Lwt.t =
-      Shared.use chain_state.block_store begin fun store ->
-        Store.Block.Contents.read_opt (store, hash) >>= function
-        | Some contents -> Lwt.return_some { chain_state ; hash ; contents ; header }
-        | None -> Lwt.return_none
-      end
+      Lwt.return_some ({ chain_state ; hash ; header } : block)
 
     let all_operation_hashes { chain_state ; hash ; header } =
       Shared.use chain_state.block_store begin fun store ->
         Lwt_list.map_p
           (fun i -> Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.Block_header.shell.validation_passes - 1))
-
       end
 
     let predecessor { chain_state ; hash ; header } =
@@ -731,7 +722,13 @@ module Block = struct
 
   let hash { hash ; _} = hash
   let header { header ; _ } = header
-  let metadata { contents = { metadata ; _ } ; _ } = metadata
+  let metadata b =
+    Shared.use b.chain_state.block_store begin fun store ->
+      Store.Block.Contents.read_opt (store, b.hash) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+      Lwt.return contents.metadata
+    end
+
   let chain_state { chain_state ; _ } = chain_state
   let chain_id { chain_state = { chain_id ; _ } ; _ } = chain_id
   let shell_header { header = { shell ; _ } ; _ } = shell
@@ -739,11 +736,25 @@ module Block = struct
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level
   let validation_passes b = (shell_header b).validation_passes
-  let message { contents = { message ; _ } ; _ } = message
-  let max_operations_ttl { contents = { max_operations_ttl ; _ } ; _ } =
-    max_operations_ttl
-  let last_allowed_fork_level { contents = { last_allowed_fork_level ; _ } ; _ } =
-    last_allowed_fork_level
+  let message b =
+    Shared.use b.chain_state.block_store begin fun store ->
+      Store.Block.Contents.read_opt (store, b.hash) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+      Lwt.return contents.message
+    end
+
+  let max_operations_ttl b =
+    Shared.use b.chain_state.block_store begin fun store ->
+      Store.Block.Contents.read_opt (store, b.hash) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+      Lwt.return contents.max_operations_ttl
+    end
+  let last_allowed_fork_level b =
+    Shared.use b.chain_state.block_store begin fun store ->
+      Store.Block.Contents.read_opt (store, b.hash) >|=
+      Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+      Lwt.return contents.last_allowed_fork_level
+    end
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block
 
@@ -800,9 +811,8 @@ module Block = struct
           | None -> return chain_state.genesis.block
           | Some hash -> return hash
       end >>=? fun hash ->
-      Store.Block.Contents.read (store, hash) >>=? fun contents ->
       Store.Block.Header.read (store, hash) >>=? fun header ->
-      return { chain_state ; hash ; contents ; header }
+      return { chain_state ; hash ; header }
     end
   let read_opt chain_state ?pred hash =
     read chain_state ?pred hash >>= function
@@ -818,9 +828,8 @@ module Block = struct
           | None -> Lwt.return chain_state.genesis.block
           | Some hash -> Lwt.return hash
       end >>= fun hash ->
-      Store.Block.Contents.read_opt (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun contents ->
       Store.Block.Header.read_opt (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
-      Lwt.return { chain_state ; hash ; contents ; header }
+      Lwt.return { chain_state ; hash ; header }
     end
 
   let predecessor { chain_state ; header ; hash ; _ } =
@@ -939,7 +948,7 @@ module Block = struct
                 (Context.compute_testchain_chain_id genesis) hash end
           else
             Lwt.return_unit end >>= fun () ->
-        let block = { chain_state ; hash ; contents ; header } in
+        let block = { chain_state ; hash ; header } in
         Lwt_watcher.notify chain_state.block_watcher block ;
         Lwt_watcher.notify chain_state.global_state.block_watcher block ;
         return_some block
@@ -1164,28 +1173,20 @@ let best_known_head_for_checkpoint chain_state checkpoint =
           Store.Block.Header.read_opt
             (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
           if Compare.Int32.(header.shell.level < checkpoint.shell.level) then
-            Store.Block.Contents.read_opt
-              (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun contents ->
-            Lwt.return { hash ; contents ; chain_state ; header }
+            Lwt.return { hash ; chain_state ; header }
           else
             predecessor_n store hash
               (1 + (Int32.to_int @@
                     Int32.sub header.shell.level checkpoint.shell.level)) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred ->
-            Store.Block.Contents.read_opt
-              (store, pred) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred_contents ->
             Store.Block.Header.read_opt
               (store, pred) >|= Option.unopt_assert ~loc:__POS__ >>= fun pred_header ->
-            Lwt.return { hash = pred ; contents = pred_contents ;
-                         chain_state ; header = pred_header } in
+            Lwt.return { hash = pred ; chain_state ; header = pred_header } in
         Store.Chain_data.Known_heads.read_all
           data.chain_data_store >>= fun heads ->
-        Store.Block.Contents.read_opt
-          (store, chain_state.genesis.block) >|= Option.unopt_assert ~loc:__POS__ >>= fun genesis_contents ->
         Store.Block.Header.read_opt
           (store, chain_state.genesis.block) >|= Option.unopt_assert ~loc:__POS__ >>= fun genesis_header ->
         let genesis =
           { hash = chain_state.genesis.block ;
-            contents = genesis_contents ;
             chain_state ; header = genesis_header } in
         Block_hash.Set.fold
           (fun head best ->

@@ -71,9 +71,10 @@ let build_raw_rpc_directory
   end ;
 
   register0 S.live_blocks begin fun block () () ->
+    State.Block.max_operations_ttl block >>= fun max_op_ttl ->
     Chain_traversal.live_blocks
       block
-      (State.Block.max_operations_ttl block)
+      max_op_ttl
     >>= fun (live_blocks, _) ->
     return live_blocks
   end ;
@@ -113,15 +114,17 @@ let build_raw_rpc_directory
   (* block metadata *)
 
   let metadata block =
+    State.Block.metadata block >>= fun metadata ->
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
-        (State.Block.metadata block) in
+        metadata in
     State.Block.test_chain block >>= fun (test_chain_status, _) ->
+    State.Block.max_operations_ttl block >>= fun max_operations_ttl ->
     return {
       Block_services.protocol_data ;
       test_chain_status ;
-      max_operations_ttl = State.Block.max_operations_ttl block ;
+      max_operations_ttl ;
       max_operation_data_length = Next_proto.max_operation_data_length ;
       max_block_header_length = Next_proto.max_block_length ;
       operation_list_quota =

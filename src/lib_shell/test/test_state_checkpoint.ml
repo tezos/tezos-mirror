@@ -414,7 +414,7 @@ let may_update_checkpoint chain_state new_head =
      Or TODO: set a level where allow to have a fork
   *)
   let old_level = checkpoint_header.shell.level in
-  let new_level = State.Block.last_allowed_fork_level new_head in
+  State.Block.last_allowed_fork_level new_head >>= fun new_level ->
   if new_level <= old_level then
     Lwt.return_unit
   else

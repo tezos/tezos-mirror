@@ -247,9 +247,10 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
       (State.Block.hash ancestor)
       from_block old_mempool >>= fun mempool ->
     Lwt_list.fold_left_s push_block mempool path >>= fun new_mempool ->
+    State.Block.max_operations_ttl to_block >>= fun max_op_ttl ->
     Chain_traversal.live_blocks
       to_block
-      (State.Block.max_operations_ttl to_block)
+      max_op_ttl
     >>= fun (live_blocks, live_operations) ->
     let new_mempool, outdated =
       Operation_hash.Map.partition
