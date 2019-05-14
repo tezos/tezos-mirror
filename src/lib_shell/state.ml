@@ -699,7 +699,7 @@ module Block = struct
 
   let known_valid chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash)
+      Header.known (store, hash)
     end
   let known_invalid chain_state hash =
     Shared.use chain_state.block_store begin fun store ->
@@ -729,15 +729,6 @@ module Block = struct
     Shared.use chain_state.block_store begin fun store ->
       Locked_block.is_valid_for_checkpoint
         store block.hash block.header checkpoint
-    end
-
-  let known chain_state hash =
-    Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash) >>= fun known ->
-      if known then
-        Lwt.return_true
-      else
-        Store.Block.Invalid_block.known store hash
     end
 
   let read chain_state ?(pred = 0) hash =
@@ -815,7 +806,7 @@ module Block = struct
            with the current checkpoint.  *)
         begin
           let predecessor = block_header.shell.predecessor in
-          Store.Block.Contents.known
+          Header.known
             (store, predecessor) >>= fun valid_predecessor ->
           if not valid_predecessor then
             Lwt.return_false
@@ -897,7 +888,7 @@ module Block = struct
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     Shared.use chain_state.block_store begin fun store ->
-      Store.Block.Contents.known (store, hash) >>= fun known_valid ->
+      Header.known (store, hash) >>= fun known_valid ->
       fail_when known_valid (failure "Known valid") >>=? fun () ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
       if known_invalid then
@@ -988,6 +979,15 @@ module Block = struct
     | Running { genesis ; _ } -> lookup_testchain genesis
     | Forking _ -> Lwt.return (status, Some block)
     | Not_running -> Lwt.return (status, None)
+
+  let known chain_state hash =
+    Shared.use chain_state.block_store begin fun store ->
+      Header.known (store, hash) >>= fun known ->
+      if known then
+        Lwt.return_true
+      else
+        Store.Block.Invalid_block.known store hash
+    end
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =
     known chain_state block >>= function
