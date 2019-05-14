@@ -123,6 +123,17 @@ module Block : sig
     last_allowed_fork_level: Int32.t ;
   }
 
+  (** Abstract view over block header storage.
+      This module aims to abstract over block header's [read], [read_opt] and [known]
+      functions by calling the adequate function depending on the block being pruned or not. *)
+  module Header : sig
+    val read :
+      Store.Block.store * Block_hash.t -> Block_header.t tzresult Lwt.t
+    val read_opt :
+      Store.Block.store * Block_hash.t -> Block_header.t option Lwt.t
+    val known : Store.Block.store * Block_hash.t -> bool Lwt.t
+  end
+
   val known: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_valid: Chain.t -> Block_hash.t -> bool Lwt.t
   val known_invalid: Chain.t -> Block_hash.t -> bool Lwt.t
@@ -147,41 +158,6 @@ module Block : sig
     Block_header.t ->
     error list ->
     bool tzresult Lwt.t
-
-  module Header : sig
-    type t = private {
-      chain_state: Chain.t ;
-      hash: Block_hash.t ;
-      header: Block_header.t ;
-    }
-    type block_header = t
-
-    val known: Chain.t -> Block_hash.t -> bool Lwt.t
-
-    val read: Chain.t -> ?pred:int -> Block_hash.t -> block_header tzresult Lwt.t
-    val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block_header option Lwt.t
-    val read_exn: Chain.t -> ?pred:int -> Block_hash.t -> block_header Lwt.t
-    val of_block: block -> block_header
-    val to_block: block_header -> block option Lwt.t
-
-    val compare: t -> t -> int
-    val equal: t -> t -> bool
-
-    val hash: t -> Block_hash.t
-    val header: t -> Block_header.t
-    val shell_header: t -> Block_header.shell_header
-    val timestamp: t -> Time.Protocol.t
-    val fitness: t -> Fitness.t
-    val validation_passes: t -> int
-    val level: t -> Int32.t
-
-    val all_operation_hashes: block_header -> Operation_hash.t list list Lwt.t
-
-    val predecessor : block_header -> block_header option Lwt.t
-    val predecessor_n : Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
-
-  end
-
 
   val compare: t -> t -> int
   val equal: t -> t -> bool

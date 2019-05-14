@@ -95,6 +95,30 @@ and block = {
   header: Block_header.t ;
 }
 
+(* Abstract view over block header storage.
+   This module aims to abstract over block header's [read], [read_opt] and [known]
+   functions by calling the adequate function depending on the block being pruned or not.
+*)
+
+module Header = struct
+
+  let read (store, hash) =
+    Store.Block.Contents.read (store, hash) >>= function
+    | Ok { header ; _ } -> return header
+    | Error _ ->
+        Store.Block.Pruned_contents.read (store, hash) >>=? fun { header } ->
+        return header
+
+  let read_opt (store, hash) =
+    read (store, hash) >>= function
+    | Ok header -> Lwt.return_some header
+    | Error _ -> Lwt.return_none
+
+  let known (store, hash) =
+    Store.Block.Pruned_contents.known (store, hash) >>= function
+    | true -> Lwt.return_true
+    | false -> Store.Block.Contents.known (store, hash)
+end
 
 let read_chain_data { chain_data ; _ } f =
   Shared.use chain_data begin fun state ->
@@ -631,86 +655,8 @@ module Block = struct
     last_allowed_fork_level: Int32.t;
   }
 
-  module Header = struct
 
-    type t = hashed_header = {
-      chain_state: chain_state ;
-      hash: Block_hash.t ;
-      header: Block_header.t ;
-    }
-    type block_header = t
-
-    let compare b1 b2 = Block_hash.compare b1.hash b2.hash
-    let equal b1 b2 = Block_hash.equal b1.hash b2.hash
-
-    let hash { hash ; _} = hash
-    let header { header ; _ } = header
-    let shell_header { header = { Block_header.shell ; _ } ; _ } = shell
-    let timestamp b = (shell_header b).timestamp
-    let fitness b = (shell_header b).fitness
-    let level b = (shell_header b).level
-    let validation_passes b = (shell_header b).validation_passes
-
-    let known chain_state hash =
-      Shared.use chain_state.block_store begin fun store ->
-        Store.Block.Header.known (store, hash)
-      end
-
-    let read chain_state ?(pred = 0) hash =
-      Shared.use chain_state.block_store begin fun store ->
-        begin
-          if pred = 0 then
-            return hash
-          else
-            predecessor_n store hash pred >>= function
-            | None -> return chain_state.genesis.block
-            | Some hash -> return hash
-        end >>=? fun hash ->
-        Store.Block.Header.read (store, hash) >>=? fun header ->
-        return { chain_state ; hash ; header }
-      end
-    let read_opt chain_state ?pred hash =
-      read chain_state ?pred hash >>= function
-      | Error _ -> Lwt.return_none
-      | Ok v -> Lwt.return_some v
-    let read_exn chain_state ?(pred = 0) hash =
-      Shared.use chain_state.block_store begin fun store ->
-        begin
-          if pred = 0 then
-            Lwt.return hash
-          else
-            predecessor_n store hash pred >>= function
-            | None -> Lwt.return chain_state.genesis.block
-            | Some hash -> Lwt.return hash
-        end >>= fun hash ->
-        Store.Block.Header.read_opt (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
-        Lwt.return { chain_state ; hash ; header }
-      end
-
-    let of_block ( { chain_state ; hash ; header } : block ) : t =
-      { chain_state ; header ; hash }
-    let to_block ( { chain_state ; hash ; header } : t ) : block option Lwt.t =
-      Lwt.return_some ({ chain_state ; hash ; header } : block)
-
-    let all_operation_hashes { chain_state ; hash ; header } =
-      Shared.use chain_state.block_store begin fun store ->
-        Lwt_list.map_p
-          (fun i -> Store.Block.Operation_hashes.read_opt (store, hash) i >|= Option.unopt_assert ~loc:__POS__)
-          (0 -- (header.Block_header.shell.validation_passes - 1))
-      end
-
-    let predecessor { chain_state ; hash ; header } =
-      if Block_hash.equal hash header.Block_header.shell.predecessor then
-        Lwt.return_none           (* we are at genesis *)
-      else
-        read_exn chain_state header.Block_header.shell.predecessor >>= fun block ->
-        Lwt.return_some block
-
-    let predecessor_n chain_state hash n =
-      Shared.use chain_state.block_store begin fun block_store ->
-        predecessor_n block_store hash n
-      end
-  end
+  module Header = Header
 
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
   let equal b1 b2 = Block_hash.equal b1.hash b2.hash

@@ -178,13 +178,13 @@ let may_update_checkpoint chain_state new_head =
     Lwt.return_unit
   else
     let head_level = State.Block.level new_head in
-    State.Block.Header.read_opt
+    State.Block.read_opt
       chain_state
       ~pred:(Int32.to_int (Int32.sub head_level new_level))
       (State.Block.hash new_head) >>= function
     | None -> Lwt.return_unit (* should not happen *)
     | Some new_block ->
-        State.Chain.set_checkpoint chain_state (State.Block.Header.header new_block)
+        State.Chain.set_checkpoint chain_state (State.Block.header new_block)
 
 let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
