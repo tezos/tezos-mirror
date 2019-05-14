@@ -20,6 +20,7 @@ integration:$num:$testname:
   <<: *test_definition
   script:
     - pytest $test
+  stage: test
 
 EOF
 done

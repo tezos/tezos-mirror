@@ -1,17 +1,19 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: a0ce95cd2089a4d5e8ec9771a15b88a11a44f8ed
+  build_deps_image_version: 300201d4607ea6d1648c77653300676bf0ae16ed
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: 1
+  GET_SOURCES_ATTEMPTS: 2
+  ARTIFACT_DOWNLOAD_ATTEMPTS: 2
 
 stages:
   - doc
   - build
   - test
-  - documentation
   - packaging
   - publish
-
 
 ############################################################
 ## Stage: build (only MR)                                 ##
@@ -30,149 +32,174 @@ stages:
     - mainnet-staging
     - zeronet-snapshots
     - mainnet-snapshots
-  before_script:
-    - opam list
-    - . ./scripts/version.sh
-    - sudo apk add py-pip python3 python3-dev
-    - sudo pip3 install -r tests_python/requirements.txt
-  tags:
-    - gitlab-org
-
-check_opam_deps:
-  <<: *build_definition
-  script:
-    - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
-        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
-        exit 1 ;
-      fi
-    - ./scripts/opam-check.sh
-    - ./scripts/check_opam_test.sh
-
-check_opam_lint:
-  <<: *build_definition
-  script:
-    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
-
-check_indentation:
-  <<: *build_definition
-  script:
-    - dune build @runtest_indent
 
 build:
   <<: *build_definition
   script:
+    - . ./scripts/version.sh
     - dune build @runtest_dune_template
-    - make all
+    - make all build-test
   artifacts:
+    name: "$CI_COMMIT_REF_NAME"
     paths:
-    - _build
+      - _build
     expire_in: 1 day
+  tags:
+    - gitlab-org
+
+############################################################
+## Stage: test                                           ##
+############################################################
+
+# depends on the build stage. download the _build artifacts
+# and run make to recreate all symlinks
+.test_template: &test_definition
+  <<: *build_definition
+  dependencies:
+    - build
+  before_script:
+    - . ./scripts/version.sh
+    - make
+  tags:
+    - gitlab-org
+  retry: 2
+
+check_opam_deps:
+  <<: *test_definition
+  script:
+    - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
+        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        echo "${build_deps_image_version} != ${opam_repository_tag}" ;
+        exit 1 ;
+      fi
+    - ./scripts/opam-check.sh
+    - ./scripts/check_opam_test.sh
+  stage: test
+
+check_opam_lint:
+  <<: *test_definition
+  script:
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
+  stage: test
+
+check_indentation:
+  <<: *test_definition
+  script:
+    - dune build @runtest_indent
+  stage: test
 
 check_python_lint:
-  <<: *build_definition
+  <<: *test_definition
   script:
     - make -C tests_python lint_all
     - make -C tests_python typecheck
+  stage: test
 
 ############################################################
 ## Stage: test (only MR)                                  ##
 ############################################################
 
-.test_template: &test_definition
-  <<: *build_definition
-  stage: test
-  before_script:
-    - sudo apk add py-pip python3 python3-dev
-    - sudo pip install --upgrade pip
-    - sudo pip3 install -r tests_python/requirements.txt
-    - make all
-  dependencies:
-    - build
-
 test:unit:stdlib:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib/runtest
+  stage: test
 
 test:unit:stdlib_unix:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib_unix/runtest
+  stage: test
 
 test:unit:data_encoding:
   <<: *test_definition
   script:
     - dune build @src/lib_data_encoding/runtest
+  stage: test
 
 test:unit:storage:
   <<: *test_definition
   script:
     - dune build @src/lib_storage/runtest
+  stage: test
 
 test:unit:crypto:
   <<: *test_definition
   script:
     - dune build @src/lib_crypto/runtest
+  stage: test
 
 test:unit:shell:
   <<: *test_definition
   script:
     - dune build @src/lib_shell/runtest
+  stage: test
 
 test:unit:p2p:io-scheduler:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
+  stage: test
 
 test:unit:p2p:socket:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
+  stage: test
 
 test:unit:p2p:pool:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
+  stage: test
 
 test:unit:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
+  stage: test
 
 test:unit:proto_alpha:lib_client:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_client/test/runtest
+  stage: test
 
 test:unit:p2p:peerset:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_peerset
+  stage: test
 
 test:unit:p2p:ipv6set:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_ipv6set
+  stage: test
 
 test:unit:p2p:banned_peers:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_banned_peers
+  stage: test
 
 test:unit:client_alpha:vote:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_delegate/runtest_vote
+  stage: test
 
 test:unit:validation:
   <<: *test_definition
   script:
     - dune build @src/lib_validation/runtest
+  stage: test
 
 test:unit:micheline:
   <<: *test_definition
   script:
     - dune build @src/lib_micheline/runtest
+  stage: test
 
 ############################################################
 ## Stage: run shell integration tests                     ##
@@ -182,46 +209,55 @@ test:integration:basic.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_basic.sh
+  stage: test
 
 test:integration:contracts.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts.sh
+  stage: test
 
 test:integration:contracts_opcode.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_opcode.sh
+  stage: test
 
 test:integration:contracts_macros.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
+  stage: test
 
 test:integration:contracts_mini_scenarios.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
+  stage: test
 
 test:integration:multinode.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_multinode.sh
+  stage: test
 
 test:integration:inject.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_injection.sh
+  stage: test
 
 test:integration:voting.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_voting.sh
+  stage: test
 
 test:integration:proto:sandbox:
   <<: *test_definition
   script:
     - dune build @runtest_sandbox
+  stage: test
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##
@@ -237,6 +273,7 @@ test:integration:sandboxes:voting:
     expire_in: 1 day
     when: on_failure
   allow_failure: true # This test uses too much resources for GitLab's workers
+  stage: test
 
 test:integration:sandboxes:acc-baking:
   <<: *test_definition
@@ -247,6 +284,7 @@ test:integration:sandboxes:acc-baking:
     - flextesa-acc-sdb
     expire_in: 1 day
     when: on_failure
+  stage: test
 
 test:integration:sandboxes:acc-endorsement:
   <<: *test_definition
@@ -257,6 +295,7 @@ test:integration:sandboxes:acc-endorsement:
     - flextesa-acc-sde
     expire_in: 1 day
     when: on_failure
+  stage: test
 
 ############################################################
 ## Stage: run python integration tests                    ##
@@ -267,66 +306,79 @@ integration:00:baker_endorser:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_baker_endorser.py
+  stage: test
 
 integration:01:basic:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_basic.py
+  stage: test
 
 integration:02:contract:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_contract.py
+  stage: test
 
 integration:03:contract_baker:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py
+  stage: test
 
 integration:04:cors:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_cors.py
+  stage: test
 
 integration:05:injection:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_injection.py
+  stage: test
 
 integration:06:many_bakers:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_many_bakers.py
+  stage: test
 
 integration:07:many_nodes:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_many_nodes.py
+  stage: test
 
 integration:08:mempool:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_mempool.py
+  stage: test
 
 integration:09:multinode:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_multinode.py
+  stage: test
 
 integration:10:rpc:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_rpc.py
+  stage: test
 
 integration:11:tls:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_tls.py
+  stage: test
 
 integration:12:voting:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_voting.py
+  stage: test
 
 
 ##END_INTEGRATION_PYTHON##
@@ -337,22 +389,14 @@ integration:12:voting:
 
 test:documentation:
   <<: *test_definition
-  stage: documentation
+  stage: test
   script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
 test:linkcheck:
   <<: *test_definition
-  stage: documentation
+  stage: test
   script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html-and-linkcheck
   allow_failure: true
 
@@ -770,10 +814,6 @@ publish:doc:
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
   before_script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - chmod 400 ~/.ssh/id_ed25519
