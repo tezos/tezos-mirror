@@ -780,43 +780,47 @@ module Block = struct
         store block.hash block.header checkpoint
     end
 
-  let read chain_state ?(pred = 0) hash =
+  let read_predecessor chain_state ~pred ?(below_save_point = false) hash =
     Shared.use chain_state.block_store begin fun store ->
-      begin
-        if pred = 0 then
-          return hash
-        else
-          predecessor_n store hash pred >>= function
-          | None -> return chain_state.genesis.block
-          | Some hash -> return hash
-      end >>=? fun hash ->
+      predecessor_n ~below_save_point store hash pred >>= fun hash_opt ->
+      let new_hash_opt =
+        match hash_opt with
+        | Some _ as hash_opt -> hash_opt
+        | None ->
+            if Block_hash.equal hash chain_state.genesis.block then
+              Some chain_state.genesis.block
+            else
+              None
+      in
+      match new_hash_opt with
+      | None -> Lwt.fail Not_found
+      | Some hash ->
+          Header.read_opt (store, hash) >>= fun header ->
+          begin match header with
+            | Some header ->
+                Lwt.return_some { chain_state ; hash ; header }
+            | None ->
+                Lwt.return_none
+          end
+    end
+
+  let read chain_state hash =
+
+    Shared.use chain_state.block_store begin fun store ->
       Header.read (store, hash) >>=? fun header ->
       return  { chain_state ; hash ; header }
     end
-  let read_opt chain_state ?pred hash =
-    read chain_state ?pred hash >>= function
+
+  let read_opt chain_state hash =
+    read chain_state hash >>= function
     | Error _ -> Lwt.return_none
     | Ok v -> Lwt.return_some v
-  let read_exn chain_state ?(pred = 0) hash =
-    Shared.use chain_state.block_store begin fun store ->
-      begin
-        if pred = 0 then
-          Lwt.return hash
-        else
-          predecessor_n store hash pred >>= function
-          | None -> Lwt.return chain_state.genesis.block
-          | Some hash -> Lwt.return hash
-      end >>= fun hash ->
-      Header.read_opt (store, hash) >|= Option.unopt_assert ~loc:__POS__ >>= fun header ->
-      Lwt.return { chain_state ; hash ; header }
-    end
 
   let predecessor { chain_state ; header ; hash ; _ } =
     if Block_hash.equal hash header.shell.predecessor then
       Lwt.return_none           (* we are at genesis *)
     else
-      read_exn chain_state header.shell.predecessor >>= fun block ->
-      Lwt.return_some block
+      read_opt chain_state header.shell.predecessor
 
   let predecessor_n b n =
     Shared.use b.chain_state.block_store begin fun block_store ->
@@ -1053,17 +1057,21 @@ module Block = struct
             Lwt.return Block_locator.Known_valid
 
   let known_ancestor chain_state locator =
+    Shared.use chain_state.global_state.global_data begin fun { global_store ; _ } ->
+      begin
+        Store.Configuration.History_mode.read_opt global_store >|=
+        Option.unopt_assert ~loc:__POS__
+      end
+    end >>= fun history_mode ->
     Block_locator.unknown_prefix
       ~is_known:(block_validity chain_state) locator >>= function
-    | None -> Lwt.return_none
-    | Some (tail, locator) ->
-        if Block_hash.equal tail (Chain.faked_genesis_hash chain_state) then
-          read_exn
-            chain_state (Chain.genesis chain_state).block >>= fun genesis ->
-          Lwt.return_some (genesis, locator)
-        else
-          read_exn chain_state tail >>= fun block ->
-          Lwt.return_some (block, locator)
+    | (Known_valid, prefix_locator) -> Lwt.return_some prefix_locator
+    | (Known_invalid, _) -> Lwt.return_none
+    | (Unknown, _) ->
+        begin match history_mode with
+          | Archive -> Lwt.return_none
+          | Rolling | Full -> Lwt.return_some locator
+        end
 
   (* Hypothesis : genesis' predecessor is itself. *)
   let get_rpc_directory ({ chain_state ; _ } as block) =
@@ -1082,7 +1090,8 @@ module Block = struct
             Lwt.return (Protocol_hash.Map.find_opt next_protocol map)
 
   let set_rpc_directory ({ chain_state ; _ } as block) dir =
-    read_exn chain_state block.header.shell.predecessor >>= fun pred ->
+    read_opt chain_state block.header.shell.predecessor >|=
+    Option.unopt_assert ~loc:__POS__ >>= fun pred ->
     protocol_hash block >>= fun next_protocol ->
     protocol_hash pred >>= fun protocol ->
     let map =
@@ -1099,22 +1108,22 @@ end
 let watcher (state : global_state) =
   Lwt_watcher.create_stream state.block_watcher
 
-let read_block { global_data ; _ } ?pred hash =
+let read_block { global_data ; _ } hash =
   Shared.use global_data begin fun { chains ; _ } ->
     Chain_id.Table.fold
       (fun _chain_id chain_state acc ->
          acc >>= function
          | Some _ -> acc
          | None ->
-             Block.read_opt chain_state ?pred hash >>= function
+             Block.read_opt chain_state hash >>= function
              | None -> acc
              | Some block -> Lwt.return_some block)
       chains
       Lwt.return_none
   end
 
-let read_block_exn t ?pred hash =
-  read_block t ?pred hash >>= function
+let read_block_exn t hash =
+  read_block t hash >>= function
   | None -> Lwt.fail Not_found
   | Some b -> Lwt.return b
 

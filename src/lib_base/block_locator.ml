@@ -212,27 +212,25 @@ type validity =
   | Known_valid
   | Known_invalid
 
-let unknown_prefix ~is_known (head, hist) =
+let unknown_prefix ~is_known locator =
+  let (head, history) = locator in
   let rec loop hist acc =
     match hist with
-    | [] -> Lwt.return_none
+    | [] ->
+        Lwt.return (Unknown, locator)
     | h :: t ->
         is_known h >>= function
         | Known_valid ->
-            Lwt.return_some (h, (List.rev (h :: acc)))
+            Lwt.return (Known_valid, (head, List.rev (h :: acc)))
         | Known_invalid ->
-            Lwt.return_none
+            Lwt.return (Known_invalid, (head, List.rev (h :: acc)))
         | Unknown ->
             loop t (h :: acc)
   in
   is_known (Block_header.hash head) >>= function
   | Known_valid ->
-      Lwt.return_some (Block_header.hash head, (head, []))
+      Lwt.return (Known_valid, (head, []))
   | Known_invalid ->
-      Lwt.return_none
+      Lwt.return (Known_invalid, (head, []))
   | Unknown ->
-      loop hist [] >>= function
-      | None ->
-          Lwt.return_none
-      | Some (tail, hist) ->
-          Lwt.return_some (tail, (head, hist))
+      loop history []

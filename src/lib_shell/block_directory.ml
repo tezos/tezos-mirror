@@ -339,16 +339,32 @@ let get_directory block =
 
 let get_block chain_state = function
   | `Genesis ->
-      Chain.genesis chain_state
-  |  `Head n ->
+      Chain.genesis chain_state >>= begin function
+        | Some b -> Lwt.return_some b
+        | None -> Lwt.return_none
+      end
+  | `Head n ->
       Chain.head chain_state >>= fun head ->
       if n < 0 then
-        Lwt.fail Not_found
+        Lwt.return_none
       else if n = 0 then
-        Lwt.return head
+        Lwt.return_some head
       else
-        State.Block.read_opt chain_state ~pred:n (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
-  | `Hash (hash, n) ->
+        State.Block.read_predecessor
+          chain_state ~pred:n ~below_save_point:true (State.Block.hash head)
+  | `Alias (_, n) | `Hash (_, n) as b ->
+      begin match b with
+        | `Alias (`Checkpoint, _) ->
+            State.Chain.checkpoint chain_state >>= fun checkpoint ->
+            Lwt.return (Block_header.hash checkpoint)
+        | `Alias (`Save_point, _) ->
+            State.Chain.save_point chain_state >>= fun (_, save_point) ->
+            Lwt.return save_point
+        | `Alias (`Caboose, _) ->
+            State.Chain.caboose chain_state >>= fun (_, caboose) ->
+            Lwt.return caboose
+        | `Hash (h, _) -> Lwt.return h
+      end >>= fun hash ->
       if n < 0 then
         State.Block.read_opt chain_state hash >|= Option.unopt_assert ~loc:__POS__ >>= fun block ->
         Chain.head chain_state >>= fun head ->
@@ -357,20 +373,25 @@ let get_block chain_state = function
         let target =
           Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
         if target < 0 then
-          Lwt.fail Not_found
+          Lwt.return_none
         else
-          State.Block.read_opt chain_state ~pred:target (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
+          State.Block.read_predecessor
+            chain_state ~pred:target ~below_save_point:true (State.Block.hash head)
       else
-        State.Block.read_opt chain_state ~pred:n hash >|= Option.unopt_assert ~loc:__POS__
+        State.Block.read_predecessor
+          chain_state ~pred:n ~below_save_point:true hash
   | `Level i ->
       Chain.head chain_state >>= fun head ->
       let target = Int32.(to_int (sub (State.Block.level head) i)) in
       if target < 0 then
         Lwt.fail Not_found
       else
-        State.Block.read_opt chain_state ~pred:target (State.Block.hash head) >|= Option.unopt_assert ~loc:__POS__
+        State.Block.read_predecessor
+          chain_state ~pred:target ~below_save_point:true (State.Block.hash head)
 
 let build_rpc_directory chain_state block =
-  get_block chain_state block >>= fun block ->
-  get_directory block >>= fun dir ->
-  Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)
+  get_block chain_state block >>= function
+  | None -> Lwt.fail Not_found
+  | Some block ->
+      get_directory block >>= fun dir ->
+      Lwt.return (RPC_directory.map (fun _ -> Lwt.return block) dir)

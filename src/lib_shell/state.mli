@@ -144,8 +144,16 @@ module Block : sig
   val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
   val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Chain.t -> ?pred:int -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Chain.t -> ?pred:int -> Block_hash.t -> block option Lwt.t
+  val read: Chain.t -> Block_hash.t -> t tzresult Lwt.t
+  val read_opt: Chain.t -> Block_hash.t -> t option Lwt.t
+
+  (** Will return the full block if the block has never been cleaned
+      (all blocks for nodes whose history-mode is set to archive), only
+      the header for nodes below the save point (nodes in full or
+      rolling history-mode) or even `Pruned` for blocks below the rock
+      bottom, only for nodes in rolling history-mode. Will fail with
+      `Not_found` if the given hash is unknown. *)
+  val read_predecessor: Chain.t -> pred:int -> ?below_save_point:bool -> Block_hash.t -> t option Lwt.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
@@ -180,7 +188,7 @@ module Block : sig
   val last_allowed_fork_level: t -> Int32.t Lwt.t
 
   val is_genesis: t -> bool
-  val predecessor: t -> block option Lwt.t
+  val predecessor: t -> t option Lwt.t
   val predecessor_n: t -> int -> Block_hash.t option Lwt.t
 
   val is_valid_for_checkpoint: t -> Block_header.t -> bool Lwt.t
@@ -204,13 +212,21 @@ module Block : sig
 
   val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
+  (** [known_ancestor chain_state locator] computes the unknown prefix in
+      the [locator] according to [chain_state].
+      It either returns:
+      - [Some (h, hist)] when we find a valid block, where [hist]
+        is the unknown prefix, ending with the first valid block found.
+      - [Some (h, hist)] when we dont find any block known valid nor invalid
+        and the node runs in full or rolling mode. In this case
+        [(h, hist)] is the given [locator].
+      - [None] when the node runs in archive history mode and
+        we find an invalid block or no valid block in the [locator].
+      - [None] when the node runs in full or rolling mode and we find
+        an invalid block in the [locator]. *)
   val known_ancestor:
-    Chain.t -> Block_locator.t -> (block * Block_locator.t) option Lwt.t
-  (** [known_ancestor chain_state locator] computes the first block of
-      [locator] that is known to be a valid block. It also computes the
-      'prefix' of [locator] with end at the first valid block.  The
-      function returns [None] when no block in the locator are known or
-      if the first known block is invalid. *)
+    Chain.t -> Block_locator.t ->
+    Block_locator.t option Lwt.t
 
   val get_rpc_directory: block -> block RPC_directory.t option Lwt.t
   val set_rpc_directory: block -> block RPC_directory.t -> unit Lwt.t
@@ -218,10 +234,10 @@ module Block : sig
 end
 
 val read_block:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t option Lwt.t
+  global_state -> Block_hash.t -> Block.t option Lwt.t
 
 val read_block_exn:
-  global_state -> ?pred:int -> Block_hash.t -> Block.t Lwt.t
+  global_state -> Block_hash.t -> Block.t Lwt.t
 
 val watcher: t -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 

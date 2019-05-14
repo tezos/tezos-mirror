@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A type for sparse block locator (/à la/ Bitcoin). *)
 type t = private raw
-(** A type for sparse block locator (/à la/ Bitcoin) *)
 
+(** Non private version of Block_store_locator.t for coercions. *)
 and raw = Block_header.t * Block_hash.t list
-(** Non private version of Block_store_locator.t for coercions *)
 
 val raw: t -> raw
 val pp: Format.formatter -> t -> unit
@@ -38,15 +38,15 @@ val bounded_encoding:
   ?max_length:int ->
   unit -> t Data_encoding.t
 
+(** Argument to the seed used to randomize the locator. *)
 type seed = {
   sender_id: P2p_peer.Id.t ;
   receiver_id: P2p_peer.Id.t
 }
-(** Argument to the seed used to randomize the locator. *)
 
-val estimated_length: seed -> t -> int
 (** [estimated_length seed locator] estimate the length of the chain
     represented by [locator] using [seed]. *)
+val estimated_length: seed -> t -> int
 
 (** [compute ~get_predecessor ~caboose ~size block_hash header seed] returns
     a sparse block locator whose header is the given [header] and whose
@@ -85,14 +85,24 @@ val to_steps: seed -> t -> step list
 val to_steps_truncate: limit:int -> save_point:Block_hash.t ->
   seed -> t -> step list
 
+(** A block can either be known valid, invalid or unknown. *)
 type validity =
   | Unknown
   | Known_valid
   | Known_invalid
 
+(** [unknown_prefix ~is_known t] either returns :
+
+    - [(Known_valid, (h, hist))] when we find a known valid block in the
+      locator history (w.r.t [is_known]), where [h] is the given locator header
+      and [hist] is the unknown prefix ending with the known valid block.
+
+    - [(Known_invalid, (h, hist))] when we find a known invalid block
+      (w.r.t [is_known]) in the locator history, where [h] is the given locator header
+      and [hist] is the unknown prefix ending with the known invalid block.
+
+    - [(Unknown, (h, hist))] when no block is known valid nor invalid
+      (w.r.t [is_known]), where [(h, hist)] is the given [locator]. *)
 val unknown_prefix:
   is_known:(Block_hash.t -> validity Lwt.t) ->
-  t -> (Block_hash.t * t) option Lwt.t
-(** [unknown_prefix validity locator] keeps only the unknown part of
-    the locator up to the first valid block. If there is no known valid
-    block or there is a known invalid one, None is returned. *)
+  t -> (validity * t) Lwt.t
