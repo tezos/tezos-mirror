@@ -55,6 +55,9 @@ module Info : sig
     increase_cap: Time.System.Span.t ;
   }
 
+  val default_greylisting_config : greylisting_config
+  val greylisting_config_encoding : greylisting_config Data_encoding.encoding
+
   val create :
     ?trusted:bool ->
     ?greylisting_config:greylisting_config ->

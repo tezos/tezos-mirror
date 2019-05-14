@@ -44,6 +44,7 @@ and p2p = {
   limits : P2p.limits ;
   disable_mempool : bool ;
   disable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 and rpc = {

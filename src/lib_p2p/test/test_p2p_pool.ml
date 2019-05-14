@@ -106,7 +106,8 @@ let detach_node f points n =
       max_known_points = None ;
       max_known_peer_ids = None ;
       swap_linger = Time.System.Span.of_seconds_exn 0. ;
-      binary_chunks_size = None
+      binary_chunks_size = None ;
+      greylisting_config = P2p_point_state.Info.default_greylisting_config ;
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)

@@ -69,6 +69,7 @@ type config = {
   disable_mempool : bool ;
   trust_discovered_peers : bool ;
   disable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 type limits = {
@@ -126,6 +127,7 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     trusted_points = config.trusted_points ;
     peers_file = config.peers_file ;
     private_mode = config.private_mode ;
+    greylisting_config = config.greylisting_config ;
     min_connections = limits.min_connections ;
     max_connections = limits.max_connections ;
     max_incoming_connections = limits.max_incoming_connections ;

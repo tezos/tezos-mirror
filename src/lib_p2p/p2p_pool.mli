@@ -70,6 +70,9 @@ type config = {
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
 
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+  (** The greylisting configuration. *)
+
   listening_port : P2p_addr.port option ;
   (** If provided, it will be passed to [P2p_connection.authenticate]
       when we authenticate against a new peer. *)

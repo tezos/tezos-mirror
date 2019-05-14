@@ -130,6 +130,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
             peers_file =
               (config.data_dir // "peers.json") ;
             private_mode = config.p2p.private_mode ;
+            greylisting_config = config.p2p.greylisting_config ;
             identity ;
             proof_of_work_target =
               Crypto_box.make_target config.p2p.expected_pow ;

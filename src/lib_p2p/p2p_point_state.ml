@@ -80,6 +80,40 @@ module Info = struct
     disconnection_delay = Ptime.Span.of_int_s 60 ;
     increase_cap = Ptime.Span.of_int_s 172800 (* 2 days *) ;
   }
+  let greylisting_config_encoding =
+    let open Data_encoding in
+    conv
+      (fun { factor ; initial_delay ; disconnection_delay ; increase_cap ; } ->
+         (factor, initial_delay, disconnection_delay, increase_cap))
+      (fun (factor, initial_delay, disconnection_delay, increase_cap) ->
+         { factor ; initial_delay ; disconnection_delay ; increase_cap ; })
+      (obj4
+         (dft "factor"
+            ~description: "The factor by which the greylisting delay is \
+                           increased when an already greylisted peer is \
+                           greylisted again. This value should be set to 1 for \
+                           a linear back-off and to >1 for an exponential \
+                           back-off."
+            float default_greylisting_config.factor)
+         (dft "initial-delay"
+            ~description: "The span of time a peer is greylisted for when it \
+                           is first greylisted."
+            Time.System.Span.encoding default_greylisting_config.initial_delay)
+         (dft "disconnection-delay"
+            ~description: "The span of time a peer is greylisted for when it \
+                           is greylisted as the result of an abrupt \
+                           disconnection."
+            Time.System.Span.encoding
+            default_greylisting_config.disconnection_delay)
+         (dft "increase-cap"
+            ~description: "The maximum amount by which the greylisting is \
+                           extended. This limits the rate of the exponential \
+                           back-off, which eventually becomes linear when it \
+                           reaches this limit. This limit is set to avoid \
+                           reaching the End-of-Time when repeatedly \
+                           greylisting a peer."
+            Time.System.Span.encoding default_greylisting_config.increase_cap)
+      )
 
   let create
       ?(trusted = false)

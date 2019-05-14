@@ -96,6 +96,9 @@ type config = {
 
   disable_testchain : bool ;
   (** If [true], testchain related messages will be ignored. *)
+
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+  (** The greylisting configuration. *)
 }
 
 (** Network capacities *)

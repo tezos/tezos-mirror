@@ -55,6 +55,7 @@ and p2p = {
   limits : P2p.limits ;
   disable_mempool : bool ;
   disable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 and rpc = {
@@ -112,6 +113,7 @@ let default_p2p = {
   limits = default_p2p_limits ;
   disable_mempool = false ;
   disable_testchain = false ;
+  greylisting_config = P2p_point_state.Info.default_greylisting_config
 }
 
 let default_rpc = {
@@ -262,17 +264,17 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; disable_testchain } ->
+           limits ; disable_mempool ; disable_testchain ; greylisting_config } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, disable_testchain))
+       disable_mempool, disable_testchain, greylisting_config))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, disable_testchain) ->
+          disable_mempool, disable_testchain, greylisting_config) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; disable_testchain })
-    (obj8
+        disable_mempool ; disable_testchain ; greylisting_config })
+    (obj9
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
                          difficulty, 24 signifies for example that at least 24 leading \
@@ -319,6 +321,10 @@ let p2p =
                          node storage usage and computation by droping the validation \
                          of the test network blocks."
           bool false)
+       (let open P2p_point_state.Info in
+        dft "greylisting_config"
+          ~description: "The greylisting policy."
+          greylisting_config_encoding default_greylisting_config)
     )
 
 let rpc : rpc Data_encoding.t =
@@ -536,7 +542,8 @@ let update
     ?log_output
     ?bootstrap_threshold
     ?history_mode
-    cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+    cfg =
+  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
     Option.map peer_table_size ~f:(fun i -> i, i / 4 * 3) in
@@ -585,6 +592,7 @@ let update
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
     disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
+    greylisting_config = cfg.p2p.greylisting_config ;
   }
   and rpc : rpc = {
     listen_addr =

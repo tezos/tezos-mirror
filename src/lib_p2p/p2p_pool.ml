@@ -43,6 +43,8 @@ type config = {
   peers_file : string ;
   private_mode : bool ;
 
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+
   listening_port : P2p_addr.port option ;
   min_connections : int ;
   max_connections : int ;
@@ -62,6 +64,7 @@ type config = {
   swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
+
 }
 
 type 'peer_meta peer_meta_config = {
@@ -80,6 +83,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
   announced_version : Network_version.t ;
   custom_p2p_versions : P2p_version.t list ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
   peer_meta_config : 'peer_meta peer_meta_config ;
   conn_meta_config : 'conn_meta P2p_socket.metadata_config ;
   message_config : 'msg message_config ;
@@ -181,7 +185,11 @@ let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool)
 let register_point ?trusted pool _source_peer_id (addr, port as point) =
   match P2p_point.Table.find_opt pool.known_points point with
   | None ->
-      let point_info = P2p_point_state.Info.create ?trusted addr port in
+      let point_info =
+        P2p_point_state.Info.create
+          ?trusted
+          ~greylisting_config:pool.greylisting_config
+          addr port in
       Option.iter pool.config.max_known_points ~f:begin fun (max, _) ->
         if P2p_point.Table.length pool.known_points >= max then gc_points pool
       end ;
@@ -1081,6 +1089,7 @@ let create
   } in
   let pool = {
     config ; peer_meta_config ; conn_meta_config ; message_config ;
+    greylisting_config = config.greylisting_config ;
     announced_version =
       Network_version.announced
         ~chain_name: message_config.chain_name
