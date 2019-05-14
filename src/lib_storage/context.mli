@@ -61,6 +61,8 @@ val commit_test_chain_genesis:
 (** {2 Generic interface} *)
 
 type key = string list
+(** [key] indicates a path in a context. *)
+
 type value = MBytes.t
 
 val mem: context -> key -> bool Lwt.t
@@ -73,6 +75,8 @@ val remove_rec: context -> key -> t Lwt.t
 (** [copy] returns None if the [from] key is not bound *)
 val copy: context -> from:key -> to_:key -> context option Lwt.t
 
+(** [fold] iterates over elements under a path (not recursive). Iteration order
+    is undeterministic. *)
 val fold:
   context -> key -> init:'a ->
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
