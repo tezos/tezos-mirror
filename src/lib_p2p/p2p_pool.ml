@@ -178,7 +178,7 @@ let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool)
         end ;
         log pool Gc_points
 
-let register_point pool ?trusted _source_peer_id (addr, port as point) =
+let register_point ?trusted pool _source_peer_id (addr, port as point) =
   match P2p_point.Table.find_opt pool.known_points point with
   | None ->
       let point_info = P2p_point_state.Info.create ?trusted addr port in
@@ -193,7 +193,8 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
       begin
         match trusted with
         | Some true -> P2p_point_state.Info.set_trusted point_info ;
-        | _ -> ()
+        | Some false -> P2p_point_state.Info.unset_trusted point_info ;
+        | None -> ()
       end ;
       point_info
 
@@ -349,8 +350,7 @@ module Points = struct
       (P2p_point.Table.find_opt pool.known_points point)
 
   let set_trusted pool point =
-    P2p_point_state.Info.set_trusted
-      (register_point pool pool.config.identity.peer_id point)
+    ignore @@ register_point ~trusted:true pool pool.config.identity.peer_id point
 
   let unset_trusted pool point =
     Option.iter ~f:P2p_point_state.Info.unset_trusted
@@ -824,13 +824,13 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
     { P2p_answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise =
-        (fun points -> register_new_points pool conn points ) ;
+        (fun points -> register_new_points pool conn points ; Lwt.return_unit) ;
       bootstrap =
         (fun () -> list_known_points ~ignore_private:true pool conn) ;
       swap_request =
-        (fun point peer_id -> swap_request pool conn point peer_id ) ;
+        (fun point peer_id -> swap_request pool conn point peer_id) ;
       swap_ack =
-        (fun point peer_id -> swap_ack pool conn point peer_id ) ;
+        (fun point peer_id -> swap_ack pool conn point peer_id) ;
     }
 
   (* when the node is in private mode: deactivate advertising,
@@ -922,8 +922,7 @@ and disconnect ?(wait = false) conn =
 and register_new_points ?trusted pool conn =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
   fun points ->
-    List.iter (register_new_point ?trusted pool source_peer_id) points ;
-    Lwt.return_unit
+    List.iter (register_new_point ?trusted pool source_peer_id) points
 
 and register_new_point ?trusted pool source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
