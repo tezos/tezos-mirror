@@ -54,7 +54,7 @@ assert_fails $client transfer 0 from bootstrap1 to replay --burn-cap 10
 init_with_transfer $contract_scenarios_dir/create_contract.tz $key2 Unit 1,000 bootstrap1
 assert_balance create_contract "1000 ꜩ"
 created_contract=\
-`$client transfer 0 from bootstrap1 to create_contract -arg '(Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 10 \
+`$client transfer 0 from bootstrap1 to create_contract -arg 'None' --burn-cap 10 \
 | grep 'New contract' \
 | sed -E 's/.*(KT1[a-zA-Z0-9]+).*/\1/' \
 | head -1`

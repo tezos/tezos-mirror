@@ -823,6 +823,38 @@ let rec interp
             logged_return
               (Item (Internal_operation { source = self ; operation ; nonce },
                      Item ((contract, "default"), rest)), ctxt)
+        | Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
+          (* Removed the instruction's arguments manager, spendable and delegatable *)
+          Item (delegate, Item
+                  (credit, Item
+                     (init, rest))) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
+            unparse_ty ctxt param_type >>=? fun (unparsed_param_type, ctxt) ->
+            let unparsed_param_type =
+              Script_ir_translator.add_field_annot (Option.map ~f:(fun n -> `Field_annot n) root_name) None unparsed_param_type in
+            unparse_ty ctxt storage_type >>=? fun (unparsed_storage_type, ctxt) ->
+            let code =
+              Micheline.strip_locations
+                (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
+                           Prim (0, K_storage, [ unparsed_storage_type ], []) ;
+                           Prim (0, K_code, [ Micheline.root code ], []) ])) in
+            unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
+            let storage = Micheline.strip_locations storage in
+            Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            (* Defaulting the removed arguments for now *)
+            let manager = Signature.Public_key_hash.zero in
+            let delegatable = false in
+            let spendable = false in
+            let operation =
+              Origination
+                { credit ; manager ; delegate ; preorigination = Some contract ;
+                  delegatable ; spendable ;
+                  script = Some { code = Script.lazy_expr code ;
+                                  storage = Script.lazy_expr storage } } in
+            Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
+            logged_return
+              (Item (Internal_operation { source = self ; operation ; nonce },
+                     Item ((contract, "default"), rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
