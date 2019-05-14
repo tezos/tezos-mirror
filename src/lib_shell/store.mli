@@ -86,6 +86,11 @@ module Chain : sig
     with type t := t
      and type elt := Chain_id.t
 
+  module Protocol_hash : MAP_STORE
+    with type t = store
+     and type key = int
+     and type value = Protocol_hash.t
+
 end
 
 

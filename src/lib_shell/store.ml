@@ -91,6 +91,20 @@ module Chain = struct
   module Allow_forked_chain =
     Indexed_store.Make_set (struct let name = ["allow_forked_chain"] end)
 
+  module Protocol_index =
+    Store_helpers.Make_indexed_substore
+      (Store_helpers.Make_substore
+         (Indexed_store.Store)
+         (struct let name = ["protocol" ; "level"] end))
+      (Store_helpers.Integer_index)
+
+  module Protocol_hash =
+    Protocol_index.Make_map
+      (struct let name = ["hash"] end)
+      (Store_helpers.Make_value(struct
+         type t = Protocol_hash.t
+         let encoding = Protocol_hash.encoding
+       end))
 end
 
 (**************************************************************************
