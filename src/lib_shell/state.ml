@@ -424,6 +424,26 @@ module Chain = struct
       Lwt.return chain_data.test_chain
     end
 
+  let get_level_indexed_protocol chain_state header =
+    let chain_id = chain_state.chain_id in
+    let protocol_level = header.Block_header.shell.proto_level in
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data begin fun global_data ->
+      let global_store = global_data.global_store in
+      let chain_store = Store.Chain.get global_store chain_id in
+      Store.Chain.Protocol_hash.read_opt chain_store protocol_level >>= function
+      | None -> Pervasives.failwith "State.Chain.get_level_index_protocol"
+      | Some p -> Lwt.return p
+    end
+
+  let update_level_indexed_protocol_store chain_state chain_id level protocol_hash =
+    let global_state = chain_state.global_state in
+    Shared.use global_state.global_data begin fun global_data ->
+      let global_store = global_data.global_store in
+      let chain_store = Store.Chain.get global_store chain_id in
+      Store.Chain.Protocol_hash.store chain_store level protocol_hash
+    end
+
   let allocate
       ~genesis
       ~faked_genesis_hash
@@ -476,6 +496,7 @@ module Chain = struct
     and chain_data_store = Store.Chain_data.get chain_store in
     let save_point = genesis_header.shell.level, genesis.block in
     let caboose = genesis_header.shell.level, genesis.block in
+    let proto_level = genesis_header.shell.proto_level in
     Store.Chain.Genesis_hash.store chain_store genesis.block >>= fun () ->
     Store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Store.Chain.Genesis_protocol.store chain_store genesis.protocol >>= fun () ->
@@ -484,6 +505,7 @@ module Chain = struct
     Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
     Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
     Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
+    Store.Chain.Protocol_hash.store chain_store proto_level genesis.protocol >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -1047,6 +1069,9 @@ module Block = struct
     context block >>= fun context ->
     Context.get_protocol context
 
+  let protocol_level block =
+    block.header.shell.proto_level
+
   let test_chain block =
     context block >>= fun context ->
     Context.get_test_chain context >>= fun status ->
@@ -1184,6 +1209,8 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
         protocol } in
     Chain.locked_create block.chain_state.global_state data
       chain_id ~expiration genesis genesis_header >>= fun testchain_state ->
+    Store.Chain.Protocol_hash.store
+      chain_store genesis_header.shell.proto_level protocol >>= fun () ->
     update_testchain block ~testchain_state >>= fun () ->
     return testchain_state
   end

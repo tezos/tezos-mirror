@@ -107,6 +107,13 @@ module Chain : sig
       This function assumes that the predecessor is known valid. *)
   val acceptable_block: chain_state -> Block_header.t -> bool Lwt.t
 
+  (** Get the level indexed chain protocol store for the given header. *)
+  val get_level_indexed_protocol: chain_state -> Block_header.t -> Protocol_hash.t Lwt.t
+
+  (** Update the level indexed chain protocol store so that block can easily access
+      the corresponding protocol hash from the protocol level in its header. *)
+  val update_level_indexed_protocol_store: chain_state -> Chain_id.t -> int -> Protocol_hash.t -> unit Lwt.t
+
 end
 
 (** {2 Block database} *)
@@ -196,6 +203,9 @@ module Block : sig
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
   val test_chain: t -> (Test_chain_status.t * t option) Lwt.t
+
+  val protocol_level: t -> int
+
 
   val operation_hashes:
     t -> int ->
