@@ -112,3 +112,80 @@ val fork_test_chain:
   context -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> context Lwt.t
 val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
 
+(** {2 Context dumping} ******************************************************)
+
+module Pruned_block : sig
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : ( int * Operation.t list ) list ;
+    operation_hashes : (int * Operation_hash.t list) list ;
+  }
+
+  val encoding : t Data_encoding.t
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+end
+
+module Block_data : sig
+
+  type t = {
+    block_header : Block_header.t ;
+    operations : Operation.t list list ;
+  }
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+  val encoding : t Data_encoding.t
+end
+
+module Protocol_data : sig
+
+  type t = Int32.t * data
+
+  and info = {
+    author : string ;
+    message : string ;
+    timestamp : Time.Protocol.t ;
+  }
+
+  and data = {
+    info : info ;
+    protocol_hash : Protocol_hash.t ;
+    test_chain_status : Test_chain_status.t ;
+    data_key : Context_hash.t ;
+    parents : Context_hash.t list ;
+  }
+
+  val to_bytes : t -> MBytes.t
+  val of_bytes : MBytes.t -> t option
+  val encoding : t Data_encoding.t
+
+end
+
+val get_protocol_data_from_header :
+  index -> Block_header.t -> Protocol_data.t Lwt.t
+
+val dump_contexts :
+  index ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) ->
+  filename:string ->
+  unit tzresult Lwt.t
+
+val restore_contexts : index -> filename:string ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   Pruned_block.t list * Protocol_data.t list) tzresult Lwt.t
+
+val validate_context_hash_consistency_and_commit :
+  data_hash:Context_hash.t ->
+  expected_context_hash:Context_hash.t ->
+  timestamp:Time.Protocol.t ->
+  test_chain:Test_chain_status.t ->
+  protocol_hash:Protocol_hash.t ->
+  message:string ->
+  author:string ->
+  parents:Context_hash.t list ->
+  index:index ->
+  bool Lwt.t
