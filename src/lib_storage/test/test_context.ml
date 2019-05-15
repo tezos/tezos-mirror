@@ -225,6 +225,55 @@ let test_fold { idx ; genesis ; _ } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return_unit
 
+let test_dump { idx ; block3b; _ } =
+  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir2 ->
+    let dumpfile = base_dir2 // "dump" in
+    let ctxt_hash = block3b in
+    let history_mode = Tezos_shell_services.History_mode.Full in
+    let empty_block_header context =
+      Block_header.{
+        protocol_data = MBytes.empty;
+        shell = {
+          level = 0l;
+          proto_level = 0;
+          predecessor = Block_hash.zero;
+          timestamp = Time.Protocol.epoch;
+          validation_passes = 0;
+          operations_hash = Operation_list_list_hash.zero;
+          fitness = [];
+          context;
+        } } in
+    let _empty_pruned_block = ({
+        block_header = empty_block_header Context_hash.zero ;
+        operations = [] ;
+        operation_hashes = [] ;
+      } : Context.Pruned_block.t) in
+    let empty = {
+      Context.Block_data.block_header = empty_block_header Context_hash.zero ;
+      operations = [[]] ;
+    } in
+    let bhs =
+      (fun context ->
+         empty_block_header context,
+         empty,
+         history_mode,
+         (fun _ -> return (None, None))
+      ) ctxt_hash
+    in
+    Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
+    let root = base_dir2 // "context" in
+    Context.init ?patch_context:None root >>= fun idx2 ->
+    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
+    let expected_ctxt_hash = (fun (bh,_,_, _,_) -> bh.Block_header.shell.context) imported in
+    assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
+    return ()
+  end
+  >>= function
+  | Error err ->
+      Error_monad.pp_print_error Format.err_formatter err ;
+      assert false
+  | Ok () -> Lwt.return_unit
+
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list = [
@@ -233,6 +282,7 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "fork", test_fork ;
   "replay", test_replay ;
   "fold", test_fold ;
+  "dump", test_dump ;
 ]
 
 
