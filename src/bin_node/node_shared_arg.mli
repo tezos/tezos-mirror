@@ -57,6 +57,8 @@ module Term : sig
   val config_file: string option Cmdliner.Term.t
 end
 
+val read_data_dir: t -> string tzresult Lwt.t
+
 val read_and_patch_config_file: ?ignore_bootstrap_peers:bool -> t -> Node_config_file.t tzresult Lwt.t
 
 module Manpage : sig
