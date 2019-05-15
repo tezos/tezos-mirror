@@ -36,3 +36,8 @@ val pp : Format.formatter -> t -> unit
 val version_encoding : t Data_encoding.encoding
 
 val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
+
+val store_dir: string -> string
+val context_dir: string -> string
+val protocol_dir: string -> string
+val lock_file: string -> string

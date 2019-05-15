@@ -23,9 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let (//) = Filename.concat
+
 type t = string
 
 let data_version = "0.0.2"
+
+(* List of upgrade functions from each still supported previous
+   version to the current [data_version] above. If this list grows too
+   much, an idea would be to have triples (version, version,
+   converter), and to sequence them dynamically instead of
+   statically. *)
+let upgradable_data_version = [
+]
+
+let store_dir data_dir = data_dir // "store"
+let context_dir data_dir = data_dir // "context"
+let protocol_dir data_dir = data_dir // "protocol"
+let lock_file data_dir = data_dir // "lock"
 
 let default_identity_file_name = "identity.json"
 
@@ -39,6 +54,7 @@ type error += Invalid_data_dir_version of t * t
 type error += Invalid_data_dir of string
 type error += No_data_dir_version_file of string
 type error += Could_not_read_data_dir_version of string
+type error += Data_dir_needs_upgrade of { expected: t ; actual: t }
 
 let () =
   register_error_kind
@@ -98,7 +114,26 @@ let () =
           \ but the file does not exist."
           path)
     (function No_data_dir_version_file path -> Some path | _ -> None)
-    (fun path -> No_data_dir_version_file path)
+    (fun path -> No_data_dir_version_file path) ;
+  register_error_kind
+    `Permanent
+    ~id: "dataDirNeedsUpgrade"
+    ~title: "The data directory needs to be upgraded"
+    ~description: "The data directory needs to be upgraded"
+    ~pp:(fun ppf (exp, got) ->
+        Format.fprintf ppf
+          "The data directory version is too old.@,\
+           Found '%s', expected '%s'.@,\
+           It needs to be upgraded with `tezos-node upgrade_storage`."
+          got exp)
+    Data_encoding.(obj2
+                     (req "expected_version" string)
+                     (req "actual_version" string))
+    (function
+      | Data_dir_needs_upgrade { expected ; actual } ->
+          Some (expected, actual)
+      | _ -> None)
+    (fun (expected, actual) -> Data_dir_needs_upgrade { expected ; actual })
 
 let version_file data_dir =
   (Filename.concat data_dir version_file_name)
@@ -113,11 +148,15 @@ let check_data_dir_version data_dir =
     try return (Data_encoding.Json.destruct version_encoding json)
     with _ -> fail (Could_not_read_data_dir_version version_file)
   end >>=? fun version ->
-  fail_unless
-    (String.equal data_version version)
-    (Invalid_data_dir_version (data_version, version)) >>=? fun () ->
-  return_unit
-
+  if String.equal version data_version then
+    return_none
+  else
+    match
+      List.find_opt (fun (v, _) -> String.equal v version) upgradable_data_version
+    with
+    | Some f -> return_some f
+    | None ->
+        fail (Invalid_data_dir_version (data_version, version))
 
 let write_version data_dir =
   Lwt_utils_unix.Json.write_file
@@ -125,30 +164,45 @@ let write_version data_dir =
     (Data_encoding.Json.construct version_encoding data_version)
 
 let ensure_data_dir bare data_dir =
-  try if Sys.file_exists data_dir then
+  let write_version () =
+    write_version data_dir >>=? fun () -> return_none in
+  try
+    if Sys.file_exists data_dir then
       match Sys.readdir data_dir with
-      | [||] -> write_version data_dir
-      | [| single |] when single = default_identity_file_name -> write_version data_dir
+      | [||] -> write_version ()
+      | [| single |] when single = default_identity_file_name ->
+          write_version ()
+      | [| file_a ; file_b |] when bare &&
+                                   (file_a = version_file_name &&
+                                    file_b = default_identity_file_name) ||
+                                   (file_b = version_file_name &&
+                                    file_a = default_identity_file_name) ->
+          write_version ()
       | files when bare ->
           let files =
             List.filter
               (fun e -> e <> default_identity_file_name)
               (Array.to_list files) in
           let to_delete =
-            let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) in
-            Format.asprintf "@[<v>%a@]" pp files in
-          fail
-            (Invalid_data_dir
-               (Format.asprintf
-                  "Please provide a clean directory (only %s is allowed) by deleting :@ %s"
-                  default_identity_file_name
-                  to_delete))
+            Format.asprintf "@[<v>%a@]"
+              (Format.pp_print_list ~pp_sep:Format.pp_print_cut Format.pp_print_string) files in
+          fail (Invalid_data_dir
+                  (Format.asprintf
+                     "Please provide a clean directory (only %s is allowed) by deleting :@ %s"
+                     default_identity_file_name
+                     to_delete))
       | _ -> check_data_dir_version data_dir
-    else
+    else begin
       Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
-      write_version data_dir
-  with Sys_error _ | Unix.Unix_error _ ->
-    fail (Invalid_data_dir data_dir)
+      write_version ()
+    end
+  with
+  | Sys_error _ | Unix.Unix_error _ ->
+      fail (Invalid_data_dir data_dir)
 
 let ensure_data_dir ?(bare = false) data_dir =
-  ensure_data_dir bare data_dir
+  ensure_data_dir bare data_dir >>=? function
+  | None -> return_unit
+  | Some (version, _) ->
+      fail (Data_dir_needs_upgrade { expected = data_version ;
+                                     actual = version })

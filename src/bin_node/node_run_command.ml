@@ -63,11 +63,6 @@ let () =
 
 let (//) = Filename.concat
 
-let store_dir data_dir = data_dir // "store"
-let context_dir data_dir = data_dir // "context"
-let protocol_dir data_dir = data_dir // "protocol"
-let lock_file data_dir = data_dir // "lock"
-
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   begin
     match sandbox with
@@ -148,8 +143,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
   let node_config : Node.config = {
     genesis ;
     patch_context = Some (Patch_context.patch_context sandbox_param) ;
-    store_root = store_dir config.data_dir ;
-    context_root = context_dir config.data_dir ;
+    store_root = Node_data_version.store_dir config.data_dir ;
+    context_root = Node_data_version.context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
     checkpoint ;
@@ -221,7 +216,7 @@ let init_signal () =
 let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
-    ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
+    ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
   let log_cfg =
     match verbosity with
@@ -229,7 +224,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
     | Some default_level -> { config.log with default_level } in
   Internal_event_unix.init ~lwt_log_sink:log_cfg
     ~configuration:config.internal_events () >>= fun () ->
-  Updater.init (protocol_dir config.data_dir) ;
+  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   begin init_node ?sandbox ?checkpoint config >>= function
     | Ok node -> return node
@@ -283,7 +278,7 @@ let process sandbox verbosity checkpoint args =
               failwith "Failed to parse the provided checkpoint (Base58Check-encoded)."
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
-      (lock_file config.data_dir) >>=? function
+      (Node_data_version.lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
           (fun () -> run ?sandbox ?verbosity ?checkpoint config)
