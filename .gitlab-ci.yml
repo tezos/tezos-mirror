@@ -333,6 +333,11 @@ integration:voting:
     - pytest tests_python/tests/test_voting.py
 
 
+integration:double_endorsement:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_double_endorsement.py
+
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
