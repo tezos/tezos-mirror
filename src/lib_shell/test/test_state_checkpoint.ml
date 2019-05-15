@@ -207,26 +207,6 @@ block and remove any concurrent branch
 does not prevent a future good block from correctly being reached
 - There are no bad quadratic behaviours *)
 
-(* test genesis/basic check point: (level_0, genesis_block) *)
-
-let test_checkpoint_genesis s =
-  Chain.genesis s.chain >>= fun genesis ->
-  let header = State.Block.header genesis in
-  let level = State.Block.level genesis in
-  if not (Block_hash.equal (State.Block.hash genesis) genesis_block)
-  then Assert.fail_msg "unexpected head";
-  (* set checkpoint at genesis *)
-  State.Chain.set_checkpoint s.chain header >>= fun () ->
-  State.Chain.checkpoint s.chain >>= fun checkpoint_header ->
-  let checkpoint_hash = Block_header.hash checkpoint_header in
-  (* if the level is equal and not the same hash then fail *)
-  if Int32.equal level checkpoint_header.shell.level &&
-     not (Block_hash.equal checkpoint_hash (State.Block.hash genesis))
-  then
-    Assert.fail_msg "unexpected checkpoint"
-  else
-    return_unit
-
 let test_basic_checkpoint s =
   let block = vblock s "A1" in
   let header = State.Block.header block in
