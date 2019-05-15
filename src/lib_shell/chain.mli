@@ -27,7 +27,7 @@
 
 (** The genesis block of the chain. On a test chain,
     the test protocol has been promoted as "main" protocol. *)
-val genesis: State.Chain.t -> State.Block.t option Lwt.t
+val genesis: State.Chain.t -> State.Block.t Lwt.t
 
 (** The current head of the chain. *)
 val head: State.Chain.t -> State.Block.t Lwt.t

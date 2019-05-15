@@ -170,16 +170,14 @@ let vblocks s =
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
-  Chain.genesis chain >>= function
-  | None -> assert false
-  | Some genesis ->
-      Hashtbl.add vtbl "Genesis" genesis ;
-      let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ] in
-      build_valid_chain chain vtbl genesis c >>= fun () ->
-      let a2 = Hashtbl.find vtbl "A2" in
-      let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ] in
-      build_valid_chain chain vtbl a2 c >>= fun () ->
-      Lwt.return vtbl
+  Chain.genesis chain >>= fun genesis ->
+  Hashtbl.add vtbl "Genesis" genesis ;
+  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ] in
+  build_valid_chain chain vtbl genesis c >>= fun () ->
+  let a2 = Hashtbl.find vtbl "A2" in
+  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ] in
+  build_valid_chain chain vtbl a2 c >>= fun () ->
+  Lwt.return vtbl
 
 let wrap_state_init f base_dir =
   begin

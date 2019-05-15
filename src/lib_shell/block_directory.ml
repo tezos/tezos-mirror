@@ -339,10 +339,8 @@ let get_directory block =
 
 let get_block chain_state = function
   | `Genesis ->
-      Chain.genesis chain_state >>= begin function
-        | Some b -> Lwt.return_some b
-        | None -> Lwt.return_none
-      end
+      Chain.genesis chain_state >>= fun genesis ->
+      Lwt.return_some genesis
   | `Head n ->
       Chain.head chain_state >>= fun head ->
       if n < 0 then

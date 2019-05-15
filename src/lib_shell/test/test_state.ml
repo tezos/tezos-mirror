@@ -148,16 +148,14 @@ let build_valid_chain state vtbl pred names =
 
 let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
-  Chain.genesis chain >>= function
-  | None -> assert false
-  | Some genesis ->
-      Hashtbl.add vtbl "Genesis" genesis ;
-      let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
-      build_valid_chain chain vtbl genesis c >>= fun () ->
-      let a3 = Hashtbl.find vtbl "A3" in
-      let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
-      build_valid_chain chain vtbl a3 c >>= fun () ->
-      Lwt.return vtbl
+  Chain.genesis chain >>= fun genesis ->
+  Hashtbl.add vtbl "Genesis" genesis ;
+  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
+  build_valid_chain chain vtbl genesis c >>= fun () ->
+  let a3 = Hashtbl.find vtbl "A3" in
+  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
+  build_valid_chain chain vtbl a3 c >>= fun () ->
+  Lwt.return vtbl
 
 type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
