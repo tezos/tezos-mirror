@@ -1,18 +1,21 @@
 open Internal_pervasives
 
 module Process = struct
-  type t =
-    { id: string
-    ; binary: string option
-    ; command: string list
-    ; kind: [`Process_group | `Docker of string] }
+  type kind =
+    [`Process_group | `Docker of string | `Process_group_script of string]
 
-  let make_in_session ?binary id command =
-    {id; binary; command= "setsid" :: command; kind= `Process_group}
+  type t = {id: string; binary: string option; command: string list; kind: kind}
+
+  let make_in_session ?binary id kind command =
+    {id; binary; command= "setsid" :: command; kind}
 
   let genspio id script =
-    let command = ["sh"; "-c"; Genspio.Compile.to_one_liner script] in
-    make_in_session id command
+    let script_content =
+      Format.asprintf "%a" Genspio.Compile.To_slow_flow.Script.pp_posix
+        (Genspio.Compile.To_slow_flow.compile script)
+    in
+    let command = ["sh"] in
+    make_in_session id (`Process_group_script script_content) command
 
   let docker_run id ~image ~options ~args =
     let name = id in
@@ -59,7 +62,8 @@ let output_path t process which =
      match which with
      | `Stdout -> "stdout.log"
      | `Stderr -> "stderr.log"
-     | `Meta -> "meta.log" )
+     | `Meta -> "meta.log"
+     | `Script -> "script.sh" )
 
 let ef_procesess state processes =
   EF.(
@@ -96,7 +100,8 @@ let ef ?(all = false) state =
                   ; desc (af "kind:")
                       ( match process.kind with
                       | `Docker n -> af "docker:%s" n
-                      | `Process_group -> af "process-group" ) ] )
+                      | `Process_group -> af "process-group"
+                      | `Process_group_script _ -> af "shell-script" ) ] )
               :: prev
           | _, _ -> prev )
         (State.processes state) []
@@ -106,8 +111,9 @@ let ef ?(all = false) state =
     label (af "Processes:") (list all_procs))
 
 let start t process =
-  let date = Tezos_stdlib_unix.Systime_os.now ()
-             |> Tezos_base.Time.System.to_notation in
+  let date =
+    Tezos_stdlib_unix.Systime_os.now () |> Tezos_base.Time.System.to_notation
+  in
   let open_file f =
     Lwt_exception.catch
       ~attach:[("open_file", `String_value f)]
@@ -129,6 +135,13 @@ let start t process =
   >>= fun stdout ->
   open_file (output_path t process `Stderr)
   >>= fun stderr ->
+  ( match process.kind with
+  | `Process_group | `Docker _ -> return process.command
+  | `Process_group_script s ->
+      let path = output_path t process `Script in
+      System.write_file t path ~content:s
+      >>= fun () -> return (process.command @ [path]) )
+  >>= fun actual_command ->
   Lwt_exception.catch
     (fun () ->
       Lwt_io.with_file ~mode:Lwt_io.output
@@ -139,7 +152,7 @@ let start t process =
             let sep = String.make 80 '=' in
             sprintf "\n%s\nDate: %s\nStarting: %s\nCmd: [%s]\n%s\n" sep date
               process.Process.id
-              ( List.map process.command ~f:(sprintf "%S")
+              ( List.map actual_command ~f:(sprintf "%S")
               |> String.concat ~sep:"; " )
               sep
           in
@@ -149,7 +162,7 @@ let start t process =
   let proc =
     Lwt_process.open_process_none ~stdout:(`FD_move stdout)
       ~stderr:(`FD_move stderr)
-      (Option.value ~default:"" process.binary, Array.of_list process.command)
+      (Option.value ~default:"" process.binary, Array.of_list actual_command)
   in
   State.add_process t process proc >>= fun () -> return {process; lwt= proc}
 
@@ -170,7 +183,7 @@ let wait _t {lwt; _} =
 
 let kill _t {lwt; process} =
   match process.kind with
-  | `Process_group ->
+  | `Process_group | `Process_group_script _ ->
       Lwt_exception.catch
         (fun () ->
           let signal = Sys.sigterm in
@@ -238,7 +251,7 @@ let run_cmdf state fmt =
   ksprintf
     (fun s ->
       let id = fresh_id state "cmd" ~seed:s in
-      let proc = Process.make_in_session id ["sh"; "-c"; s] in
+      let proc = Process.make_in_session id `Process_group ["sh"; "-c"; s] in
       start state proc
       >>= fun proc ->
       wait state proc
@@ -261,7 +274,7 @@ let run_async_cmdf state f fmt =
   ksprintf
     (fun s ->
       let id = fresh_id state "cmd" ~seed:s in
-      let proc = Process.make_in_session id ["sh"; "-c"; s] in
+      let proc = Process.make_in_session id `Process_group ["sh"; "-c"; s] in
       start_full state proc
       >>= fun (proc_state, proc) ->
       f proc

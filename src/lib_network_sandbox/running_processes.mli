@@ -5,13 +5,13 @@ open Internal_pervasives
 (** The definition of a process, for now, a process within a
     process-group or a Docker container. *)
 module Process : sig
-  type t = private
-    { id: string
-    ; binary: string option
-    ; command: string list
-    ; kind: [`Process_group | `Docker of string] }
+  type kind =
+    [`Process_group | `Docker of string | `Process_group_script of string]
 
-  val make_in_session : ?binary:string -> string -> string list -> t
+  type t = private
+    {id: string; binary: string option; command: string list; kind: kind}
+
+  val make_in_session : ?binary:string -> string -> kind -> string list -> t
   val genspio : string -> 'a Genspio.EDSL.t -> t
 
   val docker_run :
@@ -40,7 +40,7 @@ val ef_procesess :
 val ef : ?all:bool -> < runner: State.t ; .. > -> Easy_format.t
 
 val start :
-     < paths: Paths.t ; runner: State.t ; .. >
+     < application_name: string ; paths: Paths.t ; runner: State.t ; .. >
   -> Process.t
   -> (State.process_state, [> `Lwt_exn of exn]) Asynchronous_result.t
 
@@ -67,7 +67,7 @@ val find_process_by_id :
   -> (State.process_state list, [> ]) Asynchronous_result.t
 
 val run_cmdf :
-     < paths: Paths.t ; runner: State.t ; .. >
+     < paths: Paths.t ; runner: State.t ; .. > Base_state.t
   -> ( 'a
      , unit
      , string
@@ -89,7 +89,7 @@ val run_async_cmdf :
 (** Run a shell command and run a function over the process data before waiting for its end. *)
 
 val run_successful_cmdf :
-     < paths: Paths.t ; runner: State.t ; .. >
+     < paths: Paths.t ; runner: State.t ; .. > Base_state.t
   -> ( 'a
      , unit
      , string
@@ -100,7 +100,7 @@ val run_successful_cmdf :
   -> 'a
 
 val run_genspio :
-     < paths: Paths.t ; runner: State.t ; .. >
+     < paths: Paths.t ; runner: State.t ; .. > Base_state.t
   -> string
   -> 'a Genspio.Language.t
   -> (Lwt_unix.process_status, [> `Lwt_exn of exn]) Asynchronous_result.t

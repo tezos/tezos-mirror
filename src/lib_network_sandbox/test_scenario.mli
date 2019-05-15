@@ -64,7 +64,7 @@ module Network : sig
   val make : Tezos_node.t list -> t
 
   val netstat_listening_ports :
-       < paths: Paths.t ; runner: Running_processes.State.t ; .. >
+       < paths: Paths.t ; runner: Running_processes.State.t ; .. > Base_state.t
     -> ( (int * [> `Tcp of int * string list]) list
        , [> `Lwt_exn of exn | Process_result.Error.t] )
        Asynchronous_result.t
@@ -72,7 +72,10 @@ module Network : sig
 
   val start_up :
        ?check_ports:bool
-    -> < paths: Paths.t ; runner: Running_processes.State.t ; .. >
+    -> < Base_state.base
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
     -> client_exec:Tezos_executable.t
     -> t
     -> ( unit
@@ -89,7 +92,7 @@ val network_with_protocol :
   -> ?base_port:int
   -> ?size:int
   -> ?protocol:Tezos_protocol.t
-  -> < paths: Paths.t ; runner: Running_processes.State.t ; .. >
+  -> < paths: Paths.t ; runner: Running_processes.State.t ; .. > Base_state.t
   -> node_exec:Tezos_executable.t
   -> client_exec:Tezos_executable.t
   -> ( Tezos_node.t list * Tezos_protocol.t

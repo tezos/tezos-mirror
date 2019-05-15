@@ -32,12 +32,14 @@ val activate_protocol_script :
 val bootstrapped :
      t
   -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
+           Base_state.t
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 (** Wait for the node to be bootstrapped. *)
 
 val import_secret_key :
      t
   -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
+           Base_state.t
   -> string
   -> string
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
@@ -45,12 +47,14 @@ val import_secret_key :
 val register_as_delegate :
      t
   -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
+           Base_state.t
   -> string
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 
 val activate_protocol :
      t
   -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
+           Base_state.t
   -> Tezos_protocol.t
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 
@@ -81,6 +85,7 @@ val successful_client_cmd :
      ; paths: Paths.t
      ; runner: Running_processes.State.t
      ; .. >
+     Base_state.t
   -> client:t
   -> string list
   -> ( < err: string list ; out: string list ; status: Unix.process_status >
@@ -93,6 +98,7 @@ val rpc :
      ; paths: Paths.t
      ; runner: Running_processes.State.t
      ; .. >
+     Base_state.t
   -> client:t
   -> [< `Get | `Post of string]
   -> path:string
