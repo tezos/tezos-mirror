@@ -37,6 +37,11 @@ fi
 
 assert_storage $contract_op_dir/ret_int.tz None Unit '(Some 300)'
 
+assert_storage $contract_op_dir/dign.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '5'
+assert_storage $contract_op_dir/dugn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '1'
+assert_storage $contract_op_dir/dropn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '5'
+assert_storage $contract_op_dir/dipn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '6'
+
 # Map block on lists
 assert_storage $contract_op_dir/list_map_block.tz '{0}' '{}' '{}'
 assert_storage $contract_op_dir/list_map_block.tz '{0}' '{ 1 ; 1 ; 1 ; 1 }' '{ 1 ; 2 ; 3 ; 4 }'
