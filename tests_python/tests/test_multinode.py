@@ -5,6 +5,7 @@ from tools import utils
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
 
+# TODO  test doesn't pass with n=2 (--bootstrap-treshold?)
 @pytest.mark.multinode
 @pytest.mark.parametrize("clients", [3], indirect=True)
 @pytest.mark.incremental
