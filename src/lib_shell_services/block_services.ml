@@ -104,8 +104,12 @@ let parse_block s =
             Some h -> Ok (`Hash (h , 0))
           | None ->
               let l = Int32.of_string s in
-              if Int32.(compare l (of_int 0)) < 0 then raise Exit
-              else Ok (`Level (Int32.of_string s))
+              if Compare.Int32.(l < 0l) then
+                raise Exit
+              else if Compare.Int32.(l = 0l) then
+                Ok `Genesis
+              else
+                Ok (`Level (Int32.of_string s))
         end
     | ([h ; n], '~') | ([h ; n], '-') ->
         Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
