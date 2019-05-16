@@ -50,7 +50,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
     ~first_endorser_exec ~first_accuser_exec ~second_baker_exec
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
-    () =
+    test_variant () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [ node_exec; client_exec; first_baker_exec; first_endorser_exec
@@ -253,11 +253,17 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   >>= fun () ->
   wait_for_voting_period state ~client:client_0 ~attempts:50 Promotion_vote
   >>= fun _ ->
+  let protocol_switch_will_happen =
+    match test_variant with
+    | `Full_upgrade -> true
+    | `Nay_for_promotion -> false
+  in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       Tezos_client.successful_client_cmd state ~client
         [ "submit"; "ballot"; "for"
         ; Tezos_protocol.Account.name acc
-        ; new_protocol_hash; "yea" ]
+        ; new_protocol_hash
+        ; (if protocol_switch_will_happen then "yea" else "nay") ]
       >>= fun _ ->
       Console.sayf state
         Fmt.(
@@ -271,6 +277,10 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   Tezos_client.successful_client_cmd state ~client:client_0
     ["show"; "voting"; "period"]
   >>= fun res ->
+  let protocol_to_wait_for =
+    if protocol_switch_will_happen then new_protocol_hash
+    else protocol.Tezos_protocol.hash
+  in
   Helpers.wait_for state ~attempts:3 ~seconds:4. (fun _ ->
       Console.say state EF.(wf "Checking actual protocol transition")
       >>= fun () ->
@@ -280,22 +290,32 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       ( try Jqo.field ~k:"protocol" json |> Jqo.get_string |> return
         with e -> failf "Cannot parse metadata: %s" (Printexc.to_string e) )
       >>= fun proto_hash ->
-      if proto_hash <> new_protocol_hash then
+      if proto_hash <> protocol_to_wait_for then
         return
           (`Not_done
-            (sprintf "Protocol not done: %s Vs %s" proto_hash new_protocol_hash))
+            (sprintf "Protocol not done: %s Vs %s" proto_hash
+               protocol_to_wait_for))
       else return (`Done ()) )
   >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
       [ wf "Test finished, protocol is now %s, things should keep baking."
-          new_protocol_hash
+          protocol_to_wait_for
       ; markdown_verbatim (String.concat ~sep:"\n" res#out) ]
     ~force:true
 
 let cmd ~pp_error () =
   let open Cmdliner in
   let open Term in
+  let variants =
+    [ ( "full-upgrade"
+      , `Full_upgrade
+      , "Go through the whole voting process and do the protocol change." )
+    ; ( "nay-for-promotion"
+      , `Nay_for_promotion
+      , "Go through the whole voting process but vote Nay at the last period \
+         and hence stay on the same protocol." ) ]
+  in
   Test_command_line.Run_command.make ~pp_error
     ( pure
         (fun size
@@ -314,6 +334,7 @@ let cmd ~pp_error () =
         second_accuser_exec
         (`Protocol_path new_protocol_path)
         generate_kiln_config
+        test_variant
         state
         ->
           let actual_test =
@@ -321,7 +342,7 @@ let cmd ~pp_error () =
               ~first_baker_exec ~first_endorser_exec ~first_accuser_exec
               ~second_baker_exec ~second_endorser_exec ~second_accuser_exec
               ~admin_exec ?generate_kiln_config ~external_peer_ports
-              ~no_daemons_for ~new_protocol_path
+              ~no_daemons_for ~new_protocol_path test_variant
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -360,6 +381,17 @@ let cmd ~pp_error () =
                (info [] ~doc:"The protocol to inject and vote on."
                   ~docv:"PROTOCOL-PATH")))
     $ Kiln.Configuration_directory.cli_term ()
+    $ Arg.(
+        let doc =
+          sprintf "Which variant of the test to run (one of {%s})"
+            ( List.map ~f:(fun (n, _, _) -> n) variants
+            |> String.concat ~sep:", " )
+        in
+        value
+          (opt
+             (enum (List.map variants ~f:(fun (n, v, _) -> (n, v))))
+             `Full_upgrade
+             (info ["test-variant"] ~doc)))
     $ Test_command_line.cli_state ~name:"daemons-upgrade" () )
     (let doc =
        "Vote and Protocol-upgrade with bakers, endorsers, and accusers."
@@ -369,6 +401,13 @@ let cmd ~pp_error () =
        ; `P
            "This test builds and runs a sandbox network to do a full voting \
             round followed by a protocol change while all the daemons."
+       ; `P
+           (sprintf
+              "There are for now %d variants (see option `--test-variant`):"
+              (List.length variants))
+       ; `Blocks
+           (List.concat_map variants ~f:(fun (n, _, desc) ->
+                [`Noblank; `P (sprintf "* `%s`: %s" n desc)] ))
        ; `P "The test is interactive-only:"
        ; `Blocks
            (List.concat_mapi
@@ -382,8 +421,9 @@ let cmd ~pp_error () =
                  full voting round happens with a single proposal: the one at \
                  `PROTOCOL-PATH` (which should be the one understood by the \
                  `--second-*` executables)."
-              ; "Once the protocol switch has happened (and been verified), \
-                 the test re-enters an interactive prompt to let the user \
-                 play with the new protocol." ]) ]
+              ; "Once the potential protocol switch has happened (and been \
+                 verified), the test re-enters an interactive prompt to let \
+                 the user play with the protocol (the first or second one, \
+                 depending on the `--test-variant` option)." ]) ]
      in
      info "daemons-upgrade" ~man ~doc)
