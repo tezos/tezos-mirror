@@ -147,7 +147,7 @@ let live_blocks block n =
           let block_hash = Block.hash block_head in
           if Block_hash.equal genesis_hash block_hash
           then return (bacc, oacc)
-          else fail (State.Missing_block block_hash)
+          else fail (State.Block_not_found block_hash)
       | Some predecessor ->
           loop bacc oacc chain_state predecessor (pred n) in
   loop

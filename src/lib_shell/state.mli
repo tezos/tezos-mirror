@@ -109,11 +109,10 @@ module Chain : sig
 
 end
 
-(** {2 Block header manipulation} *)
-
-type error += Missing_block of Block_hash.t
-
 (** {2 Block database} *)
+
+type error += Block_not_found of Block_hash.t
+type error += Block_contents_not_found of Block_hash.t
 
 module Block : sig
 

@@ -686,20 +686,38 @@ module Chain = struct
 
 end
 
-type error += Missing_block of Block_hash.t
+type error += Block_not_found of Block_hash.t
+type error += Block_contents_not_found of Block_hash.t
 
-let () = register_error_kind `Permanent
-    ~id:"state.block.missing"
-    ~title:"Missing block"
-    ~description:"Missing block while looking for predecessor."
+let () = begin
+  register_error_kind `Permanent
+    ~id:"state.block.not_found"
+    ~title:"Block_not_found"
+    ~description:"Block not found"
     ~pp:(fun ppf block_hash ->
         Format.fprintf ppf
           "@[Cannot find block %a]"
           Block_hash.pp block_hash)
-    Data_encoding.(obj1 (req "missing_block" @@ Block_hash.encoding ) )
-    (function Missing_block block_header -> Some block_header
-            | _ -> None)
-    (fun block_header -> Missing_block block_header)
+    Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding ) )
+    (function
+      | Block_not_found block_hash -> Some block_hash
+      | _ -> None)
+    (fun block_hash -> Block_not_found block_hash) ;
+
+  register_error_kind `Permanent
+    ~id:"state.block.contents_not_found"
+    ~title:"Block_contents_not_found"
+    ~description:"Block not found"
+    ~pp:(fun ppf block_hash ->
+        Format.fprintf ppf
+          "@[Cannot find block contents %a]"
+          Block_hash.pp block_hash)
+    Data_encoding.(obj1 (req "block_contents_not_found" @@ Block_hash.encoding ) )
+    (function
+      | Block_contents_not_found block_hash -> Some block_hash
+      | _ -> None)
+    (fun block_hash -> Block_contents_not_found block_hash) ;
+end
 
 module Block = struct
 
@@ -725,11 +743,16 @@ module Block = struct
 
   let hash { hash ; _} = hash
   let header { header ; _ } = header
-  let metadata b =
-    Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
-      return contents.metadata
+
+  let read_contents block =
+    Shared.use block.chain_state.block_store begin fun store ->
+      Store.Block.Contents.read_opt (store, block.hash) >>= function
+      | None -> fail (Block_contents_not_found block.hash)
+      | Some contents -> return contents
     end
+
+  let metadata b =
+    read_contents b >>=? fun { metadata ; _ } -> return metadata
 
   let chain_state { chain_state ; _ } = chain_state
   let chain_id { chain_state = { chain_id ; _ } ; _ } = chain_id
@@ -738,22 +761,15 @@ module Block = struct
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level
   let validation_passes b = (shell_header b).validation_passes
+
   let message b =
-    Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
-      return contents.message
-    end
+    read_contents b >>=? fun { message ; _ } -> return message
 
   let max_operations_ttl b =
-    Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
-      return contents.max_operations_ttl
-    end
+    read_contents b >>=? fun { max_operations_ttl ; _ } -> return max_operations_ttl
+
   let last_allowed_fork_level b =
-    Shared.use b.chain_state.block_store begin fun store ->
-      Store.Block.Contents.read (store, b.hash) >>=? fun contents ->
-      return contents.last_allowed_fork_level
-    end
+    read_contents b >>=? fun { last_allowed_fork_level ; _ } -> return last_allowed_fork_level
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block
 
