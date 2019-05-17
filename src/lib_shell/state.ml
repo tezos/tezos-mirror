@@ -391,9 +391,13 @@ let store_header_and_prune_block store block_hash =
     | Some { header ; _ } ->
         Store.Block.Pruned_contents.store st { header }
     | None ->
-        Store.Block.Pruned_contents.known st >>= fun content_known ->
-        assert content_known;
-        Lwt.return_unit
+        Store.Block.Pruned_contents.known st >>= function
+        | true -> Lwt.return_unit
+        | false ->
+            State_logging.lwt_log_error Tag.DSL.(fun f ->
+                f "@[cannot find pruned contents of block %a@]"
+                -% t event "missing_pruned_contents"
+                -% a Block_hash.Logging.tag block_hash)
   end >>= fun () ->
   prune_block store block_hash
 
