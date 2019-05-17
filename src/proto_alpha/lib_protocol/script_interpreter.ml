@@ -263,6 +263,14 @@ let rec interp
         | Cons_pair, Item (a, Item (b, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.pair) >>=? fun ctxt ->
             logged_return (Item ((a, b), rest), ctxt)
+        (* Peephole optimization for UNPAIR *)
+        | Seq ({instr=Dup;_},
+               {instr=Seq ({instr=Car;_},
+                           {instr=Seq ({instr=Dip {instr=Cdr}},
+                                       {instr=Nop;_});_});_}),
+          Item ((a, b), rest) ->
+            Lwt.return (Gas.consume ctxt Interp_costs.pair_access) >>=? fun ctxt ->
+            logged_return (Item (a, Item (b, rest)), ctxt)
         | Car, Item ((a, _), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.pair_access) >>=? fun ctxt ->
             logged_return (Item (a, rest), ctxt)
