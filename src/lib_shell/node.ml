@@ -197,14 +197,15 @@ let default_chain_validator_limits = {
 let may_update_checkpoint chain_state checkpoint history_mode =
   match checkpoint with
   | None ->
-      Lwt.return_unit
+      return_unit
   | Some checkpoint ->
       State.best_known_head_for_checkpoint
         chain_state checkpoint >>= fun new_head ->
       Chain.set_head chain_state new_head >>= fun _old_head ->
       begin match history_mode with
         | History_mode.Archive ->
-            State.Chain.set_checkpoint chain_state checkpoint
+            State.Chain.set_checkpoint chain_state checkpoint >>= fun () ->
+            return_unit
         | Full ->
             State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
         | Rolling ->
@@ -276,7 +277,7 @@ let create
   State.init
     ~store_root ~context_root ?history_mode ?patch_context
     genesis >>=? fun (state, mainchain_state, context_index, history_mode) ->
-  may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
+  may_update_checkpoint mainchain_state checkpoint history_mode >>=? fun () ->
   let distributed_db = Distributed_db.create state p2p in
   store_known_protocols state >>= fun () ->
   Validator.create state distributed_db

@@ -238,7 +238,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
   let block_store = Store.Block.get chain_store in
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
   State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
-  >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
+  >>=? fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
   begin State.Chain.checkpoint s.chain >|= begin fun b ->
@@ -312,7 +312,7 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
   >>= fun () ->
   State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
-  >>= fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
+  >>=? fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
   begin State.Block.known s.chain hb2 >|= fun b -> assert b end
   >>= fun () ->
   begin State.Chain.checkpoint s.chain >|= begin fun b ->

@@ -100,6 +100,41 @@ and block = {
   header: Block_header.t ;
 }
 
+(* Errors *)
+
+type error += Block_not_found of Block_hash.t
+type error += Block_contents_not_found of Block_hash.t
+
+let () = begin
+  register_error_kind `Permanent
+    ~id:"state.block.not_found"
+    ~title:"Block_not_found"
+    ~description:"Block not found"
+    ~pp:(fun ppf block_hash ->
+        Format.fprintf ppf
+          "@[Cannot find block %a]"
+          Block_hash.pp block_hash)
+    Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding ) )
+    (function
+      | Block_not_found block_hash -> Some block_hash
+      | _ -> None)
+    (fun block_hash -> Block_not_found block_hash) ;
+
+  register_error_kind `Permanent
+    ~id:"state.block.contents_not_found"
+    ~title:"Block_contents_not_found"
+    ~description:"Block not found"
+    ~pp:(fun ppf block_hash ->
+        Format.fprintf ppf
+          "@[Cannot find block contents %a]"
+          Block_hash.pp block_hash)
+    Data_encoding.(obj1 (req "block_contents_not_found" @@ Block_hash.encoding ) )
+    (function
+      | Block_contents_not_found block_hash -> Some block_hash
+      | _ -> None)
+    (fun block_hash -> Block_contents_not_found block_hash) ;
+end
+
 (* Abstract view over block header storage.
    This module aims to abstract over block header's [read], [read_opt] and [known]
    functions by calling the adequate function depending on the block being pruned or not.
@@ -716,7 +751,8 @@ module Chain = struct
           Lwt.return (Some new_data, ())
         end >>= fun () ->
         Shared.use chain_state.chain_data begin fun data ->
-          Store.Chain_data.Save_point.store data.chain_data_store (lvl, hash)
+          Store.Chain_data.Save_point.store data.chain_data_store (lvl, hash) >>= fun () ->
+          return_unit
         end
       end
     end
@@ -768,8 +804,9 @@ module Chain = struct
   let purge_rolling chain_state ((lvl, hash) as checkpoint) =
     Shared.use chain_state.global_state.global_data begin fun global_data ->
       Shared.use chain_state.block_store begin fun store ->
-        Store.Block.Contents.read_opt (store, hash) >|=
-        Option.unopt_assert ~loc:__POS__ >>= fun contents ->
+        begin Store.Block.Contents.read_opt (store, hash) >>= function
+          | None -> fail (Block_contents_not_found hash)
+          | Some contents -> return contents end >>=? fun contents ->
         let max_op_ttl = contents.max_operations_ttl in
         let limit = max_op_ttl in
         purge_loop_rolling ~genesis_hash:chain_state.genesis.block
@@ -783,7 +820,7 @@ module Chain = struct
         Shared.use chain_state.chain_data begin fun data ->
           Store.Chain_data.Save_point.store data.chain_data_store checkpoint >>= fun () ->
           Store.Chain_data.Caboose.store data.chain_data_store caboose >>= fun () ->
-          Lwt.return_unit
+          return_unit
         end
 
       end
@@ -838,15 +875,13 @@ module Chain = struct
     set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
-    purge_full chain_state (lvl, hash) >>= fun () ->
-    Lwt.return_unit
+    purge_full chain_state (lvl, hash)
 
   let set_checkpoint_then_purge_rolling chain_state checkpoint =
     set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
-    purge_rolling chain_state (lvl, hash) >>= fun () ->
-    Lwt.return_unit
+    purge_rolling chain_state (lvl, hash)
 
   let acceptable_block chain_state (header : Block_header.t) =
     Shared.use chain_state.chain_data begin fun chain_data ->
@@ -869,39 +904,6 @@ module Chain = struct
         Lwt.return global_data.global_store
       end
 
-end
-
-type error += Block_not_found of Block_hash.t
-type error += Block_contents_not_found of Block_hash.t
-
-let () = begin
-  register_error_kind `Permanent
-    ~id:"state.block.not_found"
-    ~title:"Block_not_found"
-    ~description:"Block not found"
-    ~pp:(fun ppf block_hash ->
-        Format.fprintf ppf
-          "@[Cannot find block %a]"
-          Block_hash.pp block_hash)
-    Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding ) )
-    (function
-      | Block_not_found block_hash -> Some block_hash
-      | _ -> None)
-    (fun block_hash -> Block_not_found block_hash) ;
-
-  register_error_kind `Permanent
-    ~id:"state.block.contents_not_found"
-    ~title:"Block_contents_not_found"
-    ~description:"Block not found"
-    ~pp:(fun ppf block_hash ->
-        Format.fprintf ppf
-          "@[Cannot find block contents %a]"
-          Block_hash.pp block_hash)
-    Data_encoding.(obj1 (req "block_contents_not_found" @@ Block_hash.encoding ) )
-    (function
-      | Block_contents_not_found block_hash -> Some block_hash
-      | _ -> None)
-    (fun block_hash -> Block_contents_not_found block_hash) ;
 end
 
 module Block = struct
