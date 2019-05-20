@@ -188,7 +188,6 @@ let register_point ?trusted pool _source_peer_id (addr, port as point) =
       let point_info =
         P2p_point_state.Info.create
           ?trusted
-          ~greylisting_config:pool.greylisting_config
           addr port in
       Option.iter pool.config.max_known_points ~f:begin fun (max, _) ->
         if P2p_point.Table.length pool.known_points >= max then gc_points pool
@@ -618,7 +617,7 @@ let rec connect ?timeout pool point =
       return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
-      P2p_point_state.set_disconnected point_info ;
+      P2p_point_state.set_disconnected pool.greylisting_config point_info ;
       P2p_fd.close fd >>= fun () ->
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
@@ -681,7 +680,9 @@ and raw_authenticate pool ?point_info canceler fd point =
     if incoming then
       P2p_point.Table.remove pool.incoming point
     else
-      Option.iter ~f:P2p_point_state.set_disconnected point_info ;
+      Option.iter
+        ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+        point_info ;
     Lwt.return_error err
   end >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
@@ -776,7 +777,7 @@ and raw_authenticate pool ?point_info canceler fd point =
           P2p_point.Id.pp point
           P2p_peer.Id.pp info.peer_id >>= fun () ->
         Option.iter connection_point_info
-          ~f:P2p_point_state.set_disconnected ;
+          ~f:(P2p_point_state.set_disconnected pool.greylisting_config) ;
         P2p_peer_state.set_disconnected peer_info ;
         Lwt.return_error err
       end >>=? fun conn ->
@@ -797,7 +798,9 @@ and raw_authenticate pool ?point_info canceler fd point =
         acceptable_point acceptable_peer_id >>= fun () ->
       P2p_socket.kick auth_fd >>= fun () ->
       if not incoming then begin
-        Option.iter ~f:P2p_point_state.set_disconnected point_info ;
+        Option.iter
+          ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+          point_info ;
         (* FIXME P2p_peer_state.set_disconnected ~requested:true peer_info ; *)
       end ;
       match acceptable_version with
@@ -902,7 +905,9 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
   Lwt_canceler.on_cancel canceler begin fun () ->
     lwt_debug "Disconnect: %a (%a)"
       P2p_peer.Id.pp peer_id P2p_connection.Id.pp id_point >>= fun () ->
-    Option.iter ~f:P2p_point_state.set_disconnected point_info ;
+    Option.iter
+      ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+      point_info ;
     log pool (Disconnection peer_id) ;
     P2p_peer_state.set_disconnected peer_info ;
     Option.iter point_info ~f:begin fun point_info ->

@@ -62,7 +62,6 @@ module Info = struct
     mutable last_established_connection : (P2p_peer.Id.t * Time.System.t) option ;
     mutable known_public : bool ;
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option ;
-    greylisting : greylisting_config ;
     mutable greylisting_delay : Time.System.Span.t ;
     mutable greylisting_end : Time.System.t ;
     events : Pool_event.t Ring.t ;
@@ -115,9 +114,7 @@ module Info = struct
             Time.System.Span.encoding default_greylisting_config.increase_cap)
       )
 
-  let create
-      ?(trusted = false)
-      ?(greylisting_config = default_greylisting_config) addr  port = {
+  let create ?(trusted = false) addr  port = {
     point = (addr, port) ;
     trusted ;
     state = Disconnected ;
@@ -127,7 +124,6 @@ module Info = struct
     last_disconnection = None ;
     known_public = false ;
     events = Ring.create log_size ;
-    greylisting = greylisting_config ;
     greylisting_delay = Ptime.Span.of_int_s 1 ;
     greylisting_end = Time.System.epoch ;
     watchers = Lwt_watcher.create_input () ;
@@ -227,7 +223,7 @@ let maxed_time_add t s =
   | Some t -> t
   | None -> Ptime.max
 
-let set_greylisted timestamp point_info =
+let set_greylisted greylisting_config timestamp point_info =
   point_info.Info.greylisting_end <-
     maxed_time_add
       timestamp
@@ -236,34 +232,35 @@ let set_greylisted timestamp point_info =
     begin
       let new_delay =
         Time.System.Span.multiply_exn
-          point_info.greylisting.factor
+          greylisting_config.Info.factor
           point_info.greylisting_delay in
-      if Ptime.Span.compare point_info.greylisting.increase_cap new_delay > 0 then
+      if Ptime.Span.compare greylisting_config.Info.increase_cap new_delay > 0 then
         new_delay
       else
-        point_info.greylisting.increase_cap
+        greylisting_config.Info.increase_cap
     end
 
 let set_disconnected
-    ?(timestamp = Systime_os.now ()) ?(requested = false) point_info =
+    ?(timestamp = Systime_os.now ()) ?(requested = false)
+    greylisting_config point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->
-        set_greylisted timestamp point_info ;
+        set_greylisted greylisting_config timestamp point_info ;
         point_info.last_failed_connection <- Some timestamp ;
         Request_rejected None
     | Accepted { current_peer_id ; _ } ->
-        set_greylisted timestamp point_info ;
+        set_greylisted greylisting_config timestamp point_info ;
         point_info.last_rejected_connection <-
           Some (current_peer_id, timestamp) ;
         Request_rejected (Some current_peer_id)
     | Running { current_peer_id ; _ } ->
         point_info.greylisting_delay <-
-          point_info.greylisting.initial_delay ;
+          greylisting_config.Info.initial_delay ;
         point_info.greylisting_end <-
           maxed_time_add
             timestamp
-            point_info.greylisting.disconnection_delay ;
+            greylisting_config.Info.disconnection_delay ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested
         then Disconnection current_peer_id
