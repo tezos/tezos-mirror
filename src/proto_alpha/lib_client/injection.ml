@@ -145,7 +145,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       pp_print_text ppf "Branch: " ;
       Block_hash.pp ppf branch ) ;
   item (fun ppf () ->
-      fprintf ppf "Watermark: `%a` (0x%s)" 
+      fprintf ppf "Watermark: `%a` (0x%s)"
         Signature.pp_watermark watermark
         (MBytes.to_hex (Signature.bytes_of_watermark watermark) |> Hex.show) ) ;
   item (fun ppf () ->

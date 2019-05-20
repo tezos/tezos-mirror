@@ -574,7 +574,7 @@ let random_transfer () =
   let source = random_contract contracts in
   let dest = random_contract contracts in
   Context.Contract.pkh source >>=? fun source_pkh ->
-  (* given that source may not have a sufficient balance for the transfer + to bake, 
+  (* given that source may not have a sufficient balance for the transfer + to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [source_pkh]) >>=? fun b ->
   Context.Contract.balance (I b) source >>=? fun amount ->

@@ -760,7 +760,7 @@ let commands version () =
                       pp_open_hovbox ppf 2 ;
                       pp_print_string ppf "* ";
                       pp_print_text ppf msg ;
-                      pp_close_box ppf () ; 
+                      pp_close_box ppf () ;
                       pp_print_cut ppf ())
                     !errors ;
                   pp_close_box ppf ())

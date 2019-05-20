@@ -39,7 +39,7 @@ val wait_for_operation_inclusion:
   Operation_hash.t ->
   (Block_hash.t * int * int) tzresult Lwt.t
 
-(** lookup an operation in [predecessors] previous blocks, starting 
+(** lookup an operation in [predecessors] previous blocks, starting
     from head *)
 val lookup_operation_in_previous_blocks:
   #Client_context.full ->
