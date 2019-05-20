@@ -58,9 +58,9 @@ module Event = struct
 
   let level req =
     match req with
-    | Debug _ -> Logging.Debug
+    | Debug _ -> Internal_event.Debug
     | Validation_success _
-    | Validation_failure _ -> Logging.Notice
+    | Validation_failure _ -> Internal_event.Notice
 
   let encoding =
     let open Data_encoding in
@@ -90,14 +90,14 @@ module Event = struct
           "@[<v 0>Block %a successfully validated@,\
            Pushed: %a, Treated: %a, Completed: %a@]"
           Block_hash.pp req.block
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
     | Validation_failure (req, { pushed ; treated ; completed }, errs)->
         Format.fprintf ppf
           "@[<v 0>Validation of block %a failed@,\
            Pushed: %a, Treated: %a, Failed: %a@,\
            %a@]"
           Block_hash.pp req.block
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
           (Format.pp_print_list Error_monad.pp) errs
 end
 

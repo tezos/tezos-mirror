@@ -42,12 +42,13 @@ type t = {
   rpc_listen_addr: string option ;
   private_mode: bool ;
   disable_mempool: bool ;
-  enable_testchain: bool ;
+  disable_testchain: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
-  log_output: Logging_unix.Output.t option ;
+  log_output: Lwt_log_sink_unix.Output.t option ;
   bootstrap_threshold: int option ;
+  history_mode: History_mode.t option ;
 }
 
 module Term : sig
@@ -56,6 +57,8 @@ module Term : sig
   val config_file: string option Cmdliner.Term.t
 end
 
+val read_data_dir: t -> string tzresult Lwt.t
+
 val read_and_patch_config_file: ?ignore_bootstrap_peers:bool -> t -> Node_config_file.t tzresult Lwt.t
 
 module Manpage : sig
@@ -63,3 +66,4 @@ module Manpage : sig
   val args: Cmdliner.Manpage.block list
   val bugs: Cmdliner.Manpage.block list
 end
+

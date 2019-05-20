@@ -25,7 +25,7 @@
 
 open Error_monad
 
-(** {2 Hash Types} ************************************************************)
+(** {2 Hash Types} *)
 
 (** The signature of an abstract hash type, as produced by functor
     {!Make_Blake2B}. The {!t} type is abstracted for separating the
@@ -149,6 +149,11 @@ module type INDEXES = sig
 
   module Table : sig
     include Hashtbl.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
+
+  module WeakRingTable : sig
+    include WeakRingTable.S with type key = t
     val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
   end
 

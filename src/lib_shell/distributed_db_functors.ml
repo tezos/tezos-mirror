@@ -38,18 +38,17 @@ module type DISTRIBUTED_DB = sig
 
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
-  val read_exn: t -> key -> value Lwt.t
 
   val prefetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> unit
 
   val fetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit
@@ -68,7 +67,6 @@ module type DISK_TABLE = sig
   val known: store -> key -> bool Lwt.t
   val read: store -> key -> value tzresult Lwt.t
   val read_opt: store -> key -> value option Lwt.t
-  val read_exn: store -> key -> value Lwt.t
 end
 
 module type MEMORY_TABLE = sig
@@ -156,12 +154,6 @@ end = struct
     | Some (Found v) -> Lwt.return_some v
     | Some (Pending _) -> Lwt.return_none
 
-  let read_exn s k =
-    match Memory_table.find_opt s.memory k with
-    | None -> Disk_table.read_exn s.disk k
-    | Some (Found v) -> Lwt.return v
-    | Some (Pending _) -> Lwt.fail Not_found
-
   type error += Missing_data of key
   type error += Canceled of key
   type error += Timeout of key
@@ -225,8 +217,7 @@ end = struct
     match timeout with
     | None -> t
     | Some delay ->
-        let timeout =
-          Lwt_unix.sleep delay >>= fun () -> fail (Timeout k) in
+        let timeout = Systime_os.sleep delay >>= fun () -> fail (Timeout k) in
         Lwt.pick [ t ; timeout ]
 
   let fetch s ?peer ?timeout k param =
@@ -269,7 +260,7 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Some (Pending { wakener = w ; param }) -> begin
+    | Some (Pending { wakener = w ; param ; _ }) -> begin
         match Precheck.precheck k param v with
         | None ->
             Scheduler.notify_invalid s.scheduler p k ;
@@ -339,7 +330,7 @@ end
 module type REQUEST = sig
   type key
   type param
-  val initial_delay : float
+  val initial_delay : Time.System.Span.t
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
@@ -348,8 +339,6 @@ module Make_request_scheduler
     (Hash : sig
        type t
        val name : string
-       val encoding : t Data_encoding.t
-       val pp : Format.formatter -> t -> unit
 
        module Logging : sig
          val tag : t Tag.def
@@ -365,7 +354,8 @@ module Make_request_scheduler
 
 end = struct
 
-  include Logging.Make_semantic(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
+  include Internal_event.Legacy_logging.Make_semantic
+      (struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
 
   type key = Hash.t
 
@@ -382,8 +372,8 @@ end = struct
 
   and status = {
     peers: P2p_peer.Set.t ;
-    next_request: float ;
-    delay: float ;
+    next_request: Time.System.t ;
+    delay: Time.System.Span.t ;
   }
 
   and event =
@@ -434,20 +424,20 @@ end = struct
   let compute_timeout state =
     let next =
       Table.fold
-        (fun _ { next_request } acc ->
+        (fun _ { next_request ; _ } acc ->
            match acc with
            | None -> Some next_request
-           | Some x -> Some (min x next_request))
+           | Some x -> Some (Time.System.min x next_request))
         state.pending None in
     match next with
     | None -> fst @@ Lwt.task ()
     | Some next ->
-        let now = Unix.gettimeofday () in
-        let delay = next -. now in
-        if delay <= 0. then Lwt.return_unit else begin
-          (* lwt_debug "waiting at least %.2fs" delay >>= fun () -> *)
-          Lwt_unix.sleep delay
-        end
+        let now = Systime_os.now () in
+        let delay = Ptime.diff next now in
+        if Ptime.Span.compare delay Ptime.Span.zero <= 0 then
+          Lwt.return_unit
+        else
+          Systime_os.sleep delay
 
 
   let process_event state now = function
@@ -463,9 +453,13 @@ end = struct
             match peer with
             | None -> data.peers
             | Some peer -> P2p_peer.Set.add peer data.peers in
+          let next_request =
+            Option.unopt
+              ~default:Ptime.max
+              (Ptime.add_span now Request.initial_delay) in
           Table.replace state.pending key {
             delay = Request.initial_delay ;
-            next_request = min data.next_request (now +. Request.initial_delay) ;
+            next_request ;
             peers ;
           } ;
           lwt_debug Tag.DSL.(fun f ->
@@ -542,7 +536,7 @@ end = struct
             f "terminating" -% t event "terminating") >>= fun () ->
         Lwt.return_unit
       else if Lwt.state state.events <> Lwt.Sleep then
-        let now = Unix.gettimeofday () in
+        let now = Systime_os.now () in
         state.events >>= fun events ->
         state.events <- Lwt_pipe.pop_all state.queue ;
         Lwt_list.iter_s (process_event state now) events >>= fun () ->
@@ -550,12 +544,16 @@ end = struct
       else
         lwt_debug Tag.DSL.(fun f ->
             f "timeout" -% t event "timeout") >>= fun () ->
-        let now = Unix.gettimeofday () in
+        let now = Systime_os.now () in
         let active_peers = Request.active state.param in
         let requests =
           Table.fold
             (fun key { peers ; next_request ; delay } acc ->
-               if next_request > now +. 0.2 then
+               let later =
+                 Option.unopt
+                   ~default:Ptime.max
+                   (Ptime.add_span now (Time.System.Span.of_seconds_exn 0.2)) in
+               if Ptime.is_later next_request ~than:later then
                  acc
                else
                  let remaining_peers =
@@ -569,9 +567,13 @@ end = struct
                        (if P2p_peer.Set.is_empty remaining_peers
                         then active_peers
                         else remaining_peers) in
+                   let next_request =
+                     Option.unopt
+                       ~default:Ptime.max
+                       (Ptime.add_span now delay) in
                    let next = { peers = remaining_peers ;
-                                next_request = now +. delay ;
-                                delay = delay *. 1.5 } in
+                                next_request ;
+                                delay = Time.System.Span.multiply_exn 1.5 delay } in
                    Table.replace state.pending key next ;
                    let requests =
                      try key :: P2p_peer.Map.find requested_peer acc
@@ -604,6 +606,7 @@ end = struct
     } in
     state.worker <-
       Lwt_utils.worker "db_request_scheduler"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop state)
         ~cancel:(fun () -> Lwt_canceler.cancel state.canceler) ;
     state

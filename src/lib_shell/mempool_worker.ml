@@ -146,7 +146,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          (req "protocol_data" Proto.operation_data_encoding)
       )
 
-  module Log = Tezos_stdlib.Logging.Make(struct
+  module Log = Internal_event.Legacy_logging.Make(struct
       let name = "node.mempool_validator"
     end)
 
@@ -177,7 +177,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
         (fun op -> View (Validate op))
         operation_encoding
 
-    let pp ppf (View (Validate { hash })) =
+    let pp ppf (View (Validate { hash ; _ })) =
       Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
   end
 
@@ -188,8 +188,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
     let level req =
       match req with
-      | Debug _ -> Logging.Debug
-      | Request _ -> Logging.Info
+      | Debug _ -> Internal_event.Debug
+      | Request _ -> Internal_event.Info
 
     let encoding =
       let open Data_encoding in
@@ -221,12 +221,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Completed: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
       | Request (view, { pushed ; treated ; completed }, Some errors)  ->
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Failed: %a@,Errors: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
             (Format.pp_print_list Error_monad.pp) errors
   end
 
@@ -252,9 +252,6 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
     let find_opt t raw_op =
       let hash = Operation.hash raw_op in
-      Operation_hash.Table.find_opt t.table hash
-
-    let find_hash_opt t hash =
       Operation_hash.Table.find_opt t.table hash
 
     let rem t hash =
@@ -411,9 +408,6 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
   let parsed_cache = ParsedCache.create ()
 
-  let debug w =
-    Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
-
   let shutdown w =
     Worker.shutdown w
 
@@ -424,7 +418,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     let { Block_header.shell =
             { fitness = predecessor_fitness ;
               timestamp = predecessor_timestamp ;
-              level = predecessor_level } } =
+              level = predecessor_level ; _ } ; _ } =
       State.Block.header predecessor in
     State.Block.context predecessor >>= fun predecessor_context ->
     let predecessor_hash = State.Block.hash predecessor in
@@ -522,11 +516,11 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
     match request with
     | Request.Validate parsed_op -> on_validate w parsed_op >>= return
 
-  let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state } as parameters ) =
+  let on_launch (_ : t) (_ : Name.t) ( { chain_db ; validation_state ; _ } as parameters ) =
     let chain_state = Distributed_db.chain_state chain_db in
     Chain.data chain_state >>= fun {
       current_mempool = _mempool ;
-      live_blocks ; live_operations } ->
+      live_blocks ; live_operations ; _ } ->
     (* remove all operations that are already included *)
     Operation_hash.Set.iter (fun hash ->
         ParsedCache.rem parsed_cache hash
@@ -552,7 +546,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
   let on_error w r st errs =
     Worker.record_event w (Event.Request (r, st, Some errs)) ;
-    Lwt.return (Error errs)
+    Lwt.return_error errs
 
   let on_completion w r _ st =
     Worker.record_event w (Event.Request (Request.view r, st, None)) ;
@@ -572,8 +566,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let on_no_request _ = return_unit
       let on_request = on_request
     end in
-    Chain.data chain_state >>= fun { current_head = predecessor } ->
-    let timestamp = Time.now () in
+    Chain.data chain_state >>= fun { current_head = predecessor ; _ } ->
+    let timestamp = Time.System.to_protocol (Systime_os.now ()) in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch
       table
@@ -585,7 +579,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
   (* Exporting functions *)
 
   let validate t parsed_op =
-    Worker.push_request_and_wait t (Request.Validate parsed_op)
+    Worker.Queue.push_request_and_wait t (Request.Validate parsed_op)
 
   (* atomic parse + memoization *)
   let parse raw_op =

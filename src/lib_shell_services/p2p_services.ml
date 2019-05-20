@@ -44,7 +44,11 @@ let timeout_query =
   query (fun timeout -> object
           method timeout = timeout
         end)
-  |+ field "timeout" RPC_arg.float 10. (fun t -> t#timeout)
+  |+ field
+    "timeout"
+    Time.System.Span.rpc_arg
+    (Time.System.Span.of_seconds_exn 10.)
+    (fun t -> t#timeout)
   |> seal
 
 module S = struct
@@ -56,9 +60,17 @@ module S = struct
       ~output: P2p_peer.Id.encoding
       RPC_path.(root / "network" / "self")
 
+  let version =
+    RPC_service.get_service
+      ~description:"Supported network layer version."
+      ~query: RPC_query.empty
+      ~output: Network_version.encoding
+      RPC_path.(root / "network" / "version")
+
+  (* DEPRECATED: use [version] instead. *)
   let versions =
     RPC_service.get_service
-      ~description:"Supported network layer versions."
+      ~description:"DEPRECATED: use `version` instead."
       ~query: RPC_query.empty
       ~output: (Data_encoding.list Network_version.encoding)
       RPC_path.(root / "network" / "versions")
@@ -90,7 +102,8 @@ end
 open RPC_context
 let self ctxt = make_call S.self ctxt () () ()
 let stat ctxt = make_call S.stat ctxt () () ()
-let versions ctxt = make_call S.versions ctxt () () ()
+let version ctxt = make_call S.version ctxt () () ()
+let versions ctxt = make_call S.versions ctxt () () () (* DEPRECATED: use [version] instead. *)
 let events ctxt = make_streamed_call S.events ctxt () () ()
 let connect ctxt ~timeout peer_id =
   make_call1 S.connect ctxt peer_id (object method timeout = timeout end) ()

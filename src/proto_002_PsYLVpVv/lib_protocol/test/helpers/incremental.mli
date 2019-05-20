@@ -36,7 +36,7 @@ val level: incremental -> int32
 
 val begin_construction:
   ?priority:int ->
-  ?timestamp:Time.t ->
+  ?timestamp:Time.Protocol.t ->
   Block.t -> incremental tzresult Lwt.t
 
 val add_operation:

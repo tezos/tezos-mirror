@@ -749,6 +749,9 @@ Bitwise logical operators are also available on unsigned integers.
     :: nat : nat : 'S   ->   nat : 'S
 
     > LSR / x : s : S  =>  (x >> s) : S
+        iff   s <= 256
+    > LSR / x : s : S  =>  [FAILED]
+        iff   s > 256
 
 -  ``COMPARE``: Integer/natural comparison
 
@@ -1316,25 +1319,6 @@ for under/overflows.
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``CREATE_CONTRACT``: Forge a contract creation operation.
-
-::
-
-    :: key_hash : option key_hash : bool : bool : mutez : lambda (pair 'p 'g) (pair (list operation) 'g) : 'g : 'S
-       -> operation : address : 'S
-
-As with non code-emitted originations the contract code takes as
-argument the transferred amount plus an ad-hoc argument and returns an
-ad-hoc value. The code also takes the global data and returns it to be
-stored and retrieved on the next transaction. These data are initialized
-by another parameter. The calling convention for the code is as follows:
-``(Pair arg globals) -> (Pair operations globals)``, as extrapolated from
-the instruction type. The first parameters are the manager, optional
-delegate, then spendable and delegatable flags and finally the initial
-amount taken from the currently executed contract. The contract is
-returned as a first class value (to be dropped, passed as parameter or stored).
-The ``CONTRACT 'p`` instruction will fail until it is actually originated.
-
 -  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
    Forge a new contract from a literal.
 
@@ -1347,7 +1331,9 @@ Originate a contract based on a literal. This is currently the only way
 to include transfers inside of an originated contract. The first
 parameters are the manager, optional delegate, then spendable and
 delegatable flags and finally the initial amount taken from the
-currently executed contract.
+currently executed contract. The contract is returned as a first class
+value (to be dropped, passed as parameter or stored).
+The ``CONTRACT 'p`` instruction will fail until it is actually originated.
 
 -  ``CREATE_ACCOUNT``: Forge an account (a contract without code) creation operation.
 
@@ -1661,19 +1647,19 @@ to increase clarity about illegal states.
 
 ::
 
-    > ASSERT_SOME  =>  IF_NONE {FAIL} {}
+    > ASSERT_SOME @x =>  IF_NONE {FAIL} {RENAME @x}
 
 -  ``ASSERT_LEFT``
 
 ::
 
-    > ASSERT_LEFT  =>  IF_LEFT {} {FAIL}
+    > ASSERT_LEFT @x =>  IF_LEFT {RENAME @x} {FAIL}
 
 -  ``ASSERT_RIGHT``
 
 ::
 
-    > ASSERT_RIGHT  =>  IF_LEFT {FAIL} {}
+    > ASSERT_RIGHT @x =>  IF_LEFT {FAIL} {RENAME @x}
 
 Syntactic Conveniences
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -3012,7 +2998,6 @@ Full grammar
       | TRANSFER_TOKENS
       | SET_DELEGATE
       | CREATE_ACCOUNT
-      | CREATE_CONTRACT
       | CREATE_CONTRACT { <instruction> ... }
       | IMPLICIT_ACCOUNT
       | NOW
@@ -3036,7 +3021,6 @@ Full grammar
       | list <type>
       | set <comparable type>
       | operation
-      | address
       | contract <type>
       | pair <type> <type>
       | or <type> <type>
@@ -3052,6 +3036,7 @@ Full grammar
       | bool
       | key_hash
       | timestamp
+      | address
 
 Reference implementation
 ------------------------

@@ -56,6 +56,7 @@ let chain_arg =
 type block = [
   | `Genesis
   | `Head of int
+  | `Alias of [ `Caboose | `Checkpoint | `Save_point ] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t
 ]
@@ -82,14 +83,33 @@ let parse_block s =
     | (["head"], _) -> Ok (`Head 0)
     | (["head"; n], '~') | (["head"; n], '-') ->
         Ok (`Head (int_of_string n))
+    | (["checkpoint"], _) ->
+        Ok (`Alias (`Checkpoint, 0))
+    | (["checkpoint" ; n], '~') | (["checkpoint" ; n], '-') ->
+        Ok (`Alias (`Checkpoint, int_of_string n))
+    | (["checkpoint" ; n], '+') -> Ok (`Alias (`Checkpoint, - int_of_string n))
+    | (["save_point"], _) ->
+        Ok (`Alias (`Save_point, 0))
+    | (["save_point" ; n], '~') | (["save_point" ; n], '-') ->
+        Ok (`Alias (`Save_point, int_of_string n))
+    | (["save_point" ; n], '+') -> Ok (`Alias (`Save_point, - int_of_string n))
+    | (["caboose"], _) ->
+        Ok (`Alias (`Caboose, 0))
+    | (["caboose" ; n], '~') | (["caboose" ; n], '-') ->
+        Ok (`Alias (`Caboose, int_of_string n))
+    | (["caboose" ; n], '+') -> Ok (`Alias (`Caboose, - int_of_string n))
     | ([hol], _) ->
         begin
           match Block_hash.of_b58check_opt hol with
             Some h -> Ok (`Hash (h , 0))
           | None ->
               let l = Int32.of_string s in
-              if Int32.(compare l (of_int 0)) < 0 then raise Exit
-              else Ok (`Level (Int32.of_string s))
+              if Compare.Int32.(l < 0l) then
+                raise Exit
+              else if Compare.Int32.(l = 0l) then
+                Ok `Genesis
+              else
+                Ok (`Level (Int32.of_string s))
         end
     | ([h ; n], '~') | ([h ; n], '-') ->
         Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
@@ -97,8 +117,15 @@ let parse_block s =
     | _ -> raise Exit
   with _ -> Error "Cannot parse block identifier."
 
+let alias_to_string = function
+  | `Checkpoint -> "checkpoint"
+  | `Save_point -> "save_point"
+  | `Caboose -> "caboose"
 let to_string = function
   | `Genesis -> "genesis"
+  | `Alias (a, 0) -> alias_to_string a
+  | `Alias (a, n) when n < 0 -> Printf.sprintf "%s+%d" (alias_to_string a) (-n)
+  | `Alias (a, n) -> Printf.sprintf "%s~%d" (alias_to_string a) n
   | `Head 0 -> "head"
   | `Head n when n < 0 -> Printf.sprintf "head+%d" (-n)
   | `Head n -> Printf.sprintf "head~%d" n
@@ -402,12 +429,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
         RPC_path.(path / "metadata")
 
     let protocols =
-      (* same endpoint than 'metadata' *)
       RPC_service.get_service
-        ~description:".. unexported ..."
+        ~description:"Current and next protocol."
         ~query: RPC_query.empty
         ~output: raw_protocol_encoding
-        RPC_path.(path / "metadata")
+        RPC_path.(path / "protocols")
 
     module Header = struct
 
@@ -572,7 +598,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                   method timestamp = timestamp
                 end)
           |+ flag "sort" (fun t -> t#sort_operations)
-          |+ opt_field "timestamp" Time.rpc_arg (fun t -> t#timestamp)
+          |+ opt_field "timestamp" Time.Protocol.rpc_arg (fun t -> t#timestamp)
           |> seal
 
         let block =

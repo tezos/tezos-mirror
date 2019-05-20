@@ -125,7 +125,14 @@ let rec create_dir ?(perm = 0o755) dir =
   Lwt_unix.file_exists dir >>= function
   | false ->
       create_dir (Filename.dirname dir) >>= fun () ->
-      Lwt_unix.mkdir dir perm
+      Lwt.catch
+        (fun () -> Lwt_unix.mkdir dir perm)
+        (function
+          | Unix.Unix_error (Unix.EEXIST, _, _) ->
+              (* This is the case where the directory has been created
+                 by another Lwt.t, after the call to Lwt_unix.file_exists. *)
+              Lwt.return_unit
+          | e -> Lwt.fail e)
   | true ->
       Lwt_unix.stat dir >>= function
       | { st_kind = S_DIR ; _ } -> Lwt.return_unit
@@ -316,11 +323,11 @@ module Socket = struct
               | [] ->
                   Lwt.return
                     (Error (failure "could not connect to '%s'" host :: List.rev acc))
-              | { Unix.ai_family; ai_socktype; ai_protocol; ai_addr } :: addrs ->
+              | { Unix.ai_family ; ai_socktype ; ai_protocol ; ai_addr ; _ } :: addrs ->
                   let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
                   protect ~on_error:begin fun e ->
                     Lwt_unix.close sock >>= fun () ->
-                    Lwt.return (Error e)
+                    Lwt.return_error e
                   end begin fun () ->
                     with_timeout (Lwt_unix.sleep timeout) (fun _c ->
                         Lwt_unix.connect sock ai_addr >>= fun () ->
@@ -343,7 +350,7 @@ module Socket = struct
           (handle_litteral_ipv6 host) service (AI_PASSIVE :: opts) >>= function
         | [] -> failwith "could not resolve host '%s'" host
         | addrs ->
-            let do_bind { Unix.ai_family; ai_socktype; ai_protocol; ai_addr } =
+            let do_bind { Unix.ai_family ; ai_socktype ; ai_protocol ; ai_addr ; _ } =
               let sock = Lwt_unix.socket ai_family ai_socktype ai_protocol in
               Lwt_unix.setsockopt sock SO_REUSEADDR true ;
               Lwt_unix.bind sock ai_addr >>= fun () ->
@@ -415,7 +422,7 @@ end
 
 let rec retry ?(log=(fun _ -> Lwt.return_unit)) ?(n=5) ?(sleep=1.) f =
   f () >>= function
-  | Ok r -> Lwt.return (Ok r)
+  | Ok r -> Lwt.return_ok r
   | (Error error) as x ->
       if n > 0 then
         begin

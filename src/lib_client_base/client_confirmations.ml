@@ -35,30 +35,6 @@ let in_block operation_hash operations =
     None
   with Found (i,j) -> Some (i, j)
 
-let wait_for_bootstrapped (ctxt : #Client_context.full) =
-  let display = ref false in
-  Lwt.async begin fun () ->
-    Lwt_unix.sleep 0.3 >>= fun () ->
-    if not !display then
-      ctxt#answer "Waiting for the node to be bootstrapped before injection..." >>= fun () ->
-      display := true ;
-      Lwt.return_unit
-    else
-      Lwt.return_unit
-  end ;
-  Monitor_services.bootstrapped ctxt >>=? fun (stream, _stop) ->
-  Lwt_stream.iter_s
-    (fun (hash, time) ->
-       if !display then
-         ctxt#message "Current head: %a (timestamp: %a, validation: %a)"
-           Block_hash.pp_short hash
-           Time.pp_hum time
-           Time.pp_hum (Time.now ())
-       else Lwt.return_unit) stream >>= fun () ->
-  display := true ;
-  ctxt#answer "Node is bootstrapped, ready for injecting operations." >>= fun () ->
-  return_unit
-
 type operation_status =
   | Confirmed of (Block_hash.t * int * int)
   | Pending
@@ -197,7 +173,7 @@ let wait_for_operation_inclusion
                     | Error err ->
                         Lwt.fail (WrapError err)) stream >>= return)
             (function
-              | WrapError e -> Lwt.return (Error e)
+              | WrapError e -> Lwt.return_error e
               | exn -> Lwt.fail exn) >>=? function
           | None ->
               failwith "..."
@@ -221,7 +197,7 @@ let wait_for_operation_inclusion
       end
       >>=? fun block_hook ->
       Block_services.Empty.hash
-        ctxt ~block:(`Hash (head, block_hook+1)) () >>=? fun oldest ->
+        ctxt ~chain ~block:(`Hash (head, block_hook+1)) () >>=? fun oldest ->
       Block_hash.Table.add blocks oldest None ;
       loop block_hook
 

@@ -25,13 +25,27 @@
 (*****************************************************************************)
 
 open Client_context
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.context.unix" end)
-
-let filename_tag = Tag.def ~doc:"Filename" "filename"  Format.pp_print_string
+include Internal_event.Legacy_logging.Make_semantic
+    (struct let name = "client.context.unix" end)
 
 class unix_wallet ~base_dir ~password_filename : wallet = object (self)
 
-  method password_filename = password_filename
+  method load_passwords = match password_filename with
+    | None -> None
+    | Some filename ->
+        if Sys.file_exists filename then
+          Some (Lwt_io.lines_of_file filename)
+        else
+          None
+
+  method read_file path =
+    Lwt.catch
+      (fun () ->
+         Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+         return content)
+      (fun exn ->
+         failwith
+           "cannot read file (%s)" (Printexc.to_string exn))
 
   method private filename alias_name =
     Filename.concat
@@ -105,10 +119,7 @@ class unix_prompter = object
 end
 
 class unix_logger ~base_dir =
-  let startup =
-    CalendarLib.Printer.Precise_Calendar.sprint
-      "%Y-%m-%dT%H:%M:%SZ"
-      (CalendarLib.Calendar.Precise.now ()) in
+  let startup = Format.asprintf "%a" Time.System.pp_hum (Systime_os.now ()) in
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;
@@ -128,12 +139,17 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
+class unix_ui = object
+  method sleep = Lwt_unix.sleep
+end
+
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir ~password_filename
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
+    inherit unix_ui
     method chain = chain
     method block = block
     method confirmations = confirmations

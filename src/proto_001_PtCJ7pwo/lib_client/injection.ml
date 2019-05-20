@@ -34,6 +34,7 @@ let get_branch (rpc_config: #Proto_001_PtCJ7pwo.full)
     match block with
     | `Head n -> return (`Head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
+    | `Alias (a,n) -> return (`Alias (a,n))
     | `Genesis -> return `Genesis
     | `Level i -> return (`Level i)
   end >>=? fun block ->
@@ -359,7 +360,7 @@ let inject_operation
     ?(dry_run = false)
     ?branch ?src_sk
     (contents: kind contents_list)  =
-  Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
+  Client_confirmations_unix.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
     cctxt ~chain ~block ?branch contents >>=? fun contents ->
   preapply cctxt ~chain ~block

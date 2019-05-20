@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test-p2p-banned_peers" end)
+include
+  Internal_event.Legacy_logging.Make (struct
+    let name = "test-p2p-banned_peers"
+  end)
 
 let assert_equal_bool ~msg a b =
   if a <> b then Alcotest.fail msg
@@ -46,7 +49,7 @@ let test_empty _ =
 
 let test_ban _ =
   let set = P2p_acl.create 10 in
-  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Time.epoch) peers;
+  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Ptime.epoch) peers;
   List.iter (fun (_,addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
@@ -55,20 +58,23 @@ let test_ban _ =
 
 let test_gc _ =
   let set = P2p_acl.create 10 in
-  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Time.epoch) peers;
+  List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr Ptime.epoch) peers;
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
   (* remove all peers *)
-  P2p_acl.IPGreylist.remove_old set ~older_than:Time.max_value ;
+  P2p_acl.IPGreylist.remove_old set ~older_than:Ptime.max ;
   List.iter (fun (_peer,addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr)
     ) peers ;
   Lwt.return_unit
 
 let () =
+  let init_logs = lazy (Internal_event_unix.init  ()) in
   let wrap (n, f) =
-    Alcotest_lwt.test_case n `Quick (fun _ () -> f ()) in
+    Alcotest_lwt.test_case n `Quick begin fun _ () ->
+      Lazy.force init_logs >>= fun () ->
+      f () end in
   Alcotest.run ~argv:[|""|] "tezos-p2p" [
     "p2p.peerset",
     List.map wrap [

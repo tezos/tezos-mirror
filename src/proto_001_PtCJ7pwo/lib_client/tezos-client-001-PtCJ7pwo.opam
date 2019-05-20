@@ -12,7 +12,7 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-001-PtCJ7pwo"
   "tezos-shell-services"
-  "tezos-client-base"
+  "tezos-client-base-unix"
   "tezos-signer-backends"
 ]
 build: [

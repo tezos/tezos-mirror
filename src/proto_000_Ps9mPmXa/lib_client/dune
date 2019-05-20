@@ -6,11 +6,10 @@
             tezos-client-base
             tezos-client-commands
             tezos-protocol-environment
-            tezos-protocol-000-Ps9mPmXa)
+            tezos-protocol-000-Ps9mPmXa
+            tezos-stdlib-unix)
  (library_flags (:standard -linkall))
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_commands)))

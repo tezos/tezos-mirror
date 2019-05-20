@@ -27,10 +27,10 @@
 type t
 
 type limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Time.System.Span.t ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits: Worker_types.limits
 }
 
@@ -53,5 +53,5 @@ val notify_head: t -> Block_header.t -> unit
 val running_workers: unit -> ((Chain_id.t * P2p_peer.Id.t) * t) list
 val status: t -> Worker_types.worker_status
 
-val current_request : t -> (Time.t * Time.t * Peer_validator_worker_state.Request.view) option
-val last_events : t -> (Lwt_log_core.level * Peer_validator_worker_state.Event.t list) list
+val current_request : t -> (Time.System.t * Time.System.t * Peer_validator_worker_state.Request.view) option
+val last_events : t -> (Internal_event.level * Peer_validator_worker_state.Event.t list) list

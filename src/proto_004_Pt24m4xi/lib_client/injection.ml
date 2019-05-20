@@ -35,6 +35,7 @@ let get_branch (rpc_config: #Proto_alpha.full)
     match block with
     | `Head n -> return (`Head (n+branch))
     | `Hash (h,n) -> return (`Hash (h,n+branch))
+    | `Alias (a,n) -> return (`Alias (a,n))
     | `Genesis -> return `Genesis
     | `Level i -> return (`Level i)
   end >>=? fun block ->
@@ -510,7 +511,7 @@ let inject_operation
     ~fee_parameter
     ?compute_fee
     (contents: kind contents_list)  =
-  Client_confirmations.wait_for_bootstrapped cctxt >>=? fun () ->
+  Client_confirmations_unix.wait_for_bootstrapped cctxt >>=? fun () ->
   may_patch_limits
     cctxt ~chain ~block ?branch
     ~fee_parameter

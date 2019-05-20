@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test.p2p.connection" end)
+include
+  Internal_event.Legacy_logging.Make
+    (struct let name = "test.p2p.connection" end)
 
 let addr = ref Ipaddr.V6.localhost
 
@@ -79,10 +81,10 @@ let sync ch =
 
 let rec sync_nodes nodes =
   iter_p
-    (fun { Process.channel } -> Process.Channel.pop channel)
+    (fun { Process.channel ; _ } -> Process.Channel.pop channel)
     nodes >>=? fun () ->
   iter_p
-    (fun { Process.channel } -> Process.Channel.push channel ())
+    (fun { Process.channel ; _ } -> Process.Channel.push channel ())
     nodes >>=? fun () ->
   sync_nodes nodes
 
@@ -422,25 +424,34 @@ module Garbled_data = struct
 
 end
 
+let log_config = ref None
+
 let spec = Arg.[
 
     "--addr", String (fun p -> addr := Ipaddr.V6.of_string_exn p),
     " Listening addr";
 
     "-v", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection" Info) ;
-        Lwt_log_core.(add_rule "p2p.connection" Info)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection -> info; p2p.connection -> info")
+              () )),
     " Log up to info msgs" ;
 
     "-vv", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection" Debug) ;
-        Lwt_log_core.(add_rule "p2p.connection" Debug)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection -> debug; p2p.connection -> debug")
+              () )),
     " Log up to debug msgs";
 
   ]
 
+let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ()) 
+
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lazy.force init_logs >>= fun () ->
     f () >>= function
     | Ok () -> Lwt.return_unit
     | Error error ->

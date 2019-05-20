@@ -17,14 +17,15 @@ protocol and the nodes should adapt and upgrade.
 
  - Developer documentation is available online at
    https://tezos.gitlab.io/master . The documentation is automatically
-   generated for the master branch, the main network `mainnet
-   <https://tezos.gitlab.io/mainnet>`_ and the test network `alphanet
+   generated for the master branch, the `main network (mainnet)
+   <https://tezos.gitlab.io/mainnet>`_ and the `test network (alphanet)
    <https://tezos.gitlab.io/alphanet>`_.
    Make sure you are consulting the right version.
  - The website https://tezos.com/ contains more information about the project.
  - All development happens on GitLab at https://gitlab.com/tezos/tezos
 
 The source code of Tezos is placed under the MIT Open Source License.
+
 
 The Community
 -------------
@@ -35,7 +36,6 @@ The Community
 - Several community-built block explorers are available:
 
     - https://tzscan.io
-    - https://tezex.info
 
 - A few community-run websites collect useful Tezos links:
 
@@ -44,10 +44,9 @@ The Community
 
 - More resources can be found in the :ref:`support` page.
 
+
 The Networks
 ------------
-
-.. _mainnet:
 
 Mainnet
 ~~~~~~~
@@ -63,8 +62,6 @@ however we **strongly** encourage users to first try all the
 introduction tutorials on Alphanet to familiarize themselves without
 risks.
 
-.. _alphanet:
-
 Alphanet
 ~~~~~~~~
 
@@ -79,9 +76,6 @@ themselves with Tezos before using their real tez.
 We offer support for Alphanet on IRC.
 
 The Tezos Alpha (test) network has been live and open since February 2017.
-
-
-.. _zeronet:
 
 Zeronet
 ~~~~~~~
@@ -111,6 +105,7 @@ in the :ref:`introduction <howtoget>`.
    introduction/various
    introduction/support
    introduction/contributing
+   introduction/glossary
 
 .. toctree::
    :maxdepth: 2
@@ -157,6 +152,7 @@ in the :ref:`introduction <howtoget>`.
    api/rpc
    api/errors
    api/p2p
+
 
 Indices and tables
 ==================

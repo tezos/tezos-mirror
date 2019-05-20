@@ -28,7 +28,9 @@
 type error += Parse_error
 type error += Too_many_operations
 type error += Oversized_operation of { size: int ; max: int }
-type error += Future_block_header of { block: Block_hash.t ; block_time : Time.t ; time : Time.t }
+type error += Future_block_header of { block: Block_hash.t ;
+                                       block_time : Time.Protocol.t ;
+                                       time : Time.System.t }
 
 let () =
   (* Parse error *)
@@ -75,11 +77,13 @@ let () =
     ~description:"The block was annotated with a time too far in the future."
     ~pp:(fun ppf (block, block_time, time) ->
         Format.fprintf ppf "Future block header (block: %a, block_time: %a, time: %a)"
-          Block_hash.pp block Time.pp_hum block_time Time.pp_hum time)
+          Block_hash.pp block
+          Time.System.pp_hum (Time.System.of_protocol_exn block_time)
+          Time.System.pp_hum time)
     Data_encoding.(obj3
                      (req "block" Block_hash.encoding)
-                     (req "block_time" Time.encoding)
-                     (req "time" Time.encoding))
+                     (req "block_time" Time.Protocol.encoding)
+                     (req "time" Time.System.encoding))
     (function Future_block_header { block ; block_time ; time } -> Some (block, block_time, time) | _ -> None)
     (fun (block, block_time, time) -> Future_block_header { block ; block_time ; time })
 
@@ -158,6 +162,7 @@ let () =
 (******************* Bootstrap pipeline errors ****************************)
 
 type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
+type error += Too_short_locator of P2p_peer.Id.t * Block_locator.t
 
 let () =
   (* Invalid locator *)
@@ -175,7 +180,24 @@ let () =
                      (req "id" P2p_peer.Id.encoding)
                      (req "locator" Block_locator.encoding))
     (function | Invalid_locator (id, loc) -> Some (id, loc) | _ -> None)
-    (fun (id, loc) -> Invalid_locator (id, loc))
+    (fun (id, loc) -> Invalid_locator (id, loc)) ;
+  (* Too short locator *)
+  register_error_kind
+    `Permanent
+    ~id:"node.bootstrap_pipeline.too_short_locator"
+    ~title:"Too short locator"
+    ~description:"Block locator is too short."
+    ~pp: (fun ppf (id, locator) ->
+        Format.fprintf ppf
+          "Too short locator on peer %a:\n%a"
+          P2p_peer.Id.pp id
+          Block_locator.pp locator)
+    Data_encoding.(obj2
+                     (req "id" P2p_peer.Id.encoding)
+                     (req "locator" Block_locator.encoding))
+    (function | Too_short_locator (id, loc) -> Some (id, loc) | _ -> None)
+    (fun (id, loc) -> Too_short_locator (id, loc))
+
 
 (******************* Protocol validator errors ****************************)
 

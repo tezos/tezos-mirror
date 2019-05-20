@@ -29,7 +29,10 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
 
-let bake cctxt ?(timestamp = Time.now ()) block command sk =
+let bake cctxt ?timestamp block command sk =
+  let timestamp = match timestamp with
+    | Some t -> t
+    | None -> Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ())) in
   let protocol_data = { command ; signature = Signature.zero } in
   Genesis_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data
@@ -43,11 +46,6 @@ let int64_parameter =
   (Clic.parameter (fun _ p ->
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
-
-let int_parameter =
-  (Clic.parameter (fun _ p ->
-       try return (int_of_string p)
-       with _ -> failwith "Cannot read int"))
 
 let file_parameter =
   Clic.parameter (fun _ p ->
@@ -68,18 +66,30 @@ let fitness_from_int64 fitness =
   [ MBytes.of_string version_number ;
     int64_to_bytes fitness ]
 
+let timestamp_arg =
+  Clic.arg
+    ~long:"timestamp"
+    ~placeholder:"date"
+    ~doc:"Set the timestamp of the block (and initial time of the chain)"
+    (Clic.parameter (fun _ t ->
+         match (Time.Protocol.of_notation t) with
+         | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
+         | Some t -> return t))
+
+let test_delay_arg =
+  Clic.default_arg
+    ~long:"delay"
+    ~placeholder:"time"
+    ~doc:"Set the life span of the test chain (in seconds)"
+    ~default: (Int64.to_string (Int64.mul 24L 3600L))
+    (Clic.parameter (fun _ t ->
+         match Int64.of_string_opt t with
+         | None -> Error_monad.failwith "Could not parse value provided to -delay option"
+         | Some t -> return t))
+
 let commands () =
   let open Clic in
-  let args =
-    args1
-      (arg
-         ~long:"timestamp"
-         ~placeholder:"date"
-         ~doc:"Set the timestamp of the block (and initial time of the chain)"
-         (parameter (fun _ t ->
-              match (Time.of_notation t) with
-              | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
-              | Some t -> return t))) in
+  let args = args1 timestamp_arg in
   [
 
     command ~desc: "Activate a protocol"
@@ -110,17 +120,17 @@ let commands () =
       end ;
 
     command ~desc: "Fork a test protocol"
-      args
+      (args2 timestamp_arg test_delay_arg)
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Activator's key"
        @@ stop)
-      begin fun timestamp hash sk cctxt ->
+      begin fun (timestamp,delay) hash sk cctxt ->
         bake cctxt ?timestamp cctxt#block
           (Activate_testchain { protocol = hash ;
-                                delay = Int64.mul 24L 3600L })
+                                delay })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return_unit

@@ -26,7 +26,9 @@
 open Proto_alpha
 open Alpha_context
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.endorsement" end)
+include Internal_event.Legacy_logging.Make_semantic(struct
+    let name = Proto_alpha.Name.name ^ ".client.endorsement"
+  end)
 
 open Logging
 
@@ -104,7 +106,7 @@ type state = {
 }
 
 and endorsements = {
-  time: Time.t ;
+  time: Time.Protocol.t ;
   delegates: public_key_hash list ;
   block: Client_baking_blocks.block_info ;
 }
@@ -183,7 +185,11 @@ let allowed_to_endorse cctxt bi delegate  =
       | true -> return_true
 
 let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state bi =
-  if Time.diff (Time.now ()) bi.Client_baking_blocks.timestamp > max_past then
+  let past =
+    Time.Protocol.diff
+      (Time.System.to_protocol (Systime_os.now ()))
+      bi.Client_baking_blocks.timestamp in
+  if past > max_past then
     lwt_log_info Tag.DSL.(fun f ->
         f "Ignore block %a: forged too far the past"
         -% t event "endorsement_stale_block"
@@ -194,7 +200,10 @@ let prepare_endorsement ~(max_past:int64) () (cctxt : #Proto_alpha.full) state b
         f "Received new block %a"
         -% t event "endorsement_got_block"
         -% a Block_hash.Logging.tag bi.hash) >>= fun () ->
-    let time = Time.(add (now ()) state.delay) in
+    let time =
+      Time.Protocol.add
+        (Time.System.to_protocol (Systime_os.now ()))
+        state.delay in
     get_delegates cctxt state >>=? fun delegates ->
     filter_p (allowed_to_endorse cctxt bi) delegates >>=? fun delegates ->
     state.pending <- Some {
@@ -211,11 +220,18 @@ let compute_timeout state =
       match Client_baking_scheduling.sleep_until time with
       | None -> Lwt.return (block, delegates)
       | Some timeout ->
+          let timespan =
+            let timespan =
+              Ptime.diff (Time.System.of_protocol_exn time) (Systime_os.now ()) in
+            if Ptime.Span.compare timespan Ptime.Span.zero > 0 then
+              timespan
+            else
+              Ptime.Span.zero in
           lwt_log_info Tag.DSL.(fun f ->
               f "Waiting until %a (%a) to inject endorsements"
               -% t event "wait_before_injecting"
-              -% a timestamp_tag time
-              -% a timespan_tag (max 0L Time.(diff time (now ())))
+              -% a timestamp_tag (Time.System.of_protocol_exn time)
+              -% a timespan_tag timespan
             ) >>= fun () ->
           timeout >>= fun () -> Lwt.return (block, delegates)
 

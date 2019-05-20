@@ -119,20 +119,20 @@ end
 (* patricia trees using IpV6 addresses as keys *)
 module IpSet = struct
 
-  include PatriciaTree(Time)
+  include PatriciaTree(Time.System)
 
   let remove_old t ~older_than =
     let module MI =
     struct
-      type result = Time.t
-      let default = Time.max_value
+      type result = Time.System.t
+      let default = Ptime.max
       let map _t _key value = value
-      let reduce _t left right = Time.(min left right)
+      let reduce _t left right = Time.System.(min left right)
     end
     in
     let module MR = M.Map_Reduce(MI) in
     MR.filter (fun addtime ->
-        Time.(older_than <= addtime)
+        Time.System.(older_than <= addtime)
       ) t
 
 end
@@ -180,7 +180,7 @@ module IPGreylist = struct
   let add acl addr time =
     acl.greylist_ips <- IpSet.add addr time acl.greylist_ips
 
-  let mem acl addr = IpSet.mem addr !acl.greylist_ips
+  let mem acl addr = IpSet.mem addr acl.greylist_ips
 
   (* The GC operation works only on the address set. Peers are removed
      from the ring in a round-robin fashion. If a address is removed
@@ -225,7 +225,7 @@ module PeerGreylist = struct
     PeerRing.add acl.greylist_peers peer_id
 
   let mem acl peer_id =
-    (PeerRing.mem acl.greylist_peers peer_id)
+    PeerRing.mem acl.greylist_peers peer_id
 
 end
 

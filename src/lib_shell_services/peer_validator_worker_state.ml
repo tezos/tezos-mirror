@@ -60,8 +60,8 @@ module Event = struct
 
   let level req =
     match req with
-    | Debug _ -> Logging.Debug
-    | Request _ -> Logging.Info
+    | Debug _ -> Internal_event.Debug
+    | Request _ -> Internal_event.Info
 
   let encoding =
     let open Data_encoding in
@@ -94,14 +94,14 @@ module Event = struct
           "@[<v 0>%a@,\
            Pushed: %a, Treated: %a, Completed: %a@]"
           Request.pp view
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
     | Request (view, { pushed ; treated ; completed }, Some errors)  ->
         Format.fprintf ppf
           "@[<v 0>%a@,\
            Pushed: %a, Treated: %a, Failed: %a@,\
            %a@]"
           Request.pp view
-          Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
           (Format.pp_print_list Error_monad.pp) errors
 end
 

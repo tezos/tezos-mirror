@@ -27,7 +27,7 @@ type shell_header = {
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
   predecessor: Block_hash.t ;
-  timestamp: Time.t ;
+  timestamp: Time.Protocol.t ;
   validation_passes: int ; (* uint8 *)
   operations_hash: Operation_list_list_hash.t ;
   fitness: Fitness.t ;
@@ -54,7 +54,7 @@ let shell_header_encoding =
        (req "level" int32)
        (req "proto" uint8)
        (req "predecessor" Block_hash.encoding)
-       (req "timestamp" Time.encoding)
+       (req "timestamp" Time.Protocol.encoding)
        (req "validation_pass" uint8)
        (req "operations_hash" Operation_list_list_hash.encoding)
        (req "fitness" Fitness.encoding)
@@ -80,7 +80,7 @@ include Compare.Make (struct
       compare b1.protocol_data b2.protocol_data >> fun () ->
       Operation_list_list_hash.compare
         b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
-      Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
+      Time.Protocol.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
       list compare b1.shell.fitness b2.shell.fitness
   end)
 
@@ -105,6 +105,14 @@ let pp ppf op =
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
+
+let to_b58check v =
+  Base58.safe_encode (MBytes.to_string (to_bytes v))
+
+let of_b58check b =
+  Option.apply (Base58.safe_decode b) ~f: begin fun s ->
+    Data_encoding.Binary.of_bytes encoding (MBytes.of_string s)
+  end
 
 let hash block = Block_hash.hash_bytes [to_bytes block]
 let hash_raw bytes = Block_hash.hash_bytes [bytes]

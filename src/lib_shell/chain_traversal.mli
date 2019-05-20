@@ -39,7 +39,7 @@ val common_ancestor: Block.t -> Block.t -> Block.t Lwt.t
 val iter_predecessors:
   ?max:int ->
   ?min_fitness:Fitness.t ->
-  ?min_date:Time.t ->
+  ?min_date:Time.Protocol.t ->
   Block.t list ->
   f:(Block.t -> unit Lwt.t) ->
   unit Lwt.t
@@ -62,7 +62,7 @@ val new_blocks:
     [chain].  *)
 
 val live_blocks:
-  Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) Lwt.t
+  Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) tzresult Lwt.t
 (** [live_blocks b n] return a pair [(blocks,operations)] where
     [blocks] is the set of arity [n], that contains [b] and its [n-1]
     predecessors. And where [operations] is the set of operations

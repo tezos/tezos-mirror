@@ -35,7 +35,7 @@ let () =
     Sys.(set_signal sigpipe Signal_ignore)
 
 (* Logging facility for the P2P layer *)
-module Log = Logging.Make(struct let name = "p2p.fd" end)
+module Log = Internal_event.Legacy_logging.Make(struct let name = "p2p.fd" end)
 
 type t = {
   fd : Lwt_unix.file_descr ;
@@ -86,7 +86,7 @@ let write t buf =
   Lwt_utils_unix.write_mbytes t.fd buf >>= fun () ->
   t.nwrit <- t.nwrit + len ;
   log t "written: %d (%d)" len t.nwrit ;
-  Lwt.return ()
+  Lwt.return_unit
 
 let connect t saddr =
   log t "connect: %s" (string_of_sockaddr saddr);

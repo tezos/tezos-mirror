@@ -46,10 +46,10 @@ module Event = struct
   let level = function
     | Processed_block req ->
         begin match req.update with
-          | Ignored_head -> Logging.Info
-          | Branch_switch | Head_incrememt -> Logging.Notice
+          | Ignored_head -> Internal_event.Info
+          | Branch_switch | Head_incrememt -> Internal_event.Notice
         end
-    | Could_not_switch_testchain _ -> Logging.Error
+    | Could_not_switch_testchain _ -> Internal_event.Error
 
   let encoding =
     let open Data_encoding in
@@ -96,9 +96,9 @@ module Event = struct
           Fitness.pp req.fitness ;
         Format.fprintf ppf
           "Pushed: %a, Treated: %a, Completed: %a@]"
-          Time.pp_hum req.request_status.pushed
-          Time.pp_hum req.request_status.treated
-          Time.pp_hum req.request_status.completed
+          Time.System.pp_hum req.request_status.pushed
+          Time.System.pp_hum req.request_status.treated
+          Time.System.pp_hum req.request_status.completed
     | Could_not_switch_testchain err ->
         Format.fprintf ppf "@[<v 0>Error while switching test chain:@ %a@]"
           (Format.pp_print_list Error_monad.pp) err

@@ -1,7 +1,6 @@
 (*****************************************************************************)
-(*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,37 +22,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Output : sig
-  type t =
-    | Null
-    | Stdout
-    | Stderr
-    | File of string
-    | Syslog of Lwt_log.syslog_facility
+let rpc_directory () =
+  let dir = RPC_directory.empty in
+  RPC_directory.gen_register dir Stat_services.S.gc begin fun () () () ->
+    RPC_answer.return @@ Gc.stat () end |> fun dir ->
 
-  val encoding : t Data_encoding.t
-  val of_string : string -> t option
-  val to_string : t -> string
-  val pp : Format.formatter -> t -> unit
-end
-
-type cfg = {
-  output : Output.t ;
-  default_level : Logging.level ;
-  rules : string option ;
-  template : Logging.template ;
-}
-
-val default_cfg : cfg
-
-val create_cfg :
-  ?output:Output.t ->
-  ?default_level:Logging.level ->
-  ?rules:string ->
-  ?template:Logging.template -> unit -> cfg
-
-val level_encoding : Logging.level Data_encoding.t
-val cfg_encoding : cfg Data_encoding.t
-
-val init: ?cfg:cfg -> unit -> unit Lwt.t
-val close: unit -> unit Lwt.t
+  RPC_directory.gen_register dir Stat_services.S.memory begin fun () () () ->
+    Sys_info.memory_stats () >>= function
+    | Ok stats ->
+        RPC_answer.return stats
+    | Error err -> RPC_answer.fail [err] end

@@ -50,7 +50,7 @@ type baker_policy =
     a policy, defaults to By_priority 0. *)
 val get_next_baker:
   ?policy:baker_policy ->
-  t -> (public_key_hash * int * Time.t) tzresult Lwt.t
+  t -> (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 module Forge : sig
 
@@ -117,6 +117,7 @@ val genesis:
   ?endorsement_reward:Tez_repr.tez ->
   ?cost_per_byte: Tez_repr.t ->
   ?hard_storage_limit_per_operation: Z.t ->
+  ?test_chain_duration: int64 ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and

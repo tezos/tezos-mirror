@@ -9,6 +9,7 @@
             tezos-client-002-PsYLVpVv
             tezos-client-003-PsddFKi3
             tezos-client-commands
+            tezos-stdlib-unix
             tezos-storage
             tezos-rpc-http
             tezos-rpc)
@@ -23,6 +24,7 @@
                    -open Tezos_client_base
                    -open Tezos_client_003_PsddFKi3
                    -open Tezos_client_commands
+                   -open Tezos_stdlib_unix
                    -open Tezos_storage
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))

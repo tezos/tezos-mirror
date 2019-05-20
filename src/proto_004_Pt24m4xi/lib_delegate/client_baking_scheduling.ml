@@ -23,16 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.Make_semantic(struct let name = "client.scheduling" end)
+include Internal_event.Legacy_logging.Make_semantic (struct
+    let name =  Proto_alpha.Name.name ^ ".client.scheduling"
+  end)
 
 open Logging
 
 let sleep_until time =
-  let delay = Time.diff time (Time.now ()) in
-  if delay < 0L then
+  (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
+  let time = Time.System.of_protocol_exn time in
+  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
+  if Ptime.Span.compare delay Ptime.Span.zero < 0 then
     None
   else
-    Some (Lwt_unix.sleep (Int64.to_float delay))
+    Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
 
 let rec wait_for_first_event ~name stream =
   Lwt_stream.get stream >>= function

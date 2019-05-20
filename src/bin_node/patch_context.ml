@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib.Logging.SEMLOG
+open Genesis_chain
+
+let patch_context json ctxt =
+  begin
+    match json with
+    | None -> Lwt.return ctxt
+    | Some json ->
+        Tezos_storage.Context.set ctxt
+          ["sandbox_parameter"]
+          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
+  end >>= fun ctxt ->
+  let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
+  Proto.init ctxt {
+    level = 0l ;
+    proto_level = 0 ;
+    predecessor = genesis.block ;
+    timestamp = genesis.time ;
+    validation_passes = 0 ;
+    operations_hash = Operation_list_list_hash.empty ;
+    fitness = [] ;
+    context = Context_hash.zero ;
+  } >>= function
+  | Error _ -> assert false (* FIXME error *)
+  | Ok { context = ctxt ; _ } ->
+      Lwt.return ctxt
