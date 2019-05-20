@@ -27,7 +27,7 @@ let (//) = Filename.concat
 
 type t = string
 
-let data_version = "0.0.2"
+let data_version = "0.0.3"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
