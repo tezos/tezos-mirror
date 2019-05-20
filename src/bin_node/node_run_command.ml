@@ -231,7 +231,17 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
     ~configuration:config.internal_events () >>= fun () ->
   Updater.init (protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
-  init_node ?sandbox ?checkpoint config >>=? fun node ->
+  begin init_node ?sandbox ?checkpoint config >>= function
+    | Ok node -> return node
+    | Error (State.Incorrect_history_mode_switch { previous_mode ; next_mode } :: _) ->
+        failwith "@[Cannot switch from history mode '%a' to \
+                  '%a'. Import a context from a corresponding snapshot \
+                  or re-synchronize a node with an empty tezos node \
+                  directory.@]"
+          History_mode.pp previous_mode
+          History_mode.pp next_mode
+    | Error _ as err -> Lwt.return err
+  end >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
   Lwt_exit.termination_thread >>= fun x ->
