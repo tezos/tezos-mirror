@@ -322,7 +322,7 @@ let build_rpc_directory node =
            node.validator node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
   merge (Chain_directory.build_rpc_directory node.validator) ;
-  merge (P2p.build_rpc_directory node.p2p) ;
+  merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.state) ;
 
   merge (Stat_directory.rpc_directory ()) ;

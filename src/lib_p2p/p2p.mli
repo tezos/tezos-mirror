@@ -173,6 +173,10 @@ type limits = {
 type ('msg, 'peer_meta, 'conn_meta) t
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
+val announced_version :  ('msg, 'peer_meta, 'conn_meta) net -> Network_version.t
+
+val pool :  ('msg, 'peer_meta, 'conn_meta) net -> ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option
+
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
 val faked_network :
@@ -291,9 +295,6 @@ val iter_connections :
 val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
-
-val build_rpc_directory :
-  (_, Peer_metadata.t , Connection_metadata.t) t -> unit RPC_directory.t
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
