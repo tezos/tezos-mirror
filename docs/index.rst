@@ -106,6 +106,8 @@ in the :ref:`introduction <howtoget>`.
    introduction/support
    introduction/contributing
    introduction/glossary
+   introduction/history_modes
+   introduction/snapshots
 
 .. toctree::
    :maxdepth: 2

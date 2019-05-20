@@ -567,7 +567,10 @@ writing your own configuration file if needed.
          /* The number of peers to synchronize with
             before declaring the node 'bootstrapped'. */
 
-         "bootstrap_threshold": 4
+         "bootstrap_threshold": 4,
+
+         /* The history mode configuration you want to run. */
+         "history_mode": "full"
 
       }
     }
