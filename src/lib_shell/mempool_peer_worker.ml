@@ -220,8 +220,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
 
       else
         (* There are some pending operations, we need to wait on them *)
-        select pipeline >>= fun () ->
-        Lwt.return_unit
+        select pipeline
 
     let process_batch mempool_worker pool_size input =
       let pipeline = create pool_size input in

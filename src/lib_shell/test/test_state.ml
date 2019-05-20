@@ -223,8 +223,7 @@ let wrap_state_init f base_dir =
       ~context_root
       genesis >>=? fun (state, chain, _index, _history_mode) ->
     build_example_tree chain >>= fun vblock ->
-    f { state ; chain ; vblock } >>=? fun () ->
-    return_unit
+    f { state ; chain ; vblock }
   end
 
 let test_init (_ : state) =

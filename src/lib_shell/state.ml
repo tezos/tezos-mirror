@@ -1416,8 +1416,7 @@ let read_block_exn t hash =
 let update_testchain block ~testchain_state =
   update_chain_data block.chain_state begin fun _ chain_data ->
     Lwt.return (Some { chain_data with test_chain = Some testchain_state.chain_id }, ())
-  end >>= fun () ->
-  Lwt.return_unit
+  end
 
 let fork_testchain block chain_id genesis_hash genesis_header protocol expiration =
   Shared.use block.chain_state.global_state.global_data begin fun data ->
