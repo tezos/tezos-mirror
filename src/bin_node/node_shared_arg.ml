@@ -307,14 +307,15 @@ module Term = struct
     let conv s = match s with
       | "archive" -> `Ok Archive
       | "full" -> `Ok Full
-      | "rolling" -> `Ok Rolling
+      | "experimental-rolling" -> `Ok Rolling
       | s -> `Error s in
     let to_string = Format.asprintf "%a" History_mode.pp in
     let pp fmt mode = Format.fprintf fmt "%s" (to_string mode) in
     (conv, pp)
 
   let history_mode =
-    let doc = "History mode." in
+    let doc = "History mode. Possible values: \
+               $(i,archive), $(i,full) (used by default), $(i,experimental-rolling)" in
     Arg.(value & opt (some history_mode_converter) None &
          info ~docs ~doc ~docv:"History mode" ["history-mode"])
 
