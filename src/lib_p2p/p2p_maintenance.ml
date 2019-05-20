@@ -177,7 +177,7 @@ and too_few_connections st n_connected =
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
-      ] >>= return
+      ] >>= fun () -> return_unit
     end >>=? fun () ->
     maintain st
   end
