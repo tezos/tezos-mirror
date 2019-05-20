@@ -338,6 +338,13 @@ integration:double_endorsement:
   script:
     - pytest tests_python/tests/test_double_endorsement.py
 
+integration:snapshot:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode_snapshot.py
+
+
+
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
