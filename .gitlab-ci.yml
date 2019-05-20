@@ -53,10 +53,10 @@ check_opam_lint:
   script:
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
-check_indentation:
+check_linting:
   <<: *build_definition
   script:
-    - dune build @runtest_indent
+    - dune build @runtest_lint
 
 build:
   <<: *build_definition
@@ -384,6 +384,11 @@ documentation:linkcheck:
     - gitlab-org
 
 ##BEGIN_OPAM##
+opam:00:tezos-tooling:
+  <<: *opam_definition
+  variables:
+    package: tezos-tooling
+
 opam:00:ocplib-json-typed:
   <<: *opam_definition
   variables:

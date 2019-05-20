@@ -20,6 +20,6 @@
  (modules Tezos_protocol_environment_shell))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

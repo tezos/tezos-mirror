@@ -6,6 +6,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" & < "1.9" }
   "bigstring"
@@ -16,7 +17,6 @@ depends: [
   "lwt_log"
   "zarith"
   "alcotest" { with-test }
-  "ocp-indent" { with-test & = "1.6.1" }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

@@ -92,12 +92,12 @@ test:
 	@dune runtest
 	@./scripts/check_opam_test.sh
 
-test-indent:
-	@dune build @runtest_indent
+test-lint:
+	@dune build @runtest_lint
 	make -C tests_python lint_all
 
-fix-indent:
-	@src/lib_stdlib/test-ocp-indent.sh fix
+fix-lint:
+	@src/tooling/lint.sh fix
 
 build-deps:
 	@./scripts/install_build_deps.sh
