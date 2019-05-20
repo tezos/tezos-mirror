@@ -97,17 +97,23 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Introduction:
+   :caption: Introduction tutorials:
 
    introduction/howtoget
    introduction/howtouse
    introduction/howtorun
-   introduction/various
    introduction/support
-   introduction/contributing
-   introduction/glossary
-   introduction/history_modes
-   introduction/snapshots
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User documentation:
+
+   user/key-management
+   user/sandbox
+   user/history_modes
+   user/snapshots
+   user/various
+   user/glossary
 
 .. toctree::
    :maxdepth: 2
@@ -122,6 +128,20 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Developer Tutorials:
+
+   developer/rpc
+   developer/data_encoding
+   developer/error_monad
+   developer/michelson_anti_patterns
+   developer/entering_alpha
+   developer/protocol_environment
+   developer/profiling
+   developer/flextesa
+   developer/contributing
+
+.. toctree::
+   :maxdepth: 2
    :caption: Protocols:
 
    protocols/003_PsddFKi3
@@ -131,18 +151,6 @@ in the :ref:`introduction <howtoget>`.
    :caption: Releases:
 
    releases/april
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Tutorials:
-
-   tutorials/rpc
-   tutorials/data_encoding
-   tutorials/error_monad
-   tutorials/michelson_anti_patterns
-   tutorials/entering_alpha
-   tutorials/protocol_environment
-   tutorials/profiling
 
 .. toctree::
    :maxdepth: 2
