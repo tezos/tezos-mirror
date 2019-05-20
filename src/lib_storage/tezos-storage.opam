@@ -11,6 +11,7 @@ depends: [
   "tezos-base"
   "lmdb"
   "irmin-lmdb"
+  "tezos-shell-services"
   "tezos-stdlib-unix" { with-test }
   "alcotest-lwt" { with-test }
 ]

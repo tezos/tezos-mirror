@@ -468,40 +468,40 @@ opam:16:lmdb:
   variables:
     package: lmdb
 
-opam:17:pbkdf:
+opam:17:tezos-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-base
+
+opam:18:pbkdf:
   <<: *opam_definition
   variables:
     package: pbkdf
 
-opam:18:ocplib-resto-cohttp:
+opam:19:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
-
-opam:19:tezos-base:
-  <<: *opam_definition
-  variables:
-    package: tezos-base
 
 opam:20:irmin-lmdb:
   <<: *opam_definition
   variables:
     package: irmin-lmdb
 
-opam:21:bip39:
+opam:21:tezos-shell-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell-services
+
+opam:22:bip39:
   <<: *opam_definition
   variables:
     package: bip39
 
-opam:22:tezos-rpc-http:
+opam:23:tezos-rpc-http:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http
-
-opam:23:tezos-shell-services:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell-services
 
 opam:24:tezos-stdlib-unix:
   <<: *opam_definition
