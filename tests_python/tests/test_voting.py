@@ -27,22 +27,6 @@ class TestManualBaking:
         assert client.get_period_position() == 1
 
     def test_listings(self, client):
-        assert client.get_listings() == []
-
-    def test_bake_one_block(self, client):
-        client.bake('bootstrap1', BAKE_ARGS)
-
-    def test_period_position2(self, client):
-        assert client.get_period_position() == 2
-
-    def test_bake_two_blocks(self, client):
-        client.bake('bootstrap1', BAKE_ARGS)
-        client.bake('bootstrap1', BAKE_ARGS)
-
-    def test_period_position3(self, client):
-        assert client.get_period_position() == 0
-
-    def test_listings2(self, client):
         assert client.get_listings() != []
 
     def test_inject_proto1(self, client, tmpdir):
@@ -80,9 +64,6 @@ class TestManualBaking:
 
     def test_proposal2(self, client):
         assert client.get_proposals() != []
-
-    def test_bake_one_block3(self, client):
-        client.bake('bootstrap1', BAKE_ARGS)
 
     def test_breaking_tie(self, client, session):
         protos = session['protos']
