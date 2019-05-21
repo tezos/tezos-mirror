@@ -32,6 +32,7 @@ val fitness_tag : Fitness.t Tag.def
 val current_slots_tag : int Tag.def
 val future_slots_tag : int Tag.def
 val timespan_tag : Time.System.Span.t Tag.def
+val filename_tag : string Tag.def
 
 val signed_header_tag : MBytes.t Tag.def
 val signed_operation_tag : MBytes.t Tag.def

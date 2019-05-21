@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -84,8 +85,8 @@ let commands () =
     | None ->
         Alpha_services.Constants.all cctxt
           (cctxt#chain, block) >>=? fun { parametric = {
-            hard_gas_limit_per_operation
-          } } ->
+            hard_gas_limit_per_operation; _
+          }; _ } ->
         return hard_gas_limit_per_operation
     | Some gas -> return gas in
   let data_parameter =
@@ -93,17 +94,8 @@ let commands () =
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
   let bytes_parameter ~name ~desc =
-    Clic.param ~name ~desc
-      (parameter (fun (_cctxt : full) s ->
-           try
-             if String.length s < 2
-             || s.[0] <> '0' || s.[1] <> 'x' then
-               raise Exit
-             else
-               return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
-           with _ ->
-             failwith "Invalid bytes, expecting hexadecimal \
-                       notation (e.g. 0x1234abcd)" )) in
+    Clic.param ~name ~desc Client_proto_args.bytes_parameter
+  in
   let signature_parameter =
     Clic.parameter
       (fun _cctxt s ->
@@ -166,11 +158,11 @@ let commands () =
         Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
         let show_source = not no_print_source in
         (if trace_exec then
-           trace cctxt ~chain:cctxt#chain cctxt#block
+           trace cctxt ~chain:cctxt#chain ~block:cctxt#block
              ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
            print_trace_result cctxt ~show_source ~parsed:program res
          else
-           run cctxt ~chain:cctxt#chain cctxt#block
+           run cctxt ~chain:cctxt#chain ~block:cctxt#block
              ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
            print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a script."
@@ -183,7 +175,7 @@ let commands () =
          | program, [] ->
              resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
              typecheck_program
-               cctxt ~chain:cctxt#chain cctxt#block ~gas:original_gas program >>= fun res ->
+               cctxt ~chain:cctxt#chain ~block:cctxt#block ~gas:original_gas program >>= fun res ->
              print_typecheck_result
                ~emacs:emacs_mode
                ~show_types
@@ -217,7 +209,7 @@ let commands () =
        @@ stop)
       (fun (no_print_source, custom_gas) data ty cctxt ->
          resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-         Client_proto_programs.typecheck_data cctxt ~chain:cctxt#chain cctxt#block
+         Client_proto_programs.typecheck_data cctxt ~chain:cctxt#chain ~block:cctxt#block
            ~gas:original_gas ~data ~ty () >>= function
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"

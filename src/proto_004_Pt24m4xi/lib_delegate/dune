@@ -17,9 +17,7 @@
  (modules (:standard \
                      delegate_commands
                      delegate_commands_registration))
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_004_Pt24m4xi
@@ -42,9 +40,7 @@
             tezos-baking-004-Pt24m4xi)
  (library_flags (:standard -linkall))
  (modules delegate_commands)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
@@ -68,9 +64,7 @@
             tezos-rpc)
  (library_flags (:standard -linkall))
  (modules delegate_commands_registration)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_004_Pt24m4xi

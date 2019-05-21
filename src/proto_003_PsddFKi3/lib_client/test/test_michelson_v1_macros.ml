@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,7 +36,7 @@ let print expr: string =
 let assert_expands
     (original:(Micheline_parser.location, string) Micheline.node)
     (expanded:(Micheline_parser.location, string) Micheline.node) =
-  let { Michelson_v1_parser.expanded = expansion}, errors =
+  let { Michelson_v1_parser.expanded = expansion; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -455,7 +456,7 @@ let test_map_cdadr () =
 (* unpexpanded : original expression with macros *)
 
 let assert_unexpansion original ex =
-  let { Michelson_v1_parser.expanded }, errors =
+  let { Michelson_v1_parser.expanded ; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
@@ -471,13 +472,13 @@ let assert_unexpansion original ex =
   | _ :: _ -> Error errors
 
 let assert_unexpansion_consistent original =
-  let { Michelson_v1_parser.expanded }, errors =
+  let { Michelson_v1_parser.expanded ; _ }, errors =
     let source = print (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original in
   match errors with
   | _ :: _ -> Error errors
   | [] ->
-      let { Michelson_v1_parser.unexpanded } =
+      let { Michelson_v1_parser.unexpanded ; _ } =
         Michelson_v1_printer.unparse_expression expanded in
       Assert.equal ~print unexpanded (Micheline.strip_locations original) ;
       ok ()
@@ -810,6 +811,37 @@ let test_unexpand_map_cdadr () =
                     ]))
     (Prim (zero_loc, "MAP_CDADR", code, []))
 
+let test_unexpand_diip_duup1 () =
+  let single code = Seq (zero_loc, [code]) in
+  let cst str = Prim (zero_loc, str, [], []) in
+  let app str code = Prim (zero_loc, str, [code], []) in
+  let dip = app "DIP" in
+  let diip = app "DIIP" in
+  let dup = cst "DUP" in
+  let swap = cst "SWAP" in
+  let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
+  assert_unexpansion
+    (* { DIP { DIP { DIP { DUP }; SWAP }}} *)
+    (single (dip (single (dip dip_dup_swap))))
+    (* DIIP { DIP { DUP }; SWAP } *)
+    (diip dip_dup_swap)
+
+let test_unexpand_diip_duup2 () =
+  let single code = Seq (zero_loc, [code]) in
+  let cst str = Prim (zero_loc, str, [], []) in
+  let app str code = Prim (zero_loc, str, [code], []) in
+  let dip = app "DIP" in
+  let diip = app "DIIP" in
+  let dup = cst "DUP" in
+  let duup = cst "DUUP" in
+  let swap = cst "SWAP" in
+  let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
+  assert_unexpansion
+    (* { DIP { DIP {{ DIP { DUP }; SWAP }}}} *)
+    (single (dip (single (dip (single dip_dup_swap)))))
+    (* DIIP { DUUP } *)
+    (diip (single duup))
+
 (*****************************************************************************)
 (* Test           *)
 (*****************************************************************************)
@@ -885,6 +917,8 @@ let tests =
     "set_cdr annot unexpansion",  (fun _ -> Lwt.return (test_unexpand_set_cdr_annot ())) ;
 
     "map_car unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_car ())) ;
+    "diip_duup1 unexpansion", (fun _ -> Lwt.return (test_unexpand_diip_duup1 ())) ;
+    "diip_duup2 unexpansion", (fun _ -> Lwt.return (test_unexpand_diip_duup2 ())) ;
 
     (***********************************************************************)
     (*BUG
