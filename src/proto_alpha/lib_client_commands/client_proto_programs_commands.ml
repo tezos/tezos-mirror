@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,17 +83,8 @@ let commands () =
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
   let bytes_parameter ~name ~desc =
-    Clic.param ~name ~desc
-      (parameter (fun (_cctxt : full) s ->
-           try
-             if String.length s < 2
-             || s.[0] <> '0' || s.[1] <> 'x' then
-               raise Exit
-             else
-               return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
-           with _ ->
-             failwith "Invalid bytes, expecting hexadecimal \
-                       notation (e.g. 0x1234abcd)" )) in
+    Clic.param ~name ~desc Client_proto_args.bytes_parameter
+  in
   let signature_parameter =
     Clic.parameter
       (fun _cctxt s ->
