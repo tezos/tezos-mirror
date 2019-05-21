@@ -503,7 +503,7 @@ module Make (I:Dump_interface) = struct
                   if visited hash then Lwt.return_unit
                   else
                     begin
-                      Tezos_stdlib.Utils.display_progress
+                      Tezos_stdlib_unix.Utils.display_progress
                         ~refresh_rate:(!cpt, 1_000)
                         "Context: %dK elements, %dMiB written%!"
                         (!cpt / 1_000) (!written / 1_048_576) ;
@@ -539,12 +539,12 @@ module Make (I:Dump_interface) = struct
       | Some ctxt ->
           let tree = I.context_tree ctxt in
           fold_tree_path ctxt tree >>= fun () ->
-          Tezos_stdlib.Utils.display_progress_end ();
+          Tezos_stdlib_unix.Utils.display_progress_end ();
           I.context_parents ctxt >>= fun parents ->
           set_root buf bh (I.context_info ctxt) parents block_data;
           (* Dump pruned blocks *)
           let dump_pruned cpt pruned =
-            Tezos_stdlib.Utils.display_progress
+            Tezos_stdlib_unix.Utils.display_progress
               ~refresh_rate:(cpt, 1_000)
               "History: %dK block, %dMiB written"
               (cpt / 1_000) (!written / 1_048_576) ;
@@ -571,7 +571,7 @@ module Make (I:Dump_interface) = struct
               set_loot buf proto;
               maybe_flush () ;
             ) protocol_datas >>= fun () ->
-          Tezos_stdlib.Utils.display_progress_end ();
+          Tezos_stdlib_unix.Utils.display_progress_end ();
           return_unit >>=? fun () ->
           set_end buf;
           flush () >>= fun () ->
@@ -604,7 +604,7 @@ module Make (I:Dump_interface) = struct
 
     let restore history_mode =
       let rec first_pass ctxt cpt =
-        Tezos_stdlib.Utils.display_progress
+        Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Context: %dK elements, %dMiB read"
           (cpt / 1_000) (!read / 1_048_576) ;
@@ -624,7 +624,7 @@ module Make (I:Dump_interface) = struct
         | _ -> fail Inconsistent_snapshot_data in
 
       let rec second_pass pred_header (rev_block_hashes, protocol_datas) todo cpt =
-        Tezos_stdlib.Utils.display_progress
+        Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Store: %dK elements, %dMiB read"
           (cpt / 1_000) (!read / 1_048_576) ;
@@ -648,9 +648,9 @@ module Make (I:Dump_interface) = struct
             return (pred_header, rev_block_hashes, List.rev protocol_datas)
         | _ -> fail Inconsistent_snapshot_data in
       first_pass (I.make_context index) 0 >>=? fun (block_header, block_data) ->
-      Tezos_stdlib.Utils.display_progress_end () ;
+      Tezos_stdlib_unix.Utils.display_progress_end () ;
       second_pass None ([], []) [] 0 >>=? fun (oldest_header_opt, rev_block_hashes, protocol_datas) ->
-      Tezos_stdlib.Utils.display_progress_end () ;
+      Tezos_stdlib_unix.Utils.display_progress_end () ;
       return (block_header,
               block_data,
               history_mode,

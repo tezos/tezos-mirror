@@ -514,7 +514,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
                to_write) in
 
        Lwt_list.fold_left_s (fun (cpt, to_write) current_hash ->
-           Tezos_stdlib.Utils.display_progress
+           Tezos_stdlib_unix.Utils.display_progress
              ~refresh_rate:(cpt, 1_000)
              "Computing predecessors table %dK elements%!"
              (cpt / 1_000);
@@ -530,7 +530,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
            Lwt.return (cpt + 1, (current_hash, predecessors_list) :: to_write)
          ) (0, []) rev_block_hashes >>= fun (_, to_write) ->
        write_predecessors_table to_write >>= fun () ->
-       Tezos_stdlib.Utils.display_progress_end () ;
+       Tezos_stdlib_unix.Utils.display_progress_end () ;
 
        (* Process data imported from snapshot *)
        let { Block_data.block_header ; operations } = meta in
