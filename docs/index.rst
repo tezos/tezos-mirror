@@ -150,7 +150,8 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Releases:
 
-   releases/april
+   releases/april-2019
+   releases/may-2019
 
 .. toctree::
    :maxdepth: 2
