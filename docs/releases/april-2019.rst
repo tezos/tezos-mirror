@@ -1,7 +1,7 @@
-.. _mainnet-april:
+.. _mainnet-april-2019:
 
-Mainnet April
-=============
+Mainnet April 2019
+==================
 
 As announced on Nomadic Labs' blog, the April release contains many
 improvements and fixes for the Tezos shell and its baking daemons.
