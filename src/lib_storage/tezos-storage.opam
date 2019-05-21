@@ -12,7 +12,7 @@ depends: [
   "lmdb"
   "irmin-lmdb"
   "tezos-shell-services"
-  "tezos-stdlib-unix" { with-test }
+  "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
 ]
 build: [
