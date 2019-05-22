@@ -162,7 +162,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
     fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _p ->
     let chain_id = State.Chain.id chain_state in
     State.Chain.update_level_indexed_protocol_store
-      chain_state chain_id protocol_level protocol_hash
+      chain_state chain_id protocol_level protocol_hash (State.Block.header block)
     >>= fun () ->
     return_unit
   and test_protocol =
@@ -175,7 +175,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
           | None -> Lwt.return_unit
           | Some chain_id ->
               State.Chain.update_level_indexed_protocol_store
-                chain_state chain_id protocol_level protocol
+                chain_state chain_id protocol_level protocol (State.Block.header block)
         end >>= fun () ->
         return_unit in
   protocol >>=? fun () ->

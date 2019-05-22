@@ -95,15 +95,17 @@ module Chain = struct
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore
          (Indexed_store.Store)
-         (struct let name = ["protocol" ; "level"] end))
+         (struct let name = ["protocol"] end))
       (Store_helpers.Integer_index)
 
-  module Protocol_hash =
+  module Protocol_info =
     Protocol_index.Make_map
-      (struct let name = ["hash"] end)
+      (struct let name = ["info"] end)
       (Store_helpers.Make_value(struct
-         type t = Protocol_hash.t
-         let encoding = Protocol_hash.encoding
+         type t = Protocol_hash.t * Int32.t
+         let encoding =
+           let open Data_encoding in
+           tup2 Protocol_hash.encoding int32
        end))
 end
 

@@ -120,9 +120,12 @@ module Chain : sig
   (** Get the level indexed chain protocol store for the given header. *)
   val get_level_indexed_protocol: chain_state -> Block_header.t -> Protocol_hash.t Lwt.t
 
-  (** Update the level indexed chain protocol store so that block can easily access
-      the corresponding protocol hash from the protocol level in its header. *)
-  val update_level_indexed_protocol_store: chain_state -> Chain_id.t -> int -> Protocol_hash.t -> unit Lwt.t
+  (** Update the level indexed chain protocol store so that the block can easily access
+      its corresponding protocol hash from the protocol level in its header.
+      Also stores the transition block level.
+  *)
+  val update_level_indexed_protocol_store: chain_state -> Chain_id.t -> int ->
+    Protocol_hash.t -> Block_header.t -> unit Lwt.t
 
 end
 
