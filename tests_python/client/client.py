@@ -349,7 +349,7 @@ class Client:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
         if branch is not None:
             cmd += ['--branch', branch]
-            cmd += ['--check-previous', 5]
+            cmd += ['--check-previous', '5']
         if args is None:
             args = []
         cmd += args
