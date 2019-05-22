@@ -59,7 +59,31 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
+  upgrader:
+    image: $docker_image
+    hostname: node
+    command: tezos-upgrade-storage
+    volumes:
+      - node_data:/var/run/tezos/node
+      - client_data:/var/run/tezos/client
+
 EOF
+
+if [ -n "$local_snapshot_path" ]; then
+    cat >> "$docker_compose_yml" <<EOF
+
+  importer:
+    image: $docker_image
+    hostname: node
+    command: tezos-snapshot-import
+    volumes:
+      - node_data:/var/run/tezos/node
+      - client_data:/var/run/tezos/client
+      - $local_snapshot_path:/snapshot
+
+EOF
+
+fi
 
 for proto in $(cat "$active_protocol_versions") ; do
 
@@ -571,6 +595,14 @@ status() {
     warn_script_uptodate verbose
 }
 
+snapshot_import() {
+    pull_image
+    local_snapshot_path="$1"
+    update_compose_file
+    call_docker_compose up importer
+    warn_script_uptodate
+}
+
 warn_script_uptodate() {
     if [[ $ALPHANET_EMACS ]]; then
        return
@@ -596,6 +628,14 @@ update_script() {
         rm .alphanet.sh.new
         echo -e "\033[32mThe script is up to date.\033[0m"
     fi
+}
+
+upgrade_node_storage() {
+    pull_image
+    local_snapshot_path="$1"
+    update_compose_file
+    call_docker_compose up upgrader
+    warn_script_uptodate
 }
 
 usage() {
@@ -631,6 +671,8 @@ usage() {
     echo "       Replace 'alphanet.sh' with the one found in the docker image."
     echo "  Advanced commands:"
     echo "    $0 node <start|stop|status|log>"
+    echo "    $0 upgrade"
+    echo "    $0 snapshot import <snapshot_file>"
     echo "    $0 baker <start|stop|status|log>"
     echo "    $0 endorser <start|stop|status|log>"
     echo "    $0 shell"
@@ -756,6 +798,10 @@ case "$command" in
 
     ## Node
 
+    upgrade)
+        upgrade_node_storage
+        ;;
+
     node)
         subcommand="$1"
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
@@ -776,6 +822,22 @@ case "$command" in
                 usage
                 exit 1
         esac ;;
+
+    ## Snapshot import
+
+    snapshot)
+        subcommand="$1"
+        if [ "$#" -ne 2 ] ; then usage ; exit 1;  else shift ; fi
+        snapshot_file="$1"
+        case "$subcommand" in
+            import)
+                snapshot_import "$snapshot_file"
+                ;;
+            *)
+                usage
+                exit 1
+        esac ;;
+
     ## Baker
 
     baker)
