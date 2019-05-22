@@ -64,7 +64,7 @@ let (>>=?) v f =
   | Error err -> lwt_fail_error err
   | Ok v -> f v
 
-let init ?mapsize path =
+let init ?(readonly = false) ?mapsize path =
   if not (Sys.file_exists path) then Unix.mkdir path 0o755 ;
   let sync_flag =
     match Sys.getenv_opt "TEZOS_STORE_SYNC" with
@@ -78,7 +78,11 @@ let init ?mapsize path =
                             allowed: nosync nometasync" s;
             []
   in
-  match Lmdb.opendir ?mapsize ~flags:(sync_flag @ [NoTLS; NoMetaSync]) path 0o644 with
+  let readonly_flag = if readonly then [ Lmdb.RdOnly ] else [] in
+  let file_flags = if readonly then 0o444 else 0o644 in
+  match Lmdb.opendir ?mapsize ~flags:(sync_flag
+                                      @ readonly_flag
+                                      @ [NoTLS; NoMetaSync]) path file_flags with
   | Ok dir -> return { dir ; parent = Lwt.new_key () }
   | Error err -> failwith "%a" Lmdb.pp_error err
 
