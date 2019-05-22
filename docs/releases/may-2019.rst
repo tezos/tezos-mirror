@@ -14,7 +14,7 @@ From our latest bench the time to validate the migration block on the
 old storage can be as long as 15 minutes on a hdd, <4 minutes on a
 ssd, while a node from a full snapshot takes less than 5 minutes on
 hdd, <40 seconds on ssd.
-This is due to our current storage backend that will be replaced in the
+This is due to our current storage backend that will be improved in the
 `near future <https://tarides.com/blog/2019-05-13-on-the-road-to-irmin-v2.html>`_.
 
 
@@ -48,17 +48,17 @@ The default is to snapshot the chain at the position of our last
 checkpoint, which is usually 5 cycles in the past.
 This is the safest option as the tezos-node guarantees that no
 reorganization of the chain is possible earlier than a checkpoint.
-However we can also specify the block to snapshot::
+However it requires to synchronize from the network the last 5 cycles.
 
-  tezos-node snapshot export -b $HASH mainnet-$HASH.full
+Alternatively we can also specify the block to snapshot::
+
+  tezos-node snapshot export mainnet-$HASH.full --block $HASH
 
 We can now delete our upgraded archive storage and import the snapshot
-(without forgetting the node identity)::
+(without forgetting, if you need, to save ``{identity,peers,config}.json``)::
 
-    cp ~/tezos-node/identity.json ~/
     rm -r ~/.tezos-node
     tezos-node snapshot import mainnet-*.full
-    mv ~/identity.json
 
 There should be a rather smaller `~/.tezos-node` directory populated
 from which we can start our node::
@@ -67,6 +67,24 @@ from which we can start our node::
 
 It is good practice to snapshot regularly our own node, for example
 with a cron job, once compressed the files are rather small.
+
+
+Docker
+~~~~~~
+
+If you are running Docker with the helper script `mainnet.sh` there
+are two new commands.
+The node storage can be upgraded, before running the new node in
+archive mode, using::
+
+  ./mainnet.sh upgrade
+
+Otherwise you can delete your storage altogether and import a fresh
+snapshot using::
+
+  ./mainnet.sh clear
+  ./mainnet.sh snapshot import mainnet-*.full
+
 
 Known issues
 ~~~~~~~~~~~~
