@@ -695,6 +695,7 @@ module Make (I:Dump_interface) = struct
               pruned_blocks (protocol_data :: protocol_datas)
               acc (succ cpt)
         | End ->
+            Tezos_stdlib.Utils.display_progress_end ();
             if pruned_blocks <> [] || protocol_datas <> [] then
               fail Missing_snapshot_data
             else
