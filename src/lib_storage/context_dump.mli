@@ -24,6 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += System_write_error of string
+type error += Bad_hash of string * MBytes.t * MBytes.t
+type error += Context_not_found of MBytes.t
+type error += System_read_error of string
+type error += Inconsistent_snapshot_file
+type error += Inconsistent_snapshot_data
+type error += Missing_snapshot_data
+type error += Invalid_snapshot_version of string * string
+type error += Restore_context_failure
+
 module type Dump_interface = sig
   type index
   type context
@@ -40,7 +50,7 @@ module type Dump_interface = sig
   val node_encoding : [ `Node of MBytes.t ] Data_encoding.t
 
   module Block_header : sig
-    type t
+    type t = Block_header.t
     val to_bytes : t -> MBytes.t
     val of_bytes : MBytes.t -> t option
     val equal : t -> t -> bool
@@ -108,8 +118,8 @@ module type Dump_interface = sig
   val make_context : index -> context
   val update_context : context -> tree -> context
   val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
-  val add_mbytes : index -> tree -> key -> MBytes.t -> tree Lwt.t
-  val add_dir : index -> tree -> key -> ( step * hash ) list -> tree option Lwt.t
+  val add_mbytes : index -> MBytes.t -> tree Lwt.t
+  val add_dir : index -> ( step * hash ) list -> tree option Lwt.t
 
 end
 
@@ -127,9 +137,12 @@ module type S = sig
      (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
-  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+  val restore_contexts_fd : index -> Raw_store.t -> fd:Lwt_unix.file_descr ->
+    (pruned_block -> Block_hash.t -> unit tzresult Lwt.t) ->
+    (block_header option ->
+     Block_hash.t -> pruned_block -> unit tzresult Lwt.t) ->
     (block_header * block_data * History_mode.t *
-     pruned_block list * protocol_data list) tzresult Lwt.t
+     Block_header.t option * Block_hash.t list * protocol_data list) tzresult Lwt.t
 end
 
 module Make (I:Dump_interface) : S
