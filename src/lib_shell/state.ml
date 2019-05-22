@@ -499,18 +499,27 @@ module Chain = struct
     Shared.use global_state.global_data begin fun global_data ->
       let global_store = global_data.global_store in
       let chain_store = Store.Chain.get global_store chain_id in
-      Store.Chain.Protocol_hash.read_opt chain_store protocol_level >>= function
+      Store.Chain.Protocol_info.read_opt chain_store protocol_level >>= function
       | None -> Pervasives.failwith "State.Chain.get_level_index_protocol"
-      | Some p -> Lwt.return p
+      | Some (p,_) -> Lwt.return p
     end
 
-  let update_level_indexed_protocol_store chain_state chain_id level protocol_hash =
+  let update_level_indexed_protocol_store chain_state chain_id protocol_level protocol_hash block_header =
     let global_state = chain_state.global_state in
-    Shared.use global_state.global_data begin fun global_data ->
-      let global_store = global_data.global_store in
-      let chain_store = Store.Chain.get global_store chain_id in
-      Store.Chain.Protocol_hash.store chain_store level protocol_hash
-    end
+    Shared.use chain_state.block_store begin fun block_store ->
+      Header.read_opt (block_store, block_header.Block_header.shell.predecessor) >>= function
+      | None -> Lwt.return_none (* should not happen *)
+      | Some header -> Lwt.return_some header
+    end >>= function
+    | None -> Lwt.return_unit
+    | Some pred_header ->
+        if pred_header.shell.proto_level <> block_header.shell.proto_level then
+          Shared.use global_state.global_data begin fun global_data ->
+            let global_store = global_data.global_store in
+            let chain_store = Store.Chain.get global_store chain_id in
+            Store.Chain.Protocol_info.store chain_store protocol_level (protocol_hash, block_header.shell.level)
+          end
+        else Lwt.return_unit
 
   let allocate
       ~genesis
@@ -574,7 +583,8 @@ module Chain = struct
     Store.Chain_data.Checkpoint.store chain_data_store genesis_header >>= fun () ->
     Store.Chain_data.Save_point.store chain_data_store save_point >>= fun () ->
     Store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
-    Store.Chain.Protocol_hash.store chain_store proto_level genesis.protocol >>= fun () ->
+    Store.Chain.Protocol_info.store chain_store proto_level
+      (genesis.protocol, genesis_header.shell.level) >>= fun () ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -1426,8 +1436,8 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol expiratio
         protocol } in
     Chain.locked_create block.chain_state.global_state data
       chain_id ~expiration genesis genesis_header >>= fun testchain_state ->
-    Store.Chain.Protocol_hash.store
-      chain_store genesis_header.shell.proto_level protocol >>= fun () ->
+    Store.Chain.Protocol_info.store
+      chain_store genesis_header.shell.proto_level (protocol, genesis_header.shell.level) >>= fun () ->
     update_testchain block ~testchain_state >>= fun () ->
     return testchain_state
   end

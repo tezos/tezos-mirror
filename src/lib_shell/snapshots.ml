@@ -563,7 +563,8 @@ let import_protocol_data index store pruned_blocks level_oldest_block (level, pr
     ~index >>= function
   | true ->
       let protocol_level = block_header.shell.proto_level in
-      Store.Chain.Protocol_hash.store store protocol_level protocol_hash >>= fun () ->
+      let block_level = block_header.shell.level in
+      Store.Chain.Protocol_info.store store protocol_level (protocol_hash, block_level) >>= fun () ->
       return_unit
   | false -> fail (Wrong_protocol_hash protocol_hash)
 
