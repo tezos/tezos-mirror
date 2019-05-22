@@ -1092,7 +1092,7 @@ and list_known_points ?(ignore_private = false) pool conn =
         (fun point_id point_info acc ->
            if (ignore_private &&
                not (P2p_point_state.Info.known_public point_info))
-           || not (Points.banned pool point_id)
+           || Points.banned pool point_id
            then acc
            else point_info :: acc)
         pool.known_points [] in
