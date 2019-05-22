@@ -250,7 +250,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
     | Some block_header ->
         let export_mode = if export_rolling then History_mode.Rolling else Full in
         lwt_log_notice Tag.DSL.(fun f ->
-            f "Dumping a snapshot in mode %a, targeting block hash \"%a\" at level %a"
+            f "Exporting a snapshot in mode %a, targeting block hash %a at level %a"
             -%a History_mode.tag export_mode
             -%a Block_hash.Logging.tag checkpoint_block_hash
             -%a block_level_tag (Int32.to_int block_header.shell.level)
@@ -320,13 +320,15 @@ let check_history_consistency ~genesis block_header history =
                 Block_hash.equal oldest_header.shell.predecessor genesis))
     (Snapshot_import_failure "inconsistent oldest level") >>=? fun () ->
   check_operations_consistency (snd history.(0)) >>=? fun () ->
-  let rec check = function
+  let rec check n = begin
+    Tezos_stdlib.Utils.display_progress
+      ~refresh_rate:(n - 1, 1_000)
+      "Progress: %iK/%iK"
+      ((nb_blocks - n) / 1_000)
+      ((nb_blocks - 1) / 1_000) ;
+    match n with
     | 1 -> return_unit
-    | n -> Tezos_stdlib.Utils.display_progress
-             ~refresh_rate:(n - 1, 1_000)
-             "Progress: %iK/%iK"
-             ((nb_blocks - n) / 1_000)
-             ((nb_blocks - 1) / 1_000) ;
+    | n ->
         check_operations_consistency (snd history.(n)) >>=? fun () ->
         let { Context.Pruned_block.block_header ; _ } = snd history.(n) in
         fail_unless (block_header.shell.level >= 2l &&
@@ -335,6 +337,7 @@ let check_history_consistency ~genesis block_header history =
                        (fst history.(n - 1)))
           (Snapshot_import_failure "inconsistent predecessors") >>=? fun () ->
         check (n - 1)
+  end
   in
   check (nb_blocks - 1) >>=? fun () ->
   Tezos_stdlib.Utils.display_progress_end () ;
