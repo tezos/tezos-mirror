@@ -1310,7 +1310,12 @@ module Block = struct
     | None -> Lwt.return_none (* assert false *)
     | Some pred when equal pred block -> Lwt.return_none (* genesis *)
     | Some pred ->
-        protocol_hash pred >>= fun protocol ->
+        Chain.save_point chain_state >>= fun (save_point_level, _) ->
+        begin
+          if Compare.Int32.(level pred < save_point_level) then
+            Chain.get_level_indexed_protocol chain_state pred.header
+          else protocol_hash pred
+        end >>= fun protocol ->
         match
           Protocol_hash.Table.find_opt
             chain_state.block_rpc_directories protocol
@@ -1324,7 +1329,12 @@ module Block = struct
     read_opt chain_state block.header.shell.predecessor >|=
     Option.unopt_assert ~loc:__POS__ >>= fun pred ->
     protocol_hash block >>= fun next_protocol ->
-    protocol_hash pred >>= fun protocol ->
+    Chain.save_point chain_state >>= fun (save_point_level, _) ->
+    begin
+      if Compare.Int32.(level pred < save_point_level) then
+        Chain.get_level_indexed_protocol chain_state (header pred)
+      else protocol_hash pred
+    end >>= fun protocol ->
     let map =
       Option.unopt ~default:Protocol_hash.Map.empty
         (Protocol_hash.Table.find_opt chain_state.block_rpc_directories protocol)
@@ -1338,7 +1348,7 @@ module Block = struct
     Shared.use chain_state.block_store begin fun block_store ->
       Header.read_opt
         (block_store, header.Block_header.shell.predecessor) >>= function
-      | None -> Lwt.return_none (* genesis or caboose *)
+      | None -> Lwt.return_none (* caboose *)
       | Some pred when Block_header.equal pred header -> Lwt.return_none (* genesis *)
       | Some pred ->
           Chain.get_level_indexed_protocol chain_state header >>= fun protocol ->
