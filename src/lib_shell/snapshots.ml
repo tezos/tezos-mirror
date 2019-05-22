@@ -238,7 +238,7 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
         else
           let last_checkpoint_hash = Block_header.hash last_checkpoint in
           lwt_log_notice Tag.DSL.(fun f ->
-              f "There is no block hash specified with the `--block` option. Using %a by default (last checkpoint)"
+              f "There is no block hash specified with the `--block` option. Using %a (last checkpoint)"
               -%a Block_hash.Logging.tag last_checkpoint_hash
             ) >>= fun () ->
           return last_checkpoint_hash
@@ -279,17 +279,13 @@ let export ?(export_rolling=false) ~context_index ~store ~genesis filename block
     ) >>= fun () ->
   return_unit
 
-let check_operations_consistency pruned_block =
-  let { Context.Pruned_block.block_header ;
-        operations ;
-        operation_hashes ; _ } =
-    pruned_block in
+let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
   List.iter2
     (fun (_, op) (_, oph) ->
        let expected_op_hash = List.map Operation.hash op in
        List.iter2 (fun expected found ->
-           assert (Operation_hash.equal expected found)
+           assert (Operation_hash.equal expected found) (* paul:here *)
          ) expected_op_hash oph ;
     )
     operations operation_hashes ;
@@ -307,112 +303,21 @@ let check_operations_consistency pruned_block =
     (Inconsistent_operation_hashes
        (computed_hash, block_header.Block_header.shell.operations_hash))
 
-let check_history_consistency ~genesis block_header history =
-  let nb_blocks = Array.length history in
-  let oldest_header = (snd history.(0)).Context.Pruned_block.block_header in
-  let oldest_level = oldest_header.shell.level in
-  fail_unless (Block_hash.equal
-                 block_header.Block_header.shell.predecessor
-                 (fst history.(nb_blocks - 1)))
-    (Snapshot_import_failure "inconsistent predecessors") >>=? fun () ->
-  fail_unless (oldest_level >= 1l ||
-               (Compare.Int32.(oldest_level = 1l) &&
-                Block_hash.equal oldest_header.shell.predecessor genesis))
-    (Snapshot_import_failure "inconsistent oldest level") >>=? fun () ->
-  check_operations_consistency (snd history.(0)) >>=? fun () ->
-  let rec check n = begin
-    Tezos_stdlib.Utils.display_progress
-      ~refresh_rate:(n - 1, 1_000)
-      "Progress: %iK/%iK"
-      ((nb_blocks - n) / 1_000)
-      ((nb_blocks - 1) / 1_000) ;
-    match n with
-    | 1 -> return_unit
-    | n ->
-        check_operations_consistency (snd history.(n)) >>=? fun () ->
-        let { Context.Pruned_block.block_header ; _ } = snd history.(n) in
-        fail_unless (block_header.shell.level >= 2l &&
-                     Block_hash.equal
-                       block_header.shell.predecessor
-                       (fst history.(n - 1)))
-          (Snapshot_import_failure "inconsistent predecessors") >>=? fun () ->
-        check (n - 1)
-  end
-  in
-  check (nb_blocks - 1) >>=? fun () ->
-  Tezos_stdlib.Utils.display_progress_end () ;
-  return_unit
-
-let compute_predecessors_tables ~genesis history =
-  let nb_blocks = Array.length history in
-  let oldest_header = (snd history.(0)).Context.Pruned_block.block_header in
-  let oldest_level = oldest_header.shell.level in
-  Array.init nb_blocks begin fun i ->
-    let rec step s d acc =
-      if oldest_level = 1l && i - d = -1 then
-        List.rev ((s, genesis) :: acc)
-      else if i - d < 0 then
-        List.rev acc
-      else
-        step (s + 1) (d * 2) ((s, fst history.(i - d)) :: acc) in
-    step 0 1 []
-  end
-
-let store_pruned_blocks
-    store block_store
-    chain_data ~genesis history =
-  let nb_blocks = Array.length history in
-  lwt_log_notice (fun f -> f "Computing predecessor tables") >>= fun () ->
-  let predecessors = compute_predecessors_tables ~genesis history in
-  let rec loop_on_chunks cpt =
-    Store.with_atomic_rw store begin fun () ->
-      let rec loop_on_chunk cpt =
-        if cpt = nb_blocks then Lwt.return cpt else begin
-          Tezos_stdlib.Utils.display_progress
-            ~refresh_rate:(cpt, 1000)
-            "Storing blocks: %iK/%iK"
-            (cpt / 1000)
-            (nb_blocks / 1000) ;
-          let pruned_block_hash,
-              { Context.Pruned_block.block_header ; operations ; operation_hashes } =
-            history.(cpt) in
-          Store.Block.Pruned_contents.store
-            (block_store, Block_header.hash block_header) { header = block_header } >>= fun () ->
-          Lwt_list.iter_s
-            (fun (i, v) -> Store.Block.Operations.store (block_store, pruned_block_hash) i v)
-            operations >>= fun () ->
-          Lwt_list.iter_s
-            (fun (i, v) -> Store.Block.Operation_hashes.store (block_store, pruned_block_hash) i v)
-            operation_hashes >>= fun () ->
-          Lwt_list.iter_s
-            (fun (l, h) -> Store.Block.Predecessors.store (block_store, pruned_block_hash) l h)
-            predecessors.(cpt) >>= fun () ->
-          begin match predecessors.(cpt) with
-            | (0, pred_hash) :: _ ->
-                Store.Chain_data.In_main_branch.store (chain_data, pred_hash) pruned_block_hash
-            | [] -> Lwt.return_unit
-            | _ :: _ -> assert false
-          end >>= fun () ->
-          loop_on_chunk (succ cpt)
-        end in
-      if (succ cpt) mod 5000 = 0 then Lwt.return cpt else
-        loop_on_chunk cpt end >>= fun cpt ->
-    if cpt = nb_blocks then
-      Lwt.return ()
+let compute_predecessors ~genesis_hash oldest_level block_hashes i =
+  let rec step s d acc =
+    if oldest_level = 1l && i - d = -1 then
+      List.rev ((s, genesis_hash) :: acc)
+    else if i - d < 0 then
+      List.rev acc
     else
-      loop_on_chunks cpt in
-  loop_on_chunks 0 >>= fun () ->
-  Tezos_stdlib.Utils.display_progress_end () ;
-  return_unit
+      step (s + 1) (d * 2) ((s, block_hashes.(i - d)) :: acc) in
+  step 0 1 []
 
-let check_context_hash_consistency
-    (block_validation_result : Tezos_validation.Block_validation.result)
-    (block_header : Block_header.t) =
-  (* we expect to match the context_hash …*)
+let check_context_hash_consistency block_validation_result block_header =
   fail_unless
     (Context_hash.equal
-       block_validation_result.context_hash
-       block_header.shell.context)
+       block_validation_result.Tezos_validation.Block_validation.context_hash
+       block_header.Block_header.shell.context)
     (Snapshot_import_failure "resulting context hash does not match")
 
 let set_history_mode store history_mode =
@@ -490,7 +395,7 @@ let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
   Store.Chain_data.Caboose.store chain_data (caboose_level, caboose_hash) >>= fun () ->
   return_unit
 
-let reconstruct_contexts
+let _reconstruct_contexts
     store context_index chain_id block_store
     (history : (Block_hash.t * Context.Pruned_block.t) array) =
   lwt_log_notice (fun f ->
@@ -539,14 +444,16 @@ let reconstruct_contexts
   Tezos_stdlib.Utils.display_progress_end () ;
   return_unit
 
-let import_protocol_data index store pruned_blocks level_oldest_block (level, protocol_data) =
+let import_protocol_data index store block_hash_arr level_oldest_block (level, protocol_data) =
   (* Retrieve the original context hash of the block. *)
-  let block_header =
-    let delta = Int32.(to_int (sub level level_oldest_block)) in
-    let pruned_block = snd (pruned_blocks.(delta)) in
-    pruned_block.Context.Pruned_block.block_header
-  in
-  let expected_context_hash = block_header.shell.context in
+  let delta = Int32.(to_int (sub level level_oldest_block)) in
+  let pruned_block_hash = block_hash_arr.(delta) in
+  let block_store = Store.Block.get store in
+  begin State.Block.Header.read_opt (block_store, pruned_block_hash) >>= function
+    | None -> assert false
+    | Some block_header -> Lwt.return block_header
+  end >>= fun block_header ->
+  let expected_context_hash = block_header.Block_header.shell.context in
   (* Retrieve the input info. *)
   let info = protocol_data.Context.Protocol_data.info in
   let test_chain = protocol_data.test_chain_status in
@@ -571,19 +478,37 @@ let import_protocol_data index store pruned_blocks level_oldest_block (level, pr
       return_unit
   | false -> fail (Wrong_protocol_hash protocol_hash)
 
-let import_protocol_data_list index store pruned_blocks protocol_data =
-  let level_oldest_block =
-    let b = snd pruned_blocks.(0) in
-    b.Context.Pruned_block.block_header.shell.level in
+let import_protocol_data_list index store block_hash_arr level_oldest_block protocol_data =
   let rec aux = function
     | [] -> return_unit
     | (level, protocol_data) :: xs ->
         import_protocol_data
           index store
-          pruned_blocks level_oldest_block
+          block_hash_arr level_oldest_block
           (level, protocol_data) >>=? fun () ->
         aux xs in
   aux protocol_data
+
+let verify_predecessors header_opt pred_hash = match header_opt with
+  | None -> return_unit
+  | Some header ->
+      fail_unless (header.Block_header.shell.level >= 2l &&
+                   Block_hash.equal header.shell.predecessor pred_hash)
+        (Snapshot_import_failure "inconsistent predecessors")
+
+let verify_oldest_header oldest_header genesis_hash =
+  let oldest_level = oldest_header.Block_header.shell.level in
+  fail_unless (oldest_level >= 1l ||
+               (Compare.Int32.(oldest_level = 1l) &&
+                Block_hash.equal oldest_header.Block_header.shell.predecessor genesis_hash))
+    (Snapshot_import_failure "inconsistent oldest level")
+
+let block_validation
+    succ_header_opt header_hash
+    { Context.Pruned_block.block_header ; operations ; operation_hashes } =
+  verify_predecessors succ_header_opt header_hash >>=? fun () ->
+  check_operations_consistency block_header operations operation_hashes >>=? fun () ->
+  return_unit
 
 let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
   let context_root = context_dir data_dir in
@@ -592,7 +517,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
   (* FIXME: use config value ? *)
   State.init
     ~context_root ~store_root genesis
-    ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
+    ~patch_context:(patch_context None) >>=? fun (state, _chain_state, context_index, _history_mode) ->
   Store.init store_root >>=? fun store ->
   let chain_store = Store.Chain.get store chain_id in
   let chain_data = Store.Chain_data.get chain_store in
@@ -600,15 +525,57 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
   let open Context in
   Lwt.try_bind
     (fun () ->
-       (* Restore context *)
-       restore_contexts context_index ~filename >>=? fun restored_data ->
+       let k_store_pruned_block
+           { Context.Pruned_block.block_header ; operations ; operation_hashes }
+           pruned_header_hash =
+         Store.Block.Pruned_contents.store
+           (block_store, pruned_header_hash) { header = block_header } >>= fun () ->
+         Lwt_list.iter_s
+           (fun (i, v) -> Store.Block.Operations.store (block_store, pruned_header_hash) i v)
+           operations >>= fun () ->
+         Lwt_list.iter_s
+           (fun (i, v) -> Store.Block.Operation_hashes.store (block_store, pruned_header_hash) i v)
+           operation_hashes >>= fun () ->
+         return_unit
+       in
+       (* Restore context and fetch data *)
+       restore_contexts
+         context_index store ~filename k_store_pruned_block block_validation >>=?
+       fun (predecessor_block_header, meta, history_mode, oldest_header_opt,
+            rev_block_hashes, protocol_data) ->
+       let oldest_header = Option.unopt_assert ~loc:__POS__ oldest_header_opt in
+       let block_hashes_arr = Array.of_list rev_block_hashes in
+
+       let write_predecessors_table to_write =
+         Raw_store.with_atomic_rw store (fun () ->
+             Lwt_list.iter_s (fun (current_hash, predecessors_list) ->
+                 Lwt_list.iter_s (fun (l, h) ->
+                     Store.Block.Predecessors.store (block_store, current_hash) l h
+                   ) predecessors_list >>= fun () ->
+                 match predecessors_list with
+                 | (0, pred_hash) :: _ ->
+                     Store.Chain_data.In_main_branch.store (chain_data, pred_hash) current_hash
+                 | [] -> Lwt.return_unit
+                 | _ :: _ -> assert false )
+               to_write) in
+
+       Lwt_list.fold_left_s (fun (cpt, to_write) current_hash ->
+           begin if (cpt + 1) mod 5_000 = 0 then
+               write_predecessors_table to_write >>= fun () ->
+               Lwt.return_nil
+             else
+               Lwt.return to_write
+           end >>= fun to_write ->
+           let predecessors_list =
+             compute_predecessors
+               ~genesis_hash:genesis.block oldest_header.shell.level block_hashes_arr cpt in
+           Lwt.return (cpt + 1, (current_hash, predecessors_list) :: to_write)
+         ) (0, []) rev_block_hashes >>= fun (_, to_write) ->
+       write_predecessors_table to_write >>= fun () ->
 
        (* Process data imported from snapshot *)
-       let ((predecessor_block_header : Block_header.t),
-            meta, history_mode, old_blocks, protocol_data) = restored_data in
        begin
-         let ({ block_header ; operations } :
-                Block_data.t) = meta in
+         let { Block_data.block_header ; operations } = meta in
          let block_hash = Block_header.hash block_header in
          (* Checks that the block hash imported by the snapshot is the expected one *)
          begin
@@ -625,15 +592,22 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
                       snapshot is the one you expect."
                  ) >>= fun () -> return ()
          end >>=? fun () ->
+
          lwt_log_notice Tag.DSL.(fun f ->
              f "Importing block %a"
              -% a Block_hash.Logging.tag (Block_header.hash block_header)
            ) >>= fun () ->
-         (* To validate block_header we need ... *)
-         (* ... its predecessor context ... *)
          let pred_context_hash = predecessor_block_header.shell.context in
+
+         State.close state >>= fun () ->
+
+         lwt_log_notice (fun f -> f "State initialization") >>= fun () ->
+         State.init
+           ~context_root ~store_root genesis
+           ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
          checkout_exn context_index pred_context_hash >>= fun predecessor_context ->
 
+         lwt_log_notice (fun f -> f "Apply block") >>= fun () ->
          (* ... we can now call apply ... *)
          Tezos_validation.Block_validation.apply
            chain_id
@@ -647,28 +621,17 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
            block_validation_result
            block_header >>=? fun () ->
 
-         (* ... we check the history and compute the predecessor tables ...*)
-         let old_blocks = List.rev_map (fun pruned_block ->
-             let hash = Block_header.hash pruned_block.Pruned_block.block_header in
-             (hash, pruned_block))
-             old_blocks in
-         let history = Array.of_list old_blocks in
-
          lwt_log_notice (fun f -> f "Checking history consistency") >>= fun () ->
-         check_history_consistency
-           ~genesis:genesis.block block_header history >>=? fun () ->
+
+         verify_oldest_header oldest_header genesis.block >>=? fun () ->
 
          (* ... we set the history mode regarding the snapshot version hint ... *)
          set_history_mode store history_mode >>=? fun () ->
 
          (* ... and we import protocol data...*)
          import_protocol_data_list
-           context_index chain_store history protocol_data >>=? fun () ->
-
-         (* ... and we write data in store.*)
-         store_pruned_blocks
-           store block_store chain_data
-           ~genesis:genesis.block history >>=? fun () ->
+           context_index chain_store block_hashes_arr
+           oldest_header.Block_header.shell.level protocol_data  >>=? fun () ->
 
          (* Everything is ok. We can store the new head *)
          store_new_head
@@ -682,7 +645,6 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
          (* Update history mode flags *)
          update_checkpoint chain_state block_header >>= fun new_checkpoint ->
          update_savepoint chain_state new_checkpoint >>= fun () ->
-         let oldest_header = (snd history.(0)).block_header in
          update_caboose
            chain_data
            ~genesis:genesis.block block_header oldest_header
@@ -691,10 +653,10 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
          (* Reconstruct all the contexts if requested *)
          match reconstruct with
          | true ->
-             if history_mode = History_mode.Full then
-               reconstruct_contexts store context_index chain_id block_store history
-             else
-               fail Wrong_reconstruct_mode
+             (* if history_mode = History_mode.Full then
+              *   reconstruct_contexts store context_index chain_id block_store history
+              * else *)
+             fail Wrong_reconstruct_mode
          | false -> return_unit
        end >>=? fun () ->
        Store.close store ;

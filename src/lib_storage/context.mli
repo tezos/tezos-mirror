@@ -174,9 +174,13 @@ val dump_contexts :
   filename:string ->
   unit tzresult Lwt.t
 
-val restore_contexts : index -> filename:string ->
+val restore_contexts : index -> Raw_store.t -> filename:string ->
+  (Pruned_block.t -> Block_hash.t -> unit tzresult Lwt.t) ->
+  (Block_header.t option ->
+   Block_hash.t -> Pruned_block.t -> unit tzresult Lwt.t) ->
   (Block_header.t * Block_data.t * History_mode.t *
-   Pruned_block.t list * Protocol_data.t list) tzresult Lwt.t
+   Block_header.t option * Block_hash.t list  *
+   Protocol_data.t list) tzresult Lwt.t
 
 val validate_context_hash_consistency_and_commit :
   data_hash:Context_hash.t ->

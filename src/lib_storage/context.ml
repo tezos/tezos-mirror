@@ -730,25 +730,26 @@ module Dumpable_context = struct
         GitStore.Tree.add_tree tree key sub_tree >>=
         Lwt.return_some
 
-  let add_mbytes index tree key bytes =
-    GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
-    GitStore.Tree.add tree key bytes
+  let add_mbytes index bytes =
+    let tree = GitStore.Tree.of_contents bytes in
+    GitStore.Tree.hash index.repo tree >|= fun _ ->
+    tree
 
-  let add_dir index tree key l =
+  let add_dir index l =
     let rec fold_list sub_tree = function
       | [] -> Lwt.return_some sub_tree
       | ( step, hash ) :: tl ->
           begin
-            add_hash index sub_tree [step] hash >>= function
+            add_hash index sub_tree [step]hash >>= function
             | None -> Lwt.return_none
             | Some sub_tree -> fold_list sub_tree tl
           end
     in
     fold_list GitStore.Tree.empty l >>= function
     | None -> Lwt.return_none
-    | Some sub_tree ->
-        GitStore.Tree.add_tree tree key sub_tree
-        >>= Lwt.return_some
+    | Some tree ->
+        GitStore.Tree.hash index.repo tree >>= fun _ ->
+        Lwt.return_some tree
 
   module Commit_hash = Context_hash
   module Block_header = Block_header
@@ -939,7 +940,7 @@ let dump_contexts idx datas ~filename =
   >>=? fun fd ->
   dump_contexts_fd idx datas ~fd
 
-let restore_contexts idx ~filename =
+let restore_contexts idx store ~filename k_store_pruned_block pipeline_validation =
   let file_init () =
     Lwt_unix.openfile filename Lwt_unix.[O_RDONLY;] 0o600
     >>= return
@@ -953,7 +954,7 @@ let restore_contexts idx ~filename =
   >>=? fun fd ->
   Lwt.finalize
     (fun () ->
-       restore_contexts_fd idx ~fd
+       restore_contexts_fd idx store ~fd k_store_pruned_block pipeline_validation
        >>=? fun result ->
        Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR
        >>= fun current ->
