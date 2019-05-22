@@ -48,6 +48,10 @@ let transfer state ~client ~src ~dst ~amount =
     [ "--wait"; "none"; "transfer"; sprintf "%Ld" amount; "from"; src; "to"; dst
     ; "--fee"; "0.05"; "--burn-cap"; "0.3" ]
 
+let register state ~client ~dst =
+  Tezos_client.successful_client_cmd state ~client
+    [ "--wait"; "none"; "register"; "key" ; dst ; "as" ; "delegate" ; "--fee"; "0.05" ]
+
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
   let client = baker.Tezos_client.Keyed.client in
@@ -59,8 +63,7 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       | `String p when p = period_name -> return (`Done (nth - 1))
       | other ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              transfer state ~client ~amount:1L
-                ~src:baker.Tezos_client.Keyed.key_name ~dst
+              register state ~client ~dst
               >>= fun res -> return () )
           >>= fun _ ->
           ksprintf
