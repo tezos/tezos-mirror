@@ -1658,3 +1658,97 @@ let close { global_data ; _ } =
     Store.close global_store ;
     Lwt.return_unit
   end
+
+let populate_protocol_hash_table_one
+    context_index chain_store (block_contents : Store.Block.contents) =
+  Context.checkout_exn context_index block_contents.header.shell.context >>= fun context ->
+  Context.get_protocol context >>= fun protocol_hash ->
+  Store.Chain.Protocol_info.store
+    chain_store block_contents.header.shell.proto_level
+    (protocol_hash, block_contents.header.shell.level) >>= fun () ->
+  return_unit
+
+(* we are looking for the last block with the current_protocol_level
+   in a dichotomic way *)
+let populate_protocol_hash_table
+    context_index chain_store block_store hash current_protocol_level =
+  let rec aux ~anchor_hash ~current_protocol_level ~l ~r =
+    let pivot = (l - r) / 2 in
+    predecessor_n_raw block_store anchor_hash pivot >>= function
+    | None -> return_unit
+    | Some new_anchor_hash ->
+        Store.Block.Contents.read (block_store, new_anchor_hash) >>=? fun new_block_contents ->
+        let new_block_header = new_block_contents.header in
+        let new_block_protocol_level = new_block_header.shell.proto_level in
+        let new_block_level = Int32.to_int new_block_header.shell.level in
+        if pivot = 0 then begin
+          populate_protocol_hash_table_one
+            context_index chain_store new_block_contents >>=? fun () ->
+          if current_protocol_level = 0 then
+            return_unit
+          else
+            aux
+              ~anchor_hash:new_anchor_hash
+              ~current_protocol_level:(pred current_protocol_level)
+              ~l:(new_block_level + 1) ~r:0
+        end
+        else
+        if new_block_protocol_level <> current_protocol_level then
+          (* we have been too far, we must decrease the pivot by increasing r *)
+          aux ~anchor_hash ~current_protocol_level ~l ~r:(r + pivot)
+        else (* not far enought *)
+          aux
+            ~anchor_hash:new_anchor_hash ~current_protocol_level
+            ~l:(new_block_level + 1) ~r
+
+  in
+  Store.Block.Contents.read (block_store, hash) >>=? fun block_contents ->
+  let block_level = Int32.to_int block_contents.header.shell.level in
+  aux ~anchor_hash:hash ~current_protocol_level ~l:(block_level + 1) ~r:0
+
+let upgrade_0_0_1
+    ?(store_mapsize=4_096_000_000_000L)
+    ~store_root
+    ?(context_mapsize=409_600_000_000L)
+    ~context_root
+    ~protocol_root:_
+    ()
+  =
+  Store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  Context.init ~mapsize:context_mapsize context_root >>= fun context_index ->
+  Store.Chain.list global_store >>= fun chains ->
+  iter_s
+    begin fun chain_id ->
+      Format.printf "Upgrading chain %a@." Chain_id.pp chain_id;
+
+      let chain_store = Store.Chain.get global_store chain_id in
+      let block_store = Store.Block.get chain_store in
+      let chain_data_store = Store.Chain_data.get chain_store in
+
+      Format.printf "Upgrading checkpoint format...";
+      Store.Chain_data.Checkpoint_0_0_1.read
+        chain_data_store >>=? fun (_, checkpoint_0_0_1_hash) ->
+      Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store >>= fun () ->
+      Store.Block.Contents.read (block_store, checkpoint_0_0_1_hash) >>=? fun { header ; _ } ->
+      Store.Chain_data.Checkpoint.store chain_data_store header >>= fun () ->
+      Format.printf " Done !@.";
+
+      Format.printf "Storing protocol table...";
+      Store.Chain_data.Current_head.read chain_data_store >>=? fun current_head ->
+      Store.Block.Contents.read (block_store, current_head) >>=? fun head_contents ->
+      let protocol_level = head_contents.header.Block_header.shell.proto_level in
+      populate_protocol_hash_table
+        context_index chain_store block_store
+        head_contents.header.shell.predecessor protocol_level >>=? fun () ->
+      Format.printf " Done !@.";
+
+      Format.printf "Initializing history mode to: %a@." History_mode.pp History_mode.Archive ;
+      Store.Configuration.History_mode.store global_store History_mode.Archive >>= fun () ->
+      Store.Chain.Genesis_hash.read chain_store >>=? fun genesis_hash ->
+      Store.Chain_data.Save_point.store chain_data_store (0l, genesis_hash) >>= fun () ->
+      Store.Chain_data.Caboose.store chain_data_store (0l, genesis_hash) >>= fun () ->
+
+      return_unit
+    end
+    chains >>=? fun () ->
+  return_unit

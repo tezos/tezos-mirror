@@ -35,6 +35,9 @@ let data_version = "0.0.3"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version = [
+  ("0.0.1", begin fun ~store_root ~context_root ~protocol_root ->
+      State.upgrade_0_0_1 ~store_root ~context_root ~protocol_root ()
+    end) ;
 ]
 
 let store_dir data_dir = data_dir // "store"
@@ -124,7 +127,9 @@ let () =
         Format.fprintf ppf
           "The data directory version is too old.@,\
            Found '%s', expected '%s'.@,\
-           It needs to be upgraded with `tezos-node upgrade_storage`."
+           It needs to be upgraded with `tezos-node upgrade storage`.\
+           You should consider backuping your node storage before upgrading \
+           it to avoid corruption due to unexpected interruption."
           got exp)
     Data_encoding.(obj2
                      (req "expected_version" string)
@@ -199,6 +204,24 @@ let ensure_data_dir bare data_dir =
   with
   | Sys_error _ | Unix.Unix_error _ ->
       fail (Invalid_data_dir data_dir)
+
+let upgrade_data_dir data_dir =
+  ensure_data_dir false data_dir >>=? function
+  | None ->
+      Format.printf "Node data dir is up-to-date.@." ;
+      return_unit
+  | Some (version, upgrade) ->
+      Format.printf
+        "Upgrading node data dir from %s to %s...@.\
+         Please, do not interupt the process.@."
+        version data_version ;
+      upgrade
+        ~store_root:(store_dir data_dir)
+        ~context_root:(context_dir data_dir)
+        ~protocol_root:(protocol_dir data_dir) >>=? fun () ->
+      write_version data_dir >>=? fun () ->
+      Format.printf "The node data dir is now up-to-date!@." ;
+      write_version data_dir
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir >>=? function

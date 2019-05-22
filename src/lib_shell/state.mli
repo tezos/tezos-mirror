@@ -350,6 +350,15 @@ type error += Incorrect_history_mode_switch of
 
 val history_mode: global_state -> History_mode.t Lwt.t
 
+val upgrade_0_0_1:
+  ?store_mapsize:Int64.t ->
+  store_root:string ->
+  ?context_mapsize:Int64.t ->
+  context_root:string ->
+  protocol_root:string ->
+  unit ->
+  unit tzresult Lwt.t
+
 (** Read the internal state of the node and initialize
     the databases. *)
 val init:
