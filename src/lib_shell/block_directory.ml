@@ -357,7 +357,7 @@ let get_protocol hash =
   | None -> raise Not_found
   | Some protocol -> protocol
 
-let get_directory block =
+let get_directory chain_state block =
   State.Block.get_rpc_directory block >>= function
   | Some dir -> Lwt.return dir
   | None ->
@@ -369,7 +369,14 @@ let get_directory block =
                         (module Block_services.Fake_protocol)
                         next_protocol)
       | Some pred ->
-          State.Block.protocol_hash pred >>= fun protocol_hash ->
+          State.Chain.save_point chain_state >>= fun (save_point_level, _) ->
+          begin
+            if Compare.Int32.(State.Block.level pred < save_point_level) then
+              State.Chain.get_level_indexed_protocol
+                chain_state (State.Block.header pred)
+            else
+              State.Block.protocol_hash pred
+          end >>= fun protocol_hash ->
           let (module Proto) = get_protocol protocol_hash in
           State.Block.get_rpc_directory block >>= function
           | Some dir -> Lwt.return dir
@@ -464,7 +471,7 @@ let build_rpc_directory chain_state block =
       let block_hash = State.Block.hash b in
       let genesis = State.Chain.genesis chain_state in
       if block_level >= save_point_level || Block_hash.equal block_hash genesis.block then
-        get_directory b >>= fun dir ->
+        get_directory chain_state b >>= fun dir ->
         Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
       else
         let header = State.Block.header b in
