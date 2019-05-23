@@ -448,6 +448,20 @@ let block_validation
   return_unit
 
 let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
+  lwt_log_notice Tag.DSL.(fun f ->
+      f "Importing data from snapshot file %a" -%a filename_tag filename
+    ) >>= fun () ->
+  begin match block with
+    | None ->
+        lwt_log_notice (fun f ->
+            f "You may consider using the --block <block_hash> \
+               argument to verify that the block imported is the one you expect"
+          )
+    | Some _ -> Lwt.return_unit
+  end >>= fun () ->
+  lwt_log_notice (fun f ->
+      f "Retrieving and validating data. This can take a while, please bear with us"
+    ) >>= fun () ->
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
@@ -497,6 +511,10 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
                to_write) in
 
        Lwt_list.fold_left_s (fun (cpt, to_write) current_hash ->
+           Tezos_stdlib.Utils.display_progress
+             ~refresh_rate:(cpt, 1_000)
+             "Computing predecessors table %dK elements%!"
+             (cpt / 1_000);
            begin if (cpt + 1) mod 5_000 = 0 then
                write_predecessors_table to_write >>= fun () ->
                Lwt.return_nil
@@ -509,85 +527,75 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
            Lwt.return (cpt + 1, (current_hash, predecessors_list) :: to_write)
          ) (0, []) rev_block_hashes >>= fun (_, to_write) ->
        write_predecessors_table to_write >>= fun () ->
+       Tezos_stdlib.Utils.display_progress_end () ;
 
        (* Process data imported from snapshot *)
+       let { Block_data.block_header ; operations } = meta in
+       let block_hash = Block_header.hash block_header in
+       (* Checks that the block hash imported by the snapshot is the expected one *)
        begin
-         let { Block_data.block_header ; operations } = meta in
-         let block_hash = Block_header.hash block_header in
-         (* Checks that the block hash imported by the snapshot is the expected one *)
-         begin
-           match block with
-           | Some str ->
-               let bh = Block_hash.of_b58check_exn str in
-               fail_unless
-                 (Block_hash.equal bh block_hash)
-                 (Inconsistent_imported_block (bh, block_hash))
-           | None ->
-               lwt_log_notice (fun f ->
-                   f "You should consider using the --block <block_hash> \
-                      argument to check that the block imported using the \
-                      snapshot is the one you expect."
-                 ) >>= fun () -> return ()
-         end >>=? fun () ->
-
-         lwt_log_notice Tag.DSL.(fun f ->
-             f "Importing block %a"
-             -% a Block_hash.Logging.tag (Block_header.hash block_header)
-           ) >>= fun () ->
-         let pred_context_hash = predecessor_block_header.shell.context in
-
-         State.close state >>= fun () ->
-
-         lwt_log_notice (fun f -> f "State initialization") >>= fun () ->
-         State.init
-           ~context_root ~store_root genesis
-           ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
-         checkout_exn context_index pred_context_hash >>= fun predecessor_context ->
-
-         lwt_log_notice (fun f -> f "Apply block") >>= fun () ->
-         (* ... we can now call apply ... *)
-         Tezos_validation.Block_validation.apply
-           chain_id
-           ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
-           ~predecessor_block_header:predecessor_block_header
-           ~predecessor_context
-           ~block_header
-           operations >>=? fun block_validation_result ->
-
-         check_context_hash_consistency
-           block_validation_result
-           block_header >>=? fun () ->
-
-         lwt_log_notice (fun f -> f "Checking history consistency") >>= fun () ->
-
-         verify_oldest_header oldest_header genesis.block >>=? fun () ->
-
-         (* ... we set the history mode regarding the snapshot version hint ... *)
-         set_history_mode store history_mode >>=? fun () ->
-
-         (* ... and we import protocol data...*)
-         import_protocol_data_list
-           context_index chain_store block_hashes_arr
-           oldest_header.Block_header.shell.level protocol_data  >>=? fun () ->
-
-         (* Everything is ok. We can store the new head *)
-         store_new_head
-           chain_state
-           chain_data
-           ~genesis:genesis.block
-           block_header
-           operations
-           block_validation_result >>=? fun () ->
-
-         (* Update history mode flags *)
-         update_checkpoint chain_state block_header >>= fun new_checkpoint ->
-         update_savepoint chain_state new_checkpoint >>= fun () ->
-         update_caboose
-           chain_data
-           ~genesis:genesis.block block_header oldest_header
-           block_validation_result.validation_result.max_operations_ttl
-
+         match block with
+         | Some str ->
+             let bh = Block_hash.of_b58check_exn str in
+             fail_unless
+               (Block_hash.equal bh block_hash)
+               (Inconsistent_imported_block (bh, block_hash))
+         | None ->
+             return_unit
        end >>=? fun () ->
+
+       lwt_log_notice Tag.DSL.(fun f ->
+           f "Setting current head to block %a"
+           -% a Block_hash.Logging.tag (Block_header.hash block_header)
+         ) >>= fun () ->
+       let pred_context_hash = predecessor_block_header.shell.context in
+
+       State.close state >>= fun () ->
+
+       State.init
+         ~context_root ~store_root genesis
+         ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
+       checkout_exn context_index pred_context_hash >>= fun predecessor_context ->
+
+       (* ... we can now call apply ... *)
+       Tezos_validation.Block_validation.apply
+         chain_id
+         ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
+         ~predecessor_block_header:predecessor_block_header
+         ~predecessor_context
+         ~block_header
+         operations >>=? fun block_validation_result ->
+
+       check_context_hash_consistency
+         block_validation_result
+         block_header >>=? fun () ->
+
+       verify_oldest_header oldest_header genesis.block >>=? fun () ->
+
+       (* ... we set the history mode regarding the snapshot version hint ... *)
+       set_history_mode store history_mode >>=? fun () ->
+
+       (* ... and we import protocol data...*)
+       import_protocol_data_list
+         context_index chain_store block_hashes_arr
+         oldest_header.Block_header.shell.level protocol_data  >>=? fun () ->
+
+       (* Everything is ok. We can store the new head *)
+       store_new_head
+         chain_state
+         chain_data
+         ~genesis:genesis.block
+         block_header
+         operations
+         block_validation_result >>=? fun () ->
+
+       (* Update history mode flags *)
+       update_checkpoint chain_state block_header >>= fun new_checkpoint ->
+       update_savepoint chain_state new_checkpoint >>= fun () ->
+       update_caboose
+         chain_data
+         ~genesis:genesis.block block_header oldest_header
+         block_validation_result.validation_result.max_operations_ttl >>=? fun () ->
        Store.close store ;
        return_unit)
     (function
