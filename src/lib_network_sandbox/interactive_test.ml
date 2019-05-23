@@ -397,7 +397,7 @@ module Interactivity = struct
           match (interactive, pause_end, pause_error) with
           | true, _, _ -> `Full
           | false, true, _ -> `At_end
-          | false, false, true -> `At_end
+          | false, false, true -> `On_error
           | false, false, false -> `None )
       $ Arg.(
           value
