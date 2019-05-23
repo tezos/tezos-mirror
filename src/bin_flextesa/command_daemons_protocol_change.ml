@@ -50,7 +50,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
     ~first_endorser_exec ~first_accuser_exec ~second_baker_exec
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
-    ~waiting_attempts test_variant () =
+    ~extra_dummy_proposals ~waiting_attempts test_variant () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [ node_exec; client_exec; first_baker_exec; first_endorser_exec
@@ -223,18 +223,36 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
     Proposal ~level_withing_period:3
   >>= fun _ ->
+  let submit_prop acc client hash =
+    Tezos_client.successful_client_cmd state ~client
+      [ "submit"; "proposals"; "for"
+      ; Tezos_protocol.Account.name acc
+      ; hash; "--force" ]
+    >>= fun _ ->
+    Console.sayf state
+      Fmt.(
+        fun ppf () ->
+          pf ppf "%s voted for %s" (Tezos_protocol.Account.name acc) hash)
+  in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
-      Tezos_client.successful_client_cmd state ~client
-        [ "submit"; "proposals"; "for"
-        ; Tezos_protocol.Account.name acc
-        ; new_protocol_hash ]
-      >>= fun _ ->
-      Console.sayf state
-        Fmt.(
-          fun ppf () ->
-            pf ppf "%s voted for %s"
-              (Tezos_protocol.Account.name acc)
-              new_protocol_hash) )
+      submit_prop acc client new_protocol_hash )
+  >>= fun () ->
+  let extra_dummy_protocol_hashes =
+    List.map
+      (List.init extra_dummy_proposals ~f:(fun s -> sprintf "proto-%d" s))
+      ~f:(fun s -> Tezos_crypto.Protocol_hash.(hash_string [s] |> to_b58check))
+  in
+  Console.say state
+    EF.(
+      wf "Going to also vote for %s"
+        (String.concat ~sep:", " extra_dummy_protocol_hashes))
+  >>= fun () ->
+  List_sequential.iteri extra_dummy_protocol_hashes ~f:(fun nth proto_hash ->
+      match List.nth keys_and_daemons (nth / 19) with
+      | Some (acc, client, _) -> submit_prop acc client proto_hash
+      | None ->
+          failf "Too many dummy protocols Vs available voting power (%d)" nth
+  )
   >>= fun () ->
   wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
     Testing_vote
@@ -337,6 +355,7 @@ let cmd ~pp_error () =
         second_endorser_exec
         second_accuser_exec
         (`Protocol_path new_protocol_path)
+        (`Extra_dummy_proposals extra_dummy_proposals)
         generate_kiln_config
         test_variant
         state
@@ -347,6 +366,7 @@ let cmd ~pp_error () =
               ~second_baker_exec ~second_endorser_exec ~second_accuser_exec
               ~admin_exec ?generate_kiln_config ~external_peer_ports
               ~no_daemons_for ~new_protocol_path test_variant ~waiting_attempts
+              ~extra_dummy_proposals
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -391,6 +411,12 @@ let cmd ~pp_error () =
             (pos 0 (some string) None
                (info [] ~doc:"The protocol to inject and vote on."
                   ~docv:"PROTOCOL-PATH")))
+    $ Arg.(
+        pure (fun l -> `Extra_dummy_proposals l)
+        $ value
+            (opt int 0
+               (info ["extra-dummy-proposals"] ~docv:"NUMBER"
+                  ~doc:"Submit $(docv) extra proposals.")))
     $ Kiln.Configuration_directory.cli_term ()
     $ Arg.(
         let doc =
