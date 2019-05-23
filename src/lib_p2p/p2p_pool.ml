@@ -569,6 +569,37 @@ let fail_unless_disconnected_point point_info =
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
 
+(* [sample best other points] return a list of elements selected in [points].
+   The [best] first elements are taken, then [other] elements are chosen
+   randomly in the rest of the list.
+   Note that it might select fewer elements than [other] if it the same index
+   close to the end of the list is picked multiple times. *)
+let sample best other points =
+  let l = List.length points in
+  if l <= best + other then
+    points
+  else
+    let best_indexes = List.init best (fun i -> i) in
+    let other_indexes =
+      List.sort compare
+      @@ List.init other (fun _ -> best + Random.int (l - best)) in
+    let indexes = best_indexes @ other_indexes in
+    (* Note: we are doing a [fold_left_i] by hand, passing [i] manually *)
+    (fun (_, _, result) -> result) @@ List.fold_left
+      (fun (i, indexes, acc) point ->
+         match indexes with
+         | [] -> (0, [], acc) (* TODO: early return *)
+         | index :: indexes when i >= index ->
+             (* We compare `i >= index` (rather than `i = index`) to avoid a
+                corner case whereby two identical `index`es are present in the
+                list. In that case, using `>=` makes it so that if `i` overtakes
+                `index` we still pick elements. *)
+             (succ i, indexes, point :: acc)
+         | _ ->
+             (succ i, indexes, acc))
+      (0, indexes, [])
+      points
+
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)
   (* Then come long-standing connected peers. *)
@@ -947,18 +978,18 @@ and list_known_points ?(ignore_private = false) pool conn =
       P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
     Lwt.return_nil
   else
-    let knowns =
-      P2p_point.Table.fold
-        (fun point_id point_info acc ->
-           if (ignore_private &&
-               not (P2p_point_state.Info.known_public point_info))
-           || Points.banned pool point_id
-           then acc
-           else point_info :: acc)
-        pool.known_points [] in
-    let best_knowns =
-      List.take_n ~compare:compare_known_point_info 50 knowns in
-    Lwt.return (List.map P2p_point_state.Info.point best_knowns)
+    P2p_point.Table.fold
+      (fun point_id point_info acc ->
+         if (ignore_private &&
+             not (P2p_point_state.Info.known_public point_info))
+         || Points.banned pool point_id
+         then acc
+         else point_info :: acc)
+      pool.known_points []
+    |> List.sort compare_known_point_info
+    |> sample 30 20
+    |> List.map P2p_point_state.Info.point
+    |> Lwt.return
 
 and active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
