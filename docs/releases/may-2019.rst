@@ -89,15 +89,9 @@ snapshot using::
 Known issues
 ~~~~~~~~~~~~
 
-Currently the import requires 8GB of ram. This will be
-significantly reduced in the next release.
-If you have a small vps with less memory, one possible workaround is to
-import the snapshot on a machine with more ram and then copy the
-directory `.tezos-node` on the vps.
-
 In principle it is possible to export a snapshot while the node is
 running but again because of our current storage it doesn't work for now.
-It should be fixed soon.
+It will be fixed soon.
 For the time being, you should stop your node, export a snapshot and
 restart it.
 
