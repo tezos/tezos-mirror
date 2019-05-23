@@ -37,7 +37,6 @@ type error += Wrong_block_export of
     Block_hash.t * [ `Pruned | `Too_few_predecessors | `Cannot_be_found ]
 type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
 type error += Snapshot_import_failure of string
-type error += Wrong_reconstruct_mode
 type error += Wrong_protocol_hash of Protocol_hash.t
 type error += Inconsistent_operation_hashes of
     (Operation_list_list_hash.t * Operation_list_list_hash.t)
@@ -118,19 +117,6 @@ let () = begin
     (obj1 (req "message" string))
     (function Snapshot_import_failure str -> Some str | _ -> None)
     (fun str -> Snapshot_import_failure str) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"WrongReconstructMode"
-    ~title:"Wrong reconstruct mode"
-    ~description:"Reconstruction of contexts while importing is comptible \
-                  with full mode snapshots only"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf
-          "Contexts reconstruction is available with full mode snapshots only.")
-    empty
-    (function Wrong_reconstruct_mode -> Some () | _ -> None)
-    (fun () -> Wrong_reconstruct_mode) ;
 
   register_error_kind
     `Permanent
@@ -395,55 +381,6 @@ let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
   Store.Chain_data.Caboose.store chain_data (caboose_level, caboose_hash) >>= fun () ->
   return_unit
 
-let _reconstruct_contexts
-    store context_index chain_id block_store
-    (history : (Block_hash.t * Context.Pruned_block.t) array) =
-  lwt_log_notice (fun f ->
-      f "Reconstructing all the contexts from the genesis."
-    ) >>= fun () ->
-  let limit = Array.length history in
-  let rec reconstruct_chunks level =
-    Store.with_atomic_rw store begin fun () ->
-      let rec reconstruct_chunks level =
-        Tezos_stdlib.Utils.display_progress
-          "Reconstructing contexts: %i/%i"
-          level limit ;
-        if level = limit then
-          return level
-        else
-          begin
-            let block_hash, pb = history.(level) in
-            State.Block.Header.read
-              (block_store, block_hash) >>=? fun block_header ->
-            let operations = List.rev_map snd pb.operations in
-            let predecessor_block_hash = pb.block_header.shell.predecessor in
-            State.Block.Header.read
-              (block_store, predecessor_block_hash) >>=? fun pred_block_header ->
-            let context_hash = pred_block_header.shell.context in
-            Context.checkout_exn context_index context_hash >>= fun pred_context ->
-            Tezos_validation.Block_validation.apply
-              chain_id
-              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
-              ~predecessor_block_header:pred_block_header
-              ~predecessor_context:pred_context
-              ~block_header
-              operations >>=? fun block_validation_result ->
-            check_context_hash_consistency
-              block_validation_result
-              block_header >>=? fun () ->
-            reconstruct_chunks (level + 1)
-          end
-      in
-      if (level + 1) mod 1000 = 0 then return level
-      else reconstruct_chunks level end >>=? fun level ->
-    if level = limit then
-      return_unit
-    else
-      reconstruct_chunks limit in
-  reconstruct_chunks 0 >>=? fun _cpt ->
-  Tezos_stdlib.Utils.display_progress_end () ;
-  return_unit
-
 let import_protocol_data index store block_hash_arr level_oldest_block (level, protocol_data) =
   (* Retrieve the original context hash of the block. *)
   let delta = Int32.(to_int (sub level level_oldest_block)) in
@@ -510,7 +447,7 @@ let block_validation
   check_operations_consistency block_header operations operation_hashes >>=? fun () ->
   return_unit
 
-let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
+let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
@@ -648,16 +585,8 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context ~genesis
          update_caboose
            chain_data
            ~genesis:genesis.block block_header oldest_header
-           block_validation_result.validation_result.max_operations_ttl >>=? fun () ->
+           block_validation_result.validation_result.max_operations_ttl
 
-         (* Reconstruct all the contexts if requested *)
-         match reconstruct with
-         | true ->
-             (* if history_mode = History_mode.Full then
-              *   reconstruct_contexts store context_index chain_id block_store history
-              * else *)
-             fail Wrong_reconstruct_mode
-         | false -> return_unit
        end >>=? fun () ->
        Store.close store ;
        return_unit)
