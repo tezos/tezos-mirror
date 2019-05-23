@@ -59,7 +59,6 @@ module Protocol = struct
   let of_seconds x = x
   let to_seconds x = x
 
-  let encoding = Data_encoding.int64
   let rfc_encoding =
     let open Data_encoding in
     def
@@ -72,6 +71,26 @@ module Protocol = struct
          | Some s -> s
          | None -> Data_encoding.Json.cannot_destruct "Time.Protocol.of_notation")
       string
+
+  let encoding =
+    let open Data_encoding in
+    def "timestamp" @@
+    splitted
+      ~binary: int64
+      ~json:
+        (union [
+            case Json_only
+              ~title:"RFC encoding"
+              rfc_encoding
+              (fun i -> Some i)
+              (fun i -> i) ;
+            case Json_only
+              ~title:"Second since epoch"
+              int64
+              (fun _ -> None)
+              (fun i -> i) ;
+          ])
+
 
   let rpc_arg =
     RPC_arg.make
