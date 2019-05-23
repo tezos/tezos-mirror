@@ -9,9 +9,9 @@ Private node
 The node can be set in private mode with the option ``--private-mode``
 so that:
 
-- it doesn't connects to any peer other than those provided with
-  ``--peer`` or in bootstrap-peers
-- the peers connected to a private node don't include it in the list
+- it doesn't connect to any peer other than those provided with
+  ``--peer`` or in ``bootstrap-peers``
+- the peers connected to a private node don't advertise it in the list
   of peers sent to their neighborhood
 
 This feature is especially useful to hide a sensitive node that signs
