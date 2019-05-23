@@ -50,7 +50,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
     ~first_endorser_exec ~first_accuser_exec ~second_baker_exec
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
-    test_variant () =
+    ~waiting_attempts test_variant () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~executables:
       [ node_exec; client_exec; first_baker_exec; first_endorser_exec
@@ -142,8 +142,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))
         ; arbitrary_command_on_clients state ~command_names:["c0"; "client-0"]
             ~make_admin ~clients:[client_0] ]) ;
-  Test_scenario.Queries.wait_for_all_levels_to_be state ~attempts:50
-    ~seconds:10. nodes
+  Test_scenario.Queries.wait_for_all_levels_to_be state
+    ~attempts:waiting_attempts ~seconds:10. nodes
     (* TODO: wait for /chains/main/blocks/head/votes/listings to be
        non-empty instead of counting blocks *)
     (`At_least protocol.Tezos_protocol.blocks_per_voting_period)
@@ -220,8 +220,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       ; wf "Please type `q` to start a voting/protocol-change period." ]
     ~force:true
   >>= fun () ->
-  wait_for_voting_period state ~client:client_0 ~attempts:10 Proposal
-    ~level_withing_period:3
+  wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
+    Proposal ~level_withing_period:3
   >>= fun _ ->
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       Tezos_client.successful_client_cmd state ~client
@@ -236,7 +236,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (Tezos_protocol.Account.name acc)
               new_protocol_hash) )
   >>= fun () ->
-  wait_for_voting_period state ~client:client_0 ~attempts:50 Testing_vote
+  wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
+    Testing_vote
   >>= fun _ ->
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       Tezos_client.successful_client_cmd state ~client
@@ -251,7 +252,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (Tezos_protocol.Account.name acc)
               new_protocol_hash) )
   >>= fun () ->
-  wait_for_voting_period state ~client:client_0 ~attempts:50 Promotion_vote
+  wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
+    Promotion_vote
   >>= fun _ ->
   let protocol_switch_will_happen =
     match test_variant with
@@ -272,7 +274,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (Tezos_protocol.Account.name acc)
               new_protocol_hash) )
   >>= fun () ->
-  wait_for_voting_period state ~client:client_0 ~attempts:50 Proposal
+  wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
+    Proposal
   >>= fun _ ->
   Tezos_client.successful_client_cmd state ~client:client_0
     ["show"; "voting"; "period"]
@@ -281,7 +284,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     if protocol_switch_will_happen then new_protocol_hash
     else protocol.Tezos_protocol.hash
   in
-  Helpers.wait_for state ~attempts:3 ~seconds:4. (fun _ ->
+  Helpers.wait_for state ~attempts:waiting_attempts ~seconds:4. (fun _ ->
       Console.say state EF.(wf "Checking actual protocol transition")
       >>= fun () ->
       Tezos_client.rpc state ~client:client_0 `Get
@@ -320,6 +323,7 @@ let cmd ~pp_error () =
     ( pure
         (fun size
         base_port
+        (`Attempts waiting_attempts)
         (`External_peers external_peer_ports)
         (`No_daemons_for no_daemons_for)
         protocol
@@ -342,7 +346,7 @@ let cmd ~pp_error () =
               ~first_baker_exec ~first_endorser_exec ~first_accuser_exec
               ~second_baker_exec ~second_endorser_exec ~second_accuser_exec
               ~admin_exec ?generate_kiln_config ~external_peer_ports
-              ~no_daemons_for ~new_protocol_path test_variant
+              ~no_daemons_for ~new_protocol_path test_variant ~waiting_attempts
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -352,6 +356,13 @@ let cmd ~pp_error () =
     $ Arg.(
         value & opt int 20_000
         & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+    $ Arg.(
+        pure (fun n -> `Attempts n)
+        $ value
+            (opt int 60
+               (info ["waiting-attempts"]
+                  ~doc:
+                    "Number of attempts done while waiting for voting periods")))
     $ Arg.(
         pure (fun l -> `External_peers l)
         $ value
