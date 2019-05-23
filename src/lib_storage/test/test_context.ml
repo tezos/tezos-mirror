@@ -263,8 +263,17 @@ let test_dump { idx ; block3b; _ } =
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
-    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
-    let expected_ctxt_hash = (fun (bh,_,_, _,_) -> bh.Block_header.shell.context) imported in
+    Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
+      let root = base_dir // "store" in
+      Raw_store.init ~mapsize:4_096_000L root >>= function
+      | Error _ -> Assert.fail_msg "wrap_store_init"
+      | Ok store -> Lwt.return store end >>= fun store ->
+    Context.restore_contexts idx2 store
+      ~filename:dumpfile (fun _ _ -> return_unit)
+      (fun _ _ _ -> return_unit)
+    >>=? fun imported ->
+    let (bh, _, _, _, _, _) = imported in
+    let expected_ctxt_hash = bh.Block_header.shell.context in
     assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
     return ()
   end
