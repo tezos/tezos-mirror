@@ -109,9 +109,9 @@ let sync_nodes nodes =
   | Error _ as err ->
       Lwt.return err
 
-let detach_node ?timeout ?(min_connections : int option) ?max_connections
-    ?max_incoming_connections ?p2p_versions ?(msg_config = msg_config) f
-    trusted_points all_points addr port =
+let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
+    ?max_connections ?max_incoming_connections ?p2p_versions
+    ?(msg_config = msg_config) f trusted_points all_points addr port =
   let trusted_points =
     List.filter
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
@@ -154,7 +154,8 @@ let detach_node ?timeout ?(min_connections : int option) ?max_connections
   in
   (* swap_linger = Time.System.Span.of_seconds_exn 0. ; *)
   Process.detach
-    ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
+    ~prefix:
+      (Format.asprintf "%s%a: " prefix P2p_peer.Id.pp_short identity.peer_id)
     (fun channel ->
       let canceler = Lwt_canceler.create () in
       let timer ti =
@@ -221,12 +222,13 @@ let detach_node ?timeout ?(min_connections : int option) ?max_connections
           P2p_io_scheduler.shutdown sched
           >>= fun () -> lwt_log_info "Bye.@." >>= fun () -> return_unit))
 
-let detach_nodes ?timeout ?min_connections ?max_connections
+let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
   let clients = List.length points in
   Lwt_list.map_p
     (fun n ->
+      let prefix = Option.map prefix ~f:(fun f -> f n) in
       let p2p_versions = Option.map p2p_versions ~f:(fun f -> f n) in
       let msg_config = Option.map msg_config ~f:(fun f -> f n) in
       let min_connections = Option.map min_connections ~f:(fun f -> f n) in
@@ -236,6 +238,7 @@ let detach_nodes ?timeout ?min_connections ?max_connections
       in
       let ((addr, port), other_points) = List.select n points in
       detach_node
+        ?prefix
         ?p2p_versions
         ?timeout
         ?min_connections
@@ -698,10 +701,12 @@ module Overcrowded = struct
   let run points =
     (* setting connections to -1 ensure there will be no random
        acceptance of connections *)
-    let min_connections = function 0 -> -1 | _ -> 1
+    let prefix = function 0 -> "Target_" | _ -> "Client_"
+    and min_connections = function 0 -> -1 | _ -> 1
     and max_connections = function 0 -> -1 | _ -> 1
     and max_incoming_connections = function _ -> List.length points in
     detach_nodes
+      ~prefix
       ~timeout:10.
       ~min_connections
       ~max_connections
@@ -711,7 +716,12 @@ module Overcrowded = struct
       ~trusted
 
   let run_mixed_versions points =
-    let min_connections = function 0 -> -1 | _ -> 1
+    let prefix = function
+      | 0 ->
+          "Target_"
+      | i ->
+          if i mod 2 = 1 then "Client_v0_" else "Client_v1_"
+    and min_connections = function 0 -> -1 | _ -> 1
     and max_connections = function 0 -> -1 | _ -> 1
     and max_incoming_connections = function _ -> List.length points
     and p2p_versions i =
@@ -719,6 +729,7 @@ module Overcrowded = struct
       else [P2p_version.zero; P2p_version.one]
     in
     detach_nodes
+      ~prefix
       ~p2p_versions
       ~timeout:10.
       ~min_connections
