@@ -25,14 +25,32 @@
 
 open Store_sigs
 
-type t
+type t = Raw_store.t
 type global_store = t
 
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
 val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
-val close : t -> unit
+val close: t -> unit
 
+val open_with_atomic_rw:
+  ?mapsize:int64 -> string ->
+  (t -> 'a Error_monad.tzresult Lwt.t) ->
+  'a tzresult Lwt.t
+
+val with_atomic_rw:
+  t ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
+
+(** {2 Configuration} **********************************************************)
+
+module Configuration : sig
+
+  module History_mode : SINGLE_STORE
+    with type t := global_store
+     and type value := History_mode.t
+end
 
 (** {2 Chain store} **********************************************************)
 
@@ -50,7 +68,7 @@ module Chain : sig
 
   module Genesis_time : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Genesis_protocol : SINGLE_STORE
     with type t := store
@@ -62,16 +80,21 @@ module Chain : sig
 
   module Expiration : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Allow_forked_chain : SET_STORE
     with type t := t
      and type elt := Chain_id.t
 
+  module Protocol_info : MAP_STORE
+    with type t = store
+     and type key = int
+     and type value = Protocol_hash.t * Int32.t
+
 end
 
 
-(** {2 Mutable chain data} *******************************************************)
+(** {2 Mutable chain data} *)
 
 module Chain_data : sig
 
@@ -93,12 +116,24 @@ module Chain_data : sig
 
   module Checkpoint : SINGLE_STORE
     with type t := store
+     and type value := Block_header.t
+
+  module Checkpoint_0_0_1 : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Save_point : SINGLE_STORE
+    with type t := store
+     and type value := Int32.t * Block_hash.t
+
+  module Caboose : SINGLE_STORE
+    with type t := store
      and type value := Int32.t * Block_hash.t
 
 end
 
 
-(** {2 Block header store} **************************************************)
+(** {2 Block header store} *)
 
 module Block : sig
 
@@ -118,15 +153,25 @@ module Block : sig
     with type t = store * Block_hash.t
      and type value := contents
 
+  (** Block header storage used for pruned blocks.
+      Blocks that are not pruned have their header
+      stored in their contents (see {!Store.Block.Contents}).
+      For an abstraction over a block header, please see
+      the {!State.Block.Header} module.
+  *)
+
+  type pruned_contents = {
+    header: Block_header.t ;
+  }
+
+  module Pruned_contents : SINGLE_STORE
+    with type t = store * Block_hash.t
+     and type value := pruned_contents
+
   module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t
      and type key = int
      and type value = Operation_hash.t list
-
-  module Operation_path : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = Operation_list_list_hash.path
 
   module Operations : MAP_STORE
     with type t = store * Block_hash.t
@@ -161,7 +206,7 @@ module Block : sig
 end
 
 
-(** {2 Protocol store} ******************************************************)
+(** {2 Protocol store} *)
 
 module Protocol : sig
 
@@ -179,7 +224,7 @@ module Protocol : sig
 
 end
 
-(** {2 Temporary test chain forking block store} *****************************)
+(** {2 Temporary test chain forking block store} *)
 
 module Forking_block_hash : MAP_STORE
   with type t = global_store

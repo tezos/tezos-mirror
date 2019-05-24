@@ -117,6 +117,64 @@ let delegate_commands () =
        @@ stop)
       (fun () delegate cctxt ->
          endorse_block cctxt ~chain:cctxt#chain delegate) ;
+    command ~group ~desc: "Clear the nonces file by removing the \
+                           nonces which blocks cannot be found on the \
+                           chain."
+      no_options
+      (prefixes [ "filter" ; "orphan" ; "nonces" ]
+       @@ stop)
+      (fun () (cctxt : #Proto_alpha.full) ->
+         cctxt#with_lock begin fun () ->
+           let chain = cctxt#chain in
+           Client_baking_files.resolve_location
+             cctxt ~chain `Nonce >>=? fun nonces_location ->
+           let open Client_baking_nonces in
+           (* Filtering orphan nonces *)
+           load cctxt nonces_location >>=? fun nonces ->
+           Block_hash.Map.fold (fun block nonce acc ->
+               acc >>= fun acc ->
+               Shell_services.Blocks.Header.shell_header
+                 cctxt ~chain ~block:(`Hash (block, 0)) () >>= function
+               | Ok _ -> Lwt.return acc
+               | Error _ -> Lwt.return (Block_hash.Map.add block nonce acc)
+             ) nonces (Lwt.return empty) >>= fun orphans ->
+           if Block_hash.Map.cardinal orphans = 0 then begin
+             cctxt#message "No orphan nonces found." >>= fun () ->
+             return_unit
+           end else
+             (* "Backup-ing" orphan nonces *)
+             let orphan_nonces_file = "orphan_nonce" in
+             cctxt#load orphan_nonces_file ~default:empty encoding >>=? fun orphan_nonces ->
+             let orphan_nonces = add_all orphan_nonces orphans in
+             cctxt#write orphan_nonces_file orphan_nonces encoding >>=? fun () ->
+             (* Don't forget the 's'. *)
+             let orphan_nonces_file = orphan_nonces_file ^ "s" in
+             cctxt#message "Successfully filtered %d orphan \
+                            nonces and moved them to '$TEZOS_CLIENT/%s'."
+               (Block_hash.Map.cardinal orphans) orphan_nonces_file >>= fun () ->
+             let filtered_nonces = Client_baking_nonces.remove_all nonces orphans in
+             save cctxt nonces_location filtered_nonces >>=? fun () ->
+             return_unit
+         end) ;
+    command ~group ~desc: "List orphan nonces."
+      no_options
+      (prefixes [ "list" ; "orphan" ; "nonces" ]
+       @@ stop)
+      (fun () (cctxt : #Proto_alpha.full) ->
+         cctxt#with_lock begin fun () ->
+           let open Client_baking_nonces in
+           let orphan_nonces_file = "orphan_nonce" in
+           cctxt#load orphan_nonces_file ~default:empty encoding >>=? fun orphan_nonces ->
+           let block_hashes = List.map fst (Block_hash.Map.bindings orphan_nonces) in
+           cctxt#message "@[<v 2>Found %d orphan nonces associated to \
+                          the potentially unknown following blocks:@ \
+                          %a@]"
+             (Block_hash.Map.cardinal orphan_nonces)
+             (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
+             block_hashes >>= fun () ->
+           return_unit
+         end) ;
+
   ]
 
 let init_signal () =
@@ -184,10 +242,18 @@ let endorser_commands () =
          may_lock_pidfile pidfile >>=? fun () ->
          Tezos_signer_backends.Encrypted.decrypt_list
            cctxt (List.map fst delegates) >>=? fun () ->
+         let delegates = List.map snd delegates in
+         let delegates_no_duplicates = Signature.Public_key_hash.Set.
+                                         (delegates |> of_list |> elements) in
+         begin if List.length delegates <> List.length delegates_no_duplicates then
+             cctxt#message "Warning: the list of public key hash aliases contains \
+                            duplicate hashes, which are ignored"
+           else Lwt.return ()
+         end >>= fun () ->
          Client_daemon.Endorser.run cctxt
            ~chain:cctxt#chain
            ~delay:endorsement_delay
-           (List.map snd delegates)
+           delegates_no_duplicates
       )
   ]
 

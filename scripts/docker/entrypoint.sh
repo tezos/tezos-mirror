@@ -32,7 +32,13 @@ shift 1
 case $command in
     tezos-node)
         launch_node "$@"
-    ;;
+        ;;
+    tezos-upgrade-storage)
+        upgrade_node_storage
+        ;;
+    tezos-snapshot-import)
+        snapshot_import "$@"
+        ;;
     tezos-baker)
         launch_baker "$@"
         ;;
@@ -47,6 +53,9 @@ case $command in
         ;;
     tezos-accuser)
         launch_accuser "$@"
+        ;;
+    tezos-accuser-test)
+        launch_accuser_test "$@"
         ;;
     tezos-client)
         configure_client

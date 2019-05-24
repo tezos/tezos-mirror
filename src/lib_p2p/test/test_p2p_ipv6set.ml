@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "test-p2p-banned_ip" end)
+include
+  Internal_event.Legacy_logging.Make
+    (struct let name = "test-p2p-banned_ip" end)
 
 let assert_equal ?(eq = (=)) ?prn ~msg a b =
   let msg = match prn with
@@ -37,7 +39,7 @@ let assert_equal_bool = assert_equal
 let a = Ipaddr.V6.of_string_exn
 let p = Ipaddr.V6.Prefix.of_string_exn
 
-let timenow = Time.now ()
+let timenow = Systime_os.now ()
 
 let of_list l =
   List.fold_left (fun acc k ->

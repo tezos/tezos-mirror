@@ -26,8 +26,18 @@
 
 val export:
   ?export_rolling:bool ->
-  data_dir:string ->
+  context_index:Context.index ->
+  store:Store.t ->
   genesis:Block_hash.t ->
+  string ->
+  string option ->
+  unit tzresult Lwt.t
+
+val import:
+  data_dir:string ->
+  dir_cleaner:(string -> unit Lwt.t) ->
+  patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
+  genesis:State.Chain.genesis ->
   string ->
   string option ->
   unit tzresult Lwt.t

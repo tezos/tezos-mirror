@@ -29,7 +29,10 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H"
 
-let bake cctxt ?(timestamp = Time.now ()) block command sk =
+let bake cctxt ?timestamp block command sk =
+  let timestamp = match timestamp with
+    | Some t -> t
+    | None -> Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ())) in
   let protocol_data = { command ; signature = Signature.zero } in
   Genesis_block_services.Helpers.Preapply.block
     cctxt ~block ~timestamp ~protocol_data
@@ -43,11 +46,6 @@ let int64_parameter =
   (Clic.parameter (fun _ p ->
        try return (Int64.of_string p)
        with _ -> failwith "Cannot read int64"))
-
-let int_parameter =
-  (Clic.parameter (fun _ p ->
-       try return (int_of_string p)
-       with _ -> failwith "Cannot read int"))
 
 let file_parameter =
   Clic.parameter (fun _ p ->
@@ -74,7 +72,7 @@ let timestamp_arg =
     ~placeholder:"date"
     ~doc:"Set the timestamp of the block (and initial time of the chain)"
     (Clic.parameter (fun _ t ->
-         match (Time.of_notation t) with
+         match (Time.Protocol.of_notation t) with
          | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
          | Some t -> return t))
 

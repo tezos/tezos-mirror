@@ -33,12 +33,12 @@ module Program = Client_aliases.Alias (struct
     type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
     let encoding =
       Data_encoding.conv
-        (fun ({ Michelson_v1_parser.source }, _) -> source)
+        (fun ({ Michelson_v1_parser.source ; _ }, _) -> source)
         (fun source -> Michelson_v1_parser.parse_toplevel source)
         Data_encoding.string
     let of_source source =
       return (Michelson_v1_parser.parse_toplevel source)
-    let to_source ({ Michelson_v1_parser.source }, _) = return source
+    let to_source ({ Michelson_v1_parser.source ; _ }, _) = return source
     let name = "script"
   end)
 
@@ -97,7 +97,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
 let run
     (cctxt : #Proto_alpha.rpc_context)
     ~chain
-    block
+    ~block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
@@ -114,7 +114,7 @@ let run
 let trace
     (cctxt : #Proto_alpha.rpc_context)
     ~chain
-    block
+    ~block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
@@ -131,7 +131,7 @@ let trace
 let typecheck_data
     cctxt
     ~chain
-    block
+    ~block
     ?gas
     ~(data : Michelson_v1_parser.parsed)
     ~(ty : Michelson_v1_parser.parsed)
@@ -143,7 +143,7 @@ let typecheck_data
 let typecheck_program
     cctxt
     ~chain
-    block
+    ~block
     ?gas
     (program : Michelson_v1_parser.parsed) =
   Alpha_services.Helpers.Scripts.typecheck_code cctxt (chain, block) (program.expanded, gas)

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -63,21 +64,6 @@ let expand_caddadr original =
       else
         ok None
   | _ -> ok None
-
-let extract_first_annot annot char =
-  let rec extract_first_annot others = function
-    | [] -> None, List.rev others
-    | a :: rest ->
-        try
-          if a.[0] = char
-          then Some a, List.rev_append others rest
-          else extract_first_annot (a :: others) rest
-        with Invalid_argument _ -> extract_first_annot (a :: others) rest
-  in
-  extract_first_annot [] annot
-
-let extract_first_field_annot annot = extract_first_annot annot '%'
-let extract_first_var_annot annot = extract_first_annot annot '@'
 
 let extract_field_annots annot =
   List.partition (fun a ->
@@ -1120,12 +1106,27 @@ let unexpand original =
       unexpand_if_right ;
       unexpand_fail ]
 
+(*
+   If an argument of Prim is a sequence, we do not want to unexpand
+   its root in case the source already contains an expanded macro. In
+   which case unexpansion would remove surrounding braces and generate
+   ill-formed code.
+
+   For example, DIIP { DIP { DUP }; SWAP } is not unexpandable but
+   DIIP {{ DIP { DUP }; SWAP }} (note the double braces) is unexpanded
+   to DIIP { DUUP }.
+
+   unexpand_rec_but_root is the same as unexpand_rec but does not try
+   to unexpand at root *)
+
 let rec unexpand_rec expr =
-  match unexpand expr with
+  unexpand_rec_but_root (unexpand expr)
+
+and unexpand_rec_but_root = function
   | Seq (loc, items) ->
       Seq (loc, List.map unexpand_rec items)
   | Prim (loc, name, args, annot) ->
-      Prim (loc, name, List.map unexpand_rec args, annot)
+      Prim (loc, name, List.map unexpand_rec_but_root args, annot)
   | Int _ | String _ | Bytes _ as atom -> atom
 
 let () =

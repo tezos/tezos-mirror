@@ -40,6 +40,7 @@ val chain_arg: chain RPC_arg.t
 type block = [
   | `Genesis
   | `Head of int
+  | `Alias of [ `Caboose | `Checkpoint | `Save_point ] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t
 ]
@@ -86,6 +87,15 @@ module type PROTO = sig
   val operation_data_and_receipt_encoding:
     (operation_data * operation_receipt) Data_encoding.t
 end
+
+type protocols = {
+  current_protocol: Protocol_hash.t ;
+  next_protocol: Protocol_hash.t ;
+}
+
+val protocols:
+  #RPC_context.simple -> ?chain:chain -> ?block:block ->
+  unit -> protocols tzresult Lwt.t
 
 module Make(Proto : PROTO)(Next_proto : PROTO) : sig
 
@@ -219,7 +229,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       val block:
         #simple -> ?chain:chain -> ?block:block ->
         ?sort:bool ->
-        ?timestamp:Time.t ->
+        ?timestamp:Time.Protocol.t ->
         protocol_data:Next_proto.block_header_data ->
         Next_proto.operation list list ->
         (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
@@ -300,6 +310,11 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
       ([ `GET ], prefix,
        prefix, unit, unit,
        block_metadata) RPC_service.t
+
+    val protocols:
+      ([ `GET ], prefix,
+       prefix, unit, unit,
+       protocols) RPC_service.t
 
     module Header : sig
 
@@ -387,7 +402,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) : sig
         val block:
           ([ `POST ], prefix,
            prefix, < sort_operations : bool;
-                     timestamp : Time.t option >, block_param,
+                     timestamp : Time.Protocol.t option >, block_param,
            Block_header.shell_header * error Preapply_result.t list) RPC_service.t
 
         val operations:
@@ -452,12 +467,3 @@ end
 
 module Fake_protocol : PROTO
 module Empty : (module type of Make(Fake_protocol)(Fake_protocol))
-
-type protocols = {
-  current_protocol: Protocol_hash.t ;
-  next_protocol: Protocol_hash.t ;
-}
-
-val protocols:
-  #RPC_context.simple -> ?chain:chain -> ?block:block ->
-  unit -> protocols tzresult Lwt.t

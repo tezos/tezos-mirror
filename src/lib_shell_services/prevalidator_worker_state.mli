@@ -40,7 +40,7 @@ module Event : sig
   type t =
     | Request of (Request.view * Worker_types.request_status * error list option)
     | Debug of string
-  val level : t -> Logging.level
+  val level : t -> Internal_event.level
   val encoding : t Data_encoding.t
   val pp : Format.formatter -> t -> unit
 end
@@ -48,7 +48,7 @@ end
 module Worker_state : sig
   type view =
     { head : Block_hash.t ;
-      timestamp : Time.t ;
+      timestamp : Time.System.t ;
       fetching : Operation_hash.Set.t ;
       pending : Operation_hash.Set.t ;
       applied : Operation_hash.t list ;

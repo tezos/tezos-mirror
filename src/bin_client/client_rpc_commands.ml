@@ -45,9 +45,9 @@ type input = {
 (* generic JSON generation from a schema with callback for random or
    interactive filling *)
 let fill_in ?(show_optionals=true) input schema =
-  let rec element path { title ; kind }=
+  let rec element path { title ; kind ; _ }=
     match kind with
-    | Integer { minimum ; maximum } ->
+    | Integer { minimum ; maximum ; _ } ->
         let minimum =
           match minimum with
           | None -> min_int
@@ -88,7 +88,7 @@ let fill_in ?(show_optionals=true) input schema =
         in
         fill_loop [] 0 elts >>= fun acc ->
         Lwt.return (`A (List.rev acc))
-    | Object { properties } ->
+    | Object { properties ; _ } ->
         let properties =
           if show_optionals
           then properties
@@ -138,17 +138,17 @@ let random_fill_in ?(show_optionals=true) schema =
        fill_in ~show_optionals
          { int ; float ; string ; bool ; display ; continue }
          schema >>= fun json ->
-       Lwt.return (Ok json))
+       Lwt.return_ok json)
     (fun e ->
        let msg = Printf.sprintf "Fill-in failed %s\n%!" (Printexc.to_string e) in
-       Lwt.return (Error msg))
+       Lwt.return_error msg)
 
 let editor_fill_in ?(show_optionals=true) schema =
   let tmp = Filename.temp_file "tezos_rpc_call_" ".json" in
   let rec init () =
     (* write a temp file with instructions *)
     random_fill_in ~show_optionals schema >>= function
-    | Error msg -> Lwt.return (Error msg)
+    | Error msg -> Lwt.return_error msg
     | Ok json ->
         Lwt_io.(with_file ~mode:Output tmp (fun fp ->
             write_line fp (Data_encoding.Json.to_string json))) >>= fun () ->
@@ -175,13 +175,13 @@ let editor_fill_in ?(show_optionals=true) schema =
     | Unix.WSIGNALED x | Unix.WSTOPPED x | Unix.WEXITED x ->
         let msg = Printf.sprintf "FAILED %d \n%!" x in
         delete () >>= fun () ->
-        Lwt.return (Error msg)
+        Lwt.return_error msg
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) >>= fun text ->
     match Data_encoding.Json.from_string text with
-    | Ok r -> Lwt.return (Ok r)
-    | Error msg -> Lwt.return (Error (Printf.sprintf "bad input: %s" msg))
+    | Ok r -> Lwt.return_ok r
+    | Error msg -> Lwt.return_error (Format.asprintf "bad input: %s" msg)
   and delete () =
     (* and delete the temp file *)
     Lwt_unix.unlink tmp
@@ -310,18 +310,18 @@ let schema meth url (cctxt : #Client_context.full) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
-  | Static { services } -> begin
+  | Static { services ; _ } -> begin
       match RPC_service.MethMap.find_opt meth services with
       | None ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | Some ({ input = Some input ; output }) ->
+      | Some ({ input = Some input ; output ; _ }) ->
           let json = `O [ "input", Json_schema.to_json (fst input) ;
                           "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return_unit
-      | Some ({ input = None ; output }) ->
+      | Some ({ input = None ; output ; _ }) ->
           let json = `O [ "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return_unit
@@ -340,13 +340,13 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
     else
       (fun ppf (schema, _) -> Json_schema.pp ppf schema) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
-  | Static { services } -> begin
+  | Static { services ; _ } -> begin
       match RPC_service.MethMap.find_opt meth services with
       | None ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | Some ({ input = Some input ; output }) ->
+      | Some ({ input = Some input ; output ; _ }) ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Input format:@,%a@]@,\
@@ -355,7 +355,7 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
             pp input
             pp output >>= fun () ->
           return_unit
-      | Some ({ input = None ; output }) ->
+      | Some ({ input = None ; output ; _ }) ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Output format:@,%a@]@,\
@@ -371,8 +371,8 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
 let fill_in ?(show_optionals=true) schema =
   let open Json_schema in
   match (root schema).kind with
-  | Null -> Lwt.return (Ok `Null)
-  | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
+  | Null -> Lwt.return_ok `Null
+  | Any | Object { properties = [] ; _ } -> Lwt.return_ok (`O [])
   | _ -> editor_fill_in ~show_optionals schema
 
 let display_answer (cctxt : #Client_context.full) = function
@@ -397,17 +397,17 @@ let call meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
-  | Static { services } -> begin
+  | Static { services ; _ } -> begin
       match RPC_service.MethMap.find_opt meth services with
       | None ->
           cctxt#message
             "No service found at this URL with this method \
              (but this is a valid prefix)\n%!" >>= fun () ->
           return_unit
-      | Some ({ input = None }) ->
+      | Some ({ input = None ; _ }) ->
           cctxt#generic_json_call meth uri >>=?
           display_answer cctxt
-      | Some ({ input = Some input }) ->
+      | Some ({ input = Some input ; _ }) ->
           fill_in ~show_optionals:false (fst input) >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->

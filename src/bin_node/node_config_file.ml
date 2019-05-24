@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-30"]
+
 let (//) = Filename.concat
 
 let home =
@@ -39,7 +41,8 @@ type t = {
   data_dir : string ;
   p2p : p2p ;
   rpc : rpc ;
-  log : Logging_unix.cfg ;
+  log : Lwt_log_sink_unix.cfg ;
+  internal_events : Internal_event_unix.Configuration.t ;
   shell : shell ;
 }
 
@@ -51,7 +54,7 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  enable_testchain : bool ;
+  disable_testchain : bool ;
 }
 
 and rpc = {
@@ -71,13 +74,14 @@ and shell = {
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
   chain_validator_limits : Node.chain_validator_limits ;
+  history_mode : History_mode.t option ;
 }
 
 let default_p2p_limits : P2p.limits = {
-  connection_timeout = 10. ;
-  authentication_timeout = 5. ;
-  greylist_timeout = 86400 ; (* one day *)
-  maintenance_idle_time = 120. ; (* two minutes *)
+  connection_timeout = Time.System.Span.of_seconds_exn 10. ;
+  authentication_timeout = Time.System.Span.of_seconds_exn 5. ;
+  greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) ;
+  maintenance_idle_time = Time.System.Span.of_seconds_exn 120. (* two minutes *) ;
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -95,19 +99,19 @@ let default_p2p_limits : P2p.limits = {
   known_peer_ids_history_size = 500 ;
   max_known_points = Some (400, 300) ;
   max_known_peer_ids = Some (400, 300) ;
-  swap_linger = 30. ;
+  swap_linger = Time.System.Span.of_seconds_exn 30. ;
   binary_chunks_size = None ;
 }
 
 let default_p2p = {
   expected_pow = 26. ;
   bootstrap_peers  = [ "boot.tzalpha.net"; "bootalpha.tzbeta.net" ] ;
-  listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
+  listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   discovery_addr = None ;
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  enable_testchain = false ;
+  disable_testchain = false ;
 }
 
 let default_rpc = {
@@ -122,13 +126,15 @@ let default_shell = {
   prevalidator_limits = Node.default_prevalidator_limits ;
   peer_validator_limits = Node.default_peer_validator_limits ;
   chain_validator_limits = Node.default_chain_validator_limits ;
+  history_mode = None ;
 }
 
 let default_config = {
   data_dir = default_data_dir ;
   p2p = default_p2p ;
   rpc = default_rpc ;
-  log = Logging_unix.default_cfg ;
+  log = Lwt_log_sink_unix.default_cfg ;
+  internal_events = Internal_event_unix.Configuration.default ;
   shell = default_shell ;
 }
 
@@ -185,11 +191,11 @@ let limit : P2p.limits Data_encoding.t =
              (dft "connection-timeout"
                 ~description: "Delay acceptable when initiating a \
                                connection to a new peer, in seconds."
-                float default_p2p_limits.authentication_timeout)
+                Time.System.Span.encoding default_p2p_limits.authentication_timeout)
              (dft "authentication-timeout"
                 ~description: "Delay granted to a peer to perform authentication, \
                                in seconds."
-                float default_p2p_limits.authentication_timeout)
+                Time.System.Span.encoding default_p2p_limits.authentication_timeout)
              (dft "min-connections"
                 ~description: "Strict minimum number of connections (triggers an \
                                urgent maintenance)."
@@ -221,7 +227,7 @@ let limit : P2p.limits Data_encoding.t =
              (opt "max-upload-speed"
                 ~description: "Max upload speeds in KiB/s."
                 int31)
-             (dft "swap-linger" float default_p2p_limits.swap_linger))
+             (dft "swap-linger" Time.System.Span.encoding default_p2p_limits.swap_linger))
           (obj10
              (opt "binary-chunks-size" uint8)
              (dft "read-buffer-size"
@@ -243,11 +249,11 @@ let limit : P2p.limits Data_encoding.t =
           (opt "max_known_peer_ids" (tup2 uint16 uint16))
           (dft "greylist-timeout"
              ~description: "GC delay for the greylists tables, in seconds."
-             int31 default_p2p_limits.greylist_timeout)
+             Time.System.Span.encoding default_p2p_limits.greylist_timeout)
           (dft "maintenance-idle-time"
              ~description: "How long to wait at most, in seconds, \
                             before running a maintenance loop."
-             float default_p2p_limits.maintenance_idle_time)
+             Time.System.Span.encoding default_p2p_limits.maintenance_idle_time)
        )
     )
 
@@ -256,16 +262,16 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; enable_testchain } ->
+           limits ; disable_mempool ; disable_testchain } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, enable_testchain))
+       disable_mempool, disable_testchain))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, enable_testchain) ->
+          disable_mempool, disable_testchain) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; enable_testchain })
+        disable_mempool ; disable_testchain })
     (obj8
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
@@ -306,13 +312,12 @@ let p2p =
                          It can be used to decrease the memory and \
                          computation footprints of the node."
           bool false)
-       (dft "enable_testchain"
-          ~description: "If set to [true], the node will spawn a \
-                         testchain during the protocol's testing \
-                         voting period. Default value is [false]. It \
-                         is disabled to decrease the node storage \
-                         usage and computation by droping the \
-                         validation of the test network blocks."
+       (dft "disable_testchain"
+          ~description: "If set to [true], the node will not spawn a testchain during \
+                         the protocol's testing voting period. \
+                         Default value is [false]. It may be used used to decrease the \
+                         node storage usage and computation by droping the validation \
+                         of the test network blocks."
           bool false)
     )
 
@@ -354,23 +359,20 @@ let rpc : rpc Data_encoding.t =
 
 let worker_limits_encoding
     default_size
-    default_level
-    default_zombie_lifetime
-    default_zombie_memory =
+    default_level =
   let open Data_encoding in
   conv
-    (fun { Worker_types.backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory } ->
-       (backlog_size, backlog_level, zombie_lifetime, zombie_memory))
-    (fun (backlog_size, backlog_level, zombie_lifetime, zombie_memory) ->
-       { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
-    (obj4
+    (fun { Worker_types.backlog_size ; backlog_level ;} ->
+       (backlog_size, backlog_level))
+    (fun (backlog_size, backlog_level) ->
+       { backlog_size ; backlog_level })
+    (obj2
        (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" Logging_unix.level_encoding default_level)
-       (dft "worker_zombie_lifetime" float default_zombie_lifetime)
-       (dft "worker_zombie_memory" float default_zombie_memory))
+       (dft "worker_backlog_level"
+          Internal_event.Level.encoding default_level))
 
 let timeout_encoding =
-  Data_encoding.ranged_float 0. 500.
+  Time.System.Span.encoding
 
 let block_validator_limits_encoding =
   let open Data_encoding in
@@ -385,9 +387,7 @@ let block_validator_limits_encoding =
              default_shell.block_validator_limits.protocol_timeout))
        (worker_limits_encoding
           default_shell.block_validator_limits.worker_limits.backlog_size
-          default_shell.block_validator_limits.worker_limits.backlog_level
-          default_shell.block_validator_limits.worker_limits.zombie_lifetime
-          default_shell.block_validator_limits.worker_limits.zombie_memory))
+          default_shell.block_validator_limits.worker_limits.backlog_level))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -405,8 +405,7 @@ let prevalidator_limits_encoding =
        (worker_limits_encoding
           default_shell.prevalidator_limits.worker_limits.backlog_size
           default_shell.prevalidator_limits.worker_limits.backlog_level
-          default_shell.prevalidator_limits.worker_limits.zombie_lifetime
-          default_shell.prevalidator_limits.worker_limits.zombie_memory))
+       ))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -429,8 +428,7 @@ let peer_validator_limits_encoding =
        (worker_limits_encoding
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level
-          default_limits.worker_limits.zombie_lifetime
-          default_limits.worker_limits.zombie_memory))
+       ))
 
 let chain_validator_limits_encoding =
   let open Data_encoding in
@@ -449,36 +447,35 @@ let chain_validator_limits_encoding =
              default_shell.chain_validator_limits.bootstrap_threshold))
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
-          default_shell.chain_validator_limits.worker_limits.backlog_level
-          default_shell.chain_validator_limits.worker_limits.zombie_lifetime
-          default_shell.chain_validator_limits.worker_limits.zombie_memory))
+          default_shell.chain_validator_limits.worker_limits.backlog_level))
 
 let shell =
   let open Data_encoding in
   conv
     (fun { peer_validator_limits ; block_validator_limits ;
-           prevalidator_limits ; chain_validator_limits } ->
+           prevalidator_limits ; chain_validator_limits ; history_mode } ->
       (peer_validator_limits, block_validator_limits,
-       prevalidator_limits, chain_validator_limits))
+       prevalidator_limits, chain_validator_limits, history_mode))
     (fun (peer_validator_limits, block_validator_limits,
-          prevalidator_limits, chain_validator_limits) ->
+          prevalidator_limits, chain_validator_limits, history_mode) ->
       { peer_validator_limits ; block_validator_limits ;
-        prevalidator_limits ; chain_validator_limits })
-    (obj4
+        prevalidator_limits ; chain_validator_limits ; history_mode })
+    (obj5
        (dft "peer_validator" peer_validator_limits_encoding default_shell.peer_validator_limits)
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
        (dft "chain_validator" chain_validator_limits_encoding default_shell.chain_validator_limits)
+       (opt "history_mode" History_mode.encoding)
     )
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun { data_dir ; rpc ; p2p ; log ; shell } ->
-       (data_dir, rpc, p2p, log, shell))
-    (fun (data_dir, rpc, p2p, log, shell) ->
-       { data_dir ; rpc ; p2p ; log ; shell })
-    (obj5
+    (fun { data_dir ; rpc ; p2p ; log ; internal_events ; shell } ->
+       (data_dir, rpc, p2p, log, internal_events, shell))
+    (fun (data_dir, rpc, p2p, log, internal_events, shell) ->
+       { data_dir ; rpc ; p2p ; log ; internal_events ; shell })
+    (obj6
        (dft "data-dir"
           ~description: "Location of the data dir on disk."
           string default_data_dir)
@@ -488,8 +485,13 @@ let encoding =
        (req "p2p"
           ~description: "Configuration of network parameters" p2p)
        (dft "log"
-          ~description: "Configuration of logging parameters"
-          Logging_unix.cfg_encoding Logging_unix.default_cfg)
+          ~description:
+            "Configuration of the Lwt-log sink (part of the logging framework)"
+          Lwt_log_sink_unix.cfg_encoding Lwt_log_sink_unix.default_cfg)
+       (dft "internal-events"
+          ~description: "Configuration of the structured logging framework"
+          Internal_event_unix.Configuration.encoding
+          Internal_event_unix.Configuration.default)
        (dft "shell"
           ~description: "Configuration of network parameters"
           shell default_shell))
@@ -527,12 +529,13 @@ let update
     ?rpc_listen_addr
     ?(private_mode = false)
     ?(disable_mempool = false)
-    ?(enable_testchain = false)
+    ?(disable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
     ?log_output
     ?bootstrap_threshold
+    ?history_mode
     cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
@@ -581,7 +584,7 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
-    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
+    disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
   }
   and rpc : rpc = {
     listen_addr =
@@ -593,7 +596,7 @@ let update
     tls =
       Option.first_some rpc_tls cfg.rpc.tls ;
   }
-  and log : Logging_unix.cfg = {
+  and log : Lwt_log_sink_unix.cfg = {
     cfg.log with
     output = Option.unopt ~default:cfg.log.output log_output ;
   }
@@ -607,10 +610,12 @@ let update
         ~f:(fun bootstrap_threshold ->
             { cfg.shell.chain_validator_limits
               with bootstrap_threshold })
-        bootstrap_threshold
+        bootstrap_threshold ;
+    history_mode = Option.first_some history_mode cfg.shell.history_mode;
   }
   in
-  return { data_dir ; p2p ; rpc ; log ; shell }
+  let internal_events = cfg.internal_events in
+  return { data_dir ; p2p ; rpc ; log ; internal_events ; shell }
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let addr, port = P2p_point.Id.parse_addr_port peer in

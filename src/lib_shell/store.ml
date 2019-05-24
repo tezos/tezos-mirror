@@ -27,6 +27,19 @@ type t = Raw_store.t
 type global_store = t
 
 (**************************************************************************
+ * Configuration setup we need to save in order to avoid wrong changes.
+ **************************************************************************)
+
+module Configuration = struct
+
+  module History_mode = Store_helpers.Make_single_store
+      (Raw_store)
+      (struct let name = ["history_mode"] end)
+      (Store_helpers.Make_value(History_mode))
+
+end
+
+(**************************************************************************
  * Net store under "chain/"
  **************************************************************************)
 
@@ -55,7 +68,7 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["genesis" ; "time"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Genesis_protocol =
     Store_helpers.Make_single_store
@@ -73,11 +86,27 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["expiration"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Allow_forked_chain =
     Indexed_store.Make_set (struct let name = ["allow_forked_chain"] end)
 
+  module Protocol_index =
+    Store_helpers.Make_indexed_substore
+      (Store_helpers.Make_substore
+         (Indexed_store.Store)
+         (struct let name = ["protocol"] end))
+      (Store_helpers.Integer_index)
+
+  module Protocol_info =
+    Protocol_index.Make_map
+      (struct let name = ["info"] end)
+      (Store_helpers.Make_value(struct
+         type t = Protocol_hash.t * Int32.t
+         let encoding =
+           let open Data_encoding in
+           tup2 Protocol_hash.encoding int32
+       end))
 end
 
 (**************************************************************************
@@ -109,7 +138,7 @@ module Block = struct
       (Block_hash)
 
   type contents = {
-    header: Block_header.t ;
+    header : Block_header.t ;
     message: string option ;
     max_operations_ttl: int ;
     last_allowed_fork_level: Int32.t ;
@@ -145,6 +174,24 @@ module Block = struct
                 (req "header" Block_header.encoding))
        end))
 
+  type pruned_contents = {
+    header : Block_header.t ;
+  }
+
+  module Pruned_contents =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["pruned_contents"] end)
+      (Store_helpers.Make_value(struct
+         type t = pruned_contents
+         let encoding =
+           let open Data_encoding in
+           conv
+             (fun { header } -> header)
+             (fun header -> { header })
+             (obj1 (req "header" Block_header.encoding))
+       end))
+
   module Operations_index =
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore
@@ -158,14 +205,6 @@ module Block = struct
       (Store_helpers.Make_value(struct
          type t = Operation_hash.t list
          let encoding = Data_encoding.list Operation_hash.encoding
-       end))
-
-  module Operation_path =
-    Operations_index.Make_map
-      (struct let name = ["path"] end)
-      (Store_helpers.Make_value(struct
-         type t = Operation_list_list_hash.path
-         let encoding = Operation_list_list_hash.path_encoding
        end))
 
   module Operations =
@@ -259,6 +298,34 @@ module Chain_data = struct
     Store_helpers.Make_single_store
       (Chain.Indexed_store.Store)
       (struct let name = ["checkpoint"] end)
+      (Store_helpers.Make_value(Block_header))
+
+  module Checkpoint_0_0_1 =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["checkpoint"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
+  module Save_point =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["save_point"] end)
+      (Store_helpers.Make_value(struct
+         type t = Int32.t * Block_hash.t
+         let encoding =
+           let open Data_encoding in
+           tup2 int32 Block_hash.encoding
+       end))
+
+  module Caboose =
+    Store_helpers.Make_single_store
+      (Chain.Indexed_store.Store)
+      (struct let name = ["caboose"] end)
       (Store_helpers.Make_value(struct
          type t = Int32.t * Block_hash.t
          let encoding =
@@ -311,3 +378,6 @@ let init ?mapsize dir =
   return s
 
 let close = Raw_store.close
+
+let open_with_atomic_rw = Raw_store.open_with_atomic_rw
+let with_atomic_rw = Raw_store.with_atomic_rw

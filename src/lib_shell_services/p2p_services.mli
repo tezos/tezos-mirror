@@ -29,12 +29,15 @@ val self: #simple -> P2p_peer.Id.t tzresult Lwt.t
 
 val stat: #simple -> P2p_stat.t tzresult Lwt.t
 
+val version: #simple -> Network_version.t tzresult Lwt.t
+
+(* DEPRECATED: use [version] instead. *)
 val versions: #simple -> Network_version.t list tzresult Lwt.t
 
 val events: #streamed ->
   (P2p_connection.Pool_event.t Lwt_stream.t * stopper) tzresult Lwt.t
 
-val connect: #simple -> timeout:float -> P2p_point.Id.t -> unit tzresult Lwt.t
+val connect: #simple -> timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
 
 module S : sig
 
@@ -48,6 +51,12 @@ module S : sig
      unit, unit, unit,
      P2p_stat.t) RPC_service.t
 
+  val version :
+    ([ `GET ], unit,
+     unit, unit, unit,
+     Network_version.t) RPC_service.t
+
+  (* DEPRECATED: use [version] instead. *)
   val versions :
     ([ `GET ], unit,
      unit, unit, unit,
@@ -60,7 +69,7 @@ module S : sig
 
   val connect :
     ([ `PUT ], unit,
-     unit * P2p_point.Id.t, < timeout: float >, unit,
+     unit * P2p_point.Id.t, < timeout: Ptime.Span.t >, unit,
      unit) RPC_service.t
 
 end

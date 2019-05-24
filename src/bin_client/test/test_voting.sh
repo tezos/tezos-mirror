@@ -48,22 +48,8 @@ function get_period_position() {
 
 $client show voting period
 
-[ `get_period_position` = '1' ] \
-    || { echo "strange voting_period_position" ; exit 1 ; }
-echo Checking the bug of the empty listing in the first voting period...
-[ `get_listings` = '[]' ] \
-    || { echo "empty listings bug was fixed?!" ; exit 1 ; }
-
-bake # pos=2
-
-[ `get_period_position` = '2' ] \
-    || { echo "strange voting_period_position" ; exit 1 ; }
-
-bake # pos=3
-bake # new period, pos=0
-
 echo 'Checking the current period = proposal with non empty listings'
-[ `get_period_position` = '0' ] \
+[ `get_period_position` = '1' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
 [ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
@@ -72,16 +58,16 @@ echo 'Checking the current period = proposal with non empty listings'
 
 echo 'Injecting protocols...'
 
-cp -r demo $tempdir/proto1
-proto1=`$admin_client inject protocol $tempdir/proto1 | sed -r 's/Injected protocol (.*) successfully/\1/'`
+cp -r proto_test_injection $tempdir/proto1
+proto1=`$admin_client inject protocol $tempdir/proto1 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 
-cp -r demo $tempdir/proto2
+cp -r proto_test_injection $tempdir/proto2
 echo '(* 2 *)' >> $tempdir/proto2/main.ml
-proto2=`$admin_client inject protocol $tempdir/proto2 | sed -r 's/Injected protocol (.*) successfully/\1/'`
+proto2=`$admin_client inject protocol $tempdir/proto2 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 
-cp -r demo $tempdir/proto3
+cp -r proto_test_injection $tempdir/proto3
 echo '(* 3 *)' >> $tempdir/proto3/main.ml
-proto3=`$admin_client inject protocol $tempdir/proto3 | sed -r 's/Injected protocol (.*) successfully/\1/'`
+proto3=`$admin_client inject protocol $tempdir/proto3 | sed -E 's/Injected protocol (.*) successfully/\1/'`
 
 proto=($proto1 $proto2 $proto3)
 printf 'New injected protocol: %s\n' "${proto[@]}"
@@ -102,13 +88,6 @@ $client submit proposals for bootstrap1 ${proto[0]}
 $client submit proposals for bootstrap2 ${proto[0]} ${proto[1]}
 $client submit proposals for bootstrap3 ${proto[1]}
 $client submit proposals for bootstrap4 ${proto[2]}
-
-bake
-
-$client show voting period
-
-[ "`get_proposals`" != '[]' ] \
-    || { echo "strange proposals" ; exit 1 ; }
 
 bake # pos=2
 

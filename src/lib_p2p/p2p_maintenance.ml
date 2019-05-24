@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make (struct let name = "p2p.maintenance" end)
+include Internal_event.Legacy_logging.Make (struct let name = "p2p.maintenance" end)
 
 type bounds = {
   min_threshold: int ;
@@ -34,8 +34,8 @@ type bounds = {
 }
 
 type config = {
-  maintenance_idle_time: float ;
-  greylist_timeout: int ;
+  maintenance_idle_time: Time.System.Span.t ;
+  greylist_timeout: Time.System.Span.t ;
   private_mode: bool ;
 }
 
@@ -59,16 +59,16 @@ type 'meta t = {
     Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
   let Pool pool = st.pool in
-  let now = Time.now () in
+  let now = Systime_os.now () in
   let module Bounded_point_info =
     List.Bounded(struct
-      type t = (Time.t option * P2p_point.Id.t)
+      type t = (Time.System.t option * P2p_point.Id.t)
       let compare (t1, _) (t2, _) =
         match t1, t2 with
         | None, None -> 0
         | None, Some _ -> 1
         | Some _, None -> -1
-        | Some t1, Some t2 -> Time.compare t2 t1
+        | Some t1, Some t2 -> Time.System.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
   let seen_points =
@@ -89,7 +89,7 @@ let connectable st start_time expected seen_points =
           match P2p_point_state.get pi with
           | Disconnected -> begin
               match P2p_point_state.Info.last_miss pi with
-              | Some last when Time.(start_time < last)
+              | Some last when Time.System.(start_time < last)
                             || P2p_point_state.Info.greylisted ~now pi ->
                   seen_points
               | last ->
@@ -106,7 +106,7 @@ let connectable st start_time expected seen_points =
     than [max_to_contact]. But, if after trying once all disconnected
     peers, it returns [false]. *)
 let rec try_to_contact
-    st ?(start_time = Time.now ()) ~seen_points
+    st ?(start_time = Systime_os.now ()) ~seen_points
     min_to_contact max_to_contact =
   let Pool pool = st.pool in
   if min_to_contact <= 0 then
@@ -138,7 +138,9 @@ let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
   let older_than =
-    Time.(add (now ()) (Int64.of_int (- st.config.greylist_timeout)))
+    Option.unopt_exn
+      (Failure "P2p_maintenance.maintain: time overflow")
+      (Ptime.add_span (Systime_os.now ()) (Ptime.Span.neg st.config.greylist_timeout))
   in
   P2p_pool.gc_greylist pool ~older_than ;
   if n_connected < st.bounds.min_threshold then
@@ -185,15 +187,19 @@ and too_many_connections st n_connected =
   (* too many connections, start the russian roulette *)
   let to_kill = n_connected - st.bounds.max_target in
   lwt_log_notice "Too many connections, will kill %d" to_kill >>= fun () ->
-  snd @@ P2p_pool.Connection.fold pool
-    ~init:(to_kill, Lwt.return_unit)
-    ~f:(fun _ conn (i, t) ->
-        if i = 0 then (0, t)
-        else if (P2p_pool.Connection.private_node conn
+  let connections = TzList.rev_sub
+      (TzList.shuffle @@
+       P2p_pool.Connection.fold pool
+         ~init:[]
+         ~f:(fun _ conn acc ->
+             if (P2p_pool.Connection.private_node conn
                  && P2p_pool.Connection.trusted_node conn) then
-          (i, t)
-        else
-          (i - 1, t >>= fun () -> P2p_pool.disconnect conn))
+               acc
+             else
+               conn::acc))
+      to_kill
+  in
+  Lwt_list.iter_p P2p_pool.disconnect connections
   >>= fun () ->
   maintain st
 
@@ -202,7 +208,7 @@ let rec worker_loop st =
   begin
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        Lwt_unix.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
+        Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
         P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
         P2p_pool.Pool_event.wait_too_many_connections pool ;
@@ -236,11 +242,12 @@ let create ?discovery config bounds pool = {
 let activate st =
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
+      ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop st)
       ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
   Option.iter st.discovery ~f:P2p_discovery.activate
 
-let maintain { just_maintained ; please_maintain } =
+let maintain { just_maintained ; please_maintain ; _ } =
   let wait = Lwt_condition.wait just_maintained in
   Lwt_condition.broadcast please_maintain () ;
   wait
@@ -250,6 +257,7 @@ let shutdown {
     discovery ;
     maintain_worker ;
     just_maintained ;
+    _ ;
   } =
   Lwt_canceler.cancel canceler >>= fun () ->
   Lwt_utils.may ~f:P2p_discovery.shutdown discovery >>= fun () ->

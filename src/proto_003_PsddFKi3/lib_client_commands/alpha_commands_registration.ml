@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,4 +29,5 @@ let () =
   List.map (Clic.map_command (new Proto_alpha.wrap_full)) @@
   Client_proto_programs_commands.commands () @
   Client_proto_contracts_commands.commands () @
-  Client_proto_context_commands.commands network ()
+  Client_proto_context_commands.commands network () @
+  Client_proto_multisig_commands.commands ()

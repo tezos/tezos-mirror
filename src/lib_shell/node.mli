@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+[@@@ocaml.warning "-30"]
+
 type t
 
 type config = {
@@ -32,23 +34,23 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_chain_max_tll: int option ;
-  checkpoint: (Int32.t * Block_hash.t) option ;
+  checkpoint: Block_header.t option ;
 }
 
 and peer_validator_limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Time.System.Span.t ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits: Worker_types.limits
 }
 and prevalidator_limits = {
   max_refused_operations: int ;
-  operation_timeout: float ;
+  operation_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 and block_validator_limits = {
-  protocol_timeout: float ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 and chain_validator_limits = {
@@ -68,6 +70,7 @@ val create:
   block_validator_limits ->
   prevalidator_limits ->
   chain_validator_limits ->
+  History_mode.t option ->
   t tzresult Lwt.t
 
 val shutdown: t -> unit Lwt.t

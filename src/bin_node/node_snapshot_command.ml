@@ -34,28 +34,40 @@ let store_dir data_dir = data_dir // "store"
 
 module Term = struct
 
-  type subcommand = Export
+  type subcommand = Export | Import
 
   let dir_cleaner data_dir =
-    lwt_log_notice "Cleaning directory %s" data_dir >>= fun () ->
+    lwt_log_notice "Cleaning directory %s because of failure" data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-  let process subcommand config_file file block export_rolling =
-    let data_dir =
-      match config_file with
-      | None -> Node_config_file.default_data_dir
-      | Some dir -> dir in
-    let genesis = Genesis_chain.genesis in
-    let res =
+  let process subcommand args snapshot_file block export_rolling =
+    let run =
+      Internal_event_unix.init () >>= fun () ->
+      Node_shared_arg.read_data_dir args >>=? fun data_dir ->
+      let genesis = Genesis_chain.genesis in
       match subcommand with
       | Export ->
           Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+          let context_root = context_dir data_dir in
+          let store_root = store_dir data_dir in
+          Store.init store_root >>=? fun store ->
+          Context.init ~readonly:true context_root >>= fun context_index ->
           Snapshots.export
-            ~export_rolling ~data_dir
-            ~genesis:genesis.block file block
+            ~export_rolling
+            ~context_index
+            ~store
+            ~genesis:genesis.block snapshot_file block >>=? fun () ->
+          Store.close store |> return
+      | Import ->
+          Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
+          Lwt_lock_file.create ~unlink_on_exit:true
+            (Node_data_version.lock_file data_dir) >>=? fun () ->
+          Snapshots.import ~data_dir ~dir_cleaner
+            ~genesis ~patch_context:Patch_context.patch_context
+            snapshot_file block
     in
-    match Lwt_main.run res with
+    match Lwt_main.run run with
     | Ok () -> `Ok ()
     | Error err ->
         `Error (false, Format.asprintf "%a" pp_print_error err)
@@ -63,14 +75,16 @@ module Term = struct
   let subcommand_arg =
     let parser = function
       | "export" -> `Ok Export
+      | "import" -> `Ok Import
       | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
       | Export -> Format.fprintf ppf "export"
+      | Import -> Format.fprintf ppf "import"
     in
     let open Cmdliner.Arg in
     let doc =
       "Operation to perform. \
-       Possible value: $(b,export)." in
+       Possible values: $(b,export), $(b,import)." in
     required & pos 0 (some (parser, printer)) None & info [] ~docv:"OPERATION" ~doc
 
   let file_arg =
@@ -79,7 +93,7 @@ module Term = struct
 
   let blocks =
     let open Cmdliner.Arg in
-    let doc ="Block hash of the block to export." in
+    let doc ="Block hash of the block to export/import." in
     value & opt (some string) None & info ~docv:"<block_hash>" ~doc ["block"]
 
   let export_rolling =
@@ -92,7 +106,7 @@ module Term = struct
   let term =
     let open Cmdliner.Term in
     ret (const process $ subcommand_arg
-         $ Node_shared_arg.Term.data_dir
+         $ Node_shared_arg.Term.args
          $ file_arg
          $ blocks
          $ export_rolling)
@@ -102,12 +116,13 @@ end
 module Manpage = struct
 
   let command_description =
-    "The $(b,snapshot) command is meant to export snapshots files."
+    "The $(b,snapshot) command is meant to export and import snapshots files."
 
   let description = [
     `S "DESCRIPTION" ;
     `P (command_description ^ " Several operations are possible: ");
     `P "$(b,export) allows to export a snapshot of the current node state into a file." ;
+    `P "$(b,import) allows to import a snapshot from a given file." ;
   ]
 
   let options = [
@@ -119,6 +134,8 @@ module Manpage = struct
       `S "EXAMPLES" ;
       `I ("$(b,Export a snapshot using the rolling mode)",
           "$(mname) snapshot export latest.rolling --rolling") ;
+      `I ("$(b,Import a snapshot located in file.full)",
+          "$(mname) snapshot import file.full")
     ]
 
   let man =

@@ -43,7 +43,7 @@ let common_ancestor (b1: Block.t) (b2: Block.t) =
   let rec loop (b1: Block.t) (b2: Block.t) =
     if Block.equal b1 b2 then
       Lwt.return b1
-    else if Time.(Block.timestamp b1 <= Block.timestamp b2) then
+    else if Time.Protocol.(Block.timestamp b1 <= Block.timestamp b2) then
       Block.predecessor b2 >>= function
       | None -> assert false
       | Some b2 -> loop b1 b2
@@ -58,7 +58,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
   let compare b1 b2 =
     match Fitness.compare (Block.fitness b1) (Block.fitness b2) with
     | 0 -> begin
-        match Time.compare (Block.timestamp b1) (Block.timestamp b2) with
+        match Time.Protocol.compare (Block.timestamp b1) (Block.timestamp b2) with
         | 0 -> Block.compare b1 b2
         | res -> res
       end
@@ -100,7 +100,7 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
     match min_date with
     | None -> (fun _ -> true)
     | Some min_date ->
-        (fun b -> Time.(min_date <= Block.timestamp b)) in
+        (fun b -> Time.Protocol.(min_date <= Block.timestamp b)) in
   let rec loop () =
     match pop () with
     | None -> Lwt.return_unit
@@ -132,19 +132,25 @@ let new_blocks ~from_block ~to_block =
 
 let live_blocks block n =
   let rec loop bacc oacc chain_state block_head n =
-    Block.Header.all_operation_hashes chain_state block_head >>= fun hashes ->
+    Block.all_operation_hashes block_head >>= fun hashes ->
     let oacc =
       List.fold_left
         (List.fold_left
            (fun oacc op -> Operation_hash.Set.add op oacc))
         oacc hashes  in
-    let bacc = Block_hash.Set.add (Block.Header.hash block_head) bacc in
-    if n = 0 then Lwt.return (bacc, oacc)
+    let bacc = Block_hash.Set.add (Block.hash block_head) bacc in
+    if n = 0 then return (bacc, oacc)
     else
-      Block.Header.predecessor chain_state block_head >>= function
-      | None -> Lwt.return (bacc, oacc)
-      | Some predecessor -> loop bacc oacc chain_state predecessor (pred n) in
+      State.Block.predecessor block_head >>= function
+      | None ->
+          let genesis_hash = (State.Chain.genesis chain_state).block in
+          let block_hash = Block.hash block_head in
+          if Block_hash.equal genesis_hash block_hash
+          then return (bacc, oacc)
+          else fail (State.Block_not_found block_hash)
+      | Some predecessor ->
+          loop bacc oacc chain_state predecessor (pred n) in
   loop
     Block_hash.Set.empty Operation_hash.Set.empty
-    (Block.chain_state block) (Block.Header.of_block block)
+    (Block.chain_state block) block
     n

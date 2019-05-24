@@ -70,6 +70,7 @@ let worker =
   lazy begin
     Lwt.async begin fun () ->
       Lwt_utils.worker "counter"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:worker_loop
         ~cancel:(fun _ -> Lwt.return_unit)
     end
@@ -99,5 +100,5 @@ type stat = {
   average: int ;
 }
 
-let stat ({ total ; average } : t) : stat =
+let stat ({ total ; average ; _ } : t) : stat =
   { total ; average }

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <nomadic@tezcore.com>                    *)
+(* Copyright (c) 2018-2019 Nomadic Labs. <nomadic@tezcore.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +26,7 @@
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2018-11-30T15:30:56Z" ;
+    Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z" ;
   block =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe" ;

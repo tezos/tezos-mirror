@@ -97,7 +97,8 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
           (function Mempool_result result -> Some result | _ -> None)
           (fun result -> Mempool_result result) ]
 
-  module Log = Tezos_stdlib.Logging.Make(struct
+  module Log =
+    Internal_event.Legacy_logging.Make (struct
       let name = "node.mempool.peer_worker"
     end)
 
@@ -277,10 +278,11 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
       | End_error of (Request.view * Worker_types.request_status * error list)
 
     let level req =
+      let open Internal_event in
       match req with
-      | Start _ -> Logging.Info
-      | End_ok _ -> Logging.Info
-      | End_error _ -> Logging.Error
+      | Start _ -> Info
+      | End_ok _ -> Info
+      | End_error _ -> Error
 
     let encoding =
       let open Data_encoding in
@@ -362,7 +364,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
 
     let on_error t view st errs =
       Worker.record_event t (Event.End_error (view, st, errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
 
     let on_completion
       : type a. self -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t
@@ -379,7 +381,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
   (* See interface file for documentation *)
 
   let validate t os =
-    Worker.push_request_and_wait t (Request.Batch os)
+    Worker.Queue.push_request_and_wait t (Request.Batch os)
     >>=? fun (_: output) -> return_unit
 
   let create limits peer_id mempool_worker =
@@ -400,7 +402,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
              recycled
              input)
         recycled
-        (Worker.pending_requests w)
+        (Worker.Queue.pending_requests w)
     in
     let recycled =
       match Worker.current_request w with

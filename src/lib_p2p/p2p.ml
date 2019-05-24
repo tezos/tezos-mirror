@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Logging.Make(struct let name = "p2p" end)
+include Internal_event.Legacy_logging.Make(struct
+    let name = "p2p"
+  end)
 
 type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t ;
@@ -71,10 +73,10 @@ type config = {
 
 type limits = {
 
-  connection_timeout : float ;
-  authentication_timeout : float ;
-  greylist_timeout : int ;
-  maintenance_idle_time : float ;
+  connection_timeout : Time.System.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
+  greylist_timeout : Time.System.Span.t ;
+  maintenance_idle_time : Time.System.Span.t ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -98,7 +100,7 @@ type limits = {
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
 
-  swap_linger : float ;
+  swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
 }
@@ -222,10 +224,10 @@ module Real = struct
       welcome ;
     }
 
-  let peer_id { config } = config.identity.peer_id
+  let peer_id { config ; _ } = config.identity.peer_id
 
 
-  let maintain { maintenance } () =
+  let maintain { maintenance ; _ } () =
     P2p_maintenance.maintain maintenance
 
   let activate t () =
@@ -249,10 +251,10 @@ module Real = struct
     P2p_pool.destroy net.pool >>= fun () ->
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
-  let connections { pool } () =
+  let connections { pool ; _ } () =
     P2p_pool.Connection.fold pool
       ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
-  let find_connection { pool } peer_id =
+  let find_connection { pool ; _ } peer_id =
     P2p_pool.Connection.find_by_peer_id pool peer_id
   let disconnect ?wait conn =
     P2p_pool.disconnect ?wait conn
@@ -264,11 +266,11 @@ module Real = struct
     P2p_pool.Connection.remote_metadata conn
   let connection_stat _net conn =
     P2p_pool.Connection.stat conn
-  let global_stat { pool } () =
+  let global_stat { pool ; _ } () =
     P2p_pool.pool_stat pool
-  let set_peer_metadata { pool } conn meta =
+  let set_peer_metadata { pool ; _ } conn meta =
     P2p_pool.Peers.set_peer_metadata pool conn meta
-  let get_peer_metadata { pool } conn =
+  let get_peer_metadata { pool ; _ } conn =
     P2p_pool.Peers.get_peer_metadata pool conn
 
   let recv _net conn =
@@ -318,7 +320,7 @@ module Real = struct
           P2p_peer.Id.pp
           (P2p_pool.Connection.info conn).peer_id
           pp_print_error err >>= fun () ->
-        Lwt.return (Error err)
+        Lwt.return_error err
 
   let try_send _net conn v =
     match P2p_pool.write_now conn v with
@@ -334,22 +336,21 @@ module Real = struct
           pp_print_error err ;
         false
 
-  let broadcast { pool } msg =
+  let broadcast { pool ; _ } msg =
     P2p_pool.write_all pool msg ;
     debug "message broadcasted"
 
-  let fold_connections { pool } ~init ~f =
+  let fold_connections { pool ; _ } ~init ~f =
     P2p_pool.Connection.fold pool ~init ~f
 
-  let iter_connections { pool } f =
+  let iter_connections { pool ; _ } f =
     P2p_pool.Connection.fold pool
       ~init:()
       ~f:(fun gid conn () -> f gid conn)
 
-  let on_new_connection { pool } f =
+  let on_new_connection { pool ; _ } f =
     P2p_pool.on_new_connection pool f
 
-  let pool { pool } = pool
 end
 
 module Fake = struct
@@ -418,13 +419,15 @@ type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
 let check_limits =
   let fail_1 v orig =
-    if not (v <= 0.) then return_unit
+    if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative or null@."
         orig
   in
   let fail_2 v orig =
-    if not (v < 0) then return_unit
+    if not (v < 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative@." orig
   in
@@ -591,8 +594,8 @@ let info_of_peer_info pool i =
   let open P2p_peer.Info in
   let open P2p_peer.State in
   let state, id_point = match P2p_peer_state.get i with
-    | Accepted { current_point } -> Accepted, Some current_point
-    | Running { current_point } -> Running, Some current_point
+    | Accepted { current_point ; _ } -> Accepted, Some current_point
+    | Running { current_point ; _ } -> Running, Some current_point
     | Disconnected -> Disconnected, None in
   let peer_id = P2p_peer_state.Info.peer_id i in
   let score = P2p_pool.Peers.get_score pool peer_id in
@@ -628,6 +631,12 @@ let build_rpc_directory net =
   (* Network : Global *)
 
   let dir =
+    RPC_directory.register0 dir P2p_services.S.version begin fun () () ->
+      return net.announced_version
+    end in
+
+  let dir =
+    (* DEPRECATED: use [version] instead. *)
     RPC_directory.register0 dir P2p_services.S.versions begin fun () () ->
       return [net.announced_version]
     end in

@@ -49,7 +49,7 @@ val compute_testchain_genesis:
 val commit_genesis:
   index ->
   chain_id:Chain_id.t ->
-  time:Time.t ->
+  time:Time.Protocol.t ->
   protocol:Protocol_hash.t ->
   Context_hash.t Lwt.t
 
@@ -58,8 +58,7 @@ val commit_test_chain_genesis:
   Block_header.t ->
   Block_header.t Lwt.t
 
-
-(** {2 Generic interface} ****************************************************)
+(** {2 Generic interface} *)
 
 type key = string list
 (** [key] indicates a path in a context. *)
@@ -83,15 +82,15 @@ val fold:
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
-(** {2 Accessing and Updating Versions} **************************************)
+(** {2 Accessing and Updating Versions} *)
 
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
 val checkout_exn: index -> Context_hash.t -> context Lwt.t
-val hash:   time:Time.t ->
+val hash:   time:Time.Protocol.t ->
   ?message:string -> t -> Context_hash.t Lwt.t
 val commit:
-  time:Time.t ->
+  time:Time.Protocol.t ->
   ?message:string ->
   context ->
   Context_hash.t Lwt.t
@@ -99,7 +98,7 @@ val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 val set_master: index -> Context_hash.t -> unit Lwt.t
 
 
-(** {2 Predefined Fields} ****************************************************)
+(** {2 Predefined Fields} *)
 
 val get_protocol: context -> Protocol_hash.t Lwt.t
 val set_protocol: context -> Protocol_hash.t -> context Lwt.t
@@ -110,7 +109,7 @@ val set_test_chain: context -> Test_chain_status.t -> context Lwt.t
 val del_test_chain: context -> context Lwt.t
 
 val fork_test_chain:
-  context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
+  context -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> context Lwt.t
 val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
 
 (** {2 Context dumping} ******************************************************)
@@ -138,7 +137,6 @@ module Block_data : sig
 
   val to_bytes : t -> MBytes.t
   val of_bytes : MBytes.t -> t option
-  val empty : t
   val encoding : t Data_encoding.t
 end
 
@@ -149,7 +147,7 @@ module Protocol_data : sig
   and info = {
     author : string ;
     message : string ;
-    timestamp : Time.t ;
+    timestamp : Time.Protocol.t ;
   }
 
   and data = {
@@ -162,7 +160,6 @@ module Protocol_data : sig
 
   val to_bytes : t -> MBytes.t
   val of_bytes : MBytes.t -> t option
-  val empty : t
   val encoding : t Data_encoding.t
 
 end
@@ -172,16 +169,27 @@ val get_protocol_data_from_header :
 
 val dump_contexts :
   index ->
-  (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) ->
   filename:string ->
   unit tzresult Lwt.t
 
-val dump_contexts_fd :
-  index ->
-  (Block_header.t * Block_data.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) *
-   Block_header.t) list ->
-  fd:Lwt_unix.file_descr ->
-  unit tzresult Lwt.t
+val restore_contexts : index -> Raw_store.t -> filename:string ->
+  (Pruned_block.t -> Block_hash.t -> unit tzresult Lwt.t) ->
+  (Block_header.t option ->
+   Block_hash.t -> Pruned_block.t -> unit tzresult Lwt.t) ->
+  (Block_header.t * Block_data.t * History_mode.t *
+   Block_header.t option * Block_hash.t list  *
+   Protocol_data.t list) tzresult Lwt.t
+
+val validate_context_hash_consistency_and_commit :
+  data_hash:Context_hash.t ->
+  expected_context_hash:Context_hash.t ->
+  timestamp:Time.Protocol.t ->
+  test_chain:Test_chain_status.t ->
+  protocol_hash:Protocol_hash.t ->
+  message:string ->
+  author:string ->
+  parents:Context_hash.t list ->
+  index:index ->
+  bool Lwt.t

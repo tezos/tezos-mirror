@@ -164,3 +164,8 @@ let shift = function
 let rec product a b = match a with
   | [] -> []
   | hd :: tl -> (List.map (fun x -> (hd , x)) b) @ product tl b
+
+let shuffle l =
+  l |> List.map (fun d -> (Random.bits () , d))
+  |> List.sort (fun (x, _) (y, _) -> compare x y)
+  |> List.map snd

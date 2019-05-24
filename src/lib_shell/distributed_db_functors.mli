@@ -64,16 +64,12 @@ module type DISTRIBUTED_DB = sig
       the value [None]. *)
   val read_opt: t -> key -> value option Lwt.t
 
-  (** Return the value if it is known locally, otherwise fail with
-      the exception [Not_found]. *)
-  val read_exn: t -> key -> value Lwt.t
-
   (** Same as `fetch` but the call is non-blocking: the data will be
       stored in the local index when received. *)
   val prefetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> unit
 
   (** Return the value if it is known locally, or block until the data
@@ -93,7 +89,7 @@ module type DISTRIBUTED_DB = sig
   val fetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> value tzresult Lwt.t
 
   (** Remove the data from the local index or cancel all pending
@@ -124,7 +120,6 @@ module type DISK_TABLE = sig
   val known: store -> key -> bool Lwt.t
   val read: store -> key -> value tzresult Lwt.t
   val read_opt: store -> key -> value option Lwt.t
-  val read_exn: store -> key -> value Lwt.t
 end
 
 module type MEMORY_TABLE = sig
@@ -185,7 +180,7 @@ end
 module type REQUEST = sig
   type key
   type param
-  val initial_delay : float
+  val initial_delay : Time.System.Span.t
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end

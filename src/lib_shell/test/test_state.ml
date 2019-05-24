@@ -35,8 +35,7 @@ let genesis_protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
-let genesis_time =
-  Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 module Proto = (val Registered_protocol.get_exn genesis_protocol)
 
@@ -63,7 +62,7 @@ let incr_fitness fitness =
   [ new_fitness ]
 
 let incr_timestamp timestamp =
-  Time.add timestamp (Int64.add 1L (Random.int64 10L))
+  Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))
 
 let operation op =
   let op : Operation.t = {
@@ -120,15 +119,15 @@ let build_valid_chain state vtbl pred names =
                (parsed_block block) >>=? fun vstate ->
              (* no operations *)
              Proto.finalize_block vstate
-           end >>=? fun (ctxt, _metadata) ->
-           Context.commit ~time:block.shell.timestamp ctxt.context
-           >>= fun context_hash ->
+           end >>=? fun (validation_result, _metadata) ->
+           Context.commit
+             ~time:block.shell.timestamp validation_result.context >>= fun context_hash ->
            State.Block.store state
              block zero [[op]] [[zero]]
              ({context_hash;
-               message = ctxt.message;
-               max_operations_ttl = ctxt.max_operations_ttl;
-               last_allowed_fork_level = ctxt.last_allowed_fork_level} :
+               message = validation_result.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level = validation_result.last_allowed_fork_level} :
                 State.Block.validation_store)
              ~forking_testchain:false >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
@@ -181,7 +180,7 @@ let wrap_state_init f base_dir =
       ~context_mapsize:4_096_000_000L
       ~store_root
       ~context_root
-      genesis >>=? fun (state, chain, _index) ->
+      genesis >>=? fun (state, chain, _index, _history_mode) ->
     build_example_tree chain >>= fun vblock ->
     f { state ; chain ; vblock } >>=? fun () ->
     return_unit
@@ -208,6 +207,155 @@ let test_read_block (s: state) =
     ) (vblocks s) >>= fun () ->
   return_unit
 
+
+(****************************************************************************)
+
+(** Chain.set_checkpoint_then_purge_full *)
+
+let test_set_checkpoint_then_purge_full (s : state) =
+  State.Chain.checkpoint s.chain >>= fun checkpoint ->
+  let checkpoint_lvl = checkpoint.shell.level in
+  let checkpoint_hash = Block_header.hash checkpoint in
+  (* At the beginning the checkpoint is the genesis. *)
+  State.Block.read (s.chain) genesis_block >>=? fun read_genesis ->
+  let read_genesis_hash = Block_header.hash (State.Block.header read_genesis) in
+  assert (Block_hash.equal checkpoint_hash read_genesis_hash) ;
+  assert (checkpoint_lvl = Int32.zero) ;
+  let a1 = vblock s "A1" in
+  let ha1 = State.Block.hash a1 in
+  let b1 = vblock s "B1" in
+  let hb1 = State.Block.hash b1 in
+  let b2 = vblock s "B2" in
+  let hb2 = State.Block.hash b2 in
+  let la1 = State.Block.level a1 in
+  let lb1 = State.Block.level b1 in
+  let lb2 = State.Block.level b2 in
+  assert (Int32.compare checkpoint_lvl la1 = -1) ;
+  assert (Int32.compare checkpoint_lvl lb1 = -1) ;
+  assert (Int32.compare checkpoint_lvl lb2 = -1) ;
+  State.Chain.store s.chain >>= fun chain_store ->
+  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
+  let block_store = Store.Block.get chain_store in
+  (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
+  State.Chain.set_checkpoint_then_purge_full s.chain (State.Block.header b2)
+  >>=? fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
+  begin State.Block.known s.chain hb2 >|= fun b -> assert b end
+  >>= fun () ->
+  begin State.Chain.checkpoint s.chain >|= begin fun b ->
+      assert (Block_hash.equal (Block_header.hash b) hb2);
+      assert (Int32.equal b.shell.level lb2);
+    end
+  end
+  >>= fun () -> (* Assert b1 has been pruned.. *)
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  >>= fun () -> (* pruned, so we can still access its header. *)
+  begin
+    State.Block.read_opt s.chain hb1 >|= function
+    | Some _header -> assert true
+    | None -> assert false
+  end
+  >>= fun () -> (* Assert a1 has also been pruned .. *)
+  begin Store.Block.Contents.known (block_store, ha1) >|= fun b -> assert (not b) end
+  >>= fun () -> (* and we can also access its header. *)
+  begin
+    State.Block.read_opt s.chain ha1 >|= function
+    | Some _header -> assert true
+    | None -> assert false
+  end
+  >>= fun () -> (* and is accesible in Store.Block.Header *)
+  begin Store.Block.Pruned_contents.known (block_store, ha1) >|= fun b -> assert b end
+  >>= fun () -> return_unit
+
+(** Chain.set_checkpoint_then_purge_rolling *)
+
+let test_set_checkpoint_then_purge_rolling (s : state) =
+  State.Chain.checkpoint s.chain >>= fun checkpoint ->
+  let checkpoint_lvl = checkpoint.shell.level in
+  let checkpoint_hash = Block_header.hash checkpoint in
+  (* At the beginning the checkpoint is the genesis. *)
+  State.Block.read (s.chain) genesis_block >>=? fun read_genesis ->
+  let read_genesis_hash = Block_header.hash (State.Block.header read_genesis) in
+  assert (Block_hash.equal checkpoint_hash read_genesis_hash) ;
+  assert (checkpoint_lvl = Int32.zero) ;
+  let a1 = vblock s "A1" in
+  let ha1 = State.Block.hash a1 in
+  let b1 = vblock s "B1" in
+  let hb1 = State.Block.hash b1 in
+  let b2 = vblock s "B2" in
+  let hb2 = State.Block.hash b2 in
+  let la1 = State.Block.level a1 in
+  let lb1 = State.Block.level b1 in
+  let lb2 = State.Block.level b2 in
+  assert (Int32.compare checkpoint_lvl la1 = -1) ;
+  assert (Int32.compare checkpoint_lvl lb1 = -1) ;
+  assert (Int32.compare checkpoint_lvl lb2 = -1) ;
+  State.Block.max_operations_ttl b2 >>=? fun max_op_ttl ->
+  assert (max_op_ttl > 0) ;
+  let ilb1 = Int32.to_int lb1 in
+  let ilb2 = Int32.to_int lb2 in
+  (* Assert b1 is in the to-prune range. *)
+  assert (ilb2 - ilb1 <= min max_op_ttl ilb2) ;
+  (* Assert a1 is in the to-delete range. *)
+  let ila1 = Int32.to_int la1 in
+  assert (ilb2 - ila1 > min max_op_ttl ilb2);
+  (* Assert b1 is not yet in Store.Block.Header since not pruned *)
+  State.Chain.store s.chain >>= fun chain_store ->
+  let chain_store = Store.Chain.get chain_store (State.Chain.id s.chain)  in
+  let block_store = Store.Block.get chain_store in
+  begin Store.Block.Pruned_contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  >>= fun () ->
+  (* But accessible with State.Block.Header *)
+  begin State.Block.known s.chain hb1 >|= fun b -> assert b end
+  (* And Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert b end
+  (* Let us set a new checkpoint "B1" whose level is greater than the genesis. *)
+  >>= fun () ->
+  State.Chain.set_checkpoint_then_purge_rolling s.chain (State.Block.header b2)
+  >>=? fun () -> (* Assert b2 does still exist and is the new checkpoint. *)
+  begin State.Block.known s.chain hb2 >|= fun b -> assert b end
+  >>= fun () ->
+  begin State.Chain.checkpoint s.chain >|= begin fun b ->
+      assert (Block_hash.equal (Block_header.hash b) hb2);
+      assert (Int32.equal b.shell.level lb2);
+    end
+  end
+  >>= fun () -> (* Assert b1 has been pruned.. *)
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  >>= fun () -> (* pruned, so we can still access its header. *)
+  begin
+    State.Block.read_opt s.chain hb1 >|= function
+    | Some _block -> assert true
+    | None -> assert false
+  end
+  >>= fun () ->
+  (* Assert b1 is now in Store.Block.Header since it has been pruned *)
+  begin Store.Block.Pruned_contents.known (block_store, hb1) >|= fun b -> assert b end
+  >>= fun () ->
+  (* And also accessible with State.Block.Header *)
+  begin State.Block.Header.known (block_store, hb1) >|= fun b -> assert b end
+  (* But not in Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  >>= fun () -> (* Assert a1 has been deleted.. *)
+  begin State.Block.known s.chain ha1 >|= fun b -> assert (not b) end
+  >>= fun () -> (* deleted, so we can not access its header anymore. *)
+  begin
+    State.Block.read_opt s.chain ha1 >|= function
+    | Some _header -> assert false
+    | None -> assert true
+  end
+  >>= fun () ->
+  (* Assert b1 is now in Store.Block.Header since it has been pruned *)
+  begin Store.Block.Pruned_contents.known (block_store, ha1) >|= fun b -> assert (not b) end
+  >>= fun () ->
+  (* And not in State.Block.Header *)
+  begin State.Block.Header.known (block_store, ha1) >|= fun b -> assert (not b) end
+  (* Neither in Store.Block.Contents *)
+  >>= fun () ->
+  begin Store.Block.Contents.known (block_store, hb1) >|= fun b -> assert (not b) end
+  (*  *)
+  >>= fun () -> return_unit
 
 (****************************************************************************)
 
@@ -429,6 +577,8 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "head", test_head ;
   "mem", test_mem ;
   "new_blocks", test_new_blocks ;
+  "set_checkpoint_then_purge_rolling", test_set_checkpoint_then_purge_rolling ;
+  "set_checkpoint_then_purge_full", test_set_checkpoint_then_purge_full ;
 ]
 
 let wrap (n, f) =

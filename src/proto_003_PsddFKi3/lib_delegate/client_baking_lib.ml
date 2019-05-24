@@ -57,13 +57,18 @@ let bake_block
       Some seed_nonce, Some seed_nonce_hash
     else
       None, None in
+  let timestamp =
+    if minimal_timestamp then
+      None
+    else
+      Some Time.System.(to_protocol (Systime_os.now ())) in
   Client_baking_forge.forge_block cctxt
     ?force
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
     ~await_endorsements
-    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
+    ?timestamp
     ?seed_nonce_hash
     ?mempool
     ?context_path
@@ -149,7 +154,7 @@ let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
     load cctxt nonces_location >>=? fun nonces ->
     get_unrevealed_nonces cctxt nonces_location nonces >>=? fun nonces_to_reveal ->
     do_reveal cctxt ~chain ~block nonces_to_reveal >>=? fun () ->
-    filter_outdated_nonces cctxt ~chain nonces_location nonces >>=? fun nonces ->
+    filter_outdated_nonces cctxt nonces_location nonces >>=? fun nonces ->
     save cctxt nonces_location nonces >>=? fun () ->
     return_unit
   end

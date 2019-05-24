@@ -63,35 +63,7 @@ let () =
 
 let (//) = Filename.concat
 
-let store_dir data_dir = data_dir // "store"
-let context_dir data_dir = data_dir // "context"
-let protocol_dir data_dir = data_dir // "protocol"
-let lock_file data_dir = data_dir // "lock"
-
 let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
-  let patch_context json ctxt =
-    begin
-      match json with
-      | None -> Lwt.return ctxt
-      | Some json ->
-          Tezos_storage.Context.set ctxt
-            ["sandbox_parameter"]
-            (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
-    end >>= fun ctxt ->
-    let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
-    Proto.init ctxt {
-      level = 0l ;
-      proto_level = 0 ;
-      predecessor = genesis.block ;
-      timestamp = genesis.time ;
-      validation_passes = 0 ;
-      operations_hash = Operation_list_list_hash.empty ;
-      fitness = [] ;
-      context = Context_hash.zero ;
-    } >>= function
-    | Error _ -> assert false (* FIXME error *)
-    | Ok { context = ctxt ; _ } ->
-        Lwt.return ctxt in
   begin
     match sandbox with
     | None -> Lwt.return_none
@@ -163,16 +135,16 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
               Crypto_box.make_target config.p2p.expected_pow ;
             disable_mempool = config.p2p.disable_mempool ;
             trust_discovered_peers = (sandbox_param <> None) ;
-            disable_testchain = not config.p2p.enable_testchain ;
+            disable_testchain = config.p2p.disable_testchain ;
           }
         in
         return_some (p2p_config, config.p2p.limits)
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
-    patch_context = Some (patch_context sandbox_param) ;
-    store_root = store_dir config.data_dir ;
-    context_root = context_dir config.data_dir ;
+    patch_context = Some (Patch_context.patch_context sandbox_param) ;
+    store_root = Node_data_version.store_dir config.data_dir ;
+    context_root = Node_data_version.context_dir config.data_dir ;
     p2p = p2p_config ;
     test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
     checkpoint ;
@@ -184,6 +156,7 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
+    config.shell.history_mode
 
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
@@ -243,16 +216,27 @@ let init_signal () =
 let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_lock_file.create
-    ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
+    ~unlink_on_exit:true (Node_data_version.lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
   let log_cfg =
     match verbosity with
     | None -> config.log
     | Some default_level -> { config.log with default_level } in
-  Logging_unix.init ~cfg:log_cfg () >>= fun () ->
-  Updater.init (protocol_dir config.data_dir) ;
+  Internal_event_unix.init ~lwt_log_sink:log_cfg
+    ~configuration:config.internal_events () >>= fun () ->
+  Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
-  init_node ?sandbox ?checkpoint config >>=? fun node ->
+  begin init_node ?sandbox ?checkpoint config >>= function
+    | Ok node -> return node
+    | Error (State.Incorrect_history_mode_switch { previous_mode ; next_mode } :: _) ->
+        failwith "@[Cannot switch from history mode '%a' to \
+                  '%a'. Import a context from a corresponding snapshot \
+                  or re-synchronize a node with an empty tezos node \
+                  directory.@]"
+          History_mode.pp previous_mode
+          History_mode.pp next_mode
+    | Error _ as err -> Lwt.return err
+  end >>=? fun node ->
   init_rpc config.rpc node >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
   Lwt_exit.termination_thread >>= fun x ->
@@ -261,15 +245,16 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
   Lwt_list.iter_s RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
-  Logging_unix.close () >>= fun () ->
+  Internal_event_unix.close () >>= fun () ->
   return_unit
 
 let process sandbox verbosity checkpoint args =
   let verbosity =
+    let open Internal_event in
     match verbosity with
     | [] -> None
-    | [_] -> Some Logging.Info
-    | _ -> Some Logging.Debug in
+    | [_] -> Some Info
+    | _ -> Some Debug in
   let run =
     Node_shared_arg.read_and_patch_config_file
       ~ignore_bootstrap_peers:(match sandbox with
@@ -287,29 +272,13 @@ let process sandbox verbosity checkpoint args =
       match checkpoint with
       | None -> return_none
       | Some s ->
-          match String.split ',' s with
-          | [ lvl ; block ] ->
-              Lwt.return (Block_hash.of_b58check block) >>=? fun block ->
-              begin
-                match Int32.of_string_opt lvl with
-                | None ->
-                    failwith "%s isn't a 32bit integer" lvl
-                | Some lvl ->
-                    return lvl
-              end >>=? fun lvl ->
-              return_some (lvl, block)
-          | [] -> assert false
-          | [_] ->
-              failwith "Checkoints are expected to follow the format \
-                        \"<level>,<block_hash>\". \
-                        The character ',' is not present in %s" s
-          | _ ->
-              failwith "Checkoints are expected to follow the format \
-                        \"<level>,<block_hash>\". \
-                        The character ',' is present more than once in %s" s
+          match Block_header.of_b58check s with
+          | Some b -> return_some b
+          | None ->
+              failwith "Failed to parse the provided checkpoint (Base58Check-encoded)."
     end >>=? fun checkpoint ->
     Lwt_lock_file.is_locked
-      (lock_file config.data_dir) >>=? function
+      (Node_data_version.lock_file config.data_dir) >>=? function
     | false ->
         Lwt.catch
           (fun () -> run ?sandbox ?verbosity ?checkpoint config)
@@ -384,7 +353,9 @@ module Manpage = struct
   ]
 
   let debug =
-    let log_sections = String.concat " " (List.rev !Logging.sections) in
+    let log_sections =
+      String.concat " "
+        (List.rev !Internal_event.Legacy_logging.sections) in
     [
       `S "DEBUG" ;
       `P ("The environment variable $(b,TEZOS_LOG) is used to fine-tune \
@@ -415,6 +386,7 @@ module Manpage = struct
   let man =
     description @
     Node_shared_arg.Manpage.args @
+    debug @
     examples @
     Node_shared_arg.Manpage.bugs
 

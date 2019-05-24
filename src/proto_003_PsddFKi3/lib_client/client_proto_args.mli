@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -67,10 +68,15 @@ val tez_param :
   ('a, full) Clic.params ->
   (Tez.t -> 'a, full) Clic.params
 
+val signature_parameter :
+  (Signature.t, full) Clic.parameter
+
 module Daemon : sig
   val baking_switch: (bool, Proto_alpha.full) Clic.arg
   val endorsement_switch: (bool, Proto_alpha.full) Clic.arg
   val denunciation_switch: (bool, Proto_alpha.full) Clic.arg
 end
 
+val int_parameter : (int, full) Clic.parameter
 val string_parameter : (string, full) Clic.parameter
+val bytes_parameter : (MBytes.t, full) Clic.parameter

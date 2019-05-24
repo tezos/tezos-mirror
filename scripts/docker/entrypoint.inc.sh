@@ -41,7 +41,7 @@ wait_for_the_node_to_be_bootstraped() {
     "$client" bootstrapped
 }
 
-launch_node() {
+check_image_version() {
 
     mkdir -p "$node_dir"
 
@@ -75,6 +75,12 @@ launch_node() {
 
     mkdir -p "$node_data_dir"
 
+}
+
+launch_node() {
+
+    check_image_version
+
     if [ ! -f "$node_data_dir/config.json" ]; then
         echo "Configuring the node..."
         "$node" config init \
@@ -106,6 +112,22 @@ launch_node() {
     # Launching the node
 
     exec "$node" run --data-dir "$node_data_dir"
+
+}
+
+upgrade_node_storage() {
+
+    check_image_version
+
+    exec "$node" upgrade storage --data-dir "$node_data_dir"
+
+}
+
+snapshot_import() {
+
+    check_image_version
+
+    exec "$node" snapshot import "${1:-/snapshot}" --data-dir "$node_data_dir"
 
 }
 
