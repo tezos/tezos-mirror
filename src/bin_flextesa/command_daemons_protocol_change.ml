@@ -142,12 +142,6 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))
         ; arbitrary_command_on_clients state ~command_names:["c0"; "client-0"]
             ~make_admin ~clients:[client_0] ]) ;
-  Test_scenario.Queries.wait_for_all_levels_to_be state
-    ~attempts:waiting_attempts ~seconds:10. nodes
-    (* TODO: wait for /chains/main/blocks/head/votes/listings to be
-       non-empty instead of counting blocks *)
-    (`At_least protocol.Tezos_protocol.blocks_per_voting_period)
-  >>= fun () ->
   (* 
      For each node we try to see if the node knows about the protocol,
      if it does we're good, if not we inject it.
@@ -211,8 +205,20 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             , first_endorser_exec )
           ; (new_protocol_hash, second_baker_exec, second_endorser_exec) ]
       >>= fun () ->
-      return EF.(wf "Kiln was configured at `%s`" kiln_config.path) )
+      let msg =
+        EF.(
+          desc
+            (shout "Kiln-Configuration DONE")
+            (wf "Kiln was configured at `%s`" kiln_config.path))
+      in
+      Console.say state msg >>= fun () -> return msg )
   >>= fun kiln_info_opt ->
+  Test_scenario.Queries.wait_for_all_levels_to_be state
+    ~attempts:waiting_attempts ~seconds:10. nodes
+    (* TODO: wait for /chains/main/blocks/head/votes/listings to be
+       non-empty instead of counting blocks *)
+    (`At_least protocol.Tezos_protocol.blocks_per_voting_period)
+  >>= fun () ->
   Interactive_test.Pauser.generic state
     EF.
       [ wf "Test becomes interactive."
