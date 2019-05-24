@@ -52,6 +52,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
     ~extra_dummy_proposals ~waiting_attempts test_variant () =
   Helpers.System_dependencies.precheck state `Or_fail
+    ~protocol_paths:[new_protocol_path]
     ~executables:
       [ node_exec; client_exec; first_baker_exec; first_endorser_exec
       ; first_accuser_exec; second_baker_exec; second_endorser_exec
