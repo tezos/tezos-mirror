@@ -486,7 +486,10 @@ module Pauser = struct
           ~force:(Interactivity.pause_on_error state)
           EF.
             [ haf "Last pause before the test will Kill 'Em All and Quit."
-            ; desc (shout "Error:") (af "%a" pp_error error_value) ]
+            ; desc (shout "Error:")
+                (af "%a"
+                   (fun ppf c -> Attached_result.pp ppf c ~pp_error)
+                   result) ]
         >>= fun () ->
         finish () >>= fun () -> fail error_value ~attach:result.attachments )
 end
