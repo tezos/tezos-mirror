@@ -281,7 +281,7 @@ assert_storage_contains transfer_amount 500
 # This test may fail if timings are marginal, though I have not yet seen this happen
 init_with_transfer $contract_op_dir/store_now.tz $key1 '"2017-07-13T09:19:01Z"' "100" bootstrap1
 bake_after $client transfer 500 from bootstrap1 to store_now -arg Unit --burn-cap 10
-assert_storage_contains store_now "$($client get timestamp)"
+assert_storage_contains store_now "$(get_NOW)"
 
 # Test timestamp operations
 assert_storage $contract_op_dir/add_timestamp_delta.tz None '(Pair 100 100)' '(Some "1970-01-01T00:03:20Z")'

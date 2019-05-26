@@ -168,6 +168,16 @@ assert_in_output () {
     fi
 }
 
+get_NOW () {
+    local PRED_TS=`$client rpc get /chains/main/blocks/head~1/header | \
+                   jq .timetamp | \
+                   tr -d '"'`
+    local TBB=`$client rpc get /chains/main/blocks/head/context/constants | \
+               jq '.time_between_blocks | .[0]' | \
+               tr -d '"'`
+	echo "$(TZ='AAA' date -d "${PRED_TS} + ${TBB} seconds" +%FT%TZ)"
+}
+
 get_contract_addr () {
     local CONTRACT_NAME="$1"
     $client show known contract "${CONTRACT_NAME}"
