@@ -11,8 +11,8 @@ depends: [
   "dune" { build & >= "1.7" }
   "tezos-stdlib"
   "ezjsonm"
-  "ocplib-json-typed"
-  "ocplib-json-typed-bson"
+  "ocplib-json-typed" { = "dev" }
+  "ocplib-json-typed-bson" { = "dev" }
   "ocplib-endian"
   "alcotest" { with-test }
   "crowbar" { with-test }
