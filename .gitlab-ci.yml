@@ -99,103 +99,114 @@ check_python_lint:
 ## Stage: test (only MR)                                  ##
 ############################################################
 
-test:unit:stdlib:
+.test_template: &test_definition
+  <<: *build_definition
+  stage: test
+  before_script:
+    - sudo apk add py-pip python3 python3-dev
+    - sudo pip install --upgrade pip
+    - sudo pip3 install -r tests_python/requirements.txt
+    - make all
+  dependencies:
+    - build
+
+unit:stdlib:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib/runtest
   stage: test
 
-test:unit:stdlib_unix:
+unit:stdlib_unix:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib_unix/runtest
   stage: test
 
-test:unit:data_encoding:
+unit:data_encoding:
   <<: *test_definition
   script:
     - dune build @src/lib_data_encoding/runtest
   stage: test
 
-test:unit:storage:
+unit:storage:
   <<: *test_definition
   script:
     - dune build @src/lib_storage/runtest
   stage: test
 
-test:unit:crypto:
+unit:crypto:
   <<: *test_definition
   script:
     - dune build @src/lib_crypto/runtest
   stage: test
 
-test:unit:shell:
+unit:shell:
   <<: *test_definition
   script:
     - dune build @src/lib_shell/runtest
   stage: test
 
-test:unit:p2p:io-scheduler:
+unit:p2p:io-scheduler:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
   stage: test
 
-test:unit:p2p:socket:
+unit:p2p:socket:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
   stage: test
 
-test:unit:p2p:pool:
+unit:p2p:pool:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
   stage: test
 
-test:unit:proto_alpha:lib_protocol:
+unit:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
   stage: test
 
-test:unit:proto_alpha:lib_client:
+unit:proto_alpha:lib_client:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_client/test/runtest
   stage: test
 
-test:unit:p2p:peerset:
+unit:p2p:peerset:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_peerset
   stage: test
 
-test:unit:p2p:ipv6set:
+unit:p2p:ipv6set:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_ipv6set
   stage: test
 
-test:unit:p2p:banned_peers:
+unit:p2p:banned_peers:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_banned_peers
   stage: test
 
-test:unit:client_alpha:vote:
+unit:client_alpha:vote:
   <<: *test_definition
   script:
     - dune build @src/proto_alpha/lib_delegate/runtest_vote
   stage: test
 
-test:unit:validation:
+unit:validation:
   <<: *test_definition
   script:
     - dune build @src/lib_validation/runtest
   stage: test
 
-test:unit:micheline:
+unit:micheline:
   <<: *test_definition
   script:
     - dune build @src/lib_micheline/runtest
@@ -205,55 +216,55 @@ test:unit:micheline:
 ## Stage: run shell integration tests                     ##
 ############################################################
 
-test:integration:basic.sh:
+integration:basic.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_basic.sh
   stage: test
 
-test:integration:contracts.sh:
+integration:contracts.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts.sh
   stage: test
 
-test:integration:contracts_opcode.sh:
+integration:contracts_opcode.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_opcode.sh
   stage: test
 
-test:integration:contracts_macros.sh:
+integration:contracts_macros.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
   stage: test
 
-test:integration:contracts_mini_scenarios.sh:
+integration:contracts_mini_scenarios.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
   stage: test
 
-test:integration:multinode.sh:
+integration:multinode.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_multinode.sh
   stage: test
 
-test:integration:inject.sh:
+integration:inject.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_injection.sh
   stage: test
 
-test:integration:voting.sh:
+integration:voting.sh:
   <<: *test_definition
   script:
     - dune build @src/bin_client/runtest_voting.sh
   stage: test
 
-test:integration:proto:sandbox:
+integration:proto:sandbox:
   <<: *test_definition
   script:
     - dune build @runtest_sandbox
@@ -263,7 +274,7 @@ test:integration:proto:sandbox:
 ## Stage: run OCaml integration tests                     ##
 ############################################################
 
-test:integration:sandboxes:voting:
+integration:sandboxes:voting:
   <<: *test_definition
   script:
     - ROOT_PATH=$PWD/flextesa-voting-demo dune build @src/bin_flextesa/runtest_sandbox_voting_demo
@@ -275,7 +286,7 @@ test:integration:sandboxes:voting:
   allow_failure: true # This test uses too much resources for GitLab's workers
   stage: test
 
-test:integration:sandboxes:acc-baking:
+integration:sandboxes:acc-baking:
   <<: *test_definition
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_baking
@@ -286,7 +297,7 @@ test:integration:sandboxes:acc-baking:
     when: on_failure
   stage: test
 
-test:integration:sandboxes:acc-endorsement:
+integration:sandboxes:acc-endorsement:
   <<: *test_definition
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_endorsing
@@ -302,79 +313,79 @@ test:integration:sandboxes:acc-endorsement:
 ############################################################
 
 ##BEGIN_INTEGRATION_PYTHON##
-integration:00:baker_endorser:
+integration:baker_endorser:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_baker_endorser.py
   stage: test
 
-integration:01:basic:
+integration:basic:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_basic.py
   stage: test
 
-integration:02:contract:
+integration:contract:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_contract.py
   stage: test
 
-integration:03:contract_baker:
+integration:contract_baker:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py
   stage: test
 
-integration:04:cors:
+integration:cors:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_cors.py
   stage: test
 
-integration:05:injection:
+integration:injection:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_injection.py
   stage: test
 
-integration:06:many_bakers:
+integration:many_bakers:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_many_bakers.py
   stage: test
 
-integration:07:many_nodes:
+integration:many_nodes:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_many_nodes.py
   stage: test
 
-integration:08:mempool:
+integration:mempool:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_mempool.py
   stage: test
 
-integration:09:multinode:
+integration:multinode:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_multinode.py
   stage: test
 
-integration:10:rpc:
+integration:rpc:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_rpc.py
   stage: test
 
-integration:11:tls:
+integration:tls:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_tls.py
   stage: test
 
-integration:12:voting:
+integration:voting:
   <<: *test_definition
   script:
     - pytest tests_python/tests/test_voting.py
@@ -387,13 +398,13 @@ integration:12:voting:
 ## Stage: run doc integration tests                       ##
 ############################################################
 
-test:documentation:
+documentation:
   <<: *test_definition
   stage: test
   script:
     - make doc-html
 
-test:linkcheck:
+linkcheck:
   <<: *test_definition
   stage: test
   script:
