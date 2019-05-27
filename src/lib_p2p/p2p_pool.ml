@@ -34,74 +34,6 @@
 
 include Internal_event.Legacy_logging.Make (struct let name = "p2p.connection-pool" end)
 
-type 'msg encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg encoding
-
-module Message = struct
-
-  type 'msg t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'msg
-    | Disconnect
-
-  let encoding msg_encoding =
-    let open Data_encoding in
-    dynamic_size @@
-    union ~tag_size:`Uint16
-      ([ case (Tag 0x01) ~title:"Disconnect"
-           (obj1 (req "kind" (constant "Disconnect")))
-           (function Disconnect -> Some () | _ -> None)
-           (fun () -> Disconnect);
-         case (Tag 0x02) ~title:"Bootstrap"
-           (obj1 (req "kind" (constant "Bootstrap")))
-           (function Bootstrap -> Some () | _ -> None)
-           (fun () -> Bootstrap);
-         case (Tag 0x03) ~title:"Advertise"
-           (obj2
-              (req "id" (Variable.list P2p_point.Id.encoding))
-              (req "kind" (constant "Advertise")))
-           (function Advertise points -> Some (points, ()) | _ -> None)
-           (fun (points, ()) -> Advertise points);
-         case (Tag 0x04) ~title:"Swap_request"
-           (obj3
-              (req "point" P2p_point.Id.encoding)
-              (req "peer_id" P2p_peer.Id.encoding)
-              (req "kind" (constant "Swap_request")))
-           (function
-             | Swap_request (point, peer_id) -> Some (point, peer_id, ())
-             | _ -> None)
-           (fun (point, peer_id, ()) -> Swap_request (point, peer_id)) ;
-         case (Tag 0x05)
-           ~title:"Swap_ack"
-           (obj3
-              (req "point" P2p_point.Id.encoding)
-              (req "peer_id" P2p_peer.Id.encoding)
-              (req "kind" (constant "Swap_ack")))
-           (function
-             | Swap_ack (point, peer_id) -> Some (point, peer_id, ())
-             | _ -> None)
-           (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
-       ] @
-       ListLabels.map msg_encoding
-         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length = _ (* ?? *) } ->
-             Data_encoding.case (Tag tag)
-               ~title
-               encoding
-               (function Message msg -> unwrap msg | _ -> None)
-               (fun msg -> Message (wrap msg))))
-
-end
-
-
 module Answerer = struct
 
   type 'msg callback = {
@@ -114,7 +46,7 @@ module Answerer = struct
 
   type ('msg, 'meta) t = {
     canceler: Lwt_canceler.t ;
-    conn: ('msg Message.t, 'meta) P2p_socket.t ;
+    conn: ('msg P2p_message.t, 'meta) P2p_socket.t ;
     callback: 'msg callback ;
     mutable worker: unit Lwt.t ;
   }
@@ -223,7 +155,7 @@ type 'peer_meta peer_meta_config = {
 }
 
 type 'msg message_config = {
-  encoding : 'msg encoding list ;
+  encoding : 'msg P2p_message.encoding list ;
   chain_name : Distributed_db_version.name ;
   distributed_db_versions : Distributed_db_version.t list ;
 }
@@ -250,7 +182,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
   incoming : Lwt_canceler.t P2p_point.Table.t ;
   io_sched : P2p_io_scheduler.t ;
-  encoding : 'msg Message.t Data_encoding.t ;
+  encoding : 'msg P2p_message.t Data_encoding.t ;
   events : events ;
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
   acl : P2p_acl.t ;
@@ -271,7 +203,7 @@ and events = {
 and ('msg, 'peer_meta, 'conn_meta) connection = {
   canceler : Lwt_canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
-  conn : ('msg Message.t, 'conn_meta) P2p_socket.t ;
+  conn : ('msg P2p_message.t, 'conn_meta) P2p_socket.t ;
   peer_info :
     (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
   point_info :
@@ -1247,7 +1179,7 @@ let create
     connected_points = P2p_point.Table.create 53 ;
     incoming = P2p_point.Table.create 53 ;
     io_sched ;
-    encoding = Message.encoding message_config.encoding ;
+    encoding = P2p_message.encoding message_config.encoding ;
     events ;
     watcher = Lwt_watcher.create_input () ;
     acl = P2p_acl.create 1023;

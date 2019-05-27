@@ -44,17 +44,8 @@ type 'conn_meta conn_meta_config = {
   private_node : 'conn_meta -> bool ;
 }
 
-type 'msg app_message_encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg app_message_encoding
-
 type 'msg message_config = {
-  encoding : 'msg app_message_encoding list ;
+  encoding : 'msg P2p_message.encoding list ;
   chain_name : Distributed_db_version.name ;
   distributed_db_versions : Distributed_db_version.t list ;
 }
@@ -303,16 +294,3 @@ val build_rpc_directory :
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
-
-(**/**)
-
-module Raw : sig
-  type 'a t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'a
-    | Disconnect
-  val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t
-end

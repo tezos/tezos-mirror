@@ -40,7 +40,7 @@ type 'conn_meta conn_meta_config = 'conn_meta P2p_socket.metadata_config = {
   private_node : 'conn_meta -> bool ;
 }
 
-type 'msg app_message_encoding = 'msg P2p_pool.encoding =
+type 'msg app_message_encoding = 'msg P2p_message.encoding =
     Encoding : {
       tag: int ;
       title: string ;
@@ -558,17 +558,6 @@ let greylist_addr net addr =
   Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_addr pool addr)
 let greylist_peer net peer_id =
   Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_peer pool peer_id)
-
-module Raw = struct
-  type 'a t = 'a P2p_pool.Message.t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'a
-    | Disconnect
-  let encoding = P2p_pool.Message.encoding
-end
 
 let info_of_point_info i =
   let open P2p_point.Info in

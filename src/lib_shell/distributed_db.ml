@@ -969,7 +969,7 @@ let watch_operation { operation_input ; _ } =
   Lwt_watcher.create_stream operation_input
 
 module Raw = struct
-  let encoding = P2p.Raw.encoding Message.cfg.encoding
+  let encoding = P2p_message.encoding Message.cfg.encoding
   let chain_name = Message.cfg.chain_name
   let distributed_db_versions = Message.cfg.distributed_db_versions
 end
