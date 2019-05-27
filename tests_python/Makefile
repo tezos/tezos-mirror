@@ -15,7 +15,6 @@ all:
 injection:
 	pytest -s tests/test_injection.py
 
-
 lint_all: typecheck lint lint2
 
 typecheck:

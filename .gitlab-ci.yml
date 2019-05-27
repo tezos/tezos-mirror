@@ -92,7 +92,6 @@ check_python_lint:
   <<: *test_definition
   script:
     - make -C tests_python lint_all
-    - make -C tests_python typecheck
   stage: test
 
 ############################################################
