@@ -19,5 +19,5 @@ depends: [
   "ocamlfind" {build}
   "dune" {build}
   "ocplib-resto" {= "dev" }
-  "ocplib-json-typed-bson" { >= "0.6" }
+  "ocplib-json-typed-bson" { = "dev" }
 ]
