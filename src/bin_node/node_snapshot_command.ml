@@ -51,7 +51,7 @@ module Term = struct
           Node_data_version.ensure_data_dir data_dir >>=? fun () ->
           let context_root = context_dir data_dir in
           let store_root = store_dir data_dir in
-          Store.init ~readonly:true store_root >>=? fun store ->
+          Store.init store_root >>=? fun store ->
           Context.init ~readonly:true context_root >>= fun context_index ->
           Snapshots.export
             ~export_rolling
