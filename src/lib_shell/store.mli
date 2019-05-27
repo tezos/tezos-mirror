@@ -25,7 +25,7 @@
 
 open Store_sigs
 
-type t = Raw_store.t
+type t
 type global_store = t
 
 (** [init ~mapsize path] returns an initialized store at [path] of

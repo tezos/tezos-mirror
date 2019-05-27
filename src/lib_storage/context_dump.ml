@@ -130,8 +130,8 @@ module type S = sig
      (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
-  val restore_contexts_fd : index -> Raw_store.t -> fd:Lwt_unix.file_descr ->
-    (pruned_block -> Block_hash.t -> unit tzresult Lwt.t) ->
+  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+    ((Block_hash.t * pruned_block) list -> unit tzresult Lwt.t) ->
     (block_header option ->
      Block_hash.t -> pruned_block -> unit tzresult Lwt.t) ->
     (block_header * block_data * History_mode.t *
@@ -585,7 +585,7 @@ module Make (I:Dump_interface) = struct
 
   (* Restoring *)
 
-  let restore_contexts_fd index store ~fd k_store_pruned_block block_validation =
+  let restore_contexts_fd index ~fd k_store_pruned_blocks block_validation =
 
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
@@ -634,11 +634,7 @@ module Make (I:Dump_interface) = struct
             let hash = Block_header.hash header in
             block_validation pred_header hash pruned_block >>=? fun () ->
             begin if (cpt + 1) mod 5_000 = 0 then
-                Raw_store.with_atomic_rw store begin fun () ->
-                  Error_monad.iter_s begin fun (hash, pruned_block) ->
-                    k_store_pruned_block pruned_block hash
-                  end ((hash, pruned_block) :: todo)
-                end >>=? fun () ->
+                k_store_pruned_blocks ((hash, pruned_block) :: todo) >>=? fun () ->
                 second_pass (Some header)
                   (hash :: rev_block_hashes, protocol_datas) [] (cpt + 1)
               else
@@ -646,10 +642,7 @@ module Make (I:Dump_interface) = struct
                   (hash :: rev_block_hashes, protocol_datas) ((hash, pruned_block) :: todo) (cpt + 1)
             end
         | Loot protocol_data ->
-            Raw_store.with_atomic_rw store begin fun () ->
-              Error_monad.iter_s (fun (hash, pruned_block) ->
-                  k_store_pruned_block pruned_block hash) todo
-            end >>=? fun () ->
+            k_store_pruned_blocks todo >>=? fun () ->
             second_pass pred_header (rev_block_hashes, protocol_data :: protocol_datas) todo (cpt + 1)
         | End ->
             return (pred_header, rev_block_hashes, List.rev protocol_datas)
