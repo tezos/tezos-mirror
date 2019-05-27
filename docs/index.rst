@@ -138,6 +138,7 @@ in the :ref:`introduction <howtoget>`.
    developer/protocol_environment
    developer/profiling
    developer/flextesa
+   developer/python_testing_framework
    developer/contributing
 
 .. toctree::
