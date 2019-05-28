@@ -259,7 +259,15 @@ let decimal_of_roman roman =
   done;
   !arabic
 
-let expand_dxiiivp original =
+let dip ~loc ?(annot = []) depth instr =
+  assert (depth >= 0) ;
+  if depth = 1 then
+    Prim (loc, "DIP", [ instr ], annot)
+  else
+    Prim (loc, "DIP", [ Int (loc, Z.of_int depth) ; instr ], annot)
+
+let expand_deprecated_dxiiivp original =
+  (* transparently expands deprecated macro [DI...IP] to instruction [DIP n] *)
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -268,14 +276,8 @@ let expand_dxiiivp original =
       && String.get str (len - 1) = 'P' then
         try
           let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
-          let rec make i acc =
-            if i = 0 then
-              acc
-            else
-              make (i - 1)
-                (Seq (loc, [ Prim (loc, "DIP", [ acc ], annot) ])) in
           match args with
-          | [ Seq (_, _) as arg ] -> ok @@ Some (make depth arg)
+          | [ Seq (_, _) as arg ] -> ok @@ Some (dip ~loc ~annot depth arg)
           | [ _ ] -> error (Sequence_expected str)
           | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
         with Not_a_roman -> ok None
@@ -283,11 +285,6 @@ let expand_dxiiivp original =
   | _ -> ok None
 
 exception Not_a_pair
-
-let rec dip ~loc depth instr =
-  if depth <= 0
-  then instr
-  else dip ~loc (depth - 1) (Prim (loc, "DIP", [ Seq (loc, [ instr ]) ], []))
 
 type pair_item =
   | A
@@ -365,7 +362,11 @@ let expand_pappaiir original =
                   | 0, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot @ annot
                   | _, Some (car_annot, cdr_annot) -> car_annot @ cdr_annot
                 in
-                let acc = dip ~loc depth (Prim (loc, "PAIR", [], annot)) :: acc in
+                let acc =
+                  if depth = 0 then
+                    Prim (loc, "PAIR", [], annot) :: acc
+                  else
+                    dip ~loc depth (Seq (loc, [ Prim (loc, "PAIR", [], annot) ])) :: acc in
                 (depth, acc)
                 |> parse left
                 |> parse right
@@ -395,7 +396,7 @@ let expand_unpappaiir original =
           let unpair car_annot cdr_annot =
             Seq (loc, [ Prim (loc, "DUP", [], []) ;
                         Prim (loc, "CAR", [], car_annot) ;
-                        dip ~loc 1 (Prim (loc, "CDR", [], cdr_annot)) ;
+                        dip ~loc 1 (Seq (loc, [ Prim (loc, "CDR", [], cdr_annot)])) ;
                       ]) in
           let ast = parse_pair_substr str ~len 2 in
           let annots_pos = pappaiir_annots_pos ast annot in
@@ -406,7 +407,11 @@ let expand_unpappaiir original =
                   match IntMap.find_opt i annots_pos with
                   | None -> [], []
                   | Some (car_annot, cdr_annot) -> car_annot, cdr_annot in
-                let acc = dip ~loc depth (unpair car_annot cdr_annot) :: acc in
+                let acc =
+                  if depth = 0 then
+                    unpair car_annot cdr_annot :: acc
+                  else
+                    dip ~loc depth (Seq (loc, [ unpair car_annot cdr_annot ])) :: acc in
                 (depth, acc)
                 |> parse left
                 |> parse right
@@ -425,7 +430,24 @@ let expand_unpappaiir original =
 
 exception Not_a_dup
 
-let expand_duuuuup original =
+let dupn loc nloc n annot =
+  assert (n > 1) ;
+  if n = 2 then
+    (* keep the old expansion, shorter for [DUP 2] *)
+    Seq (loc, [ Prim (loc, "DIP", [ Seq (loc, [ Prim (nloc, "DUP", [], annot) ]) ], []) ;
+                Prim (loc, "SWAP", [], []) ])
+  else
+    Seq (loc, [ Prim (loc, "DIP", [ Int (loc, Z.of_int (n - 1)) ;
+                                    Seq (loc, [ Prim (loc, "DUP", [], annot) ]) ], []) ;
+                Prim (loc, "DIG", [ Int (nloc, Z.of_int n) ], []) ])
+
+let expand_dupn original =
+  match original with
+  | Prim (loc, "DUP", [ Int (nloc, n) ], annot) -> ok (Some (dupn loc nloc (Z.to_int n) annot))
+  | _ -> ok None
+
+let expand_deprecated_duuuuup original =
+  (* transparently expands deprecated macro [DU...UP] to [{ DIP n { DUP } ; DIG n }] *)
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -438,15 +460,13 @@ let expand_duuuuup original =
           | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
         end >>? fun () ->
         try
-          let rec parse i acc =
-            if i = 1 then acc
+          let rec parse i =
+            if i = 1 then dupn loc loc (len - 2) annot
             else if String.get str i = 'U' then
               parse (i - 1)
-                (Seq (loc, [ Prim (loc, "DIP", [ acc ], []) ;
-                             Prim (loc, "SWAP", [], []) ]))
             else
               raise_notrace Not_a_dup in
-          ok (Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ]))))
+          ok (Some (parse (len - 2)))
         with Not_a_dup -> ok None
       else
         ok None
@@ -606,12 +626,13 @@ let expand original =
     [ expand_caddadr ;
       expand_set_caddadr ;
       expand_map_caddadr ;
-      expand_dxiiivp ;
+      expand_deprecated_dxiiivp ;
       (* expand_paaiair ; *)
       expand_pappaiir ;
       (* expand_unpaaiair ; *)
       expand_unpappaiir ;
-      expand_duuuuup ;
+      expand_deprecated_duuuuup ;
+      expand_dupn ;
       expand_compare ;
       expand_asserts ;
       expand_if_some ;
@@ -782,42 +803,8 @@ let unexpand_map_caddadr expanded =
       Some (Prim (loc, name, [ code ], List.rev annots))
   | None -> None
 
-let roman_of_decimal decimal =
-  (* http://rosettacode.org/wiki/Roman_numerals/Encode#OCaml *)
-  let digit x y z = function
-    | 1 -> [ x ]
-    | 2 -> [ x ; x ]
-    | 3 -> [ x ; x ; x ]
-    | 4 -> [ x ; y ]
-    | 5 -> [ y ]
-    | 6 -> [ y ; x ]
-    | 7 -> [ y ; x ; x ]
-    | 8 -> [ y ; x ; x ; x ]
-    | 9 -> [ x ; z ]
-    | _ -> assert false in
-  let rec to_roman x =
-    if x = 0 then []
-    else if x < 0 then
-      invalid_arg "Negative roman numeral"
-    else if x >= 1000 then
-      "M" :: to_roman (x - 1000)
-    else if x >= 100 then
-      digit "C" "D" "M" (x / 100) @ to_roman (x mod 100)
-    else if x >= 10 then
-      digit "X" "L" "C" (x / 10) @ to_roman (x mod 10)
-    else
-      digit "I" "V" "X" x in
-  String.concat "" (to_roman decimal)
-
-let dxiiivp_roman_of_decimal decimal =
-  let roman = roman_of_decimal decimal in
-  if String.length roman = 1 then
-    (* too short for D*P, fall back to IIIII... *)
-    String.concat "" (List.init decimal (fun _ -> "I"))
-  else
-    roman
-
-let unexpand_dxiiivp expanded =
+let unexpand_deprecated_dxiiivp expanded =
+  (* transparently turn the old expansion of deprecated [DI...IP] to [DIP n] *)
   match expanded with
   | Seq (loc,
          [ Prim (_, "DIP",
@@ -827,28 +814,28 @@ let unexpand_dxiiivp expanded =
         | Seq (_, [ Prim (_, "DIP", [ sub ], []) ]) -> count (acc + 1) sub
         | sub -> (acc, sub) in
       let depth, sub = count 1 sub in
-      let name = "D" ^ dxiiivp_roman_of_decimal depth ^ "P" in
-      Some (Prim (loc, name, [ sub ], []))
+      Some (Prim (loc, "DIP", [ Int (loc, Z.of_int depth) ; sub ], []))
   | _ -> None
 
-let unexpand_duuuuup expanded =
-  let rec help expanded =
-    match expanded with
-    | Seq (loc, [ Prim (_, "DUP", [], []) ]) -> Some (loc, 1)
+let unexpand_dupn expanded =
+  match expanded with
+  | Seq (loc, [ Prim (_, "DIP", [ Int (_, np) ;
+                                  Seq (_, [ Prim (_, "DUP", [], annot) ]) ], []) ;
+                Prim (_, "DIG", [ Int (nloc, ng) ], []) ]) when Z.equal np (Z.pred ng) ->
+      Some (Prim (loc, "DUP", [ Int (nloc, ng) ], annot))
+  | _ -> None
+
+let unexpand_deprecated_duuuuup expanded =
+  (* transparently turn the old expansion of deprecated [DU...UP] to [DUP n] *)
+  let rec expand n = function
+    | Seq (loc, [ Prim (nloc, "DUP", [], annot) ]) ->
+        if n = 1 then None else
+          Some (Prim (loc, "DUP", [ Int (nloc, Z.of_int n)], annot))
     | Seq (_, [ Prim (_, "DIP", [expanded'], []);
                 Prim (_, "SWAP", [], []) ]) ->
-        begin
-          match help expanded' with
-          | None -> None
-          | Some (loc, n) -> Some (loc, n + 1)
-        end
-    | _ -> None
-  in let rec dupn = function
-      | 0 -> "P"
-      | n -> "U" ^ (dupn (n - 1)) in
-  match help expanded with
-  | None -> None
-  | Some (loc, n) -> Some (Prim (loc, "D" ^ (dupn n), [], []))
+        expand (n + 1) expanded'
+    | _ -> None in
+  expand 1 expanded
 
 let rec normalize_pair_item ?(right=false) = function
   | P (i, a, b) -> P (i, normalize_pair_item a, normalize_pair_item ~right:true b)
@@ -862,6 +849,16 @@ let unexpand_pappaiir expanded =
   | Seq (loc, (_ :: _ as nodes)) ->
       let rec exec stack nodes = match nodes, stack with
         | [], _ -> stack
+        (* support new expansion using [DIP n] *)
+        | Prim (ploc, "DIP", [ Int (loc, n) ; Seq (sloc, sub) ], []) :: rest, a :: rstack when Z.to_int n > 1 ->
+            exec (a :: exec rstack [ Prim (ploc, "DIP", [ Int (loc, Z.pred n) ; Seq (sloc, sub) ], []) ]) rest
+        | Prim (_, "DIP", [ Int (_, n) ; Seq (_, sub) ], []) :: rest, a :: rstack when Z.to_int n = 1 ->
+            exec (a :: exec rstack sub) rest
+        | Prim (ploc, "DIP", [ Int (loc, n) ; Seq (sloc, sub) ], []) :: rest, [] when Z.to_int n > 1 ->
+            exec (A :: exec [] [ Prim (ploc, "DIP", [ Int (loc, Z.pred n) ; Seq (sloc, sub) ], []) ]) rest
+        | Prim (_, "DIP", [ Int (_, n) ; Seq (_, sub) ], []) :: rest, [] when Z.to_int n = 1 ->
+            exec (A :: exec [] sub) rest
+        (* support old expansion using [DIP] *)
         | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, a :: rstack ->
             exec (a :: exec rstack sub) rest
         | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, [] ->
@@ -888,6 +885,16 @@ let unexpand_unpappaiir expanded =
   | Seq (loc, (_ :: _ as nodes)) ->
       let rec exec stack nodes = match nodes, stack with
         | [], _ -> stack
+        (* support new expansion using [DIP n] *)
+        | Prim (ploc, "DIP", [ Int (loc, n) ; Seq (sloc, sub) ], []) :: rest, a :: rstack when Z.to_int n > 1 ->
+            exec (a :: exec rstack [ Prim (ploc, "DIP", [ Int (loc, Z.pred n) ; Seq (sloc, sub) ], []) ]) rest
+        | Prim (_, "DIP", [ Int (_, n) ; Seq (_, sub) ], []) :: rest, a :: rstack when Z.to_int n = 1 ->
+            exec (a :: exec rstack sub) rest
+        | Prim (ploc, "DIP", [ Int (loc, n) ; Seq (sloc, sub) ], []) :: rest, [] when Z.to_int n > 1 ->
+            exec (A :: exec [] [ Prim (ploc, "DIP", [ Int (loc, Z.pred n) ; Seq (sloc, sub) ], []) ]) rest
+        | Prim (_, "DIP", [ Int (_, n) ; Seq (_, sub) ], []) :: rest, [] when Z.to_int n = 1 ->
+            exec (A :: exec [] sub) rest
+        (* support old expansion using [DIP] *)
         | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, a :: rstack ->
             exec (a :: exec rstack sub) rest
         | Prim (_, "DIP", [ Seq (_, sub) ], []) :: rest, [] ->
@@ -1099,10 +1106,11 @@ let unexpand original =
       unexpand_caddadr ;
       unexpand_set_caddadr ;
       unexpand_map_caddadr ;
-      unexpand_dxiiivp ;
+      unexpand_deprecated_dxiiivp ;
       unexpand_pappaiir ;
       unexpand_unpappaiir ;
-      unexpand_duuuuup ;
+      unexpand_deprecated_duuuuup ;
+      unexpand_dupn ;
       unexpand_compare ;
       unexpand_if_some ;
       unexpand_if_right ;
