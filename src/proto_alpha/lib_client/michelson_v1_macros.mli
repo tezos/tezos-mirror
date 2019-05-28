@@ -43,11 +43,11 @@ val expand_set_caddadr : 'l node -> 'l node option tzresult
 
 val expand_map_caddadr : 'l node -> 'l node option tzresult
 
-val expand_dxiiivp : 'l node -> 'l node option tzresult
+val expand_deprecated_dxiiivp : 'l node -> 'l node option tzresult
 
 val expand_pappaiir : 'l node -> 'l node option tzresult
 
-val expand_duuuuup : 'l node -> 'l node option tzresult
+val expand_deprecated_duuuuup : 'l node -> 'l node option tzresult
 
 val expand_compare : 'l node -> 'l node option tzresult
 
@@ -69,11 +69,11 @@ val unexpand_set_caddadr : 'l node -> 'l node option
 
 val unexpand_map_caddadr : 'l node -> 'l node option
 
-val unexpand_dxiiivp : 'l node -> 'l node option
+val unexpand_deprecated_dxiiivp : 'l node -> 'l node option
 
 val unexpand_pappaiir : 'l node -> 'l node option
 
-val unexpand_duuuuup : 'l node -> 'l node option
+val unexpand_deprecated_duuuuup : 'l node -> 'l node option
 
 val unexpand_compare : 'l node -> 'l node option
 
