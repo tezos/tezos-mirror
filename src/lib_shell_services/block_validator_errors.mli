@@ -48,6 +48,7 @@ type block_error =
                         pass: int ;
                         allowed_pass: int list }
   | Cannot_parse_block_header
+  | Economic_protocol_error of error list
 
 type error +=
   | Invalid_block of

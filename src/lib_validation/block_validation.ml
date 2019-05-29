@@ -189,25 +189,31 @@ module Make(Proto : Registered_protocol.T) = struct
       predecessor_context predecessor_block_header
       block_header.shell.timestamp >>=? fun context ->
     parse_operations block_hash operations >>=? fun operations ->
-    (* TODO wrap 'proto_error' into 'block_error' *)
     let context = Shell_context.wrap_disk_context context in
-    Proto.begin_application
-      ~chain_id
-      ~predecessor_context:context
-      ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-      ~predecessor_fitness:predecessor_block_header.shell.fitness
-      block_header >>=? fun state ->
-    fold_left_s
-      (fun (state, acc) ops ->
-         fold_left_s
-           (fun (state, acc) op ->
-              Proto.apply_operation state op >>=? fun (state, op_metadata) ->
-              return (state, op_metadata :: acc))
-           (state, []) ops >>=? fun (state, ops_metadata) ->
-         return (state, List.rev ops_metadata :: acc))
-      (state, []) operations >>=? fun (state, ops_metadata) ->
-    let ops_metadata = List.rev ops_metadata in
-    Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+    begin
+      begin
+        Proto.begin_application
+          ~chain_id
+          ~predecessor_context:context
+          ~predecessor_timestamp:predecessor_block_header.shell.timestamp
+          ~predecessor_fitness:predecessor_block_header.shell.fitness
+          block_header >>=? fun state ->
+        fold_left_s
+          (fun (state, acc) ops ->
+             fold_left_s
+               (fun (state, acc) op ->
+                  Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+                  return (state, op_metadata :: acc))
+               (state, []) ops >>=? fun (state, ops_metadata) ->
+             return (state, List.rev ops_metadata :: acc))
+          (state, []) operations >>=? fun (state, ops_metadata) ->
+        let ops_metadata = List.rev ops_metadata in
+        Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+        return (validation_result, block_data, ops_metadata)
+      end >>= function
+      | Error err -> fail (invalid_block (Economic_protocol_error err))
+      | Ok o -> return o
+    end >>=? fun (validation_result, block_data, ops_metadata) ->
     (* reset_test_chain
      *   validation_result.context
      *   current_block_header
