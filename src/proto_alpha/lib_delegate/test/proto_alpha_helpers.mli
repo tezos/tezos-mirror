@@ -28,7 +28,6 @@ open Alpha_context
 
 val init :
   ?exe:string ->
-  ?vote:bool ->
   ?rpc_port:int ->
   unit -> (int * Block_hash.t) tzresult Lwt.t
 (** [init ()] sets up the test environment, and return the PID of

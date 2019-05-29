@@ -104,7 +104,7 @@ let exe = try Sys.argv.(1) with _ -> "tezos-node"
 let rpc_port = try int_of_string Sys.argv.(2) with _ -> 18400
 
 let change_to_demo_proto () =
-  init ~exe ~vote:true ~rpc_port () >>=? fun (_node_pid, hash) ->
+  init ~exe ~rpc_port () >>=? fun (_node_pid, hash) ->
   run_change_to_demo_proto (`Hash (hash, 0)) Account.bootstrap_accounts >>=? fun _blkh ->
   return_unit
 

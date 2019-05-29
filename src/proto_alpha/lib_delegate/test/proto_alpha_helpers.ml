@@ -81,71 +81,22 @@ let sandbox_parameters =
   | Error err -> raise (Failure err)
   | Ok json -> json
 
+(* TODO this test works only with these constants, it should be generalized or deleted *)
 let protocol_parameters =
-  let json_result =
-    Data_encoding.Json.from_string {json|
-{ "bootstrap_accounts": [
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
-    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
-    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
-    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "commitments": [
-    [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
-    [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
-    [ "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
-    [ "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
-    [ "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
-    [ "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
-    [ "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
-    [ "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
-    [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
-    [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
-  ],
-  "time_between_blocks" : [ "1", "0" ],
-  "blocks_per_cycle" : 4,
-  "blocks_per_roll_snapshot" : 2,
-  "preserved_cycles" : 1,
-  "proof_of_work_threshold": "-1"
-}
-|json} in
-  match json_result with
-  | Error err -> raise (Failure err)
-  | Ok json ->
-      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
+  Tezos_protocol_alpha_parameters.Default_parameters.(
+    json_of_parameters
+      (parameters_of_constants { constants_sandbox with blocks_per_cycle = 4l;
+                                                        blocks_per_roll_snapshot = 2l;
+                                                        blocks_per_voting_period = 2l;
+                                                        preserved_cycles = 1 ; })) |>
+  Data_encoding.Binary.to_bytes_exn Data_encoding.json
 
-let vote_protocol_parameters =
-  let json_result =
-    Data_encoding.Json.from_string {json|
-{ "bootstrap_accounts": [
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
-    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
-    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
-    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "time_between_blocks" : [ "1", "0" ],
-  "blocks_per_cycle" : 4,
-  "blocks_per_roll_snapshot" : 2,
-  "preserved_cycles" : 1,
-  "blocks_per_voting_period": 2,
-  "proof_of_work_threshold": "-1"
-}
-|json} in
-  match json_result with
-  | Error err -> raise (Failure err)
-  | Ok json ->
-      Data_encoding.Binary.to_bytes_exn Data_encoding.json json
-
-let activate_alpha ?(vote = false) () =
+let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
   let activator_sk =
     Tezos_signer_backends.Unencrypted.make_sk
       (Signature.Secret_key.of_b58check_exn
          "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
-  let protocol_parameters =
-    if vote then vote_protocol_parameters else protocol_parameters in
   Tezos_client_genesis.Client_proto_main.bake
     (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
     (Activate  { protocol = Proto_alpha.hash ;
@@ -154,7 +105,7 @@ let activate_alpha ?(vote = false) () =
                })
     activator_sk
 
-let init ?exe ?vote ?rpc_port () =
+let init ?exe ?rpc_port () =
   begin
     match rpc_port with
     | None -> ()
@@ -168,7 +119,7 @@ let init ?exe ?vote ?rpc_port () =
       ~port:!rpc_config.port
       ~sandbox:sandbox_parameters
       () in
-  activate_alpha ?vote () >>=? fun hash ->
+  activate_alpha () >>=? fun hash ->
   return (pid, hash)
 
 let level (chain, block) =

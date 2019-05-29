@@ -11,6 +11,7 @@
             tezos-baking-alpha
             tezos-client-base-unix
             tezos-signer-backends
+            tezos-protocol-alpha-parameters
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
