@@ -10,7 +10,7 @@ source $test_dir/test_lib.inc.sh "$@"
 
 # Prepare a config with a shorter blocks_per_voting_period
 tempdir=`mktemp -d`
-sed -e 's/"blocks_per_voting_period" : [0-9]*/"blocks_per_voting_period" : 4/' $parameters_file > $tempdir/parameters.json
+sed -e 's/"blocks_per_voting_period": [0-9]*/"blocks_per_voting_period" : 4/' $parameters_file > $tempdir/parameters.json
 parameters_file=$tempdir/parameters.json
 echo params=${parameters_file}
 

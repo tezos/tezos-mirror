@@ -1,3 +1,7 @@
+(rule
+ (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
+       protocol_parameters.json))
+
 (alias
  (name runtest_basic.sh)
  (deps sandbox.json
@@ -20,6 +24,7 @@
 (alias
  (name runtest_contracts.sh)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files contracts/attic/*))
  (locks /tcp-port/18731
@@ -35,6 +40,7 @@
 (alias
  (name runtest_contracts_opcode.sh)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files contracts/opcodes/*))
   (locks /tcp-port/18731
@@ -50,6 +56,7 @@
 (alias
  (name runtest_contracts_macros.sh)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files contracts/macros/*))
  (locks /tcp-port/18731
@@ -65,6 +72,7 @@
 (alias
  (name runtest_contracts_mini_scenarios.sh)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files contracts/mini_scenarios/*))
  (locks /tcp-port/18731
@@ -80,6 +88,7 @@
 (alias
  (name runtest_multinode.sh)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh)
  (locks  /tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
          /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738
@@ -115,6 +124,7 @@
  (locks /tcp-port/18731
         /tcp-port/19731)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files proto_test_injection/*))
  (action
@@ -130,6 +140,7 @@
  (locks /tcp-port/18731
         /tcp-port/19731)
  (deps sandbox.json
+       protocol_parameters.json
        test_lib.inc.sh
        (glob_files proto_test_injection/*))
  (action
