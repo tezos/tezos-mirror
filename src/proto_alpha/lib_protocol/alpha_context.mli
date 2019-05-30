@@ -579,6 +579,8 @@ module Contract : sig
     context -> contract -> bool tzresult Lwt.t
   val is_spendable:
     context -> contract -> bool tzresult Lwt.t
+  val get_script_code:
+    context -> contract -> (context * Script.lazy_expr option) tzresult Lwt.t
   val get_script:
     context -> contract -> (context * Script.t option) tzresult Lwt.t
   val get_storage:

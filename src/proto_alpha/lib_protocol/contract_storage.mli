@@ -72,6 +72,8 @@ val reveal_manager_key:
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 
+val get_script_code:
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
 val get_script:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.t option) tzresult Lwt.t
 val get_storage:

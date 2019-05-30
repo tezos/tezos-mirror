@@ -2772,13 +2772,13 @@ and parse_contract
         Lwt.return @@ Gas.consume ctxt Typecheck_costs.get_script >>=? fun ctxt ->
         trace
           (Invalid_contract (loc, contract)) @@
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with
+        Contract.get_script_code ctxt contract >>=? fun (ctxt, code) -> match code with
         | None ->
             Lwt.return
               (ty_eq ctxt arg (Unit_t None) >>? fun (Eq, ctxt) ->
                let contract : arg typed_contract = (arg, contract) in
                ok (ctxt, contract))
-        | Some { code ; _ } ->
+        | Some code ->
             Script.force_decode ctxt code >>=? fun (code, ctxt) ->
             Lwt.return
               (parse_toplevel code >>? fun (arg_type, _, _) ->
@@ -2803,7 +2803,7 @@ and parse_contract_for_script
         Lwt.return @@ Gas.consume ctxt Typecheck_costs.get_script >>=? fun ctxt ->
         trace
           (Invalid_contract (loc, contract)) @@
-        Contract.get_script ctxt contract >>=? fun (ctxt, script) -> match script with (* can only fail because of gas *)
+        Contract.get_script_code ctxt contract >>=? fun (ctxt, code) -> match code with (* can only fail because of gas *)
         | None ->
             Lwt.return
               (match ty_eq ctxt arg (Unit_t None) with
@@ -2813,7 +2813,7 @@ and parse_contract_for_script
                | Error _ ->
                    Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
                    ok (ctxt, None))
-        | Some { code ; _ } ->
+        | Some code ->
             Script.force_decode ctxt code >>=? fun (code, ctxt) -> (* can only fail because of gas *)
             Lwt.return
               (match parse_toplevel code with

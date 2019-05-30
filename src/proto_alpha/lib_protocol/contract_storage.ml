@@ -365,6 +365,9 @@ let increment_counter c contract =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   Storage.Contract.Counter.set c contract (Z.succ contract_counter)
 
+let get_script_code c contract =
+  Storage.Contract.Code.get_option c contract
+
 let get_script c contract =
   Storage.Contract.Code.get_option c contract >>=? fun (c, code) ->
   Storage.Contract.Storage.get_option c contract >>=? fun (c, storage) ->
