@@ -493,20 +493,20 @@ opam:21:tezos-shell-services:
   variables:
     package: tezos-shell-services
 
-opam:22:bip39:
+opam:22:tezos-stdlib-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-unix
+
+opam:23:bip39:
   <<: *opam_definition
   variables:
     package: bip39
 
-opam:23:tezos-rpc-http:
+opam:24:tezos-rpc-http:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http
-
-opam:24:tezos-stdlib-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib-unix
 
 opam:25:tezos-storage:
   <<: *opam_definition
@@ -568,65 +568,65 @@ opam:36:tezos-client-base-unix:
   variables:
     package: tezos-client-base-unix
 
-opam:37:tezos-protocol-002-PsYLVpVv:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-002-PsYLVpVv
-
-opam:38:tezos-protocol-003-PsddFKi3:
+opam:37:tezos-protocol-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-protocol-003-PsddFKi3
 
-opam:39:tezos-protocol-004-Pt24m4xi:
+opam:38:tezos-protocol-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-protocol-004-Pt24m4xi
 
-opam:40:tezos-protocol-updater:
+opam:39:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:41:tezos-client-002-PsYLVpVv:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-002-PsYLVpVv
-
-opam:42:tezos-client-003-PsddFKi3:
+opam:40:tezos-client-003-PsddFKi3:
   <<: *opam_definition
   variables:
     package: tezos-client-003-PsddFKi3
 
-opam:43:tezos-client-004-Pt24m4xi:
+opam:41:tezos-client-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-client-004-Pt24m4xi
+
+opam:42:tezos-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p
+
+opam:43:tezos-validation:
+  <<: *opam_definition
+  variables:
+    package: tezos-validation
 
 opam:44:tezos-protocol-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-001-PtCJ7pwo
 
-opam:45:tezos-p2p:
+opam:45:tezos-protocol-002-PsYLVpVv:
   <<: *opam_definition
   variables:
-    package: tezos-p2p
+    package: tezos-protocol-002-PsYLVpVv
 
-opam:46:tezos-validation:
-  <<: *opam_definition
-  variables:
-    package: tezos-validation
-
-opam:47:tezos-baking-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-003-PsddFKi3
-
-opam:48:tezos-baking-004-Pt24m4xi:
+opam:46:tezos-baking-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-baking-004-Pt24m4xi
+
+opam:47:tezos-embedded-protocol-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-004-Pt24m4xi
+
+opam:48:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
 
 opam:49:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
@@ -638,200 +638,151 @@ opam:50:tezos-client-001-PtCJ7pwo:
   variables:
     package: tezos-client-001-PtCJ7pwo
 
-opam:51:tezos-protocol-demo:
+opam:51:tezos-client-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-002-PsYLVpVv
+
+opam:52:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:52:ocplib-resto-json:
+opam:53:ocplib-resto-json:
   <<: *opam_definition
   variables:
     package: ocplib-resto-json
 
-opam:53:tezos-embedded-protocol-002-PsYLVpVv:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-002-PsYLVpVv
-
-opam:54:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
-
-opam:55:tezos-embedded-protocol-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-003-PsddFKi3
-
-opam:56:tezos-embedded-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-004-Pt24m4xi
-
-opam:57:tezos-baking-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-003-PsddFKi3-commands
-
-opam:58:tezos-baking-004-Pt24m4xi-commands:
+opam:54:tezos-baking-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-baking-004-Pt24m4xi-commands
 
-opam:59:tezos-client-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-000-Ps9mPmXa
-
-opam:60:tezos-client-001-PtCJ7pwo-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-001-PtCJ7pwo-commands
-
-opam:61:tezos-client-002-PsYLVpVv-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-002-PsYLVpVv-commands
-
-opam:62:tezos-client-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
-opam:63:tezos-client-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-004-Pt24m4xi-commands
-
-opam:64:tezos-client-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-demo
-
-opam:65:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:66:tezos-network-sandbox:
-  <<: *opam_definition
-  variables:
-    package: tezos-network-sandbox
-
-opam:67:tezos-embedded-protocol-000-Ps9mPmXa:
+opam:55:tezos-embedded-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-000-Ps9mPmXa
 
-opam:68:tezos-embedded-protocol-001-PtCJ7pwo:
+opam:56:tezos-embedded-protocol-001-PtCJ7pwo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-001-PtCJ7pwo
 
-opam:69:tezos-embedded-protocol-demo:
+opam:57:tezos-embedded-protocol-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-002-PsYLVpVv
+
+opam:58:tezos-embedded-protocol-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-003-PsddFKi3
+
+opam:59:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:70:tezos-mempool-002-PsYLVpVv:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-002-PsYLVpVv
-
-opam:71:tezos-mempool-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-003-PsddFKi3
-
-opam:72:tezos-mempool-004-Pt24m4xi:
+opam:60:tezos-mempool-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-mempool-004-Pt24m4xi
 
-opam:73:tezos-baker-004-Pt24m4xi-commands:
+opam:61:tezos-client-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
-    package: tezos-baker-004-Pt24m4xi-commands
+    package: tezos-client-000-Ps9mPmXa
 
-opam:74:tezos-endorser-003-PsddFKi3-commands:
+opam:62:tezos-client-001-PtCJ7pwo-commands:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-003-PsddFKi3-commands
+    package: tezos-client-001-PtCJ7pwo-commands
 
-opam:75:tezos-client:
+opam:63:tezos-client-002-PsYLVpVv-commands:
   <<: *opam_definition
   variables:
-    package: tezos-client
+    package: tezos-client-002-PsYLVpVv-commands
 
-opam:76:ocplib-ezresto-directory:
+opam:64:tezos-client-003-PsddFKi3-commands:
   <<: *opam_definition
   variables:
-    package: ocplib-ezresto-directory
+    package: tezos-client-003-PsddFKi3-commands
 
-opam:77:tezos-baker-003-PsddFKi3-commands:
+opam:65:tezos-client-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baker-003-PsddFKi3-commands
+    package: tezos-client-004-Pt24m4xi-commands
 
-opam:78:tezos-accuser-004-Pt24m4xi:
+opam:66:tezos-client-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo
+
+opam:67:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:68:tezos-accuser-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-accuser-004-Pt24m4xi
 
-opam:79:tezos-endorser-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi
-
-opam:80:tezos-accuser-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-004-Pt24m4xi-commands
-
-opam:81:tezos-accuser-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-003-PsddFKi3-commands
-
-opam:82:tezos-baker-004-Pt24m4xi:
+opam:69:tezos-baker-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-baker-004-Pt24m4xi
 
-opam:83:tezos-accuser-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-003-PsddFKi3
-
-opam:84:tezos-endorser-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi-commands
-
-opam:85:tezos-signer:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer
-
-opam:86:tezos-baker-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-003-PsddFKi3
-
-opam:87:tezos-node:
-  <<: *opam_definition
-  variables:
-    package: tezos-node
-
-opam:88:ocplib-json-typed-browser:
+opam:70:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:89:tezos-endorser-003-PsddFKi3:
+opam:71:tezos-node:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-003-PsddFKi3
+    package: tezos-node
+
+opam:72:tezos-signer:
+  <<: *opam_definition
+  variables:
+    package: tezos-signer
+
+opam:73:tezos-accuser-004-Pt24m4xi-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-004-Pt24m4xi-commands
+
+opam:74:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:75:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:76:tezos-baker-004-Pt24m4xi-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-004-Pt24m4xi-commands
+
+opam:77:tezos-endorser-004-Pt24m4xi-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-004-Pt24m4xi-commands
+
+opam:78:tezos-endorser-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-004-Pt24m4xi
+
+opam:79:tezos-network-sandbox:
+  <<: *opam_definition
+  variables:
+    package: tezos-network-sandbox
+
 
 ##END_OPAM##
 
