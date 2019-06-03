@@ -32,29 +32,26 @@ module Protocol = struct
   let add = Int64.add
 
   let of_ptime t =
-    Option.map
-      ~f:Int64.of_int
-      (Ptime.Span.to_int_s (Ptime.to_span t))
+    let (days,ps) = (Ptime.Span.to_d_ps (Ptime.to_span t)) in
+    let s_days = Int64.mul (Int64.of_int days) 86_400L in
+    Int64.add s_days (Int64.div ps 1_000_000_000_000L)
   let to_ptime t =
-    match Ptime.of_span (Ptime.Span.of_int_s (Int64.to_int t)) with
+    let days = Int64.to_int (Int64.div t 86_400L) in
+    let ps = Int64.mul (Int64.rem t 86_400L) 1_000_000_000_000L in
+    match Option.apply ~f:Ptime.of_span (Ptime.Span.of_d_ps (days,ps)) with
     | None -> invalid_arg ("Time.Protocol.to_ptime")
     | Some ptime -> ptime
 
   let of_notation s =
     match Ptime.of_rfc3339 s with
-    | Ok (t, _, _) -> of_ptime t
+    | Ok (t, _, _) -> Some (of_ptime t)
     | Error _ -> None
   let of_notation_exn s =
     match Ptime.(rfc3339_error_to_msg (of_rfc3339 s)) with
     | Error (`Msg msg) -> invalid_arg ("Time.Protocol.of_notation: " ^ msg)
-    | Ok (t, _, _) ->
-        match of_ptime t with
-        | None -> invalid_arg "Time.Protocol.of_notation"
-        | Some t -> t
+    | Ok (t, _, _) -> of_ptime t
   let to_notation t =
-    match Ptime.of_span (Ptime.Span.of_int_s (Int64.to_int t)) with
-    | None -> invalid_arg ("Time.Protocol.to_notation")
-    | Some ptime -> Ptime.to_rfc3339 ~frac_s:0 ~tz_offset_s:0 ptime
+    Ptime.to_rfc3339 ~frac_s:0 ~tz_offset_s:0 (to_ptime t)
 
   let of_seconds x = x
   let to_seconds x = x
@@ -154,17 +151,16 @@ module System = struct
   end
 
   let of_seconds_opt x =
-    (* NOTE: on 32 bit machines, may behave incorrectly on times beyond the
-       int31 end of time *)
-    Ptime.of_span
-      (Ptime.Span.of_int_s (Int64.to_int x))
+    let days = Int64.to_int (Int64.div x 86_400L) in
+    let ps = Int64.mul (Int64.rem x 86_400L) 1_000_000_000_000L in
+    Option.apply ~f:Ptime.of_span (Ptime.Span.of_d_ps (days,ps))
   let of_seconds_exn x = match of_seconds_opt x with
     | Some t -> t
     | None -> invalid_arg "Time.of_seconds"
   let to_seconds x =
-    match Ptime.(Span.to_int_s (to_span x)) with
-    | Some s -> Int64.of_int s
-    | None -> invalid_arg "Time.to_seconds"
+    let (days,ps) = Ptime.(Span.to_d_ps (to_span x)) in
+    let s_days = Int64.mul (Int64.of_int days) 86_400L in
+    Int64.add s_days (Int64.div ps 1_000_000_000_000L)
 
   let of_protocol_exn = of_seconds_exn
   let of_protocol_opt = of_seconds_opt
