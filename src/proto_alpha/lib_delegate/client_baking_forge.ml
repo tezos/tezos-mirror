@@ -920,7 +920,11 @@ let fetch_operations
                 | (_time, required) :: _ -> required in
               let enough = nb_arrived_endorsements >= required in
               if enough then
-                return_some !operations
+                let remaining_ops =
+                  List.flatten (Lwt_stream.get_available operation_stream) in
+                let filtered_ops =
+                  filter_outdated_endorsements head.level (remaining_ops @ !operations) in
+                return_some filtered_ops
               else
                 loop nb_arrived_endorsements limits
             end
