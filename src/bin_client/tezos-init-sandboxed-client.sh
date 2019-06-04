@@ -32,60 +32,6 @@ init_sandboxed_client() {
         signer="$local_signer -base-dir $client_dir -addr $host -port $rpc"
         compiler="$local_compiler"
     fi
-    parameters_file="${parameters_file:-$client_dir/protocol_parameters.json}"
-
-    if ! [ -f "$parameters_file" ]; then
-        cat > "$parameters_file" <<EOF
-{ "bootstrap_accounts": [
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
-    [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
-    [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
-    [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-    [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ],
-    [ "tz1PooUKBaoxjBiCR2dxEtbtTUjLX3iaZQoJ", "100" ],
-    [ "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2", "1" ] ],
-  "bootstrap_contracts": [
-      { "delegate": "tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV",
-        "amount": "10000000",
-        "script":
-        { "code":
-          [ { "prim": "parameter",
-              "args": [ { "prim": "key_hash" } ] },
-            { "prim": "storage",
-              "args": [ { "prim": "timestamp" } ] },
-            { "prim": "code",
-              "args":
-              [ [ [ [ { "prim": "DUP" }, { "prim": "CAR" },
-                      { "prim": "DIP", "args": [ [ { "prim": "CDR" } ] ] } ] ],
-                  { "prim": "SWAP" },
-                  { "prim": "PUSH", "args": [ { "prim": "int" }, { "int": "300" } ] },
-                  { "prim": "ADD", "annots": [ "@FIVE_MINUTES_LATER" ] },
-                  { "prim": "NOW" },
-                  [ [ { "prim": "COMPARE" }, { "prim": "GE" } ],
-                    { "prim": "IF",
-                      "args":
-                      [ [],
-                        [ [ { "prim": "UNIT" },
-                            { "prim": "FAILWITH" } ] ] ] } ],
-                  { "prim": "IMPLICIT_ACCOUNT" },
-                  { "prim": "PUSH", "args": [ { "prim": "mutez" }, { "int": "1000000" } ] },
-                  { "prim": "UNIT" },
-                  { "prim": "TRANSFER_TOKENS" },
-                  { "prim": "NIL", "args": [ { "prim": "operation" } ] },
-                  { "prim": "SWAP" },
-                  { "prim": "CONS" },
-                  { "prim": "DIP", "args": [ [ { "prim": "NOW" } ] ] },
-                  { "prim": "PAIR" } ] ] } ],
-          "storage": { "int": "0" } } } ],
-  "time_between_blocks" : [ "1", "0" ],
-  "blocks_per_roll_snapshot" : 4,
-  "blocks_per_cycle" : 8,
-  "preserved_cycles" : 2,
-  "proof_of_work_threshold": "-1"
-}
-EOF
-    fi
-
 }
 
 cleanup_clients() {
@@ -181,8 +127,14 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
-        parameters_file="${parameters_file:-$bin_dir/../../scripts/protocol_parameters.json}"
         local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/main_native.exe}"
+
+        #create protocol_parameters.json
+        eval $(cd $bin_dir/../proto_alpha/lib_parameters/
+               rm -f sandbox-parameters.json
+               dune exec ./gen.exe -- --sandbox)
+        parameters_file="$bin_dir/../proto_alpha/lib_parameters/sandbox-parameters.json"
+
     else
 	# we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
