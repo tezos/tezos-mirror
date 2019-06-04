@@ -366,9 +366,11 @@ BINS
 LEDGER
 ~~~~~~
 
+- Drop support for Wallet and Baking apps older than 1.4.0.
+- Drop support for firmware older that 1.4.0
+- CLI and performance improvements.
+- Baking: support test-chain high-water mark, improve configuration (`setup ledger ...`).
 - APDU support
-- CLI improvements
-- drop support for firmware older that 1.4.0
 - Commits:
     - ``6ce10791b``: ``Ledger: add deauth APDU support, better get-authorized-key support, and friendlier CLI``
     - ``dc87b9a7c``: ``Ledger: clean-up bip32 module``
