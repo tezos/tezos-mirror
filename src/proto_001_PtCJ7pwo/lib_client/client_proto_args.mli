@@ -28,41 +28,10 @@ open Alpha_context
 
 val tez_sym: string
 
-val init_arg: (string, Proto_001_PtCJ7pwo.full) Clic.arg
-val fee_arg: (Tez.t, Proto_001_PtCJ7pwo.full) Clic.arg
-val gas_limit_arg: (Z.t option, Proto_001_PtCJ7pwo.full) Clic.arg
-val storage_limit_arg: (Z.t option, Proto_001_PtCJ7pwo.full) Clic.arg
-val arg_arg: (string option, Proto_001_PtCJ7pwo.full) Clic.arg
-val source_arg: (string option, Proto_001_PtCJ7pwo.full) Clic.arg
-
-val delegate_arg: (Signature.Public_key_hash.t option, Proto_001_PtCJ7pwo.full) Clic.arg
-val delegatable_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-val spendable_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-val max_priority_arg: (int option, Proto_001_PtCJ7pwo.full) Clic.arg
-val fee_threshold_arg: (Tez.tez option, Proto_001_PtCJ7pwo.full) Clic.arg
-val force_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-val minimal_timestamp_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-val endorsement_delay_arg: (int, Proto_001_PtCJ7pwo.full) Clic.arg
-val preserved_levels_arg: (int, Proto_001_PtCJ7pwo.full) Clic.arg
-
 val no_print_source_flag: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-val no_confirmation: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
 
 val tez_arg :
   default:string ->
   parameter:string ->
   doc:string ->
   (Tez.t, Proto_001_PtCJ7pwo.full) Clic.arg
-val tez_param :
-  name:string ->
-  desc:string ->
-  ('a, full) Clic.params ->
-  (Tez.t -> 'a, full) Clic.params
-
-module Daemon : sig
-  val baking_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-  val endorsement_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-  val denunciation_switch: (bool, Proto_001_PtCJ7pwo.full) Clic.arg
-end
-
-val string_parameter : (string, full) Clic.parameter
