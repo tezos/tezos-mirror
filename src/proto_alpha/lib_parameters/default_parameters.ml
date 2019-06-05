@@ -34,11 +34,11 @@ let constants_mainnet = Constants_repr.{
     time_between_blocks =
       List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
     endorsers_per_block = 32 ;
-    hard_gas_limit_per_operation = Z.of_int 400_000 ;
-    hard_gas_limit_per_block = Z.of_int 4_000_000 ;
+    hard_gas_limit_per_operation = Z.of_int 800_000 ;
+    hard_gas_limit_per_block = Z.of_int 8_000_000 ;
     proof_of_work_threshold =
       Int64.(sub (shift_left 1L 46) 1L) ;
-    tokens_per_roll = Tez_repr.(mul_exn one 10_000) ;
+    tokens_per_roll = Tez_repr.(mul_exn one 8_000) ;
     michelson_maximum_type_size = 1000 ;
     seed_nonce_revelation_tip = begin
       match Tez_repr.(one /? 8L) with
@@ -52,6 +52,7 @@ let constants_mainnet = Constants_repr.{
     endorsement_reward = Tez_repr.(mul_exn one 2) ;
     hard_storage_limit_per_operation = Z.of_int 60_000 ;
     cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
+    test_chain_duration = Int64.mul 32768L 60L;
   }
 
 let constants_sandbox = Constants_repr.{
