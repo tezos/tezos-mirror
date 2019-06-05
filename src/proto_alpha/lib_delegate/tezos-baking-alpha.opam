@@ -16,6 +16,7 @@ depends: [
   "tezos-client-commands"
   "tezos-client-alpha"
   "tezos-node" { with-test }
+  "tezos-protocol-alpha-parameters" { with-test }
   "tezos-client-genesis" { with-test }
   "tezos-client-base-unix" { with-test }
   "alcotest-lwt" { with-test }
