@@ -33,7 +33,7 @@ let constants_mainnet =
       blocks_per_commitment = 32l;
       blocks_per_roll_snapshot = 256l;
       blocks_per_voting_period = 32768l;
-      time_between_blocks = List.map Period_repr.of_seconds_exn [60L; 75L];
+      time_between_blocks = List.map Period_repr.of_seconds_exn [60L; 40L];
       endorsers_per_block = 32;
       hard_gas_limit_per_operation = Z.of_int 800_000;
       hard_gas_limit_per_block = Z.of_int 8_000_000;
@@ -50,6 +50,12 @@ let constants_mainnet =
       hard_storage_limit_per_operation = Z.of_int 60_000;
       cost_per_byte = Tez_repr.of_mutez_exn 1_000L;
       test_chain_duration = Int64.mul 32768L 60L;
+      quorum_min = 20_00l;
+      (* quorum is in centile of a percentage *)
+      quorum_max = 70_00l;
+      min_proposal_quorum = 5_00l;
+      initial_endorsers = 24;
+      delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L;
     }
 
 let constants_sandbox =
@@ -63,6 +69,8 @@ let constants_sandbox =
       blocks_per_voting_period = 64l;
       time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
       proof_of_work_threshold = Int64.of_int (-1);
+      initial_endorsers = 1;
+      delay_per_missing_endorsement = Period_repr.of_seconds_exn 1L;
     }
 
 let constants_test =
@@ -75,6 +83,8 @@ let constants_test =
       blocks_per_voting_period = 256l;
       time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
       proof_of_work_threshold = Int64.of_int (-1);
+      initial_endorsers = 1;
+      delay_per_missing_endorsement = Period_repr.of_seconds_exn 1L;
     }
 
 let bootstrap_accounts_strings =
