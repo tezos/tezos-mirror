@@ -292,6 +292,7 @@ open Tezos_protocol_alpha_parameters.Default_parameters
 
 let default = constants_mainnet
 
+[@@@ocaml.warning "-23"]
 let genesis
     ?(preserved_cycles = default.preserved_cycles)
     ?(blocks_per_cycle = default.blocks_per_cycle)
@@ -315,6 +316,7 @@ let genesis
     ?(hard_storage_limit_per_operation = default.hard_storage_limit_per_operation)
     (initial_accounts : (Account.t * Tez_repr.t) list) =
   let constants : Constants_repr.parametric = {
+    default with
     preserved_cycles ;
     blocks_per_cycle ;
     blocks_per_commitment ;
