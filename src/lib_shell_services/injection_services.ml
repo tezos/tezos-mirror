@@ -52,10 +52,15 @@ module S = struct
       ~description:
         "Inject a block in the node and broadcast it. The `operations` \
          embedded in `blockHeader` might be pre-validated using a \
-         contextual RPCs from the latest block \
-         (e.g. '/blocks/head/context/preapply'). Returns the ID of the \
+         contextual RPCs from the latest block (e.g. \
+         '/blocks/head/context/preapply'). Returns the ID of the \
          block. By default, the RPC will wait for the block to be \
-         validated before answering."
+         validated before answering. If ?async is true, the function \
+         returns immediately. Otherwise, the block will be validated \
+         before the result is returned. If ?force is true, it will be \
+         injected even on non strictly increasing fitness. An optional \
+         ?chain parameter can be used to specify whether to inject on \
+         the test chain or the main chain."
       ~query: block_query
       ~input: block_param
       ~output: Block_hash.encoding
@@ -74,13 +79,17 @@ module S = struct
   let operation =
     RPC_service.post_service
       ~description:
-        "Inject an operation in node and broadcast it. Returns the \
-         ID of the operation. The `signedOperationContents` should be \
-         constructed using a contextual RPCs from the latest block \
-         and signed by the client. By default, the RPC will wait for \
-         the operation to be (pre-)validated before answering. See \
-         RPCs under /blocks/prevalidation for more details on the \
-         prevalidation context."
+        "Inject an operation in node and broadcast it. Returns the ID \
+         of the operation. The `signedOperationContents` should be \
+         constructed using a contextual RPCs from the latest block and \
+         signed by the client. By default, the RPC will wait for the \
+         operation to be (pre-)validated before answering. See RPCs \
+         under /blocks/prevalidation for more details on the \
+         prevalidation context. If ?async is true, the function \
+         returns immediately. Otherwise, the operation will \
+         be validated before the result is returned. An optional \
+         ?chain parameter can be used to specify whether to inject on the \
+         test chain or the main chain."
       ~query: operation_query
       ~input: bytes
       ~output: Operation_hash.encoding
@@ -88,19 +97,19 @@ module S = struct
 
   let protocol_query =
     let open RPC_query in
-    query (fun async force -> object
+    query (fun async -> object
             method async = async
-            method force = force
           end)
     |+ flag "async" (fun t -> t#async)
-    |+ flag "force" (fun t -> t#force)
     |> seal
 
 
   let protocol =
     RPC_service.post_service
       ~description:
-        "Inject a protocol in node. Returns the ID of the protocol."
+        "Inject a protocol in node. Returns the ID of the protocol. If \
+         ?async is true, the function returns immediately. Otherwise, \
+         the protocol will be validated before the result is returned."
       ~query: protocol_query
       ~input: Protocol.encoding
       ~output: Protocol_hash.encoding
@@ -129,10 +138,7 @@ let operation ctxt ?(async = false) ?chain operation =
     end)
     operation
 
-let protocol ctxt ?(async = false) ?(force = false) protocol =
+let protocol ctxt ?(async = false) protocol =
   make_call S.protocol ctxt ()
-    (object
-      method async = async
-      method force = force
-    end)
+    (object method async = async end)
     protocol

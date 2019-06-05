@@ -44,7 +44,7 @@ val operation:
 
 val protocol:
   #simple ->
-  ?async:bool -> ?force:bool ->
+  ?async:bool ->
   Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
@@ -65,8 +65,7 @@ module S : sig
 
   val protocol:
     ([ `POST ], unit,
-     unit, < async : bool;
-             force : bool >, Protocol.t,
+     unit, < async : bool; >, Protocol.t,
      Protocol_hash.t) RPC_service.t
 
 end

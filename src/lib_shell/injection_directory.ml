@@ -49,7 +49,7 @@ let inject_operation validator ?chain bytes =
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
-let inject_protocol state ?force:_ proto =
+let inject_protocol state proto =
   let proto_bytes =
     Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
@@ -92,7 +92,7 @@ let build_rpc_directory validator =
   end ;
 
   register0 Injection_services.S.protocol begin fun q protocol ->
-    inject_protocol state ~force:q#force protocol >>= fun (hash, wait) ->
+    inject_protocol state protocol >>= fun (hash, wait) ->
     (if q#async then return_unit else wait) >>=? fun () ->
     return hash
   end ;
