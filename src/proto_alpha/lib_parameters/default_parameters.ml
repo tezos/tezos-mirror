@@ -52,7 +52,9 @@ let constants_mainnet = Constants_repr.{
     endorsement_reward = Tez_repr.(mul_exn one 2) ;
     hard_storage_limit_per_operation = Z.of_int 60_000 ;
     cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
-    test_chain_duration = Int64.mul 32768L 60L;
+    test_chain_duration = Int64.mul 32768L 60L ;
+    quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
+    quorum_max = 70_00l ;
   }
 
 let constants_sandbox = Constants_repr.{
