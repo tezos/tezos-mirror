@@ -31,10 +31,10 @@
  (action (run %{deps} --test)))
 
 (rule
- (targets proto004-parameters.json)
+ (targets mainnet-parameters.json)
  (deps gen.exe)
- (action (run %{deps} --proto004)))
+ (action (run %{deps} --mainnet)))
 
 (install
  (section lib)
- (files sandbox-parameters.json test-parameters.json proto004-parameters.json))
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
