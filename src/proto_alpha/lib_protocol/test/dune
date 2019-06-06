@@ -5,7 +5,6 @@
             tezos-protocol-environment
             alcotest-lwt
             tezos_alpha_test_helpers
-            michelson_parser
             tezos-stdlib-unix
             bip39
             tezos-protocol-alpha-parameters)
