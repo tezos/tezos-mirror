@@ -198,17 +198,16 @@ protocol in alternative environment possible.
     standard library as parameter. This parameter can be filled with
     any of the implementations described in the two points below.
 
-  - :package:`tezos-protocol-environment-shell` is the instance of the
-    environment whose RPC service registration and storage access are
-    the ones of the node. This is the environment that is fed by the
-    node when loading new protocols.
+  - :package:`tezos-shell-context` implements a context representation
+     that is accepted by the protocol environment. The node uses this
+     instance to read and write data on disk.
 
-  - :package:`tezos-protocol-environment` contains three alternative
-    instances of the protocol environment: one whose context access
-    function are dummy ones which can be used when only the types and
-    non contextual functions of the protocol are needed, another that
-    simulates the key-value store in memory for testing, and a functor
-    that let you build an environment from a few context accessors.
+  - :package:`tezos-protocol-environment` contains the protocol
+    generic environment. It also defines two different context
+    instances: one that simulates the key-value store in memory for
+    testing, and one whose context function are dummy ones which can
+    be used when only the types and non contextual functions of the
+    protocol are needed.
 
   - ``tezos-embedded-protocol-xxx`` contains a version of protocol
     ``xxx`` whose standard library is pre-instantiated to the shell's
