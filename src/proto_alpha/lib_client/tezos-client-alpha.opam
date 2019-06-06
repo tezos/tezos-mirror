@@ -12,7 +12,6 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-alpha"
   "tezos-shell-services"
-  "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-signer-backends"
 ]

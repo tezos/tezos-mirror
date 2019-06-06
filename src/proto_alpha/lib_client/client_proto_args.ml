@@ -296,7 +296,7 @@ let minimal_nanotez_per_byte_arg =
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
     ~default:(Z.to_string default_minimal_nanotez_per_byte)
-    ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
+    ~doc:"exclude operations with fees per byte lower than this threshold (in nanotez)"
     (parameter (fun _ s ->
          try return (Z.of_string s)
          with _ -> fail (Bad_minimal_fees s)))

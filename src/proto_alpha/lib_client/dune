@@ -5,7 +5,6 @@
             tezos-protocol-alpha
             tezos-protocol-environment
             tezos-shell-services
-            tezos-client-base
             tezos-client-base-unix
             tezos-rpc
             tezos-storage
