@@ -254,7 +254,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     let tmpdir = Paths.root state // sprintf "protocol-%s" name in
     Console.say state EF.(wf "Injecting protocol from %s" tmpdir)
     >>= fun () ->
-    Running_processes.run_successful_cmdf state "cp -L -r %s %s"
+    Running_processes.run_successful_cmdf state "cp -L -R %s %s"
       (Filename.quote path) (Filename.quote tmpdir)
     >>= fun _ ->
     ( if make_different then
