@@ -23,6 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "alpha" end
+module Name = struct let name = "alpha-parameters" end
 module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
 include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
