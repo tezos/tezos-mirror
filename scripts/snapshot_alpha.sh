@@ -96,7 +96,7 @@ sed -i.old -e 's/alpha/'${version}_${short_hash}'/' \
 rename s/alpha/${version}-${short_hash}/ $(find . -name \*.opam)
 
 # fix content of dune files
-sed -i.old -e 's/\\"alpha\\"/\\"'${version}_${short_hash}'\\"/' \
+sed -i.old -e 's/\\"alpha\\"/\\"'${version}-${short_hash}'\\"/' \
        -e 's/"alpha"/"'${version}_${short_hash}'"/' \
        -e s/_alpha/_${version}_${short_hash}/g \
        -e s/-alpha/-${version}-${short_hash}/g \
@@ -111,8 +111,15 @@ mv $daemons tmp
 cd tmp
 
 sed -i.old -e 's/"alpha"/"'${version}-${short_hash}'"/' \
-       -e 's/_alpha/_'${version}_${short_hash}'/' \
-       lib_client/proto_alpha.ml
+           -e 's/_alpha/_'${version}_${short_hash}'/' \
+           lib_client/proto_alpha.ml
+
+sed -i.old -e 's/"alpha-parameters"/"'${version}-${short_hash}'-parameters"/' \
+           -e 's/_alpha/_'${version}_${short_hash}'/' \
+           lib_parameters/proto_alpha.ml
+
+sed -i.old -e s/protocol_alpha/protocol_${version}_${short_hash}/ \
+    lib_delegate/test/proto_alpha_helpers.ml
 
 # rename main_*.ml{,i} files of the binaries
 rename s/_alpha/_${version}_${short_hash}/ $(find . -name main_\*.ml -or -name main_\*.mli)
