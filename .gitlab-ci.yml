@@ -638,25 +638,25 @@ opam:50:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:51:tezos-embedded-protocol-alpha:
+opam:51:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:52:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:52:tezos-embedded-protocol-demo:
+opam:53:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:53:tezos-embedded-protocol-genesis:
+opam:54:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
-
-opam:54:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
 
 opam:55:tezos-endorser-alpha-commands:
   <<: *opam_definition
@@ -678,42 +678,47 @@ opam:58:tezos-accuser-alpha:
   variables:
     package: tezos-accuser-alpha
 
-opam:59:tezos-endorser-alpha:
+opam:59:tezos-protocol-alpha-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-alpha-tests
+
+opam:60:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:60:tezos-accuser-alpha-commands:
+opam:61:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:61:tezos-protocol-alpha-parameters:
+opam:62:tezos-protocol-alpha-parameters:
   <<: *opam_definition
   variables:
     package: tezos-protocol-alpha-parameters
 
-opam:62:tezos-baker-alpha:
+opam:63:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:63:tezos-network-sandbox:
+opam:64:tezos-network-sandbox:
   <<: *opam_definition
   variables:
     package: tezos-network-sandbox
 
-opam:64:tezos-signer:
+opam:65:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:65:tezos-node:
+opam:66:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:66:ocplib-json-typed-browser:
+opam:67:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser

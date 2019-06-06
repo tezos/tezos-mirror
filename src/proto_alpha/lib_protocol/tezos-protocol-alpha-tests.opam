@@ -10,6 +10,12 @@ depends: [
   "dune" { build & >= "1.7" }
   "tezos-base"
   "tezos-protocol-compiler"
+  "alcotest-lwt" { with-test }
+  "tezos-stdlib-unix" { with-test }
+  "tezos-protocol-environment" { with-test }
+  "tezos-protocol-alpha-parameters" { with-test }
+  "tezos-shell-services" { with-test }
+  "bip39" { with-test }
 ]
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"
