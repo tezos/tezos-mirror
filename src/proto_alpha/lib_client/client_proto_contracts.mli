@@ -48,7 +48,7 @@ module ContractAlias : sig
     ?name:string ->
     ?doc:string ->
     unit ->
-    ((Lwt_io.file_name * Contract.t) option, #Client_context.wallet) Clic.arg
+    ((string * Contract.t) option, #Client_context.wallet) Clic.arg
   val rev_find:
     #Client_context.wallet ->
     Contract.t -> string option tzresult Lwt.t
