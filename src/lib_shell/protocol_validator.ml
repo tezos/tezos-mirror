@@ -71,19 +71,18 @@ let rec worker_loop bv =
                   Lwt.wakeup_later wakener (Ok protocol)
               | None ->
                   Lwt.wakeup_later wakener
-                    (Error
-                       [Invalid_protocol { hash ;
-                                           error = Dynlinking_failed }])
+                    (error
+                       (Invalid_protocol { hash ; error = Dynlinking_failed }))
             else
               Lwt.wakeup_later wakener
-                (Error
-                   [Invalid_protocol { hash ;
-                                       error = Compilation_failed }]) ;
+                (error
+                   (Invalid_protocol { hash ; error = Compilation_failed })) ;
             return_unit
   end >>= function
   | Ok () ->
       worker_loop bv
-  | Error [Canceled | Exn Lwt_pipe.Closed] ->
+  | Error (Canceled :: _)
+  | Error (Exn Lwt_pipe.Closed :: _) ->
       lwt_log_notice Tag.DSL.(fun f ->
           f "terminating" -% t event "terminating") >>= fun () ->
       Lwt.return_unit

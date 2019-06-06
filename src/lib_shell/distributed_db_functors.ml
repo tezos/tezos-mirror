@@ -312,7 +312,7 @@ end = struct
     | Some (Pending { wakener = w ; _ }) ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (Error [Canceled k])
+        Lwt.wakeup_later w (error (Canceled k))
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
