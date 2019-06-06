@@ -432,7 +432,7 @@ module Make
     let wakeup = function
       | _, Message (_, Some u) ->
           let name = Format.asprintf "%a" Name.pp w.name in
-          Lwt.wakeup_later u (Error [ Closed {base=base_name; name} ])
+          Lwt.wakeup_later u (error (Closed {base=base_name; name}))
       | _, Message (_, None) -> () in
     let close_queue message_queue =
       let messages = Lwt_pipe.pop_all_now message_queue in
@@ -563,7 +563,10 @@ module Make
       end >>= function
       | Ok () ->
           loop ()
-      | Error [Canceled | Exn Lwt.Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
+      | Error (Canceled :: _)
+      | Error (Exn Lwt.Canceled :: _)
+      | Error (Exn Lwt_pipe.Closed :: _)
+      | Error (Exn Lwt_dropbox.Closed :: _) ->
           Logger.lwt_log_notice
             "@[Worker terminated [%a] @]"
             Name.pp w.name  >>= fun () ->
@@ -579,7 +582,7 @@ module Make
           end >>= function
           | Ok () ->
               loop ()
-          | Error ([Timeout] as errs) ->
+          | Error (Timeout :: _ as errs) ->
               Logger.lwt_log_notice
                 "@[Worker terminated with timeout [%a] @]"
                 Name.pp w.name  >>= fun () ->

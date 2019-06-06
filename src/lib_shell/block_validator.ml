@@ -128,7 +128,7 @@ let on_request
                         ~predecessor:pred
                         header operations >>= function
                       | Ok x -> return x
-                      | Error [ Missing_test_protocol protocol ] ->
+                      | Error (Missing_test_protocol protocol  :: _) ->
                           Protocol_validator.fetch_and_compile_protocol
                             bv.protocol_validator
                             ?peer ~timeout:bv.limits.protocol_timeout
@@ -162,15 +162,18 @@ let on_request
                     block ;
                   notify_new_block block ;
                   return (Ok (Some block))
-              | Error [Canceled | Unavailable_protocol _ | Missing_test_protocol _ | System_error _ ] as err ->
-                  return err
-              | Error errors ->
+              | Error (( Canceled
+                       | Unavailable_protocol _
+                       | Missing_test_protocol _
+                       | System_error _) :: _) as error ->
+                  return error
+              | Error error ->
                   Worker.protect w begin fun () ->
                     Distributed_db.commit_invalid_block
-                      chain_db hash header errors
+                      chain_db hash header error
                   end >>=? fun commited ->
                   assert commited ;
-                  return (Error errors)
+                  return (Error error)
 
 let on_launch _ _ (limits, start_testchain, db, validation_kind) =
   let protocol_validator = Protocol_validator.create db in

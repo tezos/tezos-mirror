@@ -401,7 +401,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
     | Ok op ->
         Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
-    | Error [ Distributed_db.Operation.Canceled _ ] ->
+    | Error (Distributed_db.Operation.Canceled _  :: _) ->
         debug w
           "operation %a included before being prevalidated"
           Operation_hash.pp_short oph ;

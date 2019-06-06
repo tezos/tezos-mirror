@@ -246,12 +246,12 @@ let may_switch_test_chain w active_chains spawn_child block =
                   Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
                   Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
                   return chain_state
-              | Error [ Block_validator_errors.Missing_test_protocol missing_protocol ] ->
+              | Error (Block_validator_errors.Missing_test_protocol missing_protocol  :: _) ->
                   Block_validator.fetch_and_compile_protocol
                     nv.parameters.block_validator
                     missing_protocol >>=? fun _ ->
                   cont ()
-              | Error _ as errs -> Lwt.return errs
+              | Error _ as error -> Lwt.return error
             in
             try_init_test_chain @@ fun () ->
             try_init_test_chain @@ fun () ->
