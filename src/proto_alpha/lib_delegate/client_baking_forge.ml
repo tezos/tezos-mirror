@@ -47,9 +47,9 @@ let anonymous_index = 2
 let managers_index = 3
 
 let default_max_priority = 64
-let default_minimal_fees = Tez.zero
-let default_minimal_nanotez_per_gas_unit = Z.of_int 10000
-let default_minimal_nanotez_per_byte = Z.zero
+let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
+let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_byte = Z.of_int 1000
 let default_await_endorsements = true
 
 type state = {
