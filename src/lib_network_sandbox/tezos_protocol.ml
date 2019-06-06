@@ -1,4 +1,5 @@
 open Internal_pervasives
+open Tezos_protocol_alpha.Proto_alpha
 
 module Key = struct
   module Of_name = struct
@@ -36,7 +37,7 @@ module Script = struct
           Tezos_error_monad.Error_monad.pp_print_error el
 
   let exn_shell msg res =
-    Tezos_client_alpha.Proto_alpha.Alpha_environment.wrap_error res
+    Environment.wrap_error res
     |> exn_tezos msg
 
   let parse exprs =
@@ -48,19 +49,18 @@ module Script = struct
     | Ok json ->
         let repr =
           Tezos_data_encoding.Data_encoding.Json.destruct
-            Tezos_client_alpha.Proto_alpha.Script_repr.encoding json
+            Script_repr.encoding json
         in
         let ( (expr_code :
-                Tezos_client_alpha.Proto_alpha.Michelson_v1_primitives.prim
-                Tezos_micheline.Micheline.canonical)
+                 Michelson_v1_primitives.prim
+                   Tezos_micheline.Micheline.canonical)
             , _ ) =
-          Tezos_client_alpha.Proto_alpha.Script_repr.(force_decode repr.code)
+          Script_repr.(force_decode repr.code)
           |> exn_shell "decoding script-repr"
         in
-        let module Alph = Tezos_client_alpha.Proto_alpha in
         let strings_node =
-          Alph.Michelson_v1_primitives.strings_of_prims expr_code
-          |> Alph.Alpha_environment.Micheline.root
+          Michelson_v1_primitives.strings_of_prims expr_code
+          |> Environment.Micheline.root
         in
         Format.eprintf ">> %a\n%!" Tezos_micheline.Micheline_printer.print_expr
           (Tezos_micheline.Micheline.map_node
@@ -73,8 +73,8 @@ module Script = struct
   let json_script_repr code storage =
     match
       Tezos_data_encoding.Data_encoding.Json.construct
-        Tezos_client_alpha.Proto_alpha.Script_repr.encoding
-        Tezos_client_alpha.Proto_alpha.Script_repr.
+        Script_repr.encoding
+        Script_repr.
           {code= lazy_expr code; storage= lazy_expr storage}
     with
     | `O _ as o -> (o : Ezjsonm.t)
@@ -193,7 +193,7 @@ module Account = struct
 end
 
 module Voting_period = struct
-  type t = Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period.kind =
+  type t = Alpha_context.Voting_period.kind =
     | Proposal
     | Testing_vote
     | Testing
@@ -202,7 +202,7 @@ module Voting_period = struct
   let to_string (p : t) =
     match
       Tezos_data_encoding.Data_encoding.Json.construct
-        Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period
+        Alpha_context.Voting_period
         .kind_encoding p
     with
     | `String s -> s

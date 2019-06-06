@@ -26,8 +26,8 @@
 
 val may_patch_protocol:
   level:Int32.t ->
-  Tezos_protocol_environment_shell.validation_result ->
-  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
+  Tezos_protocol_environment.validation_result ->
+  Tezos_protocol_environment.validation_result tzresult Lwt.t
 
 val update_testchain_status:
   Context.t ->
@@ -49,7 +49,7 @@ val check_liveness:
   unit tzresult Lwt.t
 
 type result = {
-  validation_result: Tezos_protocol_environment_shell.validation_result ;
+  validation_result: Tezos_protocol_environment.validation_result ;
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;

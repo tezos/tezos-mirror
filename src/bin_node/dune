@@ -8,6 +8,7 @@
             tezos-p2p
             tezos-shell
             tezos-storage
+            tezos-shell-context
             tezos-protocol-updater
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-demo-noops
@@ -22,6 +23,7 @@
                    -open Tezos_p2p
                    -open Tezos_shell
                    -open Tezos_storage
+                   -open Tezos_shell_context
                    -open Tezos_protocol_updater
                    -linkall)))
 

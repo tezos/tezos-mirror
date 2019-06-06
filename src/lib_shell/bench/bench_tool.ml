@@ -281,12 +281,12 @@ let init () =
   (* Right now, we split half of 80.000 rolls between generated accounts *)
   (* TODO : ensure we don't overflow with the underlying commitments *)
   Tez_repr.(
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     args.params.Parameters_repr.constants.Constants_repr.tokens_per_roll
     *? 80_000L >>=? fun total_amount ->
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     total_amount /? 2L >>=? fun amount ->
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     amount /? (Int64.of_int args.accounts) ) >>=? fun initial_amount ->
 
   (* Ensure a deterministic run *)

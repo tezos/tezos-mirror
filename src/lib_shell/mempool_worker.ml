@@ -434,6 +434,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data
     end >>=? fun protocol_data ->
+    let predecessor_context = Shell_context.wrap_disk_context predecessor_context in
     Proto.begin_construction
       ~chain_id: (State.Block.chain_id predecessor)
       ~predecessor_context

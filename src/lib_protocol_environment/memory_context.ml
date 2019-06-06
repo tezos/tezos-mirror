@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context = struct
-
+module M = struct
   module StringMap = Map.Make(String)
 
   type key = string list
@@ -112,27 +111,7 @@ module Context = struct
              | Dir _ -> f (`Dir (k @ [n])) acc)
           m (Lwt.return init)
 
-  let rec pp ppf m =
-    match m with
-    | Key s -> Format.fprintf ppf "%s" (MBytes.to_string s)
-    | Dir m ->
-        StringMap.iter
-          (fun n m ->
-             match m with
-             | Key s ->
-                 Format.fprintf ppf "- %s: %s@ " n (MBytes.to_string s)
-             | Dir m ->
-                 Format.fprintf ppf "- %s:@[<v 2>@ %a@]@ " n pp (Dir m))
-          m
-
-  let dump m = Format.eprintf "@[<v>%a@]" pp m
-
   let current_protocol_key = ["protocol"]
-
-  let get_protocol v =
-    raw_get v current_protocol_key |> function
-    | Some (Key data) -> Lwt.return (Protocol_hash.of_bytes_exn data)
-    | _ -> assert false
 
   let set_protocol v key =
     raw_set v current_protocol_key (Some (Key (Protocol_hash.to_bytes key))) |> function
@@ -141,7 +120,16 @@ module Context = struct
 
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
-
 end
 
-include Tezos_protocol_environment.Make(Context)
+open Tezos_protocol_environment
+
+type t = M.t
+
+type _ Context.kind += Memory : t Context.kind
+
+let ops = (module M : CONTEXT with type t = 'ctxt)
+
+let empty =
+  let ctxt = M.empty in
+  Context.Context { ops ; ctxt ; kind = Memory }

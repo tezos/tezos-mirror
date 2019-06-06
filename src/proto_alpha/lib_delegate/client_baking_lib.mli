@@ -28,7 +28,7 @@ open Alpha_context
 
 (** Mine a block *)
 val bake_block:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->
@@ -46,20 +46,20 @@ val bake_block:
 
 (** Endorse a block *)
 val endorse_block:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Chain_services.chain ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 
 (** Get the previous cycle of the given cycle *)
 val get_predecessor_cycle:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   Cycle.t ->
   Cycle.t Lwt.t
 
 (** Reveal the nonces used to bake each block in the given list *)
 val reveal_block_nonces :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Chain_services.chain ->
   block: Block_services.block ->
   Block_hash.t list ->
@@ -67,7 +67,7 @@ val reveal_block_nonces :
 
 (** Reveal all unrevealed nonces *)
 val reveal_nonces :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Chain_services.chain ->
   block: Block_services.block ->
   unit ->

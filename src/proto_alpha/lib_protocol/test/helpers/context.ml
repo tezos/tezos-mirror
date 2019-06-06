@@ -41,13 +41,13 @@ let level = function
 let get_level ctxt =
   level ctxt
   |> Raw_level.of_int32
-  |> Alpha_environment.wrap_error
+  |> Environment.wrap_error
   |> Lwt.return
 
 let rpc_ctxt = object
   method call_proto_service0 :
     'm 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, Alpha_environment.RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, Environment.RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
     t -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr q i ->
       match pr with
@@ -55,7 +55,7 @@ let rpc_ctxt = object
       | I b -> Incremental.rpc_ctxt#call_proto_service0 s b q i
   method call_proto_service1 :
     'm 'a 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, Alpha_environment.RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, Environment.RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a q i ->
       match pr with
@@ -63,7 +63,7 @@ let rpc_ctxt = object
       | I bl -> Incremental.rpc_ctxt#call_proto_service1 s bl a q i
   method call_proto_service2 :
     'm 'a 'b 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, (Alpha_environment.RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, (Environment.RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a b q i ->
       match pr with
@@ -71,7 +71,7 @@ let rpc_ctxt = object
       | I bl -> Incremental.rpc_ctxt#call_proto_service2 s bl a b q i
   method call_proto_service3 :
     'm 'a 'b 'c 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, ((Alpha_environment.RPC_context.t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, ((Environment.RPC_context.t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a b c q i ->
       match pr with
@@ -143,7 +143,7 @@ module Vote = struct
     Alpha_services.Voting.current_proposal rpc_ctxt ctxt
 
   let get_protocol (b:Block.t) =
-    Alpha_environment.Context.get b.context ["protocol"] >>= function
+    Tezos_protocol_environment.Context.get b.context ["protocol"] >>= function
     | None -> assert false
     | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
 

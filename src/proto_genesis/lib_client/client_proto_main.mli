@@ -32,4 +32,3 @@ val bake:
   Data.Command.t ->
   Client_keys.sk_uri ->
   Block_hash.t tzresult Lwt.t
-

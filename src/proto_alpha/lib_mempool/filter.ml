@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Proto_alpha
 open Alpha_context
 
 type nanotez = Z.t
@@ -73,8 +74,6 @@ let default_config =
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte ;
     allow_script_failure = true ;
   }
-
-module Proto = Registerer.Registered
 
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
@@ -150,7 +149,7 @@ let rec post_filter_manager
 
 let post_filter config
     ~validation_state_before:_
-    ~validation_state_after: ({ Main.ctxt ; _ } : Proto.validation_state)
+    ~validation_state_after: ({ ctxt ; _ } : validation_state)
     (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)

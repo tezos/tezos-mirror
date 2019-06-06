@@ -13,6 +13,7 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-alpha"
   "tezos-shell-services"
+  "tezos-shell-context"
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-client-alpha"

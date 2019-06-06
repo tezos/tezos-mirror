@@ -5,7 +5,8 @@
             tezos-stdlib-unix
             tezos-micheline
             tezos-shell-services
-            tezos-protocol-environment-shell
+            tezos-protocol-environment
+            tezos-shell-context
             tezos-protocol-compiler.registerer
             tezos-protocol-compiler.native
             tezos-storage

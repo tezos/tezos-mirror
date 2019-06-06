@@ -35,7 +35,7 @@ val init :
     tests will begin. *)
 
 val level:
-  Chain_services.chain * Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
+  Chain_services.chain * Block_services.block -> Level.t tzresult Lwt.t
 
 (** Calls the rpc service raw_context using the right rpc context *)
 val rpc_raw_context : Block_services.block -> string list -> int ->
@@ -184,12 +184,12 @@ module Assert : sig
   val failed_to_preapply:
     msg:string ->
     ?op:Operation.packed ->
-    (Alpha_environment.Error_monad.error ->
+    (Environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit
 
   val ecoproto_error:
-    (Alpha_environment.Error_monad.error -> bool) ->
+    (Environment.Error_monad.error -> bool) ->
     error -> bool
 
   val generic_economic_error : msg:string -> 'a tzresult -> unit

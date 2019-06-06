@@ -40,16 +40,16 @@ let expect_error err = function
   | _ -> failwith "Unexpected successful result"
 
 let expect_alpha_error err =
-  expect_error (Alpha_environment.Ecoproto_error err)
+  expect_error (Environment.Ecoproto_error err)
 
 let expect_non_delegatable_contract = function
-  | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
+  | Environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
       return_unit
   | _ ->
       failwith "Contract is not delegatable and operation should fail."
 
 let expect_no_deletion_pkh pkh = function
-  | Alpha_environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
+  | Environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
       return_unit
   | _ ->
       failwith "Delegate can not be deleted and operation should fail."
@@ -132,7 +132,7 @@ let bootstrap_manager_already_registered_delegate ~fee () =
   else
     begin
       Incremental.add_operation ~expect_failure:(function
-          |  Alpha_environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
+          |  Environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
               return_unit
           | _ ->
               failwith "Delegate is already active and operation should fail.")
@@ -165,7 +165,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* origination did not proceed; fee has been debited *)
     begin
       Incremental.add_operation i ~expect_failure:(function
-          |  Alpha_environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
+          |  Environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
               return_unit
           | _ ->
               failwith "Not enough balance for origination burn: operation should fail.")
@@ -325,7 +325,7 @@ Not credited:
 *)
 
 let expect_unregistered_key pkh = function
-  | Alpha_environment.Ecoproto_error Roll_storage.Unregistered_delegate pkh0 :: _
+  | Environment.Ecoproto_error Roll_storage.Unregistered_delegate pkh0 :: _
     when pkh = pkh0 -> return_unit
   | _ -> failwith "Delegate key is not registered: operation should fail."
 

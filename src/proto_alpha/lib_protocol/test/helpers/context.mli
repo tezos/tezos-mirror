@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 open Proto_alpha
-open Alpha_environment
 open Alpha_context
+open Environment
 
 type t =
   | B of Block.t

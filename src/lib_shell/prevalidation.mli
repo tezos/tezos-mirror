@@ -64,7 +64,7 @@ module type T = sig
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
-    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_result : Tezos_protocol_environment.validation_result ;
     block_metadata : Proto.block_header_metadata ;
   }
 

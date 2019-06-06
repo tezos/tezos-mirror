@@ -23,6 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "alpha-parameters" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
-include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
+open Tezos_protocol_environment
+open Context
+
+let (>>=) = Lwt.(>>=)
+
+type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
+
+let ops = (module Tezos_storage.Context :
+            CONTEXT with type t = 'ctxt)
+
+let checkout index context_hash =
+  Tezos_storage.Context.checkout index context_hash >>= function
+  | Some ctxt -> Lwt.return_some (Context.Context { ops ; ctxt ; kind = Shell })
+  | None -> Lwt.return_none
+
+let checkout_exn index context_hash =
+  Tezos_storage.Context.checkout_exn index context_hash >>= fun ctxt ->
+  Lwt.return (Context.Context { ops ; ctxt ; kind = Shell })
+
+let wrap_disk_context ctxt =
+  Context.Context { ops ; ctxt ; kind = Shell }
+
+let unwrap_disk_context: t -> Tezos_storage.Context.t = function
+  | (Context.Context { ctxt ; kind = Shell ; _ }) -> ctxt
+  | _ -> assert false

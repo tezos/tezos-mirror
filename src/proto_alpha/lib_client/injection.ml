@@ -27,8 +27,9 @@
 open Proto_alpha
 open Alpha_context
 open Apply_results
+open Alpha_client_context
 
-let get_branch (rpc_config: #Proto_alpha.full)
+let get_branch (rpc_config: #Alpha_client_context.full)
     ~chain ~(block : Block_services.block) branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
   begin
@@ -88,7 +89,7 @@ let dummy_fee_parameter = {
 }
 
 let check_fees
-  : type t. #Proto_alpha.full -> fee_parameter -> t contents_list -> int -> unit Lwt.t
+  : type t. #Alpha_client_context.full -> fee_parameter -> t contents_list -> int -> unit Lwt.t
   = fun cctxt config op size ->
     match get_manager_operation_gas_and_fee op with
     | Error _ -> assert false (* FIXME *)
@@ -175,7 +176,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
   pp_close_box ppf ()
 
 let preapply (type t)
-    (cctxt: #Proto_alpha.full) ~chain ~block
+    (cctxt: #Alpha_client_context.full) ~chain ~block
     ?(verbose_signing = false)
     ?fee_parameter
     ?branch ?src_sk (contents : t contents_list) =
@@ -213,7 +214,7 @@ let preapply (type t)
         check_fees cctxt fee_parameter contents size
     | None -> Lwt.return_unit
   end >>= fun () ->
-  Alpha_block_services.Helpers.Preapply.operations
+  Alpha_client_context.Alpha_block_services.Helpers.Preapply.operations
     cctxt ~chain ~block [Operation.pack op] >>=? function
   | [(Operation_data op', Operation_metadata result)] -> begin
       match Operation.equal
@@ -226,7 +227,7 @@ let preapply (type t)
   | _ -> failwith "Unexpected result"
 
 let simulate (type t)
-    (cctxt: #Proto_alpha.full) ~chain ~block
+    (cctxt: #Alpha_client_context.full) ~chain ~block
     ?branch (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
@@ -258,8 +259,8 @@ let estimated_gas_single
     | Applied (Delegation_result { consumed_gas }) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
-    | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
+    | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
+    | Failed (_, errs) -> Environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
        acc >>? fun acc ->
@@ -287,8 +288,8 @@ let estimated_storage_single
     | Applied (Delegation_result _) -> Ok Z.zero
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok Z.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
-    | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
+    | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
+    | Failed (_, errs) -> Environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
        acc >>? fun acc ->
@@ -323,8 +324,8 @@ let originated_contracts_single
     | Applied (Delegation_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) -> Ok [] (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Alpha_environment.wrap_error (Error errs)
-    | Failed (_, errs) -> Alpha_environment.wrap_error (Error errs) in
+    | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
+    | Failed (_, errs) -> Environment.wrap_error (Error errs) in
   List.fold_left
     (fun acc (Internal_operation_result (_, r)) ->
        acc >>? fun acc ->
@@ -362,11 +363,11 @@ let detect_script_failure :
         | Backtracked (_, Some errs) ->
             record_trace
               (failure "The transfer simulation failed.")
-              (Alpha_environment.wrap_error (Error errs))
+              (Environment.wrap_error (Error errs))
         | Failed (_, errs) ->
             record_trace
               (failure "The transfer simulation failed.")
-              (Alpha_environment.wrap_error (Error errs)) in
+              (Environment.wrap_error (Error errs)) in
       List.fold_left
         (fun acc (Internal_operation_result (_, r)) ->
            acc >>? fun () ->
@@ -384,7 +385,7 @@ let detect_script_failure :
   fun { contents } -> detect_script_failure contents
 
 let may_patch_limits
-    (type kind) (cctxt : #Proto_alpha.full)
+    (type kind) (cctxt : #Alpha_client_context.full)
     ~fee_parameter
     ~chain ~block ?branch ?(compute_fee = false)
     (contents: kind contents_list) : kind contents_list tzresult Lwt.t =
@@ -534,7 +535,7 @@ let may_patch_limits
       end >>=? fun () ->
       begin
         Lwt.return (estimated_storage (Z.of_int origination_size) result.contents) >>=? fun storage ->
-        Lwt.return (Alpha_environment.wrap_error Tez.(cost_per_byte *? Z.to_int64 storage)) >>=? fun burn ->
+        Lwt.return (Environment.wrap_error Tez.(cost_per_byte *? Z.to_int64 storage)) >>=? fun burn ->
         if Tez.(burn > fee_parameter.burn_cap) then
           cctxt#error "The operation will burn %s%a which is higher than the configured burn cap (%s%a).@\n\
                       \ Use `--burn-cap %a` to emit this operation."

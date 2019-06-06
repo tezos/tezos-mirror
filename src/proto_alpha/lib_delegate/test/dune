@@ -20,6 +20,7 @@
                    -open Tezos_client_base
                    -open Tezos_client_genesis
                    -open Tezos_client_alpha
+                   -open Tezos_protocol_alpha
                    -open Tezos_baking_alpha
                    -open Tezos_client_base_unix)))
 

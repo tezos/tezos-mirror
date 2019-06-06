@@ -107,7 +107,7 @@ let commands () =
     command ~group ~desc: "Lists all scripts in the library."
       no_options
       (fixed [ "list" ; "known" ; "scripts" ])
-      (fun () (cctxt : Proto_alpha.full) ->
+      (fun () (cctxt : Alpha_client_context.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return_unit) ;
@@ -134,7 +134,7 @@ let commands () =
       (prefixes [ "show" ; "known" ; "script" ]
        @@ Program.alias_param
        @@ stop)
-      (fun () (_, program) (cctxt : Proto_alpha.full) ->
+      (fun () (_, program) (cctxt : Alpha_client_context.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
          return_unit) ;
@@ -213,7 +213,7 @@ let commands () =
            ~gas:original_gas ~data ~ty () >>= function
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
-               Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
+               Alpha_context.Gas.pp gas >>= fun () ->
              return_unit
          | Error errs ->
              cctxt#warning "%a"
@@ -253,9 +253,9 @@ let commands () =
                MBytes.pp_hex bytes
                Script_expr_hash.pp hash
                MBytes.pp_hex (Script_expr_hash.to_bytes hash)
-               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha256 bytes)
-               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha512 bytes)
-               Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
+               MBytes.pp_hex (Environment.Raw_hashes.sha256 bytes)
+               MBytes.pp_hex (Environment.Raw_hashes.sha512 bytes)
+               Alpha_context.Gas.pp remaining_gas >>= fun () ->
              return_unit
          | Error errs ->
              cctxt#warning "%a"
@@ -317,15 +317,16 @@ let commands () =
        @@ Clic.param ~name:"signature" ~desc:"the signature to check"
          signature_parameter
        @@ stop)
-      (fun quiet bytes (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
-         Client_keys.check key_locator signature bytes >>=? function
-         | false -> cctxt#error "invalid signature"
-         | true ->
-             if quiet then
-               return_unit
-             else
-               cctxt#message "Signature check successfull." >>= fun () ->
-               return_unit
+      (fun quiet bytes (_, (key_locator, _)) signature
+        (cctxt : #Alpha_client_context.full) ->
+        Client_keys.check key_locator signature bytes >>=? function
+        | false -> cctxt#error "invalid signature"
+        | true ->
+            if quiet then
+              return_unit
+            else
+              cctxt#message "Signature check successfull." >>= fun () ->
+              return_unit
       ) ;
 
   ]

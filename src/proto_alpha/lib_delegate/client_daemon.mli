@@ -28,7 +28,7 @@ open Alpha_context
 
 module Endorser : sig
   val run:
-    #Proto_alpha.full ->
+    #Alpha_client_context.full ->
     chain: Chain_services.chain ->
     delay: int ->
     public_key_hash list -> unit tzresult Lwt.t
@@ -36,7 +36,7 @@ end
 
 module Baker : sig
   val run:
-    #Proto_alpha.full ->
+    #Alpha_client_context.full ->
     ?minimal_fees: Tez.t ->
     ?minimal_nanotez_per_gas_unit: Z.t ->
     ?minimal_nanotez_per_byte: Z.t ->
@@ -49,7 +49,7 @@ end
 
 module Accuser : sig
   val run:
-    #Proto_alpha.full ->
+    #Alpha_client_context.full ->
     chain: Chain_services.chain ->
     preserved_levels: int ->
     unit tzresult Lwt.t

@@ -5,6 +5,7 @@
             tezos_alpha_bench_helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
+                   -open Tezos_protocol_alpha
                    -open Tezos_alpha_bench_helpers)))
 
 (alias

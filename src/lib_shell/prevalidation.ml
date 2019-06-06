@@ -61,7 +61,7 @@ module type T = sig
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
-    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_result : Tezos_protocol_environment.validation_result ;
     block_metadata : Proto.block_header_metadata ;
   }
 
@@ -147,6 +147,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data
     end >>=? fun protocol_data ->
+    let predecessor_context = Shell_context.wrap_disk_context predecessor_context in
     Proto.begin_construction
       ~chain_id: (State.Block.chain_id predecessor)
       ~predecessor_context
@@ -188,7 +189,7 @@ module Make(Proto : Registered_protocol.T) : T with module Proto = Proto = struc
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list ;
-    block_result : Tezos_protocol_environment_shell.validation_result ;
+    block_result : Tezos_protocol_environment.validation_result ;
     block_metadata : Proto.block_header_metadata ;
   }
 
@@ -289,6 +290,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   Block_validation.may_patch_protocol
     ~level block_result >>=? fun { fitness ; context ; message ; _ } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
+  let context = Shell_context.unwrap_disk_context context in
   Context.get_protocol context >>= fun protocol ->
   let proto_level =
     if Protocol_hash.equal protocol pred_protocol then
@@ -314,7 +316,9 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
           fail (Block_validator_errors.Unavailable_protocol
                   { block = State.Block.hash predecessor ; protocol })
       | Some (module NewProto) ->
+          let context = Shell_context.wrap_disk_context context in
           NewProto.init context shell_header >>=? fun { context ; message ; _ } ->
+          let context = Shell_context.unwrap_disk_context context in
           return (context, message)
   end >>=? fun (context, message) ->
   Context.hash ?message ~time:timestamp context >>= fun context ->

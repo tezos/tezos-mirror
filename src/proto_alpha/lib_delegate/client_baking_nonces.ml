@@ -27,7 +27,7 @@ open Proto_alpha
 open Alpha_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = "client." ^ Proto_alpha.Name.name ^ ".nonces"
+    let name = Proto_alpha.name ^ ".baking.nonces"
   end)
 
 type t = Nonce.t Block_hash.Map.t
@@ -146,7 +146,7 @@ let get_unrevealed_nonces cctxt location nonces =
           begin get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
             | Some level -> begin
                 Lwt.return
-                  (Alpha_environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
+                  (Environment.wrap_error (Raw_level.of_int32 level)) >>=? fun level ->
                 Alpha_services.Nonce.get cctxt (chain, `Head 0) level >>=? function
                 | Missing nonce_hash
                   when Nonce.check_hash nonce nonce_hash ->

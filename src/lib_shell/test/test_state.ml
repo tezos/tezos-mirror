@@ -122,6 +122,8 @@ let build_valid_chain state vtbl pred names =
            let hash = Block_header.hash block in
            let pred_header = State.Block.header pred in
            begin
+             let predecessor_context =
+               Shell_context.wrap_disk_context predecessor_context in
              Proto.begin_application
                ~chain_id: Chain_id.zero
                ~predecessor_context
@@ -131,8 +133,10 @@ let build_valid_chain state vtbl pred names =
              (* no operations *)
              Proto.finalize_block vstate
            end >>=? fun (validation_result, _metadata) ->
+           let context =
+             Shell_context.unwrap_disk_context validation_result.context in
            Context.commit
-             ~time:block.shell.timestamp validation_result.context >>= fun context_hash ->
+             ~time:block.shell.timestamp context >>= fun context_hash ->
            State.Block.store state
              block zero [[op]] [[zero]]
              ({context_hash;

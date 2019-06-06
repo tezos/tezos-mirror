@@ -26,6 +26,7 @@
 
 open Proto_alpha
 open Alpha_context
+open Alpha_client_context
 
 let () = Random.self_init ()
 
@@ -37,7 +38,7 @@ let rpc_config = ref {
   }
 
 let build_rpc_context config =
-  new Proto_alpha.wrap_proto_context @@
+  new wrap_rpc_context @@
   new RPC_client_unix.http_ctxt config Media_type.all_media_types
 
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
@@ -99,10 +100,10 @@ let activate_alpha () =
          "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6") in
   Tezos_client_genesis.Client_proto_main.bake
     (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
-    (Activate  { protocol = Proto_alpha.hash ;
-                 fitness ;
-                 protocol_parameters ;
-               })
+    (Activate { protocol = Proto_alpha.hash ;
+                fitness ;
+                protocol_parameters ;
+              })
     activator_sk
 
 let init ?exe ?rpc_port () =
@@ -390,7 +391,7 @@ module Assert = struct
     equal_pkh ~msg expected_delegate actual_delegate
 
   let ecoproto_error f = function
-    | Alpha_environment.Ecoproto_error error -> f error
+    | Environment.Ecoproto_error error -> f error
     | _ -> false
 
   let hash op = Tezos_base.Operation.hash op

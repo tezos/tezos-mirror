@@ -9,8 +9,9 @@ depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
-  "tezos-protocol-compiler"
+  "tezos-protocol-genesis"
   "tezos-protocol-updater"
+  "tezos-protocol-compiler"
 ]
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"

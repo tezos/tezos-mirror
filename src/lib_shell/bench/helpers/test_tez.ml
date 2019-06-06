@@ -25,7 +25,7 @@
 
 open Proto_alpha
 open Alpha_context
-open Alpha_environment
+open Environment
 
 (* This module is mostly to wrap the errors from the protocol *)
 module Tez = struct

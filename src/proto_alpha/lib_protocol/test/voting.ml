@@ -135,7 +135,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals at the beginning of proposal period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -160,7 +160,7 @@ let test_successful_vote num_delegates () =
   (* correctly count the double proposal for zero *)
   begin
     let weight = Int32.add (List.nth rolls_p1 0) (List.nth rolls_p1 1) in
-    match Alpha_environment.Protocol_hash.(Map.find_opt zero ps) with
+    match Environment.Protocol_hash.(Map.find_opt zero ps) with
     | Some v -> if v = weight then return_unit
         else failwith "%s - Wrong count %ld is not %ld" __LOC__ v weight
     | None -> failwith "%s - Missing proposal" __LOC__
@@ -211,7 +211,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals during testing_vote period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -313,7 +313,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals during promotion_vote period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -580,7 +580,7 @@ let test_multiple_identical_proposals_count_as_one () =
 
   (* correctly count the double proposal for zero as one proposal *)
   let expected_weight_proposer = proposer_rolls in
-  match Alpha_environment.Protocol_hash.(Map.find_opt zero ps) with
+  match Environment.Protocol_hash.(Map.find_opt zero ps) with
   | Some v -> if v = expected_weight_proposer then return_unit
       else failwith
           "%s - Wrong count %ld is not %ld; identical proposals count as one"

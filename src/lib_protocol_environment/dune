@@ -8,16 +8,16 @@
                    -open Tezos_micheline))
  (wrapped false)
  (modules Tezos_protocol_environment
-          Tezos_protocol_environment_faked
-          Tezos_protocol_environment_memory))
+          Dummy_context
+          Memory_context))
 
 (library
- (name tezos_protocol_environment_shell)
- (public_name tezos-protocol-environment-shell)
+ (name tezos_shell_context)
+ (public_name tezos-shell-context)
  (libraries tezos-base
             tezos-protocol-environment
             tezos-storage)
- (modules Tezos_protocol_environment_shell))
+ (modules Shell_context))
 
 (alias
  (name runtest_lint)

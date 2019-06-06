@@ -30,11 +30,11 @@ type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
   operations : Operation.packed list ;
-  context : Tezos_protocol_environment_memory.Context.t ; (** Resulting context *)
+  context : Tezos_protocol_environment.Context.t ; (** Resulting context *)
 }
 type block = t
 
-val rpc_ctxt: t Alpha_environment.RPC_context.simple
+val rpc_ctxt: t Environment.RPC_context.simple
 
 (** Policies to select the next baker:
     - [By_priority p] selects the baker at priority [p]

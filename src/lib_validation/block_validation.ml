@@ -27,7 +27,7 @@
 open Block_validator_errors
 
 type result = {
-  validation_result: Tezos_protocol_environment_shell.validation_result ;
+  validation_result: Tezos_protocol_environment.validation_result ;
   block_metadata: MBytes.t ;
   ops_metadata: MBytes.t list list ;
   context_hash: Context_hash.t ;
@@ -66,7 +66,9 @@ let init_test_chain
         | Some proto -> return proto
         | None -> fail (Missing_test_protocol protocol)
       end >>=? fun (module Proto_test) ->
-      Proto_test.init ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt ; _ } ->
+      let test_ctxt = Shell_context.wrap_disk_context ctxt in
+      Proto_test.init test_ctxt forked_header.Block_header.shell >>=? fun { context = test_ctxt ; _ } ->
+      let test_ctxt = Shell_context.unwrap_disk_context test_ctxt in
       Context.set_test_chain test_ctxt Not_running >>= fun test_ctxt ->
       Context.set_protocol test_ctxt protocol >>= fun test_ctxt ->
       Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->
@@ -74,12 +76,14 @@ let init_test_chain
 
 let may_patch_protocol
     ~level
-    (validation_result : Tezos_protocol_environment_shell.validation_result) =
+    (validation_result : Tezos_protocol_environment.validation_result) =
   match Block_header.get_forced_protocol_upgrade ~level with
   | None ->
       return validation_result
   | Some hash ->
-      Context.set_protocol validation_result.context hash >>= fun context ->
+      let context = Shell_context.unwrap_disk_context validation_result.context in
+      Context.set_protocol context hash >>= fun context ->
+      let context = Shell_context.wrap_disk_context context in
       return { validation_result with context }
 
 module Make(Proto : Registered_protocol.T) = struct
@@ -123,7 +127,7 @@ module Make(Proto : Registered_protocol.T) = struct
         fail_unless
           (Option.unopt_map ~default:true
              ~f:(fun max -> List.length ops <= max)
-             quota.Tezos_protocol_environment_shell.max_op)
+             quota.Tezos_protocol_environment.max_op)
           (let max = Option.unopt ~default:~-1 quota.max_op in
            invalid_block
              (Too_many_operations
@@ -186,6 +190,7 @@ module Make(Proto : Registered_protocol.T) = struct
       block_header.shell.timestamp >>=? fun context ->
     parse_operations block_hash operations >>=? fun operations ->
     (* TODO wrap 'proto_error' into 'block_error' *)
+    let context = Shell_context.wrap_disk_context context in
     Proto.begin_application
       ~chain_id
       ~predecessor_context:context
@@ -207,10 +212,12 @@ module Make(Proto : Registered_protocol.T) = struct
      *   validation_result.context
      *   current_block_header
      *   ~start_testchain >>=? fun forked_genesis_header -> *)
-    is_testchain_forking validation_result.context >>= fun forking_testchain ->
+    let context = Shell_context.unwrap_disk_context validation_result.context in
+    is_testchain_forking context >>= fun forking_testchain ->
     may_patch_protocol
       ~level:block_header.shell.level validation_result >>=? fun validation_result ->
-    Context.get_protocol validation_result.context >>= fun new_protocol ->
+    let context = Shell_context.unwrap_disk_context validation_result.context in
+    Context.get_protocol context >>= fun new_protocol ->
     let expected_proto_level =
       if Protocol_hash.equal new_protocol Proto.hash then
         predecessor_block_header.shell.proto_level
@@ -256,10 +263,11 @@ module Make(Proto : Registered_protocol.T) = struct
            (Data_encoding.Binary.to_bytes_exn
               Proto.operation_receipt_encoding))
         ops_metadata in
+    let context = Shell_context.unwrap_disk_context validation_result.context in
     Context.commit
       ~time:block_header.shell.timestamp
       ?message:validation_result.message
-      validation_result.context >>= fun context_hash ->
+      context >>= fun context_hash ->
     return ({ validation_result ; block_metadata ;
               ops_metadata ; context_hash ; forking_testchain })
 

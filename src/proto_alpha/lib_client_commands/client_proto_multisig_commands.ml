@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Error_monad
+open Proto_alpha
+open Alpha_context
 
 let group =
   { Clic.name = "multisig" ;
@@ -76,7 +77,7 @@ let transfer_options =
     Client_proto_args.fee_cap_arg
     Client_proto_args.burn_cap_arg
 
-let commands () =
+let commands () : #Alpha_client_context.full Clic.command list =
   Clic.[
     command ~group ~desc: "Originate a new multisig contract."
       (args15
@@ -117,7 +118,7 @@ let commands () =
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap,
                  burn_cap)
         alias_name manager balance (_, source) threshold keys
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_contracts.RawContractAlias.of_fresh
           cctxt force alias_name >>=? fun alias_name ->
         Client_proto_context.source_to_keys cctxt ~chain:cctxt#chain ~block:cctxt#block
@@ -164,7 +165,7 @@ let commands () =
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
       begin fun (bytes_only) (_, multisig_contract) amount (_, destination)
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Transfer (amount, destination))
@@ -201,7 +202,7 @@ let commands () =
          ~name: "dlgt" ~desc: "new delegate of the new multisig contract"
        @@ stop)
       begin fun (bytes_only) (_, multisig_contract)
-        new_delegate (cctxt : Proto_alpha.full) ->
+        new_delegate (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate (Some new_delegate))
@@ -235,7 +236,7 @@ let commands () =
          ~name: "multisig" ~desc: "name of the originated multisig contract"
        @@ prefixes ["withdrawing"; "delegate"]
        @@ stop)
-      begin fun (bytes_only) (_, multisig_contract) (cctxt : Proto_alpha.full) ->
+      begin fun (bytes_only) (_, multisig_contract) (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate None)
@@ -272,7 +273,7 @@ let commands () =
        @@ prefixes ["and"; "public"; "keys"; "to"]
        @@ (seq_of_param (public_key_param ())))
       begin fun (bytes_only) (_, multisig_contract)
-        new_threshold new_keys (cctxt : Proto_alpha.full) ->
+        new_threshold new_keys (cctxt : #Alpha_client_context.full) ->
         map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) new_keys >>=?
         fun keys ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
@@ -316,7 +317,7 @@ let commands () =
        @@ secret_key_param ()
        @@ stop)
       begin fun () (_, multisig_contract) amount (_, destination) (sk)
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Transfer (amount, destination))
@@ -337,7 +338,7 @@ let commands () =
        @@ secret_key_param ()
        @@ stop)
       begin fun () (_, multisig_contract) delegate (sk)
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate (Some delegate))
@@ -356,7 +357,7 @@ let commands () =
        @@ secret_key_param ()
        @@ stop)
       begin fun () (_, multisig_contract) (sk)
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
           ~chain:cctxt#chain ~block:cctxt#block ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate None)
@@ -377,7 +378,7 @@ let commands () =
        @@ prefixes ["and"; "public"; "keys"; "to"]
        @@ (seq_of_param (public_key_param ())))
       begin fun () (_, multisig_contract) sk new_threshold new_keys
-        (cctxt : Proto_alpha.full) ->
+        (cctxt : #Alpha_client_context.full) ->
         map_s (fun (pk_uri, _) -> Client_keys.public_key pk_uri) new_keys >>=?
         fun keys ->
         Client_proto_multisig.prepare_multisig_transaction cctxt
@@ -407,7 +408,8 @@ let commands () =
       begin fun (fee, dry_run, gas_limit, storage_limit, counter, no_print_source,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, multisig_contract) amount (_, destination) (_, source) signatures cctxt ->
+        (_, multisig_contract) amount (_, destination) (_, source) signatures
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_context.source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
@@ -426,7 +428,7 @@ let commands () =
           ~source ?fee ~src_pk ~src_sk ~multisig_contract
           ~action:(Client_proto_multisig.Transfer (amount, destination))
           ~signatures
-          ~amount:Proto_alpha.Alpha_context.Tez.zero
+          ~amount:Tez.zero
           ?gas_limit ?storage_limit ?counter () >>=
         Client_proto_context_commands.report_michelson_errors ~no_print_source
           ~msg:"transfer simulation failed" cctxt >>= function
@@ -451,7 +453,8 @@ let commands () =
       begin fun (fee, dry_run, gas_limit, storage_limit, counter, no_print_source,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, multisig_contract) delegate (_, source) signatures cctxt ->
+        (_, multisig_contract) delegate (_, source) signatures
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_context.source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
@@ -470,7 +473,7 @@ let commands () =
           ~source ?fee ~src_pk ~src_sk ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate (Some delegate))
           ~signatures
-          ~amount:Proto_alpha.Alpha_context.Tez.zero
+          ~amount: Tez.zero
           ?gas_limit ?storage_limit ?counter () >>=
         Client_proto_context_commands.report_michelson_errors ~no_print_source
           ~msg:"transfer simulation failed" cctxt >>= function
@@ -492,7 +495,8 @@ let commands () =
       begin fun (fee, dry_run, gas_limit, storage_limit, counter, no_print_source,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, multisig_contract) (_, source) signatures cctxt ->
+        (_, multisig_contract) (_, source) signatures
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_context.source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
@@ -511,7 +515,7 @@ let commands () =
           ~source ?fee ~src_pk ~src_sk ~multisig_contract
           ~action:(Client_proto_multisig.Change_delegate None)
           ~signatures
-          ~amount:Proto_alpha.Alpha_context.Tez.zero
+          ~amount: Tez.zero
           ?gas_limit ?storage_limit ?counter () >>=
         Client_proto_context_commands.report_michelson_errors ~no_print_source
           ~msg:"transfer simulation failed" cctxt >>= function
@@ -547,7 +551,8 @@ let commands () =
       begin fun (fee, dry_run, gas_limit, storage_limit, counter, no_print_source,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        bytes (_, multisig_contract) (_, source) signatures cctxt ->
+        bytes (_, multisig_contract) (_, source) signatures
+        (cctxt : #Alpha_client_context.full) ->
         Client_proto_context.source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           source >>=? fun (src_pk, src_sk) ->
@@ -566,7 +571,7 @@ let commands () =
           ~source ?fee ~src_pk ~src_sk ~multisig_contract
           ~bytes
           ~signatures
-          ~amount:Proto_alpha.Alpha_context.Tez.zero
+          ~amount: Tez.zero
           ?gas_limit ?storage_limit ?counter () >>=
         Client_proto_context_commands.report_michelson_errors ~no_print_source
           ~msg:"transfer simulation failed" cctxt >>= function

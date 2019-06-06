@@ -23,22 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Proto = Tezos_protocol_alpha_parameters.Proto_alpha
-module Block_services = struct
-  include Block_services
-  include Block_services.Make(Proto)(Proto)
-end
-include Proto
+open Tezos_protocol_environment
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+type _ Context.kind += Faked : unit Context.kind
 
-module M = Alpha_environment.Lift(Main)
-
-let register_error_kind
-    category ~id ~title ~description ?pp
-    encoding from_error to_error =
-  let id = "client." ^ Name.name ^ "." ^ id in
-  register_error_kind
-    category ~id ~title ~description ?pp
-    encoding from_error to_error
+val empty : Context.t

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment_memory
-
 (** Context creation *)
 
 let create_block2 ctxt =
@@ -51,7 +49,7 @@ type t = {
 }
 
 let wrap_context_init f _ () =
-  let genesis = Context.empty in
+  let genesis = Memory_context.empty in
   create_block2 genesis >>= fun block2 ->
   create_block3a block2 >>= fun block3a ->
   create_block3b block2 >>= fun block3b ->

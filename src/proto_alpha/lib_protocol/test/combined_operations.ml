@@ -124,7 +124,7 @@ let multiple_origination_and_delegation () =
   return_unit
 
 let expect_balance_too_low = function
-  | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+  | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
       return_unit
   | _ ->
       failwith "Contract should not have a sufficient balance : operation expected to fail."

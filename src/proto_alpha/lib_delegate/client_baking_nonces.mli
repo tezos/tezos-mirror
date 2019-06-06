@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha.Alpha_context
+open Proto_alpha
+open Alpha_context
 
 type t = Nonce.t Block_hash.Map.t
 
@@ -50,7 +51,7 @@ val remove_all: t -> t -> t
 (** [get_outdated_nonces] returns the nonces that cannot be associated
     to blocks (orphans) and the nonces that are older than 5 cycles. *)
 val get_outdated_nonces:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?constants:Constants.t ->
   chain:Block_services.chain ->
   t ->
@@ -59,7 +60,7 @@ val get_outdated_nonces:
 (** [filter_outdated_nonces] filters nonces older than 5 cycles in the
     nonce file. *)
 val filter_outdated_nonces:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?constants: Constants.t ->
   [ `Nonce ] Client_baking_files.location ->
   t ->
@@ -67,7 +68,7 @@ val filter_outdated_nonces:
 
 (** [get_unrevealed_nonces] retrieve registered nonces *)
 val get_unrevealed_nonces:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   [ `Nonce ] Client_baking_files.location ->
   t ->
   (Raw_level.t * Nonce.t) list tzresult Lwt.t

@@ -1,6 +1,7 @@
 (** Create and manipulate bootstrap-parameters and accounts. *)
 
 open Internal_pervasives
+open Tezos_protocol_alpha.Proto_alpha
 
 (** Manipulate public/private key pairs. *)
 module Key : sig
@@ -18,24 +19,24 @@ module Script : sig
   type origin = [`Sandbox_faucet | `String of string]
 
   val parse :
-    string -> Tezos_client_alpha.Proto_alpha.Alpha_context.Script.expr
+    string -> Alpha_context.Script.expr
 
   val code_of_json_exn :
-       string
-    -> Tezos_client_alpha.Proto_alpha.Michelson_v1_primitives.prim
-       Tezos_micheline.Micheline.canonical
+    string
+    -> Michelson_v1_primitives.prim
+      Tezos_micheline.Micheline.canonical
 
   val json_script_repr :
-       Tezos_client_alpha.Proto_alpha.Script_repr.expr
-    -> Tezos_client_alpha.Proto_alpha.Script_repr.expr
+    Script_repr.expr
+    -> Script_repr.expr
     -> Ezjsonm.t
 
   val original_json : string
   val faucet_tz : string
 
   val print :
-       Tezos_client_alpha.Proto_alpha.Script_repr.expr
-    -> Tezos_client_alpha.Proto_alpha.Script_repr.expr
+    Script_repr.expr
+    -> Script_repr.expr
     -> unit
 
   val load : origin -> Ezjsonm.t
@@ -65,7 +66,7 @@ module Account : sig
 end
 
 module Voting_period : sig
-  type t = Tezos_client_alpha.Proto_alpha.Alpha_context.Voting_period.kind =
+  type t = Alpha_context.Voting_period.kind =
     | Proposal
     | Testing_vote
     | Testing

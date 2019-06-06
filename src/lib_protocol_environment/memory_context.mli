@@ -23,25 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context = struct
-  type t
+open Tezos_protocol_environment
 
-  type key = string list
-  type value = MBytes.t
-  let mem _ _ = assert false
-  let dir_mem _ _ = assert false
-  let get _ _ = assert false
-  let set _ _ _ = assert false
-  let copy _ ~from:_ ~to_:_ = assert false
-  let del _ _ = assert false
-  let remove_rec _ _ = assert false
-  let fold _ _ ~init:_ ~f:_ = assert false
-  let keys _ _ = assert false
-  let fold_keys _ _ ~init:_ ~f:_ = assert false
+type t
 
-  let set_protocol _ _ = assert false
-  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
+type _ Context.kind += Memory : t Context.kind
 
-end
-
-include Tezos_protocol_environment.Make(Context)
+val empty : Context.t

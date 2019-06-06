@@ -28,7 +28,7 @@ open Alpha_context
 
 type t = {
   predecessor: Block.t ;
-  state: M.validation_state ;
+  state: validation_state ;
   rev_operations: Operation.packed list ;
   header: Block_header.t ;
   delegate: Account.t ;
@@ -42,14 +42,14 @@ let level st = st.header.shell.level
 let rpc_context st =
   let result = Alpha_context.finalize st.state.ctxt in
   {
-    Alpha_environment.Updater.block_hash = Block_hash.zero ;
+    Environment.Updater.block_hash = Block_hash.zero ;
     block_header = { st.header.shell with fitness = result.fitness } ;
     context = result.context ;
   }
 
 let rpc_ctxt =
-  new Alpha_environment.proto_rpc_context_of_directory
-    rpc_context Proto_alpha.rpc_services
+  new Environment.proto_rpc_context_of_directory
+    rpc_context rpc_services
 
 let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash (predecessor : Block.t) =
   Block.get_next_baker ~policy:(Block.By_priority priority)
@@ -77,7 +77,7 @@ let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash (predecessor : 
       signature = Signature.zero ;
     } ;
   } in
-  M.begin_construction
+  begin_construction
     ~chain_id:Chain_id.zero
     ~predecessor_context: predecessor.context
     ~predecessor_timestamp: predecessor.header.shell.timestamp
@@ -86,7 +86,9 @@ let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash (predecessor : 
     ~predecessor:predecessor.hash
     ~timestamp
     ~protocol_data
-    () >>=? fun state ->
+    () >>= fun state ->
+  Lwt.return (Environment.wrap_error state)
+  >>=? fun state ->
   return {
     predecessor ;
     state ;
@@ -96,11 +98,15 @@ let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash (predecessor : 
   }
 
 let add_operation st op =
-  M.apply_operation st.state op >>=? fun (state, _result) ->
+  apply_operation st.state op >>= fun x ->
+  Lwt.return (Environment.wrap_error x)
+  >>=? fun (state, _result) ->
   return { st with state ; rev_operations = op :: st.rev_operations }
 
 let finalize_block st =
-  M.finalize_block st.state >>=? fun (result, _) ->
+  finalize_block st.state >>= fun x ->
+  Lwt.return (Environment.wrap_error x)
+  >>=? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute [

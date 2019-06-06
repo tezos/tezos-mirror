@@ -6,7 +6,9 @@
             tezos-protocol-environment
             tezos-protocol-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -linkall)))
+                   -open Tezos_protocol_alpha
+                   -linkall))
+)
 
 (executable
  (name gen)

@@ -36,6 +36,7 @@ let patch_context key_json ctxt =
           (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
   end >>= fun ctxt ->
   let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
+  let ctxt = Shell_context.wrap_disk_context ctxt in
   Proto.init ctxt {
     level = 0l ;
     proto_level = 0 ;
@@ -47,5 +48,6 @@ let patch_context key_json ctxt =
     context = Context_hash.zero ;
   } >>= function
   | Error _ -> assert false (* FIXME error *)
-  | Ok { context = ctxt ; _ } ->
-      Lwt.return ctxt
+  | Ok { context ; _ } ->
+      let context = Shell_context.unwrap_disk_context context in
+      Lwt.return context

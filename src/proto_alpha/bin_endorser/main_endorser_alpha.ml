@@ -25,13 +25,13 @@
 
 let () =
   Client_commands.register Proto_alpha.hash @@ fun _network ->
-  List.map (Clic.map_command (new Proto_alpha.wrap_full)) @@
+  List.map (Clic.map_command (new Alpha_client_context.wrap_full)) @@
   Delegate_commands.delegate_commands ()
 
 let select_commands _ _ =
   return
     (List.map
-       (Clic.map_command (new Proto_alpha.wrap_full))
+       (Clic.map_command (new Alpha_client_context.wrap_full))
        (Delegate_commands.endorser_commands ()))
 
 let () = Client_main_run.run (module Client_config) ~select_commands

@@ -40,26 +40,26 @@ type block_info = {
 }
 
 val info:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
   block_info tzresult Lwt.t
 
 val monitor_valid_blocks:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
   next_protocols:Protocol_hash.t list option ->
   unit -> block_info tzresult Lwt_stream.t tzresult Lwt.t
 
 val monitor_heads:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   next_protocols:Protocol_hash.t list option ->
   Chain_services.chain ->
   block_info tzresult Lwt_stream.t tzresult Lwt.t
 
 val blocks_from_current_cycle:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
   ?offset:int32 ->

@@ -33,7 +33,7 @@ val generate_seed_nonce: unit -> Nonce.t
     reveal the aforementionned nonce during the next cycle. *)
 
 val inject_block:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?force:bool ->
   ?seed_nonce_hash:Nonce_hash.t ->
   chain:Chain_services.chain ->
@@ -54,7 +54,7 @@ type error +=
   | Failed_to_preapply of Tezos_base.Operation.t * error list
 
 val forge_block:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?force:bool ->
   ?operations: Operation.packed list ->
   ?best_effort:bool ->
@@ -95,7 +95,7 @@ val forge_block:
 *)
 
 val create:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?minimal_fees: Tez.t ->
   ?minimal_nanotez_per_gas_unit: Z.t ->
   ?minimal_nanotez_per_byte: Z.t ->

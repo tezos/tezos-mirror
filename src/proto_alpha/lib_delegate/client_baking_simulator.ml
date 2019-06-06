@@ -29,6 +29,8 @@ open Alpha_context
 type error += Failed_to_checkout_context
 type error += Invalid_context
 
+let (>>=??) x k = x >>= fun x -> Lwt.return (Environment.wrap_error x) >>=? k
+
 let () =
   register_error_kind
     `Permanent
@@ -56,8 +58,8 @@ let () =
 
 type incremental = {
   predecessor: Client_baking_blocks.block_info ;
-  context : Context.t ;
-  state: LiftedMain.validation_state ;
+  context : Tezos_protocol_environment.Context.t ;
+  state: Proto_alpha.validation_state ;
   rev_operations: Operation.packed list ;
   header: Tezos_base.Block_header.shell_header ;
 }
@@ -77,7 +79,7 @@ let check_context_consistency index context_hash =
 
 let begin_construction ~timestamp ?protocol_data index predecessor =
   let { Client_baking_blocks.context ; _ } = predecessor in
-  Context.checkout index context >>= function
+  Shell_context.checkout index context >>= function
   | None -> fail Failed_to_checkout_context
   | Some context ->
       let header : Tezos_base.Block_header.shell_header = Tezos_base.Block_header.{
@@ -90,7 +92,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
           context = Context_hash.zero ;
           operations_hash = Operation_list_list_hash.zero ;
         } in
-      LiftedMain.begin_construction
+      Proto_alpha.begin_construction
         ~chain_id: predecessor.chain_id
         ~predecessor_context: context
         ~predecessor_timestamp: predecessor.timestamp
@@ -99,7 +101,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
         ~predecessor: predecessor.hash
         ?protocol_data
         ~timestamp
-        () >>=? fun state ->
+        () >>=?? fun state ->
       return {
         predecessor ;
         context ;
@@ -109,8 +111,8 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
       }
 
 let add_operation st ( op : Operation.packed ) =
-  LiftedMain.apply_operation st.state op >>=? fun (state, receipt) ->
+  Proto_alpha.apply_operation st.state op >>=?? fun (state, receipt) ->
   return ({ st with state ; rev_operations = op :: st.rev_operations }, receipt)
 
 let finalize_construction inc =
-  LiftedMain.finalize_block inc.state
+  Proto_alpha.finalize_block inc.state >>=?? return

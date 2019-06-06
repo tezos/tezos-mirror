@@ -33,7 +33,7 @@ type t = {
 type account = t
 
 let commitment_secret =
-  Proto_alpha.Blinded_public_key_hash.activation_code_of_hex
+  Blinded_public_key_hash.activation_code_of_hex
     "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"
 
 let known_accounts = Signature.Public_key_hash.Table.create 17
@@ -70,11 +70,10 @@ let dummy_account = new_account ()
 let new_commitment ?seed () =
   let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = { pkh; pk; sk } in
-  let open Proto_alpha in
   let open Commitment_repr in
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
-  Lwt.return @@ Alpha_environment.wrap_error @@
+  Lwt.return @@ Environment.wrap_error @@
   Tez_repr.(one *? 4_000L) >>=? fun amount ->
   return @@ (unactivated_account, { blinded_public_key_hash = bpkh ; amount })
 

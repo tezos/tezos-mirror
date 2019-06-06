@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Proto_alpha
 open Alpha_context
 open Test_utils
@@ -150,7 +151,7 @@ let block_with_a_single_transfer_with_fee () =
 let transfer_zero_tez () =
   single_transfer ~expect_failure:(
     function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
         return_unit
     | _ ->
         failwith "Empty transaction should fail")
@@ -450,7 +451,7 @@ let balance_too_low fee () =
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
   Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
         return_unit
     | _ ->
         failwith "balance too low should fail"
@@ -491,7 +492,7 @@ let balance_too_low_two_transfers fee () =
   Op.transaction ~fee (I i) contract_1 contract_3
     two_third_of_balance >>=? fun operation ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
         return_unit
     | _ ->
         failwith "balance too low should fail"

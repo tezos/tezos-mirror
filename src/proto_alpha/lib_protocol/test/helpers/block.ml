@@ -32,19 +32,19 @@ type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
   operations : Operation.packed list ;
-  context : Tezos_protocol_environment_memory.Context.t ;
+  context : Tezos_protocol_environment.Context.t ;
 }
 type block = t
 
 let rpc_context block = {
-  Alpha_environment.Updater.block_hash = block.hash ;
+  Environment.Updater.block_hash = block.hash ;
   block_header = block.header.shell ;
   context = block.context ;
 }
 
 let rpc_ctxt =
-  new Alpha_environment.proto_rpc_context_of_directory
-    rpc_context Proto_alpha.rpc_services
+  new Environment.proto_rpc_context_of_directory
+    rpc_context rpc_services
 
 (******** Policies ***********)
 
@@ -215,14 +215,13 @@ let initial_context
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Tezos_protocol_environment_memory.Context.(
-    set empty ["version"] (MBytes.of_string "genesis")
-  ) >>= fun ctxt ->
-  Tezos_protocol_environment_memory.Context.(
+  Tezos_protocol_environment.Context.(
+    let empty = Memory_context.empty in
+    set empty ["version"] (MBytes.of_string "genesis") >>= fun ctxt ->
     set ctxt protocol_param_key proto_params
   ) >>= fun ctxt ->
   Main.init ctxt header
-  >|= Alpha_environment.wrap_error >>=? fun { context; _ } ->
+  >|= Environment.wrap_error >>=? fun { context; _ } ->
   return context
 
 (* if no parameter file is passed we check in the current directory
@@ -245,7 +244,7 @@ let genesis
   begin try
       let open Test_utils in
       fold_left_s (fun acc (_, amount) ->
-          Alpha_environment.wrap_error @@
+          Environment.wrap_error @@
           Tez_repr.(+?) acc amount >>?= fun acc ->
           if acc >= constants.tokens_per_roll then
             raise Exit
@@ -294,8 +293,8 @@ let genesis
 
 let apply header ?(operations = []) pred =
   begin
-    let open Alpha_environment.Error_monad in
-    Proto_alpha.Main.begin_application
+    let open Environment.Error_monad in
+    Main.begin_application
       ~chain_id: Chain_id.zero
       ~predecessor_context: pred.context
       ~predecessor_fitness: pred.header.shell.fitness
@@ -303,12 +302,12 @@ let apply header ?(operations = []) pred =
       header >>=? fun vstate ->
     fold_left_s
       (fun vstate op ->
-         Proto_alpha.apply_operation vstate op >>=? fun (state, _result) ->
+         apply_operation vstate op >>=? fun (state, _result) ->
          return state)
       vstate operations >>=? fun vstate ->
-    Proto_alpha.Main.finalize_block vstate >>=? fun (validation, _result) ->
+    Main.finalize_block vstate >>=? fun (validation, _result) ->
     return validation.context
-  end >|= Alpha_environment.wrap_error >>|? fun context ->
+  end >|= Environment.wrap_error >>|? fun context ->
   let hash = Block_header.hash header in
   { hash ; header ; operations ; context }
 
