@@ -89,7 +89,7 @@ let receive conn =
   let rec loop () =
     P2p_io_scheduler.read conn buf >>= function
     | Ok _ -> loop ()
-    | Error [P2p_errors.Connection_closed] ->
+    | Error (P2p_errors.Connection_closed :: _) ->
         Lwt.return_unit
     | Error err -> Lwt.fail (Error err)
   in

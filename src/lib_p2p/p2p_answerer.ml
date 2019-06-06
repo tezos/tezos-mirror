@@ -75,14 +75,14 @@ let rec worker_loop st =
   | Ok (size, Message msg) ->
       st.callback.message size msg >>= fun () ->
       worker_loop st
-  | Ok (_, Disconnect) | Error [P2p_errors.Connection_closed] ->
+  | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Lwt_canceler.cancel st.canceler >>= fun () ->
       Lwt.return_unit
-  | Error [P2p_errors.Decoding_error] ->
+  | Error (P2p_errors.Decoding_error :: _) ->
       (* TODO: Penalize peer... *)
       Lwt_canceler.cancel st.canceler >>= fun () ->
       Lwt.return_unit
-  | Error [ Canceled ] ->
+  | Error (Canceled  :: _) ->
       Lwt.return_unit
   | Error err ->
       lwt_log_error "@[Answerer unexpected error:@ %a@]"

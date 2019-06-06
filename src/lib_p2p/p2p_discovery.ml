@@ -114,7 +114,7 @@ module Answer = struct
 
   let worker_loop st =
     loop st >>= function
-    | Error [ Canceled ] ->
+    | Error (Canceled  :: _) ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error
@@ -223,7 +223,7 @@ module Sender = struct
     | Ok config ->
         let new_sender_config = Config.increase_delay config in
         worker_loop new_sender_config st
-    | Error [ Canceled ] ->
+    | Error (Canceled  :: _) ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error

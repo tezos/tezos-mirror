@@ -225,7 +225,7 @@ let rec worker_loop st =
     end
   end >>= function
   | Ok () -> worker_loop st
-  | Error [ Canceled ] -> Lwt.return_unit
+  | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
 let create ?discovery config bounds pool = {
