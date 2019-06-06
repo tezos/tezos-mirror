@@ -209,10 +209,7 @@ let originate_contract
     ?gas_limit
     ?storage_limit
     ~delegate
-    ?(delegatable=true)
-    ?(spendable=false)
     ~initial_storage
-    ~manager
     ~balance
     ~source
     ~src_pk
@@ -220,6 +217,11 @@ let originate_contract
     ~code
     ~fee_parameter
     () =
+  (* With the change of making implicit accounts delegatable, the following
+     3 arguments are being defaulted before they can be safely removed. *)
+  let manager = Signature.Public_key_hash.zero in
+  let delegatable = false in
+  let spendable = false in
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage ; _ } ->

@@ -53,11 +53,8 @@ val originate_multisig:
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
-  ?delegatable:bool ->
-  ?spendable:bool ->
   threshold:Z.t ->
   keys:public_key list ->
-  manager:public_key_hash ->
   balance:Tez.t ->
   source:Contract.t ->
   src_pk:public_key ->

@@ -307,11 +307,11 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
-      (args17
+      (args15
          fee_arg
          dry_run_switch verbose_signing_switch
          gas_limit_arg storage_limit_arg delegate_arg (Client_keys.force_switch ())
-         delegatable_switch spendable_switch init_arg no_print_source_flag
+         init_arg no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
@@ -321,9 +321,6 @@ let commands version () =
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
-       @@ prefix "for"
-       @@ Public_key_hash.source_param
-         ~name: "mgr" ~desc: "manager of the new contract"
        @@ prefix "transferring"
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -336,10 +333,10 @@ let commands version () =
                              Combine with -init if the storage type is not unit."
        @@ stop)
       begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
-                 delegate, force, delegatable, spendable, initial_storage,
+                 delegate, force, initial_storage,
                  no_print_source, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        alias_name manager balance (_, source) program (cctxt : Protocol_client_context.full) ->
+        alias_name balance (_, source) program (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code ; _ } ->
         source_to_keys cctxt
@@ -356,8 +353,8 @@ let commands version () =
         originate_contract cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run ~verbose_signing
-          ?fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable ~initial_storage
-          ~manager ~balance ~source ~src_pk ~src_sk ~code
+          ?fee ?gas_limit ?storage_limit ~delegate ~initial_storage
+          ~balance ~source ~src_pk ~src_sk ~code
           ~fee_parameter
           () >>= fun errors ->
         report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function

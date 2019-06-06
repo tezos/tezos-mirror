@@ -597,11 +597,8 @@ let originate_multisig
     ?gas_limit
     ?storage_limit
     ~delegate
-    ?(delegatable=false)
-    ?(spendable=false)
     ~threshold
     ~keys
-    ~manager
     ~balance
     ~source
     ~src_pk
@@ -613,8 +610,8 @@ let originate_multisig
   check_threshold ~threshold ~keys () >>=? fun () ->
   Client_proto_context.originate_contract cctxt
     ~chain ~block ?branch ?confirmations ?dry_run ?fee ?gas_limit ?storage_limit
-    ~delegate ~delegatable ~spendable ~initial_storage
-    ~manager ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter
+    ~delegate ~initial_storage ~balance ~source ~src_pk ~src_sk ~code
+    ~fee_parameter
     ()
 
 type multisig_prepared_action =

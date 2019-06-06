@@ -144,13 +144,12 @@ bake_after () {
 init_with_transfer () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
-    local KEY="$2"
-    local INITIAL_STORAGE="$3"
-    local TRANSFER_AMT="$4"
-    local TRANSFER_SRC=${5-bootstrap1}
+    local INITIAL_STORAGE="$2"
+    local TRANSFER_AMT="$3"
+    local TRANSFER_SRC=${4-bootstrap1}
     echo "Originating [$NAME]"
     $client originate contract ${NAME} \
-            for ${KEY} transferring "${TRANSFER_AMT}" \
+            transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
     bake
 }
@@ -158,13 +157,12 @@ init_with_transfer () {
 assert_fails_init_with_transfer () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
-    local KEY="$2"
-    local INITIAL_STORAGE="$3"
-    local TRANSFER_AMT="$4"
-    local TRANSFER_SRC=${5-bootstrap1}
+    local INITIAL_STORAGE="$2"
+    local TRANSFER_AMT="$3"
+    local TRANSFER_SRC=${4-bootstrap1}
     echo "Originating [$NAME]"
     assert_fails $client originate contract ${NAME} \
-                 for ${KEY} transferring "${TRANSFER_AMT}" \
+                 transferring "${TRANSFER_AMT}" \
                  from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
 }
 

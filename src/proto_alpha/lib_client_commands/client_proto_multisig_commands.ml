@@ -80,15 +80,13 @@ let transfer_options =
 let commands () : #Protocol_client_context.full Clic.command list =
   Clic.[
     command ~group ~desc: "Originate a new multisig contract."
-      (args15
+      (args13
          Client_proto_args.fee_arg
          Client_proto_context_commands.dry_run_switch
          Client_proto_args.gas_limit_arg
          Client_proto_args.storage_limit_arg
          Client_proto_args.delegate_arg
          (Client_keys.force_switch ())
-         Client_proto_args.delegatable_switch
-         Client_proto_args.spendable_switch
          Client_proto_args.no_print_source_flag
          Client_proto_args.minimal_fees_arg
          Client_proto_args.minimal_nanotez_per_byte_arg
@@ -99,9 +97,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
       (prefixes ["deploy"; "multisig"]
        @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
          ~name: "new_multisig" ~desc: "name of the new multisig contract"
-       @@ prefix "for"
-       @@ Client_keys.Public_key_hash.source_param
-         ~name: "mgr" ~desc: "manager of the new multisig contract"
        @@ prefix "transferring"
        @@ Client_proto_args.tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -113,11 +108,10 @@ let commands () : #Protocol_client_context.full Clic.command list =
        @@ prefixes ["on"; "public"; "keys"]
        @@ (seq_of_param (public_key_param ())))
       begin fun (fee, dry_run, gas_limit, storage_limit, delegate, force,
-                 delegatable, spendable, no_print_source,
-                 minimal_fees, minimal_nanotez_per_byte,
+                 no_print_source, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap,
                  burn_cap)
-        alias_name manager balance (_, source) threshold keys
+        alias_name balance (_, source) threshold keys
         (cctxt : #Protocol_client_context.full) ->
         Client_proto_contracts.RawContractAlias.of_fresh
           cctxt force alias_name >>=? fun alias_name ->
@@ -136,9 +130,9 @@ let commands () : #Protocol_client_context.full Clic.command list =
         Client_proto_multisig.originate_multisig cctxt
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run
-          ?fee ?gas_limit ?storage_limit ~delegate ~delegatable ~spendable
+          ?fee ?gas_limit ?storage_limit ~delegate
           ~threshold:(Z.of_int threshold) ~keys
-          ~manager ~balance ~source ~src_pk ~src_sk
+          ~balance ~source ~src_pk ~src_sk
           ~fee_parameter
           () >>= fun errors ->
         Client_proto_context_commands.report_michelson_errors ~no_print_source

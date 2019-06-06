@@ -34,7 +34,8 @@ type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
 type error += Cannot_originate_spendable_smart_contract (* `Permanent *)
-type error += Cannot_originate_non_spendable_account (* `Permanent *)
+type error += Cannot_originate_with_manager (* `Permanent *)
+type error += Cannot_originate_without_script (* `Permanent *)
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -143,18 +144,6 @@ let () =
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
     `Permanent
-    ~id:"cannot_originate_non_spendable_account"
-    ~title:"Cannot originate non spendable account"
-    ~description:"An origination was attempted \
-                  that would create a non spendable, non scripted contract"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "It is not possible anymore to originate \
-                            a non scripted contract that is not spendable.")
-    Data_encoding.empty
-    (function Cannot_originate_non_spendable_account -> Some () | _ -> None)
-    (fun () -> Cannot_originate_non_spendable_account) ;
-  register_error_kind
-    `Permanent
     ~id:"cannot_originate_spendable_smart_contract"
     ~title:"Cannot originate spendable smart contract"
     ~description:"An origination was attempted \
@@ -165,6 +154,18 @@ let () =
     Data_encoding.empty
     (function Cannot_originate_spendable_smart_contract -> Some () | _ -> None)
     (fun () -> Cannot_originate_spendable_smart_contract) ;
+  register_error_kind
+    `Permanent
+    ~id:"cannot_originate_with_manager"
+    ~title:"Cannot originate with a manager"
+    ~description:"An origination was attempted that would create a contract \
+                  with a manager"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "It is not possible anymore to originate \
+                            a contract with a manager.")
+    Data_encoding.empty
+    (function Cannot_originate_with_manager -> Some () | _ -> None)
+    (fun () -> Cannot_originate_with_manager) ;
   register_error_kind
     `Permanent
     ~id:"block.invalid_double_endorsement_evidence"
@@ -400,6 +401,18 @@ let () =
     (fun (required, endorsements, priority, timestamp) ->
        Not_enough_endorsements_for_priority
          { required ; endorsements ; priority ; timestamp }) ;
+  register_error_kind
+    `Permanent
+    ~id:"cannot_originate_without_script"
+    ~title:"Cannot originate without a script"
+    ~description:"An origination was attempted \
+                  that would create a contract without script"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "It is not possible anymore to originate \
+                            a contract without a script.")
+    Data_encoding.empty
+    (function Cannot_originate_without_script -> Some () | _ -> None)
+    (fun () -> Cannot_originate_without_script) ;
 
 open Apply_results
 
@@ -506,24 +519,27 @@ let apply_manager_operation_content :
       end
     | Origination { manager ; delegate ; script ; preorigination ;
                     spendable ; delegatable ; credit } ->
-        begin match script with
-          | None ->
-              if spendable then
-                return (None, ctxt)
-              else
-                fail Cannot_originate_non_spendable_account
-          | Some script ->
-              if spendable then
-                fail Cannot_originate_spendable_smart_contract
-              else
-                Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
-                Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
-                Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
-                Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
-                Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
-                Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
-                return (Some (script, big_map_diff), ctxt)
-        end >>=? fun (script, ctxt) ->
+        if not Signature.Public_key_hash.(equal zero manager) && not internal then
+          fail Cannot_originate_with_manager
+        else
+          begin match script with
+            | None ->
+                if internal then
+                  return (None, ctxt)
+                else
+                  fail Cannot_originate_without_script
+            | Some script ->
+                if spendable then
+                  fail Cannot_originate_spendable_smart_contract
+                else
+                  Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
+                  Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
+                  Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
+                  Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
+                  Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
+                  Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
+                  return (Some (script, big_map_diff), ctxt)
+          end >>=? fun (script, ctxt) ->
         spend ctxt source credit >>=? fun ctxt ->
         begin match preorigination with
           | Some contract ->

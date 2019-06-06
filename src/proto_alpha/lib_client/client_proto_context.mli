@@ -123,10 +123,7 @@ val originate_contract:
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   delegate:public_key_hash option ->
-  ?delegatable:bool ->
-  ?spendable:bool ->
   initial_storage:string ->
-  manager:public_key_hash ->
   balance:Tez.t ->
   source:Contract.t ->
   src_pk:public_key ->
