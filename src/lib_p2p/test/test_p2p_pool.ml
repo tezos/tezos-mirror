@@ -142,17 +142,17 @@ module Simple = struct
   let rec connect ~timeout pool point =
     lwt_log_info "Connect to %a" P2p_point.Id.pp point >>= fun () ->
     P2p_pool.connect pool point ~timeout >>= function
-    | Error [P2p_errors.Connected] -> begin
+    | Error (P2p_errors.Connected :: _) -> begin
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return conn
         | None -> failwith "Woops..."
       end
-    | Error ([ P2p_errors.Connection_refused
+    | Error (( P2p_errors.Connection_refused
              | P2p_errors.Pending_connection
              | P2p_errors.Rejected_socket_connection
              | Canceled
              | Timeout
-             | P2p_errors.Rejected _ as err ]) ->
+             | P2p_errors.Rejected _ as head_err) :: _) ->
         lwt_log_info "Connection to %a failed (%a)"
           P2p_point.Id.pp point
           (fun ppf err -> match err with
@@ -168,7 +168,7 @@ module Simple = struct
                  Format.fprintf ppf "timeout"
              | P2p_errors.Rejected peer ->
                  Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
-             | _ -> assert false) err >>= fun () ->
+             | _ -> assert false) head_err >>= fun () ->
         Lwt_unix.sleep (0.5 +. Random.float 2.) >>= fun () ->
         connect ~timeout pool point
     | Ok _ | Error _ as res -> Lwt.return res

@@ -124,12 +124,12 @@ module Scheduler(IO : IO) = struct
           false, (Queue.pop st.readys_low)
       in
       match msg with
-      | Error [ Canceled ] ->
+      | Error (Canceled  :: _) ->
           worker_loop st
-      | Error ([P2p_errors.Connection_closed |
-                Exn ( Lwt_pipe.Closed |
-                      Unix.Unix_error ((EBADF | ETIMEDOUT), _, _) )]
-               as err) ->
+      | Error (P2p_errors.Connection_closed :: _ as err)
+      | Error (Exn Lwt_pipe.Closed :: _ as err)
+      | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err)
+        ->
           lwt_debug "Connection closed (pop: %d, %s)"
             conn.id IO.name >>= fun () ->
           cancel conn err >>= fun () ->
@@ -144,11 +144,11 @@ module Scheduler(IO : IO) = struct
           conn.current_push <- begin
             IO.push conn.out_param msg >>= function
             | Ok ()
-            | Error [ Canceled ] ->
+            | Error (Canceled  :: _) ->
                 return_unit
-            | Error ([P2p_errors.Connection_closed |
-                      Exn (Unix.Unix_error (EBADF, _, _) |
-                           Lwt_pipe.Closed)] as err) ->
+            | Error (P2p_errors.Connection_closed :: _ as err)
+            | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
+            | Error (Exn Lwt_pipe.Closed :: _ as err) ->
                 lwt_debug "Connection closed (push: %d, %s)"
                   conn.id IO.name >>= fun () ->
                 cancel conn err >>= fun () ->
@@ -418,7 +418,7 @@ let read_from conn ?pos ?len buf msg =
           Some (MBytes.sub msg read_len (msg_len - read_len)) ;
       Ok read_len
   | Error _ ->
-      Error [P2p_errors.Connection_closed]
+      error P2p_errors.Connection_closed
 
 let read_now conn ?pos ?len buf =
   match conn.partial_read with
@@ -430,7 +430,7 @@ let read_now conn ?pos ?len buf =
         Option.map
           ~f:(read_from conn ?pos ?len buf)
           (Lwt_pipe.pop_now conn.read_queue)
-      with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
+      with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed)
 
 let read ?canceler conn ?pos ?len buf =
   match conn.partial_read with
