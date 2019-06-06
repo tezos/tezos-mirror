@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "alpha-client" end
+module Name = struct let name = "alpha" end
 module T = Tezos_protocol_environment.Make(Tezos_storage.Context)
 module Alpha_environment = T.MakeV1(Name)()
 
@@ -74,3 +74,4 @@ let register_error_kind
   register_error_kind
     category ~id ~title ~description ?pp
     encoding from_error to_error
+
