@@ -15,4 +15,4 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: alpha parameters "
+synopsis: "Tezos/Protocol: parameters"

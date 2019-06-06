@@ -21,4 +21,4 @@ depends: [
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: alpha (protocol-specific commands for baking)"
+synopsis: "Tezos/Protocol: protocol-specific commands for baking"
