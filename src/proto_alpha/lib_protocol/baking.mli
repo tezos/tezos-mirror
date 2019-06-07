@@ -63,8 +63,15 @@ val check_endorsement_rights:
   context -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
-(** Returns the endorsement reward calculated w.r.t a given priority.  *)
-val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
+(** Returns the baking reward calculated w.r.t a given priority [p] and a
+    number [e] of included endorsements as follows:
+      (block_reward / (p+1)) * (0.8 + 0.2 * e / endorsers_per_block)
+*)
+val baking_reward: context ->
+  block_priority:int -> included_endorsements:int -> Tez.t tzresult Lwt.t
+
+(** Returns the endorsing reward calculated w.r.t a given priority.  *)
+val endorsing_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
@@ -135,7 +142,7 @@ val minimum_allowed_endorsements: context -> block_delay:Period.t -> int
 
 (** This is the somehow the dual of the previous function. Given a
     block priority and a number of endorsement slots (given by the
-    `endorsement_power` argument), it returns the minimum time at which
+    `endorsing_power` argument), it returns the minimum time at which
     the next block can be baked. *)
 val minimal_valid_time:
   context ->
