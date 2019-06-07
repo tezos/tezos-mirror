@@ -715,6 +715,16 @@ let () =
 
 type error += Canceled
 
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"canceled"
+    ~title:"Canceled"
+    ~description:"A promise was unexpectedly canceled"
+    Data_encoding.unit
+    (function Canceled -> Some () | _ -> None)
+    (fun () -> Canceled)
+
 let protect ?on_error ?canceler t =
   let cancelation =
     match canceler with
