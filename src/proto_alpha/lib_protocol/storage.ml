@@ -66,10 +66,10 @@ module Make_index(H : Storage_description.INDEX)
     }
 end
 
-module Last_block_priority =
-  Make_single_data_storage
+module Block_priority =
+  Make_single_data_storage(Registered)
     (Raw_context)
-    (struct let name = ["last_block_priority"] end)
+    (struct let name = ["block_priority"] end)
     (Int)
 
 (** Contracts handling *)

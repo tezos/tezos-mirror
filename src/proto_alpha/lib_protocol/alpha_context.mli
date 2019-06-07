@@ -1124,8 +1124,8 @@ end
 
 module Global : sig
 
-  val get_last_block_priority: context -> int tzresult Lwt.t
-  val set_last_block_priority: context -> int -> context tzresult Lwt.t
+  val get_block_priority: context -> int tzresult Lwt.t
+  val set_block_priority: context -> int -> context tzresult Lwt.t
 
 end
 

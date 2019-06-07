@@ -822,8 +822,8 @@ let apply_contents_list
           Tez.(Constants.endorsement_security_deposit ctxt *?
                Int64.of_int gap) >>=? fun deposit ->
         Delegate.freeze_deposit ctxt delegate deposit >>=? fun ctxt ->
-        Global.get_last_block_priority ctxt >>=? fun block_priority ->
-        Baking.endorsement_reward ctxt ~block_priority gap >>=? fun reward ->
+        Global.get_block_priority ctxt >>=? fun block_priority ->
+        Baking.endorsing_reward ctxt ~block_priority gap >>=? fun reward ->
         Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
         let level = Level.from_raw ctxt level in
         return (ctxt, Single_result
@@ -1004,6 +1004,8 @@ let may_start_new_cycle ctxt =
       return (ctxt, update_balances, deactivated)
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
+  Alpha_context.Global.set_block_priority ctxt
+    protocol_data.Block_header.priority >>=? fun ctxt ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun (delegate_pk, block_delay) ->
   let ctxt = Fitness.increase ctxt in
@@ -1024,6 +1026,8 @@ let begin_partial_construction ctxt =
       return ctxt
 
 let begin_application ctxt chain_id block_header pred_timestamp =
+  Alpha_context.Global.set_block_priority ctxt
+    block_header.Block_header.protocol_data.contents.priority >>=? fun ctxt ->
   let current_level = Alpha_context.Level.current ctxt in
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
@@ -1047,24 +1051,25 @@ let begin_application ctxt chain_id block_header pred_timestamp =
       let ctxt = init_endorsements ctxt rights in
       return (ctxt, delegate_pk, block_delay)
 
-let check_minimum_endorsements ctxt protocol_data block_delay =
+let check_minimum_endorsements ctxt protocol_data block_delay included_endorsements =
   let minimum = Baking.minimum_allowed_endorsements ctxt ~block_delay in
-  let timestamp = Alpha_context.Timestamp.current ctxt in
-  if Compare.Int.(included_endorsements ctxt >= minimum) then
-    Ok ()
-  else
-    error (Not_enough_endorsements_for_priority
-             { required = minimum ;
-               priority = protocol_data.Block_header.priority ;
-               endorsements = included_endorsements ctxt ;
-               timestamp })
+  let timestamp = Timestamp.current ctxt in
+  fail_unless Compare.Int.(included_endorsements >= minimum)
+    (Not_enough_endorsements_for_priority
+       { required = minimum ;
+         priority = protocol_data.Block_header.priority ;
+         endorsements = included_endorsements ;
+         timestamp })
 
 let finalize_application ctxt protocol_data delegate ~block_delay =
-  Lwt.return
-    (check_minimum_endorsements ctxt protocol_data block_delay) >>=? fun () ->
+  let included_endorsements = included_endorsements ctxt in
+  check_minimum_endorsements ctxt
+    protocol_data block_delay included_endorsements >>=? fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>=? fun ctxt ->
-  let reward = (Constants.block_reward ctxt) in
+
+  Baking.baking_reward ctxt
+    ~block_priority:protocol_data.priority ~included_endorsements >>=? fun reward ->
   add_rewards ctxt reward >>=? fun ctxt ->
   Signature.Public_key_hash.Map.fold
     (fun delegate deposit ctxt ->
@@ -1084,8 +1089,6 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
         Nonce.record_hash ctxt
           { nonce_hash ; delegate ; rewards ; fees }
   end >>=? fun ctxt ->
-  Alpha_context.Global.set_last_block_priority
-    ctxt protocol_data.priority >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->
   may_start_new_cycle ctxt >>=? fun (ctxt, balance_updates, deactivated) ->
