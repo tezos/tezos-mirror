@@ -2,7 +2,6 @@
  (names test_error_tables)
  (libraries tezos-error-monad
             lwt.unix
-            alcotest
             alcotest-lwt)
  (flags (:standard -w -9-32
                    -safe-string
