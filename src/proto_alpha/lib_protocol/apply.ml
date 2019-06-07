@@ -36,6 +36,7 @@ type error += Internal_operation_replay of packed_internal_operation
 type error += Cannot_originate_spendable_smart_contract (* `Permanent *)
 type error += Cannot_originate_with_manager (* `Permanent *)
 type error += Cannot_originate_without_script (* `Permanent *)
+type error += Cannot_set_delegate_for_originated_contract (* `Permanent *)
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -413,6 +414,18 @@ let () =
     Data_encoding.empty
     (function Cannot_originate_without_script -> Some () | _ -> None)
     (fun () -> Cannot_originate_without_script) ;
+  register_error_kind
+    `Permanent
+    ~id:"cannot_set_delegate_for_originated_contract"
+    ~title:"Cannot set or withdraw delegate for originated contract"
+    ~description:"Attempted to set or withdraw delegate for originated \
+                  contract"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "It is not possible anymore to set or withdraw \
+                            delegate for originated contract.")
+    Data_encoding.empty
+    (function Cannot_set_delegate_for_originated_contract -> Some () | _ -> None)
+    (fun () -> Cannot_set_delegate_for_originated_contract) ;
 
 open Apply_results
 
@@ -571,8 +584,13 @@ let apply_manager_operation_content :
               paid_storage_size_diff } in
         return (ctxt, result, [])
     | Delegation delegate ->
-        set_delegate ctxt source delegate >>=? fun ctxt ->
-        return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
+        match Contract.is_implicit source with
+        | None when not internal ->
+            (* Originated contract can only set delegate with script instruction (internal). *)
+            fail Cannot_set_delegate_for_originated_contract
+        | _ ->
+            set_delegate ctxt source delegate >>=? fun ctxt ->
+            return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
 
 let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
