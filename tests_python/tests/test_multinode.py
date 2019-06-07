@@ -40,15 +40,24 @@ class TestManualBaking:
         transfer = clients[client_id].transfer(500, 'bootstrap1', 'bootstrap3')
         session["transfer_hash"] = transfer.operation_hash
 
-    def test_bake(self, clients):
-        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
-
-    def test_contains_endorse_and_transfer(self, clients, session):
+    def test_mempool_contains_endorse_and_transfer(self, clients, session):
         endorse_hash = session["endorse_hash"]
         transfer_hash = session["transfer_hash"]
         operation_hashes = [endorse_hash, transfer_hash]
         for client in clients:
-            assert utils.check_contains_operations(client, operation_hashes)
+            assert utils.check_mempool_contains_operations(
+                client, operation_hashes)
+
+    def test_bake(self, clients):
+        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
+
+    def test_block_contains_endorse_and_transfer(self, clients, session):
+        endorse_hash = session["endorse_hash"]
+        transfer_hash = session["transfer_hash"]
+        operation_hashes = [endorse_hash, transfer_hash]
+        for client in clients:
+            assert utils.check_block_contains_operations(
+                client, operation_hashes)
 
     def test_balance(self, clients):
         bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')

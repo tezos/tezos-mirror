@@ -41,12 +41,20 @@ def retry(timeout: float, attempts: float):  # pylint: disable=unused-argument
 
 
 @retry(timeout=1., attempts=10)
-def check_contains_operations(client: Client,
-                              operation_hashes: List[str]) -> bool:
+def check_block_contains_operations(client: Client,
+                                    operation_hashes: List[str]) -> bool:
     res = client.rpc('get', '/chains/main/blocks/head/operation_hashes')
     flatten = (res[0] + res[1] + res[2] + res[3] if res is not None and
                len(res) == 4 else [])
     return all(oh in flatten for oh in operation_hashes)
+
+
+@retry(timeout=1., attempts=10)
+def check_mempool_contains_operations(client: Client,
+                                      operation_hashes: List[str]) -> bool:
+    mempool = client.get_mempool()['applied']
+    res = {x['hash'] for x in mempool}
+    return len(res.symmetric_difference(set(operation_hashes))) == 0
 
 
 @retry(timeout=1., attempts=20)
