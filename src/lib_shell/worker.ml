@@ -709,6 +709,7 @@ module Make
   let find_opt { instances ; _ } =
     Hashtbl.find_opt instances
 
+  (* TODO? add a list of cancelers for nested protection ? *)
   let protect { canceler ; _ } ?on_error f =
     protect ?on_error ~canceler f
 
