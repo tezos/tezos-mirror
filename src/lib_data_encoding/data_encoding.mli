@@ -78,7 +78,7 @@
 module Encoding: sig
 
   (** The type descriptors for values of type ['a]. *)
-  type 'a t
+  type 'a t = 'a Encoding.t
   type 'a encoding = 'a t
 
   (** {3 Ground descriptors} *)
@@ -543,6 +543,34 @@ module Encoding: sig
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
+
+module Registration : sig
+  (* FIXME add documentation *)
+
+  type id = string
+
+  type registered_encoding
+
+  val binary_schema : registered_encoding -> Binary_schema.t
+  val json_schema : registered_encoding -> Json.schema
+  val description : registered_encoding -> string option
+
+  val json_pretty_printer: registered_encoding -> (Format.formatter -> Json.t -> unit)
+  val binary_pretty_printer: registered_encoding -> (Format.formatter -> MBytes.t -> unit)
+
+  val register :
+    id:id ->
+    ?description:string ->
+    ?pp:(Format.formatter -> 'a -> unit) ->
+    'a Encoding.t ->
+    unit
+
+  val find_opt : id -> registered_encoding option
+  val list_registered_encodings : unit -> (id * registered_encoding) list
+
+  val bytes_of_json : registered_encoding -> Json.t -> MBytes.t option
+  val json_of_bytes : registered_encoding -> MBytes.t -> Json.t option
+end
 
 module With_version: sig
 

@@ -127,6 +127,7 @@ end
 include Encoding
 
 module With_version = With_version
+module Registration = Registration
 
 module Json = Json
 module Bson = Bson
