@@ -262,3 +262,16 @@ module System = struct
   module Table = Hashtbl.Make (struct include Ptime let hash = hash end)
 
 end
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"time.protocol"
+    ~pp:Protocol.pp_hum
+    Protocol.encoding ;
+  Data_encoding.Registration.register
+    ~id:"time.system"
+    ~pp:System.pp_hum
+    System.encoding ;
+  Data_encoding.Registration.register
+    ~id:"time.system.span"
+    System.Span.encoding

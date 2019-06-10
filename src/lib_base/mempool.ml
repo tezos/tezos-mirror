@@ -50,3 +50,8 @@ let empty = {
   known_valid = [] ;
   pending = Operation_hash.Set.empty ;
 }
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"mempool"
+    encoding

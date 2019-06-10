@@ -381,3 +381,14 @@ module Pool_event = struct
     ]
 
 end
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"p2p_connection.id"
+    ~pp:Id.pp
+    Id.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"p2p_connection.pool_event"
+    ~pp:Pool_event.pp
+    Pool_event.encoding

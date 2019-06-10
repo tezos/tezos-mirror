@@ -32,3 +32,9 @@ let encoding = Data_encoding.uint16
 let zero = 0
 
 let supported = [ zero ]
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"p2p_version"
+    ~pp:pp
+    encoding

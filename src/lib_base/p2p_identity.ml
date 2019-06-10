@@ -54,3 +54,8 @@ let generate_with_bound ?max target =
   { peer_id ; public_key ; secret_key ; proof_of_work_stamp }
 
 let generate target = generate_with_bound target
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"p2p_identity"
+    encoding

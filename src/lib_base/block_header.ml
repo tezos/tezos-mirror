@@ -36,7 +36,11 @@ type shell_header = {
 
 let shell_header_encoding =
   let open Data_encoding in
-  def "block_header.shell" @@
+  def "block_header.shell"
+    ~title:"Shell header"
+    ~description:"Block header's shell-related content. It contains \
+                  information such as the block level, its predecessor \
+                  and timestamp." @@
   conv
     (fun { level ; proto_level ; predecessor ;
            timestamp ; validation_passes ; operations_hash ; fitness ;
@@ -86,6 +90,10 @@ include Compare.Make (struct
 
 let encoding =
   let open Data_encoding in
+  def "block_header"
+    ~title:"Block header"
+    ~description:"Block header. It contains both shell and \
+                  protocol specific data." @@
   conv
     (fun { shell ; protocol_data } -> (shell, protocol_data))
     (fun (shell, protocol_data) -> { shell ; protocol_data })
@@ -130,3 +138,12 @@ let get_forced_protocol_upgrade =
       LevelMap.empty
       forced_protocol_upgrades in
   fun ~level -> LevelMap.find_opt level table
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"block_header.shell_header"
+    shell_header_encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"block_header"
+    encoding
