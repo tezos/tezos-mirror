@@ -88,3 +88,9 @@ let pp ppf = function
         Block_hash.pp genesis
         Chain_id.pp chain_id
         Time.System.pp_hum (Time.System.of_protocol_exn expiration)
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"test_chain_status"
+    ~pp:pp
+    encoding

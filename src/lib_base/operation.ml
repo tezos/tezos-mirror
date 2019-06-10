@@ -95,3 +95,12 @@ let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 let hash op = Operation_hash.hash_bytes [to_bytes op]
 let hash_raw bytes = Operation_hash.hash_bytes [bytes]
 
+let () =
+  Data_encoding.Registration.register
+    ~id:"operation"
+    ~pp:pp
+    encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"operation.shell_header"
+    shell_header_encoding

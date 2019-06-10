@@ -93,3 +93,9 @@ let select
     some { chain_name ;
            distributed_db_version ;
            p2p_version }
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"network_version"
+    ~pp:pp
+    encoding

@@ -189,3 +189,13 @@ module Pool_event = struct
          (opt "port" uint16))
 
 end
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"p2p_peer.state"
+    ~pp:State.pp_digram
+    State.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"p2p_peer.pool_event"
+    Pool_event.encoding

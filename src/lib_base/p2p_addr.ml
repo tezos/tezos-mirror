@@ -62,3 +62,9 @@ let of_string_exn str =
   | Some t -> t
 
 let to_string saddr = Format.asprintf "%a" pp saddr
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"p2p_addr"
+    ~pp:pp
+    encoding

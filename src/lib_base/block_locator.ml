@@ -234,3 +234,9 @@ let unknown_prefix ~is_known locator =
       Lwt.return (Known_invalid, (head, []))
   | Unknown ->
       loop history []
+
+let () =
+  Data_encoding.Registration.register
+    ~id:"block_locator"
+    ~pp:pp_short
+    encoding

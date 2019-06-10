@@ -43,3 +43,12 @@ let encoding = Data_encoding.uint16
 
 let zero = 0
 
+let () =
+  Data_encoding.Registration.register
+    ~id:"distributed_db_version.name"
+    ~pp:pp_name
+    name_encoding ;
+  Data_encoding.Registration.register
+    ~id:"distributed_db_version"
+    ~pp:pp
+    encoding
