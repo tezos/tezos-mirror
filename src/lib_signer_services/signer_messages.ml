@@ -242,3 +242,29 @@ module Request = struct
     ]
 
 end
+
+let () =
+  let open Tezos_data_encoding in
+  Data_encoding.Registration.register
+    ~id:"signer_messages.request"
+    Request.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"signer_messages.sign.response"
+    Sign.Response.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"signer_messages.deterministic_nonce.response"
+    Deterministic_nonce.Response.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"signer_messages.deterministic_nonce_hash.response"
+    Deterministic_nonce_hash.Response.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"signer_messages.supports_deterministic_nonces.response"
+    Supports_deterministic_nonces.Response.encoding ;
+
+  Data_encoding.Registration.register
+    ~id:"signer_messages.public_key.response"
+    Public_key.Response.encoding
