@@ -680,13 +680,14 @@ end
 
 include Make(struct let id = "" end)
 
+type error += Exn of exn
+
 let generic_error fmt =
-  Format.kasprintf (fun s -> error (Unclassified s)) fmt
+  Format.kasprintf (fun s -> error (Exn (Failure  s))) fmt
 
 let failwith fmt =
-  Format.kasprintf (fun s -> fail (Unclassified s)) fmt
+  Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
-type error += Exn of exn
 let error s = Error [ s ]
 let error_exn s = Error [ Exn s ]
 let trace_exn exn f = trace (Exn exn) f
