@@ -1,0 +1,26 @@
+(executables
+ (names codec)
+ (public_names tezos-codec)
+ (libraries tezos-data-encoding
+            tezos-base
+            tezos-stdlib-unix
+            tezos-event-logging
+            tezos-client-base
+            tezos-client-base-unix
+            tezos-clic
+            tezos-signer-services
+            tezos-client-alpha
+ )
+ (flags (:standard -open Tezos_data_encoding
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_client_base_unix
+                   -open Tezos_client_base
+                   -open Tezos_clic
+                   -open Tezos_stdlib_unix
+                   -open Tezos_event_logging
+                   -linkall)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

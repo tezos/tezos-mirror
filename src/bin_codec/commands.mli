@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,72 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ('a, 'b) lwt_format =
-  ('a, Format.formatter, unit, 'b Lwt.t) format4
-
-class type printer = object
-  method error : ('a, 'b) lwt_format -> 'a
-  method warning : ('a, unit) lwt_format -> 'a
-  method message : ('a, unit) lwt_format -> 'a
-  method answer :  ('a, unit) lwt_format -> 'a
-  method log : string -> ('a, unit) lwt_format -> 'a
-end
-
-class type prompter = object
-  method prompt : ('a, string tzresult) lwt_format -> 'a
-  method prompt_password : ('a, MBytes.t tzresult) lwt_format -> 'a
-end
-
-class type io = object
-  inherit printer
-  inherit prompter
-end
-
-class type wallet = object
-  method load_passwords : string Lwt_stream.t option
-  method read_file : string -> string tzresult Lwt.t
-  method with_lock : (unit -> 'a Lwt.t) -> 'a  Lwt.t
-  method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
-  method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
-end
-
-class type chain = object
-  method chain : Shell_services.chain
-end
-
-class type block = object
-  method block : Shell_services.block
-  method confirmations : int option
-end
-
-class type io_wallet = object
-  inherit printer
-  inherit prompter
-  inherit wallet
-end
-
-class type io_rpcs = object
-  inherit printer
-  inherit prompter
-  inherit RPC_context.json
-end
-
-class type ui = object
-  method sleep : float -> unit Lwt.t
-  method now : unit -> Ptime.t
-end
-
-class type full = object
-  inherit printer
-  inherit prompter
-  inherit wallet
-  inherit RPC_context.json
-  inherit chain
-  inherit block
-  inherit ui
-end
-
-class simple_printer : (string -> string -> unit Lwt.t) -> printer
-class proxy_context : full -> full
-
-val null_printer: printer
+val commands : unit -> Client_context.printer Clic.command list

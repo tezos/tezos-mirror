@@ -22,6 +22,7 @@ endif
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
 		src/bin_signer/main_signer.exe \
+		src/bin_codec/codec.exe \
 		src/lib_protocol_compiler/main_native.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
@@ -31,6 +32,7 @@ endif
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
+	@cp _build/default/src/bin_codec/codec.exe tezos-codec
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@for p in $(active_protocol_directories) ; do \
 	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
@@ -38,7 +40,6 @@ endif
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json sandbox-parameters.json ; \
 	 done
-
 
 PROTOCOLS := genesis alpha demo_noops
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
