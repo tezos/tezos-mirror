@@ -347,6 +347,7 @@ class Client:
                            branch: str = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
+        cmd += ['--check-previous', '5']
         if branch is not None:
             cmd += ['--branch', branch]
         if args is None:
