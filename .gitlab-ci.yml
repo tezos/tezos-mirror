@@ -847,82 +847,87 @@ opam:088:tezos-accuser-004-Pt24m4xi:
   variables:
     package: tezos-accuser-004-Pt24m4xi
 
-opam:089:ocplib-json-typed-browser:
+opam:089:tezos-codec:
+  <<: *opam_definition
+  variables:
+    package: tezos-codec
+
+opam:090:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:090:tezos-endorser-004-Pt24m4xi:
+opam:091:tezos-endorser-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-endorser-004-Pt24m4xi
 
-opam:091:tezos-tooling:
+opam:092:tezos-tooling:
   <<: *opam_definition
   variables:
     package: tezos-tooling
 
-opam:092:tezos-accuser-004-Pt24m4xi-commands:
+opam:093:tezos-accuser-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-004-Pt24m4xi-commands
 
-opam:093:tezos-004-Pt24m4xi-test-helpers:
+opam:094:tezos-004-Pt24m4xi-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-004-Pt24m4xi-test-helpers
 
-opam:094:tezos-protocol-004-Pt24m4xi-tests:
+opam:095:tezos-protocol-004-Pt24m4xi-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-004-Pt24m4xi-tests
 
-opam:095:tezos-endorser-005-PsBabyM1:
+opam:096:tezos-endorser-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-endorser-005-PsBabyM1
 
-opam:096:tezos-baker-004-Pt24m4xi:
+opam:097:tezos-baker-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-baker-004-Pt24m4xi
 
-opam:097:tezos-endorser-004-Pt24m4xi-commands:
+opam:098:tezos-endorser-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-004-Pt24m4xi-commands
 
-opam:098:tezos-network-sandbox:
+opam:099:tezos-network-sandbox:
   <<: *opam_definition
   variables:
     package: tezos-network-sandbox
 
-opam:099:tezos-signer:
+opam:100:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:100:tezos-baker-005-PsBabyM1:
+opam:101:tezos-baker-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-baker-005-PsBabyM1
 
-opam:101:tezos-protocol-005-PsBabyM1-tests:
+opam:102:tezos-protocol-005-PsBabyM1-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBabyM1-tests
 
-opam:102:tezos-accuser-005-PsBabyM1:
+opam:103:tezos-accuser-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-accuser-005-PsBabyM1
 
-opam:103:tezos-node:
+opam:104:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:104:tezos-005-PsBabyM1-test-helpers:
+opam:105:tezos-005-PsBabyM1-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-005-PsBabyM1-test-helpers

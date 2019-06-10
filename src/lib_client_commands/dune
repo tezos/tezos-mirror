@@ -7,12 +7,14 @@
             tezos-p2p
             tezos-shell-services
             tezos-stdlib-unix
-            tezos-signer-backends)
+            tezos-signer-backends
+            tezos-data-encoding)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc
                    -open Tezos_client_base
-                   -open Tezos_shell_services)))
+                   -open Tezos_shell_services
+                   -open Tezos_data_encoding)))
 
 (alias
  (name runtest_lint)

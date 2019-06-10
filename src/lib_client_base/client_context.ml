@@ -140,3 +140,6 @@ class proxy_context (obj : full) = object
   method sleep : float -> unit Lwt.t = obj#sleep
   method now : unit -> Ptime.t = obj#now
 end
+
+let log _ _ = Lwt.return_unit
+let null_printer : #printer = new simple_printer log
