@@ -115,7 +115,8 @@ let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
        State.Block.context pred >>= fun predecessor_context ->
-       let rec attempt context =
+       let max_trials = 100 in
+       let rec attempt trials context =
          begin
            let oph, op, _bytes = operation name in
            let block = block ?context state ~operations:[oph] pred name in
@@ -132,45 +133,51 @@ let build_valid_chain state vtbl pred names =
                (parsed_block block) >>=? fun vstate ->
              (* no operations *)
              Proto.finalize_block vstate
-           end >>=? fun (validation_result, _metadata) ->
+           end >>=? fun (result, _metadata) ->
            let context =
-             Shell_context.unwrap_disk_context validation_result.context in
+             Shell_context.unwrap_disk_context result.context in
            Context.commit
-             ~time:block.shell.timestamp context >>= fun context_hash ->
+             ~time:block.shell.timestamp
+             context >>= fun context_hash ->
+           let validation_store =
+             { State.Block.context_hash;
+               message = result.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level = result.last_allowed_fork_level
+             } in
            State.Block.store state
              block zero [[op]] [[zero]]
-             ({context_hash;
-               message = validation_result.message;
-               max_operations_ttl = 1;
-               last_allowed_fork_level = validation_result.last_allowed_fork_level} :
-                State.Block.validation_store)
+             validation_store
              ~forking_testchain:false >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
          end >>= function
-         | Ok v -> Lwt.return v
-         | Error [ Validation_errors.Inconsistent_hash (got, _) ] ->
+         | Ok v ->
+             begin if trials < max_trials then
+                 Format.eprintf
+                   "Took %d trials to build valid chain"
+                   (max_trials - trials + 1)
+             end ;
+             Lwt.return v
+         | Error (Validation_errors.Inconsistent_hash (got, _)  :: _) ->
              (* Kind of a hack, but at least it tests idempotence to some extent. *)
-             attempt (Some got)
+             if trials <= 0 then
+               assert false
+             else begin
+               Format.eprintf
+                 "Inconsistent context hash: got %a, retrying (%d)\n"
+                 Context_hash.pp got
+                 trials ;
+               attempt (trials - 1) (Some got)
+             end
          | Error err ->
-             Error_monad.pp_print_error Format.err_formatter err ;
+             Format.eprintf "Error: %a\n" Error_monad.pp_print_error err ;
              assert false in
-       attempt None)
+       attempt max_trials None)
     pred
     names >>= fun _ ->
   Lwt.return_unit
-
-let build_example_tree chain =
-  let vtbl = Hashtbl.create 23 in
-  Chain.genesis chain >>= fun genesis ->
-  Hashtbl.add vtbl "Genesis" genesis ;
-  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
-  build_valid_chain chain vtbl genesis c >>= fun () ->
-  let a3 = Hashtbl.find vtbl "A3" in
-  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
-  build_valid_chain chain vtbl a3 c >>= fun () ->
-  Lwt.return vtbl
 
 type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
@@ -185,6 +192,25 @@ exception Found of string
 let vblocks s =
   Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.vblock []
   |> List.sort Pervasives.compare
+
+(*******************************************************)
+(*
+
+    Genesis - A1 - A2 - A3 - A4 - A5 - A6 - A7 - A8
+                         \
+                          B1 - B2 - B3 - B4 - B5 - B6 - B7 - B8
+*)
+
+let build_example_tree chain =
+  let vtbl = Hashtbl.create 23 in
+  Chain.genesis chain >>= fun genesis ->
+  Hashtbl.add vtbl "Genesis" genesis ;
+  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
+  build_valid_chain chain vtbl genesis c >>= fun () ->
+  let a3 = Hashtbl.find vtbl "A3" in
+  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
+  build_valid_chain chain vtbl a3 c >>= fun () ->
+  Lwt.return vtbl
 
 let wrap_state_init f base_dir =
   begin
@@ -203,10 +229,6 @@ let wrap_state_init f base_dir =
 
 let test_init (_ : state) =
   return_unit
-
-
-
-(****************************************************************************)
 
 (** State.Block.read *)
 

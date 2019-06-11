@@ -25,7 +25,6 @@
 
 let (//) = Filename.concat
 
-(**************************************************************************)
 (** Basic blocks *)
 
 let genesis_block =
@@ -36,8 +35,7 @@ let genesis_protocol =
   Protocol_hash.of_b58check_exn
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
-let genesis_time =
-  Time.Protocol.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 module Proto = (val Registered_protocol.get_exn genesis_protocol)
 
@@ -46,15 +44,6 @@ let genesis : State.Chain.genesis = {
   block = genesis_block ;
   protocol = genesis_protocol ;
 }
-
-let operation op =
-  let op : Operation.t = {
-    shell = { branch = genesis_block } ;
-    proto = MBytes.of_string op ;
-  } in
-  Operation.hash op,
-  op,
-  Data_encoding.Binary.to_bytes Operation.encoding op
 
 let incr_fitness fitness =
   let new_fitness =
@@ -72,6 +61,15 @@ let incr_fitness fitness =
 
 let incr_timestamp timestamp =
   Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))
+
+let operation op =
+  let op : Operation.t = {
+    shell = { branch = genesis_block } ;
+    proto = MBytes.of_string op ;
+  } in
+  Operation.hash op,
+  op,
+  Data_encoding.Binary.to_bytes Operation.encoding op
 
 let block_header_data_encoding =
   Data_encoding.(obj1 (req "proto_block_header" string))
@@ -117,7 +115,8 @@ let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
        State.Block.context pred >>= fun predecessor_context ->
-       let rec attempt context =
+       let max_trials = 100 in
+       let rec attempt trials context =
          begin
            let oph, op, _bytes = operation name in
            let block = block ?context state ~operations:[oph] pred name in
@@ -142,24 +141,41 @@ let build_valid_chain state vtbl pred names =
              ?message:result.message
              context >>= fun context_hash ->
            let validation_store =
-             { State.Block.context_hash ; message = result.message ;
+             { State.Block.context_hash ;
+               message = result.message ;
                max_operations_ttl = result.max_operations_ttl ;
                last_allowed_fork_level = result.last_allowed_fork_level
              } in
            State.Block.store state
-             block zero [[op]] [[zero]] validation_store ~forking_testchain:false >>=? fun _vblock ->
+             block zero [[op]] [[zero]]
+             validation_store
+             ~forking_testchain:false >>=? fun _vblock ->
            State.Block.read state hash >>=? fun vblock ->
            Hashtbl.add vtbl name vblock ;
            return vblock
          end >>= function
-         | Ok v -> Lwt.return v
-         | Error [ Validation_errors.Inconsistent_hash (got, _) ] ->
+         | Ok v ->
+             begin if trials < max_trials then
+                 Format.eprintf
+                   "Took %d trials to build valid chain"
+                   (max_trials - trials + 1)
+             end ;
+             Lwt.return v
+         | Error (Validation_errors.Inconsistent_hash (got, _)  :: _) ->
              (* Kind of a hack, but at least it tests idempotence to some extent. *)
-             attempt (Some got)
+             if trials <= 0 then
+               assert false
+             else begin
+               Format.eprintf
+                 "Inconsistent context hash: got %a, retrying (%d)\n"
+                 Context_hash.pp got
+                 trials ;
+               attempt (trials - 1) (Some got)
+             end
          | Error err ->
-             Error_monad.pp_print_error Format.err_formatter err ;
+             Format.eprintf "Error: %a\n" Error_monad.pp_print_error err ;
              assert false in
-       attempt None)
+       attempt max_trials None)
     pred
     names >>= fun _ ->
   Lwt.return_unit
@@ -211,8 +227,6 @@ let wrap_state_init f base_dir =
     f { state ; chain ; vblock } >>=? fun () ->
     return_unit
   end
-
-(*******************************************************)
 
 (** State.Chain.checkpoint *)
 
@@ -490,7 +504,7 @@ let test_note_may_update_checkpoint s =
   note_may_update_checkpoint s.chain (Some checkpoint) >>= fun () ->
   return_unit
 
-(**********************************************************)
+(****************************************************************************)
 
 let tests: (string * (state -> unit tzresult Lwt.t)) list = [
   "basic checkpoint", test_basic_checkpoint;
@@ -510,8 +524,7 @@ let wrap (n, f) =
       wrap_state_init f dir >>= function
       | Ok () -> Lwt.return_unit
       | Error error ->
-          Format.eprintf "WWW %a@." pp_print_error error ;
-          Lwt.fail Alcotest.Test_error
+          Format.kasprintf Pervasives.failwith "%a" pp_print_error error
     end
   end
 
