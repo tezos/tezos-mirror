@@ -14,7 +14,7 @@ for test in tests_python/tests/test_*.py; do
     testname=${testname%%.py}
     cat >> $tmp <<EOF
 integration:$testname:
-  <<: *test_definition
+  <<: *integration_definition
   script:
     - pytest $test
   stage: test
@@ -25,4 +25,3 @@ done
 sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
 
 mv $tmp "$src_dir/.gitlab-ci.yml"
-
