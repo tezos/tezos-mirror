@@ -468,7 +468,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
   (* FIXME: use config value ? *)
   State.init
     ~context_root ~store_root genesis
-    ~patch_context:(patch_context None) >>=? fun (state, _chain_state, context_index, _history_mode) ->
+    ~patch_context:(patch_context None) >>=? fun (state, chain_state, context_index, _history_mode) ->
   Store.init store_root >>=? fun store ->
   let chain_store = Store.Chain.get store chain_id in
   let chain_data = Store.Chain_data.get chain_store in
@@ -550,11 +550,6 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
          ) >>= fun () ->
        let pred_context_hash = predecessor_block_header.shell.context in
 
-       State.close state >>= fun () ->
-
-       State.init
-         ~context_root ~store_root genesis
-         ~patch_context:(patch_context None) >>=? fun (_state, chain_state, context_index, _history_mode) ->
        checkout_exn context_index pred_context_hash >>= fun predecessor_context ->
 
        (* ... we can now call apply ... *)
@@ -597,6 +592,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
          ~genesis:genesis.block block_header oldest_header
          block_validation_result.validation_result.max_operations_ttl >>=? fun () ->
        Store.close store ;
+       State.close state >>= fun () ->
        return_unit)
     (function
       | Ok () ->

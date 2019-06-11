@@ -17,7 +17,6 @@ depends: [
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-003-PsddFKi3"
   "tezos-embedded-protocol-004-Pt24m4xi"
-  "tezos-mempool-003-PsddFKi3"
   "tezos-mempool-004-Pt24m4xi"
   "cmdliner"
   "tls"

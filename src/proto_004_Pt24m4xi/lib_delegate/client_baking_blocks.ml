@@ -69,7 +69,7 @@ module Block_seen_event = struct
   }
   let make hash header occurrence () = { hash ; header ; occurrence }
   module Definition = struct
-    let name = "block-seen-004"
+    let name = "block-seen-" ^ Proto_alpha.Name.name
     type nonrec t = t
     let encoding =
       let open Data_encoding in

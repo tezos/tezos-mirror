@@ -13,7 +13,6 @@
             tezos-client-003-PsddFKi3
             tezos-client-004-Pt24m4xi
             tezos-client-003-PsddFKi3-commands.registration
-            tezos-baking-003-PsddFKi3-commands.registration
             tezos-client-004-Pt24m4xi-commands.registration
             tezos-baking-004-Pt24m4xi-commands.registration
             tezos-signer-backends)

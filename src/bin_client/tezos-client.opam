@@ -17,7 +17,6 @@ depends: [
   "tezos-client-003-PsddFKi3"
   "tezos-client-004-Pt24m4xi"
   "tezos-client-003-PsddFKi3-commands"
-  "tezos-baking-003-PsddFKi3-commands"
   "tezos-client-004-Pt24m4xi-commands"
   "tezos-baking-004-Pt24m4xi-commands"
   "tezos-signer-backends"

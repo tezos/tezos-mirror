@@ -145,6 +145,7 @@ in the :ref:`introduction <howtoget>`.
    :caption: Protocols:
 
    protocols/003_PsddFKi3
+   protocols/004_Pt24m4xi
 
 .. toctree::
    :maxdepth: 2

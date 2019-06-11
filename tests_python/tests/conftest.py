@@ -106,7 +106,7 @@ def sandbox_multibranch(log_dir, request):
     mapped to a pair (git revision, protocol version). For instance,
     suppose a mapping:
 
-      MAP = { 0: ('zeronet', 'alpha'), 1:('mainnet', '003-PsddFKi3'),
+      MAP = { 0: ('zeronet', 'alpha'), 1:('mainnet', '004-Pt24m4xi'),
               2: ('alphanet', '003-PsddFKi3' }
 
     If we annotate the class test as follows.
