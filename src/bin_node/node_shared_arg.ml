@@ -44,7 +44,7 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   discovery_addr: string option ;
-  rpc_listen_addr: string option ;
+  rpc_listen_addrs: string list ;
   private_mode: bool ;
   disable_mempool: bool ;
   disable_testchain: bool ;
@@ -62,7 +62,7 @@ let wrap
     peer_table_size
     listen_addr discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
     disable_mempool disable_testchain
-    expected_pow rpc_listen_addr rpc_tls
+    expected_pow rpc_listen_addrs rpc_tls
     cors_origins cors_headers log_output history_mode =
 
   let actual_data_dir =
@@ -106,7 +106,7 @@ let wrap
     no_bootstrap_peers ;
     listen_addr ;
     discovery_addr ;
-    rpc_listen_addr ;
+    rpc_listen_addrs ;
     private_mode ;
     disable_mempool ;
     disable_testchain ;
@@ -272,11 +272,11 @@ module Term = struct
   (* rpc args *)
   let docs = Manpage.rpc_section
 
-  let rpc_listen_addr =
+  let rpc_listen_addrs =
     let doc =
       "The TCP socket address at which this RPC server \
        instance can be reached." in
-    Arg.(value & opt (some string) None &
+    Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let rpc_tls =
@@ -329,7 +329,7 @@ module Term = struct
     $ peer_table_size
     $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
     $ private_mode $ disable_mempool $ disable_testchain
-    $ expected_pow $ rpc_listen_addr $ rpc_tls
+    $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
     $ history_mode
@@ -359,7 +359,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         listen_addr ; private_mode ;
         discovery_addr ;
         disable_mempool ; disable_testchain ;
-        rpc_listen_addr ; rpc_tls ;
+        rpc_listen_addrs ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
         bootstrap_threshold ;
@@ -377,6 +377,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
+    ~bootstrap_peers ?listen_addr ?discovery_addr ~rpc_listen_addrs ~private_mode
     ~disable_mempool ~disable_testchain ~cors_origins ~cors_headers ?rpc_tls
     ?log_output ?bootstrap_threshold ?history_mode cfg

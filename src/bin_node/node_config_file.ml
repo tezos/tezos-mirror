@@ -59,7 +59,7 @@ and p2p = {
 }
 
 and rpc = {
-  listen_addr : string option ;
+  listen_addrs : string list ;
   cors_origins : string list ;
   cors_headers : string list ;
   tls : tls option ;
@@ -117,7 +117,7 @@ let default_p2p = {
 }
 
 let default_rpc = {
-  listen_addr = None ;
+  listen_addrs = [] ;
   cors_origins = [] ;
   cors_headers = [] ;
   tls = None ;
@@ -330,22 +330,34 @@ let p2p =
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { cors_origins ; cors_headers ; listen_addr ; tls } ->
+    (fun { cors_origins ; cors_headers ; listen_addrs ; tls } ->
        let cert, key =
          match tls with
          | None -> None, None
          | Some { cert ; key } -> Some cert, Some key in
-       (listen_addr, cors_origins, cors_headers, cert, key ))
-    (fun (listen_addr, cors_origins, cors_headers, cert, key ) ->
+       (Some listen_addrs, None, cors_origins, cors_headers, cert, key ))
+    (fun (listen_addrs, legacy_listen_addr, cors_origins, cors_headers, cert, key ) ->
        let tls =
          match cert, key with
          | None, _ | _, None -> None
          | Some cert, Some key -> Some { cert ; key } in
-       { listen_addr ; cors_origins ; cors_headers ; tls })
-    (obj5
-       (opt "listen-addr"
-          ~description: "Host to listen to. If the port is not specified, \
+       let listen_addrs =
+         match listen_addrs, legacy_listen_addr with
+         | Some addrs, None -> addrs
+         | None, Some addr -> [addr]
+         | None, None -> default_rpc.listen_addrs
+         | Some _, Some _ ->
+             Pervasives.failwith
+               "Config file: Use only \"listen-addrs\" and not (legacy) \"listen-addr\"."
+       in
+       { listen_addrs ; cors_origins ; cors_headers ; tls })
+    (obj6
+       (opt "listen-addrs"
+          ~description: "Hosts to listen to. If the port is not specified, \
                          the default port 8732 will be assumed."
+          (list string))
+       (opt "listen-addr"
+          ~description: "Legacy value: Host to listen to"
           string)
        (dft "cors-origin"
           ~description: "Cross Origin Resource Sharing parameters, see \
@@ -532,7 +544,7 @@ let update
     ?bootstrap_peers
     ?listen_addr
     ?discovery_addr
-    ?rpc_listen_addr
+    ?(rpc_listen_addrs = [])
     ?(private_mode = false)
     ?(disable_mempool = false)
     ?(disable_testchain = false)
@@ -595,8 +607,8 @@ let update
     greylisting_config = cfg.p2p.greylisting_config ;
   }
   and rpc : rpc = {
-    listen_addr =
-      Option.first_some rpc_listen_addr cfg.rpc.listen_addr ;
+    listen_addrs =
+      unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs ;
     cors_origins =
       unopt_list ~default:cfg.rpc.cors_origins cors_origins ;
     cors_headers =
@@ -680,7 +692,7 @@ let resolve_bootstrap_addrs peers =
     ~default_port:default_p2p_port
     peers
 
-let check_listening_addr config =
+let check_listening_addrs config =
   match config.p2p.listen_addr with
   | None -> Lwt.return_unit
   | Some addr ->
@@ -717,22 +729,22 @@ let check_discovery_addr config =
       end
 
 let check_rpc_listening_addr config =
-  match config.rpc.listen_addr with
-  | None -> Lwt.return_unit
-  | Some addr ->
-      Lwt.catch begin fun () ->
-        resolve_rpc_listening_addrs addr >>= function
-        | [] ->
-            Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-            Lwt.return_unit
-        | _ :: _ ->
-            Lwt.return_unit
-      end begin function
-        | (Invalid_argument msg) ->
-            Format.eprintf "Warning: failed to parse %S:\   %s\n@." addr msg ;
-            Lwt.return_unit
-        | exn -> Lwt.fail exn
-      end
+  Lwt_list.iter_p
+    (fun addr ->
+       Lwt.catch begin fun () ->
+         resolve_rpc_listening_addrs addr >>= function
+         | [] ->
+             Format.eprintf "Warning: failed to resolve %S\n@." addr ;
+             Lwt.return_unit
+         | _ :: _ ->
+             Lwt.return_unit
+       end begin function
+         | (Invalid_argument msg) ->
+             Format.eprintf "Warning: failed to parse %S:\   %s\n@." addr msg ;
+             Lwt.return_unit
+         | exn -> Lwt.fail exn
+       end)
+    config.rpc.listen_addrs
 
 let check_bootstrap_peer addr =
   Lwt.catch begin fun () ->
@@ -797,7 +809,7 @@ let check_connections config =
 
 
 let check config =
-  check_listening_addr config >>= fun () ->
+  check_listening_addrs config >>= fun () ->
   check_rpc_listening_addr config >>= fun () ->
   check_discovery_addr config >>= fun () ->
   check_bootstrap_peers config >>= fun () ->

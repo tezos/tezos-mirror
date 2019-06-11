@@ -197,16 +197,18 @@ let launch_rpc_server
   end
 
 let init_rpc (rpc_config: Node_config_file.rpc) node =
-  match rpc_config.listen_addr with
-  | None ->
-      lwt_log_notice "Not listening to RPC calls." >>= fun () ->
-      return_nil
-  | Some addr ->
-      Node_config_file.resolve_rpc_listening_addrs addr >>= function
-      | [] ->
-          failwith "Cannot resolve listening address: %S" addr
-      | addrs ->
-          map_s (launch_rpc_server rpc_config node) addrs
+  fold_right_s
+    (fun addr acc ->
+       Node_config_file.resolve_rpc_listening_addrs addr >>= function
+       | [] ->
+           failwith "Cannot resolve listening address: %S" addr
+       | addrs ->
+           fold_right_s
+             (fun x a ->
+                launch_rpc_server rpc_config node x >>=?
+                fun o -> return (o::a))
+             addrs acc)
+    rpc_config.listen_addrs []
 
 let init_signal () =
   let handler name id = try
@@ -246,7 +248,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
-  Lwt_list.iter_s RPC_server.shutdown rpc >>= fun () ->
+  Lwt_list.iter_p RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Internal_event_unix.close () >>= fun () ->
   return_unit
@@ -287,12 +289,12 @@ let process sandbox verbosity checkpoint args =
           (fun () -> run ?sandbox ?verbosity ?checkpoint config)
           (function
             |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
-                begin match config.rpc.listen_addr with
-                  | None -> assert false
-                  | Some addr ->
-                      Node_config_file.resolve_rpc_listening_addrs addr >>= fun addrlist ->
-                      fail (RPC_Port_already_in_use addrlist)
-                end
+                Lwt_list.fold_right_s
+                  (fun addr acc ->
+                     Node_config_file.resolve_rpc_listening_addrs addr >>=
+                     fun x -> Lwt.return (x @ acc))
+                  config.rpc.listen_addrs [] >>= fun addrlist ->
+                fail (RPC_Port_already_in_use addrlist)
             | exn -> Lwt.return (error_exn exn)
           )
     | true -> failwith "Data directory is locked by another process" in
