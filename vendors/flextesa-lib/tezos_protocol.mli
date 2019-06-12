@@ -51,7 +51,27 @@ type t =
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
   ; preserved_cycles: int
-  ; proof_of_work_threshold: int }
+  ; proof_of_work_threshold: int
+  ; blocks_per_commitment: int
+  ; endorsers_per_block: int
+  ; hard_gas_limit_per_operation: int
+  ; hard_gas_limit_per_block: int
+  ; tokens_per_roll: int
+  ; michelson_maximum_type_size: int
+  ; seed_nonce_revelation_tip: int
+  ; origination_size: int
+  ; block_security_deposit: int
+  ; endorsement_security_deposit: int
+  ; block_reward: int
+  ; endorsement_reward: int
+  ; hard_storage_limit_per_operation: int
+  ; cost_per_byte: int
+  ; test_chain_duration: int
+  ; quorum_min: int
+  ; quorum_max: int
+  ; min_proposal_quorum: int
+  ; initial_endorsers: int
+  ; delay_per_missing_endorsement: int }
 (** [t] wraps bootstrap parameters for sandboxed protocols. *)
 
 val compare : t -> t -> int
