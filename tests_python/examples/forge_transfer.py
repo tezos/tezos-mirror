@@ -22,9 +22,9 @@ def scenario():
 
         counter_path = (f'/chains/main/blocks/head/context/contracts/'
                         f'{SENDER_ID}/counter')
-        counter = utils.rpc('localhost', port, 'get', counter_path)
+        counter = utils.rpc('localhost', port, 'get', counter_path).json()
         head_hash = utils.rpc('localhost', port, 'get',
-                              '/chains/main/blocks/head/hash')
+                              '/chains/main/blocks/head/hash').json()
 
         operation_json = {"branch": head_hash,
                           "contents": [{"kind": "transaction",
@@ -43,7 +43,7 @@ def scenario():
         run_operation_path = ('/chains/main/blocks/head/helpers/scripts/'
                               'run_operation')
         res = utils.rpc('localhost', port, 'post', run_operation_path,
-                        data=operation_json)
+                        data=operation_json).json()
 
         # update fields before forging
         gas_limit = (res['contents'][0]['metadata']['operation_result']
@@ -57,7 +57,7 @@ def scenario():
         # forge operation
         path_forge = '/chains/main/blocks/head/helpers/forge/operations'
         operation_hex_string = utils.rpc('localhost', port, 'post', path_forge,
-                                         data=operation_json)
+                                         data=operation_json).json()
 
         # sign operation
         watermarked_operation = b'\x03' + bytes.fromhex(operation_hex_string)
@@ -75,7 +75,7 @@ def scenario():
 
         preapply_path = '/chains/main/blocks/head/helpers/preapply/operations'
         preapply_res = utils.rpc('localhost', port, 'post', preapply_path,
-                                 data=operation_json)
+                                 data=operation_json).json()
 
         preapply_status = (preapply_res[0]['contents'][0]['metadata']
                            ['operation_result']['status'])
@@ -83,10 +83,11 @@ def scenario():
 
         # injection require hex signature
         signed_op = operation_hex_string + sig_hex
-        op_hash = utils.rpc(port, 'post', 'injection/operation', signed_op)
+        op_hash = utils.rpc('localhost', port, 'post', 'injection/operation',
+                            signed_op).json()
 
         mempool = utils.rpc('localhost', port, 'get',
-                            '/chains/main/mempool/pending_operations')
+                            '/chains/main/mempool/pending_operations').json()
         assert op_hash == mempool['applied'][0]['hash']
 
 
