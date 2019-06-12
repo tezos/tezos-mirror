@@ -776,6 +776,7 @@ publish:doc:
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
   before_script:
+    - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - chmod 400 ~/.ssh/id_ed25519
