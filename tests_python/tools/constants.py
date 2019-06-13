@@ -49,7 +49,9 @@ PARAMETERS = {
     "hard_storage_limit_per_operation": "60000",
     "test_chain_duration": "1966080",
     "quorum_min": 3000,
-    "quorum_max": 7000
+    "quorum_max": 7000,
+    "initial_endorsers": 1,
+    "delay_per_missing_endorsement": "1"
 }
 
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
