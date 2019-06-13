@@ -106,7 +106,9 @@ type t =
   ; cost_per_byte: int
   ; test_chain_duration: int
   ; quorum_min: int
-  ; quorum_max: int }
+  ; quorum_max: int
+  ; initial_endorsers: int
+  ; delay_per_missing_endorsement: int }
 
 val compare : t -> t -> int
 val default : unit -> t
@@ -127,7 +129,7 @@ val ensure_script :
     bootstrap-parameters JSON file. *)
 
 val ensure :
-     t
+  t
   -> config:< paths: Paths.t ; .. >
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 (** Run the script created by [ensure_script], i.e. create the JSON

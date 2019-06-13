@@ -139,22 +139,22 @@ module Script = struct
   let test () =
     let faucet_like =
       {mich| {parameter key_hash ;
-  storage timestamp ;
-  code { { { DUP ; CAR ; DIP { CDR } } } ;
-         SWAP ;
-         PUSH int 300 ;
-         ADD @FIVE_MINUTES_LATER ;
-         NOW ;
-         { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
-         IMPLICIT_ACCOUNT ;
-         PUSH mutez 1000000 ;
-         UNIT ;
-         TRANSFER_TOKENS ;
-         NIL operation ;
-         SWAP ;
-         CONS ;
-         DIP { NOW } ;
-         PAIR }} |mich}
+             storage timestamp ;
+             code { { { DUP ; CAR ; DIP { CDR } } } ;
+             SWAP ;
+             PUSH int 300 ;
+             ADD @FIVE_MINUTES_LATER ;
+             NOW ;
+             { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+             IMPLICIT_ACCOUNT ;
+             PUSH mutez 1000000 ;
+             UNIT ;
+             TRANSFER_TOKENS ;
+             NIL operation ;
+             SWAP ;
+             CONS ;
+             DIP { NOW } ;
+             PAIR }} |mich}
     in
     print (parse faucet_like) (parse "0") ;
     let original = code_of_json_exn original_json in
@@ -239,7 +239,9 @@ type t =
   ; cost_per_byte: int
   ; test_chain_duration: int
   ; quorum_min: int
-  ; quorum_max: int }
+  ; quorum_max: int
+  ; initial_endorsers: int
+  ; delay_per_missing_endorsement: int }
 
 let compare a b = String.compare a.id b.id
 
@@ -276,7 +278,9 @@ let default () =
   ; cost_per_byte= 1000
   ; test_chain_duration= 1966080
   ; quorum_min= 3000
-  ; quorum_max= 7000 }
+  ; quorum_max= 7000
+  ; initial_endorsers = 1
+  ; delay_per_missing_endorsement = 1 }
 
 
 let protocol_parameters_json t : Ezjsonm.t =
@@ -332,6 +336,9 @@ let protocol_parameters_json t : Ezjsonm.t =
        string (Int.to_string t.test_chain_duration))
     ; ("quorum_min", int t.quorum_min)
     ; ("quorum_max", int t.quorum_max)
+    ; ("initial_endorsers", int t.initial_endorsers)
+    ; ("delay_per_missing_endorsement",
+       string (Int.to_string t.delay_per_missing_endorsement))
     ]
 
 let sandbox {dictator; _} =
@@ -380,33 +387,33 @@ let cli_term () =
   let open Term in
   pure
     (fun remove_default_bas
-    (`Blocks_per_voting_period bpvp)
-    (`Protocol_hash hashopt)
-    (`Time_between_blocks tbb)
-    add_bootstraps
-    ->
-      let d = default () in
-      let id =
-        if add_bootstraps = [] && remove_default_bas = false then d.id
-        else "default-and-command-line"
-      in
-      let time_between_blocks =
-        Option.value tbb ~default:d.time_between_blocks
-      in
-      let bootstrap_accounts =
-        add_bootstraps
-        @ if remove_default_bas then [] else d.bootstrap_accounts
-      in
-      let blocks_per_voting_period =
-        match bpvp with Some v -> v | None -> d.blocks_per_voting_period
-      in
-      let hash = Option.value hashopt ~default:d.hash in
-      { d with
-        id
-      ; hash
-      ; bootstrap_accounts
-      ; time_between_blocks
-      ; blocks_per_voting_period } )
+      (`Blocks_per_voting_period bpvp)
+      (`Protocol_hash hashopt)
+      (`Time_between_blocks tbb)
+      add_bootstraps
+      ->
+        let d = default () in
+        let id =
+          if add_bootstraps = [] && remove_default_bas = false then d.id
+          else "default-and-command-line"
+        in
+        let time_between_blocks =
+          Option.value tbb ~default:d.time_between_blocks
+        in
+        let bootstrap_accounts =
+          add_bootstraps
+          @ if remove_default_bas then [] else d.bootstrap_accounts
+        in
+        let blocks_per_voting_period =
+          match bpvp with Some v -> v | None -> d.blocks_per_voting_period
+        in
+        let hash = Option.value hashopt ~default:d.hash in
+        { d with
+          id
+        ; hash
+        ; bootstrap_accounts
+        ; time_between_blocks
+        ; blocks_per_voting_period } )
   $ Arg.(
       value
         (flag
@@ -415,36 +422,36 @@ let cli_term () =
   $ Arg.(
       pure (fun x -> `Blocks_per_voting_period x)
       $ value
-          (opt (some int) None
-             (info
-                ["blocks-per-voting-period"]
-                ~doc:"Set the length of voting periods")))
+        (opt (some int) None
+           (info
+              ["blocks-per-voting-period"]
+              ~doc:"Set the length of voting periods")))
   $ Arg.(
       pure (fun x -> `Protocol_hash x)
       $ value
-          (opt (some string) None
-             (info ["protocol-hash"] ~doc:"Set the (starting) protocol hash.")))
+        (opt (some string) None
+           (info ["protocol-hash"] ~doc:"Set the (starting) protocol hash.")))
   $ Arg.(
       pure (fun x -> `Time_between_blocks x)
       $ value
-          (opt
-             (some (list ~sep:',' int))
-             None
-             (info ["time-between-blocks"] ~docv:"COMMA-SEPARATED-SECONDS"
-                ~doc:
-                  "Set the time between blocks bootstrap-parameter, e.g. \
-                   `2,3,2`.")))
+        (opt
+           (some (list ~sep:',' int))
+           None
+           (info ["time-between-blocks"] ~docv:"COMMA-SEPARATED-SECONDS"
+              ~doc:
+                "Set the time between blocks bootstrap-parameter, e.g. \
+                 `2,3,2`.")))
   $ Arg.(
       pure (fun l ->
           List.map l ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
               (Account.key_pair name ~pubkey ~pubkey_hash ~private_key, tez) )
-      )
+        )
       $ value
-          (opt_all
-             (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
-             []
-             (info ["add-bootstrap-account"]
-                ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
-                ~doc:
-                  "Add a custom bootstrap account, e.g. \
-                   `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`.")))
+        (opt_all
+           (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
+           []
+           (info ["add-bootstrap-account"]
+              ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
+              ~doc:
+                "Add a custom bootstrap account, e.g. \
+                 `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`.")))
