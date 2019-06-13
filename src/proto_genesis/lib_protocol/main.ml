@@ -181,7 +181,7 @@ let begin_construction
       prepare_application ctxt command level timestamp fitness
 
 let apply_operation _vctxt _ =
-  Lwt.return (Error []) (* absurd *)
+  failwith "genesis.apply_operation" (* absurd *)
 
 let finalize_block state = return (state, ())
 
