@@ -24,4 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Error_monad_monad_maker.Make (Error_monad_core)
+include Sig.MONAD with type error := Core.error

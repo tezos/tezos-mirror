@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Error : Error_monad_sig.CORE) :
-  Error_monad_sig.MONAD with type error := Error.error = struct
+module Make (Error : Sig.CORE) : Sig.MONAD with type error := Error.error =
+struct
   (* INVARIANT: traces are never empty, they must contain at least one error *)
 
   type trace = Error.error list

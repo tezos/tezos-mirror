@@ -36,21 +36,21 @@ let json_pp id encoding ppf x =
 
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
-module Make (Prefix : Error_monad_sig.PREFIX) : sig
-  include Error_monad_sig.CORE
+module Make (Prefix : Sig.PREFIX) : sig
+  include Sig.CORE
 
-  include Error_monad_sig.EXT with type error := error
+  include Sig.EXT with type error := error
 
-  include Error_monad_sig.WITH_WRAPPED with type error := error
+  include Sig.WITH_WRAPPED with type error := error
 end = struct
   type error = ..
 
   module type Wrapped_error_monad = sig
     type unwrapped = ..
 
-    include Error_monad_sig.CORE with type error := unwrapped
+    include Sig.CORE with type error := unwrapped
 
-    include Error_monad_sig.EXT with type error := unwrapped
+    include Sig.EXT with type error := unwrapped
 
     val unwrap : error -> unwrapped option
 
@@ -58,7 +58,7 @@ end = struct
   end
 
   type full_error_category =
-    | Main of Error_monad_sig.error_category
+    | Main of Sig.error_category
     | Wrapped of (module Wrapped_error_monad)
 
   (* the toplevel store for error kinds *)
@@ -75,7 +75,7 @@ end = struct
         -> error_kind
 
   type error_info = {
-    category : Error_monad_sig.error_category;
+    category : Sig.error_category;
     id : string;
     title : string;
     description : string;

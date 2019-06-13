@@ -30,17 +30,17 @@
 
 type error_category = [`Branch | `Temporary | `Permanent]
 
-include Error_monad_core
-include Error_monad_monad
+include Core
+include Monad
 
-module Make (Prefix : Error_monad_sig.PREFIX) : sig
-  include Error_monad_sig.CORE
+module Make (Prefix : Sig.PREFIX) : sig
+  include Sig.CORE
 
-  include Error_monad_sig.EXT with type error := error
+  include Sig.EXT with type error := error
 
-  include Error_monad_sig.WITH_WRAPPED with type error := error
+  include Sig.WITH_WRAPPED with type error := error
 end = struct
-  include Error_monad_core_maker.Make (Prefix)
+  include Core_maker.Make (Prefix)
 end
 
 type error += Exn of exn
@@ -65,8 +65,6 @@ let () =
 let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
-
-let error s = Error [s]
 
 let error_exn s = Error [Exn s]
 
@@ -151,4 +149,4 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
 
 let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
 
-let json_to_string = Error_monad_core_maker.json_to_string
+let json_to_string = Core_maker.json_to_string

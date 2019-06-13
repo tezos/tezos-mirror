@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,8 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Error_monad_sig.CORE
-
-include Error_monad_sig.EXT with type error := error
-
-include Error_monad_sig.WITH_WRAPPED with type error := error
+module Make (Error : Sig.CORE) : Sig.MONAD with type error := Error.error

@@ -24,4 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Error_monad_sig.MONAD with type error := Error_monad_core.error
+(* Tezos Protocol Implementation - Error Monad *)
+
+(*-- Error classification ----------------------------------------------------*)
+
+include Core_maker.Make (struct
+  let id = ""
+end)

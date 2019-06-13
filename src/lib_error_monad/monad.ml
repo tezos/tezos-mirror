@@ -24,10 +24,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tezos Protocol Implementation - Error Monad *)
-
-(*-- Error classification ----------------------------------------------------*)
-
-include Error_monad_core_maker.Make (struct
-  let id = ""
-end)
+include Monad_maker.Make (Core)

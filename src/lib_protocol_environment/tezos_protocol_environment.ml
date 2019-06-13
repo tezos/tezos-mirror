@@ -533,7 +533,7 @@ struct
   end
 
   module Error_core = struct
-    include Error_monad_core_maker.Make (struct
+    include Tezos_error_monad.Core_maker.Make (struct
       let id = Format.asprintf "proto.%s." Param.name
     end)
   end
@@ -546,9 +546,9 @@ struct
     include (
       Error_core :
         sig
-          include Error_monad_sig.CORE with type error := unwrapped
+          include Tezos_error_monad.Sig.CORE with type error := unwrapped
 
-          include Error_monad_sig.EXT with type error := unwrapped
+          include Tezos_error_monad.Sig.EXT with type error := unwrapped
         end )
 
     let unwrap = function
@@ -568,7 +568,7 @@ struct
     type error_category = [`Branch | `Temporary | `Permanent]
 
     include Error_core
-    include Error_monad_monad_maker.Make (Error_core)
+    include Tezos_error_monad.Monad_maker.Make (Error_core)
   end
 
   let () =

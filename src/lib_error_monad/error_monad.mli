@@ -31,13 +31,13 @@ type error_category =
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
-include Error_monad_sig.CORE
+include Sig.CORE
 
-include Error_monad_sig.EXT with type error := error
+include Sig.EXT with type error := error
 
-include Error_monad_sig.WITH_WRAPPED with type error := error
+include Sig.WITH_WRAPPED with type error := error
 
-include Error_monad_sig.MONAD with type error := error
+include Sig.MONAD with type error := error
 
 (** Erroneous result (shortcut for generic errors) *)
 val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
@@ -94,12 +94,12 @@ val with_timeout :
   (Lwt_canceler.t -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
-module Make (Prefix : Error_monad_sig.PREFIX) : sig
-  include Error_monad_sig.CORE
+module Make (Prefix : Sig.PREFIX) : sig
+  include Sig.CORE
 
-  include Error_monad_sig.EXT with type error := error
+  include Sig.EXT with type error := error
 
-  include Error_monad_sig.WITH_WRAPPED with type error := error
+  include Sig.WITH_WRAPPED with type error := error
 end
 
 (**/**)
