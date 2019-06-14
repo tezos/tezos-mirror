@@ -1176,7 +1176,7 @@ let () =
     ~description:"A wrong number of arguments was provided to a macro"
     ~pp:(fun ppf (name, got, exp) ->
         Format.fprintf ppf
-          "Macro %s expects %d arguments, was given %d." name got exp)
+          "Macro %s expects %d arguments, was given %d." name exp got)
     (obj3
        (req "macro_name" string)
        (req "given_number_of_arguments" uint16)
