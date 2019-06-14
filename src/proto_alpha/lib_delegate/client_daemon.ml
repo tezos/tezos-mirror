@@ -26,7 +26,7 @@
 let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
   f x >>= function
   | Ok _ as r -> Lwt.return r
-  | Error (RPC_client.Request_failed
+  | Error (RPC_client_errors.Request_failed
              { error = Connection_failed _ ; _ } :: _) as err
     when tries > 0 -> begin
       cctxt#message

@@ -12,7 +12,7 @@ depends: [
   "tezos-stdlib"
   "tezos-data-encoding"
   "tezos-error-monad"
-  "lwt"
+  "lwt_log"
 ]
 build: [[ "dune" "build" "-p" name "-j" jobs ]]
 synopsis: "Tezos event logging library"

@@ -156,7 +156,7 @@ module Cfg_file = struct
          (opt "node_port" int16)
          (opt "tls" bool)
          (opt "web_port" int16)
-         (opt "remote_signer" RPC_client.uri_encoding)
+         (opt "remote_signer" RPC_encoding.uri_encoding)
          (opt "confirmations" int8)
          (opt "password_filename" string)
       )
@@ -554,7 +554,7 @@ module type Remote_params =
 sig
   val authenticate: Signature.public_key_hash list ->
     MBytes.t -> Signature.t tzresult Lwt.t
-  val logger : RPC_client.logger
+  val logger : RPC_client_unix.logger
 end
 
 let other_registrations : (_ -> (module Remote_params) -> _) option  =

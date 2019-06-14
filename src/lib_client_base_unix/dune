@@ -5,11 +5,12 @@
             tezos-client-base
             tezos-client-commands
             tezos-stdlib-unix
-            tezos-rpc-http
+            tezos-rpc-http-client-unix
             tezos-signer-backends
             tezos-shell-services)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
+                   -open Tezos_rpc_http_client_unix
                    -open Tezos_shell_services
                    -open Tezos_stdlib_unix
                    -open Tezos_client_base

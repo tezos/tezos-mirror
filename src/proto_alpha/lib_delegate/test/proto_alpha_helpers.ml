@@ -30,21 +30,21 @@ open Alpha_context
 let () = Random.self_init ()
 
 let rpc_config = ref {
-    RPC_client.host = "localhost" ;
+    RPC_client_unix.host = "localhost" ;
     port = 8192 + Random.int 8192 ;
     tls = false ;
-    logger = RPC_client.null_logger ;
+    logger = RPC_client_unix.null_logger ;
   }
 
 let build_rpc_context config =
   new Proto_alpha.wrap_proto_context @@
-  new RPC_client.http_ctxt config Media_type.all_media_types
+  new RPC_client_unix.http_ctxt config Media_type.all_media_types
 
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
 let no_write_context ?(chain = `Main) ?(block = `Head 0) config : #Client_context.full = object
-  inherit RPC_client.http_ctxt config Media_type.all_media_types
+  inherit RPC_client_unix.http_ctxt config Media_type.all_media_types
   inherit Client_context.simple_printer (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
     fun _ ~default _ -> return default

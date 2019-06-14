@@ -3,7 +3,7 @@
         test_rpc
         test_vote)
  (libraries tezos-base
-            tezos-rpc-http
+            tezos-rpc-http-client-unix
             tezos-shell-services
             tezos-client-base
             tezos-client-genesis
@@ -15,6 +15,7 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
+                   -open Tezos_rpc_http_client_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_genesis

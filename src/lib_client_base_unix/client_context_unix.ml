@@ -147,7 +147,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_c
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir ~password_filename
-    inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
+    inherit RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
     inherit unix_ui
     method chain = chain
     method block = block

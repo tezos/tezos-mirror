@@ -23,7 +23,7 @@
             re.str
             ptime
             ezjsonm
-            lwt.unix
+            lwt
             mtime.clock.os
             ipaddr.unix))
 

@@ -65,14 +65,14 @@ sig
     (* Provide your own [logger] here if you need to override the
        logger that might come from elsewhere. Default (in [Client_config]) is
        [None], but [Main_signer] uses this overriding feature. *)
-    RPC_client.logger option
+    RPC_client_unix.logger option
 
 end
 
 val run :
   (module M) ->
   select_commands :
-    (RPC_client.http_ctxt ->
+    (RPC_client_unix.http_ctxt ->
      Client_config.cli_args ->
      Client_context.full Clic.command list tzresult Lwt.t) ->
   unit

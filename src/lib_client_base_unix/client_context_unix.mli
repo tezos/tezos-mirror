@@ -41,5 +41,5 @@ class unix_full :
   block:Shell_services.block ->
   confirmations:int option ->
   password_filename: string option ->
-  rpc_config:RPC_client.config ->
+  rpc_config:RPC_client_unix.config ->
   Client_context.full
