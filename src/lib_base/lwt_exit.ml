@@ -47,3 +47,91 @@ let () =
             (Printexc.to_string e)
             pp_exn_trace backtrace ;
           Lwt.wakeup exit_wakener 1)
+
+
+let signals =
+  let open Sys in [
+    (sigabrt, "ABRT") ;
+    (sigalrm, "ALRM") ;
+    (sigfpe, "FPE") ;
+    (sighup, "HUP") ;
+    (sigill, "ILL") ;
+    (sigint, "INT") ;
+    (sigkill, "KILL") ;
+    (sigpipe, "PIPE") ;
+    (sigquit, "QUIT") ;
+    (sigsegv, "SEGV") ;
+    (sigterm, "TERM") ;
+    (sigusr1, "USR1") ;
+    (sigusr2, "USR2") ;
+    (sigchld, "CHLD") ;
+    (sigcont, "CONT") ;
+    (sigstop, "STOP") ;
+    (sigtstp, "TSTP") ;
+    (sigttin, "TTIN") ;
+    (sigttou, "TTOU") ;
+    (sigvtalrm, "VTALRM") ;
+    (sigprof, "PROF") ;
+    (sigbus, "BUS") ;
+    (sigpoll, "POLL") ;
+    (sigsys, "SYS") ;
+    (sigtrap, "TRAP") ;
+    (sigurg, "URG") ;
+    (sigxcpu, "XCPU") ;
+    (sigxfsz, "XFSZ") ;
+  ]
+
+let set_exit_handler ?(log = fun _ -> ()) signal =
+  match List.assoc_opt signal signals with
+  | None ->
+      Format.kasprintf
+        invalid_arg
+        "Killable.set_exit_handler: unknown signal %d" signal
+  | Some name ->
+      let handler signal =
+        try
+          Format.kasprintf
+            log
+            "Received the %s signal, triggering shutdown." name ;
+          exit signal
+        with _ -> ()
+      in
+      ignore (Lwt_unix.on_signal signal handler : Lwt_unix.signal_handler_id)
+
+(* Which signals is the program meant to exit on *)
+let signals_to_exit_on = ref []
+
+let exit_on ?log signal =
+  if List.mem signal !signals_to_exit_on then
+    Format.kasprintf
+      failwith
+      "Killable.exit_on: already registered signal %d" signal
+  else begin
+    signals_to_exit_on := signal :: !signals_to_exit_on;
+    set_exit_handler ?log signal
+  end
+
+type 'a outcome =
+  | Resolved of 'a Error_monad.tzresult
+  | Exited of int
+
+let wrap_promise (p : unit Error_monad.tzresult Lwt.t) =
+  let open Lwt.Infix in
+  Lwt.choose
+    [ (p >|= fun v -> Resolved v) ;
+      (termination_thread >|= fun s -> Exited s) ] >>= function
+  | Resolved r -> Lwt.return r
+  | Exited s ->
+      (*TODO: what are the correct expected behaviour here?*)
+      if List.mem s !signals_to_exit_on then
+        (* Exit because of signal *)
+        begin
+          Lwt.cancel p;
+          Error_monad.return_unit
+        end
+      else
+        (* Other exit *)
+        begin
+          Lwt.cancel p;
+          Error_monad.return_unit
+        end
