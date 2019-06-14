@@ -205,3 +205,10 @@ let description_request_encoding =
     (obj1 (dft "recursive" bool false))
 
 let description_answer_encoding = directory_descr_encoding
+
+let uri_encoding =
+  let open Data_encoding in
+  conv
+    Uri.to_string
+    Uri.of_string
+    string

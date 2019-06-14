@@ -167,11 +167,6 @@ let make_streamed_call s (ctxt : #streamed) p q i =
 
 let () =
   let open Data_encoding in
-  let uri_encoding =
-    conv
-      Uri.to_string
-      Uri.of_string
-      string in
   register_error_kind
     `Branch
     ~id:"RPC_context.Not_found"
@@ -179,9 +174,10 @@ let () =
     ~description:"RPC lookup failed. No RPC exists at the URL or the RPC tried to access non-existent data."
     (obj2
        (req "method" RPC_service.meth_encoding)
-       (req "uri" uri_encoding))
+       (req "uri" RPC_encoding.uri_encoding))
     ~pp:(fun ppf (meth, uri) ->
-        Format.fprintf ppf "Did not find service: %s %a" (RPC_service.string_of_meth meth) Uri.pp_hum uri)
+        Format.fprintf ppf "Did not find service: %s %a"
+          (RPC_service.string_of_meth meth) Uri.pp_hum uri)
     (function Not_found { meth ; uri } -> Some (meth, uri)
             | _ -> None)
     (fun (meth, uri) -> Not_found { meth ; uri })
