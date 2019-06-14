@@ -52,8 +52,87 @@ let migrate_delegated ctxt contract =
   else
     return ctxt
 
+let transform_script:
+  (manager_pkh: Signature.Public_key_hash.t ->
+   script_code: Script_repr.lazy_expr ->
+   script_storage: Script_repr.lazy_expr ->
+   (Script_repr.lazy_expr * Script_repr.lazy_expr) tzresult Lwt.t) ->
+  Raw_context.t ->
+  Contract_repr.t ->
+  Script_repr.lazy_expr ->
+  Raw_context.t tzresult Lwt.t =
+  fun transformation ctxt contract code ->
+  (* Get the manager of the originated contract *)
+  Contract_storage.get_manager ctxt contract >>=? fun manager_pkh ->
+  Storage.Contract.Storage.get ctxt contract >>=? fun (_ctxt, storage) ->
+  transformation manager_pkh code storage >>=? fun (migrated_code, migrated_storage) ->
+  (* Set the migrated script code for free *)
+  Storage.Contract.Code.set_free ctxt contract migrated_code >>=? fun (ctxt, code_size_diff) ->
+  (* Set the migrated script storage for free *)
+  Storage.Contract.Storage.set_free ctxt contract migrated_storage >>=? fun (ctxt, storage_size_diff) ->
+  Storage.Contract.Used_storage_space.get ctxt contract >>=? fun used_space ->
+  let total_size = Z.(add (of_int code_size_diff) (add (of_int storage_size_diff) used_space)) in
+  (* Free storage space for migrated contracts *)
+  Storage.Contract.Used_storage_space.set ctxt contract total_size >>=? fun ctxt ->
+  Storage.Contract.Paid_storage_space.get ctxt contract >>=? fun paid_space ->
+  if Compare.Z.(paid_space < total_size) then
+    Storage.Contract.Paid_storage_space.set ctxt contract total_size >>=? fun ctxt ->
+    return ctxt
+  else
+    return ctxt
 
-(* This is the genesis protocol: initialise the state *)
+let manager_script_storage: Signature.Public_key_hash.t -> Script_repr.lazy_expr =
+  fun manager_pkh ->
+  let open Micheline in
+  Script_repr.lazy_expr @@ strip_locations @@
+  (* store in optimized binary representation - as unparsed with [Optimized]. *)
+  let bytes = Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding manager_pkh in
+  Bytes (0, bytes)
+
+(* Process an individual contract *)
+let process_contract contract ctxt =
+  let open Legacy_script_support_repr in
+  match Contract_repr.is_originated contract with
+  | None -> return ctxt (* Only process originated contracts *)
+  | Some _ -> begin
+      Storage.Contract.Spendable.mem ctxt contract >>= fun is_spendable ->
+      Storage.Contract.Delegatable.mem ctxt contract >>= fun is_delegatable ->
+      (* Try to get script code (ignore ctxt update to discard the initialization) *)
+      Storage.Contract.Code.get_option ctxt contract >>=? fun (_ctxt, code) ->
+      match code with
+      | Some code ->
+          (*
+          | spendable | delegatable | template         |
+          |-----------+-------------+------------------|
+          | true      | true        | add_do           |
+          | true      | false       | add_do           |
+          | false     | true        | add_set_delegate |
+          | false     | false       | nothing          |
+          *)
+          if is_spendable then
+            transform_script add_do ctxt contract code
+          else if is_delegatable then
+            transform_script add_set_delegate ctxt contract code
+          else
+            return ctxt
+      | None -> begin
+          (* Check that the contract is spendable *)
+          (* Get the manager of the originated contract *)
+          Contract_storage.get_manager ctxt contract >>=? fun manager_pkh ->
+          (* Initialize the script code for free *)
+          Storage.Contract.Code.init_free ctxt contract manager_script_code >>=? fun (ctxt, code_size) ->
+          let storage = manager_script_storage manager_pkh in
+          (* Initialize the script storage for free *)
+          Storage.Contract.Storage.init_free ctxt contract storage >>=? fun (ctxt, storage_size) ->
+          let total_size = Z.(add (of_int code_size) (of_int storage_size)) in
+          (* Free storage space for migrated contracts *)
+          Storage.Contract.Paid_storage_space.init_set ctxt contract total_size >>= fun ctxt ->
+          Storage.Contract.Used_storage_space.init_set ctxt contract total_size >>= fun ctxt ->
+          return ctxt
+        end
+    end
+
+
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
     ~level ~timestamp ~fitness ctxt >>=? fun (previous_protocol, ctxt) ->
@@ -83,7 +162,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Contract.fold ctxt ~init:(Ok ctxt)
         ~f:(fun contract ctxt ->
             Lwt.return ctxt >>=? fun ctxt ->
-            migrate_delegated ctxt contract)
+            migrate_delegated ctxt contract >>=? fun ctxt ->
+            process_contract contract ctxt)
       >>=? fun ctxt ->
       return ctxt
 
