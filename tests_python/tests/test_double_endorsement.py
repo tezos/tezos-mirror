@@ -101,7 +101,6 @@ class TestDoubleEndorsement:
 
     def test_operation_applied(self, sandbox, session):
         """Check operation is in mempool"""
-        client = sandbox.client(2)
-        mempool = client.get_mempool()
-        applied_ops = [op['hash'] for op in mempool['applied']]
-        assert session['operation'] in applied_ops
+        client = sandbox.client(1)
+        assert utils.check_mempool_contains_operations(client,
+                                                       [session['operation']])

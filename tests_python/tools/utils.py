@@ -49,12 +49,12 @@ def check_block_contains_operations(client: Client,
     return all(oh in flatten for oh in operation_hashes)
 
 
-@retry(timeout=1., attempts=10)
+@retry(timeout=1., attempts=20)
 def check_mempool_contains_operations(client: Client,
                                       operation_hashes: List[str]) -> bool:
     mempool = client.get_mempool()['applied']
     res = {x['hash'] for x in mempool}
-    return len(res.symmetric_difference(set(operation_hashes))) == 0
+    return set(operation_hashes).issubset(res)
 
 
 @retry(timeout=1., attempts=20)
