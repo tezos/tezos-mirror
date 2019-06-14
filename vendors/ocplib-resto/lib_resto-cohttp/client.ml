@@ -25,7 +25,7 @@
 
 open Lwt.Infix
 
-module Make (Encoding : Resto.ENCODING) = struct
+module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
 
   open Cohttp
 
@@ -133,17 +133,13 @@ module Make (Encoding : Resto.ENCODING) = struct
         | [] -> None
         | m :: _ -> Some m
 
-  let clone_body = function
-    | `Stream s -> `Stream (Lwt_stream.clone s)
-    | x -> x
-
   type log = {
     log:
       'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
       string Lwt.t Lazy.t -> unit Lwt.t ;
   }
 
-  let internal_call meth (log : log) ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
+  let internal_call meth _log ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
     let host =
       match Uri.host uri, Uri.port uri with
       | None, _ -> None
@@ -176,29 +172,9 @@ module Make (Encoding : Resto.ENCODING) = struct
       | Some ranges ->
           Header.add headers "accept" (Media_type.accept_header ranges) in
     Lwt.catch begin fun () ->
-      let rec call_and_retry_on_502 attempt delay =
-        Cohttp_lwt_unix.Client.call
-          ~headers
-          (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
-        let status = Response.status response in
-        match status with
-        | `Bad_gateway ->
-            let log_ansbody = clone_body ansbody in
-            log.log ~media:faked_media Encoding.untyped status
-              (lazy (Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
-                     Lwt.return @@ Format.sprintf
-                       "Attempt number %d/10, will retry after %g seconds.\n\
-                        Original body follows.\n\
-                        %s"
-                       attempt delay text)) >>= fun () ->
-            if attempt >= 10 then
-              Lwt.return (response, ansbody)
-            else
-              Lwt_unix.sleep delay >>= fun () ->
-              call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
-        | _ ->
-            Lwt.return (response, ansbody) in
-      call_and_retry_on_502 1 0. >>= fun (response, ansbody) ->
+      Client.call
+        ~headers
+        (meth :> Code.meth) ~body uri >>= fun (response, ansbody) ->
       let headers = Response.headers response in
       let media_name =
         match Header.get_media_type headers with
