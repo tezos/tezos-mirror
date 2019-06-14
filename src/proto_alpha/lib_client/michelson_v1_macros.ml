@@ -1699,8 +1699,8 @@ let () =
         ppf
         "Macro %s expects %d arguments, was given %d."
         name
-        got
-        exp)
+        exp
+        got)
     (obj3
        (req "macro_name" string)
        (req "given_number_of_arguments" uint16)
