@@ -10,7 +10,7 @@
 
 (** Typed RPC services: client implementation. *)
 
-module Make (Encoding : Resto.ENCODING) : sig
+module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
 
   module Service : (module type of (struct include Resto.MakeService(Encoding) end))
 
