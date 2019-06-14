@@ -23,4 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.LOG
+type rpc_error =
+  | Empty_answer
+  | Connection_failed of string
+  | Bad_request of string
+  | Method_not_allowed of RPC_service.meth list
+  | Unsupported_media_type of string option
+  | Not_acceptable of { proposed: string ; acceptable: string }
+  | Unexpected_status_code of { code: Cohttp.Code.status_code ;
+                                content: string ;
+                                media_type: string option }
+  | Unexpected_content_type of { received: string ;
+                                 acceptable: string list ;
+                                 body : string }
+  | Unexpected_content of { content: string ;
+                            media_type: string ;
+                            error: string }
+  | OCaml_exception of string
+  | Unauthorized_host of string option
+
+type error +=
+  | Request_failed of { meth: RPC_service.meth ;
+                        uri: Uri.t ;
+                        error: rpc_error }
+

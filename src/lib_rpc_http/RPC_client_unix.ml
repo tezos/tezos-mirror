@@ -23,11 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type cors = Resto_cohttp.Cors.t = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
-}
+include RPC_client.Make(struct
+    include Cohttp_lwt_unix.Client
 
-module RPC_logging = Internal_event.Legacy_logging.Make(struct let name = "rpc" end)
+    let clone_body = function
+      | `Stream s -> `Stream (Lwt_stream.clone s)
+      | x -> x
 
-include Resto_cohttp_server.Server.Make(RPC_encoding)(RPC_logging)
+    let call ?ctx ?headers ?body ?chunked meth uri =
+      let rec call_and_retry_on_502 attempt delay =
+        call ?ctx ?headers ?body ?chunked meth uri >>= fun (response, ansbody) ->
+        let status = Cohttp.Response.status response in
+        match status with
+        | `Bad_gateway ->
+            let log_ansbody = clone_body ansbody in
+            Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
+            (* FIXME use the logging system *)
+            Format.eprintf
+              "Attempt number %d/10, will retry after %g seconds.\n\
+               Original body follows.\n\
+               %s" attempt delay text ;
+            if attempt >= 10 then
+              Lwt.return (response, ansbody)
+            else
+              Lwt_unix.sleep delay >>= fun () ->
+              call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
+        | _ ->
+            Lwt.return (response, ansbody) in
+      call_and_retry_on_502 1 0.
+  end)

@@ -1,10 +1,45 @@
 (library
  (name tezos_rpc_http)
  (public_name tezos-rpc-http)
+ (modules RPC_client_errors media_type)
  (libraries tezos-base
             ocplib-resto-cohttp)
+ (flags (:standard -open Tezos_base__TzPervasives)))
+
+(library
+ (name tezos_rpc_http_client)
+ (public_name tezos-rpc-http-client)
+ (modules RPC_client)
+ (libraries tezos-base
+            ocplib-resto-cohttp-client
+	    tezos-rpc-http)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc)))
+                   -open Tezos_rpc_http)))
+
+(library
+ (name tezos_rpc_http_client_unix)
+ (public_name tezos-rpc-http-client-unix)
+ (modules RPC_client_unix)
+ (libraries tezos-stdlib-unix
+            tezos-base
+	    cohttp-lwt-unix
+            ocplib-resto-cohttp-client
+	    tezos-rpc-http-client)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_rpc_http_client)))
+
+(library
+ (name tezos_rpc_http_server)
+ (public_name tezos-rpc-http-server)
+ (libraries tezos-base
+            ocplib-resto-cohttp-server
+	    tezos-rpc-http)
+ (modules RPC_server)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_rpc
+		   -open Tezos_rpc_http)))
 
 (alias
  (name runtest_indent)

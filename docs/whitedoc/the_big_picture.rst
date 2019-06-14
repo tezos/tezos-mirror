@@ -157,7 +157,8 @@ protocols.
     into the client to call the services in a type-safe way, only the
     description of services is done here. The registration of handlers
     is done in the rest of the node's implementation.
-  - :package:`tezos-rpc-http` uses :opam:`cohttp` to implement the RPC
+  - :package:`tezos-rpc-http-client` and :package:`tezos-rpc-http-server`
+    use :opam:`cohttp` to implement the RPC
     over HTTP server and client, allowing to make actual use of
     services declared using :package:`tezos-rpc`.
   - :package:`tezos-p2p` is the in-house peer-to-peer layer.
