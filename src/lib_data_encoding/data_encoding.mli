@@ -539,27 +539,29 @@ module Encoding: sig
       See the module [Documented_example] in ["./test/versioned.ml"]
       for a tutorial.
   *)
-  module With_version: sig
 
-    (** An encapsulation of consecutive encoding versions. *)
-    type _ t
-
-    (** [first_version enc] records that [enc] is the first (known)
-        version of the object. *)
-    val first_version : 'a encoding -> 'a t
-
-    (** [next_version enc upgrade prev] constructs a new version from
-        the previous version [prev] and an [upgrade] function. *)
-    val next_version : 'a encoding -> ('b -> 'a) -> 'b t -> 'a t
-
-    (** Make an encoding from an encapsulation of versions; the
-        argument [~name] is used to prefix the version "tag" in the
-        encoding, it should not change from one version to the next. *)
-    val encoding : name: string -> 'a t -> 'a encoding
-  end
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
+
+module With_version: sig
+
+  (** An encapsulation of consecutive encoding versions. *)
+  type _ t
+
+  (** [first_version enc] records that [enc] is the first (known)
+      version of the object. *)
+  val first_version : 'a encoding -> 'a t
+
+  (** [next_version enc upgrade prev] constructs a new version from
+      the previous version [prev] and an [upgrade] function. *)
+  val next_version : 'a encoding -> ('b -> 'a) -> 'b t -> 'a t
+
+  (** Make an encoding from an encapsulation of versions; the
+      argument [~name] is used to prefix the version "tag" in the
+      encoding, it should not change from one version to the next. *)
+  val encoding : name: string -> 'a t -> 'a encoding
+end
 
 module Json: sig
 
