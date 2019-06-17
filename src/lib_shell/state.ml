@@ -1000,13 +1000,6 @@ module Block = struct
 
   type block = t
 
-  type validation_store = {
-    context_hash : Context_hash.t;
-    message : string option;
-    max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
-  }
-
   module Header = Header
 
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
@@ -1139,8 +1132,8 @@ module Block = struct
 
   let store ?(dont_enforce_context_hash = false) chain_state block_header
       block_header_metadata operations operations_metadata
-      {context_hash; message; max_operations_ttl; last_allowed_fork_level}
-      ~forking_testchain =
+      ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
+        Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless

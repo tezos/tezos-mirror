@@ -510,20 +510,9 @@ let set_history_mode store history_mode =
 
 let store_new_head chain_state chain_data ~genesis block_header operations
     block_validation_result =
-  let { Tezos_validation.Block_validation.validation_result;
-        block_metadata;
-        ops_metadata;
-        forking_testchain;
-        context_hash } =
+  let ({validation_store; block_metadata; ops_metadata; forking_testchain}
+        : Tezos_validation.Block_validation.result) =
     block_validation_result
-  in
-  let validation_store =
-    {
-      State.Block.context_hash;
-      message = validation_result.message;
-      max_operations_ttl = validation_result.max_operations_ttl;
-      last_allowed_fork_level = validation_result.last_allowed_fork_level;
-    }
   in
   State.Block.store
     chain_state
@@ -808,7 +797,9 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
         ~block_header
         operations
       >>=? fun block_validation_result ->
-      check_context_hash_consistency block_validation_result block_header
+      check_context_hash_consistency
+        block_validation_result.validation_store
+        block_header
       >>=? fun () ->
       verify_oldest_header oldest_header genesis.block
       >>=? fun () ->
@@ -842,7 +833,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
         ~genesis:genesis.block
         block_header
         oldest_header
-        block_validation_result.validation_result.max_operations_ttl
+        block_validation_result.validation_store.max_operations_ttl
       >>=? fun () ->
       Store.close store ;
       State.close state >>= fun () -> return_unit)

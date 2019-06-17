@@ -9,6 +9,7 @@
             tezos-shell-services
             tezos-embedded-protocol-demo-noops
             tezos-stdlib-unix
+	    tezos-validation
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
@@ -16,7 +17,8 @@
                    -open Tezos_protocol_updater
                    -open Tezos_shell
                    -open Tezos_shell_services
-                   -open Tezos_stdlib_unix)))
+                   -open Tezos_stdlib_unix
+		   -open Tezos_validation)))
 
 (alias
  (name buildtest)

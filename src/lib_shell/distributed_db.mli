@@ -161,7 +161,7 @@ val commit_block :
   Bytes.t ->
   Operation.t list list ->
   Bytes.t list list ->
-  State.Block.validation_store ->
+  Block_validation.validation_store ->
   forking_testchain:bool ->
   State.Block.t option tzresult Lwt.t
 
