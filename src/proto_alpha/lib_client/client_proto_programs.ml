@@ -107,10 +107,11 @@ let run
     ?gas
     ?(entrypoint = "default")
     () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
+    (storage.expanded, input.expanded, amount, chain_id, source, payer, gas, entrypoint)
 
 let trace
     (cctxt : #Protocol_client_context.rpc_context)
@@ -125,10 +126,11 @@ let trace
     ?gas
     ?(entrypoint = "default")
     () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
+    (storage.expanded, input.expanded, amount, chain_id, source, payer, gas, entrypoint)
 
 let typecheck_data
     cctxt

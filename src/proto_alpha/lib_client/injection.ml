@@ -234,8 +234,9 @@ let simulate (type t)
     { shell = { branch } ;
       protocol_data = { contents ; signature = None } } in
   let oph = Operation.hash op in
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.run_operation
-    cctxt (chain, block) (Operation.pack op) >>=? function
+    cctxt (chain, block) (Operation.pack op, chain_id) >>=? function
   | (Operation_data op', Operation_metadata result) -> begin
       match Operation.equal
               op { shell = { branch } ; protocol_data = op' },
