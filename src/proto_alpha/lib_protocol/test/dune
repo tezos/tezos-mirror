@@ -4,7 +4,7 @@
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
-            tezos_alpha_test_helpers
+            tezos-alpha-test-helpers
             tezos-stdlib-unix
             bip39
             tezos-protocol-alpha-parameters)
