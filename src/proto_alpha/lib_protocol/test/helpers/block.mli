@@ -94,6 +94,8 @@ val genesis:
   ?endorsers_per_block:int ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
+val genesis_with_parameters: Parameters_repr.t -> block tzresult Lwt.t
+
 (** Applies a signed header and its operations to a block and
     obtains a new block *)
 val apply:

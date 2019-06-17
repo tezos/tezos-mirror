@@ -32,10 +32,12 @@ type t = {
 }
 type account = t
 
+val known_accounts: t Signature.Public_key_hash.Table.t
+
 val activator_account: account
 val dummy_account: account
 
-val new_account: unit -> account
+val new_account: ?seed:MBytes.t -> unit -> account
 
 val add_account : t -> unit
 
@@ -48,3 +50,8 @@ val find_alternate: Signature.Public_key_hash.t -> t
     4.000.000.000 tz (if the list is too short); and add them to the
     global account state *)
 val generate_accounts : ?initial_balances:int64 list -> int -> (t * Tez_repr.t) list
+
+val commitment_secret : Blinded_public_key_hash.activation_code
+
+val new_commitment : ?seed:MBytes.t -> unit ->
+  (account * Commitment_repr.t) tzresult Lwt.t

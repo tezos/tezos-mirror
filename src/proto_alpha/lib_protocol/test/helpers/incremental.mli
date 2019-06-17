@@ -37,6 +37,7 @@ val level: incremental -> int32
 val begin_construction:
   ?priority:int ->
   ?timestamp:Time.Protocol.t ->
+  ?seed_nonce_hash: Nonce_hash.t ->
   ?policy:Block.baker_policy ->
   Block.t ->
   incremental tzresult Lwt.t

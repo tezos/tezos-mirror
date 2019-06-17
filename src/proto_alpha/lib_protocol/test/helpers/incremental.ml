@@ -53,13 +53,13 @@ let rpc_ctxt =
   new Environment.proto_rpc_context_of_directory
     rpc_context rpc_services
 
-let begin_construction ?(priority=0) ?timestamp
+let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash
     ?(policy=Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy
     predecessor >>=? fun (delegate, priority, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
   let timestamp = Option.unopt ~default:real_timestamp timestamp in
-  let contents = Block.Forge.contents ~priority () in
+  let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {
     Block_header.contents ;
     signature = Signature.zero ;

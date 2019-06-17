@@ -224,6 +224,42 @@ let initial_context
   >|= Environment.wrap_error >>=? fun { context; _ } ->
   return context
 
+let genesis_with_parameters parameters =
+  let hash =
+    Block_hash.of_b58check_exn "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
+  in
+  let shell = Forge.make_shell
+      ~level:0l
+      ~predecessor:hash
+      ~timestamp:Time.Protocol.epoch
+      ~fitness: (Fitness_repr.from_int64 0L)
+      ~operations_hash: Operation_list_list_hash.zero in
+  let contents = Forge.make_contents
+      ~priority:0
+      ~seed_nonce_hash:None () in
+  let open Tezos_protocol_alpha_parameters in
+  let json = Default_parameters.json_of_parameters parameters in
+  let proto_params =
+    Data_encoding.Binary.to_bytes_exn Data_encoding.json json
+  in
+  Tezos_protocol_environment.Context.(
+    let empty = Memory_context.empty in
+    set empty ["version"] (MBytes.of_string "genesis") >>= fun ctxt ->
+    set ctxt protocol_param_key proto_params
+  ) >>= fun ctxt ->
+  Main.init ctxt shell
+  >|= Environment.wrap_error >>=? fun { context; _ } ->
+  let block = { hash ;
+                header = { shell ;
+                           protocol_data = {
+                             contents = contents ;
+                             signature = Signature.zero ;
+                           } } ;
+                operations = [] ;
+                context ;
+              } in
+  return block
+
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis
