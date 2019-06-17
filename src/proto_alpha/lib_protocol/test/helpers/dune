@@ -5,8 +5,7 @@
             tezos-shell-services
             tezos-protocol-environment
             tezos-protocol-alpha
-            tezos-protocol-alpha-parameters
-            alcotest-lwt)
+            tezos-protocol-alpha-parameters)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_protocol_alpha
