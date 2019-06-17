@@ -406,9 +406,9 @@ open Apply_results
 let apply_manager_operation_content :
   type kind.
   ( Alpha_context.t -> Script_ir_translator.unparsing_mode -> payer:Contract.t -> source:Contract.t ->
-    internal:bool -> kind manager_operation ->
+    chain_id:Chain_id.t -> internal:bool -> kind manager_operation ->
     (context * kind successful_manager_operation_result * packed_internal_operation list) tzresult Lwt.t ) =
-  fun ctxt mode ~payer ~source ~internal operation ->
+  fun ctxt mode ~payer ~source ~chain_id ~internal operation ->
     let before_operation =
       (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -478,7 +478,8 @@ let apply_manager_operation_content :
             Lwt.return (Gas.consume ctxt cost_parameter) >>=? fun ctxt ->
             Script_interpreter.execute
               ctxt mode
-              ~source ~payer ~self:(destination, script) ~amount ~parameter ~entrypoint
+              ~source ~payer ~chain_id ~self:(destination, script)
+              ~amount ~parameter ~entrypoint
             >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
             Contract.update_script_storage
               ctxt destination storage big_map_diff >>=? fun ctxt ->
@@ -557,7 +558,7 @@ let apply_manager_operation_content :
         set_delegate ctxt source delegate >>=? fun ctxt ->
         return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
 
-let apply_internal_manager_operations ctxt mode ~payer ops =
+let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (`Success ctxt, List.rev applied)
@@ -569,7 +570,7 @@ let apply_internal_manager_operations ctxt mode ~payer ops =
           else
             let ctxt = record_internal_nonce ctxt nonce in
             apply_manager_operation_content
-              ctxt mode ~source ~payer ~internal:true operation
+              ctxt mode ~source ~payer ~chain_id ~internal:true operation
         end >>= function
         | Error errors ->
             let result =
@@ -631,7 +632,7 @@ let precheck_manager_contents
   return ctxt
 
 let apply_manager_contents
-    (type kind) ctxt mode (op : kind Kind.manager contents)
+    (type kind) ctxt mode chain_id (op : kind Kind.manager contents)
   : ([ `Success of context | `Failure ] *
      kind manager_operation_result *
      packed_internal_operation_result list) Lwt.t =
@@ -640,10 +641,10 @@ let apply_manager_contents
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
   apply_manager_operation_content ctxt mode
-    ~source ~payer:source ~internal:false operation >>= function
+    ~source ~payer:source ~internal:false ~chain_id operation >>= function
   | Ok (ctxt, operation_results, internal_operations) -> begin
       apply_internal_manager_operations
-        ctxt mode ~payer:source internal_operations >>= function
+        ctxt mode ~payer:source ~chain_id internal_operations >>= function
       | (`Success ctxt, internal_operations_results) -> begin
           Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >>= function
           | Ok ctxt ->
@@ -708,14 +709,14 @@ let rec precheck_manager_contents_list
 let rec apply_manager_contents_list_rec
   : type kind.
     Alpha_context.t -> Script_ir_translator.unparsing_mode ->
-    public_key_hash -> kind Kind.manager contents_list ->
+    public_key_hash -> Chain_id.t -> kind Kind.manager contents_list ->
     ([ `Success of context | `Failure ] *
      kind Kind.manager contents_result_list) Lwt.t =
-  fun ctxt mode baker contents_list ->
+  fun ctxt mode baker chain_id contents_list ->
     let level = Level.current ctxt in
     match contents_list with
     | Single (Manager_operation { source ; fee ; _ } as op) -> begin
-        apply_manager_contents ctxt mode op
+        apply_manager_contents ctxt mode chain_id op
         >>= fun (ctxt_result, operation_result, internal_operation_results) ->
         let result =
           Manager_operation_result {
@@ -729,7 +730,7 @@ let rec apply_manager_contents_list_rec
         Lwt.return (ctxt_result, Single_result (result))
       end
     | Cons (Manager_operation { source ; fee ; _ } as op, rest) ->
-        apply_manager_contents ctxt mode op >>= function
+        apply_manager_contents ctxt mode chain_id op >>= function
         | (`Failure, operation_result, internal_operation_results) ->
             let result =
               Manager_operation_result {
@@ -751,7 +752,7 @@ let rec apply_manager_contents_list_rec
                 operation_result ;
                 internal_operation_results ;
               } in
-            apply_manager_contents_list_rec ctxt mode baker rest >>= fun (ctxt_result, results) ->
+            apply_manager_contents_list_rec ctxt mode baker chain_id rest >>= fun (ctxt_result, results) ->
             Lwt.return (ctxt_result, Cons_result (result, results))
 
 let mark_backtracked results =
@@ -785,8 +786,8 @@ let mark_backtracked results =
       | Applied result -> Backtracked (result, None) in
   mark_contents_list results
 
-let apply_manager_contents_list ctxt mode baker contents_list =
-  apply_manager_contents_list_rec ctxt mode baker contents_list >>= fun (ctxt_result, results) ->
+let apply_manager_contents_list ctxt mode baker chain_id contents_list =
+  apply_manager_contents_list_rec ctxt mode baker chain_id contents_list >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | `Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
   | `Success ctxt -> Lwt.return (ctxt, results)
@@ -958,11 +959,11 @@ let apply_contents_list
       return (ctxt, Single_result Ballot_result)
   | Single (Manager_operation _) as op ->
       precheck_manager_contents_list ctxt chain_id operation op >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
+      apply_manager_contents_list ctxt mode baker chain_id op >>= fun (ctxt, result) ->
       return (ctxt, result)
   | Cons (Manager_operation _, _) as op ->
       precheck_manager_contents_list ctxt chain_id operation op >>=? fun ctxt ->
-      apply_manager_contents_list ctxt mode baker op >>= fun (ctxt, result) ->
+      apply_manager_contents_list ctxt mode baker chain_id op >>= fun (ctxt, result) ->
       return (ctxt, result)
 
 let apply_operation ctxt chain_id mode pred_block baker hash operation =

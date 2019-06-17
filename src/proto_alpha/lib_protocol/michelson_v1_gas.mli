@@ -101,6 +101,7 @@ module Cost_of : sig
   val source : Gas.cost
   val self : Gas.cost
   val amount : Gas.cost
+  val chain_id : Gas.cost
   val wrap : Gas.cost
   val compare_bool : 'a -> 'b -> Gas.cost
   val compare_string : string -> string -> Gas.cost
@@ -127,6 +128,7 @@ module Cost_of : sig
     val key : Gas.cost
     val key_hash : Gas.cost
     val signature : Gas.cost
+    val chain_id : Gas.cost
 
     val contract : Gas.cost
 
@@ -178,6 +180,7 @@ module Cost_of : sig
     val key_hash : Gas.cost
     val signature : Gas.cost
     val operation : MBytes.t -> Gas.cost
+    val chain_id : MBytes.t -> Gas.cost
 
     val contract : Gas.cost
 

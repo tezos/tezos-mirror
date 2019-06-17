@@ -226,6 +226,7 @@ module Cost_of = struct
   let source = step_cost 1
   let self = step_cost 1
   let amount = step_cost 1
+  let chain_id = step_cost 1
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =
     step_cost ((7 + Compare.Int.max (String.length s1) (String.length s2)) / 8) +@ step_cost 1
@@ -255,6 +256,7 @@ module Cost_of = struct
     let key = step_cost 3 +@ alloc_cost 3
     let key_hash = step_cost 1 +@ alloc_cost 1
     let signature = step_cost 1 +@ alloc_cost 1
+    let chain_id = step_cost 1 +@ alloc_cost 1
     let contract = step_cost 5
     let get_script = step_cost 20 +@ alloc_cost 5
     let contract_exists = step_cost 15 +@ alloc_cost 5
@@ -404,6 +406,7 @@ module Cost_of = struct
         | Dug (n,_) -> n *@ alloc_cost 1
         | Dipn (n,_,_) -> n *@ alloc_cost 1
         | Dropn (n,_) -> n *@ alloc_cost 1
+        | ChainId -> alloc_cost 1
   end
 
   module Unparse = struct
@@ -423,6 +426,7 @@ module Cost_of = struct
     let tez = Script.int_node_cost_of_numbits 60 (* int64 bound *)
     let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
     let operation bytes = Script.bytes_node_cost bytes
+    let chain_id bytes = Script.bytes_node_cost bytes
     let key = string_cost 54
     let key_hash = string_cost 36
     let signature = string_cost 128

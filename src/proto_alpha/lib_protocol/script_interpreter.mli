@@ -47,6 +47,7 @@ val execute:
   Script_ir_translator.unparsing_mode ->
   source: Contract.t ->
   payer: Contract.t ->
+  chain_id: Chain_id.t ->
   self: (Contract.t * Script.t) ->
   entrypoint: string ->
   parameter: Script.expr ->
@@ -58,6 +59,7 @@ val trace:
   Script_ir_translator.unparsing_mode ->
   source: Contract.t ->
   payer: Contract.t ->
+  chain_id: Chain_id.t ->
   self: (Contract.t * Script.t) ->
   entrypoint: string ->
   parameter: Script.expr ->
