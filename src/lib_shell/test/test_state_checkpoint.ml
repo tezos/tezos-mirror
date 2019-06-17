@@ -137,12 +137,13 @@ let build_valid_chain state vtbl pred names =
            context
          >>= fun context_hash ->
          let validation_store =
-           {
-             State.Block.context_hash;
-             message = result.message;
-             max_operations_ttl = result.max_operations_ttl;
-             last_allowed_fork_level = result.last_allowed_fork_level;
-           }
+           ( {
+               context_hash;
+               message = result.message;
+               max_operations_ttl = result.max_operations_ttl;
+               last_allowed_fork_level = result.last_allowed_fork_level;
+             }
+             : Tezos_validation.Block_validation.validation_store )
          in
          State.Block.store
            state

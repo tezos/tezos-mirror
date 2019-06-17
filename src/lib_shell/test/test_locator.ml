@@ -117,7 +117,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   let header = {header with shell = {header.shell with context}} in
   let empty_result =
     {
-      State.Block.context_hash = empty_context_hash;
+      Block_validation.context_hash = empty_context_hash;
       message = None;
       max_operations_ttl = 0;
       last_allowed_fork_level = 0l;

@@ -133,12 +133,13 @@ let build_valid_chain state vtbl pred names =
          Context.commit ~time:block.shell.timestamp context
          >>= fun context_hash ->
          let validation_store =
-           {
-             State.Block.context_hash;
-             message = result.message;
-             max_operations_ttl = 1;
-             last_allowed_fork_level = result.last_allowed_fork_level;
-           }
+           ( {
+               context_hash;
+               message = result.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level = result.last_allowed_fork_level;
+             }
+             : Block_validation.validation_store )
          in
          State.Block.store
            state
@@ -146,7 +147,14 @@ let build_valid_chain state vtbl pred names =
            zero
            [[op]]
            [[zero]]
-           validation_store
+           ( {
+               context_hash;
+               message = validation_store.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level =
+                 validation_store.last_allowed_fork_level;
+             }
+             : Block_validation.validation_store )
            ~forking_testchain:false
          >>=? fun _vblock ->
          State.Block.read state hash
