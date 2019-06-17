@@ -258,6 +258,17 @@ class Client:
         cmd += args
         return client_output.OriginationResult(self.run(cmd))
 
+    def hash(self, data: str, typ: str) -> client_output.HashResult:
+        cmd = ['hash', 'data', data, 'of', 'type', typ]
+        return client_output.HashResult(self.run(cmd))
+
+    def pack(self, data: str, typ: str) -> str:
+        return self.hash(data, typ).packed
+
+    def sign(self, data: str, identity: str) -> str:
+        cmd = ['sign', 'bytes', data, 'for', identity]
+        return client_output.SignatureResult(self.run(cmd)).sig
+
     def transfer(self,
                  amount: float,
                  account1: str,

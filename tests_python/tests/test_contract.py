@@ -1,10 +1,36 @@
 import os
 import subprocess
 import pytest
-from tools import paths
-
+from tools import utils, paths, constants
 
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts'
+
+BAKE_ARGS = ['--minimal-timestamp']
+
+
+def file_basename(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+def originate(client,
+              session,
+              contract,
+              init_storage,
+              amount,
+              contract_name=None,
+              manager='bootstrap1',
+              sender='bootstrap1',
+              baker='bootstrap5'):
+    if contract_name is None:
+        contract_name = file_basename(contract)
+    args = ['--init', init_storage, '--burn-cap', '10.0']
+    origination = client.originate(contract_name, manager, amount,
+                                   sender, contract, args)
+    session['contract'] = origination.contract
+    print(origination.contract)
+    client.bake(baker, BAKE_ARGS)
+    assert utils.check_block_contains_operations(client,
+                                                 [origination.operation_hash])
 
 
 def all_contracts():
@@ -97,3 +123,37 @@ class TestGasBound:
         client.run_script(contract, storage, inp)
 
     # TODO complete with tests from test_contract.sh
+
+
+@pytest.mark.contract
+class TestChainId:
+
+    def test_chain_id_opcode(self, client, session):
+        path = f'{CONTRACT_PATH}/opcodes/chain_id.tz'
+        originate(client, session, path, 'Unit', 0)
+        client.transfer(0, 'bootstrap2', "chain_id", [])
+        client.bake('bootstrap5', BAKE_ARGS)
+
+    def test_chain_id_authentication_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/mini_scenarios/authentication.tz'
+        pubkey = constants.IDENTITIES['bootstrap1']['public']
+        originate(client, session, path, f'Pair 0 "{pubkey}"', 1000)
+        client.bake('bootstrap5', BAKE_ARGS)
+
+    def test_chain_id_authentication_first_run(self, client, session):
+        destination = constants.IDENTITIES['bootstrap2']['identity']
+        operation = '{DROP; NIL operation; ' + \
+            f'PUSH address "{destination}"; ' + \
+            'CONTRACT unit; ASSERT_SOME; PUSH mutez 1000; UNIT; ' + \
+            'TRANSFER_TOKENS; CONS}'
+        chain_id = client.rpc('get', 'chains/main/chain_id')
+        contract_address = session['contract']
+        packed = client.pack(
+            f'Pair (Pair "{chain_id}" "{contract_address}") ' +
+            f'(Pair {operation} 0)',
+            'pair (pair chain_id address)' +
+            '(pair (lambda unit (list operation)) nat)')
+        signature = client.sign(packed, "bootstrap1")
+        client.transfer(0, 'bootstrap2', 'authentication',
+                        ['--arg', f'Pair {operation} \"{signature}\"'])
+        client.bake('bootstrap5', BAKE_ARGS)
