@@ -39,6 +39,8 @@ type multisig_prepared_action = {
   counter : Z.t;
 }
 
+val known_multisig_hashes : Script_expr_hash.t list tzresult
+
 val originate_multisig :
   full ->
   chain:Shell_services.chain ->

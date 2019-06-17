@@ -29,7 +29,8 @@ open Alpha_context
 
 type error += Contract_has_no_script of Contract.t
 
-type error += Not_a_supported_multisig_contract of Script.expr
+type error +=
+  | Not_a_supported_multisig_contract of (Script_expr_hash.t * Script.expr)
 
 type error += Contract_has_no_storage of Contract.t
 
@@ -72,15 +73,23 @@ let () =
     ~description:
       "A multisig command has referenced a smart contract whose script is not \
        one of the known multisig contract scripts."
-    ~pp:(fun ppf script ->
+    ~pp:(fun ppf (hash, script) ->
       Format.fprintf
         ppf
-        "Not a supported multisig contract %a."
+        "Not a supported multisig contract %a.@\n\
+         The hash of this script is 0x%a, it was not found among in the list \
+         of known multisig script hashes."
         Michelson_v1_printer.print_expr
-        script)
-    Data_encoding.(obj1 (req "script" Script.expr_encoding))
-    (function Not_a_supported_multisig_contract c -> Some c | _ -> None)
-    (fun c -> Not_a_supported_multisig_contract c) ;
+        script
+        Hex.pp
+        (Script_expr_hash.to_bytes hash |> Hex.of_bytes))
+    Data_encoding.(
+      obj2
+        (req "hash" Script_expr_hash.encoding)
+        (req "script" Script.expr_encoding))
+    (function
+      | Not_a_supported_multisig_contract (h, c) -> Some (h, c) | _ -> None)
+    (fun (h, c) -> Not_a_supported_multisig_contract (h, c)) ;
   register_error_kind
     `Permanent
     ~id:"contractHasNoStorage"
@@ -244,6 +253,7 @@ let () =
 
 (* The multisig contract script written by Arthur Breitman
      https://github.com/murbard/smart-contracts/blob/master/multisig/michelson/multisig.tz *)
+(* Updated to take the chain id into account *)
 let multisig_script_string =
   "parameter (pair\n\
   \             (pair :payload\n\
@@ -272,7 +282,7 @@ let multisig_script_string =
   \        # pair the payload with the current contract address, to ensure \
    signatures\n\
   \        # can't be replayed accross different contracts if a key is reused.\n\
-  \        DUP ; SELF ; ADDRESS ; PAIR ;\n\
+  \        DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;\n\
   \        PACK ; # form the binary payload that we expect to be signed\n\
   \        DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP\n\
   \      } ;\n\n\
@@ -347,23 +357,82 @@ let multisig_script_hash =
   let hash = Script_expr_hash.hash_bytes [bytes] in
   ok hash
 
-let known_multisig_hashes = multisig_script_hash >>? fun hash -> ok [hash]
+(* The previous multisig script is the only one that the client can
+   originate but the client knows how to interact with several
+   versions of the multisig contract. For each version, the description
+   indicates which features are available and how to interact with
+   the contract. *)
 
-let check_multisig_script script : unit tzresult Lwt.t =
+type multisig_contract_description = {
+  hash : Script_expr_hash.t;
+  (* The hash of the contract script *)
+  requires_chain_id : bool;
+  (* The signatures should contain the chain identifier *)
+  generic : bool;
+      (* False means that the contract uses a custom action type, true
+                       means that the contract expects the action as a (lambda unit
+                       (list operation)). *)
+}
+
+let script_hash_of_hex_string s =
+  Script_expr_hash.of_bytes_exn @@ MBytes.of_hex @@ `Hex s
+
+(* List of known multisig contracts hashes with their kinds *)
+let known_multisig_contracts : multisig_contract_description list tzresult =
+  multisig_script_hash
+  >>? fun hash ->
+  ok
+    [
+      {hash; requires_chain_id = true; generic = false};
+      {
+        hash =
+          script_hash_of_hex_string
+            "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
+        requires_chain_id = true;
+        generic = false;
+      };
+      {
+        hash =
+          script_hash_of_hex_string
+            "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
+        requires_chain_id = false;
+        generic = false;
+      };
+    ]
+
+let known_multisig_hashes =
+  known_multisig_contracts
+  >>? fun l -> ok (List.map (fun descr -> descr.hash) l)
+
+let check_multisig_script script : multisig_contract_description tzresult Lwt.t
+    =
   let bytes = Data_encoding.force_bytes script in
   let hash = Script_expr_hash.hash_bytes [bytes] in
-  Lwt.return known_multisig_hashes
+  Lwt.return known_multisig_contracts
   >>=? fun l ->
-  fold_left_s (fun b h -> return (b || Script_expr_hash.(h = hash))) false l
-  >>=? fun hash_found ->
-  fail_unless
-    hash_found
-    (Not_a_supported_multisig_contract
-       ( match Data_encoding.force_decode script with
-       | Some s ->
-           s
-       | None ->
-           assert false ))
+  fold_left_s
+    (fun descr_opt d ->
+      return
+      @@
+      match descr_opt with
+      | Some descr ->
+          Some descr
+      | None ->
+          if Script_expr_hash.(d.hash = hash) then Some d else None)
+    None
+    l
+  >>=? function
+  | None ->
+      fail
+        (Not_a_supported_multisig_contract
+           ( hash,
+             match Data_encoding.force_decode script with
+             | Some s ->
+                 s
+             | None ->
+                 assert false ))
+  | Some d ->
+      return d
 
 (* Returns [Ok ()] if [~contract] is an originated contract whose code
    is [multisig_script] *)
@@ -626,14 +695,23 @@ let mutlisig_param_string ~counter ~action ~optional_signatures () =
   >>=? fun expr ->
   return @@ Format.asprintf "%a" Michelson_v1_printer.print_expr expr
 
-let multisig_bytes ~counter ~action ~contract () =
+let get_contract_address_maybe_chain_id ~descr ~loc ~chain_id contract =
+  let address =
+    bytes ~loc (Data_encoding.Binary.to_bytes_exn Contract.encoding contract)
+  in
+  if descr.requires_chain_id then
+    let chain_id_bytes =
+      bytes ~loc (Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id)
+    in
+    pair ~loc chain_id_bytes address
+  else address
+
+let multisig_bytes ~counter ~action ~contract ~chain_id ~descr () =
   let loc = Tezos_micheline.Micheline_parser.location_zero in
   let triple =
     pair
       ~loc
-      (bytes
-         ~loc
-         (Data_encoding.Binary.to_bytes_exn Contract.encoding contract))
+      (get_contract_address_maybe_chain_id ~descr ~loc ~chain_id contract)
       (pair ~loc (int ~loc counter) (action_to_expr ~loc action))
   in
   let bytes =
@@ -702,12 +780,14 @@ let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
     ~block ~multisig_contract ~action () =
   let contract = multisig_contract in
   check_multisig_contract cctxt ~chain ~block contract
-  >>=? fun () ->
+  >>=? fun descr ->
   check_action ~action ()
   >>=? fun () ->
   multisig_get_information cctxt ~chain ~block contract
   >>=? fun {counter; threshold; keys} ->
-  multisig_bytes ~counter ~action ~contract ()
+  Chain_services.chain_id cctxt ~chain ()
+  >>=? fun chain_id ->
+  multisig_bytes ~counter ~action ~contract ~descr ~chain_id ()
   >>=? fun bytes -> return {bytes; threshold; keys; counter}
 
 let check_multisig_signatures ~bytes ~threshold ~keys signatures =
@@ -778,7 +858,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~fee_parameter
     ()
 
-let action_of_bytes ~multisig_contract ~stored_counter bytes =
+let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
   if
     Compare.Int.(Bytes.length bytes >= 1)
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
@@ -800,12 +880,44 @@ let action_of_bytes ~multisig_contract ~stored_counter bytes =
                   [Tezos_micheline.Micheline.Int (_, counter); e],
                   [] );
             ],
-            [] ) ->
+            [] )
+        when not descr.requires_chain_id ->
           let contract =
             Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
           in
           if counter = stored_counter then
             if multisig_contract = contract then action_of_expr e
+            else fail (Bad_deserialized_contract (contract, multisig_contract))
+          else fail (Bad_deserialized_counter (counter, stored_counter))
+      | Tezos_micheline.Micheline.Prim
+          ( _,
+            Script.D_Pair,
+            [
+              Tezos_micheline.Micheline.Prim
+                ( _,
+                  Script.D_Pair,
+                  [
+                    Tezos_micheline.Micheline.Bytes (_, chain_id_bytes);
+                    Tezos_micheline.Micheline.Bytes (_, contract_bytes);
+                  ],
+                  [] );
+              Tezos_micheline.Micheline.Prim
+                ( _,
+                  Script.D_Pair,
+                  [Tezos_micheline.Micheline.Int (_, counter); e],
+                  [] );
+            ],
+            [] )
+        when descr.requires_chain_id ->
+          let contract =
+            Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
+          in
+          let cid =
+            Data_encoding.Binary.of_bytes_exn Chain_id.encoding chain_id_bytes
+          in
+          if counter = stored_counter then
+            if multisig_contract = contract && chain_id = cid then
+              action_of_expr e
             else fail (Bad_deserialized_contract (contract, multisig_contract))
           else fail (Bad_deserialized_counter (counter, stored_counter))
       | _ ->
@@ -818,7 +930,16 @@ let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
     ?storage_limit ?counter ~fee_parameter () =
   multisig_get_information cctxt ~chain ~block multisig_contract
   >>=? fun info ->
-  action_of_bytes ~multisig_contract ~stored_counter:info.counter bytes
+  check_multisig_contract cctxt ~chain ~block multisig_contract
+  >>=? fun descr ->
+  Chain_services.chain_id cctxt ~chain ()
+  >>=? fun chain_id ->
+  action_of_bytes
+    ~multisig_contract
+    ~stored_counter:info.counter
+    ~chain_id
+    ~descr
+    bytes
   >>=? fun action ->
   call_multisig
     cctxt

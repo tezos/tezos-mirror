@@ -884,4 +884,21 @@ let commands () : #Protocol_client_context.full Clic.command list =
                   cctxt
             >>= function
             | None -> return_unit | Some (_res, _contracts) -> return_unit);
+      command
+        ~group
+        ~desc:"Show the hashes of the supported multisig contracts."
+        no_options
+        (fixed ["show"; "supported"; "multisig"; "hashes"])
+        (fun () _cctxt ->
+          Lwt.return Client_proto_multisig.known_multisig_hashes
+          >>=? fun l ->
+          Format.printf "Hashes of supported multisig contracts:@." ;
+          List.iter
+            (fun h ->
+              Format.printf
+                "  0x%a@."
+                Hex.pp
+                (Script_expr_hash.to_bytes h |> Hex.of_bytes))
+            l ;
+          return_unit);
     ]
