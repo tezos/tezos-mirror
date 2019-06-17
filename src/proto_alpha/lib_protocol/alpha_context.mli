@@ -212,6 +212,7 @@ module Script : sig
     | I_BALANCE
     | I_CAR
     | I_CDR
+    | I_CHAIN_ID
     | I_CHECK_SIGNATURE
     | I_COMPARE
     | I_CONCAT
@@ -302,6 +303,7 @@ module Script : sig
     | T_unit
     | T_operation
     | T_address
+    | T_chain_id
 
 
   type location = Micheline.canonical_location

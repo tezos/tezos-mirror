@@ -59,11 +59,12 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj8
+      (obj9
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
          (req "amount" Tez.encoding)
+         (req "chain_id" Chain_id.encoding)
          (opt "source" Contract.encoding)
          (opt "payer" Contract.encoding)
          (opt "gas" z)
@@ -148,7 +149,9 @@ module Scripts = struct
         ~description:
           "Run an operation without signature checks"
         ~query: RPC_query.empty
-        ~input: Operation.encoding
+        ~input: (obj2
+                   (req "operation" Operation.encoding)
+                   (req "chain_id" Chain_id.encoding))
         ~output: Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
@@ -171,7 +174,7 @@ module Scripts = struct
         ~script: (script, None) >>=? fun ctxt ->
       return (ctxt, dummy_contract) in
     register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount, source, payer, gas, entrypoint) ->
+      (code, storage, parameter, amount, chain_id, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
@@ -188,6 +191,7 @@ module Scripts = struct
         ctxt Readable
         ~source
         ~payer
+        ~chain_id
         ~self:(dummy_contract, { storage ; code })
         ~entrypoint
         ~amount ~parameter
@@ -195,7 +199,7 @@ module Scripts = struct
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount, source, payer, gas, entrypoint) ->
+      (code, storage, parameter, amount, chain_id, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
@@ -212,6 +216,7 @@ module Scripts = struct
         ctxt Readable
         ~source
         ~payer
+        ~chain_id
         ~self:(dummy_contract, { storage ; code })
         ~entrypoint
         ~amount ~parameter
@@ -243,7 +248,7 @@ module Scripts = struct
       return (bytes, Gas.level ctxt)
     end ;
     register0 S.run_operation begin fun ctxt ()
-      { shell ; protocol_data = Operation_data protocol_data } ->
+      ({ shell ; protocol_data = Operation_data protocol_data }, chain_id) ->
       (* this code is a duplicate of Apply without signature check *)
       let partial_precheck_manager_contents
           (type kind) ctxt (op : kind Kind.manager contents)
@@ -313,27 +318,27 @@ module Scripts = struct
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op >>= fun (_ctxt, result) ->
           return result
       | Cons (Manager_operation _, _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op >>= fun (_ctxt, result) ->
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Chain_id.zero Optimized shell.branch baker operation
+            ctxt chain_id Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 
     end
 
-  let run_code ctxt block code (storage, input, amount, source, payer, gas, entrypoint) =
+  let run_code ctxt block code (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount, source, payer, gas, entrypoint)
+      block () (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
 
-  let trace_code ctxt block code (storage, input, amount, source, payer, gas, entrypoint) =
+  let trace_code ctxt block code (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount, source, payer, gas, entrypoint)
+      block () (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()

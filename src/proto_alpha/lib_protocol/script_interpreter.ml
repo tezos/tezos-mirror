@@ -184,9 +184,9 @@ let rec interp
     (?log: execution_trace ref ->
      context ->
      source: Contract.t -> payer:Contract.t -> self: Contract.t -> Tez.t ->
-     (p, r) lambda -> p ->
+     chain_id: Chain_id.t -> (p, r) lambda -> p ->
      (r * context) tzresult Lwt.t)
-  = fun ?log ctxt ~source ~payer ~self amount (Lam (code, _)) arg ->
+  = fun ?log ctxt ~source ~payer ~self amount ~chain_id (Lam (code, _)) arg ->
     let rec step
       : type b a.
         context -> (b, a) descr -> b stack ->
@@ -658,7 +658,7 @@ let rec interp
             logged_return (Item (ign, res), ctxt)
         | Exec, Item (arg, Item (lam, rest)) ->
             Lwt.return (Gas.consume ctxt Interp_costs.exec) >>=? fun ctxt ->
-            interp ?log ctxt ~source ~payer ~self amount lam arg >>=? fun (res, ctxt) ->
+            interp ?log ctxt ~source ~payer ~chain_id ~self amount lam arg >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
         | Lambda lam, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.push) >>=? fun ctxt ->
@@ -885,7 +885,10 @@ let rec interp
         | Dropn (n, n'), stack ->
             Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n)) >>=? fun ctxt ->
             interp_stack_prefix_preserving_operation (fun stk -> return (stk, stk)) n' stack
-            >>=? fun (_, rest) -> logged_return (rest, ctxt) in
+            >>=? fun (_, rest) -> logged_return (rest, ctxt)
+        | ChainId, rest ->
+            Lwt.return (Gas.consume ctxt Interp_costs.chain_id) >>=? fun ctxt ->
+            logged_return (Item (chain_id, rest), ctxt) in
     let stack = (Item (arg, Empty)) in
     begin match log with
       | None -> return_unit
@@ -900,7 +903,7 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log ctxt mode ~source ~payer ~self ~entrypoint script amount arg :
+and execute ?log ctxt mode ~source ~payer ~self ~chain_id ~entrypoint script amount arg :
   (Script.expr * packed_internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script ~legacy:true
@@ -914,7 +917,7 @@ and execute ?log ctxt mode ~source ~payer ~self ~entrypoint script amount arg :
   Script.force_decode ctxt script.code >>=? fun (script_code, ctxt) ->
   trace
     (Runtime_contract_error (self, script_code))
-    (interp ?log ctxt ~source ~payer ~self amount code (arg, storage))
+    (interp ?log ctxt ~source ~payer ~self amount ~chain_id code (arg, storage))
   >>=? fun ((ops, sto), ctxt) ->
   trace Cannot_serialize_storage
     (unparse_data ctxt mode storage_type sto) >>=? fun (storage, ctxt) ->
@@ -927,9 +930,9 @@ type execution_result =
     big_map_diff : Contract.big_map_diff option ;
     operations : packed_internal_operation list }
 
-let trace ctxt mode ~source ~payer ~self:(self, script) ~entrypoint ~parameter ~amount =
+let trace ctxt mode ~source ~payer ~chain_id ~self:(self, script) ~entrypoint ~parameter ~amount =
   let log = ref [] in
-  execute ~log ctxt mode ~source ~payer ~self ~entrypoint script amount (Micheline.root parameter)
+  execute ~log ctxt mode ~source ~payer ~chain_id ~self ~entrypoint script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map) ->
   begin match big_map with
     | None -> return (None, ctxt)
@@ -940,8 +943,8 @@ let trace ctxt mode ~source ~payer ~self:(self, script) ~entrypoint ~parameter ~
   let trace = List.rev !log in
   return ({ ctxt ; storage ; big_map_diff ; operations }, trace)
 
-let execute ctxt mode ~source ~payer ~self:(self, script) ~entrypoint ~parameter ~amount =
-  execute ctxt mode ~source ~payer ~self ~entrypoint script amount (Micheline.root parameter)
+let execute ctxt mode ~source ~payer ~chain_id ~self:(self, script) ~entrypoint ~parameter ~amount =
+  execute ctxt mode ~source ~payer ~chain_id ~self ~entrypoint script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map) ->
   begin match big_map with
     | None -> return (None, ctxt)

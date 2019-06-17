@@ -102,6 +102,7 @@ let rec type_size : type t. t ty -> int =
         1 + comparable_type_size k + type_size v
     | Contract_t (arg, _) ->
         1 + type_size arg
+    | Chain_id_t _ -> 1
 
 let rec type_size_of_stack_head
   : type st. st stack_ty -> up_to:int -> int
@@ -244,6 +245,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Dug _ -> 0
   | Dipn _ -> 0
   | Dropn _ -> 0
+  | ChainId -> 0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -286,6 +288,7 @@ let namespace = function
   | I_BALANCE
   | I_CAR
   | I_CDR
+  | I_CHAIN_ID
   | I_CHECK_SIGNATURE
   | I_COMPARE
   | I_CONCAT
@@ -375,7 +378,8 @@ let namespace = function
   | T_timestamp
   | T_unit
   | T_operation
-  | T_address -> Type_namespace
+  | T_address
+  | T_chain_id -> Type_namespace
 
 
 let unexpected expr exp_kinds exp_ns exp_prims =
@@ -612,6 +616,7 @@ let rec unparse_ty_no_lwt
     | Address_t tname -> return ctxt (T_address, [], unparse_type_annot tname)
     | Signature_t tname -> return ctxt (T_signature, [], unparse_type_annot tname)
     | Operation_t tname -> return ctxt (T_operation, [], unparse_type_annot tname)
+    | Chain_id_t tname -> return ctxt (T_chain_id, [], unparse_type_annot tname)
     | Contract_t (ut, tname) ->
         unparse_ty_no_lwt ctxt ut >>? fun (t, ctxt) ->
         return ctxt (T_contract, [ t ], unparse_type_annot tname)
@@ -695,6 +700,7 @@ let name_of_ty
     | Address_t tname -> tname
     | Signature_t tname -> tname
     | Operation_t tname -> tname
+    | Chain_id_t tname -> tname
     | Contract_t (_, tname) -> tname
     | Pair_t (_, _, tname) -> tname
     | Union_t (_, _, tname) -> tname
@@ -760,6 +766,7 @@ let rec ty_eq
     | Signature_t _, Signature_t _ -> ok Eq ctxt 0
     | Mutez_t _, Mutez_t _ -> ok Eq ctxt 0
     | Timestamp_t _, Timestamp_t _ -> ok Eq ctxt 0
+    | Chain_id_t _, Chain_id_t _ -> ok Eq ctxt 0
     | Address_t _, Address_t _ -> ok Eq ctxt 0
     | Bool_t _, Bool_t _ -> ok Eq ctxt 0
     | Operation_t _, Operation_t _ -> ok Eq ctxt 0
@@ -897,6 +904,9 @@ let merge_types :
       | Bool_t tn1, Bool_t tn2 ->
           merge_type_annot ~legacy tn1 tn2 >|? fun tname ->
           Bool_t tname, ctxt
+      | Chain_id_t tn1, Chain_id_t tn2 ->
+          merge_type_annot ~legacy tn1 tn2 >|? fun tname ->
+          Chain_id_t tname, ctxt
       | Operation_t tn1, Operation_t tn2 ->
           merge_type_annot ~legacy tn1 tn2 >|? fun tname ->
           Operation_t tname, ctxt
@@ -1144,6 +1154,10 @@ and parse_ty :
           Ex_ty (Operation_t ty_name), ctxt
         else
           error (Unexpected_operation loc)
+    | Prim (loc, T_chain_id, [], annot) ->
+        parse_type_annot loc annot >>? fun ty_name ->
+        Gas.consume ctxt (Typecheck_costs.type_ 0) >|? fun ctxt ->
+        Ex_ty (Chain_id_t ty_name), ctxt
     | Prim (loc, T_contract, [ utl ], annot) ->
         if allow_contract then
           parse_ty ctxt ~legacy ~allow_big_map:false ~allow_operation:false ~allow_contract:true utl >>? fun (Ex_ty tl, ctxt) ->
@@ -1227,7 +1241,7 @@ and parse_ty :
             T_unit ; T_signature  ; T_contract ;
             T_int ; T_nat ; T_operation ;
             T_string ; T_bytes ; T_mutez ; T_bool ;
-            T_key ; T_key_hash ; T_timestamp ]
+            T_key ; T_key_hash ; T_timestamp ; T_chain_id ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
@@ -1279,6 +1293,7 @@ let check_packable ~legacy loc root =
     | Timestamp_t _ -> ok ()
     | Address_t _ -> ok ()
     | Bool_t _ -> ok ()
+    | Chain_id_t _ -> ok ()
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
         check l_ty >>? fun () -> check r_ty
     | Union_t ((l_ty, _), (r_ty, _), _) ->
@@ -1586,6 +1601,21 @@ let rec parse_data
         (* operations cannot appear in parameters or storage,
            the protocol should never parse the bytes of an operation *)
         assert false
+    (* Chain_ids *)
+    | Chain_id_t _, Bytes (_, bytes) ->
+        Lwt.return (Gas.consume ctxt Typecheck_costs.chain_id) >>=? fun ctxt ->
+        begin match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
+          | Some k -> return (k, ctxt)
+          | None -> error () >>=? fail
+        end
+    | Chain_id_t _, String (_,  s) ->
+        Lwt.return (Gas.consume ctxt Typecheck_costs.chain_id) >>=? fun ctxt ->
+        begin match Chain_id.of_b58check_opt s with
+          | Some s -> return (s, ctxt)
+          | None -> error () >>=? fail
+        end
+    | Chain_id_t _, expr ->
+        traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Addresses *)
     | Address_t _, Bytes (loc, bytes) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
@@ -2957,6 +2987,11 @@ and parse_instr
         parse_var_annot loc annot ~default:default_amount_annot >>=? fun annot ->
         typed ctxt loc Amount
           (Item_t (Mutez_t None, stack, annot))
+    | Prim (loc, I_CHAIN_ID, [], annot),
+      stack ->
+        parse_var_annot loc annot >>=? fun annot ->
+        typed ctxt loc ChainId
+          (Item_t (Chain_id_t None, stack, annot))
     | Prim (loc, I_BALANCE, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_balance_annot >>=? fun annot ->
@@ -3474,6 +3509,10 @@ let rec unparse_data
     | Operation_t _, op ->
         let bytes = Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op in
         Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes)) >>=? fun ctxt ->
+        return (Bytes (-1, bytes), ctxt)
+    | Chain_id_t _, chain_id ->
+        let bytes = Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id in
+        Lwt.return (Gas.consume ctxt (Unparse_costs.chain_id bytes)) >>=? fun ctxt ->
         return (Bytes (-1, bytes), ctxt)
     | Pair_t ((tl, _, _), (tr, _, _), _), (l, r) ->
         Lwt.return (Gas.consume ctxt Unparse_costs.pair) >>=? fun ctxt ->

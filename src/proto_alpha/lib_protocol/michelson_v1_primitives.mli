@@ -52,6 +52,7 @@ type prim =
   | I_BALANCE
   | I_CAR
   | I_CDR
+  | I_CHAIN_ID
   | I_CHECK_SIGNATURE
   | I_COMPARE
   | I_CONCAT
@@ -142,6 +143,7 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_chain_id
 
 val prim_encoding : prim Data_encoding.encoding
 

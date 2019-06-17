@@ -111,6 +111,7 @@ and 'ty ty =
   | Big_map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
   | Operation_t : type_annot option -> packed_internal_operation ty
+  | Chain_id_t : type_annot option -> Chain_id.t ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * var_annot option -> ('ty * 'rest) stack_ty
@@ -399,6 +400,8 @@ and ('bef, 'aft) instr =
       ('bef, 'aft) instr
   | Dropn : int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness ->
       ('bef, 'rest) instr
+  | ChainId :
+      ('rest, Chain_id.t * 'rest) instr
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.

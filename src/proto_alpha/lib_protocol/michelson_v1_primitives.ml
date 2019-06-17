@@ -54,6 +54,7 @@ type prim =
   | I_BALANCE
   | I_CAR
   | I_CDR
+  | I_CHAIN_ID
   | I_CHECK_SIGNATURE
   | I_COMPARE
   | I_CONCAT
@@ -144,6 +145,7 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_chain_id
 
 let valid_case name =
   let is_lower = function  '_' | 'a'..'z' -> true | _ -> false in
@@ -189,6 +191,7 @@ let string_of_prim = function
   | I_BALANCE -> "BALANCE"
   | I_CAR -> "CAR"
   | I_CDR -> "CDR"
+  | I_CHAIN_ID -> "CHAIN_ID"
   | I_CHECK_SIGNATURE -> "CHECK_SIGNATURE"
   | I_COMPARE -> "COMPARE"
   | I_CONCAT -> "CONCAT"
@@ -279,6 +282,7 @@ let string_of_prim = function
   | T_unit -> "unit"
   | T_operation -> "operation"
   | T_address -> "address"
+  | T_chain_id -> "chain_id"
 
 let prim_of_string = function
   | "parameter" -> ok K_parameter
@@ -305,6 +309,7 @@ let prim_of_string = function
   | "BALANCE" -> ok I_BALANCE
   | "CAR" -> ok I_CAR
   | "CDR" -> ok I_CDR
+  | "CHAIN_ID" -> ok I_CHAIN_ID
   | "CHECK_SIGNATURE" -> ok I_CHECK_SIGNATURE
   | "COMPARE" -> ok I_COMPARE
   | "CONCAT" -> ok I_CONCAT
@@ -395,6 +400,7 @@ let prim_of_string = function
   | "unit" -> ok T_unit
   | "operation" -> ok T_operation
   | "address" -> ok T_address
+  | "chain_id" -> ok T_chain_id
   | n ->
       if valid_case n then
         error (Unknown_primitive_name n)
@@ -570,6 +576,8 @@ let prim_encoding =
     (* Alpha_005 addition *)
     ("DIG", I_DIG) ;
     ("DUG", I_DUG) ;
+    ("chain_id", T_chain_id) ;
+    ("CHAIN_ID", I_CHAIN_ID)
     (* New instructions must be added here, for backward compatibility of the encoding. *)
   ]
 
