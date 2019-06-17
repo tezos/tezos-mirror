@@ -28,7 +28,7 @@ module Id = P2p_peer_id
 module Map = Id.Map
 module Set = Id.Set
 module Table = Id.Table
-module InitializationTable : Error_table.S
+module Error_table : Error_table.S
   with type key = Table.key
 
 module Filter : sig
