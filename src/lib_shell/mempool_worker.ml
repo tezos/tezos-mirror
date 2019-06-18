@@ -612,8 +612,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          let state = Worker.state w in
          let filter_result = function
            | Applied _ -> params#applied
-           | Refused _ -> params#branch_refused
-           | Branch_refused _ -> params#refused
+           | Refused _ -> params#refused
+           | Branch_refused _ -> params#branch_refused
            | Branch_delayed _ -> params#branch_delayed
            | _ -> false in
 
