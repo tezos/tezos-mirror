@@ -3,6 +3,10 @@
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
+This specification gives a detailed formal semantics of the Michelson
+language, and a short explanation of how smart contracts are executed
+and interact in the blockchain.
+
 The language is stack-based, with high level data types and primitives
 and strict static type checking. Its design cherry picks traits from
 several language families. Vigilant readers will notice direct
@@ -14,30 +18,154 @@ previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
 
-A Michelson program receives as input a stack containing a single pair whose
-first element is an input value and second element the content of a storage
-space. It must return a stack containing a single pair whose first element is
-a list of internal operations, and second element the new contents of the
-storage space. Alternatively, a Michelson program can fail, explicitly using
-a specific opcode, or because something went wrong that could not be caught
-by the type system (e.g. division by zero, gas exhaustion).
-
-The types of the input, output and storage are fixed and monomorphic,
+The types of the input and output stack are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
 No smart contract execution can fail because an instruction has been
 executed on a stack of unexpected length or contents.
 
 This specification gives the complete instruction set, type system and
 semantics of the language. It is meant as a precise reference manual,
-not an easy introduction. Even though, some examples are provided at the
-end of the document and can be read first or at the same time as the
-specification.
+not an easy introduction. Even though, some examples are provided at
+the end of the document and can be read first or at the same time as
+the specification. The document also starts with a less formal
+explanation of the context: how Michelson code interacts with the
+blockchain.
 
-Semantics
----------
+Semantics of smart contracts and transactions
+---------------------------------------------
 
-This specification gives a detailed formal semantics of the Michelson
-language. It explains in a symbolic way the computation performed by the
+The Tezos ledger currently has two types of accounts that can hold
+tokens (and be the destinations of transactions).
+
+  - An implicit account is a non programmable account, whose tokens
+    are spendable and delegatable by a public key. Its address is
+    directly the public key hash, and starts with ``tz1``, ``tz2`` or
+    ``tz3``.
+  - A smart contract is a programmable account. A transaction to such
+    an address can provide data, and can fail for reasons decided by
+    its Michelson code. Its address is a unique hash that depends on
+    the operation that led to its creation, and starts with ``KT1``.
+
+From Michelson, they are indistinguishable. A safe way to think about
+this is to consider that implicit accounts are smart contracts that
+always succeed to receive tokens, and does nothing else.
+
+Intra-transaction semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Alongside their tokens, smart contracts keep a piece of storage. Both
+are ruled by a specific logic specified by a Michelson program. A
+transaction to smart contract will provide an input value and in
+option some tokens, and in return, the smart contract can modify its
+storage and transfer its tokens.
+
+The Michelson program receives as input a stack containing a single
+pair whose first element is an input value and second element the
+content of the storage space. It must return a stack containing a
+single pair whose first element is the list of internal operations
+that it wants to emit, and second element is the new contents of the
+storage space. Alternatively, a Michelson program can fail, explicitly
+using a specific opcode, or because something went wrong that could
+not be caught by the type system (e.g. gas exhaustion).
+
+A bit of polymorphism can be used at contract level, with a
+lightweight system of named entrypoints: instead of an input value,
+the contract can be called with an entrypoint name and an argument,
+and these two component are transformed automatically in a simple and
+deterministic way to an input value. This feature is available both
+for users and from Michelson code. See the dedicated section.
+
+Inter-transaction semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An operation included in the blockchain is a sequence of "external
+operations" signed as a whole by a source address. These operations
+are of three kinds:
+
+  - Transactions to transfer tokens to implicit accounts or tokens and
+    parameters to a smart contract (or, optionally, to a specified
+    entrypoint of a smart contract).
+  - Originations to create new smart contracts from its Michelson
+    source code, an initial amount of tokens transferred from the
+    source, and an initial storage contents.
+  - Delegations to assign the tokens of the source to the stake of
+    another implicit account (without transferring any tokens).
+
+Smart contracts can also emit "internal operations". These are run
+in sequence after the external transaction completes, as in the
+following schema for a sequence of two external operations.
+
+::
+
+    +------+----------------+-------+----------------+
+    | op 1 | internal ops 1 |  op 2 | internal ops 2 |
+    +------+----------------+-------+----------------+
+
+Smart contracts called by internal transactions can in turn also emit
+internal operation. The interpretation of the internal operations
+of a given external operation use a queue, as in the following
+example, also with two external operations.
+
+::
+
+   +-----------+---------------+--------------------------+
+   | executing | emissions     | resulting queue          |
+   +-----------+---------------+--------------------------+
+   | op 1      | 1a, 1b, 1c    | 1a, 1b, 1c               |
+   | op 1a     | 1ai, 1aj      | 1b, 1c, 1ai, 1aj         |
+   | op 1b     | 1bi           | 1c, 1ai, 1aj, 1bi        |
+   | op 1c     |               | 1ai, 1aj, 1bi            |
+   | op 1ai    |               | 1aj, 1bi                 |
+   | op 1aj    |               | 1bi                      |
+   | op 1bi    |               |                          |
+   | op 2      | 2a, 2b        | 2a, 2b                   |
+   | op 2a     | 2ai           | 2b, 2ai                  |
+   | op 2b     |               | 2ai                      |
+   | op 2ai    | 2ai1          | 2ai1                     |
+   | op 2a1    | 2ai2          | 2ai2                     |
+   | op 2a2    | 2ai3          | 2ai3                     |
+   | op 2a3    |               |                          |
+   +-----------+---------------+--------------------------+
+
+Failures
+~~~~~~~~
+
+All transactions can fail for a few reasons, mostly:
+
+  - Not enough tokens in the source to spend the specified amount.
+  - The script took too many execution steps.
+  - The script failed programmatically using the ``FAILWITH`` instruction.
+
+External transactions can also fail for these additional reasons:
+
+  - The signature of the external operations was wrong.
+  - The code or initial storage in an origination did not typecheck.
+  - The parameter in a transfer did not typecheck.
+  - The destination did not exist.
+  - The specified entrypoint did not exist.
+
+All these errors cannot happen in internal transactions, as the type
+system catches them at operation creation time. In particular,
+Michelson has two types to talk about other accounts: ``address`` and
+``contract t``. The ``address`` type merely gives the guarantee that
+the value has the form of a Tezos address. The ``contract t`` type, on
+the other hand, guarantees that the value is indeed a valid, existing
+account whose parameter type is ``t``. To make a transaction from
+Michelson, a value of type ``contract t`` must be provided, and the
+type system checks that the argument to the transaction is indeed of
+type ``t``. Hence, all transactions made from Michelson are well
+formed by construction.
+
+In any case, when a failure happens, either total success or total
+failure is guaranteed. If a transaction (internal or external) fails,
+then the whole sequence fails and all the effects up to the failure
+are reverted. These transactions can still be included in blocks, and
+the transaction fees given to the implicit account who baked the block.
+
+Language semantics
+------------------
+
+This specification explains in a symbolic way the computation performed by the
 Michelson interpreter on a given program and initial stack to produce
 the corresponding resulting stack. The Michelson interpreter is a pure
 function: it only builds a result stack from the elements of an initial
@@ -1192,9 +1320,10 @@ Domain specific data types
 
 -  ``mutez``: A specific type for manipulating tokens.
 
--  ``contract 'param``: A contract, with the type of its code.
+-  ``address``: An untyped address (implicit account or smart contract).
 
--  ``address``: An untyped contract address.
+-  ``contract 'param``: A contract, with the type of its code,
+   ``contract unit`` for implicit accounts.
 
 -  ``operation``: An internal operation emitted by a contract.
 
@@ -1936,10 +2065,14 @@ line can also be written, using C-like delimiters (``/* ... */``).
 Annotations
 -----------
 
-The annotation mechanism of Michelson provides ways to better track data
-on the stack and to give additional type constraints. Annotations are
-only here to add constraints, *i.e.* they cannot turn an otherwise
-rejected program into an accepted one.
+The annotation mechanism of Michelson provides ways to better track
+data on the stack and to give additional type constraints. Except for
+a single exception specified just after, annotations are only here to
+add constraints, *i.e.* they cannot turn an otherwise rejected program
+into an accepted one. The notable exception to this rule is for
+entrypoints: the `CONTRACT` instruction semantics varies depending on
+its constructor annotation, and some contract origination may fail due
+to invalid entrypoint constructor annotations.
 
 Stack visualization tools like the Michelson's Emacs mode print
 annotations associated with each type in the program, as propagated by
@@ -2220,12 +2353,6 @@ and variable annotations).
    RIGHT %left %right 'a
    :: 'b : 'S -> (or ('a %left) ('b %right)) : 'S
 
-   NONE %some 'a
-   :: 'S -> (option ('a %some))
-
-   Some %some
-   :: 'a : 'S -> (option ('a %some))
-
 To improve readability and robustness, instructions ``CAR`` and ``CDR``
 accept one field annotation. For the contract to type check, the name of
 the accessed field in the destructed pair must match the one given here.
@@ -2432,6 +2559,144 @@ treatment of annotations with `.`.
    :: @p.x 'a : @p.y 'b : 'S   ->  @p (pair ('a %x) ('b %y)) : 'S
    :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
+Entrypoints
+-----------
+
+The specification up to this point has been mostly ignoring existence
+of entrypoints: a mechanism of contract level polymorphism. This
+mechanism is optional, non intrusive, and transparent to smart
+contracts that don't use them. This section is to be read as a patch
+over the rest of the specification, introducing rules that apply only
+in presence of contracts that make use of entrypoints.
+
+Defining and calling entrypoints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Entrypoints piggyback on the constructor annotations. A contract with
+entrypoints is basically a contract that takes a disjunctive type (a
+nesting of ``or`` types) as the root of its input parameter, decorated
+with constructor annotations. An extra check is performed on these
+constructor annotations: a contract cannot define two entrypoints with
+the same name.
+
+An external transaction can include an entrypoint name alongside the
+parameter value. In that case, if there is a constructor annotation
+with this name at any position in the nesting of ``or`` types, the
+value is automatically wrapped into the according constructors. If the
+transaction specifies an entrypoint, but there is no such constructor
+annotation, the transaction fails.
+
+For instance, suppose the following input type.
+
+``parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))``
+
+The input values will be wrapped as in the following examples.
+
+::
+
+   +------------+-----------+---------------------------------+
+   | entrypoint | input     | wrapped input                   |
+   +------------+-----------+---------------------------------+
+   | %A         | 3         | Left (Left 3)                   |
+   | %B         | False     | Left (Right False)              |
+   | %C         | "bob"     | Right (Right "bob")             |
+   | %Z         | Unit      | Right (Left Unit)               |
+   | %maybe_C   | Right "x" | Right (Right "x")               |
+   | %maybe_C   | Left Unit | Right (Left Unit)               |
+   +------------+-----------+---------------------------------+
+   | not given  | value     | value (untouched)               |
+   | %BAD       | _         | failure, contract not called    |
+   +------------+-----------+---------------------------------+
+
+The ``default`` entrypoint
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A special semantics is assigned to the ``default`` entrypoint. If the
+contract does not explicitly declare a ``default`` entrypoint, then it
+is automatically assigned to the root of the parameter
+type. Conversely, if the contract is called without specifying an
+entrypoint, then it is assumed to be called with the ``default``
+entrypoint. This behaviour makes the entrypoint system completely
+transparent to contracts that do not use it.
+
+This is the case for the previous example, for instance. If a value is
+passed to such a contract specifying entrypoint ``default``, then the
+value is fed to the contract untouched, exactly as if no entrypoint
+was given.
+
+A non enforced convention is to make the entrypoint ``default`` of
+type unit, and to implement the crediting operation (just receive the
+transferred tokens).
+
+A consequence of this semantics is that if the contract uses the
+entrypoint system and defines a ``default`` entrypoint somewhere else
+than at the root of the parameter type, then it must provide an
+entrypoint for all the paths in the toplevel disjunction. Otherwise,
+some parts of the contracts would be dead code.
+
+Another consequence of setting the entrypoint somewhere else than at
+the root is that it makes it impossible to send the raw values of the
+full parameter type to a contract. A trivial solution for that is to
+name the root of the type. The conventional name for that is ``root``.
+
+Let us recapitulate this by tweaking the names of the previous example.
+
+``parameter %root (or (or (nat %A) (bool %B)) (or (unit %default) string))``
+
+The input values will be wrapped as in the following examples.
+
+::
+
+   +------------+---------------------+-----------------------+
+   | entrypoint | input               | wrapped input         |
+   +------------+---------------------+-----------------------+
+   | %A         | 3                   | Left (Left 3)         |
+   | %B         | False               | Left (Right False)    |
+   | %default   | Unit                | Right (Left Unit)     |
+   | %root      | Right (Right "bob") | Right (Right "bob")   |
+   +------------+---------------------+-----------------------+
+   | not given  | Unit                | Right Unit            |
+   | %BAD       | _                   | failure, contract not |
+   +------------+---------------------+-----------------------+
+
+Calling entrypoints from Michelson
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Michelson code can also produce transactions to a specific entrypoint.
+
+For this, both types ``address`` and ``contract`` have the ability to
+denote not just an address, but a pair of an address and an
+entrypoint. The concrete notation is ``"address%entrypoint"``.
+Note that ``"address"`` is strictly equivalent to ``"address%default"``,
+and for clarity, the second variant is forbidden in the concrete syntax.
+
+When the ``TRANSFER_TOKENS`` instruction is called, it places the
+entrypoint provided in the contract handle in the transaction.
+
+The ``CONTRACT t`` instruction has a variant ``CONTRACT %entrypoint
+t``, that works as follows. Note that ``CONTRACT t`` is strictly
+equivalent to ``CONTRACT %default t``, and for clarity, the second
+variant is forbidden in the concrete syntax.
+
+::
+
+   +---------------+---------------------+------------------------------------------+
+   | input address | instruction         | output contract                          |
+   +---------------+---------------------+------------------------------------------+
+   | "addr"        | CONTRACT t          | (Some "addr") if contract exists, has a  |
+   |               |                     | default entrypoint of type t, or has no  |
+   |               |                     | default entrypoint and parameter type t  |
+   +---------------+---------------------+------------------------------------------+
+   | "addr%name"   | CONTRACT t          | (Some "addr%name") if addr exists and    |
+   +---------------+---------------------+ has an entrypoint %name of type t        |
+   | "addr"        | CONTRACT %name t    |                                          |
+   +---------------+---------------------+------------------------------------------+
+   | "addr%_"      | CONTRACT %_ t       | None                                     |
+   +---------------+---------------------+------------------------------------------+
+
+Implicit accounts are considered to have a single ``default``
+entrypoint of type ``Unit``.
+
 JSON syntax
 -----------
 
@@ -2490,6 +2755,23 @@ The simplest contract is the contract for which the ``parameter`` and
     storage unit;
     parameter unit;
 
+
+Example contract with entrypoints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following contract maintains a number in its storage. It has two
+entrypoints ``add`` and ``sub`` to modify it, and the default
+entrypoint, of type ``unit`` will reset it to ``0``.
+
+::
+
+   { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
+     storage int ;
+     code { AMOUNT ; PUSH mutez 0 ; ASSERT_CMPEQ ; UNPAIR ;
+            IF_LEFT
+              { IF_LEFT { ADD } { SWAP ; SUB } }
+              { DROP ; DROP ; PUSH int 0 } ;
+            NIL operation ; PAIR } }
 
 Multisig contract
 ~~~~~~~~~~~~~~~~~
