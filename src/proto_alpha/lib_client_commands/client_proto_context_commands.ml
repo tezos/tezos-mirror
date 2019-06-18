@@ -468,6 +468,51 @@ let commands version () =
             return_unit
       end;
 
+    command ~group ~desc: "Call a smart contract (same as 'transfer 0')."
+      (args14 fee_arg dry_run_switch verbose_signing_switch
+         gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes [ "call" ]
+       @@ prefix "from"
+       @@ ContractAlias.destination_param
+         ~name: "src" ~desc: "name of the source contract"
+       @@ prefix "to"
+       @@ ContractAlias.destination_param
+         ~name: "dst" ~desc: "name/literal of the destination contract"
+       @@ stop)
+      begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
+                 counter, arg, no_print_source, minimal_fees,
+                 minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
+                 force_low_fee, fee_cap, burn_cap)
+        (_, source) (_, destination) cctxt ->
+        source_to_keys cctxt
+          ~chain:cctxt#chain ~block:cctxt#block
+          source >>=? fun (src_pk, src_sk) ->
+        let fee_parameter = {
+          Injection.minimal_fees ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
+          force_low_fee ;
+          fee_cap ;
+          burn_cap ;
+        } in
+        let amount = Tez.zero in
+        transfer cctxt
+          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+          ~dry_run ~verbose_signing
+          ~fee_parameter
+          ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
+        report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
+        | None -> return_unit
+        | Some (_res, _contracts) ->
+            return_unit
+      end;
+
     command ~group ~desc: "Reveal the public key of the contract manager."
       (args9 fee_arg
          dry_run_switch verbose_signing_switch
