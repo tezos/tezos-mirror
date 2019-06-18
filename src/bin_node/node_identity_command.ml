@@ -43,10 +43,10 @@ let generate_with_animation ppf target =
         try Ok (P2p_identity.generate_with_bound ~max:count target)
         with Not_found -> Error count)
     ~on_retry:(fun time count ->
-        if Mtime.Span.(equal zero time) then
+        let ms = int_of_float (Mtime.Span.to_ms time) in
+        if ms <= 1 then
           max 10 (count * 10)
         else
-          let ms = int_of_float (Mtime.Span.to_ms time) in
           count * duration / ms)
     10000
 
@@ -57,8 +57,7 @@ let generate { Node_config_file.data_dir ; p2p ; _ } =
   else
     let target = Crypto_box.make_target p2p.expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " p2p.expected_pow ;
-    let id =
-      generate_with_animation Format.err_formatter target in
+    let id = generate_with_animation Format.err_formatter target in
     Node_identity_file.write identity_file id >>=? fun () ->
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
