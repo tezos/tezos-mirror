@@ -139,7 +139,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
       string Lwt.t Lazy.t -> unit Lwt.t ;
   }
 
-  let internal_call meth _log ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
+  let generic_call meth ?(headers = []) ?accept ?body ?media uri : (content, content) generic_rest_result Lwt.t =
     let host =
       match Uri.host uri, Uri.port uri with
       | None, _ -> None
@@ -279,7 +279,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
+      generic_call meth ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
           Lwt.return (`Ok None)
@@ -323,7 +323,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
       media_types ?logger ?base
       service params query body >>= fun (log, meth, uri, body, media) ->
     begin
-      internal_call meth log ?headers ~accept:media_types ?body ?media uri >>= function
+      generic_call meth ?headers ~accept:media_types ?body ?media uri >>= function
       | `Ok None ->
           on_close () ;
           log.log Encoding.untyped `No_content (lazy (Lwt.return "")) >>= fun () ->
@@ -381,19 +381,5 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
       | `Unauthorized_host _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
-
-  let generic_call meth ?(logger = null_logger) ?headers ?accept ?body ?media uri =
-    let module Logger = (val logger) in
-    begin match body with
-      | None->
-          Logger.log_empty_request uri
-      | Some (`Stream _) ->
-          Logger.log_request Encoding.untyped uri "<stream>"
-      | Some body ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          Logger.log_request ?media Encoding.untyped uri body
-    end >>= fun log_request ->
-    let log = { log = fun ?media -> Logger.log_response log_request ?media } in
-    internal_call meth log ?headers ?accept ?body ?media uri
 
 end
