@@ -26,13 +26,13 @@
 
 open Genesis_chain
 
-let patch_context json ctxt =
+let patch_context key_json ctxt =
   begin
-    match json with
+    match key_json with
     | None -> Lwt.return ctxt
-    | Some json ->
+    | Some (key, json) ->
         Tezos_storage.Context.set ctxt
-          ["sandbox_parameter"]
+          [key]
           (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
   end >>= fun ctxt ->
   let module Proto = (val Registered_protocol.get_exn genesis.protocol) in

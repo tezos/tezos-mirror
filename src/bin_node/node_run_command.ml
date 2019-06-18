@@ -141,6 +141,8 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
         in
         return_some (p2p_config, config.p2p.limits)
   end >>=? fun p2p_config ->
+  let sandbox_param =
+    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_param in
   let node_config : Node.config = {
     genesis ;
     patch_context = Some (Patch_context.patch_context sandbox_param) ;
