@@ -33,7 +33,8 @@ let addr_parameter =
   let open Clic in
   param ~name:"address"
     ~desc:"<IPv4>:PORT or <IPV6>:PORT address (PORT defaults to 9732)."
-    (parameter (fun _ x -> return (P2p_point.Id.of_string_exn x)))
+    (parameter
+       (fun _ x -> return (P2p_point.Id.of_string_exn ~default_port:9732 x)))
 
 let commands () =
   let open Clic in
