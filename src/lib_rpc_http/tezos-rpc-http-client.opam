@@ -9,8 +9,7 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "ocplib-resto-directory"
-  "ocplib-resto-cohttp"
+  "tezos-rpc-http"
   "ocplib-resto-cohttp-client"
 ]
 build: [

@@ -9,8 +9,9 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-stdlib-unix"
   "cohttp-lwt-unix" { >= "1.0.0" }
-  "ocplib-resto-cohttp-client"
+  "tezos-rpc-http-client"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
