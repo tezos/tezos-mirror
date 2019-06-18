@@ -23,6 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type attempt_event = { attempt : int; delay : float; text : string }
+
+module Attempt_logging = Internal_event.Make(struct
+    type t = attempt_event
+
+    let name = "rpc_http_attempt"
+
+    let doc = "Error emmited when an HTTP request returned a 502 error."
+
+    let encoding = Data_encoding.(
+        conv
+          (fun { attempt; delay; text } -> (attempt, delay, text))
+          (fun (attempt, delay, text) -> { attempt; delay; text })
+          (obj3 (req "attempt" int8) (req "delay" float) (req "text" string)))
+
+    let pp f { attempt; delay; text } =
+      Format.fprintf
+        f "Attempt number %d/10, will retry after %g seconds.\n\
+           Original body follows.\n\
+           %s" attempt delay text
+
+    let level _ = Internal_event.Error
+  end)
+
 include RPC_client.Make(struct
     include Cohttp_lwt_unix.Client
 
@@ -38,11 +62,7 @@ include RPC_client.Make(struct
         | `Bad_gateway ->
             let log_ansbody = clone_body ansbody in
             Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
-            (* FIXME use the logging system *)
-            Format.eprintf
-              "Attempt number %d/10, will retry after %g seconds.\n\
-               Original body follows.\n\
-               %s" attempt delay text ;
+            Attempt_logging.emit (fun () -> { attempt ; delay ; text }) >>= fun _ ->
             if attempt >= 10 then
               Lwt.return (response, ansbody)
             else
