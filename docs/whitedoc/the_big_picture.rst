@@ -70,7 +70,7 @@ is fully inter-operable, and auto descriptive, using JSON schema.
 .. |Tezos architecture diagram| image:: octopus.svg
 
 
-Software Architecture and Package Relashionships
+Software Architecture and Packages Relationship
 ------------------------------------------------
 .. _packages:
 
@@ -238,7 +238,7 @@ The Client Library
 ~~~~~~~~~~~~~~~~~~
 
 The client is split into many packages, to enforce three separation
-lines: shell vs economic protocol, Unix dependent vs Javascript
+lines: shell vs economic protocol, Unix dependent vs JavaScript
 compatible, and library vs command line interface.
 
   - :package:`tezos-client-base` define the client context, which is
@@ -311,7 +311,7 @@ The Final Executables
     readme).
   - :package:`tezos-client` provides the ``tezos-client`` and
     ``tezos-admin-client`` binaries. The former contains a small
-    comand line wallet, the latter an administration tool for the
+    command line wallet, the latter an administration tool for the
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
   - :package:`tezos-baker-alpha` provides the ``tezos-baker-alpha``

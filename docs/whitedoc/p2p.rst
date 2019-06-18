@@ -88,12 +88,13 @@ will decide how this new connection must be handled.
 
 The welcome worker takes care of filtering all incoming connections using two
 static lists of addresses handled either by ``tezos-admin-client`` and a system
-table that is handled automatically by the p2p layer. The node admin can block
-or whitelist individual ip addresses, while the p2p layer is in charge of
-temporarily banning ip addresses and peers who misbehave. The delay to remove
-an ip address from the greylist table is defined by the configuration variable
+table that is handled automatically by the P2P layer. The node administrator can
+block or whitelist individual IP addresses, while the P2P layer is in charge of
+temporarily banning IP addresses and peers who misbehave. The delay to remove an
+IP address from the greylist table is defined by the configuration variable
 ``greylist_timeout``, while peers that are greylisted are periodically removed.
-The node admin can also flush greylist tables with the ``tezos-admin-client``.
+The node administrator can also flush greylist tables with the
+``tezos-admin-client``.
 
 Maintenance worker
 ------------------
@@ -124,4 +125,4 @@ Given these bounds, the maintenance worker:
   more than ``max_target`` connections).
 
 The maintenance worker is also in charge of periodically run the
-greylists GC functions to unban ip addresses from the greylist.
+greylists GC functions to unban IP addresses from the greylist.

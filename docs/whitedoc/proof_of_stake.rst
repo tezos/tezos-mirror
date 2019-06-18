@@ -308,7 +308,7 @@ Accusations
 -----------
 
 If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, the evidence can be collected by an accurser and included
+height by a delegate, the evidence can be collected by an accuser and included
 in a block for a period of PRESERVED_CYCLES, including the current cycle.
 
 This accusation forfeits the entirety of the safety deposit and future reward up
