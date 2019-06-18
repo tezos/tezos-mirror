@@ -54,7 +54,6 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
 
   val generic_call:
     [< Resto.meth ] ->
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?accept:Media_type.Make(Encoding).t list ->
     ?body:Cohttp_lwt.Body.t ->

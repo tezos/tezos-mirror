@@ -74,7 +74,6 @@ module type S = sig
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
 
   val generic_json_call :
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?body:Data_encoding.json ->
     [< RPC_service.meth ] -> Uri.t ->
@@ -84,7 +83,6 @@ module type S = sig
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
   val generic_call :
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?accept:Media_type.t list ->
     ?body:Cohttp_lwt.Body.t ->

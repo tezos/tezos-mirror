@@ -74,7 +74,6 @@ module type S = sig
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
 
   val generic_json_call :
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?body:Data_encoding.json ->
     [< RPC_service.meth ] -> Uri.t ->
@@ -84,7 +83,6 @@ module type S = sig
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
   val generic_call :
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?accept:Media_type.t list ->
     ?body:Cohttp_lwt.Body.t ->
@@ -111,9 +109,9 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     let meth = ( meth : [< RPC_service.meth ] :> RPC_service.meth) in
     fail (RPC_client_errors.Request_failed { meth ; uri ; error })
 
-  let generic_call ?logger ?headers ?accept ?body ?media meth uri :
+  let generic_call ?headers ?accept ?body ?media meth uri :
     (content, content) RPC_context.rest_result Lwt.t =
-    Client.generic_call meth ?logger ?headers ?accept ?body ?media uri >>= function
+    Client.generic_call meth ?headers ?accept ?body ?media uri >>= function
     | `Ok (Some v) -> return (`Ok v)
     | `Ok None -> request_failed meth uri Empty_answer
     | `Conflict _
@@ -168,14 +166,14 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
                                        acceptable = [Media_type.(name json)] ;
                                        body })
 
-  let generic_json_call ?logger ?headers ?body meth uri :
+  let generic_json_call ?headers ?body meth uri :
     (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
     let body =
       Option.map body ~f:begin fun b ->
         (Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
       end in
     let media = Media_type.json in
-    generic_call meth ?logger ?headers ~accept:Media_type.[bson ; json]
+    generic_call meth ?headers ~accept:Media_type.[bson ; json]
       ?body ~media uri >>=? function
     | `Ok (body, (Some ("application", "json") | None), _) -> begin
         Cohttp_lwt.Body.to_string body >>= fun body ->
@@ -325,7 +323,7 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         let path = Uri.path uri and query = Uri.query uri in
         let uri = Uri.with_path base path in
         let uri = Uri.with_query uri query in
-        generic_json_call ~logger meth ?body uri
+        generic_json_call meth ?body uri
       method call_service
         : 'm 'p 'q 'i 'o.
           ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
