@@ -31,7 +31,9 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
-type validator_kind = Internal of Context.index
+type validator_kind =
+  | Internal of Context.index
+  | External of Context.index * string * string * string * string
 
 val create :
   limits ->
