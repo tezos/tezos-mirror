@@ -638,52 +638,27 @@ opam:046:tezos-client-004-Pt24m4xi:
   variables:
     package: tezos-client-004-Pt24m4xi
 
-<<<<<<< HEAD
 opam:047:tezos-client-005-PsBabyM1:
-=======
-opam:045:tezos-version:
-  <<: *opam_definition
-  variables:
-    package: tezos-version
-
-opam:046:tezos-client-005-PsBABY5H:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
   <<: *opam_definition
   variables:
     package: tezos-client-005-PsBabyM1
 
-<<<<<<< HEAD
 opam:048:tezos-protocol-001-PtCJ7pwo:
-=======
-opam:047:tezos-protocol-001-PtCJ7pwo:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
   <<: *opam_definition
   variables:
     package: tezos-protocol-001-PtCJ7pwo
 
-<<<<<<< HEAD
 opam:049:tezos-protocol-002-PsYLVpVv:
-=======
-opam:048:tezos-protocol-002-PsYLVpVv:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
   <<: *opam_definition
   variables:
     package: tezos-protocol-002-PsYLVpVv
 
-<<<<<<< HEAD
 opam:050:tezos-protocol-003-PsddFKi3:
-=======
-opam:049:tezos-protocol-003-PsddFKi3:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
   <<: *opam_definition
   variables:
     package: tezos-protocol-003-PsddFKi3
 
-<<<<<<< HEAD
 opam:051:tezos-validation:
-=======
-opam:050:tezos-validation:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
   <<: *opam_definition
   variables:
     package: tezos-validation
@@ -908,24 +883,15 @@ opam:095:tezos-protocol-004-Pt24m4xi-tests:
   variables:
     package: tezos-protocol-004-Pt24m4xi-tests
 
-opam:096:tezos-endorser-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-<<<<<<< HEAD
-    package: tezos-endorser-005-PsBabyM1
-=======
-    package: tezos-endorser-005-PsBABY5H-commands
-
 opam:096:flextesa:
   <<: *opam_definition
   variables:
     package: flextesa
 
-opam:097:tezos-accuser-005-PsBABY5H:
+opam:097:tezos-endorser-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-005-PsBABY5H
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
+    package: tezos-endorser-005-PsBabyM1
 
 opam:098:tezos-baker-004-Pt24m4xi:
   <<: *opam_definition
@@ -937,49 +903,37 @@ opam:099:tezos-endorser-004-Pt24m4xi-commands:
   variables:
     package: tezos-endorser-004-Pt24m4xi-commands
 
-<<<<<<< HEAD
-opam:099:tezos-network-sandbox:
+opam:100:tezos-fork-validator:
   <<: *opam_definition
   variables:
-    package: tezos-network-sandbox
+    package: tezos-fork-validator
 
-opam:100:tezos-signer:
-=======
-opam:100:tezos-endorser-005-PsBABY5H:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
+opam:101:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-<<<<<<< HEAD
-opam:101:tezos-baker-005-PsBabyM1:
-=======
-opam:101:tezos-baker-005-PsBABY5H:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
+opam:102:tezos-baker-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-baker-005-PsBabyM1
 
-<<<<<<< HEAD
-opam:102:tezos-protocol-005-PsBabyM1-tests:
+opam:103:tezos-protocol-005-PsBabyM1-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBabyM1-tests
 
-opam:103:tezos-accuser-005-PsBabyM1:
-=======
-opam:102:tezos-signer:
->>>>>>> e7e9a7952... Use vendored flextesa (at `357fd56b85`)
+opam:104:tezos-accuser-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-accuser-005-PsBabyM1
 
-opam:104:tezos-node:
+opam:105:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:105:tezos-005-PsBabyM1-test-helpers:
+opam:106:tezos-005-PsBabyM1-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-005-PsBabyM1-test-helpers

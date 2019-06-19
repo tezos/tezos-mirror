@@ -17,6 +17,7 @@ __pycache__
 /docs/api/tezos-endorser-*.html
 
 /tezos-node
+/tezos-fork-validator
 /tezos-protocol-compiler
 /tezos-client
 /tezos-admin-client

@@ -19,6 +19,7 @@ ifneq (${current_ocaml_version},${ocaml_version})
 endif
 	@dune build \
 		src/bin_node/main.exe \
+		src/bin_validation/main_fork_validator.exe \
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
 		src/bin_signer/main_signer.exe \
@@ -29,6 +30,7 @@ endif
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json)
 	@cp _build/default/src/bin_node/main.exe tezos-node
+	@cp _build/default/src/bin_validation/main_fork_validator.exe tezos-fork-validator
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
@@ -121,6 +123,7 @@ clean:
 	@-find . -name dune-project -delete
 	@-rm -f \
 		tezos-node \
+		tezos-fork-validator \
 		tezos-client \
 		tezos-signer \
 		tezos-admin-client \
