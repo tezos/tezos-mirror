@@ -11,6 +11,7 @@ depends: [
   "tezos-base"
   "tezos-client-base"
   "tezos-rpc"
+  "tezos-p2p"
   "tezos-shell-services"
   "tezos-signer-backends"
   "tezos-stdlib-unix"
