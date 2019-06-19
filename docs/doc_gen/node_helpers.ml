@@ -43,6 +43,7 @@ let with_node f =
         patch_context = None;
         store_root = dir / "store";
         context_root = dir / "context";
+        protocol_root = dir / "protocol";
         p2p = None;
         test_chain_max_tll = None;
         checkpoint = None;
