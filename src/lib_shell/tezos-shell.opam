@@ -15,7 +15,7 @@ depends: [
   "tezos-validation"
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
-  "tezos-embedded-protocol-demo" { with-test }
+  "tezos-embedded-protocol-demo-noops" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

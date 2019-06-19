@@ -230,8 +230,8 @@ Three economic protocols are included in the main Tezos repository.
     (:package:`tezos-embedded-protocol-alpha`) is the first real
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
     to start reading the protocol's code.
-  - :package:`tezos-protocol-demo`
-    (:package:`tezos-embedded-protocol-demo`) is just a demo protocol
+  - :package:`tezos-protocol-demo-noops`
+    (:package:`tezos-embedded-protocol-demo-noops`) is just a demo protocol
     that does nothing interesting but has the right shape.
 
 The Client Library

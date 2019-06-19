@@ -10,7 +10,7 @@
             tezos-storage
             tezos-protocol-updater
             tezos-embedded-protocol-genesis
-            tezos-embedded-protocol-demo
+            tezos-embedded-protocol-demo-noops
             tezos-embedded-protocol-alpha
             cmdliner
             tls)

@@ -70,14 +70,14 @@ class TestActivation:
 
     def test_proto_known(self, client):
         res = client.list_protocols()
-        assert 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9' in res
+        assert 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp' in res
 
     def test_first_protocol(self, client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
     def test_activate_demo(self, client):
-        proto = 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9'
+        proto = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
         parameters = {}
         res = client.activate_protocol_json(proto, parameters, key='activator',
                                             fitness='1')

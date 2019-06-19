@@ -1,7 +1,7 @@
 import time
 import pytest
 
-PROTO = 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9'
+PROTO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
 PARAMS = ['-p', PROTO_GENESIS]
 
@@ -32,7 +32,7 @@ def forge_block_header_data(protocol_data):
 
 @pytest.mark.incremental
 class TestProtoDemo:
-    """Activate demo protocol, injection some operations and bake block.
+    """Activate protocol demo_noops, injection some operations and bake block.
 
     This test relies on the fixture client which launches a single
     sandboxed node.
@@ -46,7 +46,7 @@ class TestProtoDemo:
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
-    def test_activate_demo(self, client):
+    def test_activate_proto(self, client):
         parameters = {}
         res = client.activate_protocol_json(PROTO, parameters, key='activator',
                                             fitness='1')

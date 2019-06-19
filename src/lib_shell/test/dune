@@ -6,7 +6,7 @@
             tezos-protocol-updater
             tezos-shell
             tezos-shell-services
-            tezos-embedded-protocol-demo
+            tezos-embedded-protocol-demo-noops
             tezos-stdlib-unix
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives

@@ -234,10 +234,10 @@ integration:proto:sandbox:
 integration:sandboxes:voting:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-voting-demo dune build @src/bin_flextesa/runtest_sandbox_voting_demo
+    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_flextesa/runtest_sandbox_voting_demo_noops
   artifacts:
     paths:
-    - flextesa-voting-demo
+    - flextesa-voting-demo-noops
     expire_in: 1 day
     when: on_failure
   allow_failure: true # This test uses too much resources for GitLab's workers
@@ -342,10 +342,10 @@ integration:snapshot:
   script:
     - pytest tests_python/tests/test_multinode_snapshot.py
 
-integration:proto_demo:
+integration:proto_demo_noops:
   <<: *integration_definition
   script:
-    - pytest tests_python/tests/test_proto_demo_manual_bake.py
+    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
 
 ##END_INTEGRATION_PYTHON##
 
@@ -609,10 +609,10 @@ opam:44:ocplib-resto-json:
   variables:
     package: ocplib-resto-json
 
-opam:45:tezos-protocol-demo:
+opam:45:tezos-protocol-demo-noops:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-demo
+    package: tezos-protocol-demo-noops
 
 opam:46:tezos-protocol-genesis:
   <<: *opam_definition
@@ -664,10 +664,10 @@ opam:56:tezos-embedded-protocol-alpha:
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:57:tezos-embedded-protocol-demo:
+opam:57:tezos-embedded-protocol-demo-noops:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-demo
+    package: tezos-embedded-protocol-demo-noops
 
 opam:58:tezos-embedded-protocol-genesis:
   <<: *opam_definition

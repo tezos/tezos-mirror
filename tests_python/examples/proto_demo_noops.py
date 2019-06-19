@@ -3,7 +3,7 @@ from tools import constants, paths
 from launchers.sandbox import Sandbox
 
 
-PROTO_DEMO = 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9'
+PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
 PARAMS = ['-p', PROTO_GENESIS]
 

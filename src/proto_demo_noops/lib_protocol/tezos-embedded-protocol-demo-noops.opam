@@ -14,10 +14,10 @@ depends: [
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"
       "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "dune" "demo" ]
+      "dune" "demo_noops" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: demo (economic-protocol definition, embedded in `tezos-node`)"
+synopsis: "Tezos/Protocol: demo_noops (economic-protocol definition, embedded in `tezos-node`)"

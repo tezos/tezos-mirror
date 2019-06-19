@@ -37,7 +37,7 @@ endif
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	 done
 
-PROTOCOLS := genesis alpha demo
+PROTOCOLS := genesis alpha demo_noops
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 generate_dune: ${DUNE_INCS}

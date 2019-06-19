@@ -614,7 +614,7 @@ let cmd ~pp_error () =
                (info [] ~docv:"LOOSER-PROTOCOL-PATH"
                   ~doc:
                     "The protocol to inject and down-vote, e.g. \
-                     `./src/bin_client/test/demo/TEZOS_PROTOCOL`.")))
+                     `./src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`.")))
     $ Tezos_executable.cli_term `Node "current"
     $ Tezos_executable.cli_term `Client "current"
     $ Tezos_executable.cli_term `Admin "current"
