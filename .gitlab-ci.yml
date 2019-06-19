@@ -678,15 +678,15 @@ opam:54:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:55:tezos-embedded-protocol-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-alpha
-
-opam:56:tezos-shell:
+opam:55:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
+
+opam:56:tezos-embedded-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-alpha
 
 opam:57:tezos-protocol-alpha-parameters:
   <<: *opam_definition
@@ -778,12 +778,17 @@ opam:74:tezos-baker-alpha:
   variables:
     package: tezos-baker-alpha
 
-opam:75:tezos-signer:
+opam:75:tezos-fork-validator:
+  <<: *opam_definition
+  variables:
+    package: tezos-fork-validator
+
+opam:76:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:76:tezos-node:
+opam:77:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node

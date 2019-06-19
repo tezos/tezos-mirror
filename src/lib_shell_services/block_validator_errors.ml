@@ -400,6 +400,43 @@ let pp_block_error ppf = function
         Error_monad.pp_print_error
         err
 
+type validation_process_error =
+  | Missing_handshake
+  | Inconsistent_handshake of string
+  | Protocol_dynlink_failure of string
+
+let validation_process_error_encoding =
+  let open Data_encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Missing_handshake"
+        (obj1 (req "constant" (constant "missing_handshake")))
+        (function Missing_handshake -> Some () | _ -> None)
+        (fun () -> Missing_handshake);
+      case
+        (Tag 1)
+        ~title:"Inconsistent_handshake"
+        (obj1 (req "inconsistent_handshake" string))
+        (function Inconsistent_handshake msg -> Some msg | _ -> None)
+        (fun msg -> Inconsistent_handshake msg);
+      case
+        (Tag 2)
+        ~title:"Protocol_dynlink_failure"
+        (obj1 (req "pretocol_dynlink_failure" string))
+        (function Protocol_dynlink_failure msg -> Some msg | _ -> None)
+        (fun msg -> Protocol_dynlink_failure msg) ]
+
+let pp_validation_process_error ppf = function
+  | Missing_handshake ->
+      Format.fprintf
+        ppf
+        "Missing handshake while initializing validation process."
+  | Protocol_dynlink_failure msg ->
+      Format.fprintf ppf "%s" msg
+  | Inconsistent_handshake msg ->
+      Format.fprintf ppf "Inconsistent handshake: %s." msg
+
 type error +=
   | Invalid_block of {block : Block_hash.t; error : block_error}
   | Unavailable_protocol of {block : Block_hash.t; protocol : Protocol_hash.t}
@@ -411,6 +448,7 @@ type error +=
   | Failed_to_checkout_context of Context_hash.t
   | System_error of {errno : Unix.error; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
+  | Validation_process_failed of validation_process_error
 
 let () =
   Error_monad.register_error_kind
@@ -487,7 +525,7 @@ let () =
       Inconsistent_operations_hash {block; expected; found}) ;
   Error_monad.register_error_kind
     `Permanent
-    ~id:"Validator_process.failed_to_checkout_context"
+    ~id:"Block_validator_process.failed_to_checkout_context"
     ~title:"Fail during checkout context"
     ~description:"The context checkout failed using a given hash"
     ~pp:(fun ppf (hash : Context_hash.t) ->
@@ -529,6 +567,20 @@ let () =
         protocol)
     Data_encoding.(obj1 (req "test_protocol" Protocol_hash.encoding))
     (function Missing_test_protocol protocol -> Some protocol | _ -> None)
-    (fun protocol -> Missing_test_protocol protocol)
+    (fun protocol -> Missing_test_protocol protocol) ;
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"validator.validation_process_failed"
+    ~title:"Validation process failed"
+    ~description:"Failed to validate block using exteranl validation process."
+    ~pp:(fun ppf error ->
+      Format.fprintf
+        ppf
+        "Failed to validate block using exteranl validation process. %a"
+        pp_validation_process_error
+        error)
+    Data_encoding.(obj1 (req "error" validation_process_error_encoding))
+    (function Validation_process_failed error -> Some error | _ -> None)
+    (fun error -> Validation_process_failed error)
 
 let invalid_block block error = Invalid_block {block; error}
