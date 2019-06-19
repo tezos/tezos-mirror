@@ -31,6 +31,7 @@ type config = {
   genesis : State.Chain.genesis;
   store_root : string;
   context_root : string;
+  protocol_root : string;
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
   test_chain_max_tll : int option;
@@ -72,6 +73,7 @@ val default_chain_validator_limits : chain_validator_limits
 
 val create :
   ?sandboxed:bool ->
+  ?multiprocess:string ->
   config ->
   peer_validator_limits ->
   block_validator_limits ->
