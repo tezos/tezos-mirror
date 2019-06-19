@@ -34,6 +34,7 @@ type limits = {
 
 type validator_kind = Block_validator_process.validator_kind =
   | Internal of Context.index
+  | External of Context.index * string * string * string * string
 
 module Name = struct
   type t = unit
