@@ -441,14 +441,16 @@ let chain_state {chain_state; _} = chain_state
 let db {global_db; _} = global_db
 
 let information
-    ({ global_db = {p2p_readers; active_chains; _};
+    ({
+       global_db = {p2p_readers; active_chains; _};
        operation_db;
        operations_db;
        block_header_db;
        operation_hashes_db;
        active_connections;
        active_peers;
-       _ } :
+       _;
+     } :
       chain_db) =
   {
     Chain_validator_worker_state.Distributed_db_state.p2p_readers_length =

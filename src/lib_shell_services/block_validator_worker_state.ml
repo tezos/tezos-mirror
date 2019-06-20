@@ -72,7 +72,8 @@ module Event = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Debug"
           (obj1 (req "message" string))
@@ -95,7 +96,8 @@ module Event = struct
              (dft "errors" RPC_error.encoding []))
           (function
             | Validation_failure (r, s, err) -> Some (r, s, err) | _ -> None)
-          (fun (r, s, err) -> Validation_failure (r, s, err)) ]
+          (fun (r, s, err) -> Validation_failure (r, s, err));
+      ]
 
   let pp ppf = function
     | Debug msg ->

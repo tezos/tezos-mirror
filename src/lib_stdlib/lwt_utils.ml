@@ -121,8 +121,8 @@ let stable_sort cmp l =
                 Lwt.return [x1; x2; x3]
             | _ -> (
                 cmp x1 x3
-                >|= function x when x <= 0 -> [x1; x3; x2] | _ -> [x3; x1; x2]
-                ) )
+                >|= function
+                | x when x <= 0 -> [x1; x3; x2] | _ -> [x3; x1; x2] ) )
         | _ -> (
             cmp x1 x3
             >>= function
@@ -130,8 +130,8 @@ let stable_sort cmp l =
                 Lwt.return [x2; x1; x3]
             | _ -> (
                 cmp x2 x3
-                >|= function x when x <= 0 -> [x2; x3; x1] | _ -> [x3; x2; x1]
-                ) ) )
+                >|= function
+                | x when x <= 0 -> [x2; x3; x1] | _ -> [x3; x2; x1] ) ) )
     | (n, l) ->
         let n1 = n asr 1 in
         let n2 = n - n1 in

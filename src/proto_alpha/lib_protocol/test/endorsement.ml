@@ -55,9 +55,11 @@ let get_expected_reward ?(priority = 0) ~nb_baking ~nb_endorsement ctxt =
 let get_expected_deposit ctxt ~nb_baking ~nb_endorsement =
   Context.get_constants ctxt
   >>=? fun Constants.
-             { parametric =
+             {
+               parametric =
                  {endorsement_security_deposit; block_security_deposit; _};
-               _ } ->
+               _;
+             } ->
   let open Environment in
   let open Tez in
   endorsement_security_deposit *? Int64.of_int nb_endorsement
@@ -226,8 +228,8 @@ let reward_retrieval () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_constants (B b)
-  >>=? fun Constants.{parametric = {preserved_cycles; endorsement_reward; _}; _}
-           ->
+  >>=? fun Constants.
+             {parametric = {preserved_cycles; endorsement_reward; _}; _} ->
   Context.get_endorser (B b)
   >>=? fun (endorser, slots) ->
   Context.Contract.balance (B b) (Contract.implicit_contract endorser)
@@ -260,12 +262,16 @@ let reward_retrieval_two_endorsers () =
   >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
-             { parametric =
-                 { preserved_cycles;
+             {
+               parametric =
+                 {
+                   preserved_cycles;
                    endorsement_reward;
                    endorsement_security_deposit;
-                   _ };
-               _ } ->
+                   _;
+                 };
+               _;
+             } ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   let endorser1 = List.hd endorsers in
@@ -524,7 +530,8 @@ let no_enough_for_deposit () =
           false)
 
 let tests =
-  [ Test.tztest "Simple endorsement" `Quick simple_endorsement;
+  [
+    Test.tztest "Simple endorsement" `Quick simple_endorsement;
     Test.tztest "Maximum endorsement" `Quick max_endorsement;
     Test.tztest "Consistent priority" `Quick consistent_priority;
     Test.tztest "Consistent priorities" `Quick consistent_priorities;
@@ -534,10 +541,11 @@ let tests =
       `Quick
       reward_retrieval_two_endorsers;
     (* Fail scenarios *)
-    Test.tztest
-      "Wrong endorsement predecessor"
-      `Quick
-      wrong_endorsement_predecessor;
+      Test.tztest
+        "Wrong endorsement predecessor"
+        `Quick
+        wrong_endorsement_predecessor;
     Test.tztest "Invalid endorsement level" `Quick invalid_endorsement_level;
     Test.tztest "Duplicate endorsement" `Quick duplicate_endorsement;
-    Test.tztest "Not enough for deposit" `Quick no_enough_for_deposit ]
+    Test.tztest "Not enough for deposit" `Quick no_enough_for_deposit;
+  ]

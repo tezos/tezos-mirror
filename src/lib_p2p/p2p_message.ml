@@ -48,7 +48,8 @@ let encoding msg_encoding =
   dynamic_size
   @@ union
        ~tag_size:`Uint16
-       ( [ case
+       ( [
+           case
              (Tag 0x01)
              ~title:"Disconnect"
              (obj1 (req "kind" (constant "Disconnect")))
@@ -93,7 +94,8 @@ let encoding msg_encoding =
                    Some (point, peer_id, ())
                | _ ->
                    None)
-             (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ]
+             (fun (point, peer_id, ()) -> Swap_ack (point, peer_id));
+         ]
        @ ListLabels.map msg_encoding ~f:(function
              | Encoding
                  {tag; title; encoding; wrap; unwrap; max_length = _ (* ?? *)}

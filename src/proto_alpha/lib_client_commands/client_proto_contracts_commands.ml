@@ -35,7 +35,8 @@ let group =
 
 let commands () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"Add a contract to the wallet."
       (args1 (RawContractAlias.force_switch ()))
@@ -83,5 +84,5 @@ let commands () =
       ( prefixes ["show"; "known"; "contract"]
       @@ RawContractAlias.alias_param @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        cctxt#message "%a\n%!" Contract.pp contract >>= fun () -> return_unit)
+        cctxt#message "%a\n%!" Contract.pp contract >>= fun () -> return_unit);
   ]

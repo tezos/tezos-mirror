@@ -610,12 +610,14 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
          RPC_directory.gen_register
            !dir
            (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-           (fun { applied;
+           (fun {
+                  applied;
                   refusals = refused;
                   branch_refusals = branch_refused;
                   branch_delays = branch_delayed;
                   operation_stream;
-                  _ }
+                  _;
+                }
                 params
                 ()
                 ->
@@ -835,11 +837,13 @@ module Make (Proto : Registered_protocol.T) (Arg : ARG) : T = struct
     let on_launch w _ (limits, chain_db) =
       let chain_state = Distributed_db.chain_state chain_db in
       Chain.data chain_state
-      >>= fun { current_head = predecessor;
+      >>= fun {
+                current_head = predecessor;
                 current_mempool = mempool;
                 live_blocks;
                 live_operations;
-                _ } ->
+                _;
+              } ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation.create ~predecessor ~timestamp ()

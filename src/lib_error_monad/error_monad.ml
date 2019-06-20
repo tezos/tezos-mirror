@@ -93,13 +93,16 @@ struct
            | Error_kind {id = ""; _} ->
                []
            | Error_kind
-               { id;
+               {
+                 id;
                  title;
                  description;
                  category = Main category;
                  encoding_case;
-                 _ } ->
-               [ {
+                 _;
+               } ->
+               [
+                 {
                    id;
                    title;
                    description;
@@ -107,7 +110,8 @@ struct
                    schema =
                      Data_encoding.Json.schema
                        (Data_encoding.union [encoding_case]);
-                 } ]
+                 };
+               ]
            | Error_kind {category = Wrapped (module WEM); _} ->
                List.map
                  (fun {WEM.id; title; description; category; schema} ->
@@ -397,7 +401,8 @@ struct
     let t_encoding = obj1 (req "result" t_encoding) in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           t_encoding
           ~title:"Ok"
@@ -408,7 +413,8 @@ struct
           errors_encoding
           ~title:"Error"
           (function Error x -> Some x | _ -> None)
-          (fun errs -> Error errs) ]
+          (fun errs -> Error errs);
+      ]
 
   let return v = Lwt.return_ok v
 

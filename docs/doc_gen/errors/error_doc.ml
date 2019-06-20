@@ -40,11 +40,13 @@ let default_section_title = "Miscellaneous"
    bottom of the document. Unprefixed ids or unreferenced prefixes
    will default to `Miscellaneous` *)
 let section_titles =
-  [ (["proto.alpha"], "Protocol Alpha");
+  [
+    (["proto.alpha"], "Protocol Alpha");
     (["distributed_db"; "node"; "raw_store"; "validator"; "worker"], "Shell");
     (["micheline"; "michelson"], "Michelson parsing/macros");
     (["rpc_client"], "Client");
-    (["cli"; "utils"; default_section_id], default_section_title) ]
+    (["cli"; "utils"; default_section_id], default_section_title);
+  ]
 
 let pp_rst_title ~char ppf title =
   let sub = String.map (fun _ -> char) title in

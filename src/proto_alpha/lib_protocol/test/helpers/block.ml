@@ -81,10 +81,12 @@ let get_next_baker_by_account pkh block =
     ~max_priority:256
     block
   >>=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     List.hd bakers
   in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
@@ -92,10 +94,12 @@ let get_next_baker_by_account pkh block =
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
   >>=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     List.find
       (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
         not (List.mem delegate excludes))

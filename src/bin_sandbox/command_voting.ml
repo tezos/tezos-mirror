@@ -15,10 +15,12 @@ let setup_baking_ledger state uri ~client =
   Interactive_test.Pauser.generic
     state
     EF.
-      [ wf "Setting up the ledger device %S" uri;
+      [
+        wf "Setting up the ledger device %S" uri;
         haf
           "Please make sure the ledger is on the Baking app and quit (`q`) \
-           this prompt to continue." ]
+           this prompt to continue.";
+      ]
     ~force:true
   >>= fun () ->
   let key_name = "ledgered" in
@@ -45,7 +47,8 @@ let setup_baking_ledger state uri ~client =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "setup";
+    [
+      "setup";
       "ledger";
       "to";
       "bake";
@@ -54,7 +57,8 @@ let setup_baking_ledger state uri ~client =
       "--main-hwm";
       "0";
       "--test-hwm";
-      "0" ]
+      "0";
+    ]
   >>= fun _ -> return baker
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
@@ -63,7 +67,8 @@ let transfer state ~client ~src ~dst ~amount =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "--wait";
+    [
+      "--wait";
       "none";
       "transfer";
       sprintf "%Ld" amount;
@@ -74,13 +79,15 @@ let transfer state ~client ~src ~dst ~amount =
       "--fee";
       "0.05";
       "--burn-cap";
-      "0.3" ]
+      "0.3";
+    ]
 
 let register state ~client ~dst =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "--wait";
+    [
+      "--wait";
       "none";
       "register";
       "key";
@@ -88,7 +95,8 @@ let register state ~client ~dst =
       "as";
       "delegate";
       "--fee";
-      "0.05" ]
+      "0.05";
+    ]
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
@@ -239,7 +247,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           state
           ~command_names:["wc"; "winner-client"]
           ?make_admin:None
-          ~clients:[winner_client] ] ;
+          ~clients:[winner_client];
+      ] ;
   Interactive_test.Pauser.generic
     state
     EF.[wf "You can now try the new-client"]
@@ -251,7 +260,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           state
           ~command_names:["baker"]
           ~make_admin
-          ~clients:[special_baker.Tezos_client.Keyed.client] ] ;
+          ~clients:[special_baker.Tezos_client.Keyed.client];
+      ] ;
   transfer
     state (* Tezos_client.successful_client_cmd state *)
     ~client:(client 0)
@@ -287,7 +297,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Tezos_client.successful_client_cmd
     state
     ~client:(client 0)
-    [ "--wait";
+    [
+      "--wait";
       "none";
       "register";
       "key";
@@ -295,7 +306,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       "as";
       "delegate";
       "--fee";
-      "0.5" ]
+      "0.5";
+    ]
   >>= fun _ ->
   let activation_bakes =
     let open Tezos_protocol in
@@ -376,8 +388,10 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     Interactive_test.Pauser.generic
       state
       EF.
-        [ af "Just injected %s (%s): %s" name path hash;
-          markdown_verbatim (String.concat ~sep:"\n" res#out) ]
+        [
+          af "Just injected %s (%s): %s" name path hash;
+          markdown_verbatim (String.concat ~sep:"\n" res#out);
+        ]
     >>= fun () -> return hash
   in
   make_and_inject_protocol "winner" winner_path
@@ -393,7 +407,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Network up";
+      [
+        af "Network up";
         desc (haf "Protcols")
         @@ list
              (List.map after_injections_protocols ~f:(fun p ->
@@ -409,14 +424,16 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                       | _ when p = demo_hash ->
                           "injected demo"
                       | _ ->
-                          "injected unknown" ))) ]
+                          "injected unknown" )));
+      ]
   >>= fun () ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       Interactive_test.Pauser.generic
         state
         EF.
-          [ af "About to VOTE";
-            haf "Please switch to the Wallet app and quit (`q`) this prompt."
+          [
+            af "About to VOTE";
+            haf "Please switch to the Wallet app and quit (`q`) this prompt.";
           ]
         ~force:true)
   >>= fun (_ : unit option) ->
@@ -533,10 +550,12 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                 Interactive_test.Pauser.generic
                   state
                   EF.
-                    [ af "About to bake on the test chain.";
+                    [
+                      af "About to bake on the test chain.";
                       haf
                         "Please switch back to the Baking app and quit (`q`) \
-                         this prompt." ]
+                         this prompt.";
+                    ]
                   ~force:true)
             >>= fun (_ : unit option) ->
             let testing_bakes = 5 in
@@ -628,9 +647,10 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       Interactive_test.Pauser.generic
         state
         EF.
-          [ af "About to cast approval ballot.";
+          [
+            af "About to cast approval ballot.";
             haf
-              "Please switch back to the Wallet app and quit (`q`) this prompt."
+              "Please switch back to the Wallet app and quit (`q`) this prompt.";
           ]
         ~force:true
       >>= fun () ->
@@ -660,14 +680,16 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Final ballot(s) are baked in.";
+      [
+        af "Final ballot(s) are baked in.";
         af
           "The client `%s` understands the following protocols: %s"
           Tezos_executable.(
             Option.value
               ~default:(default_binary client_exec)
               client_exec.binary)
-          (String.concat ~sep:", " client_protocols_result#out) ]
+          (String.concat ~sep:", " client_protocols_result#out);
+      ]
   >>= fun () ->
   Helpers.wait_for
     state
@@ -752,10 +774,12 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                 Interactive_test.Pauser.generic
                   state
                   EF.
-                    [ af "About to bake on the new winning protocol.";
+                    [
+                      af "About to bake on the new winning protocol.";
                       haf
                         "Please switch to the Baking app and quit (`q`) this \
-                         prompt." ]
+                         prompt.";
+                    ]
                   ~force:true
                 >>= fun () ->
                 Console.say state EF.(wf "Sleeping for a couple of seconds…")
@@ -794,10 +818,12 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.
-      [ haf "End of the Voting test: SUCCESS \\o/";
+      [
+        haf "End of the Voting test: SUCCESS \\o/";
         desc
           (af "Estimated level: %d" (Counter_log.sum level_counter))
-          (markdown_verbatim (Counter_log.to_table_string level_counter)) ]
+          (markdown_verbatim (Counter_log.to_table_string level_counter));
+      ]
   >>= fun () -> return ()
 
 let cmd ~pp_error () =
@@ -923,7 +949,8 @@ $ Arg.(
     $ Test_command_line.cli_state ~name:"voting" () )
     (let doc = "Sandbox network with a full round of voting." in
      let man : Manpage.block list =
-       [ `S "VOTING TEST";
+       [
+         `S "VOTING TEST";
          `P
            "This command provides a test which uses a network sandbox to \
             perform a full round of protocol vote and upgrade, including \
@@ -957,6 +984,7 @@ $ Arg.(
             have to be interactive. In this case, the option \
             `--serialize-proposals` is recommended, because if it is not \
             provided, the proposal vote will be a “Sign Unverfied” \
-            operation." ]
+            operation.";
+       ]
      in
      info ~doc ~man "voting")

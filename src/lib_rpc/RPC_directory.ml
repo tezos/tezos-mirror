@@ -31,7 +31,10 @@ let gen_register dir service handler =
       Lwt.catch
         (fun () -> handler p q i)
         (function
-          | Not_found -> RPC_answer.not_found | exn -> RPC_answer.fail [Exn exn]))
+          | Not_found ->
+              RPC_answer.not_found
+          | exn ->
+              RPC_answer.fail [Exn exn]))
 
 let gen_register =
   ( gen_register

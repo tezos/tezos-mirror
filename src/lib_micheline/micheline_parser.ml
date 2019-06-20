@@ -72,7 +72,8 @@ type token_value =
 let token_value_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"String"
         (obj1 (req "string" string))
@@ -109,11 +110,13 @@ let token_value_encoding =
            (req
               "punctuation"
               (string_enum
-                 [ ("(", Open_paren);
+                 [
+                   ("(", Open_paren);
                    (")", Close_paren);
                    ("{", Open_brace);
                    ("}", Close_brace);
-                   (";", Semi) ])))
+                   (";", Semi);
+                 ])))
         (fun t -> Some t)
         (fun t -> t);
       case
@@ -121,7 +124,8 @@ let token_value_encoding =
         ~title:"Bytes"
         (obj1 (req "bytes" string))
         (function Bytes s -> Some s | _ -> None)
-        (fun s -> Bytes s) ]
+        (fun s -> Bytes s);
+    ]
 
 type token = {token : token_value; loc : location}
 
@@ -588,7 +592,8 @@ let rec parse ?(check = true) errors tokens stack =
          :: rem )
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Int _ | String _ | Bytes _; _}
-      :: ( { token =
+      :: ( {
+             token =
                ( Ident _
                | Int _
                | String _
@@ -597,7 +602,8 @@ let rec parse ?(check = true) errors tokens stack =
                | Close_paren
                | Open_paren
                | Open_brace );
-             _ } as token )
+             _;
+           } as token )
          :: rem )
   | ( Unwrapped (_, _, _, _) :: Toplevel _ :: _,
       ({token = Close_brace; _} as token) :: rem )

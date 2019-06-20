@@ -130,9 +130,11 @@ module ContractAlias = struct
     let desc =
       String.concat
         "\n"
-        [ desc;
+        [
+          desc;
           "Can be an alias, a key, or a literal (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force." ]
+           Use 'text:literal', 'alias:name', 'key:name' to force.";
+        ]
     in
     Clic.param ~name ~desc (destination_parameter ()) next
 
@@ -140,9 +142,11 @@ module ContractAlias = struct
     let doc =
       String.concat
         "\n"
-        [ doc;
+        [
+          doc;
           "Can be an alias, a key, or a literal (autodetected in order).\n\
-           Use 'text:literal', 'alias:name', 'key:name' to force." ]
+           Use 'text:literal', 'alias:name', 'key:name' to force.";
+        ]
     in
     Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 

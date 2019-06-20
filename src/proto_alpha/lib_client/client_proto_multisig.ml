@@ -457,12 +457,16 @@ let action_of_expr e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Left,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Pair,
-              [ Tezos_micheline.Micheline.Int (_, i);
-                Tezos_micheline.Micheline.Bytes (_, s) ],
-              [] ) ],
+              [
+                Tezos_micheline.Micheline.Int (_, i);
+                Tezos_micheline.Micheline.Bytes (_, s);
+              ],
+              [] );
+        ],
         [] ) -> (
     match Tez.of_mutez (Z.to_int64 i) with
     | None ->
@@ -474,25 +478,31 @@ let action_of_expr e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Left,
               [Tezos_micheline.Micheline.Prim (_, Script.D_None, [], [])],
-              [] ) ],
+              [] );
+        ],
         [] ) ->
       return @@ Change_delegate None
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Left,
-              [ Tezos_micheline.Micheline.Prim
+              [
+                Tezos_micheline.Micheline.Prim
                   ( _,
                     Script.D_Some,
                     [Tezos_micheline.Micheline.Bytes (_, s)],
-                    [] ) ],
-              [] ) ],
+                    [] );
+              ],
+              [] );
+        ],
         [] ) ->
       return
       @@ Change_delegate
@@ -503,16 +513,22 @@ let action_of_expr e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Right,
-              [ Tezos_micheline.Micheline.Prim
+              [
+                Tezos_micheline.Micheline.Prim
                   ( _,
                     Script.D_Pair,
-                    [ Tezos_micheline.Micheline.Int (_, threshold);
-                      Tezos_micheline.Micheline.Seq (_, key_bytes) ],
-                    [] ) ],
-              [] ) ],
+                    [
+                      Tezos_micheline.Micheline.Int (_, threshold);
+                      Tezos_micheline.Micheline.Seq (_, key_bytes);
+                    ],
+                    [] );
+              ],
+              [] );
+        ],
         [] ) ->
       map_s
         (function
@@ -551,8 +567,10 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
     | Prim
         ( _,
           D_Pair,
-          [ Int (_, counter);
-            Prim (_, D_Pair, [Int (_, threshold); Seq (_, key_nodes)], _) ],
+          [
+            Int (_, counter);
+            Prim (_, D_Pair, [Int (_, threshold); Seq (_, key_nodes)], _);
+          ],
           _ ) ->
         map_s
           (function
@@ -774,12 +792,14 @@ let action_of_bytes ~multisig_contract ~stored_counter bytes =
       | Tezos_micheline.Micheline.Prim
           ( _,
             Script.D_Pair,
-            [ Tezos_micheline.Micheline.Bytes (_, contract_bytes);
+            [
+              Tezos_micheline.Micheline.Bytes (_, contract_bytes);
               Tezos_micheline.Micheline.Prim
                 ( _,
                   Script.D_Pair,
                   [Tezos_micheline.Micheline.Int (_, counter); e],
-                  [] ) ],
+                  [] );
+            ],
             [] ) ->
           let contract =
             Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes

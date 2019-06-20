@@ -359,7 +359,8 @@ let activation_key_encoding =
        ~binary:raw_activation_key_encoding
        ~json:
          (union
-            [ case
+            [
+              case
                 ~title:"Activation"
                 Json_only
                 raw_activation_key_encoding
@@ -378,7 +379,8 @@ let activation_key_encoding =
                    (req "password" string)
                    (req "email" string))
                 (fun _ -> None)
-                (fun x -> x) ])
+                (fun x -> x);
+            ])
 
 let read_key key =
   match Bip39.of_words key.mnemonic with

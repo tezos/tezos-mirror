@@ -55,7 +55,8 @@ let main () =
   let consumed_per_consumer = ref 10 in
   let spec =
     Arg.
-      [ ("-qsize", Set_int qsize, "<int> Size of the pipe");
+      [
+        ("-qsize", Set_int qsize, "<int> Size of the pipe");
         ("-nc", Set_int nb_consumers, "<int> Number of consumers");
         ("-np", Set_int nb_producers, "<int> Number of producers");
         ( "-n",
@@ -69,7 +70,8 @@ let main () =
           " Log up to info msgs" );
         ( "-vv",
           Unit (fun () -> Lwt_log_core.(add_rule "*" Debug)),
-          " Log up to debug msgs" ) ]
+          " Log up to debug msgs" );
+      ]
   in
   let anon_fun _ = () in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in

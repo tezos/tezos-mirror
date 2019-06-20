@@ -45,14 +45,16 @@ let shell_header_encoding =
       "Block header's shell-related content. It contains information such as \
        the block level, its predecessor and timestamp."
   @@ conv
-       (fun { level;
+       (fun {
+              level;
               proto_level;
               predecessor;
               timestamp;
               validation_passes;
               operations_hash;
               fitness;
-              context } ->
+              context;
+            } ->
          ( level,
            proto_level,
            predecessor,

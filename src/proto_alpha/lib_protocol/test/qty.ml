@@ -26,7 +26,8 @@
 open Protocol
 
 let known_ok_tez_litterals =
-  [ (0L, "0");
+  [
+    (0L, "0");
     (10L, "0.00001");
     (100L, "0.0001");
     (1_000L, "0.001");
@@ -46,10 +47,12 @@ let known_ok_tez_litterals =
     (1_000_000_010_000L, "1000000.01");
     (1_000_000_100_000L, "1000000.1");
     (123_123_123_123_123_123L, "123123123123.123123");
-    (999_999_999_999_999_999L, "999999999999.999999") ]
+    (999_999_999_999_999_999L, "999999999999.999999");
+  ]
 
 let known_bad_tez_litterals =
-  [ "10000.";
+  [
+    "10000.";
     "100,.";
     "100,";
     "1,0000";
@@ -59,7 +62,8 @@ let known_bad_tez_litterals =
     "HAHA";
     "0.000,000,1";
     "0.0000000";
-    "9,999,999,999,999.999,999" ]
+    "9,999,999,999,999.999,999";
+  ]
 
 let fail expected given msg =
   Format.kasprintf
@@ -145,8 +149,10 @@ let test_random_tez_litterals () =
   return_unit
 
 let tests =
-  [ ("tez-litterals", fun _ -> test_known_tez_litterals ());
-    ("rnd-tez-litterals", fun _ -> test_random_tez_litterals ()) ]
+  [
+    ("tez-litterals", fun _ -> test_known_tez_litterals ());
+    ("rnd-tez-litterals", fun _ -> test_random_tez_litterals ());
+  ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

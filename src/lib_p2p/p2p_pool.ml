@@ -239,10 +239,12 @@ module Gc_peer_set = List.Bounded (struct
 end)
 
 let gc_peer_ids
-    ( { peer_meta_config = {score; _};
+    ( {
+        peer_meta_config = {score; _};
         config = {max_known_peer_ids; _};
         known_peer_ids;
-        _ } as pool ) =
+        _;
+      } as pool ) =
   match max_known_peer_ids with
   | None ->
       ()

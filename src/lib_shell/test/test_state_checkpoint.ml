@@ -536,7 +536,8 @@ let test_note_may_update_checkpoint s =
 (****************************************************************************)
 
 let tests : (string * (state -> unit tzresult Lwt.t)) list =
-  [ ("basic checkpoint", test_basic_checkpoint);
+  [
+    ("basic checkpoint", test_basic_checkpoint);
     ("is valid checkpoint", test_is_valid_checkpoint);
     ("acceptable block", test_acceptable_block);
     ("best know head", test_best_know_head_for_checkpoint);
@@ -544,7 +545,8 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list =
     ("future checkpoint bad/good block", test_future_checkpoint_bad_good_block);
     ("test_reach_checkpoint", test_reach_checkpoint);
     ("update checkpoint", test_may_update_checkpoint);
-    ("update checkpoint in node", test_note_may_update_checkpoint) ]
+    ("update checkpoint in node", test_note_may_update_checkpoint);
+  ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

@@ -184,11 +184,13 @@ let test_fold {genesis = ctxt; _} =
 (******************************************************************************)
 
 let tests =
-  [ ("simple", test_simple);
+  [
+    ("simple", test_simple);
     ("continuation", test_continuation);
     ("fork", test_fork);
     ("replay", test_replay);
-    ("fold", test_fold) ]
+    ("fold", test_fold);
+  ]
 
 let tests =
   List.map

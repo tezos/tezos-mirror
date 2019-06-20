@@ -29,7 +29,8 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"New_head"
           (obj2
@@ -45,7 +46,8 @@ module Request = struct
              (req "block" Block_hash.encoding)
              (req "locators" int31))
           (function New_branch (h, l) -> Some ((), h, l) | _ -> None)
-          (fun ((), h, l) -> New_branch (h, l)) ]
+          (fun ((), h, l) -> New_branch (h, l));
+      ]
 
   let pp ppf = function
     | New_head hash ->
@@ -75,7 +77,8 @@ module Event = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Debug"
           (obj1 (req "message" string))
@@ -98,7 +101,8 @@ module Event = struct
              (req "status" Worker_types.request_status_encoding))
           (function
             | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-          (fun (errs, req, t) -> Request (req, t, Some errs)) ]
+          (fun (errs, req, t) -> Request (req, t, Some errs));
+      ]
 
   let pp ppf = function
     | Debug msg ->
@@ -151,10 +155,12 @@ module Worker_state = struct
     let open Data_encoding in
     conv
       (function
-        | { bootstrapped;
+        | {
+            bootstrapped;
             pipeline_length;
             last_validated_head;
-            last_advertised_head } ->
+            last_advertised_head;
+          } ->
             ( bootstrapped,
               pipeline_length,
               last_validated_head,

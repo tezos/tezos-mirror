@@ -185,12 +185,14 @@ module Block = struct
         let encoding =
           let open Data_encoding in
           conv
-            (fun { header;
+            (fun {
+                   header;
                    message;
                    max_operations_ttl;
                    last_allowed_fork_level;
                    context;
-                   metadata } ->
+                   metadata;
+                 } ->
               ( message,
                 max_operations_ttl,
                 last_allowed_fork_level,

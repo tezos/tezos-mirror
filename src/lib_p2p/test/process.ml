@@ -126,7 +126,8 @@ let detach ?(prefix = "") f =
 
 let signal_name =
   let names =
-    [ (Sys.sigabrt, "ABRT");
+    [
+      (Sys.sigabrt, "ABRT");
       (Sys.sigalrm, "ALRM");
       (Sys.sigfpe, "FPE");
       (Sys.sighup, "HUP");
@@ -153,7 +154,8 @@ let signal_name =
       (Sys.sigtrap, "TRAP");
       (Sys.sigurg, "URG");
       (Sys.sigxcpu, "XCPU");
-      (Sys.sigxfsz, "XFSZ") ]
+      (Sys.sigxfsz, "XFSZ");
+    ]
   in
   fun n -> List.assoc n names
 

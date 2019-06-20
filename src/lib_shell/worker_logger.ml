@@ -46,7 +46,8 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
     let open Data_encoding in
     Time.System.stamped_encoding
     @@ union
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Event"
              Event.encoding
@@ -96,7 +97,8 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
              ~title:"Duplicate"
              string
              (function Duplicate n -> Some n | _ -> None)
-             (fun n -> Duplicate n) ]
+             (fun n -> Duplicate n);
+         ]
 
   let pp base_name ppf = function
     | WorkerEvent evt ->

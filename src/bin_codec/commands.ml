@@ -54,7 +54,8 @@ let json_parameter =
 let bytes_parameter = parameter (fun _ hex -> return (Hex.to_bytes (`Hex hex)))
 
 let commands () =
-  [ command
+  [
+    command
       ~group
       ~desc:"List the registered encoding in Tezos."
       no_options
@@ -100,7 +101,8 @@ let commands () =
                ( Registration.list ()
                |> List.map (fun (id, enc) ->
                       `O
-                        [ ("id", `String id);
+                        [
+                          ("id", `String id);
                           ( "json",
                             Json.construct
                               Json.schema_encoding
@@ -108,7 +110,8 @@ let commands () =
                           ( "binary",
                             Json.construct
                               Binary_schema.encoding
-                              (Registration.binary_schema enc) ) ]) )))
+                              (Registration.binary_schema enc) );
+                        ]) )))
         >>= fun () -> return_unit);
     (* JSON -> Binary *)
     command
@@ -136,25 +139,25 @@ let commands () =
             cctxt#message "%a" Hex.pp (Hex.of_bytes bytes)
             >>= fun () -> return_unit);
     (* Binary -> JSON *)
-    command
-      ~group
-      ~desc:
-        "Decode the binary encoded data into JSON using the provided encoding \
-         identifier."
-      no_options
-      ( prefix "decode"
-      @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
-      @@ prefix "from"
-      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop )
-      (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
-        match
-          Data_encoding.Registration.json_of_bytes registered_encoding bytes
-        with
-        | None ->
-            cctxt#error "Cannot parse the binary with the given encoding"
-        | Some bytes ->
-            cctxt#message "%a" Json.pp bytes >>= fun () -> return_unit);
+      command
+        ~group
+        ~desc:
+          "Decode the binary encoded data into JSON using the provided \
+           encoding identifier."
+        no_options
+        ( prefix "decode"
+        @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
+        @@ prefix "from"
+        @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
+        @@ stop )
+        (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
+          match
+            Data_encoding.Registration.json_of_bytes registered_encoding bytes
+          with
+          | None ->
+              cctxt#error "Cannot parse the binary with the given encoding"
+          | Some bytes ->
+              cctxt#message "%a" Json.pp bytes >>= fun () -> return_unit);
     command
       ~group
       ~desc:
@@ -221,4 +224,5 @@ let commands () =
         let schema =
           Data_encoding.Registration.json_schema registered_encoding
         in
-        cctxt#message "%a" Json_schema.pp schema >>= fun () -> return_unit) ]
+        cctxt#message "%a" Json_schema.pp schema >>= fun () -> return_unit);
+  ]

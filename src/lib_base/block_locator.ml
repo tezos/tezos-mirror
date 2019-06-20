@@ -114,7 +114,8 @@ end = struct
       (update st)
       [ P2p_peer.Id.to_bytes seed.sender_id;
         P2p_peer.Id.to_bytes seed.receiver_id;
-        Block_hash.to_bytes head ] ;
+        Block_hash.to_bytes head;
+      ] ;
     (1l, 9, SHA256.finish st)
 
   let draw seed n =

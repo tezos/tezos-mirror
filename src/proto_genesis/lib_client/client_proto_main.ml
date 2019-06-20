@@ -121,7 +121,8 @@ let commands () =
               | Some t ->
                   return t)))
   in
-  [ command
+  [
+    command
       ~desc:"Activate a protocol"
       args
       ( prefixes ["activate"; "protocol"]
@@ -200,6 +201,7 @@ let commands () =
           sk
         >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash
-        >>= fun () -> return_unit) ]
+        >>= fun () -> return_unit);
+  ]
 
 let () = Client_commands.register protocol @@ fun _network -> commands ()

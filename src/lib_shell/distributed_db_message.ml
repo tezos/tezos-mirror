@@ -174,7 +174,8 @@ let encoding =
   let case ?max_length ~tag ~title encoding unwrap wrap =
     P2p_message.Encoding {tag; title; encoding; wrap; unwrap; max_length}
   in
-  [ case
+  [
+    case
       ~tag:0x10
       ~title:"Get_current_branch"
       (obj1 (req "get_current_branch" Chain_id.encoding))
@@ -314,7 +315,8 @@ let encoding =
         | _ ->
             None)
       (fun ((block, ofs), (path, ops)) ->
-        Operations_for_block (block, ofs, ops, path)) ]
+        Operations_for_block (block, ofs, ops, path));
+  ]
 
 let cfg : _ P2p.message_config =
   {

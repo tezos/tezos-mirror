@@ -49,7 +49,8 @@ let p2p_peer_id_param ~name ~desc t =
 
 let commands () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"show global network status"
       no_options
@@ -306,4 +307,5 @@ let commands () =
         P2p_services.ACL.clear cctxt ()
         >>=? fun () ->
         cctxt#message "The access control rules are now cleared."
-        >>= fun () -> return_unit) ]
+        >>= fun () -> return_unit);
+  ]

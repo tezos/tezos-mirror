@@ -78,7 +78,8 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
   let result_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Cannot download"
           (obj1 (req "download_errors" (list Error_monad.error_encoding)))
@@ -101,7 +102,8 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
           ~title:"Validation result"
           (obj1 (req "validation_result" Mempool_worker.result_encoding))
           (function Mempool_result result -> Some result | _ -> None)
-          (fun result -> Mempool_result result) ]
+          (fun result -> Mempool_result result);
+      ]
 
   module Log = Internal_event.Legacy_logging.Make (struct
     let name = "node.mempool.peer_worker"
@@ -293,7 +295,8 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
     let encoding =
       let open Data_encoding in
       union
-        [ case
+        [
+          case
             (Tag 0)
             ~title:"Start"
             (obj1 (req "input" (list Operation_hash.encoding)))
@@ -324,7 +327,8 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
                   Some (view, status, errs)
               | _ ->
                   None)
-            (fun (view, status, errs) -> End_error (view, status, errs)) ]
+            (fun (view, status, errs) -> End_error (view, status, errs));
+        ]
 
     let pp ppf = function
       | Start input ->

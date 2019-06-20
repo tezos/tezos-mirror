@@ -97,14 +97,16 @@ module Info = struct
   let encoding metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { incoming;
+      (fun {
+             incoming;
              peer_id;
              id_point;
              remote_socket_port;
              announced_version;
              private_node;
              local_metadata;
-             remote_metadata } ->
+             remote_metadata;
+           } ->
         ( incoming,
           peer_id,
           id_point,
@@ -142,14 +144,16 @@ module Info = struct
          (req "remote_metadata" metadata_encoding))
 
   let pp pp_meta ppf
-      { incoming;
+      {
+        incoming;
         id_point = (remote_addr, remote_port);
         remote_socket_port;
         peer_id;
         announced_version;
         private_node;
         local_metadata = _;
-        remote_metadata } =
+        remote_metadata;
+      } =
     let point =
       match remote_port with
       | None ->
@@ -280,7 +284,8 @@ module Pool_event = struct
          errors, peer swaps, etc."
     @@ union
          ~tag_size:`Uint8
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Too_few_connections"
              (branch_encoding "too_few_connections" empty)
@@ -468,7 +473,8 @@ module Pool_event = struct
                 "swap_failure"
                 (obj1 (req "source" P2p_peer_id.encoding)))
              (function Swap_failure {source} -> Some source | _ -> None)
-             (fun source -> Swap_failure {source}) ]
+             (fun source -> Swap_failure {source});
+         ]
 end
 
 let () =

@@ -27,9 +27,11 @@ let () =
   Random.init 100 ;
   Alcotest.run
     "tezos-data-encoding"
-    [ ("success", Success.tests);
+    [
+      ("success", Success.tests);
       ("invalid_encoding", Invalid_encoding.tests);
       ("read_failure", Read_failure.tests);
       ("write_failure", Write_failure.tests);
       ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests) ]
+      ("versioned", Versioned.tests);
+    ]

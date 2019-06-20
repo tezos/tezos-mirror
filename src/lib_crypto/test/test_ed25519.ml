@@ -59,15 +59,19 @@ let test_b58check_invalid input =
 let test_b58check_invalids () =
   List.iter
     test_b58check_invalid
-    [ "ThisIsGarbageNotACheck";
+    [
+      "ThisIsGarbageNotACheck";
       "\x00";
       String.make 1000 '\x00';
       String.make 2048 'a';
       String.init 2048 (fun _ -> Char.chr (Random.int 256));
-      "" ]
+      "";
+    ]
 
 let tests =
-  [ ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
-    ("b58check.invalid", `Slow, test_b58check_invalids) ]
+  [
+    ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
+    ("b58check.invalid", `Slow, test_b58check_invalids);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("ed25519", tests)]

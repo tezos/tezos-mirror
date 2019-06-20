@@ -54,7 +54,8 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
       [ Bytes.of_string "\x04";
         tag;
         Signature.Public_key_hash.to_bytes pkh;
-        data ]
+        data;
+      ]
 
   let encoding =
     let open Data_encoding in
@@ -165,7 +166,8 @@ module Authorized_keys = struct
     let encoding =
       let open Data_encoding in
       union
-        [ case
+        [
+          case
             (Tag 0)
             ~title:"No_authentication"
             (constant "no_authentication_required")
@@ -176,7 +178,8 @@ module Authorized_keys = struct
             ~title:"Authorized_keys"
             (list Signature.Public_key_hash.encoding)
             (function Authorized_keys l -> Some l | _ -> None)
-            (fun l -> Authorized_keys l) ]
+            (fun l -> Authorized_keys l);
+        ]
   end
 end
 
@@ -193,7 +196,8 @@ module Request = struct
     let open Data_encoding in
     def "signer_messages.request"
     @@ union
-         [ case
+         [
+           case
              (Tag 0)
              ~title:"Sign"
              (merge_objs
@@ -243,7 +247,8 @@ module Request = struct
                    Some ((), req)
                | _ ->
                    None)
-             (fun ((), req) -> Supports_deterministic_nonces req) ]
+             (fun ((), req) -> Supports_deterministic_nonces req);
+         ]
 end
 
 let () =

@@ -404,12 +404,14 @@ module Make (I : Dump_interface) = struct
   let command_encoding =
     Data_encoding.union
       ~tag_size:`Uint8
-      [ blob_encoding;
+      [
+        blob_encoding;
         node_encoding;
         end_encoding;
         loot_encoding;
         proot_encoding;
-        root_encoding ]
+        root_encoding;
+      ]
 
   (* IO toolkit. *)
 

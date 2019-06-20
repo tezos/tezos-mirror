@@ -126,7 +126,8 @@ let expand_set_caddadr original =
                 let acc =
                   Seq
                     ( loc,
-                      [ Prim (loc, "DUP", [], []);
+                      [
+                        Prim (loc, "DUP", [], []);
                         Prim
                           ( loc,
                             "DIP",
@@ -134,21 +135,24 @@ let expand_set_caddadr original =
                             [] );
                         Prim (loc, "CDR", [], ["@%%"]);
                         Prim (loc, "SWAP", [], []);
-                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ] )
+                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot);
+                      ] )
                 in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
                   Seq
                     ( loc,
-                      [ Prim (loc, "DUP", [], []);
+                      [
+                        Prim (loc, "DUP", [], []);
                         Prim
                           ( loc,
                             "DIP",
                             [Seq (loc, [Prim (loc, "CDR", [], ["@%%"]); acc])],
                             [] );
                         Prim (loc, "CAR", [], ["@%%"]);
-                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ] )
+                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot);
+                      ] )
                 in
                 parse (i - 1) acc
             | _ ->
@@ -161,19 +165,23 @@ let expand_set_caddadr original =
               | None ->
                   []
               | Some f ->
-                  [ Prim (loc, "DUP", [], []);
+                  [
+                    Prim (loc, "DUP", [], []);
                     Prim (loc, "CAR", [], [f]);
-                    Prim (loc, "DROP", [], []) ]
+                    Prim (loc, "DROP", [], []);
+                  ]
             in
             let encoding =
               [Prim (loc, "CDR", [], ["@%%"]); Prim (loc, "SWAP", [], [])]
             in
             let pair =
-              [ Prim
+              [
+                Prim
                   ( loc,
                     "PAIR",
                     [],
-                    [Option.unopt field_annot ~default:"%"; "%@"] ) ]
+                    [Option.unopt field_annot ~default:"%"; "%@"] );
+              ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -183,17 +191,21 @@ let expand_set_caddadr original =
               | None ->
                   []
               | Some f ->
-                  [ Prim (loc, "DUP", [], []);
+                  [
+                    Prim (loc, "DUP", [], []);
                     Prim (loc, "CDR", [], [f]);
-                    Prim (loc, "DROP", [], []) ]
+                    Prim (loc, "DROP", [], []);
+                  ]
             in
             let encoding = [Prim (loc, "CAR", [], ["@%%"])] in
             let pair =
-              [ Prim
+              [
+                Prim
                   ( loc,
                     "PAIR",
                     [],
-                    ["%@"; Option.unopt field_annot ~default:"%"] ) ]
+                    ["%@"; Option.unopt field_annot ~default:"%"] );
+              ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
             ok (Some (parse (len - 3) init))
@@ -242,7 +254,8 @@ let expand_map_caddadr original =
                 let acc =
                   Seq
                     ( loc,
-                      [ Prim (loc, "DUP", [], []);
+                      [
+                        Prim (loc, "DUP", [], []);
                         Prim
                           ( loc,
                             "DIP",
@@ -250,21 +263,24 @@ let expand_map_caddadr original =
                             [] );
                         Prim (loc, "CDR", [], ["@%%"]);
                         Prim (loc, "SWAP", [], []);
-                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ] )
+                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot);
+                      ] )
                 in
                 parse (i - 1) acc
             | 'D' ->
                 let acc =
                   Seq
                     ( loc,
-                      [ Prim (loc, "DUP", [], []);
+                      [
+                        Prim (loc, "DUP", [], []);
                         Prim
                           ( loc,
                             "DIP",
                             [Seq (loc, [Prim (loc, "CDR", [], ["@%%"]); acc])],
                             [] );
                         Prim (loc, "CAR", [], ["@%%"]);
-                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot) ] )
+                        Prim (loc, "PAIR", [], "%@" :: "%@" :: annot);
+                      ] )
                 in
                 parse (i - 1) acc
             | _ ->
@@ -282,7 +298,8 @@ let expand_map_caddadr original =
             let init =
               Seq
                 ( loc,
-                  [ Prim (loc, "DUP", [], []);
+                  [
+                    Prim (loc, "DUP", [], []);
                     Prim (loc, "CDR", [], ["@%%"]);
                     Prim
                       ( loc,
@@ -294,14 +311,16 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        [Option.unopt field_annot ~default:"%"; "%@"] ) ] )
+                        [Option.unopt field_annot ~default:"%"; "%@"] );
+                  ] )
             in
             ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq
                 ( loc,
-                  [ Prim (loc, "DUP", [], []);
+                  [
+                    Prim (loc, "DUP", [], []);
                     Prim (loc, "CDR", [], cr_annot);
                     code;
                     Prim (loc, "SWAP", [], []);
@@ -310,7 +329,8 @@ let expand_map_caddadr original =
                       ( loc,
                         "PAIR",
                         [],
-                        ["%@"; Option.unopt field_annot ~default:"%"] ) ] )
+                        ["%@"; Option.unopt field_annot ~default:"%"] );
+                  ] )
             in
             ok (Some (parse (len - 3) init))
         | _ ->
@@ -510,9 +530,11 @@ let expand_unpappaiir original =
           let unpair car_annot cdr_annot =
             Seq
               ( loc,
-                [ Prim (loc, "DUP", [], []);
+                [
+                  Prim (loc, "DUP", [], []);
                   Prim (loc, "CAR", [], car_annot);
-                  dip ~loc 1 (Prim (loc, "CDR", [], cdr_annot)) ] )
+                  dip ~loc 1 (Prim (loc, "CDR", [], cdr_annot));
+                ] )
           in
           let ast = parse_pair_substr str ~len 2 in
           let annots_pos = pappaiir_annots_pos ast annot in
@@ -784,20 +806,22 @@ let expand original =
         | None -> try_expansions expanders | Some rewritten -> ok rewritten )
   in
   try_expansions
-    [ expand_caddadr;
+    [
+      expand_caddadr;
       expand_set_caddadr;
       expand_map_caddadr;
       expand_dxiiivp;
       (* expand_paaiair ; *)
-      expand_pappaiir;
+        expand_pappaiir;
       (* expand_unpaaiair ; *)
-      expand_unpappaiir;
+        expand_unpappaiir;
       expand_duuuuup;
       expand_compare;
       expand_asserts;
       expand_if_some;
       expand_if_right;
-      expand_fail ]
+      expand_fail;
+    ]
 
 let expand_rec expr =
   let rec error_map (expanded, errors) f = function
@@ -855,44 +879,54 @@ let unexpand_set_caddadr expanded =
   let rec steps acc annots = function
     | Seq
         ( loc,
-          [ Prim (_, "CDR", [], _);
+          [
+            Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], _);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "A" :: acc, annots)
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CAR", [], [field_annot]);
             Prim (_, "DROP", [], []);
             Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], []);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "A" :: acc, field_annot :: annots)
     | Seq (loc, [Prim (_, "CAR", [], _); Prim (_, "PAIR", [], _)]) ->
         Some (loc, "D" :: acc, annots)
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CDR", [], [field_annot]);
             Prim (_, "DROP", [], []);
             Prim (_, "CAR", [], _);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "D" :: acc, field_annot :: annots)
     | Seq
         ( _,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "DIP", [Seq (_, [Prim (_, "CAR", [], _); sub])], []);
             Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], []);
-            Prim (_, "PAIR", [], pair_annots) ] ) ->
+            Prim (_, "PAIR", [], pair_annots);
+          ] ) ->
         let (_, pair_annots) = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq
         ( _,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], _); sub])], []);
             Prim (_, "CAR", [], _);
-            Prim (_, "PAIR", [], pair_annots) ] ) ->
+            Prim (_, "PAIR", [], pair_annots);
+          ] ) ->
         let (_, pair_annots) = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ ->
@@ -909,15 +943,18 @@ let unexpand_map_caddadr expanded =
   let rec steps acc annots = function
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], []);
             Prim (_, "DIP", [Seq (_, [Prim (_, "CAR", [], []); code])], []);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "A" :: acc, annots, code)
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], []);
             Prim
@@ -925,41 +962,50 @@ let unexpand_map_caddadr expanded =
                 "DIP",
                 [Seq (_, [Prim (_, "CAR", [], [field_annot]); code])],
                 [] );
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "A" :: acc, field_annot :: annots, code)
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CDR", [], []);
             code;
             Prim (_, "SWAP", [], []);
             Prim (_, "CAR", [], _);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "D" :: acc, annots, code)
     | Seq
         ( loc,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "CDR", [], [field_annot]);
             code;
             Prim (_, "SWAP", [], []);
             Prim (_, "CAR", [], _);
-            Prim (_, "PAIR", [], _) ] ) ->
+            Prim (_, "PAIR", [], _);
+          ] ) ->
         Some (loc, "D" :: acc, field_annot :: annots, code)
     | Seq
         ( _,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "DIP", [Seq (_, [Prim (_, "CAR", [], _); sub])], []);
             Prim (_, "CDR", [], _);
             Prim (_, "SWAP", [], []);
-            Prim (_, "PAIR", [], pair_annots) ] ) ->
+            Prim (_, "PAIR", [], pair_annots);
+          ] ) ->
         let (_, pair_annots) = extract_field_annots pair_annots in
         steps ("A" :: acc) (List.rev_append pair_annots annots) sub
     | Seq
         ( _,
-          [ Prim (_, "DUP", [], []);
+          [
+            Prim (_, "DUP", [], []);
             Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], []); sub])], []);
             Prim (_, "CAR", [], []);
-            Prim (_, "PAIR", [], pair_annots) ] ) ->
+            Prim (_, "PAIR", [], pair_annots);
+          ] ) ->
         let (_, pair_annots) = extract_field_annots pair_annots in
         steps ("D" :: acc) (List.rev_append pair_annots annots) sub
     | _ ->
@@ -1110,28 +1156,31 @@ let unexpand_unpappaiir expanded =
             exec (A :: exec [] sub) rest
         | ( Seq
               ( _,
-                [ Prim (_, "DUP", [], []);
+                [
+                  Prim (_, "DUP", [], []);
                   Prim (_, "CAR", [], []);
-                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []) ]
-              )
+                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []);
+                ] )
             :: rest,
             a :: b :: rstack ) ->
             exec (P (0, a, b) :: rstack) rest
         | ( Seq
               ( _,
-                [ Prim (_, "DUP", [], []);
+                [
+                  Prim (_, "DUP", [], []);
                   Prim (_, "CAR", [], []);
-                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []) ]
-              )
+                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []);
+                ] )
             :: rest,
             [a] ) ->
             exec [P (0, a, I)] rest
         | ( Seq
               ( _,
-                [ Prim (_, "DUP", [], []);
+                [
+                  Prim (_, "DUP", [], []);
                   Prim (_, "CAR", [], []);
-                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []) ]
-              )
+                  Prim (_, "DIP", [Seq (_, [Prim (_, "CDR", [], [])])], []);
+                ] )
             :: rest,
             [] ) ->
             exec [P (0, A, I)] rest
@@ -1166,39 +1215,51 @@ let unexpand_compare expanded =
       Some (Prim (loc, "CMPGE", [], annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "EQ", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPEQ", args, annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "NEQ", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPNEQ", args, annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "LT", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPLT", args, annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "GT", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPGT", args, annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "LE", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPLE", args, annot))
   | Seq
       ( loc,
-        [ Prim (_, "COMPARE", [], _);
+        [
+          Prim (_, "COMPARE", [], _);
           Prim (_, "GE", [], _);
-          Prim (_, "IF", args, annot) ] ) ->
+          Prim (_, "IF", args, annot);
+        ] ) ->
       Some (Prim (loc, "IFCMPGE", args, annot))
   | Seq (loc, [Prim (_, "EQ", [], _); Prim (_, "IF", args, annot)]) ->
       Some (Prim (loc, "IFEQ", args, annot))
@@ -1219,159 +1280,247 @@ let unexpand_asserts expanded =
   match expanded with
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF",
-              [ Seq (_, []);
+              [
+                Seq (_, []);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT", [], []))
   | Seq
       ( loc,
-        [ Seq (_, [Prim (_, "COMPARE", [], []); Prim (_, comparison, [], [])]);
+        [
+          Seq (_, [Prim (_, "COMPARE", [], []); Prim (_, comparison, [], [])]);
           Prim
             ( _,
               "IF",
-              [ Seq (_, []);
+              [
+                Seq (_, []);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_CMP" ^ comparison, [], []))
   | Seq
       ( loc,
-        [ Prim (_, comparison, [], []);
+        [
+          Prim (_, comparison, [], []);
           Prim
             ( _,
               "IF",
-              [ Seq (_, []);
+              [
+                Seq (_, []);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_" ^ comparison, [], []))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_NONE",
-              [ Seq (_, [Prim (_, "RENAME", [], annot)]);
+              [
+                Seq (_, [Prim (_, "RENAME", [], annot)]);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_NONE", [], annot))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_NONE",
-              [ Seq (_, []);
+              [
+                Seq (_, []);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_NONE", [], []))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_NONE",
-              [ Seq
+              [
+                Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] );
-                Seq (_, []) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+                Seq (_, []);
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_SOME", [], []))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_NONE",
-              [ Seq
+              [
+                Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] );
-                Seq (_, [Prim (_, "RENAME", [], annot)]) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+                Seq (_, [Prim (_, "RENAME", [], annot)]);
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_SOME", [], annot))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_LEFT",
-              [ Seq (_, []);
+              [
+                Seq (_, []);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_LEFT", [], []))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_LEFT",
-              [ Seq (_, [Prim (_, "RENAME", [], annot)]);
+              [
+                Seq (_, [Prim (_, "RENAME", [], annot)]);
                 Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] ) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_LEFT", [], annot))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_LEFT",
-              [ Seq
+              [
+                Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] );
-                Seq (_, []) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+                Seq (_, []);
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_RIGHT", [], []))
   | Seq
       ( loc,
-        [ Prim
+        [
+          Prim
             ( _,
               "IF_LEFT",
-              [ Seq
+              [
+                Seq
                   ( _,
-                    [ Seq
+                    [
+                      Seq
                         ( _,
-                          [ Prim (_, "UNIT", [], []);
-                            Prim (_, "FAILWITH", [], []) ] ) ] );
-                Seq (_, [Prim (_, "RENAME", [], annot)]) ],
-              [] ) ] ) ->
+                          [
+                            Prim (_, "UNIT", [], []);
+                            Prim (_, "FAILWITH", [], []);
+                          ] );
+                    ] );
+                Seq (_, [Prim (_, "RENAME", [], annot)]);
+              ],
+              [] );
+        ] ) ->
       Some (Prim (loc, "ASSERT_RIGHT", [], annot))
   | _ ->
       None
@@ -1413,7 +1562,8 @@ let unexpand original =
         rewritten
   in
   try_unexpansions
-    [ unexpand_asserts;
+    [
+      unexpand_asserts;
       unexpand_caddadr;
       unexpand_set_caddadr;
       unexpand_map_caddadr;
@@ -1424,7 +1574,8 @@ let unexpand original =
       unexpand_compare;
       unexpand_if_some;
       unexpand_if_right;
-      unexpand_fail ]
+      unexpand_fail;
+    ]
 
 (*
    If an argument of Prim is a sequence, we do not want to unexpand

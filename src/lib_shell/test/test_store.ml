@@ -563,7 +563,8 @@ module SubSubBlocks =
 (** *)
 
 let tests_raw : (string * (Raw_store.t -> unit Lwt.t)) list =
-  [ ("init", test_init);
+  [
+    ("init", test_init);
     ("generic", test_generic (module Raw_store));
     ("generic_substore", test_generic (module Sub));
     ( "generic_indexedstore",
@@ -594,7 +595,8 @@ let tests_raw : (string * (Raw_store.t -> unit Lwt.t)) list =
       fun s -> test_hashmap (module SubBlocks.Store) (s, bh1) );
     ( "hashmap_indexedsubstore",
       fun s -> test_hashmap (module SubSubBlocks.Store) ((s, bh1), bh2) );
-    ("subblock", test_subblock) ]
+    ("subblock", test_subblock);
+  ]
 
 let tests : (string * (Store.t -> unit Lwt.t)) list =
   [("expand", test_expand); ("block", test_block)]

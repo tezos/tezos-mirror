@@ -34,7 +34,8 @@ type worker_status =
 let worker_status_encoding error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Launching"
         (obj2
@@ -78,7 +79,8 @@ let worker_status_encoding error_encoding =
            (req "errors" error_encoding))
         (function
           | Closed (t0, t, Some errs) -> Some ((), t0, t, errs) | _ -> None)
-        (fun ((), t0, t, errs) -> Closed (t0, t, Some errs)) ]
+        (fun ((), t0, t, errs) -> Closed (t0, t, Some errs));
+    ]
 
 type worker_information = {
   instances_number : int;

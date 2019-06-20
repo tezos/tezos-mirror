@@ -88,7 +88,8 @@ module Info = struct
   let encoding peer_metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { peer_id;
+      (fun {
+             peer_id;
              trusted;
              peer_metadata;
              events;
@@ -97,7 +98,8 @@ module Info = struct
              last_rejected_connection;
              last_established_connection;
              last_disconnection;
-             _ } ->
+             _;
+           } ->
         ( peer_id,
           created,
           trusted,

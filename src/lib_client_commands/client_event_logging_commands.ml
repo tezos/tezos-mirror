@@ -81,7 +81,8 @@ let flat_pp pp o =
 let commands () =
   let open Clic in
   let command ~desc = command ~group ~desc in
-  [ command
+  [
+    command
       ~desc:"Query the events from an event sink."
       (args7
          (arg
@@ -300,4 +301,5 @@ let commands () =
                 Lwt_io.write chan v)
             >>= fun () ->
             cctxt#message "Wrote schema of %s to %s" event path
-            >>= fun () -> return_unit) ]
+            >>= fun () -> return_unit);
+  ]

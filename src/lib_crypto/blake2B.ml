@@ -360,7 +360,8 @@ struct
     let open Data_encoding in
     mu "path" (fun path_encoding ->
         union
-          [ case
+          [
+            case
               (Tag 240)
               ~title:"Left"
               (obj2 (req "path" path_encoding) (req "right" encoding))
@@ -377,7 +378,8 @@ struct
               ~title:"Op"
               unit
               (function Op -> Some () | _ -> None)
-              (fun () -> Op) ])
+              (fun () -> Op);
+          ])
 
   let bounded_path_encoding ?max_length () =
     match max_length with

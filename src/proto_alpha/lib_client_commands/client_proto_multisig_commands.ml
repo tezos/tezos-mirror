@@ -82,7 +82,8 @@ let transfer_options =
 
 let commands () : #Protocol_client_context.full Clic.command list =
   Clic.
-    [ command
+    [
+      command
         ~group
         ~desc:"Originate a new multisig contract."
         (args15
@@ -802,84 +803,85 @@ let commands () : #Protocol_client_context.full Clic.command list =
 
        However, we can run any action by deserialising the sequence of
        bytes built using the "prepare multisig transaction" commands *)
-      command
-        ~group
-        ~desc:
-          "Run a transaction described by a sequence of bytes on a multisig \
-           contract."
-        transfer_options
-        ( prefixes ["run"; "transaction"]
-        @@ bytes_param
-             ~name:"bytes"
-             ~desc:
-               "the sequence of bytes to deserialize as a multisig action, \
-                can be obtained by one of the \"prepare multisig \
-                transaction\" commands"
-        @@ prefixes ["on"; "multisig"; "contract"]
-        @@ Client_proto_contracts.RawContractAlias.alias_param
-             ~name:"multisig"
-             ~desc:"name of the originated multisig contract"
-        @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.ContractAlias.destination_param
-             ~name:"src"
-             ~desc:"source calling the multisig contract"
-        @@ prefixes ["with"; "signatures"]
-        @@ seq_of_param (signature_param ()) )
-        (fun ( fee,
-               dry_run,
-               gas_limit,
-               storage_limit,
-               counter,
-               no_print_source,
-               minimal_fees,
-               minimal_nanotez_per_byte,
-               minimal_nanotez_per_gas_unit,
-               force_low_fee,
-               fee_cap,
-               burn_cap )
-             bytes
-             (_, multisig_contract)
-             (_, source)
-             signatures
-             (cctxt : #Protocol_client_context.full) ->
-          Client_proto_context.source_to_keys
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            source
-          >>=? fun (src_pk, src_sk) ->
-          let fee_parameter =
-            {
-              Injection.minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            }
-          in
-          Client_proto_multisig.call_multisig_on_bytes
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~fee_parameter
-            ~source
-            ?fee
-            ~src_pk
-            ~src_sk
-            ~multisig_contract
-            ~bytes
-            ~signatures
-            ~amount:Tez.zero
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= function
-          | None -> return_unit | Some (_res, _contracts) -> return_unit) ]
+        command
+          ~group
+          ~desc:
+            "Run a transaction described by a sequence of bytes on a multisig \
+             contract."
+          transfer_options
+          ( prefixes ["run"; "transaction"]
+          @@ bytes_param
+               ~name:"bytes"
+               ~desc:
+                 "the sequence of bytes to deserialize as a multisig action, \
+                  can be obtained by one of the \"prepare multisig \
+                  transaction\" commands"
+          @@ prefixes ["on"; "multisig"; "contract"]
+          @@ Client_proto_contracts.RawContractAlias.alias_param
+               ~name:"multisig"
+               ~desc:"name of the originated multisig contract"
+          @@ prefixes ["on"; "behalf"; "of"]
+          @@ Client_proto_contracts.ContractAlias.destination_param
+               ~name:"src"
+               ~desc:"source calling the multisig contract"
+          @@ prefixes ["with"; "signatures"]
+          @@ seq_of_param (signature_param ()) )
+          (fun ( fee,
+                 dry_run,
+                 gas_limit,
+                 storage_limit,
+                 counter,
+                 no_print_source,
+                 minimal_fees,
+                 minimal_nanotez_per_byte,
+                 minimal_nanotez_per_gas_unit,
+                 force_low_fee,
+                 fee_cap,
+                 burn_cap )
+               bytes
+               (_, multisig_contract)
+               (_, source)
+               signatures
+               (cctxt : #Protocol_client_context.full) ->
+            Client_proto_context.source_to_keys
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              source
+            >>=? fun (src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            Client_proto_multisig.call_multisig_on_bytes
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~fee_parameter
+              ~source
+              ?fee
+              ~src_pk
+              ~src_sk
+              ~multisig_contract
+              ~bytes
+              ~signatures
+              ~amount:Tez.zero
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ()
+            >>= Client_proto_context_commands.report_michelson_errors
+                  ~no_print_source
+                  ~msg:"transfer simulation failed"
+                  cctxt
+            >>= function
+            | None -> return_unit | Some (_res, _contracts) -> return_unit);
+    ]

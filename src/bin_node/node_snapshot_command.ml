@@ -142,23 +142,27 @@ module Manpage = struct
     "The $(b,snapshot) command is meant to export and import snapshots files."
 
   let description =
-    [ `S "DESCRIPTION";
+    [
+      `S "DESCRIPTION";
       `P (command_description ^ " Several operations are possible: ");
       `P
         "$(b,export) allows to export a snapshot of the current node state \
          into a file.";
-      `P "$(b,import) allows to import a snapshot from a given file." ]
+      `P "$(b,import) allows to import a snapshot from a given file.";
+    ]
 
   let options = [`S "OPTIONS"]
 
   let examples =
-    [ `S "EXAMPLES";
+    [
+      `S "EXAMPLES";
       `I
         ( "$(b,Export a snapshot using the rolling mode)",
           "$(mname) snapshot export latest.rolling --rolling" );
       `I
         ( "$(b,Import a snapshot located in file.full)",
-          "$(mname) snapshot import file.full" ) ]
+          "$(mname) snapshot import file.full" );
+    ]
 
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 

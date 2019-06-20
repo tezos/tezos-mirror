@@ -476,13 +476,17 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     ~fee_parameter ~chain ~block ?branch ?(compute_fee = false)
     (contents : kind contents_list) : kind contents_list tzresult Lwt.t =
   Alpha_services.Constants.all cctxt (chain, block)
-  >>=? fun { parametric =
-               { hard_gas_limit_per_operation = gas_limit;
+  >>=? fun {
+             parametric =
+               {
+                 hard_gas_limit_per_operation = gas_limit;
                  hard_storage_limit_per_operation = storage_limit;
                  origination_size;
                  cost_per_byte;
-                 _ };
-             _ } ->
+                 _;
+               };
+             _;
+           } ->
   let may_need_patching_single :
       type kind. kind contents -> kind contents option = function
     | Manager_operation c

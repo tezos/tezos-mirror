@@ -90,7 +90,8 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
   let result_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Applied"
           (obj1 (req "receipt" Proto.operation_receipt_encoding))
@@ -125,7 +126,8 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
           ~title:"Not_in_branch"
           empty
           (function Not_in_branch -> Some () | _ -> None)
-          (fun () -> Not_in_branch) ]
+          (fun () -> Not_in_branch);
+      ]
 
   let pp_result ppf = function
     | Applied _ ->
@@ -205,7 +207,8 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
     let encoding =
       let open Data_encoding in
       union
-        [ case
+        [
+          case
             (Tag 0)
             ~title:"Debug"
             (obj1 (req "message" string))
@@ -228,7 +231,8 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
                (req "status" Worker_types.request_status_encoding))
             (function
               | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-            (fun (errs, req, t) -> Request (req, t, Some errs)) ]
+            (fun (errs, req, t) -> Request (req, t, Some errs));
+        ]
 
     let pp ppf = function
       | Debug msg ->
@@ -426,12 +430,16 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
   open Validation_errors
 
   let create ?protocol_data ~predecessor ~timestamp () =
-    let { Block_header.shell =
-            { fitness = predecessor_fitness;
-              timestamp = predecessor_timestamp;
-              level = predecessor_level;
-              _ };
-          _ } =
+    let {
+      Block_header.shell =
+        {
+          fitness = predecessor_fitness;
+          timestamp = predecessor_timestamp;
+          level = predecessor_level;
+          _;
+        };
+      _;
+    } =
       State.Block.header predecessor
     in
     State.Block.context predecessor

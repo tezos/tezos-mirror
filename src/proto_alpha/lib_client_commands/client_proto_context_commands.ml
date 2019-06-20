@@ -99,7 +99,8 @@ let binary_description =
 
 let commands version () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"Access the timestamp of the block."
       (args1
@@ -765,10 +766,12 @@ let commands version () =
             cctxt#message "Delegate already activated."
             >>= fun () -> return_unit
         | Error el ->
-            Lwt.return (Error el)) ]
+            Lwt.return (Error el));
+  ]
   @ ( if version = Some `Mainnet then []
     else
-      [ command
+      [
+        command
           ~group
           ~desc:"Register and activate an Alphanet/Zeronet faucet account."
           (args2 (Secret_key.force_switch ()) encrypted_switch)
@@ -810,10 +813,12 @@ let commands version () =
                   ~force
                   key
                   name
-                >>=? fun _res -> return_unit) ] )
+                >>=? fun _res -> return_unit);
+      ] )
   @ ( if version <> Some `Mainnet then []
     else
-      [ command
+      [
+        command
           ~group
           ~desc:"Activate a fundraiser account."
           (args1 dry_run_switch)
@@ -837,8 +842,10 @@ let commands version () =
               ~dry_run
               name
               code
-            >>=? fun _res -> return_unit) ] )
-  @ [ command
+            >>=? fun _res -> return_unit);
+      ] )
+  @ [
+      command
         ~desc:"Wait until an operation is included in a block"
         (args3
            (default_arg
@@ -1087,9 +1094,10 @@ let commands version () =
               return_unit
           | Error errs ->
               ( match errs with
-              | [ Unregistred_error
-                    (`O [("kind", `String "generic"); ("error", `String msg)])
-                ] ->
+              | [
+               Unregistred_error
+                 (`O [("kind", `String "generic"); ("error", `String msg)]);
+              ] ->
                   cctxt#message
                     "Error:@[<hov>@.%a@]"
                     Format.pp_print_text
@@ -1233,5 +1241,5 @@ let commands version () =
                 ballots_info.supermajority
               >>= fun () -> return_unit
           | Testing ->
-              print_proposal info.current_proposal >>= fun () -> return_unit)
+              print_proposal info.current_proposal >>= fun () -> return_unit);
     ]

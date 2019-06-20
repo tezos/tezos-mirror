@@ -473,9 +473,11 @@ let decode_priority cctxt chain block = function
         (chain, block)
       >>=? fun possibilities ->
       try
-        let { Alpha_services.Delegate.Baking_rights.priority = prio;
-              timestamp = time;
-              _ } =
+        let {
+          Alpha_services.Delegate.Baking_rights.priority = prio;
+          timestamp = time;
+          _;
+        } =
           List.find
             (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
             possibilities
@@ -651,13 +653,17 @@ let filter_and_apply_operations state block_info ~timestamp ?protocol_data
       (List.nth quota anonymous_index)
   in
   let is_evidence = function
-    | { protocol_data =
+    | {
+        protocol_data =
           Operation_data {contents = Single (Double_baking_evidence _); _};
-        _ } ->
+        _;
+      } ->
         true
-    | { protocol_data =
+    | {
+        protocol_data =
           Operation_data {contents = Single (Double_endorsement_evidence _); _};
-        _ } ->
+        _;
+      } ->
         true
     | _ ->
         false
@@ -759,8 +765,10 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (chain, block)
   >>=? fun Constants.
-             { parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
-               _ } ->
+             {
+               parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
+               _;
+             } ->
   classify_operations
     cctxt
     ~chain
@@ -976,9 +984,11 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
 let filter_outdated_endorsements expected_level ops =
   List.filter
     (function
-      | { Alpha_context.protocol_data =
+      | {
+          Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement {level; _}); _};
-          _ } ->
+          _;
+        } ->
           Raw_level.equal expected_level level
       | _ ->
           true)
@@ -1007,9 +1017,11 @@ let count_slots_endorsements inc (_timestamp, (head, _priority, _delegate))
     operations =
   Lwt_list.fold_left_s
     (fun acc -> function
-      | { Alpha_context.protocol_data =
+      | {
+          Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement {level; _}); _};
-          _ } as op
+          _;
+        } as op
         when Raw_level.(level = head.Client_baking_blocks.level) -> (
           let open Apply_results in
           Client_baking_simulator.add_operation inc op
@@ -1087,13 +1099,15 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
            - We bake with what we have when the time limit has been reached.
         *)
         let limits =
-          [ ( Time.Protocol.add timestamp (Int64.div hard_delay 3L),
+          [
+            ( Time.Protocol.add timestamp (Int64.div hard_delay 3L),
               endorsers_per_block );
             ( Time.Protocol.add
                 timestamp
                 (Int64.div (Int64.mul hard_delay 2L) 3L),
               2 * endorsers_per_block / 3 );
-            (limit_date, endorsers_per_block / 3) ]
+            (limit_date, endorsers_per_block / 3);
+          ]
         in
         let timespan =
           let timespan =
@@ -1137,8 +1151,10 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
         in
         let rec loop nb_arrived_endorsements limits =
           Lwt.choose
-            [ (timeout >|= fun () -> `Timeout);
-              (get_event () >|= fun e -> `Event e) ]
+            [
+              (timeout >|= fun () -> `Timeout);
+              (get_event () >|= fun e -> `Event e);
+            ]
           >>= function
           | `Event (Some op_list) ->
               last_get_event := None ;

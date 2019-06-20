@@ -85,7 +85,9 @@ let () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [ ( "p2p.peerset",
+    [
+      ( "p2p.peerset",
         List.map
           wrap
-          [("empty", test_empty); ("ban", test_ban); ("gc", test_gc)] ) ]
+          [("empty", test_empty); ("ban", test_ban); ("gc", test_gc)] );
+    ]

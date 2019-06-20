@@ -40,7 +40,8 @@ let commands () =
     else failwith "%s is not a directory" dn
   in
   let check_dir_parameter = parameter check_dir in
-  [ command
+  [
+    command
       ~group
       ~desc:"List protocols known by the node."
       no_options
@@ -127,4 +128,5 @@ let commands () =
               "Error while fetching protocol: %a"
               Error_monad.pp_print_error
               err
-            >>= fun () -> return_unit) ]
+            >>= fun () -> return_unit);
+  ]

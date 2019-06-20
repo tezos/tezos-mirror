@@ -128,9 +128,11 @@ let multiple_origination_and_delegation () =
       (function
         | Contents_result
             (Manager_operation_result
-              { operation_result =
+              {
+                operation_result =
                   Applied (Origination_result {originated_contracts = [h]; _});
-                _ }) ->
+                _;
+              }) ->
             h
         | _ ->
             assert false)
@@ -201,8 +203,10 @@ let failing_operation_in_the_middle () =
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
          (Manager_operation_result
-           { operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
-             _ })
+           {
+             operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
+             _;
+           })
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
@@ -257,8 +261,10 @@ let failing_operation_in_the_middle_with_fees () =
       (Manager_operation_result {operation_result = Backtracked _; _})
     :: Contents_result
          (Manager_operation_result
-           { operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
-             _ })
+           {
+             operation_result = Failed (_, [Contract_storage.Balance_too_low _]);
+             _;
+           })
        :: Contents_result
             (Manager_operation_result {operation_result = Skipped _; _})
           :: _ ->
@@ -277,7 +283,8 @@ let failing_operation_in_the_middle_with_fees () =
   >>=? fun () -> return_unit
 
 let tests =
-  [ Test.tztest "multiple transfers" `Quick multiple_transfers;
+  [
+    Test.tztest "multiple transfers" `Quick multiple_transfers;
     Test.tztest
       "multiple originations and delegations"
       `Quick
@@ -289,4 +296,5 @@ let tests =
     Test.tztest
       "Failing operation in the middle (with fees)"
       `Quick
-      failing_operation_in_the_middle_with_fees ]
+      failing_operation_in_the_middle_with_fees;
+  ]

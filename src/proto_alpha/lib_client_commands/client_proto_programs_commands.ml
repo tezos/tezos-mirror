@@ -112,7 +112,8 @@ let commands () =
         | None ->
             failwith "Not given a valid signature")
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Lists all scripts in the library."
       no_options
@@ -413,4 +414,5 @@ let commands () =
             if quiet then return_unit
             else
               cctxt#message "Signature check successfull."
-              >>= fun () -> return_unit) ]
+              >>= fun () -> return_unit);
+  ]

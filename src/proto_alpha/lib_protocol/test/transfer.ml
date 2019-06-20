@@ -760,14 +760,15 @@ let random_multi_transactions () =
 (*********************************************************************)
 
 let tests =
-  [ (* single transfer *)
-    Test.tztest "single transfer" `Quick block_with_a_single_transfer;
+  [
+    (* single transfer *)
+      Test.tztest "single transfer" `Quick block_with_a_single_transfer;
     Test.tztest
       "single transfer with fee"
       `Quick
       block_with_a_single_transfer_with_fee;
     (* transfer zero tez *)
-    Test.tztest "single transfer zero tez" `Quick transfer_zero_tez;
+      Test.tztest "single transfer zero tez" `Quick transfer_zero_tez;
     Test.tztest
       "transfer zero tez from originated contract"
       `Quick
@@ -777,24 +778,24 @@ let tests =
       `Quick
       transfer_zero_implicit;
     (* transfer to originated contract *)
-    Test.tztest
-      "transfer to originated contract paying transaction fee"
-      `Quick
-      transfer_to_originate_with_fee;
+      Test.tztest
+        "transfer to originated contract paying transaction fee"
+        `Quick
+        transfer_to_originate_with_fee;
     (* transfer by the balance of contract *)
-    Test.tztest
-      "transfer the amount from source contract balance"
-      `Quick
-      transfer_amount_of_contract_balance;
+      Test.tztest
+        "transfer the amount from source contract balance"
+        `Quick
+        transfer_amount_of_contract_balance;
     (* transfer to itself *)
-    Test.tztest "transfers to itself" `Quick transfers_to_self;
+      Test.tztest "transfers to itself" `Quick transfers_to_self;
     (* missing operation *)
-    Test.tztest "missing transaction" `Quick missing_transaction;
+      Test.tztest "missing transaction" `Quick missing_transaction;
     (* transfer from/to implicit/originted contracts*)
-    Test.tztest
-      "transfer from an implicit to implicit contract "
-      `Quick
-      transfer_from_implicit_to_implicit_contract;
+      Test.tztest
+        "transfer from an implicit to implicit contract "
+        `Quick
+        transfer_from_implicit_to_implicit_contract;
     Test.tztest
       "transfer from an implicit to an originated contract"
       `Quick
@@ -808,23 +809,23 @@ let tests =
       `Quick
       transfer_from_originated_to_implicit;
     (* Slow tests *)
-    Test.tztest
-      "block with multiple transfers"
-      `Slow
-      block_with_multiple_transfers;
+      Test.tztest
+        "block with multiple transfers"
+        `Slow
+        block_with_multiple_transfers;
     (* TODO increase the number of transaction times *)
-    Test.tztest
-      "block with multiple transfer paying fee"
-      `Slow
-      block_with_multiple_transfers_pay_fee;
+      Test.tztest
+        "block with multiple transfer paying fee"
+        `Slow
+        block_with_multiple_transfers_pay_fee;
     Test.tztest
       "block with multiple transfer without paying fee"
       `Slow
       block_with_multiple_transfers_with_without_fee;
     (* build the chain *)
-    Test.tztest "build a chain" `Quick build_a_chain;
+      Test.tztest "build a chain" `Quick build_a_chain;
     (* Erroneous *)
-    Test.tztest "empty implicit" `Quick empty_implicit;
+      Test.tztest "empty implicit" `Quick empty_implicit;
     Test.tztest
       "balance too low - transfer zero"
       `Quick
@@ -849,5 +850,6 @@ let tests =
       add_the_same_operation_twice;
     Test.tztest "ownership sender" `Quick ownership_sender;
     (* Random tests *)
-    Test.tztest "random transfer" `Quick random_transfer;
-    Test.tztest "random multi transfer" `Quick random_multi_transactions ]
+      Test.tztest "random transfer" `Quick random_transfer;
+    Test.tztest "random multi transfer" `Quick random_multi_transactions;
+  ]

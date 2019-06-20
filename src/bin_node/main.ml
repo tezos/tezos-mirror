@@ -51,12 +51,14 @@ let term =
   ret (const (`Help (`Pager, None)))
 
 let description =
-  [ `S "DESCRIPTION";
+  [
+    `S "DESCRIPTION";
     `P "Entry point for initializing, configuring and running a Tezos node.";
     `P Node_identity_command.Manpage.command_description;
     `P Node_run_command.Manpage.command_description;
     `P Node_config_command.Manpage.command_description;
-    `P Node_snapshot_command.Manpage.command_description ]
+    `P Node_snapshot_command.Manpage.command_description;
+  ]
 
 let man = description @ Node_run_command.Manpage.examples
 
@@ -68,10 +70,12 @@ let info =
   Cmdliner.Term.info ~doc:"The Tezos node" ~man ~version "tezos-node"
 
 let commands =
-  [ Node_run_command.cmd;
+  [
+    Node_run_command.cmd;
     Node_config_command.cmd;
     Node_identity_command.cmd;
-    Node_snapshot_command.cmd ]
+    Node_snapshot_command.cmd;
+  ]
 
 let () =
   Random.self_init () ;

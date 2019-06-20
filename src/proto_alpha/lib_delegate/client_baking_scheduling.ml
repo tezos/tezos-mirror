@@ -106,9 +106,11 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     (* event construction *)
     let timeout = compute_timeout state in
     Lwt.choose
-      [ (Lwt_exit.termination_thread >|= fun _ -> `Termination);
+      [
+        (Lwt_exit.termination_thread >|= fun _ -> `Termination);
         (timeout >|= fun timesup -> `Timeout timesup);
-        (get_event () >|= fun e -> `Event e) ]
+        (get_event () >|= fun e -> `Event e);
+      ]
     >>= function
     (* event matching *)
     | `Termination ->

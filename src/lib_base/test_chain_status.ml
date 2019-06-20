@@ -42,7 +42,8 @@ let encoding =
        the moment), forking (the test chain is being setup), running (the \
        test chain is running)."
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Not_running"
            (obj1 (req "status" (constant "not_running")))
@@ -76,7 +77,8 @@ let encoding =
              | _ ->
                  None)
            (fun ((), chain_id, genesis, protocol, expiration) ->
-             Running {chain_id; genesis; protocol; expiration}) ]
+             Running {chain_id; genesis; protocol; expiration});
+       ]
 
 let pp ppf = function
   | Not_running ->

@@ -363,7 +363,8 @@ module Commands = struct
                                ( if List.length subset_of_clients = 1 then ""
                                else "s" )
                                (String.concat ~sep:", " clients))
-                            (markdown_verbatim res)))) ]))
+                            (markdown_verbatim res))));
+              ]))
 
   let arbitrary_commands_for_each_client ?make_admin
       ?(make_command_names = fun i -> [sprintf "c%d" i; sprintf "client-%d" i])

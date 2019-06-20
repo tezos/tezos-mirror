@@ -56,7 +56,8 @@ let commands () =
              ignore Clic.(setup_formatter ppf Plain Full) ;
              return ppf))
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"The last heads that have been considered by the node."
       (args1 output_arg)
@@ -87,4 +88,5 @@ let commands () =
               "@[<v>%a@]@."
               (Format.pp_print_list print_invalid_blocks)
               invalid ;
-            return_unit) ]
+            return_unit);
+  ]

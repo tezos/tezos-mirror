@@ -35,8 +35,10 @@ let rec retry (cctxt : #Protocol_client_context.full) ~delay ~tries f x =
       cctxt#message "Connection refused, retrying in %.2f seconds..." delay
       >>= fun () ->
       Lwt.pick
-        [ (Lwt_unix.sleep delay >|= fun () -> `Continue);
-          (Lwt_exit.termination_thread >|= fun _ -> `Killed) ]
+        [
+          (Lwt_unix.sleep delay >|= fun () -> `Continue);
+          (Lwt_exit.termination_thread >|= fun _ -> `Killed);
+        ]
       >>= function
       | `Killed ->
           Lwt.return err
@@ -105,8 +107,10 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     (* Got a testchain for a different protocol, skipping *)
   in
   Lwt.pick
-    [ (Lwt_exit.termination_thread >>= fun _ -> failwith "Interrupted...");
-      loop () ]
+    [
+      (Lwt_exit.termination_thread >>= fun _ -> failwith "Interrupted...");
+      loop ();
+    ]
   >>=? fun () -> cctxt#message "Test chain forked." >>= fun () -> return_unit
 
 module Endorser = struct

@@ -36,7 +36,8 @@ let chain_status_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Main"
         (obj1 (req "chain_id" Chain_id.encoding))
@@ -61,7 +62,8 @@ let chain_status_encoding =
         ~title:"Stopping"
         (obj1 (req "stopping" Chain_id.encoding))
         (function Stopping chain_id -> Some chain_id | _ -> None)
-        (fun chain_id -> Stopping chain_id) ]
+        (fun chain_id -> Stopping chain_id);
+    ]
 
 module S = struct
   open Data_encoding

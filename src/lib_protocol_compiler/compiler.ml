@@ -91,15 +91,19 @@ let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
 
 let tezos_protocol_env =
   let open Embedded_cmis in
-  [ ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
+  [
+    ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
     ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
     ( "Tezos_protocol_environment_sigs__V1",
-      tezos_protocol_environment_sigs__V1_cmi ) ]
+      tezos_protocol_environment_sigs__V1_cmi );
+  ]
 
 let register_env =
   let open Embedded_cmis in
-  [ ( "tezos_protocol_registerer__Registerer",
-      tezos_protocol_registerer__Registerer_cmi ) ]
+  [
+    ( "tezos_protocol_registerer__Registerer",
+      tezos_protocol_registerer__Registerer_cmi );
+  ]
 
 (** Helpers *)
 
@@ -150,7 +154,8 @@ let main {compile_ml; pack_objects; link_shared} =
   and hash_only = ref false
   and check_protocol_hash = ref true in
   let args_spec =
-    [ ("-o", Arg.String (fun s -> output_file := Some s), "");
+    [
+      ("-o", Arg.String (fun s -> output_file := Some s), "");
       ( "-hash-only",
         Arg.Set hash_only,
         " Only display the hash of the protocol and don't compile" );
@@ -165,7 +170,8 @@ let main {compile_ml; pack_objects; link_shared} =
       ("-output-dep", Arg.Set output_dep, " ...");
       ( "-build-dir",
         Arg.String (fun s -> build_dir := Some s),
-        "use custom build directory and preserve build artifacts" ) ]
+        "use custom build directory and preserve build artifacts" );
+    ]
   in
   let usage_msg =
     Printf.sprintf "Usage: %s [options] <srcdir>\nOptions are:" Sys.argv.(0)

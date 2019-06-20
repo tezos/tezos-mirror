@@ -277,9 +277,11 @@ module Ledger_commands = struct
       | Error
           (LedgerError
              (AppError
-               { status =
+               {
+                 status =
                    Ledgerwallet.Transport.Status.Referenced_data_not_found;
-                 _ })
+                 _;
+               })
           :: _) ->
           return `No_baking_authorized
       | Error _ as e ->
@@ -816,7 +818,8 @@ let pp_ledger_chain_id fmt s =
 (** Commands for both ledger applications. *)
 let generic_commands group =
   Clic.
-    [ command
+    [
+      command
         ~group
         ~desc:"List supported Ledger Nano devices connected."
         no_options
@@ -978,13 +981,15 @@ let generic_commands group =
               | `Ledger _ ->
                   cctxt#message "* This is just a ledger URI."
                   >>= fun () -> return_unit )
-              >>=? fun () -> return_some ())) ]
+              >>=? fun () -> return_some ()));
+    ]
 
 (** Commands specific to the Baking app minus the high-water-mark ones
     which get a specific treatment in {!high_water_mark_commands}. *)
 let baking_commands group =
   Clic.
-    [ Clic.command
+    [
+      Clic.command
         ~group
         ~desc:"Query the path of the authorized key"
         no_options
@@ -1228,7 +1233,8 @@ let baking_commands group =
             (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
               Ledger_commands.wrap_ledger_cmd (fun pp ->
                   Ledgerwallet_tezos.deauthorize_baking ~pp hidapi)
-              >>=? fun () -> return_some ())) ]
+              >>=? fun () -> return_some ()));
+    ]
 
 (** Commands for high water mark of the Baking app. The
     [watermark_spelling] argument is used to make 2 sets of commands: with
@@ -1242,7 +1248,8 @@ let high_water_mark_commands group watermark_spelling =
     else desc
   in
   Clic.
-    [ Clic.command
+    [
+      Clic.command
         ~group
         ~desc:(make_desc "Get high water mark of a Ledger")
         (args1
@@ -1327,7 +1334,8 @@ let high_water_mark_commands group watermark_spelling =
                     Ledger_uri.pp
                     ledger_uri
                     new_hwm
-                  >>= fun () -> return_some ())) ]
+                  >>= fun () -> return_some ()));
+    ]
 
 let commands =
   let group =

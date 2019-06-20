@@ -118,9 +118,11 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Clients ready";
+      [
+        af "Clients ready";
         af "Node 0 baked %d times." (starting_level - 1);
-        af "All nodes should be at level %d." starting_level ]
+        af "All nodes should be at level %d." starting_level;
+      ]
   >>= fun () ->
   return (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2)
 
@@ -213,10 +215,12 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "About to forge";
+      [
+        af "About to forge";
         ef_json "Baking 0" baking_0_header;
         ef_json "Baking 1" baking_1_header;
-        ef_json "Head hash" head_hash_json ]
+        ef_json "Head hash" head_hash_json;
+      ]
   >>= fun () ->
   Tezos_client.Keyed.forge_and_inject
     state
@@ -229,22 +233,30 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
          |> remove_field ~name:"protocol"
        in
        `O
-         [ ("branch", head_hash_json);
+         [
+           ("branch", head_hash_json);
            ( "contents",
              `A
-               [ `O
-                   [ ("kind", `String "double_baking_evidence");
+               [
+                 `O
+                   [
+                     ("kind", `String "double_baking_evidence");
                      ("bh1", clean baking_0_header);
-                     ("bh2", clean baking_1_header) ] ] ) ])
+                     ("bh2", clean baking_1_header);
+                   ];
+               ] );
+         ])
   >>= fun result ->
   Interactive_test.Pauser.generic
     state
     EF.
-      [ af "Waiting for accuser to notice double baking";
+      [
+        af "Waiting for accuser to notice double baking";
         ef_json "Result of injection" result;
         af
           "All nodes reaching level %d"
-          (starting_level + number_of_lonely_bakes + 1) ]
+          (starting_level + number_of_lonely_bakes + 1);
+      ]
   >>= fun () ->
   wait_for_operation_in_mempools
     state
@@ -357,8 +369,10 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
     state
     EF.(
       list
-        [ ef_json "Endorsement 0:" endorsement_0;
-          ef_json "Endorsement 1:" endorsement_1 ])
+        [
+          ef_json "Endorsement 0:" endorsement_0;
+          ef_json "Endorsement 1:" endorsement_1;
+        ])
   >>= fun () ->
   Helpers.restart_node state node_1 ~client_exec
   >>= fun () ->
@@ -403,18 +417,28 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
             assert false
       in
       `O
-        [("branch", branch); ("operations", contents); ("signature", signature)]
+        [
+          ("branch", branch);
+          ("operations", contents);
+          ("signature", signature);
+        ]
     in
     let inlined_endorsement_1 = transform_endorsement endorsement_0 in
     let inlined_endorsement_2 = transform_endorsement endorsement_1 in
     `O
-      [ ("branch", head_hash_json);
+      [
+        ("branch", head_hash_json);
         ( "contents",
           `A
-            [ `O
-                [ ("kind", `String "double_endorsement_evidence");
+            [
+              `O
+                [
+                  ("kind", `String "double_endorsement_evidence");
                   ("op1", inlined_endorsement_1);
-                  ("op2", inlined_endorsement_2) ] ] ) ]
+                  ("op2", inlined_endorsement_2);
+                ];
+            ] );
+      ]
   in
   Interactive_test.Pauser.generic
     state
@@ -552,9 +576,11 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
   >>= fun () ->
   pause
     EF.
-      [ af "Two clients ready";
+      [
+        af "Two clients ready";
         af "Node 0 baked %d times." (starting_level - 1);
-        af "All nodes should be at level %d." starting_level ]
+        af "All nodes should be at level %d." starting_level;
+      ]
   >>= fun () ->
   let transfer _msg client =
     let dest =
@@ -564,7 +590,8 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
     Tezos_client.successful_client_cmd
       state
       ~client
-      [ "--wait";
+      [
+        "--wait";
         "none";
         "transfer";
         "1";
@@ -573,7 +600,8 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
         "to";
         dest;
         "--fee";
-        "0.05" ]
+        "0.05";
+      ]
     >>= fun res ->
     say
       state
@@ -640,11 +668,13 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
   >>= fun () ->
   pause
     EF.
-      [ af "Node 0 was killed";
+      [
+        af "Node 0 was killed";
         af "Node 1 was restarted";
         af "Node 1 transfered";
         af "Node 1 baked";
-        af "Node 1 was killed" ]
+        af "Node 1 was killed";
+      ]
   >>= fun () ->
   List.fold ~init:(return ()) intermediary_nodes ~f:(fun prev x ->
       prev >>= fun () -> Helpers.restart_node state ~client_exec x)
@@ -708,10 +738,12 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
   >>= fun () ->
   pause
     EF.
-      [ af "One more baking (level should include accusation)";
+      [
+        af "One more baking (level should include accusation)";
         af
           "All nodes reaching level %d"
-          (starting_level + number_of_lonely_bakes + 2) ]
+          (starting_level + number_of_lonely_bakes + 2);
+      ]
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_1 "a couple more"
   >>= fun () ->
@@ -728,7 +760,8 @@ let cmd ~pp_error () =
   let pf fmt = ksprintf (fun s -> `P s) fmt in
   let tests =
     let test variant name title man = (variant, name, title, man) in
-    [ test
+    [
+      test
         `With_accusers
         "with-accusers"
         "Network With Accusers"
@@ -749,7 +782,8 @@ let cmd ~pp_error () =
         (pf
            "This test builds a very simple 3-piece network, makes a baker \
             double endorse and $(i,manually) inserts a double-baking \
-            accusation.") ]
+            accusation.");
+    ]
   in
   Test_command_line.Run_command.make
     ~pp_error
@@ -832,13 +866,15 @@ let cmd ~pp_error () =
     $ Test_command_line.cli_state ~name:"accusing" () )
     (let doc = "Sandbox networks which record double-bakings." in
      let man : Manpage.block list =
-       [ `S "ACCUSATION TESTS";
+       [
+         `S "ACCUSATION TESTS";
          pf
            "This command provides %d tests which use network sandboxes to \
             make double-bakings and double-endorsements happen."
            (List.length tests);
          `Blocks
            (List.map tests ~f:(fun (_, n, tit, m) ->
-                `Blocks [pf "* $(b,`%s`): $(i,%s)." n tit; `Noblank; m])) ]
+                `Blocks [pf "* $(b,`%s`): $(i,%s)." n tit; `Noblank; m]));
+       ]
      in
      info ~man ~doc "accusations")

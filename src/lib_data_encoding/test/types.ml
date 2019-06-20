@@ -90,7 +90,8 @@ type union = A of int | B of string | C of int | D of string | E
 
 let union_enc =
   union
-    [ case
+    [
+      case
         (Tag 1)
         ~title:"A"
         int8
@@ -119,16 +120,19 @@ let union_enc =
         ~title:"E"
         empty
         (function E -> Some () | _ -> None)
-        (fun () -> E) ]
+        (fun () -> E);
+    ]
 
 let mini_union_enc =
   union
-    [ case
+    [
+      case
         (Tag 1)
         ~title:"A"
         int8
         (function A i -> Some i | _ -> None)
-        (fun i -> A i) ]
+        (fun i -> A i);
+    ]
 
 let union_to_string = function
   | A i ->
@@ -144,7 +148,14 @@ let union_to_string = function
 
 let enum_enc =
   string_enum
-    [("one", 1); ("two", 2); ("three", 3); ("four", 4); ("five", 5); ("six", 6)]
+    [
+      ("one", 1);
+      ("two", 2);
+      ("three", 3);
+      ("four", 4);
+      ("five", 5);
+      ("six", 6);
+    ]
 
 let mini_enum_enc = string_enum [("one", 1); ("two", 2)]
 
@@ -152,7 +163,8 @@ let mu_list_enc enc =
   mu "list"
   @@ fun mu_list_enc ->
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Nil"
         empty
@@ -163,7 +175,8 @@ let mu_list_enc enc =
         ~title:"Cons"
         (obj2 (req "value" enc) (req "next" mu_list_enc))
         (function x :: xs -> Some (x, xs) | [] -> None)
-        (fun (x, xs) -> x :: xs) ]
+        (fun (x, xs) -> x :: xs);
+    ]
 
 let bounded_list ~total ~elements enc =
   check_size total (Variable.list (check_size elements enc))

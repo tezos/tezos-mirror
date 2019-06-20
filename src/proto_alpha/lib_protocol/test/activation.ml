@@ -104,7 +104,9 @@ let secrets () =
             (Invalid_argument "tez conversion")
             (Tez.of_mutez (Int64.of_string amount));
       })
-    [ ( [ "envelope";
+    [
+      ( [
+          "envelope";
           "hospital";
           "mind";
           "sunset";
@@ -118,13 +120,15 @@ let secrets () =
           "lucky";
           "style";
           "picnic";
-          "success" ],
+          "success";
+        ],
         "0f39ed0b656509c2ecec4771712d9cddefe2afac",
         "23932454669343",
         "tz1MawerETND6bqJqx8GV3YHUrvMBCDasRBF",
         "z0eZHQQGKt",
         "cjgfoqmk.wpxnvnup@tezos.example.org" );
-      ( [ "flag";
+      ( [
+          "flag";
           "quote";
           "will";
           "valley";
@@ -138,13 +142,15 @@ let secrets () =
           "cause";
           "demise";
           "bottom";
-          "practice" ],
+          "practice";
+        ],
         "41f98b15efc63fa893d61d7d6eee4a2ce9427ac4",
         "72954577464032",
         "tz1X4maqF9tC1Yn4jULjHRAyzjAtc25Z68TX",
         "MHErskWPE6",
         "oklmcktr.ztljnpzc@tezos.example.org" );
-      ( [ "library";
+      ( [
+          "library";
           "away";
           "inside";
           "paper";
@@ -158,13 +164,15 @@ let secrets () =
           "planet";
           "zone";
           "reflect";
-          "finger" ],
+          "finger";
+        ],
         "411dfef031eeecc506de71c9df9f8e44297cf5ba",
         "217487035428348",
         "tz1SWBY7rWMutEuWS54Pt33MkzAS6eWkUuTc",
         "0AO6BzQNfN",
         "ctgnkvqm.kvtiybky@tezos.example.org" );
-      ( [ "cruel";
+      ( [
+          "cruel";
           "fluid";
           "damage";
           "demand";
@@ -178,13 +186,15 @@ let secrets () =
           "uniform";
           "fire";
           "asthma";
-          "milk" ],
+          "milk";
+        ],
         "08d7d355bc3391d12d140780b39717d9f46fcf87",
         "4092742372031",
         "tz1amUjiZaevaxQy5wKn4SSRvVoERCip3nZS",
         "9kbZ7fR6im",
         "bnyxxzqr.tdszcvqb@tezos.example.org" );
-      ( [ "opera";
+      ( [
+          "opera";
           "divorce";
           "easy";
           "myself";
@@ -198,13 +208,15 @@ let secrets () =
           "humor";
           "ticket";
           "client";
-          "edge" ],
+          "edge";
+        ],
         "9b7cad042fba557618bdc4b62837c5f125b50e56",
         "17590039016550",
         "tz1Zaee3QBtD4ErY1SzqUvyYTrENrExu6yQM",
         "suxT5H09yY",
         "iilkhohu.otnyuvna@tezos.example.org" );
-      ( [ "token";
+      ( [
+          "token";
           "similar";
           "ginger";
           "tongue";
@@ -218,13 +230,15 @@ let secrets () =
           "success";
           "hobby";
           "shell";
-          "cart" ],
+          "cart";
+        ],
         "124c0ca217f11ffc6c7b76a743d867c8932e5afd",
         "26322312350555",
         "tz1geDUUhfXK1EMj7VQdRjug1MoFe6gHWnCU",
         "4odVdLykaa",
         "kwhlglvr.slriitzy@tezos.example.org" );
-      ( [ "shield";
+      ( [
+          "shield";
           "warrior";
           "gorilla";
           "birth";
@@ -238,13 +252,15 @@ let secrets () =
           "extend";
           "pulse";
           "suffer";
-          "vapor" ],
+          "vapor";
+        ],
         "ac7a2125beea68caf5266a647f24dce9fea018a7",
         "244951387881443",
         "tz1h3nY7jcZciJgAwRhWcrEwqfVp7VQoffur",
         "A6yeMqBFG8",
         "lvrmlbyj.yczltcxn@tezos.example.org" );
-      ( [ "waste";
+      ( [
+          "waste";
           "open";
           "scan";
           "tip";
@@ -258,13 +274,15 @@ let secrets () =
           "clerk";
           "another";
           "staff";
-          "liar" ],
+          "liar";
+        ],
         "2b3e94be133a960fa0ef87f6c0922c19f9d87ca2",
         "80065050465525",
         "tz1VzL4Xrb3fL3ckvqCWy6bdGMzU2w9eoRqs",
         "oVZqpq60sk",
         "rfodmrha.zzdndvyk@tezos.example.org" );
-      ( [ "fiber";
+      ( [
+          "fiber";
           "next";
           "property";
           "cradle";
@@ -278,13 +296,15 @@ let secrets () =
           "minimum";
           "nice";
           "boil";
-          "age" ],
+          "age";
+        ],
         "dac31640199f2babc157aadc0021cd71128ca9ea",
         "3569618927693",
         "tz1RUHg536oRKhPLFfttcB5gSWAhh4E9TWjX",
         "FfytQTTVbu",
         "owecikdy.gxnyttya@tezos.example.org" );
-      ( [ "print";
+      ( [
+          "print";
           "labor";
           "budget";
           "speak";
@@ -298,12 +318,14 @@ let secrets () =
           "ankle";
           "happy";
           "only";
-          "exclude" ],
+          "exclude";
+        ],
         "bb841227f250a066eb8429e56937ad504d7b34dd",
         "9034781424478",
         "tz1M1LFbgctcPWxstrao9aLr2ECW1fV4pH5u",
         "zknAl3lrX2",
-        "ettilrvh.zsrqrbud@tezos.example.org" ) ]
+        "ettilrvh.zsrqrbud@tezos.example.org" );
+    ]
 
 let activation_init () =
   Context.init ~with_commitments:true 1
@@ -546,7 +568,8 @@ let invalid_transfer_from_unactived_account () =
           false)
 
 let tests =
-  [ Test.tztest "init with commitments" `Quick simple_init_with_commitments;
+  [
+    Test.tztest "init with commitments" `Quick simple_init_with_commitments;
     Test.tztest "single activation" `Quick single_activation;
     Test.tztest "multi-activation one-by-one" `Quick multi_activation_1;
     Test.tztest "multi-activation all at a time" `Quick multi_activation_2;
@@ -568,4 +591,5 @@ let tests =
     Test.tztest
       "invalid transfer from unactivated account"
       `Quick
-      invalid_transfer_from_unactived_account ]
+      invalid_transfer_from_unactived_account;
+  ]

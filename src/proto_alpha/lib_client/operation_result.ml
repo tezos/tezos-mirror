@@ -59,13 +59,15 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
             expr ) ;
       pp_result ppf result ; Format.fprintf ppf "@]"
   | Origination
-      { manager;
+      {
+        manager;
         delegate;
         credit;
         spendable;
         delegatable;
         script;
-        preorigination = _ } ->
+        preorigination = _;
+      } ->
       Format.fprintf
         ppf
         "@[<v 2>%s:@,From: %a@,For: %a@,Credit: %s%a"
@@ -214,14 +216,16 @@ let pp_manager_operation_contents_and_result ppf
         {balance_updates; operation_result; internal_operation_results} ) =
   let pp_transaction_result
       (Transaction_result
-        { balance_updates;
+        {
+          balance_updates;
           consumed_gas;
           storage;
           originated_contracts;
           storage_size;
           paid_storage_size_diff;
           big_map_diff = _;
-          allocated_destination_contract = _ }) =
+          allocated_destination_contract = _;
+        }) =
     ( match originated_contracts with
     | [] ->
         ()
@@ -260,11 +264,13 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_origination_result
       (Origination_result
-        { balance_updates;
+        {
+          balance_updates;
           consumed_gas;
           originated_contracts;
           storage_size;
-          paid_storage_size_diff }) =
+          paid_storage_size_diff;
+        }) =
     ( match originated_contracts with
     | [] ->
         ()

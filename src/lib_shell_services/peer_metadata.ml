@@ -48,14 +48,16 @@ type messages = {
 let sent_requests_encoding =
   let open Data_encoding in
   (conv
-     (fun { branch;
+     (fun {
+            branch;
             head;
             block_header;
             operations;
             protocols;
             operation_hashes_for_block;
             operations_for_block;
-            other } ->
+            other;
+          } ->
        ( branch,
          head,
          block_header,
@@ -141,7 +143,8 @@ type prevalidator_results = {
 let prevalidator_results_encoding =
   let open Data_encoding in
   conv
-    (fun { cannot_download;
+    (fun {
+           cannot_download;
            cannot_parse;
            refused_by_prefilter;
            refused_by_postfilter;
@@ -150,7 +153,8 @@ let prevalidator_results_encoding =
            branch_refused;
            refused;
            duplicate;
-           outdated } ->
+           outdated;
+         } ->
       ( cannot_download,
         cannot_parse,
         refused_by_prefilter,
@@ -367,7 +371,8 @@ let empty () =
 let encoding =
   let open Data_encoding in
   (conv
-     (fun { responses;
+     (fun {
+            responses;
             requests;
             valid_blocks;
             old_heads;
@@ -376,7 +381,8 @@ let encoding =
             inactive_chains;
             future_blocks_advertised;
             unadvertised;
-            advertisements } ->
+            advertisements;
+          } ->
        ( ( responses,
            requests,
            valid_blocks,

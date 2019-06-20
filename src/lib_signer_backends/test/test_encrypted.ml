@@ -38,7 +38,8 @@ let passwords =
       "Naif5iel";
       " eir6Aed1";
       "aa6Aesai";
-      "" ]
+      "";
+    ]
 
 let nb_passwds = List.length passwords
 
@@ -73,39 +74,48 @@ let make_sk_uris =
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
 let ed25519_sks =
-  [ "edsk3kMNLNdzLPbbABASDLARft8JRZ3Wpwibn8SMAb4KmuWSMJmAFd";
+  [
+    "edsk3kMNLNdzLPbbABASDLARft8JRZ3Wpwibn8SMAb4KmuWSMJmAFd";
     "edsk3Kqr8VHRx9kmR8Pj5qRGcmvQH34cForiMaMz1Ahhq5DkZp7FxJ";
-    "edsk2mBu4w9sMGhryvvXK53dXgpcNdZWi8pJQ1QL2rAgRPrE5y12az" ]
+    "edsk2mBu4w9sMGhryvvXK53dXgpcNdZWi8pJQ1QL2rAgRPrE5y12az";
+  ]
 
 let ed25519_sks_encrypted =
   make_sk_uris
-    [ "edesk1oGXxunJ5FTGpQ6o1xdop8VGKdT36Fj7LwWF9HLjzEqaCC4V6tdRVN1jaeJTfCHS8bYf7U2YhMK2yW6jSUy";
+    [
+      "edesk1oGXxunJ5FTGpQ6o1xdop8VGKdT36Fj7LwWF9HLjzEqaCC4V6tdRVN1jaeJTfCHS8bYf7U2YhMK2yW6jSUy";
       "edesk1s4xEifbUdUkghHHimbNUuyQ4eidDVJdc8JtPRUon758hBqZNZsQxadUDFRSRiUdLoFqBG35HAiLKafyczw";
-      "edesk1zY5jEs4QXrF9tXxFq1mfW9PkatdRxCKQ2Q598y5LLz65nQj4eWxefYFp8YLerya1haRdGe5NWckHDb5ApM"
+      "edesk1zY5jEs4QXrF9tXxFq1mfW9PkatdRxCKQ2Q598y5LLz65nQj4eWxefYFp8YLerya1haRdGe5NWckHDb5ApM";
     ]
 
 let secp256k1_sks =
-  [ "spsk24attf9uuQ7PUKFHxTm6E3TMqB6SPkFiMbXPBur7JNrvupW2xg";
+  [
+    "spsk24attf9uuQ7PUKFHxTm6E3TMqB6SPkFiMbXPBur7JNrvupW2xg";
     "spsk2H32XfWL7MkW58r76q6Yu5tJg77YGgVyjwq7EvLUHhn4JmAtEG";
-    "spsk3KQ56REAUGc6Gn87xCRnWyPwR2Un667vegQVuU16ZcgNyLCooh" ]
+    "spsk3KQ56REAUGc6Gn87xCRnWyPwR2Un667vegQVuU16ZcgNyLCooh";
+  ]
 
 let secp256k1_sks_encrypted =
   make_sk_uris
-    [ "spesk2CXQHDbzrcNatRzmg83Dto6kX6BWwpP2zGs4Zks9LDsXzaX6mAYRj5ZrrdgyZQap4DS9YRRLNSpaVC2TSsk";
+    [
+      "spesk2CXQHDbzrcNatRzmg83Dto6kX6BWwpP2zGs4Zks9LDsXzaX6mAYRj5ZrrdgyZQap4DS9YRRLNSpaVC2TSsk";
       "spesk1upiFp23osWSUTgHcx8DCVpTrMr9xtdqVQkQDWj5sFG7vqcWLDaNv9AKKcF27Nb266YfuAGF2hEbcyAxHmK";
-      "spesk1w7d68hzTWJusk5Xn5oz8EgDXbotDW9BXb5ksFjr8Jd94Kxnu5yKAhgRszojhMUoJ1EEt5BtPpGpkgCjELq"
+      "spesk1w7d68hzTWJusk5Xn5oz8EgDXbotDW9BXb5ksFjr8Jd94Kxnu5yKAhgRszojhMUoJ1EEt5BtPpGpkgCjELq";
     ]
 
 let p256_sks =
-  [ "p2sk2YQcwF5h7qgRztocEMrfizUwZaM41f4v7zWneiig2Y5AxajqYC";
+  [
+    "p2sk2YQcwF5h7qgRztocEMrfizUwZaM41f4v7zWneiig2Y5AxajqYC";
     "p2sk2XiSoQC9tvejVBDJyvkbHUq2kvcQHdJJ2wM8rii228DkjKV2b5";
-    "p2sk3ZsfsEaxDNn74orv91Ruu35fomzF373aT9ForA4fDo54c47o6H" ]
+    "p2sk3ZsfsEaxDNn74orv91Ruu35fomzF373aT9ForA4fDo54c47o6H";
+  ]
 
 let p256_sks_encrypted =
   make_sk_uris
-    [ "p2esk2JMFpR9yaSpgsaKQYLqFnv16t4gowJ4cgjj7D7iMfoaJz2vZuH7Tdi11MrX6FC2yhfs2nvy5VRxAvzH1STE";
+    [
+      "p2esk2JMFpR9yaSpgsaKQYLqFnv16t4gowJ4cgjj7D7iMfoaJz2vZuH7Tdi11MrX6FC2yhfs2nvy5VRxAvzH1STE";
       "p2esk1nfobVL73mY5Y18W8Ltb3Vm6Nf5Th7trN3yA3ucyyP4AH93XfyRatkh9AxxaDtnju1EtArykjroEQHDT97k";
-      "p2esk2Ge1jrVak7NhxksimzaQjRCTLx5vxUZ4Akgq3spGQLx6N41h6aKXeEYDgxN5eztnPwD6QiCHCfVAKXLPNm8"
+      "p2esk2Ge1jrVak7NhxksimzaQjRCTLx5vxUZ4Akgq3spGQLx6N41h6aKXeEYDgxN5eztnPwD6QiCHCfVAKXLPNm8";
     ]
 
 let sk_testable =
@@ -121,9 +131,11 @@ let test_vectors () =
       >>=? fun decs ->
       assert (decs = sks) ;
       return_unit)
-    [ (ed25519_sks, ed25519_sks_encrypted);
+    [
+      (ed25519_sks, ed25519_sks_encrypted);
       (secp256k1_sks, secp256k1_sks_encrypted);
-      (p256_sks, p256_sks_encrypted) ]
+      (p256_sks, p256_sks_encrypted);
+    ]
 
 let test_random algo =
   let open Encrypted in
@@ -153,7 +165,9 @@ let test_vectors _switch () =
   | Ok _ -> Lwt.return_unit | Error _ -> Lwt.fail_with "test_vectors"
 
 let tests =
-  [ Alcotest_lwt.test_case "random_roundtrip" `Quick test_random;
-    Alcotest_lwt.test_case "vectors_decrypt" `Quick test_vectors ]
+  [
+    Alcotest_lwt.test_case "random_roundtrip" `Quick test_random;
+    Alcotest_lwt.test_case "vectors_decrypt" `Quick test_vectors;
+  ]
 
 let () = Alcotest.run "tezos-signer-backends" [("encrypted", tests)]

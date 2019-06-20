@@ -157,12 +157,14 @@ let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126) ()
   >>= fun branch ->
   let json =
     `O
-      [ ("branch", `String branch);
+      [
+        ("branch", `String branch);
         ( "contents",
           `A
             (List.map (List.range 0 n) ~f:(fun i ->
                  `O
-                   [ ("kind", `String "transaction");
+                   [
+                     ("kind", `String "transaction");
                      ("source", `String src);
                      ( "destination",
                        `String "tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F" );
@@ -172,7 +174,9 @@ let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126) ()
                      );
                      ("counter", `String (string_of_int i));
                      ("gas_limit", `String (string_of_int 127));
-                     ("storage_limit", `String (string_of_int 277)) ])) ) ]
+                     ("storage_limit", `String (string_of_int 277));
+                   ])) );
+      ]
   in
   Tezos_client.rpc
     state
