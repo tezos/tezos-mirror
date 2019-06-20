@@ -72,7 +72,7 @@ let () =
 
 let of_int32 l =
   try Ok (of_int32_exn l)
-  with _ -> Error [Unexpected_level l]
+  with _ -> error (Unexpected_level l)
 
 module Index = struct
   type t = raw_level
