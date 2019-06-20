@@ -42,6 +42,11 @@ module Block_priority : sig
   val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
 end
 
+(* Only for migration from 004 *)
+module Last_block_priority : sig
+  val delete : Raw_context.t -> Raw_context.t tzresult Lwt.t
+end
+
 module Roll : sig
 
   (** Storage from this submodule must only be accessed through the

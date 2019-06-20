@@ -72,6 +72,13 @@ module Block_priority =
     (struct let name = ["block_priority"] end)
     (Int)
 
+(* Only for migration from 004 *)
+module Last_block_priority =
+  Make_single_data_storage(Ghost)
+    (Raw_context)
+    (struct let name = ["last_block_priority"] end)
+    (Int)
+
 (** Contracts handling *)
 
 module Contract = struct

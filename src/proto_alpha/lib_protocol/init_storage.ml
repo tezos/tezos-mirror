@@ -48,6 +48,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Vote.Current_quorum_004.get ctxt >>=? fun quorum ->
       Storage.Vote.Participation_ema.init ctxt quorum >>=? fun ctxt ->
       Storage.Vote.Current_quorum_004.delete ctxt >>=? fun ctxt ->
+      Storage.Block_priority.init ctxt 0 >>=? fun ctxt ->
+      Storage.Last_block_priority.delete ctxt >>=? fun ctxt ->
       return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =
