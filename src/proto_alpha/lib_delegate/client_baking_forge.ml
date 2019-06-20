@@ -692,7 +692,7 @@ let forge_block
         if Protocol_hash.equal current_protocol next_protocol then begin
           finalize_block_header final_context.header ~timestamp:min_valid_timestamp
             validation_result operations >>= function
-          | Error [ Forking_test_chain ] ->
+          | Error (Forking_test_chain :: _) ->
               Alpha_block_services.Helpers.Preapply.block
                 cctxt ~chain ~block
                 ~timestamp:min_valid_timestamp
@@ -938,7 +938,7 @@ let build_block
             if Protocol_hash.equal current_protocol next_protocol then begin
               finalize_block_header final_context.header ~timestamp:valid_timestamp
                 validation_result operations >>= function
-              | Error [ Forking_test_chain ] ->
+              | Error (Forking_test_chain :: _) ->
                   shell_prevalidation cctxt ~chain ~block ~timestamp seed_nonce_hash
                     operations slot
               | Error _ as errs -> Lwt.return errs
