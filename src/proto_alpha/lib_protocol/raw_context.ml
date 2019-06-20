@@ -520,7 +520,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             blocks_per_commitment = c.blocks_per_commitment ;
             blocks_per_roll_snapshot = c.blocks_per_roll_snapshot ;
             blocks_per_voting_period = c.blocks_per_voting_period ;
-            time_between_blocks = c.time_between_blocks ;
+            time_between_blocks =
+              List.map Period_repr.of_seconds_exn [ 60L ; 40L ] ;
             endorsers_per_block = c.endorsers_per_block ;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation ;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block ;
@@ -538,6 +539,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             test_chain_duration = c.test_chain_duration ;
             quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
             quorum_max = 70_00l ;
+            initial_endorsers = 24 ;
+            delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
           } in
         set_constants ctxt constants >>= fun ctxt ->
         return ctxt
