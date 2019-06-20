@@ -670,12 +670,12 @@ let check_signature_sync (type kind) key chain_id ({ shell ; protocol_data } : k
     if Signature.check ~watermark key signature unsigned_operation then
       Ok ()
     else
-      Error [Invalid_signature] in
+      error Invalid_signature in
   match protocol_data.contents, protocol_data.signature with
   | Single _, None ->
-      Error [Missing_signature]
+      error Missing_signature
   | Cons _, None ->
-      Error [Missing_signature]
+      error Missing_signature
   | Single (Endorsement _) as contents, Some signature ->
       check ~watermark:(Endorsement chain_id) (Contents_list contents) signature
   | Single _ as contents, Some signature ->

@@ -28,7 +28,7 @@ open Storage_sigs
 module Make_encoder (V : VALUE) = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes V.encoding b with
-    | None -> Error [Raw_context.Storage_error (Corrupted_data key)]
+    | None -> error (Raw_context.Storage_error (Corrupted_data key))
     | Some v -> Ok v
   let to_bytes v =
     match Data_encoding.Binary.to_bytes V.encoding v with
