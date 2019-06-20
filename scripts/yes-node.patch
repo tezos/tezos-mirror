@@ -1,0 +1,41 @@
+diff --git a/src/lib_crypto/signature.ml b/src/lib_crypto/signature.ml
+index 8aec1057e..8295e6980 100644
+--- a/src/lib_crypto/signature.ml
++++ b/src/lib_crypto/signature.ml
+@@ -572,6 +572,23 @@ let check ?watermark public_key signature message =
+       P256.check ?watermark pk signature message
+   | _ -> false
+
++let fake_sign pkh msg =
++  let pkh = Data_encoding.Binary.to_bytes_exn
++      Public_key_hash.encoding pkh in
++  let half = size / 2 in
++  let tmp = MBytes.init size (fun _ -> '0') in
++  let all_or_half buf = Pervasives.min (MBytes.length buf) half in
++  MBytes.blit pkh 0 tmp 0 (all_or_half pkh) ;
++  MBytes.blit msg 0 tmp half (all_or_half msg) ;
++  of_bytes_exn tmp
++
++let fake_check ?watermark pk signature msg =
++  let pkh = Public_key.hash pk in
++  if equal signature (fake_sign pkh msg) then true else
++    check ?watermark pk signature msg
++
++let check = fake_check
++
+ let append ?watermark sk msg =
+   MBytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
+
+diff --git a/src/lib_crypto/signature.mli b/src/lib_crypto/signature.mli
+index 675c6ed89..f370d380f 100644
+--- a/src/lib_crypto/signature.mli
++++ b/src/lib_crypto/signature.mli
+@@ -53,6 +53,8 @@ include S.SIGNATURE with type Public_key_hash.t = public_key_hash
+                      and type Secret_key.t = secret_key
+                      and type watermark := watermark
+
++val fake_sign: public_key_hash -> MBytes.t -> t
++
+ val append : ?watermark:watermark -> secret_key -> MBytes.t -> MBytes.t
+ (** [append sk buf] is the concatenation of [buf] and the
+     serialization of the signature of [buf] signed by [sk]. *)
