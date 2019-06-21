@@ -314,7 +314,7 @@ let rec interp
             step ctxt bt (Item (hd, Item (tl, rest)))
         | List_map body, Item (l, rest) ->
             let rec loop rest ctxt l acc =
-              Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
+              Lwt.return (Gas.consume ctxt Interp_costs.loop_map) >>=? fun ctxt ->
               match l with
               | [] -> return (Item (List.rev acc, rest), ctxt)
               | hd :: tl ->
@@ -334,7 +334,7 @@ let rec interp
             logged_return (Item (Script_int.(abs (of_int len)), rest), ctxt)
         | List_iter body, Item (l, init) ->
             let rec loop ctxt l stack =
-              Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
+              Lwt.return (Gas.consume ctxt Interp_costs.loop_iter) >>=? fun ctxt ->
               match l with
               | [] -> return (stack, ctxt)
               | hd :: tl ->
@@ -351,7 +351,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt (Interp_costs.set_to_list set)) >>=? fun ctxt ->
             let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
             let rec loop ctxt l stack =
-              Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
+              Lwt.return (Gas.consume ctxt Interp_costs.loop_iter) >>=? fun ctxt ->
               match l with
               | [] -> return (stack, ctxt)
               | hd :: tl ->
@@ -374,7 +374,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map)) >>=? fun ctxt ->
             let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
             let rec loop rest ctxt l acc =
-              Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
+              Lwt.return (Gas.consume ctxt Interp_costs.loop_map) >>=? fun ctxt ->
               match l with
               | [] -> return (acc, ctxt)
               | (k, _) as hd :: tl ->
@@ -387,7 +387,7 @@ let rec interp
             Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map)) >>=? fun ctxt ->
             let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
             let rec loop ctxt l stack =
-              Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle) >>=? fun ctxt ->
+              Lwt.return (Gas.consume ctxt Interp_costs.loop_iter) >>=? fun ctxt ->
               match l with
               | [] -> return (stack, ctxt)
               | hd :: tl ->
@@ -406,11 +406,11 @@ let rec interp
             consume_gas_unop descr (map_size, map) (fun _ -> Interp_costs.map_size) rest ctxt
         (* Big map operations *)
         | Big_map_mem, Item (key, Item (map, rest)) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.big_map_mem key map)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.map_mem key map.diff)) >>=? fun ctxt ->
             Script_ir_translator.big_map_mem ctxt self key map >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
         | Big_map_get, Item (key, Item (map, rest)) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.big_map_get key map)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.map_get key map.diff)) >>=? fun ctxt ->
             Script_ir_translator.big_map_get ctxt self key map >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
         | Big_map_update, Item (key, Item (maybe_value, Item (map, rest))) ->
