@@ -161,6 +161,14 @@ module Contract = struct
          (struct let name = ["delegated"] end))
       (Make_index(Contract_repr.Index))
 
+  (** Only for migration from proto_004  *)
+  module Delegated_004 =
+    Make_data_set_storage
+      (Make_subcontext(Ghost)
+         (Indexed_context.Raw_context)
+         (struct let name = ["delegated_004"] end))
+      (Make_index(Contract_hash))
+
   module Counter =
     Indexed_context.Make_map
       (struct let name = ["counter"] end)

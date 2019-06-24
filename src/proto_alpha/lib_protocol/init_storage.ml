@@ -50,6 +50,37 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Vote.Current_quorum_004.delete ctxt >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0 >>=? fun ctxt ->
       Storage.Last_block_priority.delete ctxt >>=? fun ctxt ->
+      (* Delegated storage changed type of value from Contract_hash to
+         Contract_repr. Move all 'delegated' data into a storage with
+         the original type, then copy over into the new storage. *)
+      Storage.Contract.fold ctxt ~init:(Ok ctxt)
+        ~f:(fun contract ctxt ->
+            Lwt.return ctxt >>=? fun ctxt ->
+            let path = "contracts" :: (* module Contract *)
+                       "index" :: (* module Indexed_context *)
+                       Contract_repr.Index.to_path contract [
+                         "delegated" ; (* module Delegated *)
+                       ] in
+            let path_tmp = "contracts" :: (* module Contract *)
+                           "index" :: (* module Indexed_context *)
+                           Contract_repr.Index.to_path contract [
+                             "delegated_004" ; (* module Delegated *)
+                           ] in
+            Raw_context.dir_mem ctxt path >>= fun exists ->
+            if exists then
+              Raw_context.copy ctxt path path_tmp >>=? fun ctxt ->
+              Raw_context.remove_rec ctxt path >>= fun ctxt ->
+              Storage.Contract.Delegated_004.fold (ctxt, contract) ~init:(Ok ctxt) ~f:(fun delegated ctxt ->
+                  Lwt.return ctxt >>=? fun ctxt ->
+                  let originated = Contract_repr.originated_contract_004 delegated in
+                  Storage.Contract.Delegated.add (ctxt, contract) originated >>= fun ctxt ->
+                  return ctxt
+                ) >>=? fun ctxt ->
+              Raw_context.remove_rec ctxt path_tmp >>= fun ctxt ->
+              return ctxt
+            else
+              return ctxt
+          ) >>=? fun ctxt ->
       return ctxt
 
 let prepare ctxt ~level ~timestamp ~fitness =

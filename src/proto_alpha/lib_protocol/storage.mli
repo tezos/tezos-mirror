@@ -162,6 +162,11 @@ module Contract : sig
     with type elt = Contract_repr.t
      and type t = Raw_context.t * Contract_repr.t
 
+  (** Only for migration from proto_004  *)
+  module Delegated_004 : Data_set_storage
+    with type elt = Contract_hash.t
+     and type t = Raw_context.t * Contract_repr.t
+
   module Inactive_delegate : Data_set_storage
     with type elt = Contract_repr.t
      and type t = Raw_context.t

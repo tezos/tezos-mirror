@@ -34,6 +34,9 @@ include Compare.S with type t := contract
 
 val implicit_contract : Signature.Public_key_hash.t -> contract
 
+(** Only for migration from proto_004  *)
+val originated_contract_004 : Contract_hash.t -> contract
+
 val is_implicit : contract -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} *)
