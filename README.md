@@ -24,16 +24,15 @@ The Community
 
  - Several community built block explorers are available:
 
-    - http://tzscan.io
+    - http://tzscan.io ([source code](https://gitlab.com/tzscan/tzscan))
     - https://tezos.id
-    - https://tezex.info
 
 - A few community run websites collect useful Tezos links:
 
     - https://www.tezos.help
     - https://tezos.rocks
 
- - There is a matrix channel *Tezos* that you can join `here <https://riot.im/app/#/room/#tezos:matrix.org>`_.
+ - There is a matrix channel *Tezos* that you can join [here](https://riot.im/app/#/room/#tezos:matrix.org)
  - There is a sub-reddit at https://www.reddit.com/r/tezos/
  - There is also a community FAQ at https://github.com/tezoscommunity/faq/wiki/Tezos-Technical-FAQ
  - There is a *#tezos* IRC channel on *freenode* that is reserved for technical discussions
