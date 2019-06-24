@@ -1394,8 +1394,9 @@ let rec parse_data
       (items, ctxt) in
     match ty, script_data with
     (* Unit *)
-    | Unit_t ty_name, Prim (loc, D_Unit, [], annot) ->
-        check_const_type_annot loc annot ty_name [] >>=? fun () ->
+    | Unit_t _, Prim (loc, D_Unit, [], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.unit) >>|? fun ctxt ->
         ((() : a), ctxt)
     | Unit_t _, Prim (loc, D_Unit, l, _) ->
@@ -1403,12 +1404,14 @@ let rec parse_data
     | Unit_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ D_Unit ]))
     (* Booleans *)
-    | Bool_t ty_name, Prim (loc, D_True, [], annot) ->
-        check_const_type_annot loc annot ty_name [] >>=? fun () ->
+    | Bool_t _, Prim (loc, D_True, [], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.bool) >>|? fun ctxt ->
         (true, ctxt)
-    | Bool_t ty_name, Prim (loc, D_False, [], annot) ->
-        check_const_type_annot loc annot ty_name [] >>=? fun () ->
+    | Bool_t _, Prim (loc, D_False, [], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.bool) >>|? fun ctxt ->
         (false, ctxt)
     | Bool_t _, Prim (loc, (D_True | D_False as c), l, _) ->
@@ -1602,8 +1605,9 @@ let rec parse_data
     | Contract_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Pairs *)
-    | Pair_t ((ta, af, _), (tb, bf, _), ty_name), Prim (loc, D_Pair, [ va; vb ], annot) ->
-        check_const_type_annot loc annot ty_name [af; bf] >>=? fun () ->
+    | Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, [ va; vb ], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.pair) >>=? fun ctxt ->
         traced @@
         parse_data ?type_logger ctxt ~legacy ta va >>=? fun (va, ctxt) ->
@@ -1614,16 +1618,17 @@ let rec parse_data
     | Pair_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ D_Pair ]))
     (* Unions *)
-    | Union_t ((tl, lconstr), _, ty_name), Prim (loc, D_Left, [ v ], annot) ->
-        check_const_type_annot loc annot ty_name [lconstr]>>=? fun () ->
+    | Union_t ((tl, _), _, _), Prim (loc, D_Left, [ v ], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.union) >>=? fun ctxt ->
         traced @@
         parse_data ?type_logger ctxt ~legacy tl v >>=? fun (v, ctxt) ->
         return (L v, ctxt)
     | Union_t _, Prim (loc, D_Left, l, _) ->
         fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
-    | Union_t (_, (tr, rconstr), ty_name), Prim (loc, D_Right, [ v ], annot) ->
-        check_const_type_annot loc annot ty_name [rconstr] >>=? fun () ->
+    | Union_t (_, (tr, _), _), Prim (loc, D_Right, [ v ], annot) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.union) >>=? fun ctxt ->
         traced @@
         parse_data ?type_logger ctxt ~legacy tr v >>=? fun (v, ctxt) ->
@@ -1640,16 +1645,18 @@ let rec parse_data
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
-    | Option_t (t, ty_name), Prim (loc, D_Some, [ v ], annot) ->
-        check_const_type_annot loc annot ty_name [] >>=? fun () ->
+    | Option_t (t, _), Prim (loc, D_Some, [ v ], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.some) >>=? fun ctxt ->
         traced @@
         parse_data ?type_logger ctxt ~legacy t v >>=? fun (v, ctxt) ->
         return (Some v, ctxt)
     | Option_t _, Prim (loc, D_Some, l, _) ->
         fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
-    | Option_t (_, ty_name), Prim (loc, D_None, [], annot) ->
-        check_const_type_annot loc annot ty_name [] >>=? fun () ->
+    | Option_t (_, _), Prim (loc, D_None, [], annot) ->
+        (if legacy then return () else
+           fail_unexpected_annot loc annot) >>=? fun () ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.none) >>=? fun ctxt ->
         return (None, ctxt)
     | Option_t _, Prim (loc, D_None, l, _) ->
