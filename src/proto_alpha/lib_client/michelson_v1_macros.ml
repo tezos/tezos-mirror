@@ -52,16 +52,17 @@ let expand_caddadr original =
           | [] -> ok ()
           | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
         end >>? fun () ->
-        let rec parse i annot acc =
+        let path_annot = List.filter (function "@%" | "@%%" -> true |_ -> false) annot in
+        let rec parse i acc =
           if i = 0 then
             Seq (loc, acc)
           else
-            let annot = if i = len - 2 then annot else [] in
+            let annot = if i = len - 2 then annot else path_annot in
             match String.get str i with
-            | 'A' -> parse (i - 1) [] (Prim (loc, "CAR", [], annot) :: acc)
-            | 'D' -> parse (i - 1) [] (Prim (loc, "CDR", [], annot) :: acc)
+            | 'A' -> parse (i - 1) (Prim (loc, "CAR", [], annot) :: acc)
+            | 'D' -> parse (i - 1) (Prim (loc, "CDR", [], annot) :: acc)
             | _ -> assert false in
-        ok (Some (parse (len - 2) annot []))
+        ok (Some (parse (len - 2) []))
       else
         ok None
   | _ -> ok None
