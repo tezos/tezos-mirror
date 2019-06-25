@@ -62,6 +62,7 @@ type 'a comparable_ty = ('a, comb) comparable_struct
 
 module type Boxed_set = sig
   type elt
+  val elt_ty : elt comparable_ty
   module OPS : S.SET with type elt = elt
   val boxed : OPS.t
   val size : int
@@ -403,13 +404,13 @@ and ('bef, 'aft) instr =
   | Amount :
       ('rest, Tez.t * 'rest) instr
   | Dig   : int * ('x * 'rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
-      ('bef, 'x * 'aft) instr
+    ('bef, 'x * 'aft) instr
   | Dug   : int * ('rest, 'x * 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
-      ('x * 'bef, 'aft) instr
+    ('x * 'bef, 'aft) instr
   | Dipn  : int * ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness * ('fbef, 'faft) descr ->
-      ('bef, 'aft) instr
+    ('bef, 'aft) instr
   | Dropn : int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness ->
-      ('bef, 'rest) instr
+    ('bef, 'rest) instr
   | ChainId :
       ('rest, Chain_id.t * 'rest) instr
 

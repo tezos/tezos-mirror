@@ -447,6 +447,7 @@ let empty_set
       end) in
     (module struct
       type elt = a
+      let elt_ty = ty
       module OPS = OPS
       let boxed = OPS.empty
       let size = 0
@@ -457,6 +458,7 @@ let set_update
   = fun v b (module Box) ->
     (module struct
       type elt = a
+      let elt_ty = Box.elt_ty
       module OPS = Box.OPS
       let boxed =
         if b
