@@ -1,0 +1,22 @@
+(library
+ (name tezos_client_demo_counter)
+ (public_name tezos-client-demo-counter)
+ (libraries
+            tezos-base
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-commands
+            tezos-protocol-demo-counter)
+ (library_flags (:standard -linkall))
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_commands
+                   -open Tezos_protocol_demo_counter)))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

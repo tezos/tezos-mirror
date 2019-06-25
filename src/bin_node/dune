@@ -18,6 +18,7 @@
             tezos-embedded-protocol-genesis-babylonnet
             tezos-embedded-protocol-genesis-carthagenet
             tezos-embedded-protocol-demo-noops
+            tezos-embedded-protocol-demo-counter
             tezos-embedded-protocol-alpha
             tezos-embedded-protocol-000-Ps9mPmXa
             tezos-embedded-protocol-001-PtCJ7pwo

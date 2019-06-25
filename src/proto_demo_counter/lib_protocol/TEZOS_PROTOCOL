@@ -1,0 +1,5 @@
+{
+    "hash": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
+    "modules": ["Error", "Proto_params", "Header", "State",
+                "Proto_operation", "Receipt", "Apply", "Services", "Main"]
+}

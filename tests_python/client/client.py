@@ -490,6 +490,10 @@ class Client:
         cmd = ['list', 'protocols']
         return client_output.extract_protocols(self.run(cmd, admin=True))
 
+    def list_understood_protocols(self) -> List[str]:
+        cmd = ['list', 'understood', 'protocols']
+        return client_output.extract_protocols(self.run(cmd, admin=True))
+
     def submit_proposals(self,
                          account: str,
                          protos: List[str]

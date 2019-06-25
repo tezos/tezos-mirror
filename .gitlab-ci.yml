@@ -425,6 +425,12 @@ integration:multisig:
     - pytest tests_python/tests/test_multisig.py -s --log-dir=tmp
   stage: test
 
+integration:proto_demo_counter:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_proto_demo_counter.py -s --log-dir=tmp
+  stage: test
+
 integration:proto_demo_noops_manual_bake:
   <<: *integration_python_definition
   script:
@@ -820,6 +826,11 @@ opam:tezos-client-commands:
   variables:
     package: tezos-client-commands
 
+opam:tezos-client-demo-counter:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-demo-counter
+
 opam:tezos-client-genesis:
   <<: *opam_definition
   variables:
@@ -899,6 +910,11 @@ opam:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
+
+opam:tezos-embedded-protocol-demo-counter:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo-counter
 
 opam:tezos-embedded-protocol-demo-noops:
   <<: *opam_definition
@@ -1074,6 +1090,11 @@ opam:tezos-protocol-compiler:
   <<: *opam_definition
   variables:
     package: tezos-protocol-compiler
+
+opam:tezos-protocol-demo-counter:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-demo-counter
 
 opam:tezos-protocol-demo-noops:
   <<: *opam_definition
