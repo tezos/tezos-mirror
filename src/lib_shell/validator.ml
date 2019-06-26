@@ -134,13 +134,22 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
       return (hash, validation)
 
 let shutdown { active_chains ; block_validator ; _ } =
-  let jobs =
-    Block_validator.shutdown block_validator ::
-    Chain_id.Table.fold
-      (fun _ nv acc -> Chain_validator.shutdown nv :: acc)
-      active_chains [] in
-  Lwt.join jobs >>= fun () ->
-  Lwt.return_unit
+  let block_validator_job =
+    lwt_log_notice Tag.DSL.(fun f ->
+        f "Shutting down the block validator..."
+        -% t event "shutdown") >>= fun () ->
+    Block_validator.shutdown block_validator in
+  let chain_validator_jobs =
+    List.of_seq @@
+    Seq.map
+      (fun (id, nv) ->
+         lwt_log_notice Tag.DSL.(fun f ->
+             f "Shutting down the chain validator %a..."
+             -% t event "shutdown"
+             -% a State_logging.chain_id id) >>= fun () ->
+         Chain_validator.shutdown nv)
+      (Chain_id.Table.to_seq active_chains) in
+  Lwt.join (block_validator_job :: chain_validator_jobs)
 
 let watcher { valid_block_input ; _ } =
   Lwt_watcher.create_stream valid_block_input

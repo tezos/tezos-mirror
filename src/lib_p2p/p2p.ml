@@ -248,9 +248,13 @@ module Real = struct
   (* returns when all workers have shutted down in the opposite
      creation order. *)
   let shutdown net () =
+    lwt_log_notice "Shutting down the p2p's welcome worker..." >>= fun () ->
     Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome >>= fun () ->
+    lwt_log_notice "Shutting down the p2p's network maintenance worker..." >>= fun () ->
     P2p_maintenance.shutdown net.maintenance >>= fun () ->
+    lwt_log_notice "Shutting down the p2p connection pool..." >>= fun () ->
     P2p_pool.destroy net.pool >>= fun () ->
+    lwt_log_notice "Shutting down the p2p scheduler..." >>= fun () ->
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections { pool ; _ } () =
