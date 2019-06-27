@@ -88,6 +88,20 @@ module Status = struct
           end "Unregistered status message" !string_fs
         with Failure s -> s
 
+  let to_help_suggestion = function
+    | Conditions_of_use_not_satisfied ->
+        Some "Either you rejected the operation or you waited long enough \
+              to respond that the device rejected it for you."
+    | Incorrect_class ->
+        Some "A Tezos application wasn't found on the device. Is the Tezos \
+              Wallet or Tezos Baking application open on the device? Is the \
+              device busy talking to another process?"
+    | Security_status_unsatisfied ->
+        Some "The operation was automatically rejected for security reasons. \
+              If baking, you may need to setup the device or reset the \
+              high-water mark."
+    | _ -> None
+
   let show t = to_string t
 
   let pp ppf t =
@@ -185,8 +199,13 @@ let apdu_error r =
 
 let pp_error ppf = function
   | AppError { status ; msg } ->
-      Format.fprintf ppf "Application level error (%s): %a"
+      Format.fprintf ppf "Application level error (%s): %a%a"
         msg Status.pp status
+        (fun ppf -> function
+           | None -> Format.fprintf ppf ""
+           | Some s -> Format.fprintf ppf " - %a" Format.pp_print_text s
+        )
+        (Status.to_help_suggestion status)
   | ApduError e ->
       Format.fprintf ppf "APDU level error: %a" Header.Error.pp e
   | TransportError e ->

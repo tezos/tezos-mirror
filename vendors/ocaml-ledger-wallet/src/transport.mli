@@ -28,6 +28,7 @@ module Status : sig
   val register_string_f : (t -> string option) -> unit
 
   val to_string : t -> string
+  val to_help_suggestion : t -> string option
   val show : t -> string
   val pp : Format.formatter -> t -> unit
 end
