@@ -409,31 +409,29 @@ let check_kind kinds expr =
 
 (* ---- Sets and Maps -------------------------------------------------------*)
 
+let wrap_compare compare a b =
+  let res = compare a b in
+  if Compare.Int.(res = 0) then 0
+  else if Compare.Int.(res > 0) then 1
+  else -1
+
 let compare_comparable
   : type a. a comparable_ty -> a -> a -> int
-  = fun kind x y -> match kind with
-    | String_key _ -> Compare.String.compare x y
-    | Bool_key _ -> Compare.Bool.compare x y
-    | Mutez_key _ -> Tez.compare x y
-    | Key_hash_key _ -> Signature.Public_key_hash.compare x y
-    | Int_key _ ->
-        let res = (Script_int.compare x y) in
-        if Compare.Int.(res = 0) then 0
-        else if Compare.Int.(res > 0) then 1
-        else -1
-    | Nat_key _ ->
-        let res = (Script_int.compare x y) in
-        if Compare.Int.(res = 0) then 0
-        else if Compare.Int.(res > 0) then 1
-        else -1
-    | Timestamp_key _ -> Script_timestamp.compare x y
+  = fun kind -> match kind with
+    | String_key _ -> wrap_compare Compare.String.compare
+    | Bool_key _ -> wrap_compare Compare.Bool.compare
+    | Mutez_key _ -> wrap_compare Tez.compare
+    | Key_hash_key _ -> wrap_compare Signature.Public_key_hash.compare
+    | Int_key _ -> wrap_compare Script_int.compare
+    | Nat_key _ -> wrap_compare Script_int.compare
+    | Timestamp_key _ -> wrap_compare Script_timestamp.compare
     | Address_key _ ->
-        let x, ex = x and y, ey = y in
+        wrap_compare @@ fun (x, ex) (y, ey) ->
         let lres = Contract.compare x y in
         if Compare.Int.(lres = 0) then
           Compare.String.compare ex ey
         else lres
-    | Bytes_key _ -> MBytes.compare x y
+    | Bytes_key _ -> wrap_compare MBytes.compare
 
 let empty_set
   : type a. a comparable_ty -> a set
