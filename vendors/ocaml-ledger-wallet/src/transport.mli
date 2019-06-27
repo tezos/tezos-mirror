@@ -23,6 +23,7 @@ module Status : sig
     | Referenced_data_not_found
     | Technical_problem of int
     | Ok
+    | Unknown of int
 
   val register_string_f : (t -> string option) -> unit
 
