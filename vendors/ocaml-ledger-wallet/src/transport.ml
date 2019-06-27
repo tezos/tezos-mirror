@@ -63,18 +63,23 @@ module Status = struct
     string_fs := f :: !string_fs
 
   let to_string = function
-    | Invalid_pin i -> "Invalid pin " ^  string_of_int i
-    | Incorrect_length -> "Incorrect length"
-    | Incompatible_file_structure -> "Incompatible file structure"
-    | Security_status_unsatisfied -> "Security status unsatisfied"
     | Conditions_of_use_not_satisfied -> "Conditions of use not satisfied"
-    | Incorrect_data -> "Incorrect data"
     | File_not_found -> "File not found"
-    | Incorrect_params -> "Incorrect params"
+    | Hid_required -> "HID required"
+    | Incompatible_file_structure -> "Incompatible file structure"
+    | Incorrect_class -> "Incorrect class"
+    | Incorrect_data -> "Incorrect data"
+    | Incorrect_length -> "Incorrect length"
+    | Incorrect_length_for_ins -> "Incorrect length for instruction"
+    | Incorrect_params -> "Incorrect parameters"
     | Ins_not_supported -> "Instruction not supported"
-    | Technical_problem i -> "Technical problem " ^ string_of_int i
-    | Referenced_data_not_found -> "Referenced data not found"
+    | Invalid_pin i -> "Invalid pin " ^ string_of_int i
+    | Memory_error -> "Memory error"
     | Ok -> "Ok"
+    | Parse_error -> "Parse error"
+    | Referenced_data_not_found -> "Referenced data not found"
+    | Security_status_unsatisfied -> "Security status unsatisfied"
+    | Technical_problem i -> "Technical problem " ^ string_of_int i
     | Unknown i -> Printf.sprintf "Unknown status code 0x%x" i
     | t ->
         try
