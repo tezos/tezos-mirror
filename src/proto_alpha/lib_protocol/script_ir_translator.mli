@@ -77,6 +77,8 @@ val ty_eq :
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->
   (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
 
+val compare_comparable : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> int
+
 val parse_data :
   ?type_logger: type_logger ->
   context -> legacy: bool ->
