@@ -266,8 +266,12 @@ let status = Worker.status
 
 let running_worker () =
   match Worker.list table with
-  | (_, single) :: _ -> single
+  | [(_, single)] -> single
   | [] -> raise Not_found
+  | _ :: _ :: _ ->
+      (* NOTE: names of workers must be unique, [Name.t = unit] which has only
+         one inhabitant. *)
+      assert false
 
 let pending_requests t = Worker.Queue.pending_requests t
 
