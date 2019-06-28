@@ -603,56 +603,57 @@ module Make
         Format.asprintf "%a" Name.pp name in
       let full_name =
         if name_s = "" then base_name else Format.asprintf "%s_%s" base_name name_s in
-      let id =
-        table.last_id <- table.last_id + 1 ;
-        table.last_id in
-      let id_name =
-        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id in
       if Hashtbl.mem table.instances name then
-        invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name) ;
-      let canceler = Lwt_canceler.create () in
-      let buffer : kind buffer =
-        match table.buffer_kind with
-        | Queue ->
-            Queue_buffer (Lwt_pipe.create ())
-        | Bounded { size } ->
-            Bounded_buffer (Lwt_pipe.create ~size:(size, (fun _ -> 1)) ())
-        | Dropbox _ ->
-            Dropbox_buffer (Lwt_dropbox.create ()) in
-      let event_log =
-        let levels =
-          Internal_event.[
-            Debug ; Info ; Notice ; Warning ; Error ; Fatal
-          ] in
-        List.map (fun l -> l, Ring.create limits.backlog_size) levels in
-      let module Logger =
-        Internal_event.Legacy_logging.Make(struct
-          let name = id_name
-        end) in
-      let w = { limits ; parameters ; name ; canceler ;
-                table ; buffer ; logger = (module Logger) ;
-                state = None ; id ;
-                worker = Lwt.return_unit ;
-                event_log ; timeout ;
-                current_request = None ;
-                status = Launching (Systime_os.now ())} in
-      Hashtbl.add table.instances name w ;
-      begin
-        if id_name = base_name then
-          Logger.lwt_log_notice "Worker started"
-        else
-          Logger.lwt_log_notice "Worker started for %s" name_s
-      end >>= fun () ->
-      Handlers.on_launch w name parameters >>=? fun state ->
-      w.status <- Running (Systime_os.now ()) ;
-      w.state <- Some state ;
-      w.worker <-
-        Lwt_utils.worker
-          full_name
-          ~on_event:Internal_event.Lwt_worker_event.on_event
-          ~run:(fun () -> worker_loop (module Handlers) w)
-          ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
-      return w
+        invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
+      else
+        let id =
+          table.last_id <- table.last_id + 1 ;
+          table.last_id in
+        let id_name =
+          if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id in
+        let canceler = Lwt_canceler.create () in
+        let buffer : kind buffer =
+          match table.buffer_kind with
+          | Queue ->
+              Queue_buffer (Lwt_pipe.create ())
+          | Bounded { size } ->
+              Bounded_buffer (Lwt_pipe.create ~size:(size, (fun _ -> 1)) ())
+          | Dropbox _ ->
+              Dropbox_buffer (Lwt_dropbox.create ()) in
+        let event_log =
+          let levels =
+            Internal_event.[
+              Debug ; Info ; Notice ; Warning ; Error ; Fatal
+            ] in
+          List.map (fun l -> l, Ring.create limits.backlog_size) levels in
+        let module Logger =
+          Internal_event.Legacy_logging.Make(struct
+            let name = id_name
+          end) in
+        let w = { limits ; parameters ; name ; canceler ;
+                  table ; buffer ; logger = (module Logger) ;
+                  state = None ; id ;
+                  worker = Lwt.return_unit ;
+                  event_log ; timeout ;
+                  current_request = None ;
+                  status = Launching (Systime_os.now ())} in
+        Hashtbl.add table.instances name w ;
+        begin
+          if id_name = base_name then
+            Logger.lwt_log_notice "Worker started"
+          else
+            Logger.lwt_log_notice "Worker started for %s" name_s
+        end >>= fun () ->
+        Handlers.on_launch w name parameters >>=? fun state ->
+        w.status <- Running (Systime_os.now ()) ;
+        w.state <- Some state ;
+        w.worker <-
+          Lwt_utils.worker
+            full_name
+            ~on_event:Internal_event.Lwt_worker_event.on_event
+            ~run:(fun () -> worker_loop (module Handlers) w)
+            ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
+        return w
 
   let shutdown w =
     let (module Logger) = w.logger in
