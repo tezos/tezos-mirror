@@ -25,6 +25,7 @@ type curve =
   | Ed25519
   | Secp256k1
   | Secp256r1
+  | Bip32_ed25519
 
 val curve_of_string : string -> curve option
 val pp_curve : Format.formatter -> curve -> unit

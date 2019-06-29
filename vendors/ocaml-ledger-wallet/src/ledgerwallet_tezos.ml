@@ -93,20 +93,24 @@ type curve =
   | Ed25519
   | Secp256k1
   | Secp256r1
+  | Bip32_ed25519
 
 let pp_curve ppf = function
   | Ed25519 -> Format.pp_print_string ppf "ed25519"
   | Secp256k1 -> Format.pp_print_string ppf "secp256k1"
   | Secp256r1 -> Format.pp_print_string ppf "P-256"
+  | Bip32_ed25519 -> Format.pp_print_string ppf "bip25519"
 
 let pp_curve_short ppf = function
   | Ed25519 -> Format.pp_print_string ppf "ed"
   | Secp256k1 -> Format.pp_print_string ppf "secp"
   | Secp256r1 -> Format.pp_print_string ppf "p2"
+  | Bip32_ed25519 -> Format.pp_print_string ppf "bip25519"
 
 let curve_of_string str =
   match String.lowercase_ascii str with
   | "ed" | "ed25519" -> Some Ed25519
+  | "bip25519" | "bip32-ed25519" -> Some Bip32_ed25519
   | "secp256k1" -> Some Secp256k1
   | "p256" | "p-256" | "secp256r1" -> Some Secp256r1
   | _ -> None
@@ -115,11 +119,13 @@ let int_of_curve = function
   | Ed25519 -> 0x00
   | Secp256k1 -> 0x01
   | Secp256r1 -> 0x02
+  | Bip32_ed25519 -> 0x03
 
 let curve_of_int = function
   | 0x00 -> Some Ed25519
   | 0x01 -> Some Secp256k1
   | 0x02 -> Some Secp256r1
+  | 0x03 -> Some Bip32_ed25519
   | _ -> None
 
 type Transport.Status.t +=

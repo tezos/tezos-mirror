@@ -188,7 +188,7 @@ module Ledger_commands = struct
     end >>|? fun pk ->
     let pk = Cstruct.to_bigarray pk in
     match curve with
-    | Ledgerwallet_tezos.Ed25519 ->
+    | Ed25519 | Bip32_ed25519 ->
         MBytes.set_int8 pk 0 0 ; (* hackish, but works. *)
         Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
     | Secp256k1 ->
@@ -281,7 +281,7 @@ module Ledger_commands = struct
     end
     >>=? fun () ->
     match curve with
-    | Ed25519 ->
+    | Ed25519 | Bip32_ed25519 ->
         let signature = Cstruct.to_bigarray signature in
         let signature = Ed25519.of_bytes_exn signature in
         return (Signature.of_ed25519 signature)
@@ -392,6 +392,7 @@ module Ledger_uri = struct
     | Ledgerwallet_tezos.Ed25519 -> false
     | Ledgerwallet_tezos.Secp256k1 -> true
     | Ledgerwallet_tezos.Secp256r1 -> true
+    | Ledgerwallet_tezos.Bip32_ed25519 -> true
 
   let parse ?allow_weak uri : t tzresult Lwt.t =
     let host = Uri.host uri in
@@ -734,7 +735,7 @@ let generic_commands group = Clic.[
                           Ledger_id.pp ledger_id
                           Ledgerwallet_tezos.pp_curve curve ;
                         pp_print_cut ppf ())
-                      [ Ed25519 ; Secp256k1 ; Secp256r1 ] ;
+                      [ Bip32_ed25519 ; Secp256k1 ; Secp256r1; Ed25519 ] ;
                     pp_close_box ppf () ;
                     pp_print_newline ppf () )
               >>= fun () ->
