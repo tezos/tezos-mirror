@@ -136,6 +136,7 @@ in the :ref:`introduction <howtoget>`.
    developer/michelson_anti_patterns
    developer/entering_alpha
    developer/protocol_environment
+   developer/proposal_testing
    developer/profiling
    developer/flextesa
    developer/python_testing_framework

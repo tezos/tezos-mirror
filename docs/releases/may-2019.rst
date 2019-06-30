@@ -58,7 +58,7 @@ We can now delete our upgraded archive storage and import the snapshot
 (without forgetting, if you need, to save ``{identity,peers,config}.json``)::
 
     rm -r ~/.tezos-node
-    tezos-node snapshot import mainnet-*.full
+    tezos-node snapshot import ./mainnet-*.full
 
 There should be a rather smaller `~/.tezos-node` directory populated
 from which we can start our node::
