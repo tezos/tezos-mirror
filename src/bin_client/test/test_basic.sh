@@ -93,7 +93,7 @@ echo
 echo "-- Origination --"
 echo
 
-bake_after $client deploy multisig msig for bootstrap1 transferring 100 from bootstrap1 with threshold 2 on public keys $key1 $key2 $key3 --burn-cap 100
+bake_after $client deploy multisig msig transferring 100 from bootstrap1 with threshold 2 on public keys $key1 $key2 $key3 --burn-cap 100
 
 echo
 echo "-- Transfer --"

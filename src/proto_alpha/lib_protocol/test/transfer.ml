@@ -158,25 +158,8 @@ let transfer_zero_tez () =
     Tez.zero
 
 (********************)
-(** Transfer zero tez from an originated/implicit contract *)
+(** Transfer zero tez from an implicit contract *)
 (********************)
-
-let transfer_zero_originated () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun i ->
-  (* originated the first contract *)
-  Op.origination (I i) contract_1 >>=? fun (operation, orig_contract_1) ->
-  Incremental.add_operation i operation >>=? fun i ->
-  Context.Contract.balance (I i) orig_contract_1 >>=? fun balance_1 ->
-  (* transfer all the tez inside the originated contract *)
-  transfer_and_check_balances ~loc:__LOC__ i
-    orig_contract_1 contract_2 balance_1 >>=? fun (i, _) ->
-  Op.transaction (I i) orig_contract_1 contract_2 Tez.zero >>=? fun op ->
-  Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res begin function
-    | Contract_storage.Empty_transaction _ -> true
-    | _ -> false
-  end
 
 let transfer_zero_implicit () =
   Context.init 1 >>=? fun (b, contracts) ->
@@ -201,7 +184,7 @@ let transfer_to_originate_with_fee () =
   Incremental.begin_construction b >>=? fun b ->
   two_nth_of_balance b contract 10L >>=? fun fee ->
   (* originated contract, paying a fee to originated this contract *)
-  Op.origination (I b) ~fee:ten_tez contract >>=? fun (operation, new_contract) ->
+  Op.origination (I b) ~fee:ten_tez contract ~script:Op.dummy_script >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_nth_of_balance b contract 3L >>=? fun amount ->
   transfer_and_check_balances ~loc:__LOC__ b ~fee:fee contract
@@ -307,45 +290,11 @@ let transfer_from_implicit_to_originated_contract () =
   transfer_and_check_balances ~with_burn:true ~loc:__LOC__ b bootstrap_contract src amount1
   >>=? fun (b, _) ->
   (* originated contract *)
-  Op.origination (I b) contract >>=? fun (operation, new_contract) ->
+  Op.origination (I b) contract ~script:Op.dummy_script >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_nth_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
   (* transfer from implicit contract to originated contract *)
   transfer_and_check_balances ~loc:__LOC__ b src new_contract amount2
-  >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ ->
-  return_unit
-
-(** Originted to originted *)
-
-let transfer_from_originated_to_originated () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  Incremental.begin_construction b >>=? fun b ->
-  (* originated contract 1 *)
-  Op.origination (I b) contract_1 >>=? fun (operation, orig_contract_1) ->
-  Incremental.add_operation b operation >>=? fun b ->
-  (* originated contract 2 *)
-  Op.origination (I b) contract_2 >>=? fun (operation, orig_contract_2) ->
-  Incremental.add_operation b operation >>=? fun b ->
-  (* transfer from originated contract 1 to originated contract 2 *)
-  transfer_and_check_balances ~loc:__LOC__ b
-    orig_contract_1 orig_contract_2 Alpha_context.Tez.one >>=? fun (b,_) ->
-  Incremental.finalize_block b >>=? fun _ ->
-  return_unit
-
-(** Originted to impicit *)
-
-let transfer_from_originated_to_implicit () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract_1 = List.nth contracts 0 in
-  let account = Account.new_account () in
-  let src = Contract.implicit_contract account.pkh in
-  Incremental.begin_construction b >>=? fun b ->
-  (* originated contract 1*)
-  Op.origination (I b) contract_1 >>=? fun (operation, new_contract) ->
-  Incremental.add_operation b operation >>=? fun b ->
-  (* transfer from originated contract to implicit contract *)
-  transfer_and_check_balances ~with_burn:true ~loc:__LOC__ b new_contract src Alpha_context.Tez.one_mutez
   >>=? fun (b, _) ->
   Incremental.finalize_block b >>=? fun _ ->
   return_unit
@@ -603,7 +552,6 @@ let tests = [
 
   (* transfer zero tez *)
   Test.tztest "single transfer zero tez" `Quick transfer_zero_tez ;
-  Test.tztest "transfer zero tez from originated contract" `Quick transfer_zero_originated;
   Test.tztest "transfer zero tez from implicit contract" `Quick transfer_zero_implicit;
 
   (* transfer to originated contract *)
@@ -622,8 +570,6 @@ let tests = [
   (* transfer from/to implicit/originted contracts*)
   Test.tztest "transfer from an implicit to implicit contract " `Quick transfer_from_implicit_to_implicit_contract ;
   Test.tztest "transfer from an implicit to an originated contract" `Quick transfer_from_implicit_to_originated_contract ;
-  Test.tztest "transfer from an originated to an originated contract" `Quick transfer_from_originated_to_originated ;
-  Test.tztest "transfer from an originated to an implicit contract" `Quick transfer_from_originated_to_implicit ;
 
   (* Slow tests *)
   Test.tztest "block with multiple transfers" `Slow block_with_multiple_transfers ;

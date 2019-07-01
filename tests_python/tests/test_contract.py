@@ -18,13 +18,12 @@ def originate(client,
               init_storage,
               amount,
               contract_name=None,
-              manager='bootstrap1',
               sender='bootstrap1',
               baker='bootstrap5'):
     if contract_name is None:
         contract_name = file_basename(contract)
     args = ['--init', init_storage, '--burn-cap', '10.0']
-    origination = client.originate(contract_name, manager, amount,
+    origination = client.originate(contract_name, amount,
                                    sender, contract, args)
     session['contract'] = origination.contract
     print(origination.contract)
@@ -111,8 +110,7 @@ class TestGasBound:
         # TODO client.typecheck(contract) -> type error not what we expect?
         args = ['-G', '8000', '--burn-cap', '10']
         with pytest.raises(subprocess.CalledProcessError) as _exc:
-            client.originate(f'{name}', 'bootstrap1', 0,
-                             'bootstrap1', contract, args)
+            client.originate(f'{name}', 0, 'bootstrap1', contract, args)
         # TODO capture output and check error message is correct
 
     def test_originate_second_explosion(self, client, session):

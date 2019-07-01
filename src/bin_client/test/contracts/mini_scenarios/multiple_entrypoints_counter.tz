@@ -1,4 +1,4 @@
-{ parameter key_hash ;
+{ parameter unit ;
   storage (option address) ;
   code { SENDER ; SELF ; ADDRESS ;
          IFCMPEQ
@@ -13,7 +13,8 @@
              DROP ; DIP { NONE address } ; PAIR }
            { CAR ; DUP ;
              DIP
-               { DIP { PUSH int 0 ; PUSH mutez 0 ; PUSH bool False ; PUSH bool False ; NONE key_hash } ;
+               { DIP { PUSH int 0 ; PUSH mutez 0 ; NONE key_hash } ;
+                 DROP ;
                  CREATE_CONTRACT
                    { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
                      storage int ;

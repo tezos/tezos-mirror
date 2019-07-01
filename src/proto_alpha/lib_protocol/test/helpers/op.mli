@@ -112,3 +112,6 @@ val proposals : Context.t -> Contract.t -> Protocol_hash.t list ->
 val ballot : Context.t ->
   Contract.t -> Protocol_hash.t -> Vote.ballot ->
   Operation.packed tzresult Lwt.t
+
+val dummy_script : Script.t
+val dummy_script_cost : Test_tez.Tez.t

@@ -245,14 +245,12 @@ class Client:
 
     def originate(self,
                   contract_name: str,
-                  manager: str,
                   amount: float,
                   sender: str,
                   contract: str,
                   args: List[str] = None) -> client_output.OriginationResult:
-        cmd = ['originate', 'contract', contract_name, 'for', manager,
-               'transferring', str(amount), 'from', sender, 'running',
-               contract]
+        cmd = ['originate', 'contract', contract_name, 'transferring',
+               str(amount), 'from', sender, 'running', contract]
         if args is None:
             args = []
         cmd += args

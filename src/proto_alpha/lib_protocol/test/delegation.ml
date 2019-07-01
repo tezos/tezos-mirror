@@ -224,10 +224,12 @@ let delegate_to_bootstrap_by_origination ~fee () =
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
-  Op.origination ~fee ~credit:Tez.zero ~delegate:manager.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
+  Op.origination ~fee ~credit:Tez.zero ~delegate:manager.pkh (I i) bootstrap ~script:Op.dummy_script >>=? fun (op, orig_contract) ->
   Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } -> (* 0.257tz *)
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
-  Lwt.return (Tez.(+?) fee origination_burn) >>=? fun total_fee ->
+  Lwt.return (
+    Tez.(+?) fee origination_burn >>?
+    Tez.(+?) Op.dummy_script_cost) >>=? fun total_fee ->
   if fee > balance then
     begin
       Incremental.add_operation i op >>= fun err ->
@@ -239,7 +241,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* origination did not proceed; fee has been debited *)
     begin
       Incremental.add_operation i ~expect_failure:(function
-          |  Environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
+          | Environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
               return_unit
           | _ ->
               failwith "Not enough balance for origination burn: operation should fail.")
@@ -261,69 +263,6 @@ let delegate_to_bootstrap_by_origination ~fee () =
       Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance total_fee
     end
 
-(** bootstrap manager can be set as delegate of an originated contract
-    without initial delegate (through delegation operation) *)
-let delegate_to_bootstrap_by_delegation ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap = List.hd bootstrap_contracts in
-  Context.Contract.manager (I i) bootstrap >>=? fun manager ->
-  (* originate a contract with no delegate *)
-  Op.origination ~fee:Tez.zero (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.balance (I i) orig_contract >>=? fun orig_balance ->
-  (* Format.printf "\nBalance of originated contract: %a\n%!" Tez.pp orig_balance; *)
-  (* delegate to bootstrap *)
-  Op.delegation ~fee (I i) orig_contract (Some manager.pkh) >>=? fun deleg_op ->
-  if fee > orig_balance then
-    begin
-      Incremental.add_operation i deleg_op >>= fun err ->
-      Assert.proto_error ~loc:__LOC__ err (function
-          | Contract_storage.Balance_too_low _ -> true
-          | _ -> false)
-    end
-  else
-    (* manager is delegate, fee is debited *)
-    begin
-      Incremental.add_operation i deleg_op >>=? fun i ->
-      Context.Contract.delegate (I i) orig_contract >>=? fun delegate ->
-      Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun () ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) orig_contract orig_balance fee
-    end
-
-(** bootstrap manager can be set as delegate of an originated contract
-    with initial delegate (through delegation operation) *)
-let delegate_to_bootstrap_by_delegation_switch ~fee () =
-  Context.init 2 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap0 = List.hd bootstrap_contracts in
-  Context.Contract.manager (I i) bootstrap0 >>=? fun manager0 ->
-  let bootstrap1 = List.nth bootstrap_contracts 1 in
-  Context.Contract.manager (I i) bootstrap1 >>=? fun manager1 ->
-  (* originate a contract with bootstrap1's manager as delegate *)
-  Op.origination ~fee:Tez.zero ~credit:Tez.one ~delegate:manager1.pkh (I i) bootstrap0 >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.balance (I i) orig_contract >>=? fun orig_balance ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate manager1.pkh >>=? fun _ ->
-  (* switch delegate to bootstrap0 *)
-  Op.delegation ~fee (I i) orig_contract (Some manager0.pkh) >>=? fun switch_deleg ->
-  if fee > orig_balance then
-    begin
-      Incremental.add_operation i switch_deleg >>= fun err ->
-      Assert.proto_error ~loc:__LOC__ err (function
-          | Contract_storage.Balance_too_low _ -> true
-          | _ -> false)
-    end
-  else
-    (* manager0 is delegate, fee is debited *)
-    begin
-      Incremental.add_operation i switch_deleg >>=? fun i ->
-      Context.Contract.delegate (I i) orig_contract >>=? fun delegate ->
-      Assert.equal_pkh ~loc:__LOC__ delegate manager0.pkh >>=? fun () ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) orig_contract orig_balance fee
-    end
-
 let tests_bootstrap_contracts = [
   Test.tztest "bootstrap contracts delegate to themselves" `Quick bootstrap_manager_is_bootstrap_delegate ;
   Test.tztest "bootstrap contracts can change their delegate (small fee)" `Quick (bootstrap_delegate_cannot_change ~fee:Tez.one_mutez) ;
@@ -337,14 +276,10 @@ let tests_bootstrap_contracts = [
   Test.tztest "bootstrap keys are already registered as delegate keys (small fee)" `Quick (bootstrap_manager_already_registered_delegate ~fee:Tez.one_mutez) ;
   Test.tztest "bootstrap keys are already registered as delegate keys (max fee)" `Quick (bootstrap_manager_already_registered_delegate ~fee:Tez.max_tez) ;
   Test.tztest "bootstrap manager can be delegate (init origination, small fee)" `Quick (delegate_to_bootstrap_by_origination ~fee:Tez.one_mutez) ;
-  (* balance enough for fee but not for fee + origination burn *)
-  Test.tztest "bootstrap manager can be delegate (init origination, edge case)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_mutez_exn 3_999_999_743_000L)) ;
+  (* balance enough for fee but not for fee + origination burn + dummy script storage cost *)
+  Test.tztest "bootstrap manager can be delegate (init origination, edge case)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_mutez_exn 3_999_999_705_000L)) ;
   (* fee bigger than bootstrap's initial balance*)
   Test.tztest "bootstrap manager can be delegate (init origination, large fee)" `Quick (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000)) ;
-  Test.tztest "bootstrap manager can be delegate (init delegation, small fee)" `Quick (delegate_to_bootstrap_by_delegation ~fee:Tez.one_mutez) ;
-  Test.tztest "bootstrap manager can be delegate (init delegation, max fee)" `Quick (delegate_to_bootstrap_by_delegation ~fee:Tez.max_tez) ;
-  Test.tztest "bootstrap manager can be delegate (switch delegation, small fee)" `Quick (delegate_to_bootstrap_by_delegation_switch ~fee:Tez.one_mutez) ;
-  Test.tztest "bootstrap manager can be delegate (switch delegation, max fee)" `Quick (delegate_to_bootstrap_by_delegation_switch ~fee:Tez.max_tez) ;
 ]
 
 (**************************************************************************)
@@ -364,8 +299,8 @@ let tests_bootstrap_contracts = [
 
    We consider three scenarios for setting a delegate:
    - through origination,
-   - through delegation when the originated contract has no delegate yet,
-   - through delegation when the originated contract already has a delegate.
+   - through delegation when the implicit contract has no delegate yet,
+   - through delegation when the implicit contract already has a delegate.
 
    We also test that emptying the implicit contract linked to a
    registered delegate key does not unregister the delegate key.
@@ -390,13 +325,13 @@ Not credited:
 (* Two main series of tests: without self-delegation, and with a failed attempt at self-delegation
    1- no self-delegation
      a- no credit
-        - no token transfer
-        - credit of 1μꜩ and then debit of 1μꜩ
+   - no token transfer
+   - credit of 1μꜩ and then debit of 1μꜩ
      b- with credit of 1μꜩ.
-   For every scenario, we try three different ways of delegating:
+     For every scenario, we try three different ways of delegating:
    - through origination (init origination)
-   - through delegation when no delegate was assigned at origination (init delegation)
-   - through delegation when a delegate was assigned at origination (switch delegation).
+   - through delegation when no delegate was assigned (init delegation)
+   - through delegation when a delegate was assigned (switch delegation).
 
    2- Self-delegation fails if the contract has no credit. We try the
    two possibilities of 1a for non-credited contracts.
@@ -416,7 +351,7 @@ let unregistered_delegate_key_init_origination ~fee () =
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
-  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
+  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap ~script:Op.dummy_script >>=? fun (op, orig_contract) ->
   Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun _total_fee -> (* FIXME unused variable *)
@@ -448,12 +383,16 @@ let unregistered_delegate_key_init_delegation ~fee () =
   let bootstrap = List.hd bootstrap_contracts in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
-  Context.Contract.balance (I i) bootstrap >>=? fun _balance -> (* FIXME unused variable *)
-  (* origination without delegate argument *)
+  let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination (I i) bootstrap ~credit  >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Op.delegation ~fee (I i) orig_contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract credit >>=? fun _ ->
+  (* try to delegate *)
+  Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
   if fee > credit then
     begin
       Incremental.add_operation i delegate_op >>= fun err ->
@@ -465,11 +404,11 @@ let unregistered_delegate_key_init_delegation ~fee () =
     (* fee has been debited; no delegate *)
     begin
       Incremental.add_operation i
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) orig_contract credit fee >>=? fun () ->
-      (* originated contract has no delegate *)
-      Context.Contract.delegate (I i) orig_contract >>= fun err ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee >>=? fun () ->
+      (* implicit contract has no delegate *)
+      Context.Contract.delegate (I i) impl_contract >>= fun err ->
       Assert.error ~loc:__LOC__ err (function
           | RPC_context.Not_found _ -> true
           | _ -> false)
@@ -479,17 +418,24 @@ let unregistered_delegate_key_switch_delegation ~fee () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b >>=? fun i ->
   let bootstrap = List.hd bootstrap_contracts in
+  let bootstrap_pkh = Contract.is_implicit bootstrap |> Option.unopt_assert ~loc:__POS__ in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
-  (* origination with delegate setting *)
-  Context.Contract.manager (I i) bootstrap >>=? fun manager ->
+  let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
+  (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination (I i) ~delegate:manager.pkh bootstrap ~credit >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun _ ->
-  (* switch delegate through delegation *)
-  Op.delegation ~fee (I i) orig_contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun init_credit ->
+  Incremental.add_operation i init_credit >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract credit >>=? fun _ ->
+  (* set and check the initial delegate *)
+  Op.delegation ~fee:Tez.zero (I i) impl_contract (Some bootstrap_pkh) >>=? fun delegate_op ->
+  Incremental.add_operation i delegate_op >>=? fun i ->
+  Context.Contract.delegate (I i) bootstrap >>=? fun delegate_pkh ->
+  Assert.equal_pkh ~loc:__LOC__ bootstrap_pkh delegate_pkh >>=? fun () ->
+  (* try to delegate *)
+  Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
   if fee > credit then
     begin
       Incremental.add_operation i delegate_op >>= fun err ->
@@ -501,13 +447,12 @@ let unregistered_delegate_key_switch_delegation ~fee () =
     (* fee has been debited; no delegate *)
     begin
       Incremental.add_operation i
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) orig_contract credit fee >>=? fun () ->
-      (* originated contract's delegate has not changed *)
-      Context.Contract.delegate (I i) orig_contract >>=? fun delegate ->
-      Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_pkh >>=? fun () ->
-      Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee >>=? fun () ->
+      (* implicit contract delegate has not changed *)
+      Context.Contract.delegate (I i) bootstrap >>=? fun delegate_pkh_after ->
+      Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate_pkh_after
     end
 
 (* credit of some amount, no self-delegation *)
@@ -524,7 +469,7 @@ let unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
   (* origination with delegate argument *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
-  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
+  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap ~script:Op.dummy_script >>=? fun (op, orig_contract) ->
   if fee > balance then
     begin
       Incremental.add_operation i op >>= fun err ->
@@ -551,15 +496,20 @@ let unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
   (* credit + check balance *)
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract amount >>=? fun create_contract ->
   Incremental.add_operation i create_contract >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
-  (* origination without delegate argument *)
+  (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination ~fee:Tez.zero ~credit (I i) bootstrap >>=? fun (op, contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Op.delegation ~fee (I i) contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Lwt.return Tez.(credit +? amount) >>=? fun balance ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun init_credit ->
+  Incremental.add_operation i init_credit >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract balance >>=? fun _ ->
+  (* try to delegate *)
+  Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
   if fee > credit then
     Incremental.add_operation i delegate_op >>= fun err ->
     Assert.proto_error ~loc:__LOC__ err (function
@@ -569,10 +519,11 @@ let unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
     begin
       (* fee has been taken, no delegate for contract *)
       Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         i delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract credit fee >>=? fun () ->
-      Context.Contract.delegate (I i) contract >>= fun err ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract balance fee >>=? fun () ->
+      Context.Contract.delegate (I i) impl_contract >>= fun err ->
+
       Assert.error ~loc:__LOC__ err (function
           | RPC_context.Not_found _ -> true
           | _ -> false)
@@ -582,22 +533,29 @@ let unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b >>=? fun i ->
   let bootstrap = List.hd bootstrap_contracts in
+  let bootstrap_pkh = Contract.is_implicit bootstrap |> Option.unopt_assert ~loc:__POS__ in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
   (* credit + check balance *)
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract amount >>=? fun create_contract ->
   Incremental.add_operation i create_contract >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
-  (* origination without delegate setting *)
-  Context.Contract.manager (I i) bootstrap >>=? fun manager ->
+  (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination (I i) ~fee:Tez.zero ~credit ~delegate:manager.pkh bootstrap >>=? fun (op, contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.delegate (I i) contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun _ ->
+  Lwt.return Tez.(credit +? amount) >>=? fun balance ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun init_credit ->
+  Incremental.add_operation i init_credit >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract balance >>=? fun _ ->
+  (* set and check the initial delegate *)
+  Op.delegation ~fee:Tez.zero (I i) impl_contract (Some bootstrap_pkh) >>=? fun delegate_op ->
+  Incremental.add_operation i delegate_op >>=? fun i ->
+  Context.Contract.delegate (I i) bootstrap >>=? fun delegate_pkh ->
+  Assert.equal_pkh ~loc:__LOC__ bootstrap_pkh delegate_pkh >>=? fun () ->
   (* switch delegate through delegation *)
-  Op.delegation ~fee (I i) contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
   if fee > credit then
     Incremental.add_operation i delegate_op >>= fun err ->
     Assert.proto_error ~loc:__LOC__ err (function
@@ -607,12 +565,12 @@ let unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
     begin
       (* fee has been taken, delegate for contract has not changed *)
       Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         i delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract credit fee >>=? fun () ->
-      Context.Contract.delegate (I i) contract >>=? fun delegate ->
-      Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_pkh >>=? fun () ->
-      Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract balance fee >>=? fun () ->
+      Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
+      Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_delegate_pkh >>=? fun () ->
+      Assert.equal_pkh ~loc:__LOC__ delegate bootstrap_pkh
     end
 
 (* a credit of some amount followed by a debit of the same amount, no self-delegation *)
@@ -633,7 +591,7 @@ let unregistered_delegate_key_init_origination_credit_debit ~fee ~amount () =
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
   (* origination with delegate argument *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
-  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
+  Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap ~script:Op.dummy_script >>=? fun (op, orig_contract) ->
   if fee > balance then
     begin
       Incremental.add_operation i op  >>= fun err ->
@@ -660,6 +618,8 @@ let unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee () =
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
   (* credit + check balance *)
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract amount >>=? fun create_contract ->
   Incremental.add_operation i create_contract >>=? fun i ->
@@ -668,12 +628,14 @@ let unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee () =
   Op.transaction ~fee:Tez.zero (I i) impl_contract bootstrap amount >>=? fun debit_contract ->
   Incremental.add_operation i debit_contract >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
-  (* origination without delegate argument *)
+  (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination ~fee:Tez.zero (I i) ~credit bootstrap >>=? fun (op, contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  (* set a delegate with delegation operation *)
-  Op.delegation ~fee (I i) contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract credit >>=? fun _ ->
+  (* try to delegate *)
+  Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
+
   if fee > credit then
     begin
       Incremental.add_operation i delegate_op >>= fun err ->
@@ -685,10 +647,11 @@ let unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee () =
     begin
       (* fee has been taken, no delegate for contract *)
       Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         i delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract credit fee >>=? fun () ->
-      Context.Contract.delegate (I i) contract >>= fun err ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee >>=? fun () ->
+      Context.Contract.delegate (I i) impl_contract >>= fun err ->
+
       Assert.error ~loc:__LOC__ err (function
           | RPC_context.Not_found _ -> true
           | _ -> false)
@@ -698,9 +661,12 @@ let unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b >>=? fun i ->
   let bootstrap = List.hd bootstrap_contracts in
+  let bootstrap_pkh = Contract.is_implicit bootstrap |> Option.unopt_assert ~loc:__POS__ in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
+  let unregistered_delegate_account = Account.new_account () in
+  let unregistered_delegate_pkh = Account.(unregistered_delegate_account.pkh) in
   (* credit + check balance *)
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract amount >>=? fun create_contract ->
   Incremental.add_operation i create_contract >>=? fun i ->
@@ -709,15 +675,19 @@ let unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount () =
   Op.transaction (I i) impl_contract bootstrap amount >>=? fun debit_contract ->
   Incremental.add_operation i debit_contract >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
-  (* origination with delegate setting *)
-  Context.Contract.manager (I i) bootstrap >>=? fun manager ->
+  (* delegation - initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Op.origination (I i) ~fee:Tez.zero ~credit ~delegate:manager.pkh bootstrap >>=? fun (op, contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.delegate (I i) contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun _ ->
+  Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract credit >>=? fun _ ->
+  (* set and check the initial delegate *)
+  Op.delegation ~fee:Tez.zero (I i) impl_contract (Some bootstrap_pkh) >>=? fun delegate_op ->
+  Incremental.add_operation i delegate_op >>=? fun i ->
+  Context.Contract.delegate (I i) bootstrap >>=? fun delegate_pkh ->
+  Assert.equal_pkh ~loc:__LOC__ bootstrap_pkh delegate_pkh >>=? fun () ->
   (* switch delegate through delegation *)
-  Op.delegation (I i) ~fee contract (Some unregistered_pkh) >>=? fun delegate_op ->
+  Op.delegation (I i) ~fee impl_contract (Some unregistered_delegate_pkh) >>=? fun delegate_op ->
+
   if fee > credit then
     Incremental.add_operation i delegate_op >>= fun err ->
     Assert.proto_error ~loc:__LOC__ err (function
@@ -727,12 +697,11 @@ let unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount () =
     begin
       (* fee has been taken, delegate for contract has not changed *)
       Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key unregistered_pkh)
+        ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
         i delegate_op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract credit fee >>=? fun () ->
-      Context.Contract.delegate (I i) contract >>=? fun delegate ->
-      Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_pkh >>=? fun () ->
-      Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh
+      Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee >>=? fun () ->
+      Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
+      Assert.not_equal_pkh ~loc:__LOC__ delegate unregistered_delegate_pkh
     end
 
 (* A2- self-delegation to an empty contract fails *)
@@ -781,30 +750,7 @@ let failed_self_delegation_emptied_implicit_contract amount () =
     - credit implicit contract with some ꜩ + verification of balance
     - self delegation + verification
     - empty contract + verification of balance + verification of not being erased / self-delegation
-    - originate contract w implicit contract as delegate + verification of delegation *)
-let valid_delegate_registration_init_origination_credit amount () =
-  (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap = List.hd bootstrap_contracts in
-  let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
-  let impl_contract = Contract.implicit_contract delegate_pkh in
-  (* credit > 0ꜩ + check balance *)
-  Op.transaction (I i) bootstrap impl_contract amount >>=? fun create_contract ->
-  Incremental.add_operation i create_contract >>=? fun i ->
-  Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
-  (* self delegation + verification *)
-  Op.delegation (I i) impl_contract (Some delegate_pkh) >>=? fun self_delegation ->
-  Incremental.add_operation i self_delegation >>=? fun i ->
-  Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun _ ->
-  (* originating a contract with the newly registered delegate account as delegate *)
-  Op.origination ~delegate:delegate_account.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
-
+    - create delegator implicit contract w first implicit contract as delegate + verification of delegation *)
 let valid_delegate_registration_init_delegation_credit amount () =
   (* create an implicit contract *)
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
@@ -822,20 +768,23 @@ let valid_delegate_registration_init_delegation_credit amount () =
   Incremental.add_operation i self_delegation >>=? fun i ->
   Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun _ ->
-  (* originating a contract with no delegate *)
-  Op.origination (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  (* check no delegate for orig contract *)
-  Context.Contract.delegate (I i) orig_contract >>= fun err ->
+  (* create an implicit contract with no delegate *)
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let delegator = Contract.implicit_contract unregistered_pkh in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap delegator Tez.one >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  (* check no delegate for delegator contract *)
+  Context.Contract.delegate (I i) delegator >>= fun err ->
   Assert.error ~loc:__LOC__ err (function
       | RPC_context.Not_found _ -> true
       | _ -> false) >>=? fun _ ->
   (* delegation to the newly registered key *)
-  Op.delegation (I i) orig_contract (Some delegate_account.pkh) >>=? fun delegation ->
+  Op.delegation (I i) delegator (Some delegate_account.pkh) >>=? fun delegation ->
   Incremental.add_operation i delegation >>=? fun i ->
   (* check delegation *)
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
 let valid_delegate_registration_switch_delegation_credit amount () =
   (* create an implicit contract *)
@@ -854,51 +803,23 @@ let valid_delegate_registration_switch_delegation_credit amount () =
   Incremental.add_operation i self_delegation >>=? fun i ->
   Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun _ ->
-  (* originating a contract with bootstrap's account as delegate *)
+  (* create an implicit contract with bootstrap's account as delegate *)
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let delegator = Contract.implicit_contract unregistered_pkh in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap delegator Tez.one >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
   Context.Contract.manager (I i) bootstrap >>=? fun bootstrap_manager ->
-  Op.origination (I i) ~delegate:bootstrap_manager.pkh bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  (* test delegate of new contract is bootstrap *)
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate bootstrap_manager.pkh  >>=? fun _ ->
-  (* delegation with newly registered key *)
-  Op.delegation (I i) orig_contract (Some delegate_account.pkh) >>=? fun delegation ->
+  Op.delegation (I i) delegator (Some bootstrap_manager.pkh) >>=? fun delegation ->
   Incremental.add_operation i delegation >>=? fun i ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
-
-let valid_delegate_registration_init_origination_credit_debit amount () =
-  (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap = List.hd bootstrap_contracts in
-  let delegate_account = Account.new_account () in
-  let delegate_pkh = Account.(delegate_account.pkh) in
-  let impl_contract = Contract.implicit_contract delegate_pkh in
-  (* credit > 0ꜩ+ check balance *)
-  Op.transaction (I i) bootstrap impl_contract amount >>=? fun create_contract ->
-  Incremental.add_operation i create_contract >>=? fun i ->
-  Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
-  (* self delegation + verification *)
-  Op.delegation (I i) impl_contract (Some delegate_pkh) >>=? fun self_delegation ->
-  Incremental.add_operation i self_delegation >>=? fun i ->
-  Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
-  (* empty implicit contracts are usually deleted but they are kept if
-     they were registered as delegates. we empty the contract in
-     order to verify this. *)
-  Op.transaction (I i) impl_contract bootstrap amount >>=? fun empty_contract ->
-  Incremental.add_operation i empty_contract >>=? fun i ->
-  (* impl_contract is empty *)
-  Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
-  (* verify self-delegation after contract is emptied *)
-  Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
-  Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
-  (* originating a contract with the newly registered delegate account as delegate *)
-  Op.origination ~delegate:delegate_account.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
+  (* test delegate of new contract is bootstrap *)
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh  >>=? fun _ ->
+  (* delegation with newly registered key *)
+  Op.delegation (I i) delegator (Some delegate_account.pkh) >>=? fun delegation ->
+  Incremental.add_operation i delegation >>=? fun i ->
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
 let valid_delegate_registration_init_delegation_credit_debit amount () =
   (* create an implicit contract *)
@@ -927,20 +848,23 @@ let valid_delegate_registration_init_delegation_credit_debit amount () =
   (* verify self-delegation after contract is emptied *)
   Context.Contract.delegate (I i) impl_contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate_pkh delegate >>=? fun _ ->
-  (* originating a contract with no delegate *)
-  Op.origination (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  (* check no delegate for orig contract *)
-  Context.Contract.delegate (I i) orig_contract >>= fun err ->
+  (* create an implicit contract with no delegate *)
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let delegator = Contract.implicit_contract unregistered_pkh in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap delegator Tez.one >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
+  (* check no delegate for delegator contract *)
+  Context.Contract.delegate (I i) delegator >>= fun err ->
   Assert.error ~loc:__LOC__ err (function
       | RPC_context.Not_found _ -> true
       | _ -> false) >>=? fun _ ->
   (* delegation to the newly registered key *)
-  Op.delegation (I i) orig_contract (Some delegate_account.pkh) >>=? fun delegation ->
+  Op.delegation (I i) delegator (Some delegate_account.pkh) >>=? fun delegation ->
   Incremental.add_operation i delegation >>=? fun i ->
   (* check delegation *)
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
 let valid_delegate_registration_switch_delegation_credit_debit amount () =
   (* create an implicit contract *)
@@ -966,18 +890,23 @@ let valid_delegate_registration_switch_delegation_credit_debit amount () =
   Incremental.add_operation i empty_contract >>=? fun i ->
   (* impl_contract is empty *)
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
-  (* originating a contract with bootstrap's account as delegate *)
+  (* create an implicit contract with bootstrap's account as delegate *)
+  let unregistered_account = Account.new_account () in
+  let unregistered_pkh = Account.(unregistered_account.pkh) in
+  let delegator = Contract.implicit_contract unregistered_pkh in
+  Op.transaction ~fee:Tez.zero (I i) bootstrap delegator Tez.one >>=? fun credit_contract ->
+  Incremental.add_operation i credit_contract >>=? fun i ->
   Context.Contract.manager (I i) bootstrap >>=? fun bootstrap_manager ->
-  Op.origination (I i) ~delegate:bootstrap_manager.pkh bootstrap >>=? fun (op, orig_contract) ->
-  Incremental.add_operation i op >>=? fun i ->
-  (* test delegate of new contract is bootstrap *)
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate bootstrap_manager.pkh  >>=? fun _ ->
-  (* delegation with newly registered key *)
-  Op.delegation (I i) orig_contract (Some delegate_account.pkh) >>=? fun delegation ->
+  Op.delegation (I i) delegator (Some bootstrap_manager.pkh) >>=? fun delegation ->
   Incremental.add_operation i delegation >>=? fun i ->
-  Context.Contract.delegate (I i) orig_contract >>=? fun orig_delegate ->
-  Assert.equal_pkh ~loc:__LOC__ orig_delegate delegate_pkh
+  (* test delegate of new contract is bootstrap *)
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate bootstrap_manager.pkh  >>=? fun _ ->
+  (* delegation with newly registered key *)
+  Op.delegation (I i) delegator (Some delegate_account.pkh) >>=? fun delegation ->
+  Incremental.add_operation i delegation >>=? fun i ->
+  Context.Contract.delegate (I i) delegator >>=? fun delegator_delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegator_delegate delegate_pkh
 
 (** C- a second self-delegation should raise an `Active_delegate` error *)
 (* with implicit contract with some credit *)
@@ -1061,96 +990,85 @@ let double_registration_when_recredited () =
       | Delegate_storage.Active_delegate -> true
       | _ -> false)
 
-(* originate and self-delegation on unrevealed contract *)
-let unregistered_and_unrevealed_self_delegate_key_init_origination ~fee () =
+(* self-delegation on unrevealed contract *)
+let unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let { Account.pkh ; _ } = Account.new_account () in
+  let { Account.pkh = delegate_pkh ; _ } = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.delegation ~fee (I i) contract (Some delegate_pkh) >>=? fun op ->
+  Context.Contract.balance (I i) contract >>=? fun balance ->
+  if fee > balance then
+    begin
+      Incremental.add_operation i op >>= fun err ->
+      Assert.proto_error ~loc:__LOC__ err (function
+          | Contract_storage.Balance_too_low _ -> true
+          | _ -> false)
+    end
+  else
+    (* origination did not proceed; fee has been debited *)
+    begin
+      Incremental.add_operation
+        ~expect_failure:(expect_unregistered_key delegate_pkh)
+        i op >>=? fun i ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
+    end
+
+(* self-delegation on revelead but not registered contract *)
+let unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let { Account.pkh ; pk ; _ }  = Account.new_account () in
+  let { Account.pkh = delegate_pkh ; _ } = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.revelation (I i) pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.delegation ~fee (I i) contract (Some delegate_pkh) >>=? fun op ->
+  Context.Contract.balance (I i) contract >>=? fun balance ->
+  if fee > balance then
+    begin
+      Incremental.add_operation i op >>= fun err ->
+      Assert.proto_error ~loc:__LOC__ err (function
+          | Contract_storage.Balance_too_low _ -> true
+          | _ -> false)
+    end
+  else
+    (* origination did not proceed; fee has been debited *)
+    begin
+      Incremental.add_operation
+        ~expect_failure:(expect_unregistered_key delegate_pkh)
+        i op >>=? fun i ->
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
+    end
+
+(* self-delegation on revealed and registered contract *)
+let registered_self_delegate_key_init_delegation () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
   Incremental.begin_construction b >>=? fun i ->
   let bootstrap = List.hd bootstrap_contracts in
   let { Account.pkh ; _ }  = Account.new_account () in
+  let { Account.pkh = delegate_pkh ; pk = delegate_pk ; _ } = Account.new_account () in
   let contract = Alpha_context.Contract.implicit_contract pkh in
+  let delegate_contract = Alpha_context.Contract.implicit_contract delegate_pkh in
   Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  (* origination with delegate argument *)
-  Op.origination ~fee ~delegate:pkh (I i) contract >>=? fun (op, orig_contract) ->
-  Context.Contract.balance (I i) contract >>=? fun balance ->
-  if fee > balance then
-    begin
-      Incremental.add_operation i op >>= fun err ->
-      Assert.proto_error ~loc:__LOC__ err (function
-          | Contract_storage.Balance_too_low _ -> true
-          | _ -> false)
-    end
-  else
-    (* origination did not proceed; fee has been debited *)
-    begin
-      Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key pkh)
-        i op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee >>=? fun () ->
-      (* originated contract has not been created *)
-      Context.Contract.balance (I i) orig_contract >>= fun err ->
-      Assert.error ~loc:__LOC__ err (function
-          | RPC_context.Not_found _ -> true
-          | _ -> false)
-    end
-
-(* originate and self-delegation on revelead but not registered contract *)
-let unregistered_and_revealed_self_delegate_key_init_origination ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap = List.hd bootstrap_contracts in
-  let { Account.pkh ; pk ; _ }  = Account.new_account () in
-  let contract = Alpha_context.Contract.implicit_contract pkh in
-  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Op.transaction (I i) bootstrap delegate_contract (Tez.of_int 1) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  Op.revelation (I i) pk >>=? fun op ->
+  Op.revelation (I i) delegate_pk >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  (* origination with delegate argument *)
-  Op.origination ~fee ~delegate:pkh (I i) contract >>=? fun (op, orig_contract) ->
-  Context.Contract.balance (I i) contract >>=? fun balance ->
-  if fee > balance then
-    begin
-      Incremental.add_operation i op >>= fun err ->
-      Assert.proto_error ~loc:__LOC__ err (function
-          | Contract_storage.Balance_too_low _ -> true
-          | _ -> false)
-    end
-  else
-    (* origination did not proceed; fee has been debited *)
-    begin
-      Incremental.add_operation
-        ~expect_failure:(expect_unregistered_key pkh)
-        i op >>=? fun i ->
-      Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee >>=? fun () ->
-      (* originated contract has not been created *)
-      Context.Contract.balance (I i) orig_contract >>= fun err ->
-      Assert.error ~loc:__LOC__ err (function
-          | RPC_context.Not_found _ -> true
-          | _ -> false)
-    end
-
-(* originate and self-delegation on revealed and registered contract *)
-let registered_self_delegate_key_init_origination () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let bootstrap = List.hd bootstrap_contracts in
-  let { Account.pkh ; pk ; _ }  = Account.new_account () in
-  let contract = Alpha_context.Contract.implicit_contract pkh in
-  Op.transaction (I i) bootstrap contract (Tez.of_int 10) >>=? fun op ->
+  Op.delegation (I i) delegate_contract (Some delegate_pkh) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  Op.revelation (I i) pk >>=? fun op ->
+  Op.delegation(I i) contract (Some delegate_pkh) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  Op.delegation (I i) contract (Some pkh) >>=? fun op ->
-  Incremental.add_operation i op >>=? fun i ->
-  Context.Contract.balance (I i) contract >>=? fun balance ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
-  Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
-  (* origination with delegate argument *)
-  Op.origination ~delegate:pkh ~credit:Tez.one (I i) contract >>=? fun (op, orig_contract) ->
-  Tez.(origination_burn +? Tez.one) >>?= fun total_cost ->
-  Incremental.add_operation i op >>=? fun i ->
-  Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance total_cost >>=? fun () ->
-  Assert.balance_is ~loc:__LOC__ (I i) orig_contract Tez.one >>=? fun () ->
+  Context.Contract.delegate (I i) contract >>=? fun delegate ->
+  Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun () ->
   return_unit
 
 let tests_delegate_registration =
@@ -1208,21 +1126,21 @@ let tests_delegate_registration =
     Test.tztest "unregistered delegate key - credit 1μꜩ (switch with delegation, large fee)"
       `Quick (unregistered_delegate_key_switch_delegation_credit ~amount:Tez.one_mutez ~fee:Tez.max_tez) ;
 
-    (* origination with self_delegation on unrevealed and unregistered contract *)
-    Test.tztest "unregistered and unrevealed self-delegation (origination, small fee)"
-      `Quick (unregistered_and_unrevealed_self_delegate_key_init_origination ~fee:Tez.one_mutez) ;
-    Test.tztest "unregistered and unrevealed self-delegation (origination, large fee)"
-      `Quick (unregistered_and_unrevealed_self_delegate_key_init_origination ~fee:Tez.max_tez) ;
+    (* self delegation on unrevealed and unregistered contract *)
+    Test.tztest "unregistered and unrevealed self-delegation (small fee)"
+      `Quick (unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee:Tez.one_mutez) ;
+    Test.tztest "unregistered and unrevealed self-delegation (large fee)"
+      `Quick (unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee:Tez.max_tez) ;
 
-    (* origination with self_delegation on unregistered contract *)
-    Test.tztest "unregistered and revealed self-delegation (origination, small fee)"
-      `Quick (unregistered_and_revealed_self_delegate_key_init_origination ~fee:Tez.one_mutez) ;
-    Test.tztest "unregistered and revealed self-delegation (origination, large fee)"
-      `Quick (unregistered_and_revealed_self_delegate_key_init_origination ~fee:Tez.max_tez) ;
+    (* self delegation on unregistered contract *)
+    Test.tztest "unregistered and revealed self-delegation (small fee)"
+      `Quick (unregistered_and_revealed_self_delegate_key_init_delegation ~fee:Tez.one_mutez) ;
+    Test.tztest "unregistered and revealed self-delegation  large fee)"
+      `Quick (unregistered_and_revealed_self_delegate_key_init_delegation ~fee:Tez.max_tez) ;
 
-    (* origination with self_delegation on registered contract *)
-    Test.tztest "registered and revelead self-delegation (origination)"
-      `Quick registered_self_delegate_key_init_origination ;
+    (* self delegation on registered contract *)
+    Test.tztest "registered and revelead self-delegation"
+      `Quick registered_self_delegate_key_init_delegation ;
 
     (*** unregistered delegate key: failed self-delegation ***)
     (* no token transfer, self-delegation *)
@@ -1232,15 +1150,11 @@ let tests_delegate_registration =
 
     (*** valid registration ***)
     (* valid registration: credit 1 μꜩ, self delegation *)
-    Test.tztest "valid delegate registration: credit 1μꜩ, self delegation (origination)"
-      `Quick (valid_delegate_registration_init_origination_credit Tez.one_mutez) ;
     Test.tztest "valid delegate registration: credit 1μꜩ, self delegation (init with delegation)"
       `Quick (valid_delegate_registration_init_delegation_credit Tez.one_mutez) ;
     Test.tztest "valid delegate registration: credit 1μꜩ, self delegation (switch with delegation)"
       `Quick (valid_delegate_registration_switch_delegation_credit Tez.one_mutez) ;
     (* valid registration: credit 1 μꜩ, self delegation, debit 1μꜩ *)
-    Test.tztest "valid delegate registration: credit 1μꜩ, self delegation, debit 1μꜩ (origination)"
-      `Quick (valid_delegate_registration_init_origination_credit_debit Tez.one_mutez) ;
     Test.tztest "valid delegate registration: credit 1μꜩ, self delegation, debit 1μꜩ (init with delegation)"
       `Quick (valid_delegate_registration_init_delegation_credit_debit Tez.one_mutez) ;
     Test.tztest "valid delegate registration: credit 1μꜩ, self delegation, debit 1μꜩ (switch with delegation)"
