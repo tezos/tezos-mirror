@@ -485,11 +485,10 @@ Core data types and notations
 
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
    ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ; ... }``,
-   with keys sorted.  These maps should be used if you intend to store
+   with keys sorted. These maps should be used if you intend to store
    large amounts of data in a map. They have higher gas costs than
-   standard maps as data is lazily deserialized.  You are limited to a
-   single ``big_map`` per program, which must appear on the left hand
-   side of a pair in the contract's storage.
+   standard maps as data is lazily deserialized. A ``big_map`` cannot
+   appear inside another ``big_map``.
 
 Core instructions
 -----------------
@@ -1171,6 +1170,15 @@ The behavior of these operations is the same as if they were normal
 maps, except that under the hood, the elements are loaded and
 deserialized on demand.
 
+-  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map from keys of a
+   given type to values of another given type.
+
+   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
+   be defined over it).
+
+::
+
+    :: 'S -> map 'key 'val : 'S
 
 -  ``GET``: Access an element in a ``big_map``, returns an optional value to be
    checked with ``IF_SOME``.
@@ -2172,6 +2180,9 @@ type on top.
    EMPTY_MAP :t 'key 'val
    :: 'S -> (map :t 'key 'val) : 'S
 
+   EMPTY_BIG_MAP :t 'key 'val
+   :: 'S -> (big_map :t 'key 'val) : 'S
+
 
 A no-op instruction ``CAST`` ensures the top of the stack has the
 specified type, and change its type if it is compatible. In particular,
@@ -2237,6 +2248,7 @@ The instructions which accept at most one variable annotation are:
    MEM
    EMPTY_SET
    EMPTY_MAP
+   EMPTY_BIG_MAP
    UPDATE
    GET
    LAMBDA
@@ -2957,6 +2969,7 @@ Full grammar
       | SIZE
       | EMPTY_SET <comparable type>
       | EMPTY_MAP <comparable type> <type>
+      | EMPTY_BIG_MAP <comparable type> <type>
       | MAP { <instruction> ... }
       | ITER { <instruction> ... }
       | MEM
