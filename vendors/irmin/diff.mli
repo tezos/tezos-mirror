@@ -1,6 +1,5 @@
 (*
  * Copyright (c) 2013-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
- * Copyright (c) 2017 Dynamic Ledger Solutions <contact@tezos.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,9 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** Quick-and-dirty LevelDB backend for Irmin. *)
+type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
 
-val config:
-  ?config:Irmin.config -> ?mapsize:int64 -> ?readonly:bool -> string -> Irmin.config
-
-module Make : Irmin.S_MAKER
+val t : 'a Type.t -> 'a t Type.t

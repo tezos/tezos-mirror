@@ -1,0 +1,4 @@
+(library
+ (public_name index.unix)
+ (name index_unix)
+ (libraries unix index))
