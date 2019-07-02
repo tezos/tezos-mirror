@@ -328,7 +328,7 @@ let rec interp
               (List.fold_left
                  (fun acc _ ->
                     acc >>? fun (size, ctxt) ->
-                    Gas.consume ctxt Interp_costs.list_size >>? fun ctxt ->
+                    Gas.consume ctxt Interp_costs.loop_size >>? fun ctxt ->
                     ok (size + 1 (* FIXME: overflow *), ctxt))
                  (ok (0, ctxt)) list) >>=? fun (len, ctxt) ->
             logged_return (Item (Script_int.(abs (of_int len)), rest), ctxt)
@@ -416,7 +416,7 @@ let rec interp
         | Big_map_update, Item (key, Item (maybe_value, Item (map, rest))) ->
             consume_gas_terop descr
               (Script_ir_translator.big_map_update, key, maybe_value, map)
-              Interp_costs.big_map_update rest
+              (fun k v m -> Interp_costs.map_update k (Some v) m.diff) rest
         (* timestamp operations *)
         | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
             consume_gas_binop descr
@@ -847,22 +847,22 @@ let rec interp
             let now = Script_timestamp.now ctxt in
             logged_return (Item (now, rest), ctxt)
         | Check_signature, Item (key, Item (signature, Item (message, rest))) ->
-            Lwt.return (Gas.consume ctxt Interp_costs.check_signature) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.check_signature key message)) >>=? fun ctxt ->
             let res = Signature.check key signature message in
             logged_return (Item (res, rest), ctxt)
         | Hash_key, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.hash_key) >>=? fun ctxt ->
             logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
         | Blake2b, Item (bytes, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash_blake2b bytes)) >>=? fun ctxt ->
             let hash = Raw_hashes.blake2b bytes in
             logged_return (Item (hash, rest), ctxt)
         | Sha256, Item (bytes, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 32)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash_sha256 bytes)) >>=? fun ctxt ->
             let hash = Raw_hashes.sha256 bytes in
             logged_return (Item (hash, rest), ctxt)
         | Sha512, Item (bytes, rest) ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.hash bytes 64)) >>=? fun ctxt ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.hash_sha512 bytes)) >>=? fun ctxt ->
             let hash = Raw_hashes.sha512 bytes in
             logged_return (Item (hash, rest), ctxt)
         | Steps_to_quota, rest ->
