@@ -477,8 +477,14 @@ let apply_manager_operation_content :
         Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
         Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
         Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
-        Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
-        Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
+        Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (Ex_script parsed_script, ctxt) ->
+        Script_ir_translator.collect_big_maps ctxt parsed_script.storage_type parsed_script.storage >>=? fun (to_duplicate, ctxt) ->
+        let to_update = Script_ir_translator.no_big_map_id in
+        Script_ir_translator.extract_big_map_diff ctxt Optimized parsed_script.storage_type parsed_script.storage
+          ~to_duplicate ~to_update ~temporary:false >>=? fun (storage, big_map_diff, ctxt) ->
+        Script_ir_translator.unparse_data ctxt Optimized parsed_script.storage_type storage >>=? fun (storage, ctxt) ->
+        let storage = Script.lazy_expr (Micheline.strip_locations storage) in
+        let script = { script with storage } in
         Contract.spend ctxt source credit >>=? fun ctxt ->
         begin match preorigination with
           | Some contract ->
@@ -497,7 +503,8 @@ let apply_manager_operation_content :
         Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, paid_storage_size_diff, fees) ->
         let result =
           Origination_result
-            { balance_updates =
+            { big_map_diff ;
+              balance_updates =
                 Delegate.cleanup_balance_updates
                   [ Contract payer, Debited fees ;
                     Contract payer, Debited origination_burn ;
@@ -749,7 +756,9 @@ let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   apply_manager_contents_list_rec ctxt mode baker chain_id contents_list >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | `Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
-  | `Success ctxt -> Lwt.return (ctxt, results)
+  | `Success ctxt ->
+      Big_map.cleanup_temporary ctxt >>= fun ctxt ->
+      Lwt.return (ctxt, results)
 
 let apply_contents_list
     (type kind) ctxt chain_id mode pred_block baker

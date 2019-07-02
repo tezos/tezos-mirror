@@ -74,6 +74,7 @@ type error += Type_too_large : Script.location * int * int -> error
 type error += Invalid_constant : Script.location * Script.expr * Script.expr -> error
 type error += Invalid_syntactic_constant : Script.location * Script.expr * string -> error
 type error += Invalid_contract of Script.location * Contract.t
+type error += Invalid_big_map of Script.location * Big_map.id
 type error += Comparable_type_expected : Script.location * Script.expr -> error
 type error += Inconsistent_types : Script.expr * Script.expr -> error
 type error += Unordered_map_keys of Script.location * Script.expr

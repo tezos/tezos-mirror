@@ -73,3 +73,5 @@ val minimal_deserialize_cost : lazy_expr -> Gas_limit_repr.cost
 val unit_parameter : lazy_expr
 
 val is_unit_parameter : lazy_expr -> bool
+
+val strip_annotations : node -> node

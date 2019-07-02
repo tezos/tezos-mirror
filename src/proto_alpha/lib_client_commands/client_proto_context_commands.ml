@@ -157,19 +157,16 @@ let commands version () =
 
     command ~group ~desc: "Get the value associated to a key in the big map storage of a contract."
       no_options
-      (prefixes [ "get" ; "big" ; "map" ; "value" ; "for" ]
+      (prefixes [ "get" ; "big" ; "map" ; "value" ]
        @@ Clic.param ~name:"key" ~desc:"the key to look for"
          data_parameter
-       @@ prefixes [ "of" ; "type" ]
-       @@ Clic.param ~name:"type" ~desc:"type of the key"
-         data_parameter
        @@ prefix "in"
-       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ Clic.param ~name:"big_map" ~desc:"identifier of the big_map" int_parameter
        @@ stop)
-      begin fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      begin fun () key id (cctxt : Protocol_client_context.full) ->
         get_big_map_value cctxt
           ~chain:cctxt#chain ~block:cctxt#block
-          contract (key.expanded, key_type.expanded) >>=? function
+          (Z.of_int id) key.expanded >>=? function
         | None ->
             cctxt#error "No value associated to this key."
         | Some value ->

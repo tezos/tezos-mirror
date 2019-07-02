@@ -75,11 +75,21 @@ val get_storage:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 
-type big_map_diff_item = {
-  diff_key : Script_repr.expr;
-  diff_key_hash : Script_expr_hash.t;
-  diff_value : Script_repr.expr option;
-}
+type big_map_diff_item =
+  | Update of {
+      big_map : Z.t ;
+      diff_key : Script_repr.expr;
+      diff_key_hash : Script_expr_hash.t;
+      diff_value : Script_repr.expr option;
+    }
+  | Clear of Z.t
+  | Copy of Z.t * Z.t
+  | Alloc of {
+      big_map : Z.t;
+      key_type : Script_repr.expr;
+      value_type : Script_repr.expr;
+    }
+
 type big_map_diff = big_map_diff_item list
 
 val big_map_diff_encoding : big_map_diff Data_encoding.t
@@ -119,10 +129,3 @@ val init:
 val used_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 val paid_storage_space: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
 val set_paid_storage_space_and_return_fees_to_pay: Raw_context.t -> Contract_repr.t -> Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
-
-module Big_map : sig
-  val mem :
-    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * bool) tzresult Lwt.t
-  val get_opt :
-    Raw_context.t -> Contract_repr.t -> Script_expr_hash.t -> (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
-end

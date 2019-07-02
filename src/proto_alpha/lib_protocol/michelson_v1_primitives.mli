@@ -64,6 +64,7 @@ type prim =
   | I_DROP
   | I_DUP
   | I_EDIV
+  | I_EMPTY_BIG_MAP
   | I_EMPTY_MAP
   | I_EMPTY_SET
   | I_EQ

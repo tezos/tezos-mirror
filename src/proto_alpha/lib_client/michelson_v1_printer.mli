@@ -37,6 +37,9 @@ val print_execution_trace:
   Format.formatter ->
   (Script.location * Gas.t * (Script.expr * string option) list) list -> unit
 
+val print_big_map_diff:
+  Format.formatter -> Contract.big_map_diff -> unit
+
 (** Insert the type map returned by the typechecker as comments in a
     printable Micheline AST. *)
 val inject_types :

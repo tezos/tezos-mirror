@@ -80,8 +80,10 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
+type operation = packed_internal_operation * Contract.big_map_diff option
+
 type ('arg, 'storage) script =
-  { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
+  { code : (('arg, 'storage) pair, (operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     storage : 'storage ;
     storage_type : 'storage ty ;
@@ -110,23 +112,29 @@ and 'ty ty =
   | Pair_t :
       ('a ty * field_annot option * var_annot option) *
       ('b ty * field_annot option * var_annot option) *
-      type_annot option -> ('a, 'b) pair ty
-  | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option  -> ('a, 'b) union ty
+      type_annot option *
+      bool -> ('a, 'b) pair ty
+  | Union_t :
+      ('a ty * field_annot option) *
+      ('b ty * field_annot option) *
+      type_annot option *
+      bool -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty * type_annot option  -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * type_annot option  -> 'v option ty
-  | List_t : 'v ty * type_annot option -> 'v list ty
+  | Option_t : 'v ty * type_annot option * bool  -> 'v option ty
+  | List_t : 'v ty * type_annot option * bool -> 'v list ty
   | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option * bool -> ('k, 'v) map ty
   | Big_map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
-  | Operation_t : type_annot option -> packed_internal_operation ty
+  | Operation_t : type_annot option -> operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * var_annot option -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
 
-and ('key, 'value) big_map = { diff : ('key, 'value option) map ;
+and ('key, 'value) big_map = { id : Z.t option ;
+                               diff : ('key, 'value option) map ;
                                key_type : 'key ty ;
                                value_type : 'value ty }
 
@@ -209,6 +217,8 @@ and ('bef, 'aft) instr =
       ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
   | Map_size : (('a, 'b) map * 'rest, n num * 'rest) instr
   (* big maps *)
+  | Empty_big_map : 'a comparable_ty * 'v ty ->
+    ('rest, ('a, 'v) big_map * 'rest) instr
   | Big_map_mem :
       ('a * (('a, 'v) big_map * 'rest), bool * 'rest) instr
   | Big_map_get :
@@ -362,19 +372,19 @@ and ('bef, 'aft) instr =
   | Contract : 'p ty * string ->
     (address * 'rest, 'p typed_contract option * 'rest) instr
   | Transfer_tokens :
-      ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
+      ('arg * (Tez.t * ('arg typed_contract * 'rest)), operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       packed_internal_operation * (address * 'rest)) instr
+       operation * (address * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda * string option ->
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     packed_internal_operation * (address * 'rest)) instr
-  | Create_contract_2 : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda * string option  ->
-    (public_key_hash option * (Tez.t * ('g * 'rest)), packed_internal_operation * (address * 'rest)) instr
+     operation * (address * 'rest)) instr
+  | Create_contract_2 : 'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option  ->
+    (public_key_hash option * (Tez.t * ('g * 'rest)), operation * (address * 'rest)) instr
   | Set_delegate :
-      (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
+      (public_key_hash option * 'rest, operation * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :

@@ -59,13 +59,13 @@ val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
 val map_key_ty : ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
 val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
 
+val empty_big_map : 'a Script_typed_ir.comparable_ty -> 'b Script_typed_ir.ty -> ('a, 'b) Script_typed_ir.big_map
 val big_map_mem :
-  context -> Contract.t -> 'key ->
+  context -> 'key ->
   ('key, 'value) Script_typed_ir.big_map ->
   (bool * context) tzresult Lwt.t
 val big_map_get :
-  context ->
-  Contract.t -> 'key ->
+  context -> 'key ->
   ('key, 'value) Script_typed_ir.big_map ->
   ('value option * context) tzresult Lwt.t
 val big_map_update :
@@ -138,13 +138,17 @@ val find_entrypoint :
 val pack_data : context -> 'a Script_typed_ir.ty -> 'a -> (MBytes.t * context) tzresult Lwt.t
 val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (Script_expr_hash.t * context) tzresult Lwt.t
 
-val extract_big_map :
-  'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map option
+type big_map_ids
 
-val diff_of_big_map :
-  context -> unparsing_mode -> Script_typed_ir.ex_big_map ->
-  (Contract.big_map_diff * context) tzresult Lwt.t
+val no_big_map_id : big_map_ids
 
-val big_map_initialization :
-  context -> unparsing_mode -> ex_script ->
-  (Contract.big_map_diff option * context) tzresult Lwt.t
+val collect_big_maps :
+  context -> 'a Script_typed_ir.ty -> 'a -> (big_map_ids * context) tzresult Lwt.t
+
+val extract_big_map_diff :
+  context -> unparsing_mode ->
+  temporary: bool ->
+  to_duplicate: big_map_ids ->
+  to_update: big_map_ids ->
+  'a Script_typed_ir.ty -> 'a ->
+  ('a * Contract.big_map_diff option * context) tzresult Lwt.t

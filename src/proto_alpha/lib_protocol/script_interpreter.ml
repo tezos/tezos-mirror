@@ -405,13 +405,16 @@ let rec interp
         | Map_size, Item (map, rest) ->
             consume_gas_unop descr (map_size, map) (fun _ -> Interp_costs.map_size) rest ctxt
         (* Big map operations *)
+        | Empty_big_map (tk, tv), rest ->
+            Lwt.return (Gas.consume ctxt Interp_costs.empty_map) >>=? fun ctxt ->
+            logged_return (Item (Script_ir_translator.empty_big_map tk tv, rest), ctxt)
         | Big_map_mem, Item (key, Item (map, rest)) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.map_mem key map.diff)) >>=? fun ctxt ->
-            Script_ir_translator.big_map_mem ctxt self key map >>=? fun (res, ctxt) ->
+            Script_ir_translator.big_map_mem ctxt key map >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
         | Big_map_get, Item (key, Item (map, rest)) ->
             Lwt.return (Gas.consume ctxt (Interp_costs.map_get key map.diff)) >>=? fun ctxt ->
-            Script_ir_translator.big_map_get ctxt self key map >>=? fun (res, ctxt) ->
+            Script_ir_translator.big_map_get ctxt key map >>=? fun (res, ctxt) ->
             logged_return (Item (res, rest), ctxt)
         | Big_map_update, Item (key, Item (maybe_value, Item (map, rest))) ->
             consume_gas_terop descr
@@ -733,13 +736,17 @@ let rec interp
         | Transfer_tokens,
           Item (p, Item (amount, Item ((tp, (destination, entrypoint)), rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->
+            collect_big_maps ctxt tp p >>=? fun (to_duplicate, ctxt) ->
+            let to_update = no_big_map_id in
+            extract_big_map_diff ctxt Optimized tp p
+              ~to_duplicate ~to_update ~temporary:true >>=? fun (p, big_map_diff, ctxt) ->
             unparse_data ctxt Optimized tp p >>=? fun (p, ctxt) ->
             let operation =
               Transaction
                 { amount ; destination ; entrypoint ;
                   parameters = Script.lazy_expr (Micheline.strip_locations p) } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item ((Internal_operation { source = self ; operation ; nonce }, big_map_diff), rest), ctxt)
         | Create_account,
           Item (manager, Item (delegate, Item (_delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -758,7 +765,7 @@ let rec interp
               Origination
                 { credit ; delegate ; preorigination = Some contract ; script } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item (Internal_operation { source = self ; operation ; nonce },
+            logged_return (Item ((Internal_operation { source = self ; operation ; nonce }, None),
                                  Item ((contract, "default"), rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
@@ -782,6 +789,10 @@ let rec interp
                 (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
                            Prim (0, K_storage, [ unparsed_storage_type ], []) ;
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
+            collect_big_maps ctxt storage_type init >>=? fun (to_duplicate, ctxt) ->
+            let to_update = no_big_map_id in
+            extract_big_map_diff ctxt Optimized storage_type init
+              ~to_duplicate ~to_update ~temporary:true >>=? fun (init, big_map_diff, ctxt) ->
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Script.lazy_expr @@ Micheline.strip_locations storage in
             begin
@@ -803,7 +814,7 @@ let rec interp
                   script = { code ; storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
-              (Item (Internal_operation { source = self ; operation ; nonce },
+              (Item ((Internal_operation { source = self ; operation ; nonce }, big_map_diff),
                      Item ((contract, "default"), rest)), ctxt)
         | Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
           (* Removed the instruction's arguments manager, spendable and delegatable *)
@@ -820,6 +831,10 @@ let rec interp
                 (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
                            Prim (0, K_storage, [ unparsed_storage_type ], []) ;
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
+            collect_big_maps ctxt storage_type init >>=? fun (to_duplicate, ctxt) ->
+            let to_update = no_big_map_id in
+            extract_big_map_diff ctxt Optimized storage_type init
+              ~to_duplicate ~to_update ~temporary:true >>=? fun (init, big_map_diff, ctxt) ->
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
@@ -830,14 +845,14 @@ let rec interp
                              storage = Script.lazy_expr storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
-              (Item (Internal_operation { source = self ; operation ; nonce },
+              (Item ((Internal_operation { source = self ; operation ; nonce }, big_map_diff),
                      Item ((contract, "default"), rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             let operation = Delegation delegate in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
-            logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
+            logged_return (Item ((Internal_operation { source = self ; operation ; nonce }, None), rest), ctxt)
         | Balance, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.balance) >>=? fun ctxt ->
             Contract.get_balance ctxt self >>=? fun balance ->
@@ -918,26 +933,35 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log ctxt mode ~source ~payer ~self ~chain_id ~entrypoint script amount arg :
-  (Script.expr * packed_internal_operation list * context *
-   Script_typed_ir.ex_big_map option) tzresult Lwt.t =
-  parse_script ctxt script ~legacy:true
-  >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type ; root_name }), ctxt) ->
+and execute ?log ctxt mode ~source ~payer ~self ~chain_id ~entrypoint unparsed_script amount arg :
+  (Script.expr * packed_internal_operation list * context * Contract.big_map_diff option) tzresult Lwt.t =
+  parse_script ctxt unparsed_script ~legacy:true
+  >>=? fun (Ex_script { code ; arg_type ; storage ; storage_type ; root_name }, ctxt) ->
   trace
     (Bad_contract_parameter self)
     (Lwt.return (find_entrypoint arg_type ~root_name entrypoint)) >>=? fun (box, _) ->
   trace
     (Bad_contract_parameter self)
     (parse_data ctxt ~legacy:false arg_type (box arg))  >>=? fun (arg, ctxt) ->
-  Script.force_decode ctxt script.code >>=? fun (script_code, ctxt) ->
+  Script.force_decode ctxt unparsed_script.code >>=? fun (script_code, ctxt) ->
+  Script_ir_translator.collect_big_maps ctxt arg_type arg >>=? fun (to_duplicate, ctxt) ->
+  Script_ir_translator.collect_big_maps ctxt storage_type storage >>=? fun (to_update, ctxt) ->
   trace
     (Runtime_contract_error (self, script_code))
     (interp ?log ctxt ~source ~payer ~self amount ~chain_id code (arg, storage))
-  >>=? fun ((ops, sto), ctxt) ->
+  >>=? fun ((ops, storage), ctxt) ->
+  Script_ir_translator.extract_big_map_diff ctxt mode
+    ~temporary:false ~to_duplicate ~to_update storage_type storage
+  >>=? fun (storage, big_map_diff, ctxt) ->
   trace Cannot_serialize_storage
-    (unparse_data ctxt mode storage_type sto) >>=? fun (storage, ctxt) ->
-  return (Micheline.strip_locations storage, ops, ctxt,
-          Script_ir_translator.extract_big_map storage_type sto)
+    (unparse_data ctxt mode storage_type storage) >>=? fun (storage, ctxt) ->
+  let ops, op_diffs = List.split ops in
+  let big_map_diff = match
+      List.flatten (List.map (Option.unopt ~default:[]) (op_diffs @ [ big_map_diff ]))
+    with
+    | [] -> None
+    | diff -> Some diff in
+  return (Micheline.strip_locations storage, ops, ctxt, big_map_diff)
 
 type execution_result =
   { ctxt : context ;
@@ -948,23 +972,11 @@ type execution_result =
 let trace ctxt mode ~source ~payer ~chain_id ~self:(self, script) ~entrypoint ~parameter ~amount =
   let log = ref [] in
   execute ~log ctxt mode ~source ~payer ~chain_id ~self ~entrypoint script amount (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, big_map) ->
-  begin match big_map with
-    | None -> return (None, ctxt)
-    | Some big_map ->
-        Script_ir_translator.diff_of_big_map ctxt mode big_map >>=? fun (big_map_diff, ctxt) ->
-        return (Some big_map_diff, ctxt)
-  end >>=? fun (big_map_diff, ctxt) ->
+  >>=? fun (storage, operations, ctxt, big_map_diff) ->
   let trace = List.rev !log in
   return ({ ctxt ; storage ; big_map_diff ; operations }, trace)
 
 let execute ctxt mode ~source ~payer ~chain_id ~self:(self, script) ~entrypoint ~parameter ~amount =
   execute ctxt mode ~source ~payer ~chain_id ~self ~entrypoint script amount (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, big_map) ->
-  begin match big_map with
-    | None -> return (None, ctxt)
-    | Some big_map ->
-        Script_ir_translator.diff_of_big_map ctxt mode big_map >>=? fun (big_map_diff, ctxt) ->
-        return (Some big_map_diff, ctxt)
-  end >>=? fun (big_map_diff, ctxt) ->
+  >>=? fun (storage, operations, ctxt, big_map_diff) ->
   return { ctxt ; storage ; big_map_diff ; operations }

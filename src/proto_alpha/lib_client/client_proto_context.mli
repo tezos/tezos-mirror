@@ -43,8 +43,8 @@ val get_big_map_value:
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Contract.t ->
-  (Script.expr * Script.expr) ->
+  Z.t ->
+  Script.expr ->
   Script.expr option tzresult Lwt.t
 
 val get_script:

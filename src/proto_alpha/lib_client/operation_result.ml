@@ -158,7 +158,7 @@ let pp_manager_operation_contents_and_result ppf
                             storage ;
                             originated_contracts ;
                             storage_size ; paid_storage_size_diff ;
-                            big_map_diff = _ ;
+                            big_map_diff ;
                             allocated_destination_contract = _ }) =
     begin match originated_contracts with
       | [] -> ()
@@ -171,6 +171,12 @@ let pp_manager_operation_contents_and_result ppf
       | Some expr ->
           Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
             Michelson_v1_printer.print_expr expr
+    end ;
+    begin match big_map_diff with
+      | None | Some [] -> ()
+      | Some diff ->
+          Format.fprintf ppf "@,@[<v 2>Updated big_maps:@ %a@]"
+            Michelson_v1_printer.print_big_map_diff diff
     end ;
     begin if storage_size <> Z.zero then
         Format.fprintf ppf
@@ -193,7 +199,7 @@ let pp_manager_operation_contents_and_result ppf
             pp_balance_updates balance_updates
     end in
   let pp_origination_result
-      (Origination_result { balance_updates ; consumed_gas ;
+      (Origination_result { big_map_diff ; balance_updates ; consumed_gas ;
                             originated_contracts ;
                             storage_size ; paid_storage_size_diff }) =
     begin match originated_contracts with
@@ -206,6 +212,12 @@ let pp_manager_operation_contents_and_result ppf
         Format.fprintf ppf
           "@,Storage size: %s bytes"
           (Z.to_string storage_size)
+    end ;
+    begin match big_map_diff with
+      | None | Some [] -> ()
+      | Some diff ->
+          Format.fprintf ppf "@,@[<v 2>Updated big_maps:@ %a@]"
+            Michelson_v1_printer.print_big_map_diff diff
     end ;
     begin if paid_storage_size_diff <> Z.zero then
         Format.fprintf ppf

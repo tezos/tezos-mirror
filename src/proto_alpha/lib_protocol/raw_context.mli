@@ -253,3 +253,12 @@ val init_endorsements:
 (** Marks an endorsment in the map as used. *)
 val record_endorsement:
   context -> Signature.Public_key_hash.t -> context
+
+(** Provide a fresh identifier for a temporary big map (negative index). *)
+val fresh_temporary_big_map: context -> context * Z.t
+
+(** Reset the temporary big_map identifier generator to [-1]. *)
+val reset_temporary_big_map: context -> context
+
+(** Iterate over all created temporary big maps since the last {!reset_temporary_big_map}. *)
+val temporary_big_maps: context -> ('a -> Z.t -> 'a Lwt.t) -> 'a -> 'a Lwt.t

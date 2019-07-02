@@ -36,7 +36,7 @@ module Int32 = struct
 end
 
 module Z = struct
-  type t = Z.t
+  include Z
   let encoding = Data_encoding.z
 end
 
@@ -252,15 +252,146 @@ module Contract = struct
     Make_carbonated_map_expr
       (struct let name = ["storage"] end)
 
-  type bigmap_key = Raw_context.t * Contract_repr.t
+  module Paid_storage_space =
+    Indexed_context.Make_map
+      (struct let name = ["paid_bytes"] end)
+      (Z)
 
-  (* Consume gas for serilization and deserialization of expr in this
-     module *)
-  module Big_map = struct
+  module Used_storage_space =
+    Indexed_context.Make_map
+      (struct let name = ["used_bytes"] end)
+      (Z)
+
+  module Roll_list =
+    Indexed_context.Make_map
+      (struct let name = ["roll_list"] end)
+      (Roll_repr)
+
+  module Change =
+    Indexed_context.Make_map
+      (struct let name = ["change"] end)
+      (Tez_repr)
+
+end
+
+(** Big maps handling *)
+
+module Big_map = struct
+  module Raw_context =
+    Make_subcontext(Registered)(Raw_context)(struct let name = ["big_maps"] end)
+
+  module Next = struct
+    include
+      Make_single_data_storage(Registered)
+        (Raw_context)
+        (struct let name = ["next"] end)
+        (Z)
+    let incr ctxt =
+      get ctxt >>=? fun i ->
+      set ctxt (Z.succ i) >>=? fun ctxt ->
+      return (ctxt, i)
+    let init ctxt = init ctxt Z.zero
+  end
+
+  module Index = struct
+    type t = Z.t
+
+    let rpc_arg =
+      let construct = Z.to_string in
+      let destruct hash =
+        match Z.of_string hash with
+        | exception _ -> Error "Cannot parse big map id"
+        | id -> Ok id in
+      RPC_arg.make
+        ~descr: "A big map identifier"
+        ~name: "big_map_id"
+        ~construct
+        ~destruct
+        ()
+
+    let encoding =
+      Data_encoding.def "big_map_id"
+        ~title:"Big map identifier"
+        ~description: "A big map identifier"
+        Z.encoding
+    let compare = Compare.Z.compare
+
+    let path_length = 7
+
+    let to_path c l =
+      let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+      let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+      String.sub index_key 0 2 ::
+      String.sub index_key 2 2 ::
+      String.sub index_key 4 2 ::
+      String.sub index_key 6 2 ::
+      String.sub index_key 8 2 ::
+      String.sub index_key 10 2 ::
+      Z.to_string c ::
+      l
+
+    let of_path = function
+      | [] | [_] | [_;_] | [_;_;_] | [_;_;_;_] | [_;_;_;_;_] | [_;_;_;_;_;_]
+      | _::_::_::_::_::_::_::_::_ ->
+          None
+      | [ index1 ; index2 ; index3 ; index4 ; index5 ; index6 ; key ] ->
+          let c = Z.of_string key in
+          let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+          let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+          assert Compare.String.(String.sub index_key 0 2 = index1) ;
+          assert Compare.String.(String.sub index_key 2 2 = index2) ;
+          assert Compare.String.(String.sub index_key 4 2 = index3) ;
+          assert Compare.String.(String.sub index_key 6 2 = index4) ;
+          assert Compare.String.(String.sub index_key 8 2 = index5) ;
+          assert Compare.String.(String.sub index_key 10 2 = index6) ;
+          Some c
+  end
+
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["index"] end))
+      (Make_index(Index))
+
+  let rpc_arg = Index.rpc_arg
+
+  let fold = Indexed_context.fold_keys
+  let list = Indexed_context.keys
+
+  let remove_rec ctxt n =
+    Indexed_context.remove_rec ctxt n
+
+  let copy ctxt ~from ~to_ =
+    Indexed_context.copy ctxt ~from ~to_
+
+  type key = Raw_context.t * Z.t
+
+  module Total_bytes =
+    Indexed_context.Make_map
+      (struct let name = ["total_bytes"] end)
+      (Z)
+
+  module Key_type =
+    Indexed_context.Make_map
+      (struct let name = ["key_type"] end)
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+  module Value_type =
+    Indexed_context.Make_map
+      (struct let name = ["value_type"] end)
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+  module Contents = struct
+
     module I = Storage_functors.Make_indexed_carbonated_data_storage
         (Make_subcontext(Registered)
            (Indexed_context.Raw_context)
-           (struct let name = ["big_map"] end))
+           (struct let name = ["contents"] end))
         (Make_index(Script_expr_hash))
         (struct
           type t = Script_repr.expr
@@ -296,26 +427,6 @@ module Contract = struct
           consume_deserialize_gas ctxt value >>|? fun ctxt ->
           (ctxt, value_opt)
   end
-
-  module Paid_storage_space =
-    Indexed_context.Make_map
-      (struct let name = ["paid_bytes"] end)
-      (Z)
-
-  module Used_storage_space =
-    Indexed_context.Make_map
-      (struct let name = ["used_bytes"] end)
-      (Z)
-
-  module Roll_list =
-    Indexed_context.Make_map
-      (struct let name = ["roll_list"] end)
-      (Roll_repr)
-
-  module Change =
-    Indexed_context.Make_map
-      (struct let name = ["change"] end)
-      (Tez_repr)
 
 end
 

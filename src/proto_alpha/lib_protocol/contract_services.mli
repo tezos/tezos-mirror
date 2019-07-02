@@ -68,7 +68,7 @@ val storage_opt:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr option shell_tzresult Lwt.t
 
 val big_map_get_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr * Script.expr ->
+  'a #RPC_context.simple -> 'a -> Z.t -> Script.expr ->
   Script.expr option shell_tzresult Lwt.t
 
 

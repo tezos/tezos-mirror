@@ -96,13 +96,12 @@ module S = struct
 
   let big_map_get =
     RPC_service.post_service
-      ~description: "Access the value associated with a key in the big map storage  of the contract."
+      ~description: "Access the value associated with a key in a big map storage."
       ~query: RPC_query.empty
-      ~input: (obj2
-                 (req "key" Script.expr_encoding)
-                 (req "type" Script.expr_encoding))
+      ~input: (obj1
+                 (req "key" Script.expr_encoding))
       ~output: (option Script.expr_encoding)
-      RPC_path.(custom_root /: Contract.rpc_arg / "big_map_get")
+      RPC_path.(open_root / "context" / "big_maps" /: Big_map.rpc_arg / "big_map_get")
 
   let info =
     RPC_service.get_service
@@ -165,15 +164,30 @@ let register () =
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode ctxt script.storage >>=? fun (storage, _ctxt) ->
           return_some storage) ;
-  register1 S.big_map_get (fun ctxt contract () (key, key_type) ->
+  register1 S.big_map_get (fun ctxt id () key ->
       let open Script_ir_translator in
       let ctxt = Gas.set_unlimited ctxt in
-      Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root key_type))
-      >>=? fun (Ex_ty key_type, ctxt) ->
-      parse_data ctxt ~legacy:true key_type (Micheline.root key) >>=? fun (key, ctxt) ->
-      hash_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
-      Contract.Big_map.get_opt ctxt contract key_hash >>=? fun (_ctxt, value) ->
-      return value) ;
+      Big_map.exists ctxt id >>=? fun (ctxt, types) ->
+      match types with
+      | None -> return_none
+      | Some (key_type, value_type) ->
+          Lwt.return (parse_ty ctxt
+                        ~legacy:true ~allow_big_map:false ~allow_operation:false ~allow_contract:true
+                        (Micheline.root key_type))
+          >>=? fun (Ex_ty key_type, ctxt) ->
+          Lwt.return (parse_ty ctxt
+                        ~legacy:true ~allow_big_map:false ~allow_operation:false ~allow_contract:true
+                        (Micheline.root value_type))
+          >>=? fun (Ex_ty value_type, ctxt) ->
+          parse_data ctxt ~legacy:true key_type (Micheline.root key) >>=? fun (key, ctxt) ->
+          hash_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
+          Big_map.get_opt ctxt id key_hash >>=? fun (_ctxt, value) ->
+          match value with
+          | None -> return_none
+          | Some value ->
+              parse_data ctxt ~legacy:true value_type (Micheline.root value) >>=? fun (value, ctxt) ->
+              unparse_data ctxt Readable value_type value >>=? fun (value, _ctxt) ->
+              return_some (Micheline.strip_locations value)) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.get ctxt contract >>=? fun delegate ->

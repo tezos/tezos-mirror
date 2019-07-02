@@ -294,9 +294,14 @@ let init ctxt block_header =
   let fitness = block_header.fitness in
   let timestamp = block_header.timestamp in
   let typecheck (ctxt:Alpha_context.context) (script:Alpha_context.Script.t) =
-    Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
-    Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
-    return ((script, big_map_diff), ctxt)
+    Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (Ex_script parsed_script, ctxt) ->
+    Script_ir_translator.extract_big_map_diff ctxt Optimized parsed_script.storage_type parsed_script.storage
+      ~to_duplicate: Script_ir_translator.no_big_map_id
+      ~to_update: Script_ir_translator.no_big_map_id
+      ~temporary:false >>=? fun (storage, big_map_diff, ctxt) ->
+    Script_ir_translator.unparse_data ctxt Optimized parsed_script.storage_type storage >>=? fun (storage, ctxt) ->
+    let storage = Alpha_context.Script.lazy_expr (Micheline.strip_locations storage) in
+    return (({ script with storage }, big_map_diff), ctxt)
   in
   Alpha_context.prepare_first_block
     ~typecheck

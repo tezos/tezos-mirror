@@ -45,6 +45,7 @@ type t = {
   storage_space_to_pay: Z.t option ;
   allocated_contracts: int option ;
   origination_nonce: Contract_repr.origination_nonce option ;
+  temporary_big_map: Z.t ;
   internal_nonce: int ;
   internal_nonces_used: Int_set.t ;
 }
@@ -485,6 +486,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     allocated_contracts = None ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     origination_nonce = None ;
+    temporary_big_map = Z.sub Z.zero Z.one ;
     internal_nonce = 0 ;
     internal_nonces_used = Int_set.empty ;
   }
@@ -686,3 +688,19 @@ let project x = x
 let absolute_key _ k = k
 
 let description = Storage_description.create ()
+
+let fresh_temporary_big_map ctxt =
+  { ctxt with temporary_big_map = Z.sub ctxt.temporary_big_map Z.one },
+  ctxt.temporary_big_map
+
+let reset_temporary_big_map ctxt =
+  { ctxt with temporary_big_map = Z.sub Z.zero Z.one }
+
+let temporary_big_maps ctxt f acc =
+  let rec iter acc id =
+    if Z.equal id ctxt.temporary_big_map then
+      Lwt.return acc
+    else
+      f acc id >>= fun acc ->
+      iter acc (Z.sub id Z.one) in
+  iter acc (Z.sub Z.zero Z.one)
