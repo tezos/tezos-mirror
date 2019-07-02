@@ -146,6 +146,7 @@ module Gas : sig
   type error += Gas_limit_too_high (* `Permanent *)
 
   val free : cost
+  val atomic_step_cost : int -> cost
   val step_cost : int -> cost
   val alloc_cost : int -> cost
   val alloc_bytes_cost : int -> cost

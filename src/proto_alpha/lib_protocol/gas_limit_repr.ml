@@ -160,7 +160,7 @@ let alloc_bits_cost n =
 
 let atomic_step_cost n =
   { allocations = Z.zero ;
-    steps = Z.of_int n ;
+    steps = Z.of_int (2 * n) ;
     reads = Z.zero ;
     writes = Z.zero ;
     bytes_read = Z.zero ;

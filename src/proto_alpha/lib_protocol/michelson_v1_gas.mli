@@ -40,7 +40,9 @@ module Cost_of : sig
   module Interpreter : sig
     val cycle : Gas.cost
     val loop_cycle : Gas.cost
-    val list_size : Gas.cost
+    val loop_size : Gas.cost
+    val loop_iter : Gas.cost
+    val loop_map : Gas.cost
     val nop : Gas.cost
     val stack_op : Gas.cost
     val stack_n_op : int -> Gas.cost
@@ -54,19 +56,11 @@ module Cost_of : sig
     val concat_string : string list -> Gas.cost
     val concat_bytes : MBytes.t list -> Gas.cost
     val slice_string : int -> Gas.cost
-    val slice_bytes : Gas.cost
-    val map_mem :
-      'a -> ('b, 'c) Script_typed_ir.map -> Gas.cost
-    val map_to_list :
-      ('b, 'c) Script_typed_ir.map -> Gas.cost
-    val map_get :
-      'a -> ('b, 'c) Script_typed_ir.map -> Gas.cost
-    val map_update :
-      'a -> 'b -> ('c, 'd) Script_typed_ir.map -> Gas.cost
+    val map_mem :  'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val map_get : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
+    val map_update : 'a -> 'b option -> ('a, 'b) Script_typed_ir.map -> Gas.cost
     val map_size : Gas.cost
-    val big_map_mem : 'key -> ('key, 'value) Script_typed_ir.big_map -> Gas.cost
-    val big_map_get : 'key -> ('key, 'value) Script_typed_ir.big_map -> Gas.cost
-    val big_map_update : 'key -> 'value option -> ('key, 'value) Script_typed_ir.big_map -> Gas.cost
     val set_to_list : 'a Script_typed_ir.set -> Gas.cost
     val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
     val set_mem : 'a -> 'a Script_typed_ir.set -> Gas.cost
@@ -86,7 +80,6 @@ module Cost_of : sig
     val int64_op : Gas.cost
     val z_to_int64 : Gas.cost
     val int64_to_z : Gas.cost
-    val bitwise_binop : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
     val logor : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
     val logand : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
     val logxor : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
@@ -106,9 +99,11 @@ module Cost_of : sig
     val set_delegate : Gas.cost
     val balance : Gas.cost
     val now : Gas.cost
-    val check_signature : Gas.cost
+    val check_signature : public_key -> MBytes.t -> Gas.cost
     val hash_key : Gas.cost
-    val hash : MBytes.t -> int -> Gas.cost
+    val hash_blake2b : MBytes.t -> Gas.cost
+    val hash_sha256 : MBytes.t -> Gas.cost
+    val hash_sha512 : MBytes.t -> Gas.cost
     val steps_to_quota : Gas.cost
     val source : Gas.cost
     val self : Gas.cost
