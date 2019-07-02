@@ -225,6 +225,7 @@ module Script : sig
     | I_DROP
     | I_DUP
     | I_EDIV
+    | I_EMPTY_BIG_MAP
     | I_EMPTY_MAP
     | I_EMPTY_SET
     | I_EQ
@@ -571,6 +572,17 @@ module Seed : sig
 
 end
 
+module Big_map: sig
+  type id = Z.t
+  val fresh : context -> (context * id) tzresult Lwt.t
+  val fresh_temporary : context -> context * id
+  val mem : context -> id -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
+  val get_opt : context -> id -> Script_expr_hash.t -> (context * Script.expr option) tzresult Lwt.t
+  val rpc_arg : id RPC_arg.t
+  val cleanup_temporary : context -> context Lwt.t
+  val exists : context -> id -> (context * (Script.expr * Script.expr) option) tzresult Lwt.t
+end
+
 module Contract : sig
 
   include BASIC_DATA
@@ -615,11 +627,20 @@ module Contract : sig
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff_item = {
-    diff_key : Script_repr.expr;
-    diff_key_hash : Script_expr_hash.t;
-    diff_value : Script_repr.expr option;
-  }
+  type big_map_diff_item =
+  | Update of {
+      big_map : Big_map.id ;
+      diff_key : Script.expr;
+      diff_key_hash : Script_expr_hash.t;
+      diff_value : Script.expr option;
+    }
+  | Clear of Big_map.id
+  | Copy of Big_map.id * Big_map.id
+  | Alloc of {
+      big_map : Big_map.id;
+      key_type : Script.expr;
+      value_type : Script.expr;
+    }
   type big_map_diff = big_map_diff_item list
   val big_map_diff_encoding : big_map_diff Data_encoding.t
 
@@ -650,13 +671,6 @@ module Contract : sig
 
   val check_counter_increment:
     context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
-
-  module Big_map : sig
-    val mem:
-      context -> contract -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
-    val get_opt:
-      context -> contract -> Script_expr_hash.t -> (context * Script_repr.expr option) tzresult Lwt.t
-  end
 
   (**/**)
   (* Only for testing *)

@@ -75,9 +75,11 @@ val list_entrypoints:
 val storage_opt:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr option shell_tzresult Lwt.t
 
-val big_map_get_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr * Script.expr ->
-  Script.expr option shell_tzresult Lwt.t
+val big_map_get:
+  'a #RPC_context.simple -> 'a -> Z.t -> Script_expr_hash.t ->
+  Script.expr shell_tzresult Lwt.t
 
+val contract_big_map_get_opt:
+  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr * Script.expr -> Script.expr option shell_tzresult Lwt.t
 
 val register: unit -> unit

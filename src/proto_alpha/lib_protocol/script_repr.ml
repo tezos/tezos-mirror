@@ -208,3 +208,12 @@ let is_unit_parameter =
     ~fun_value:(fun v -> match Micheline.root v with Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true | _ -> false)
     ~fun_bytes:(fun b -> MBytes.(=) b unit_bytes)
     ~fun_combine:(fun res _ -> res)
+
+let rec strip_annotations node =
+  let open Micheline in
+  match node with
+  | Int (_, _) | String (_, _) | Bytes (_, _) as leaf -> leaf
+  | Prim (loc, name, args, _) ->
+      Prim (loc, name, List.map strip_annotations args, [])
+  | Seq (loc, args) ->
+      Seq (loc, List.map strip_annotations args)

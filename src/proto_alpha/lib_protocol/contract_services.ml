@@ -28,6 +28,9 @@ open Alpha_context
 let custom_root =
   (RPC_path.(open_root / "context" / "contracts") : RPC_context.t RPC_path.context)
 
+let big_map_root =
+  (RPC_path.(open_root / "context" / "big_maps") : RPC_context.t RPC_path.context)
+
 type info = {
   balance: Tez.t ;
   delegate: public_key_hash option ;
@@ -115,15 +118,22 @@ module S = struct
                      (assoc Script.expr_encoding)))
       RPC_path.(custom_root /: Contract.rpc_arg / "entrypoints")
 
+  let contract_big_map_get_opt =
+     RPC_service.post_service
+       ~description: "Access the value associated with a key in a big map of the contract (deprecated)."
+       ~query: RPC_query.empty
+       ~input: (obj2
+                  (req "key" Script.expr_encoding)
+                  (req "type" Script.expr_encoding))
+       ~output: (option Script.expr_encoding)
+       RPC_path.(custom_root /: Contract.rpc_arg / "big_map_get")
+
   let big_map_get =
-    RPC_service.post_service
-      ~description: "Access the value associated with a key in the big map storage  of the contract."
+    RPC_service.get_service
+      ~description: "Access the value associated with a key in a big map."
       ~query: RPC_query.empty
-      ~input: (obj2
-                 (req "key" Script.expr_encoding)
-                 (req "type" Script.expr_encoding))
-      ~output: (option Script.expr_encoding)
-      RPC_path.(custom_root /: Contract.rpc_arg / "big_map_get")
+      ~output: Script.expr_encoding
+      RPC_path.(big_map_root /: Big_map.rpc_arg /: Script_expr_hash.rpc_arg)
 
   let info =
     RPC_service.get_service
@@ -158,6 +168,24 @@ let register () =
          f ctxt a1 >>=? function
          | None -> raise Not_found
          | Some v -> return v) in
+  let do_big_map_get ctxt id key =
+    let open Script_ir_translator in
+    let ctxt = Gas.set_unlimited ctxt in
+    Big_map.exists ctxt id >>=? fun (ctxt, types) ->
+    match types with
+    | None -> raise Not_found
+    | Some (_, value_type) ->
+        Lwt.return (parse_ty ctxt
+                      ~legacy:true ~allow_big_map:false ~allow_operation:false ~allow_contract:true
+                      (Micheline.root value_type))
+        >>=? fun (Ex_ty value_type, ctxt) ->
+        Big_map.get_opt ctxt id key >>=? fun (_ctxt, value) ->
+        match value with
+        | None -> raise Not_found
+        | Some value ->
+            parse_data ctxt ~legacy:true value_type (Micheline.root value) >>=? fun (value, ctxt) ->
+            unparse_data ctxt Readable value_type value >>=? fun (value, _ctxt) ->
+            return (Micheline.strip_locations value) in
   register_field S.balance Contract.get_balance ;
   register1 S.manager_key
     (fun ctxt contract () () ->
@@ -232,15 +260,25 @@ let register () =
                  (entry , Micheline.strip_locations ty) ::acc end
                map [])
     ) ;
-  register1 S.big_map_get (fun ctxt contract () (key, key_type) ->
-      let open Script_ir_translator in
-      let ctxt = Gas.set_unlimited ctxt in
-      Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root key_type))
-      >>=? fun (Ex_ty key_type, ctxt) ->
-      parse_data ctxt ~legacy:true key_type (Micheline.root key) >>=? fun (key, ctxt) ->
-      hash_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
-      Contract.Big_map.get_opt ctxt contract key_hash >>=? fun (_ctxt, value) ->
-      return value) ;
+  register1 S.contract_big_map_get_opt (fun ctxt contract () (key, key_type) ->
+      Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+      Lwt.return (Script_ir_translator.parse_packable_ty ctxt ~legacy:true (Micheline.root key_type)) >>=? fun (Ex_ty key_type, ctxt) ->
+      Script_ir_translator.parse_data ctxt ~legacy:true key_type (Micheline.root key) >>=? fun (key, ctxt) ->
+      Script_ir_translator.hash_data ctxt key_type key >>=? fun (key, ctxt) ->
+      match script with
+      | None -> raise Not_found
+      | Some script ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let open Script_ir_translator in
+          parse_script ctxt ~legacy:true script >>=? fun (Ex_script script, ctxt) ->
+          Script_ir_translator.collect_big_maps ctxt script.storage_type script.storage >>=? fun (ids, _ctxt) ->
+          let ids = Script_ir_translator.list_of_big_map_ids ids in
+          let rec find = function
+            | [] -> return_none
+            | (id : Z.t) :: ids -> try do_big_map_get ctxt id key >>=? return_some with Not_found -> find ids in
+          find ids) ;
+  register2 S.big_map_get (fun ctxt id key () () ->
+      do_big_map_get ctxt id key) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.get ctxt contract >>=? fun delegate ->
@@ -301,5 +339,8 @@ let list_entrypoints ctxt block contract =
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()
 
-let big_map_get_opt ctxt block contract key =
-  RPC_context.make_call1 S.big_map_get ctxt block contract () key
+let big_map_get ctxt block id key =
+  RPC_context.make_call2 S.big_map_get ctxt block id key () ()
+
+let contract_big_map_get_opt ctxt block contract key =
+  RPC_context.make_call1 S.contract_big_map_get_opt ctxt block contract () key

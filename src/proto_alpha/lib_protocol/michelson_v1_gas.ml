@@ -357,6 +357,7 @@ module Cost_of = struct
         | Map_get -> alloc_cost 1
         | Map_update -> alloc_cost 1
         | Map_size -> alloc_cost 1
+        | Empty_big_map _ -> alloc_cost 2
         | Big_map_mem -> alloc_cost 1
         | Big_map_get -> alloc_cost 1
         | Big_map_update -> alloc_cost 1

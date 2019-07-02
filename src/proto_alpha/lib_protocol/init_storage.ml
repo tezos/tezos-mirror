@@ -27,6 +27,7 @@
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
     ~level ~timestamp ~fitness ctxt >>=? fun (previous_protocol, ctxt) ->
+  Storage.Big_map.Next.init ctxt >>=? fun ctxt ->
   match previous_protocol with
   | Genesis param ->
       Commitment_storage.init ctxt param.commitments >>=? fun ctxt ->

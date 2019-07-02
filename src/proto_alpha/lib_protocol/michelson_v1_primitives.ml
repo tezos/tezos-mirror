@@ -66,6 +66,7 @@ type prim =
   | I_DROP
   | I_DUP
   | I_EDIV
+  | I_EMPTY_BIG_MAP
   | I_EMPTY_MAP
   | I_EMPTY_SET
   | I_EQ
@@ -203,6 +204,7 @@ let string_of_prim = function
   | I_DROP -> "DROP"
   | I_DUP -> "DUP"
   | I_EDIV -> "EDIV"
+  | I_EMPTY_BIG_MAP -> "EMPTY_BIG_MAP"
   | I_EMPTY_MAP -> "EMPTY_MAP"
   | I_EMPTY_SET -> "EMPTY_SET"
   | I_EQ -> "EQ"
@@ -321,6 +323,7 @@ let prim_of_string = function
   | "DROP" -> ok I_DROP
   | "DUP" -> ok I_DUP
   | "EDIV" -> ok I_EDIV
+  | "EMPTY_BIG_MAP" -> ok I_EMPTY_BIG_MAP
   | "EMPTY_MAP" -> ok I_EMPTY_MAP
   | "EMPTY_SET" -> ok I_EMPTY_SET
   | "EQ" -> ok I_EQ
@@ -576,6 +579,7 @@ let prim_encoding =
     (* Alpha_005 addition *)
     ("DIG", I_DIG) ;
     ("DUG", I_DUG) ;
+    ("EMPTY_BIG_MAP", I_EMPTY_BIG_MAP) ;
     ("chain_id", T_chain_id) ;
     ("CHAIN_ID", I_CHAIN_ID)
     (* New instructions must be added here, for backward compatibility of the encoding. *)

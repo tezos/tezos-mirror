@@ -170,8 +170,9 @@ let () =
     ~id:"michelson_v1.unexpected_bigmap"
     ~title: "Big map in unauthorized position (type error)"
     ~description:
-      "When parsing script, a big_map type was found somewhere else \
-       than in the left component of the toplevel storage pair."
+      "When parsing script, a big_map type was found in a position \
+       where it could end up stored inside a big_map, which is \
+       forbidden for now."
     (obj1
        (req "loc" location_encoding))
     (function Unexpected_big_map loc -> Some loc | _ -> None)
@@ -541,6 +542,21 @@ let () =
       | _ -> None)
     (fun (loc, c) ->
        Invalid_contract (loc, c)) ;
+  (* Invalid big_map *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.invalid_big_map"
+    ~title: "Invalid big_map"
+    ~description:
+      "A script or data expression references a big_map that does not \
+       exist or assumes a wrong type for an existing big_map."
+    (located (obj1 (req "big_map" z)))
+    (function
+      | Invalid_big_map (loc, c) ->
+          Some (loc, c)
+      | _ -> None)
+    (fun (loc, c) ->
+       Invalid_big_map (loc, c)) ;
   (* Comparable type expected *)
   register_error_kind
     `Permanent
