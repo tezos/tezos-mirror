@@ -25,6 +25,10 @@
 
 open Storage_sigs
 
+module type REGISTER = sig val ghost : bool end
+module Registered = struct let ghost = false end
+module Ghost = struct let ghost = true end
+
 module Make_encoder (V : VALUE) = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes V.encoding b with
@@ -54,7 +58,7 @@ let map_key f = function
   | `Key k -> `Key (f k)
   | `Dir k -> `Dir (f k)
 
-module Make_subcontext (C : Raw_context.T) (N : NAME)
+module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME)
   : Raw_context.T with type t = C.t = struct
   type t = C.t
   type context = t
@@ -84,10 +88,12 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let consume_gas = C.consume_gas
   let check_enough_gas = C.check_enough_gas
   let description =
-    Storage_description.register_named_subcontext C.description N.name
+    let description = if R.ghost then Storage_description.create ()
+      else C.description in
+    Storage_description.register_named_subcontext description N.name
 end
 
-module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
+module Make_single_data_storage (R : REGISTER) (C : Raw_context.T) (N : NAME) (V : VALUE)
   : Single_data_storage with type t = C.t
                          and type value = V.t = struct
   type t = C.t
@@ -129,9 +135,11 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
 
   let () =
     let open Storage_description in
+    let description = if R.ghost then Storage_description.create ()
+      else C.description in
     register_value
       ~get:get_option
-      (register_named_subcontext C.description N.name)
+      (register_named_subcontext description N.name)
       V.encoding
 
 end
@@ -455,8 +463,8 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
   let data_name = ["current"]
   let snapshot_name = ["snapshot"]
 
-  module C_data = Make_subcontext(C)(struct let name = data_name end)
-  module C_snapshot = Make_subcontext(C)(struct let name = snapshot_name end)
+  module C_data = Make_subcontext(Registered)(C)(struct let name = data_name end)
+  module C_snapshot = Make_subcontext(Registered)(C)(struct let name = snapshot_name end)
 
   include Make_indexed_data_storage(C_data)(I) (V)
   module Snapshot = Make_indexed_data_storage(C_snapshot)(Pair(Snapshot_index)(I))(V)
