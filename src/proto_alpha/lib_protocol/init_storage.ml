@@ -216,6 +216,107 @@ let process_contract contract ctxt =
   process_contract_add_manager contract ctxt >>=? fun ctxt ->
   return ctxt
 
+(* Extract Big_maps from their parent contract directory,
+   recompute their used space, and assign them an ID. *)
+let migrate_contract_big_map ctxt contract =
+  Storage.Contract.Code.get_option ctxt contract >>=? function
+  | ctxt, None -> return ctxt
+  | ctxt, Some code ->
+      Storage.Contract.Storage.get ctxt contract >>=? fun (ctxt, storage) ->
+      let extract_big_map_types expr =
+        let open Michelson_v1_primitives in
+        let open Micheline in
+        match Micheline.root expr with
+        | Seq (_, [ Prim (_, K_storage, [ expr ], _) ; _ ; _ ])
+        | Seq (_, [ _ ; Prim (_, K_storage, [ expr ], _) ; _ ])
+        | Seq (_, [ _ ; _ ; Prim (_, K_storage, [ expr ], _) ]) ->
+            begin match expr with
+              | Prim (_, T_pair, [ Prim (_, T_big_map, [ kt ; vt ], _ ) ; _ ], _) -> Some (kt, vt)
+              | _ -> None
+            end
+        | _ -> None in
+      let rewrite_big_map expr id =
+        let open Michelson_v1_primitives in
+        let open Micheline in
+        match Micheline.root expr with
+        | Prim (_, D_Pair, [ Seq (_, _ (* ignore_unused_origination_literal *)) ; pannot ], sannot) ->
+            Micheline.strip_locations (Prim (0, D_Pair, [ Int (0, id) ; pannot ], sannot))
+        | _ -> assert false in
+      Lwt.return (Script_repr.force_decode code) >>=? fun (code, _) ->
+      match extract_big_map_types code with
+      | None -> return ctxt
+      | Some (kt, vt) ->
+          Lwt.return (Script_repr.force_decode storage) >>=? fun (storage, _) ->
+          Storage.Big_map.Next.incr ctxt >>=? fun (ctxt, id) ->
+          let contract_path suffix =
+            "contracts" :: (* module Contract *)
+            "index" :: (* module Indexed_context *)
+            Contract_repr.Index.to_path contract suffix in
+          let old_path = contract_path [ "big_map" ] in
+          let storage = rewrite_big_map storage id in
+          Storage.Contract.Storage.set ctxt contract (Script_repr.lazy_expr storage) >>=? fun (ctxt, _) ->
+          let kt = Micheline.strip_locations (Script_repr.strip_annotations kt) in
+          let vt = Micheline.strip_locations (Script_repr.strip_annotations vt) in
+          Storage.Big_map.Key_type.init ctxt id kt >>=? fun ctxt ->
+          Storage.Big_map.Value_type.init ctxt id vt >>=? fun ctxt ->
+          Raw_context.dir_mem ctxt old_path >>= fun exists ->
+          if exists then
+            let read_size ctxt key =
+              Raw_context.get ctxt key >>=? fun len ->
+              match Data_encoding.(Binary.of_bytes int31) len with
+              | None -> assert false
+              | Some len -> return len in
+            let iter_sizes f (ctxt, acc) =
+              let rec dig i path (ctxt, acc) =
+                if Compare.Int.(i <= 0) then
+                  Raw_context.fold ctxt path ~init:(ok (ctxt, acc)) ~f:begin fun k acc ->
+                    Lwt.return acc >>=? fun (ctxt, acc) ->
+                    match k with
+                    | `Dir _ -> return (ctxt, acc)
+                    | `Key file ->
+                        match List.rev file with
+                        | last :: _ when Compare.String.(last = "data") ->
+                            return (ctxt, acc)
+                        | last :: _ when Compare.String.(last = "len") ->
+                            read_size ctxt file >>=? fun len ->
+                            return (ctxt, f len acc)
+                        | _ -> assert false
+                  end
+                else
+                  Raw_context.fold ctxt path ~init:(ok (ctxt, acc)) ~f:begin fun k acc ->
+                    Lwt.return acc >>=? fun (ctxt, acc) ->
+                    match k with
+                    | `Dir k -> dig (i-1) k (ctxt, acc)
+                    | `Key _ -> return (ctxt, acc)
+                  end in
+              dig Script_expr_hash.path_length old_path (ctxt, acc) in
+            iter_sizes
+              (fun s acc -> (acc |> Z.add (Z.of_int s) |> Z.add (Z.of_int 65)))
+              (ctxt, (Z.of_int 0)) >>=? fun (ctxt, total_bytes) ->
+            Storage.Big_map.Total_bytes.init ctxt id total_bytes >>=? fun ctxt ->
+            let new_path = "big_maps" :: (* module Big_map *)
+                           "index" :: (* module Indexed_context *)
+                           Storage.Big_map.Index.to_path id [
+                             "contents" ; (* module Delegated *)
+                           ] in
+            Raw_context.copy ctxt old_path new_path >>=? fun ctxt ->
+            Raw_context.remove_rec ctxt old_path >>= fun ctxt ->
+            read_size ctxt (contract_path [ "len" ; "code" ]) >>=? fun code_size ->
+            read_size ctxt (contract_path [ "len" ; "storage" ]) >>=? fun storage_size ->
+            let total_bytes =
+              total_bytes |>
+              Z.add (Z.of_int 33) |>
+              Z.add (Z.of_int code_size) |>
+              Z.add (Z.of_int storage_size) in
+            Storage.Contract.Used_storage_space.get ctxt contract >>=? fun previous_size ->
+            Storage.Contract.Paid_storage_space.get ctxt contract >>=? fun paid_bytes ->
+            let change = Z.sub paid_bytes previous_size in
+            Storage.Contract.Used_storage_space.set ctxt contract total_bytes >>=? fun ctxt ->
+            Storage.Contract.Paid_storage_space.set ctxt contract (Z.add total_bytes change)
+          else
+            Storage.Big_map.Total_bytes.init ctxt id Z.zero >>=? fun ctxt ->
+            return ctxt
+
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
     ~level ~timestamp ~fitness ctxt >>=? fun (previous_protocol, ctxt) ->
@@ -247,6 +348,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~f:(fun contract ctxt ->
             Lwt.return ctxt >>=? fun ctxt ->
             migrate_delegated ctxt contract >>=? fun ctxt ->
+            migrate_contract_big_map ctxt contract >>=? fun ctxt ->
             process_contract contract ctxt)
       >>=? fun ctxt ->
       return ctxt

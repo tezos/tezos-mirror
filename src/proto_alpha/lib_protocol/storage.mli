@@ -260,6 +260,8 @@ module Big_map : sig
 
   val rpc_arg : Z.t RPC_arg.t
 
+  module Index : Storage_description.INDEX with type t = Z.t
+
   module Contents : Non_iterable_indexed_carbonated_data_storage
     with type key = Script_expr_hash.t
      and type value = Script_repr.expr
