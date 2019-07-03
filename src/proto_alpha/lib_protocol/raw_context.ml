@@ -539,6 +539,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             test_chain_duration = c.test_chain_duration ;
             quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
             quorum_max = 70_00l ;
+            min_proposal_quorum = 5_00l ;
             initial_endorsers = 24 ;
             delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
           } in
