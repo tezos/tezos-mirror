@@ -4,10 +4,10 @@ Personal problem:
 * Lost or compromised key
 * Fundraiser issues
 * Questions about how to use Tezos
-* Feature requests
 * Questions about the state of development
 
-These sorts of questions should be asked on the [riot chat](https://riot.im/app/#/room/#tezos:matrix.org). People there will be happy to assist you.
+These sorts of questions should be asked, and may have already been answered, on the Tezos stack exchange: https://tezos.stackexchange.com
+More information about the Tezos community can be found on the Tezos developer documentation: https://tezos.gitlab.io
 
 Bugs:
 * Crashes or exceptions in the node
@@ -15,7 +15,17 @@ Bugs:
 * Missing documentation
 * Build failures
 
-Make sure to give your issue a descriptive title. We should get the general idea of the problem just from reading the title. Avoid words like "weird", "strange", and "unexpected". Instead, spell out the strange behavior in as much detail as possible. As an example, "Michelson: lists are reversed" is significantly better than "List handling is weird". Unless your investigations have revealed the source of the bug, do not speculate on its cause or severity. The easier it is for us to understand your bug the easier it is for us to fix.
+Make sure to give your issue a descriptive title. 
+We should get the general idea of the problem just from reading the title. 
+Avoid words like "weird", "strange", and "unexpected".
+Instead, spell out the strange behavior in as much detail as possible. 
+As an example, "Michelson: lists are reversed" is significantly better than "List handling is weird".
+
+Unless your investigations have revealed the source of the bug, do not speculate on its cause or severity.
+The easier it is for us to understand your bug, the easier it is for us to fix.
+
+If you have found a potential vulnerability in the Tezos codebase and you think it should not be made public, 
+use the Tezos Bug Bounty program: https://tezos.com/bug-bounty
 
 ### Environment (Alphanet, build from source, or both)
 
@@ -29,8 +39,13 @@ If you're running the alphanet, the status output is extremely useful:
 
 `./alphanet.sh status`
 
+### Summary
+
+Summarize the bug encountered concisely.
+
 ### Expected behavior
-What you expected to happen. 
+
+What you expected to happen.
 
 ### Actual behavior
 
@@ -38,19 +53,26 @@ What actually happened.
 
 ### Steps to reproduce
 
-Please provide the command that led to the issue. Copy and paste the command line and the output into the issue and attach any files we'll need to reproduce the bug. Screenshots are much harder to deal with because we cannot rerun your commands or see the entire setup.
+Copy and paste the command line and the output into the issue and attach any files we'll need to reproduce the bug.
+Screenshots are much harder to deal with because we cannot rerun your commands or see the entire setup.
 
-Whenever possible, provide the smallest amount of code needed to produce the bug dependably. If you cannot reproduce the bug, we likely will not be able to either.
+Whenever possible, provide the smallest amount of code needed to produce the bug dependably.
+If you cannot reproduce the bug, we likely will not be able to either.
 
-If you had a problem while trying to build Tezos from source, please include the output of `opam list -i` and any error messages that you saw while building. If you ran a second command which fixed the problem, provide us with the error you saw initially in addition to telling us how you fixed the bug.
+If you had a problem while trying to build Tezos from source, please include the output of `opam list -i` and any error messages that you saw while building. 
+If you ran a second command which fixed the problem, provide us with the error you saw initially in addition to telling us how you fixed the bug.
 
 ### Logs
-Please include logs with your bug report whenever possible.
 
+Please include logs with your bug report whenever possible.
 
 On the alphanet, you can access the log from the node, baker, and endorser using the following commands:
 * `./alphanet.sh node log`
 * `./alphanet.sh baker log`
 * `./alphanet.sh endorser log`
 
-If you've encountered the bug when using the sandboxed node initialization scripts, there should be a file in the directory called `LOG.N`, where `N` is the number with which you started the node. Please attach that log to the bug report.
+If you've encountered the bug when using the sandboxed node initialization scripts, there should be a file in the directory called `LOG.N`, where `N` is the number with which you started the node. 
+Please attach that log to the bug report.
+
+
+Thank you for reporting this issue.
