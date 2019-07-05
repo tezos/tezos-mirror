@@ -101,26 +101,26 @@ let gen_access_annot
         Some (`Var_annot (String.concat "." [v; f]))
 
 let merge_type_annot
-  : type_annot option -> type_annot option -> type_annot option tzresult
-  = fun annot1 annot2 ->
+  : legacy: bool -> type_annot option -> type_annot option -> type_annot option tzresult
+  = fun ~legacy annot1 annot2 ->
     match annot1, annot2 with
     | None, None
     | Some _, None
     | None, Some _ -> ok None
     | Some `Type_annot a1, Some `Type_annot a2 ->
-        if String.equal a1 a2
+        if legacy || String.equal a1 a2
         then ok annot1
         else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
 
 let merge_field_annot
-  : field_annot option -> field_annot option -> field_annot option tzresult
-  = fun annot1 annot2 ->
+  : legacy: bool -> field_annot option -> field_annot option -> field_annot option tzresult
+  = fun ~legacy annot1 annot2 ->
     match annot1, annot2 with
     | None, None
     | Some _, None
     | None, Some _ -> ok None
     | Some `Field_annot a1, Some `Field_annot a2 ->
-        if String.equal a1 a2
+        if legacy || String.equal a1 a2
         then ok annot1
         else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
 
@@ -256,26 +256,6 @@ let parse_composed_type_annot
     get_one_annot loc types >>? fun t ->
     get_two_annot loc fields >|? fun (f1, f2) ->
     (t, f1, f2)
-
-let check_const_type_annot
-  : int -> string list -> type_annot option -> field_annot option list -> unit tzresult Lwt.t
-  = fun loc annot expected_name expected_fields ->
-    Lwt.return
-      (parse_composed_type_annot loc annot >>? fun (ty_name, field1, field2) ->
-       merge_type_annot expected_name ty_name >>? fun _ ->
-       match expected_fields, field1, field2 with
-       | [], Some _, _ | [], _, Some _ | [_], Some _, Some _ ->
-           (* Too many annotations *)
-           error (Unexpected_annotation loc)
-       | _ :: _ :: _ :: _, _, _ | [_], None, Some _ ->
-           error (Unexpected_annotation loc)
-       | [], None, None -> ok ()
-       | [ f1; f2 ], _,  _ ->
-           merge_field_annot f1 field1 >>? fun _ ->
-           merge_field_annot f2 field2 >|? fun _ -> ()
-       | [ f1 ], _,  None ->
-           merge_field_annot f1 field1 >|? fun _ -> ()
-      )
 
 let parse_field_annot
   : int -> string list -> field_annot option tzresult

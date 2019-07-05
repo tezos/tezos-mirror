@@ -737,7 +737,8 @@ let rec interp
             Lwt.return (Gas.consume ctxt Interp_costs.contract) >>=? fun ctxt ->
             begin match contract, entrypoint with
               | (contract, "default"), entrypoint | (contract, entrypoint), "default" ->
-                  Script_ir_translator.parse_contract_for_script ctxt loc t contract ~entrypoint >>=? fun (ctxt, maybe_contract) ->
+                  Script_ir_translator.parse_contract_for_script
+                    ~legacy:false ctxt loc t contract ~entrypoint >>=? fun (ctxt, maybe_contract) ->
                   logged_return (Item (maybe_contract, rest), ctxt)
               | _ -> logged_return (Item (None, rest), ctxt)
             end
