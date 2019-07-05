@@ -121,12 +121,12 @@ val unparse_script :
   ('a, 'b) Script_typed_ir.script -> (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
-  context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
+  legacy: bool -> context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
   entrypoint: string ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
 val parse_contract_for_script :
-  context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
+  legacy: bool -> context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
   entrypoint: string ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 

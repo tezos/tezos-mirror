@@ -79,15 +79,15 @@ val gen_access_annot :
 
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
-    and different *)
+    and different, unless [legacy] *)
 val merge_type_annot :
-  type_annot option -> type_annot option -> type_annot option tzresult
+  legacy: bool -> type_annot option -> type_annot option -> type_annot option tzresult
 
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
-    and different *)
+    and different, unless [legacy] *)
 val merge_field_annot :
-  field_annot option -> field_annot option -> field_annot option tzresult
+  legacy: bool -> field_annot option -> field_annot option -> field_annot option tzresult
 
 (** Merge variable annotations, does not fail ([None] if different). *)
 val merge_var_annot :
@@ -116,11 +116,6 @@ val parse_type_field_annot :
 val parse_composed_type_annot :
   int -> string list ->
   (type_annot option * field_annot option * field_annot option) tzresult
-
-(** Check that type annotations on constants are consistent *)
-val check_const_type_annot :
-  int -> string list -> type_annot option -> field_annot option list ->
-  unit tzresult Lwt.t
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :
