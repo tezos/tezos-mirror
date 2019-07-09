@@ -144,8 +144,8 @@ type gen_state = { mutable possible_transfers : (Account.t * Account.t) list ;
 let get_n_endorsements ctxt n =
   Context.get_endorsers ctxt >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
-  map_s (fun { Delegate_services.Endorsing_rights.delegate ; level ; _ } ->
-      Op.endorsement ~delegate ~level ctxt ()
+  map_s (fun { Delegate_services.Endorsing_rights.delegate ; level ; slots ; _ } ->
+      Op.endorsement ~delegate:(delegate,List.hd slots) ~level ctxt ()
     ) endorsing_rights
 
 let generate_and_add_random_endorsements inc =
