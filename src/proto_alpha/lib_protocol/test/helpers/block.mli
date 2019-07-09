@@ -96,6 +96,7 @@ val genesis:
   ?with_commitments:bool ->
   ?endorsers_per_block:int ->
   ?initial_endorsers: int ->
+  ?min_proposal_quorum: int32 ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
 
 val genesis_with_parameters: Parameters_repr.t -> block tzresult Lwt.t

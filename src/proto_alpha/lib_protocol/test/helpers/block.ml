@@ -281,6 +281,7 @@ let genesis
     ?with_commitments
     ?endorsers_per_block
     ?initial_endorsers
+    ?min_proposal_quorum
     (initial_accounts : (Account.t * Tez_repr.t) list)
   =
   if initial_accounts = [] then
@@ -292,7 +293,9 @@ let genesis
     Option.unopt ~default:constants.endorsers_per_block endorsers_per_block in
   let initial_endorsers =
     Option.unopt ~default:constants.initial_endorsers initial_endorsers in
-  let constants = { constants with endorsers_per_block ; initial_endorsers } in
+  let min_proposal_quorum =
+    Option.unopt ~default:constants.min_proposal_quorum min_proposal_quorum in
+  let constants = { constants with endorsers_per_block ; initial_endorsers ; min_proposal_quorum } in
 
   (* Check there is at least one roll *)
   begin try

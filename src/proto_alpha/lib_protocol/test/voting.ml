@@ -98,7 +98,8 @@ let get_rolls b delegates loc =
     ) delegates
 
 let test_successful_vote num_delegates () =
-  Context.init num_delegates >>=? fun (b,_) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,_) ->
   Context.get_constants (B b) >>=?
   fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
@@ -401,7 +402,8 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
 (* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in testing vote,
    go back to proposal period *)
 let test_not_enough_quorum_in_testing_vote num_delegates () =
-  Context.init num_delegates >>=? fun (b,delegates) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,delegates) ->
   Context.get_constants (B b) >>=?
   fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
@@ -465,7 +467,8 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
 (* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in promotion vote,
    go back to proposal period *)
 let test_not_enough_quorum_in_promotion_vote num_delegates () =
-  Context.init num_delegates >>=? fun (b,delegates) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,delegates) ->
   Context.get_constants (B b) >>=?
   fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
@@ -594,7 +597,8 @@ let test_multiple_identical_proposals_count_as_one () =
 (* assumes the initial balance of allocated by Context.init is at
    least 4 time the value of the tokens_per_roll constant *)
 let test_supermajority_in_proposal there_is_a_winner () =
-  Context.init ~initial_balances:[1L; 1L; 1L] 10 >>=? fun (b,delegates) ->
+  let min_proposal_quorum = 0l in
+  Context.init ~min_proposal_quorum ~initial_balances:[1L; 1L; 1L] 10 >>=? fun (b,delegates) ->
   Context.get_constants (B b)
   >>=? fun { parametric = {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll; _ } ; _ } ->
 
@@ -651,8 +655,71 @@ let test_supermajority_in_proposal there_is_a_winner () =
   return_unit
 
 
+let test_quorum_in_proposal has_quorum () =
+  let total_tokens = 32_000_000_000_000L in
+  let half_tokens = Int64.div total_tokens 2L in
+  Context.init
+    ~initial_balances:[1L; half_tokens; half_tokens]
+    3 >>=? fun (b,delegates) ->
+  Context.get_constants (B b) >>=? fun {
+    parametric = {
+      blocks_per_cycle;
+      blocks_per_voting_period;
+      min_proposal_quorum; _ } ; _ } ->
+
+  let del1 = List.nth delegates 0 in
+  let del2 = List.nth delegates 1 in
+
+  map_s (fun del -> Context.Contract.pkh del) [del1; del2] >>=? fun pkhs ->
+  let policy = Block.Excluding pkhs in
+
+  let quorum =
+    if has_quorum then
+      Int64.of_int32 min_proposal_quorum
+    else
+      Int64.(sub (of_int32 min_proposal_quorum) 10L) in
+  let bal =
+    Int64.(div (mul total_tokens quorum) 100_00L)
+    |> Test_tez.Tez.of_mutez_exn in
+  Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
+  Block.bake ~policy ~operations:[op2] b >>=? fun b ->
+
+  (* we let one voting period pass; we make sure that:
+     - the two selected delegates remain active by re-registering as delegates
+     - their number of rolls do not change *)
+  fold_left_s (fun b _ ->
+      Error_monad.map_s (fun del ->
+          Context.Contract.pkh del >>=? fun pkh ->
+          Op.delegation (B b) del (Some pkh)
+        ) [del1;del2] >>=? fun ops ->
+      Block.bake ~policy ~operations:ops b >>=? fun b ->
+      Block.bake_until_cycle_end ~policy b
+    ) b (1 --
+         (Int32.to_int (Int32.div blocks_per_voting_period blocks_per_cycle))) >>=? fun b ->
+
+  (* make the proposal *)
+  Op.proposals (B b) del1 [protos.(0)] >>=? fun ops ->
+  Block.bake ~policy ~operations:[ops] b >>=? fun b ->
+  Block.bake_n ~policy ((Int32.to_int blocks_per_voting_period)-1) b >>=? fun b ->
+
+  (* we remain in the proposal period when there is no quorum,
+     otherwise we move to the testing vote period *)
+  Context.Vote.get_current_period_kind (B b) >>=? begin function
+    | Testing_vote ->
+        if has_quorum then return_unit
+        else failwith "%s - Expected period kind Proposal, obtained Testing_vote" __LOC__
+    | Proposal ->
+        if not has_quorum then return_unit
+        else failwith "%s - Expected period kind Testing_vote, obtained Proposal" __LOC__
+    | _ -> failwith "%s - Unexpected period kind" __LOC__
+  end >>=? fun () ->
+
+  return_unit
+
+
 let test_supermajority_in_testing_vote supermajority () =
-  Context.init 100 >>=? fun (b,delegates) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / 100) in
+  Context.init ~min_proposal_quorum 100 >>=? fun (b,delegates) ->
   Context.get_constants (B b) >>=?
   fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
@@ -717,7 +784,8 @@ let test_supermajority_in_testing_vote supermajority () =
 
 (* test also how the selection scales: all delegates propose max proposals *)
 let test_no_winning_proposal num_delegates () =
-  Context.init num_delegates >>=? fun (b,_) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,_) ->
   Context.get_constants (B b) >>=?
   fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
@@ -750,7 +818,8 @@ let test_no_winning_proposal num_delegates () =
     (100%), it is sufficient for the vote quorum to be equal or greater than
     the maximum quorum cap. *)
 let test_quorum_capped_maximum num_delegates () =
-  Context.init num_delegates >>=? fun (b,delegates) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,delegates) ->
   (* set the participation EMA to 100% *)
   Context.Vote.set_participation_ema b 100_00l >>= fun b ->
   Context.get_constants (B b) >>=?
@@ -805,7 +874,8 @@ let test_quorum_capped_maximum num_delegates () =
     (0%), it is sufficient for the vote quorum to be equal or greater than
     the minimum quorum cap. *)
 let test_quorum_capped_minimum num_delegates () =
-  Context.init num_delegates >>=? fun (b,delegates) ->
+  let min_proposal_quorum = Int32.(of_int @@ 100_00 / num_delegates) in
+  Context.init ~min_proposal_quorum num_delegates >>=? fun (b,delegates) ->
   (* set the participation EMA to 0% *)
   Context.Vote.set_participation_ema b 0l >>= fun b ->
   Context.get_constants (B b) >>=?
@@ -863,6 +933,8 @@ let tests = [
   Test.tztest "voting counting double proposal" `Quick test_multiple_identical_proposals_count_as_one;
   Test.tztest "voting proposal, with supermajority" `Quick (test_supermajority_in_proposal true) ;
   Test.tztest "voting proposal, without supermajority" `Quick (test_supermajority_in_proposal false) ;
+  Test.tztest "voting proposal, with quorum" `Quick (test_quorum_in_proposal true) ;
+  Test.tztest "voting proposal, without quorum" `Quick (test_quorum_in_proposal false) ;
   Test.tztest "voting testing vote, with supermajority" `Quick (test_supermajority_in_testing_vote true) ;
   Test.tztest "voting testing vote, without supermajority" `Quick (test_supermajority_in_testing_vote false) ;
   Test.tztest "voting proposal, no winning proposal" `Quick (test_no_winning_proposal 400) ;

@@ -264,6 +264,7 @@ let init
     ?with_commitments
     ?(initial_balances = [])
     ?initial_endorsers
+    ?min_proposal_quorum
     n =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts = List.map (fun (a, _) ->
@@ -272,5 +273,6 @@ let init
     ?endorsers_per_block
     ?with_commitments
     ?initial_endorsers
+    ?min_proposal_quorum
     accounts >>=? fun blk ->
   return (blk, contracts)
