@@ -50,6 +50,7 @@ PARAMETERS = {
     "test_chain_duration": "1966080",
     "quorum_min": 3000,
     "quorum_max": 7000,
+    "min_proposal_quorum": 500,
     "initial_endorsers": 1,
     "delay_per_missing_endorsement": "1"
 }

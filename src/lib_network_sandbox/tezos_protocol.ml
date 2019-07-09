@@ -240,6 +240,7 @@ type t =
   ; test_chain_duration: int
   ; quorum_min: int
   ; quorum_max: int
+  ; min_proposal_quorum: int
   ; initial_endorsers: int
   ; delay_per_missing_endorsement: int }
 
@@ -279,6 +280,7 @@ let default () =
   ; test_chain_duration= 1966080
   ; quorum_min= 3000
   ; quorum_max= 7000
+  ; min_proposal_quorum = 500
   ; initial_endorsers = 1
   ; delay_per_missing_endorsement = 1 }
 
@@ -336,6 +338,7 @@ let protocol_parameters_json t : Ezjsonm.t =
        string (Int.to_string t.test_chain_duration))
     ; ("quorum_min", int t.quorum_min)
     ; ("quorum_max", int t.quorum_max)
+    ; ("min_proposal_quorum", int t.min_proposal_quorum)
     ; ("initial_endorsers", int t.initial_endorsers)
     ; ("delay_per_missing_endorsement",
        string (Int.to_string t.delay_per_missing_endorsement))

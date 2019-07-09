@@ -107,6 +107,7 @@ type t =
   ; test_chain_duration: int
   ; quorum_min: int
   ; quorum_max: int
+  ; min_proposal_quorum: int
   ; initial_endorsers: int
   ; delay_per_missing_endorsement: int }
 
