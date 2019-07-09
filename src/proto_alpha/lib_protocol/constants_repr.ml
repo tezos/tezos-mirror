@@ -97,6 +97,7 @@ type parametric = {
   test_chain_duration: int64 ;  (* in seconds *)
   quorum_min: int32 ;
   quorum_max: int32 ;
+  min_proposal_quorum: int32 ;
   initial_endorsers: int ;
   delay_per_missing_endorsement: Period_repr.t ;
 }
@@ -128,6 +129,7 @@ let parametric_encoding =
           c.test_chain_duration,
           c.quorum_min,
           c.quorum_max,
+          c.min_proposal_quorum,
           c.initial_endorsers,
           c.delay_per_missing_endorsement
          ))) )
@@ -154,6 +156,7 @@ let parametric_encoding =
             test_chain_duration,
             quorum_min,
             quorum_max,
+            min_proposal_quorum,
             initial_endorsers,
             delay_per_missing_endorsement))) ->
       { preserved_cycles ;
@@ -179,6 +182,7 @@ let parametric_encoding =
         test_chain_duration ;
         quorum_min ;
         quorum_max ;
+        min_proposal_quorum ;
         initial_endorsers ;
         delay_per_missing_endorsement ;
       } )
@@ -203,13 +207,14 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj8
+          (obj9
              (req "endorsement_reward" Tez_repr.encoding)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "test_chain_duration" int64)
              (req "quorum_min" int32)
              (req "quorum_max" int32)
+             (req "min_proposal_quorum" int32)
              (req "initial_endorsers" uint16)
              (req "delay_per_missing_endorsement" Period_repr.encoding)
           )))

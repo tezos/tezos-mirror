@@ -385,6 +385,7 @@ module Constants : sig
     test_chain_duration: int64;
     quorum_min: int32 ;
     quorum_max: int32 ;
+    min_proposal_quorum : int32 ;
     initial_endorsers: int ;
     delay_per_missing_endorsement : Period.t ;
   }
@@ -415,6 +416,7 @@ module Constants : sig
   val test_chain_duration: context -> int64
   val quorum_min: context -> int32
   val quorum_max: context -> int32
+  val min_proposal_quorum: context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {
