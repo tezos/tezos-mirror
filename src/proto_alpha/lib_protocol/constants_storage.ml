@@ -98,5 +98,8 @@ let quorum_min c =
 let quorum_max c =
   let constants = Raw_context.constants c in
   constants.quorum_max
+let min_proposal_quorum c =
+  let constants = Raw_context.constants c in
+  constants.min_proposal_quorum
 let parametric c =
   Raw_context.constants c

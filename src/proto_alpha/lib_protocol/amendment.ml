@@ -26,22 +26,32 @@
 open Alpha_context
 
 (** Returns the proposal submitted by the most delegates.
-    Returns None in case of a tie or if there are no proposals. *)
-let select_winning_proposal proposals =
+    Returns None in case of a tie, if proposal quorum is below required
+    minimum or if there are no proposals. *)
+let select_winning_proposal ctxt =
+  Vote.get_proposals ctxt >>=? fun proposals ->
   let merge proposal vote winners =
     match winners with
     | None -> Some ([proposal], vote)
     | Some (winners, winners_vote) as previous ->
         if Compare.Int32.(vote = winners_vote) then
           Some (proposal :: winners, winners_vote)
-        else if Compare.Int32.(vote >= winners_vote) then
+        else if Compare.Int32.(vote > winners_vote) then
           Some ([proposal], vote)
         else
           previous in
   match Protocol_hash.Map.fold merge proposals None with
-  | None -> None
-  | Some ([proposal], _) -> Some proposal
-  | Some _ -> None (* in case of a tie, lets do nothing. *)
+  | Some ([proposal], vote) ->
+      Vote.listing_size ctxt >>=? fun max_vote ->
+      let min_proposal_quorum = Constants.min_proposal_quorum ctxt in
+      let min_vote_to_pass =
+        Int32.div (Int32.mul min_proposal_quorum max_vote) 100_00l in
+      if Compare.Int32.(vote >= min_vote_to_pass) then
+        return_some proposal
+      else
+        return_none
+  | _ ->
+      return_none (* in case of a tie, let's do nothing. *)
 
 (** A proposal is approved if it has supermajority and the participation reaches
     the current quorum.
@@ -87,10 +97,10 @@ let check_approval_and_update_participation_ema ctxt =
 let start_new_voting_period ctxt =
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal -> begin
-      Vote.get_proposals ctxt >>=? fun proposals ->
+      select_winning_proposal ctxt >>=? fun proposal ->
       Vote.clear_proposals ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
-      match select_winning_proposal proposals with
+      match proposal with
       | None ->
           Vote.freeze_listings ctxt >>=? fun ctxt ->
           return ctxt
