@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" & < "1.9" }
+  "dune" { build & >= "1.7" }
   "bigstring"
   "hex"
   "ocplib-endian"
