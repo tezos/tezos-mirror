@@ -55,6 +55,7 @@ let constants_mainnet = Constants_repr.{
     test_chain_duration = Int64.mul 32768L 60L ;
     quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
     quorum_max = 70_00l ;
+    min_proposal_quorum = 5_00l ;
     initial_endorsers = 24 ;
     delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
   }
