@@ -157,5 +157,11 @@ val parse_destr_annot :
   value_annot:var_annot option ->
   (var_annot option * field_annot option) tzresult
 
+val parse_entrypoint_annot :
+  int ->
+  ?default:var_annot option ->
+  string list ->
+  (var_annot option * field_annot option) tzresult
+
 val parse_var_type_annot :
   int -> string list -> (var_annot option * type_annot option) tzresult

@@ -669,7 +669,12 @@ let rec interp
         | Compare (Timestamp_key _), Item (a, Item (b, rest)) ->
             consume_gaz_comparison descr Script_timestamp.compare Interp_costs.compare_timestamp a b rest
         | Compare (Address_key _), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr Contract.compare Interp_costs.compare_address a b rest
+            let compare (x, ex) (y, ey) =
+              let lres = Contract.compare x y in
+              if Compare.Int.(lres = 0) then
+                Compare.String.compare ex ey
+              else lres in
+            consume_gaz_comparison descr compare Interp_costs.compare_address a b rest
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
@@ -725,21 +730,25 @@ let rec interp
             else
               logged_return (Item (None, rest), ctxt)
         (* protocol *)
-        | Address, Item ((_, contract), rest) ->
+        | Address, Item ((_, address), rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.address) >>=? fun ctxt ->
-            logged_return (Item (contract, rest), ctxt)
-        | Contract t, Item (contract, rest) ->
+            logged_return (Item (address, rest), ctxt)
+        | Contract (t, entrypoint), Item (contract, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.contract) >>=? fun ctxt ->
-            Script_ir_translator.parse_contract_for_script ctxt loc t contract >>=? fun (ctxt, maybe_contract) ->
-            logged_return (Item (maybe_contract, rest), ctxt)
+            begin match contract, entrypoint with
+              | (contract, "default"), entrypoint | (contract, entrypoint), "default" ->
+                  Script_ir_translator.parse_contract_for_script ctxt loc t contract ~entrypoint >>=? fun (ctxt, maybe_contract) ->
+                  logged_return (Item (maybe_contract, rest), ctxt)
+              | _ -> logged_return (Item (None, rest), ctxt)
+            end
         | Transfer_tokens,
-          Item (p, Item (amount, Item ((tp, destination), rest))) ->
+          Item (p, Item (amount, Item ((tp, (destination, entrypoint)), rest))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.transfer) >>=? fun ctxt ->
             unparse_data ctxt Optimized tp p >>=? fun (p, ctxt) ->
             let operation =
               Transaction
-                { amount ; destination ;
-                  parameters = Some (Script.lazy_expr (Micheline.strip_locations p)) } in
+                { amount ; destination ; entrypoint ;
+                  parameters = Script.lazy_expr (Micheline.strip_locations p) } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Create_account,
@@ -752,12 +761,12 @@ let rec interp
                   delegatable ; script = None ; spendable = true } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return (Item (Internal_operation { source = self ; operation ; nonce },
-                                 Item (contract, rest)), ctxt)
+                                 Item ((contract, "default"), rest)), ctxt)
         | Implicit_account, Item (key, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.implicit_account) >>=? fun ctxt ->
             let contract = Contract.implicit_contract key in
-            logged_return (Item ((Unit_t None, contract), rest), ctxt)
-        | Create_contract (storage_type, param_type, Lam (_, code)),
+            logged_return (Item ((Unit_t None, (contract, "default")), rest), ctxt)
+        | Create_contract (storage_type, param_type, Lam (_, code), root_name),
           Item (manager, Item
                   (delegate, Item
                      (spendable, Item
@@ -766,6 +775,8 @@ let rec interp
                               (init, rest)))))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_contract) >>=? fun ctxt ->
             unparse_ty ctxt param_type >>=? fun (unparsed_param_type, ctxt) ->
+            let unparsed_param_type =
+              Script_ir_translator.add_field_annot (Option.map ~f:(fun n -> `Field_annot n) root_name) None unparsed_param_type in
             unparse_ty ctxt storage_type >>=? fun (unparsed_storage_type, ctxt) ->
             let code =
               Micheline.strip_locations
@@ -784,7 +795,7 @@ let rec interp
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
               (Item (Internal_operation { source = self ; operation ; nonce },
-                     Item (contract, rest)), ctxt)
+                     Item ((contract, "default"), rest)), ctxt)
         | Set_delegate,
           Item (delegate, rest) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
@@ -826,13 +837,13 @@ let rec interp
             logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
         | Source, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
-            logged_return (Item (payer, rest), ctxt)
+            logged_return (Item ((payer, "default"), rest), ctxt)
         | Sender, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.source) >>=? fun ctxt ->
-            logged_return (Item (source, rest), ctxt)
-        | Self t, rest ->
+            logged_return (Item ((source, "default"), rest), ctxt)
+        | Self (t, entrypoint), rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.self) >>=? fun ctxt ->
-            logged_return (Item ((t,self), rest), ctxt)
+            logged_return (Item ((t, (self, entrypoint)), rest), ctxt)
         | Amount, rest ->
             Lwt.return (Gas.consume ctxt Interp_costs.amount) >>=? fun ctxt ->
             logged_return (Item (amount, rest), ctxt) in
@@ -850,14 +861,17 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log ctxt mode ~source ~payer ~self script amount arg :
+and execute ?log ctxt mode ~source ~payer ~self ~entrypoint script amount arg :
   (Script.expr * packed_internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script ~legacy:true
-  >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
+  >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type ; root_name }), ctxt) ->
   trace
     (Bad_contract_parameter self)
-    (parse_data ctxt ~legacy:false arg_type arg) >>=? fun (arg, ctxt) ->
+    (Lwt.return (find_entrypoint arg_type ~root_name entrypoint)) >>=? fun (box, _) ->
+  trace
+    (Bad_contract_parameter self)
+    (parse_data ctxt ~legacy:false arg_type (box arg))  >>=? fun (arg, ctxt) ->
   Script.force_decode ctxt script.code >>=? fun (script_code, ctxt) ->
   trace
     (Runtime_contract_error (self, script_code))
@@ -874,9 +888,9 @@ type execution_result =
     big_map_diff : Contract.big_map_diff option ;
     operations : packed_internal_operation list }
 
-let trace ctxt mode ~source ~payer ~self:(self, script) ~parameter ~amount =
+let trace ctxt mode ~source ~payer ~self:(self, script) ~entrypoint ~parameter ~amount =
   let log = ref [] in
-  execute ~log ctxt mode ~source ~payer ~self script amount (Micheline.root parameter)
+  execute ~log ctxt mode ~source ~payer ~self ~entrypoint script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map) ->
   begin match big_map with
     | None -> return (None, ctxt)
@@ -887,8 +901,8 @@ let trace ctxt mode ~source ~payer ~self:(self, script) ~parameter ~amount =
   let trace = List.rev !log in
   return ({ ctxt ; storage ; big_map_diff ; operations }, trace)
 
-let execute ctxt mode ~source ~payer ~self:(self, script) ~parameter ~amount =
-  execute ctxt mode ~source ~payer ~self script amount (Micheline.root parameter)
+let execute ctxt mode ~source ~payer ~self:(self, script) ~entrypoint ~parameter ~amount =
+  execute ctxt mode ~source ~payer ~self ~entrypoint script amount (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map) ->
   begin match big_map with
     | None -> return (None, ctxt)

@@ -111,7 +111,8 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.lazy_expr option ;
+      parameters: Script_repr.lazy_expr ;
+      entrypoint: string ;
       destination: Contract_repr.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
@@ -226,6 +227,19 @@ module Encoding = struct
           (fun pkh -> Reveal pkh)
       }
 
+    let entrypoint_encoding =
+      def
+        ~title:"entrypoint"
+        ~description:"Named entrypoint to a Michelson smart contract"
+        "entrypoint" @@
+      let builtin_case tag name =
+        Data_encoding.case (Tag tag) ~title:name
+          (constant name)
+          (fun n -> if Compare.String.(n = name) then Some () else None) (fun () -> name) in
+      union [ builtin_case 0 "default" ;
+              builtin_case 1 "root" ;
+              Data_encoding.case (Tag 255) ~title:"named" string (fun s -> Some s) (fun s -> s) ]
+
     let transaction_case =
       MCase {
         tag = 1 ;
@@ -234,18 +248,29 @@ module Encoding = struct
           (obj3
              (req "amount" Tez_repr.encoding)
              (req "destination" Contract_repr.encoding)
-             (opt "parameters" Script_repr.lazy_expr_encoding)) ;
+             (opt "parameters"
+                (obj2
+                   (req "entrypoint" entrypoint_encoding)
+                   (req "value" Script_repr.lazy_expr_encoding)))) ;
         select =
           (function
             | Manager (Transaction _ as op) -> Some op
             | _ -> None) ;
         proj =
           (function
-            | Transaction { amount ; destination ; parameters } ->
+            | Transaction { amount ; destination ; parameters ; entrypoint } ->
+                let parameters =
+                  if Script_repr.is_unit_parameter parameters && Compare.String.(entrypoint = "default") then
+                    None
+                  else
+                    Some (entrypoint, parameters) in
                 (amount, destination, parameters)) ;
         inj =
           (fun (amount, destination, parameters) ->
-             Transaction { amount ; destination ; parameters })
+             let entrypoint, parameters = match parameters with
+               | None -> "default", Script_repr.unit_parameter
+               | Some (entrypoint, value) -> entrypoint, value in
+             Transaction { amount ; destination ; parameters ; entrypoint })
       }
 
     let origination_case =

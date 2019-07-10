@@ -339,6 +339,8 @@ module Script : sig
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
   val force_decode : context -> lazy_expr -> (expr * context) tzresult Lwt.t
   val force_bytes : context -> lazy_expr -> (MBytes.t * context) tzresult Lwt.t
+
+  val unit_parameter : lazy_expr
 end
 
 module Constants : sig
@@ -922,7 +924,8 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
       amount: Tez.tez ;
-      parameters: Script.lazy_expr option ;
+      parameters: Script.lazy_expr ;
+      entrypoint: string ;
       destination: Contract.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {

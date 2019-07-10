@@ -59,14 +59,15 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj7
+      (obj8
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
          (req "amount" Tez.encoding)
          (opt "source" Contract.encoding)
          (opt "payer" Contract.encoding)
-         (opt "gas" z))
+         (opt "gas" z)
+         (dft "entrypoint" string "default"))
 
     let trace_encoding =
       def "scripted.trace" @@
@@ -170,7 +171,7 @@ module Scripts = struct
         ~script: (script, None) >>=? fun ctxt ->
       return (ctxt, dummy_contract) in
     register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount, source, payer, gas) ->
+      (code, storage, parameter, amount, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
@@ -188,12 +189,13 @@ module Scripts = struct
         ~source
         ~payer
         ~self:(dummy_contract, { storage ; code })
+        ~entrypoint
         ~amount ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount, source, payer, gas) ->
+      (code, storage, parameter, amount, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
@@ -211,6 +213,7 @@ module Scripts = struct
         ~source
         ~payer
         ~self:(dummy_contract, { storage ; code })
+        ~entrypoint
         ~amount ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
       return (storage, operations, trace, big_map_diff)
@@ -255,9 +258,9 @@ module Scripts = struct
           match operation with
           | Reveal pk ->
               Contract.reveal_manager_key ctxt source pk
-          | Transaction { parameters = Some arg ; _ } ->
+          | Transaction { parameters ; _ } ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-              let arg_bytes = Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding arg in
+              let arg_bytes = Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding parameters in
               let arg = match Data_encoding.Binary.of_bytes Script.lazy_expr_encoding arg_bytes with
                 | Some arg -> arg
                 | None -> assert false in
@@ -324,13 +327,13 @@ module Scripts = struct
 
     end
 
-  let run_code ctxt block code (storage, input, amount, source, payer, gas) =
+  let run_code ctxt block code (storage, input, amount, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount, source, payer, gas)
+      block () (code, storage, input, amount, source, payer, gas, entrypoint)
 
-  let trace_code ctxt block code (storage, input, amount, source, payer, gas) =
+  let trace_code ctxt block code (storage, input, amount, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount, source, payer, gas)
+      block () (code, storage, input, amount, source, payer, gas, entrypoint)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()
@@ -431,12 +434,12 @@ module Forge = struct
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
-        ~amount ~destination ?parameters
+        ~amount ~destination ?(entrypoint = "default") ?parameters
         ~gas_limit ~storage_limit ~fee ()=
-      let parameters = Option.map ~f:Script.lazy_expr parameters in
+      let parameters = Option.unopt_map ~f:Script.lazy_expr ~default:Script.unit_parameter parameters in
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        [Manager (Transaction { amount ; parameters ; destination })]
+        [Manager (Transaction { amount ; parameters ; destination ; entrypoint })]
 
     let origination ctxt
         block ~branch

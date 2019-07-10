@@ -109,7 +109,7 @@ module Cost_of : sig
   val compare_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
   val compare_key_hash : 'a -> 'b -> Gas.cost
   val compare_timestamp : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
-  val compare_address : Contract.t -> Contract.t -> Gas.cost
+  val compare_address : (Contract.t * string) -> (Contract.t * string) -> Gas.cost
 
   val manager_operation : Gas.cost
 

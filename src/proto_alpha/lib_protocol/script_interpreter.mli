@@ -48,6 +48,7 @@ val execute:
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->
+  entrypoint: string ->
   parameter: Script.expr ->
   amount: Tez.t ->
   execution_result tzresult Lwt.t
@@ -58,6 +59,7 @@ val trace:
   source: Contract.t ->
   payer: Contract.t ->
   self: (Contract.t * Script.t) ->
+  entrypoint: string ->
   parameter: Script.expr ->
   amount: Tez.t ->
   (execution_result * execution_trace) tzresult Lwt.t
