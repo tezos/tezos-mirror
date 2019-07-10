@@ -15,13 +15,13 @@
              DIP
                { DIP { PUSH int 0 ; PUSH mutez 0 ; PUSH bool False ; PUSH bool False ; NONE key_hash } ;
                  CREATE_CONTRACT
-                   { parameter (option %default (or (nat %add) (nat %sub))) ;
+                   { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
                      storage int ;
                      code { AMOUNT ; PUSH mutez 0 ; ASSERT_CMPEQ ;
                             UNPAIR ;
-                            IF_SOME
+                            IF_LEFT
                               { IF_LEFT { ADD } { SWAP ; SUB } }
-                              { DROP ; PUSH int 0 } ;
+                              { DROP ; DROP ; PUSH int 0 } ;
                             NIL operation ; PAIR } } } ;
              DIP { SELF ; PUSH mutez 0 } ; TRANSFER_TOKENS ;
              NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
