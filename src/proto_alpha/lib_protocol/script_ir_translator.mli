@@ -79,17 +79,21 @@ val ty_eq :
 
 val parse_data :
   ?type_logger: type_logger ->
-  context ->
+  context -> legacy: bool ->
   'a Script_typed_ir.ty -> Script.node -> ('a * context) tzresult Lwt.t
 val unparse_data :
   context -> unparsing_mode -> 'a Script_typed_ir.ty -> 'a ->
   (Script.node * context) tzresult Lwt.t
 
 val parse_ty :
-  context ->
+  context -> legacy: bool ->
   allow_big_map: bool ->
   allow_operation: bool ->
+  allow_contract: bool ->
   Script.node -> (ex_ty * context) tzresult
+
+val parse_packable_ty :
+  context -> legacy: bool -> Script.node -> (ex_ty * context) tzresult
 
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
@@ -106,7 +110,7 @@ val typecheck_data :
 
 val parse_script :
   ?type_logger: type_logger ->
-  context -> Script.t -> (ex_script * context) tzresult Lwt.t
+  context -> legacy: bool -> Script.t -> (ex_script * context) tzresult Lwt.t
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :

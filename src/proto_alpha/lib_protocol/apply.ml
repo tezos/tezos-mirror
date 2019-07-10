@@ -526,7 +526,7 @@ let apply_manager_operation_content :
                 Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
                 Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
                 Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
-                Script_ir_translator.parse_script ctxt script >>=? fun (ex_script, ctxt) ->
+                Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
                 Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
                 return (Some (script, big_map_diff), ctxt)
         end >>=? fun (script, ctxt) ->

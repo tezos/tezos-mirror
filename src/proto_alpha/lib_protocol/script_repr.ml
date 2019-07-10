@@ -62,7 +62,7 @@ let lazy_expr expr =
 
 type t = {
   code : lazy_expr ;
-  storage : lazy_expr
+  storage : lazy_expr ;
 }
 
 let encoding =

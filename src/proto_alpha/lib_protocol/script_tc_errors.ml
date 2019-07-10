@@ -44,6 +44,7 @@ type error += Missing_field of prim
 type error += Duplicate_field of Script.location * prim
 type error += Unexpected_big_map of Script.location
 type error += Unexpected_operation of Script.location
+type error += Unexpected_contract of Script.location
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
