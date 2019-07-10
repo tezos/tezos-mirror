@@ -166,6 +166,7 @@ val transfer :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   destination:Contract.t ->
+  ?entrypoint:string ->
   ?arg:string ->
   amount:Tez.t ->
   ?fee:Tez.t ->

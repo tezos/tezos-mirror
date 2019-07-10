@@ -105,11 +105,12 @@ let run
     ?source
     ?payer
     ?gas
+    ?(entrypoint = "default")
     () =
   Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas)
+    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
 
 let trace
     (cctxt : #Protocol_client_context.rpc_context)
@@ -122,11 +123,12 @@ let trace
     ?source
     ?payer
     ?gas
+    ?(entrypoint = "default")
     () =
   Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas)
+    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
 
 let typecheck_data
     cctxt

@@ -50,7 +50,7 @@ let parse_expression arg =
 let transfer (cctxt : #full)
     ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ~destination ?arg
+    ?branch ~source ~src_pk ~src_sk ~destination ?(entrypoint = "default") ?arg
     ~amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter
     () =
@@ -60,8 +60,8 @@ let transfer (cctxt : #full)
         return_some arg
     | None -> return_none
   end >>=? fun parameters ->
-  let parameters = Option.map ~f:Script.lazy_expr parameters in
-  let contents = Transaction { amount ; parameters ; destination } in
+  let parameters = Option.unopt_map ~f:Script.lazy_expr ~default:Script.unit_parameter parameters in
+  let contents = Transaction { amount ; parameters ; destination ; entrypoint } in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing

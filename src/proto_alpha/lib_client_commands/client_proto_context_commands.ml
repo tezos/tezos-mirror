@@ -422,14 +422,15 @@ let commands version () =
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
-      (args14 fee_arg dry_run_switch verbose_signing_switch
+      (args15 fee_arg dry_run_switch verbose_signing_switch
          gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
+         burn_cap_arg
+         entrypoint_arg)
       (prefixes [ "transfer" ]
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -443,7 +444,7 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
                  counter, arg, no_print_source, minimal_fees,
                  minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
-                 force_low_fee, fee_cap, burn_cap)
+                 force_low_fee, fee_cap, burn_cap, entrypoint)
         amount (_, source) (_, destination) cctxt ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
@@ -460,7 +461,7 @@ let commands version () =
           ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
           ~dry_run ~verbose_signing
           ~fee_parameter
-          ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
+          ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
         report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
         | None -> return_unit
         | Some (_res, _contracts) ->

@@ -32,7 +32,7 @@ let pp_manager_operation_content
     ppf (operation, result : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
   begin match operation with
-    | Transaction { destination ; amount ; parameters } ->
+    | Transaction { destination ; amount ; parameters ; entrypoint } ->
         Format.fprintf ppf
           "@[<v 2>%s:@,\
            Amount: %s%a@,\
@@ -43,16 +43,18 @@ let pp_manager_operation_content
           Tez.pp amount
           Contract.pp source
           Contract.pp destination ;
-        begin match parameters with
-          | None -> ()
-          | Some expr ->
-              let expr =
-                Option.unopt_exn
-                  (Failure "ill-serialized argument")
-                  (Data_encoding.force_decode expr) in
-              Format.fprintf ppf
-                "@,Parameter: @[<v 0>%a@]"
-                Michelson_v1_printer.print_expr expr
+        begin match entrypoint with
+          | "default" -> ()
+          | _ -> Format.fprintf ppf "@,Entrypoint: %s" entrypoint
+        end ;
+        begin if not (Script_repr.is_unit_parameter parameters) then
+            let expr =
+              Option.unopt_exn
+                (Failure "ill-serialized argument")
+                (Data_encoding.force_decode parameters) in
+            Format.fprintf ppf
+              "@,Parameter: @[<v 0>%a@]"
+              Michelson_v1_printer.print_expr expr
         end ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;

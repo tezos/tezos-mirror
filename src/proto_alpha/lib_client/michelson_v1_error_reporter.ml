@@ -72,6 +72,9 @@ let collect_error_locations errs =
   let rec collect acc = function
     | Environment.Ecoproto_error
         (Ill_formed_type (_, _, _)
+        | No_such_entrypoint _
+        | Duplicate_entrypoint _
+        | Unreachable_entrypoint _
         | Runtime_contract_error (_, _)
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
         | Ill_typed_data (_, _, _)
@@ -168,6 +171,19 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_ty ty ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Environment.Ecoproto_error (No_such_entrypoint entrypoint) :: rest ->
+        Format.fprintf ppf "Contract has no entrypoint named %s" entrypoint ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Duplicate_entrypoint entrypoint) :: rest ->
+        Format.fprintf ppf "Contract has two entrypoints named %s" entrypoint ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Unreachable_entrypoint path) :: rest ->
+        let path = String.concat "/" (List.map Michelson_v1_primitives.string_of_prim path) in
+        Format.fprintf ppf "Entrypoint at path %s is not reachable" path ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
         let parsed =
           match parsed with

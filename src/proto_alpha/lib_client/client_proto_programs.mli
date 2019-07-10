@@ -41,6 +41,7 @@ val run :
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Z.t ->
+  ?entrypoint:string ->
   unit ->
   (Script.expr *
    packed_internal_operation list *
@@ -57,6 +58,7 @@ val trace :
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Z.t ->
+  ?entrypoint:string ->
   unit ->
   (Script.expr *
    packed_internal_operation list *
