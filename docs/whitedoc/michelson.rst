@@ -1350,7 +1350,7 @@ contract.
 
 ::
 
-    :: 'p : mutez : contract 'p : 'S   ->   operation : S
+    :: 'p : mutez : contract 'p : 'S   ->   operation : 'S
 
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
@@ -1359,7 +1359,7 @@ contract, unit for an account.
 
 ::
 
-    :: option key_hash : 'S   ->   operation : S
+    :: option key_hash : 'S   ->   operation : 'S
 
 -  ``BALANCE``: Push the current amount of mutez of the current contract.
 
