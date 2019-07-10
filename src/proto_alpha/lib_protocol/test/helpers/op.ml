@@ -230,13 +230,14 @@ let miss_signed_endorsement ?level ctxt  =
   let delegate = Account.find_alternate real_delegate_pkh in
   endorsement ~delegate:(delegate.pkh, List.hd slots) ~level ctxt ()
 
-let transaction ?fee ?gas_limit ?storage_limit ?parameters ctxt
+let transaction ?fee ?gas_limit ?storage_limit ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
     (src:Contract.t) (dst:Contract.t)
     (amount:Tez.t) =
   let top = Transaction {
       amount;
       parameters;
       destination=dst;
+      entrypoint;
     } in
   manager_operation ?fee ?gas_limit ?storage_limit
     ~source:src ctxt top >>=? fun sop ->

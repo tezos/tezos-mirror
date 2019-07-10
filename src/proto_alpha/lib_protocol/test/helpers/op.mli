@@ -41,6 +41,7 @@ val transaction:
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
+  ?entrypoint:string ->
   Context.t ->
   Contract.t ->
   Contract.t ->
