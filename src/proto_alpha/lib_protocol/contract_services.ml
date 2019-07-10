@@ -193,16 +193,16 @@ let register () =
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+          parse_script ctxt ~legacy:true script >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode ctxt script.storage >>=? fun (storage, _ctxt) ->
           return_some storage) ;
   register1 S.big_map_get (fun ctxt contract () (key, key_type) ->
       let open Script_ir_translator in
       let ctxt = Gas.set_unlimited ctxt in
-      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false (Micheline.root key_type))
+      Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root key_type))
       >>=? fun (Ex_ty key_type, ctxt) ->
-      parse_data ctxt key_type (Micheline.root key) >>=? fun (key, ctxt) ->
+      parse_data ctxt ~legacy:true key_type (Micheline.root key) >>=? fun (key, ctxt) ->
       hash_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
       Contract.Big_map.get_opt ctxt contract key_hash >>=? fun (_ctxt, value) ->
       return value) ;
@@ -219,7 +219,7 @@ let register () =
         | Some script ->
             let ctxt = Gas.set_unlimited ctxt in
             let open Script_ir_translator in
-            parse_script ctxt script >>=? fun (Ex_script script, ctxt) ->
+            parse_script ctxt ~legacy:true script >>=? fun (Ex_script script, ctxt) ->
             unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
             return (Some script, ctxt)
       end >>=? fun (script, _ctxt) ->

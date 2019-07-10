@@ -716,7 +716,7 @@ let rec interp
                   logged_return (Item (None, rest), ctxt)
               | Some expr ->
                   Lwt.return (Gas.consume ctxt (Script.deserialized_cost expr)) >>=? fun ctxt ->
-                  parse_data ctxt t (Micheline.root expr) >>= function
+                  parse_data ctxt ~legacy:false t (Micheline.root expr) >>= function
                   | Ok (value, ctxt) ->
                       logged_return (Item (Some value, rest), ctxt)
                   | Error _ignored ->
@@ -853,11 +853,11 @@ let rec interp
 and execute ?log ctxt mode ~source ~payer ~self script amount arg :
   (Script.expr * packed_internal_operation list * context *
    Script_typed_ir.ex_big_map option) tzresult Lwt.t =
-  parse_script ctxt script
+  parse_script ctxt script ~legacy:true
   >>=? fun ((Ex_script { code ; arg_type ; storage ; storage_type }), ctxt) ->
   trace
     (Bad_contract_parameter self)
-    (parse_data ctxt arg_type arg) >>=? fun (arg, ctxt) ->
+    (parse_data ctxt ~legacy:false arg_type arg) >>=? fun (arg, ctxt) ->
   Script.force_decode ctxt script.code >>=? fun (script_code, ctxt) ->
   trace
     (Runtime_contract_error (self, script_code))

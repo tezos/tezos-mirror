@@ -180,14 +180,26 @@ let () =
   register_error_kind
     `Permanent
     ~id:"michelson_v1.unexpected_operation"
-    ~title: "Big map in unauthorized position (type error)"
+    ~title: "Operation in unauthorized position (type error)"
     ~description:
-      "When parsing script, a operation type was found \
+      "When parsing script, an operation type was found \
        in the storage or parameter field."
     (obj1
        (req "loc" location_encoding))
     (function Unexpected_operation loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_operation loc) ;
+  (* Unexpected contract *)
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedContract"
+    ~title: "Contract in unauthorized position (type error)"
+    ~description:
+      "When parsing script, a contract type was found \
+       in the storage or parameter field."
+    (obj1
+       (req "loc" location_encoding))
+    (function Unexpected_contract loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_contract loc) ;
   (* -- Value typing errors ---------------------- *)
   (* Unordered map keys *)
   register_error_kind
