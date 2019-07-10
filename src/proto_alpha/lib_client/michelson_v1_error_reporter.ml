@@ -234,6 +234,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_loc loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
+    | Environment.Ecoproto_error (Unexpected_contract loc) :: rest ->
+        Format.fprintf ppf "%acontract type forbidden in storage and constants"
+          print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
           match parsed with
