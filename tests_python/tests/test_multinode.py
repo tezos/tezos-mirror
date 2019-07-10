@@ -61,4 +61,4 @@ class TestManualBaking:
 
     def test_balance(self, clients):
         bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
-        assert bal == 3998987.998717
+        assert bal == 3998987.998716
