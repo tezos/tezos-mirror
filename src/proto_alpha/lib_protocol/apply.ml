@@ -425,7 +425,7 @@ let apply_manager_operation_content :
     | Reveal _ ->
         return (* No-op: action already performed by `precheck_manager_contents`. *)
           (ctxt, (Reveal_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt } : kind successful_manager_operation_result), [])
-    | Transaction { amount ; parameters ; destination } -> begin
+    | Transaction { amount ; parameters ; destination ; entrypoint  } -> begin
         spend ctxt source amount >>=? fun ctxt ->
         begin match Contract.is_implicit destination with
           | None -> return (ctxt, [], false)
@@ -440,20 +440,21 @@ let apply_manager_operation_content :
         Contract.get_script ctxt destination >>=? fun (ctxt, script) ->
         match script with
         | None -> begin
-            match parameters with
-            | None -> return ctxt
-            | Some arg ->
-                Script.force_decode ctxt arg >>=? fun (arg, ctxt) -> (* see [note] *)
-                (* [note]: for toplevel ops, cost is nil since the
-                   lazy value has already been forced at precheck, so
-                   we compute and consume the full cost again *)
-                let cost_arg = Script.deserialized_cost arg in
-                Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
-                match Micheline.root arg with
-                | Prim (_, D_Unit, [], _) ->
-                    (* Allow [Unit] parameter to non-scripted contracts. *)
-                    return ctxt
-                | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
+            begin match entrypoint with
+              | "default" -> return ()
+              | entrypoint -> fail (Script_tc_errors.No_such_entrypoint entrypoint)
+            end >>=? fun () ->
+            Script.force_decode ctxt parameters >>=? fun (arg, ctxt) -> (* see [note] *)
+            (* [note]: for toplevel ops, cost is nil since the
+               lazy value has already been forced at precheck, so
+               we compute and consume the full cost again *)
+            let cost_arg = Script.deserialized_cost arg in
+            Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
+            match Micheline.root arg with
+            | Prim (_, D_Unit, [], _) ->
+                (* Allow [Unit] parameter to non-scripted contracts. *)
+                return ctxt
+            | _ -> fail (Script_interpreter.Bad_contract_parameter destination)
           end >>=? fun ctxt ->
             let result =
               Transaction_result
@@ -472,20 +473,12 @@ let apply_manager_operation_content :
                 } in
             return (ctxt, result, [])
         | Some script ->
-            begin match parameters with
-              | None ->
-                  (* Forge a [Unit] parameter that will be checked by [execute]. *)
-                  let unit = Micheline.strip_locations (Prim (0, Script.D_Unit, [], [])) in
-                  return (ctxt, unit)
-              | Some parameters ->
-                  Script.force_decode ctxt parameters >>=? fun (arg, ctxt) -> (* see [note] *)
-                  let cost_arg = Script.deserialized_cost arg in
-                  Lwt.return (Gas.consume ctxt cost_arg) >>=? fun ctxt ->
-                  return (ctxt, arg)
-            end >>=? fun (ctxt, parameter) ->
+            Script.force_decode ctxt parameters >>=? fun (parameter, ctxt) -> (* see [note] *)
+            let cost_parameter = Script.deserialized_cost parameter in
+            Lwt.return (Gas.consume ctxt cost_parameter) >>=? fun ctxt ->
             Script_interpreter.execute
               ctxt mode
-              ~source ~payer ~self:(destination, script) ~amount ~parameter
+              ~source ~payer ~self:(destination, script) ~amount ~parameter ~entrypoint
             >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
             Contract.update_script_storage
               ctxt destination storage big_map_diff >>=? fun ctxt ->
@@ -606,13 +599,13 @@ let precheck_manager_contents
     match operation with
     | Reveal pk ->
         Contract.reveal_manager_key ctxt source pk
-    | Transaction { parameters = Some arg ; _ } ->
+    | Transaction { parameters ; _ } ->
         (* Fail quickly if not enough gas for minimal deserialization cost *)
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
-        Gas.check_enough ctxt (Script.minimal_deserialize_cost arg) >>=? fun () ->
+        Gas.check_enough ctxt (Script.minimal_deserialize_cost parameters) >>=? fun () ->
         (* Fail if not enough gas for complete deserialization cost *)
         trace Gas_quota_exceeded_init_deserialize @@
-        Script.force_decode ctxt arg >>|? fun (_arg, ctxt) -> ctxt
+        Script.force_decode ctxt parameters >>|? fun (_arg, ctxt) -> ctxt
     | Origination { script = Some script ; _ } ->
         (* Fail quickly if not enough gas for minimal deserialization cost *)
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@

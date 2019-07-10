@@ -99,7 +99,10 @@ val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
 
 val parse_toplevel :
-  Script.expr -> (Script.node * Script.node * Script.node) tzresult
+  legacy: bool -> Script.expr -> (Script.node * Script.node * Script.node * string option) tzresult
+
+val add_field_annot :
+  [ `Field_annot of string ] option -> [ `Var_annot of string ] option -> Script.node -> Script.node
 
 val typecheck_code :
   context -> Script.expr -> (type_map * context) tzresult Lwt.t
@@ -119,11 +122,16 @@ val unparse_script :
 
 val parse_contract :
   context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
+  entrypoint: string ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
 val parse_contract_for_script :
   context -> Script.location -> 'a Script_typed_ir.ty -> Contract.t ->
+  entrypoint: string ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
+
+val find_entrypoint :
+  't Script_typed_ir.ty -> root_name: string option -> string -> ((Script.node -> Script.node) * ex_ty) tzresult
 
 val pack_data : context -> 'a Script_typed_ir.ty -> 'a -> (MBytes.t * context) tzresult Lwt.t
 val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (Script_expr_hash.t * context) tzresult Lwt.t

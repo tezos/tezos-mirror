@@ -34,6 +34,8 @@ type field_annot = [ `Field_annot of string ]
 
 type annot = [ var_annot | type_annot | field_annot ]
 
+type address = Contract.t * string
+
 type 'ty comparable_ty =
   | Int_key : type_annot option -> (z num) comparable_ty
   | Nat_key : type_annot option -> (n num) comparable_ty
@@ -43,7 +45,7 @@ type 'ty comparable_ty =
   | Bool_key : type_annot option -> bool comparable_ty
   | Key_hash_key : type_annot option -> public_key_hash comparable_ty
   | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
-  | Address_key : type_annot option -> Contract.t comparable_ty
+  | Address_key : type_annot option -> address comparable_ty
 
 
 module type Boxed_set = sig
@@ -69,7 +71,8 @@ type ('arg, 'storage) script =
   { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     storage : 'storage ;
-    storage_type : 'storage ty }
+    storage_type : 'storage ty ;
+    root_name : string option }
 
 and ('a, 'b) pair = 'a * 'b
 
@@ -80,8 +83,7 @@ and end_of_stack = unit
 and ('arg, 'ret) lambda =
     Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
 
-and 'arg typed_contract =
-  'arg ty * Contract.t
+and 'arg typed_contract = 'arg ty * address
 
 and 'ty ty =
   | Unit_t : type_annot option -> unit ty
@@ -94,7 +96,7 @@ and 'ty ty =
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
   | Timestamp_t : type_annot option -> Script_timestamp.t ty
-  | Address_t : type_annot option -> Contract.t ty
+  | Address_t : type_annot option -> address ty
   | Bool_t : type_annot option -> bool ty
   | Pair_t :
       ('a ty * field_annot option * var_annot option) *
@@ -348,19 +350,19 @@ and ('bef, 'aft) instr =
 
   (* protocol *)
   | Address :
-      (_ typed_contract * 'rest, Contract.t * 'rest) instr
-  | Contract : 'p ty ->
-    (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
+      (_ typed_contract * 'rest, address * 'rest) instr
+  | Contract : 'p ty * string ->
+    (address * 'rest, 'p typed_contract option * 'rest) instr
   | Transfer_tokens :
       ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       packed_internal_operation * (Contract.t * 'rest)) instr
+       packed_internal_operation * (address * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda  ->
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda * string option ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     packed_internal_operation * (Contract.t * 'rest)) instr
+     packed_internal_operation * (address * 'rest)) instr
   | Set_delegate :
       (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
   | Now :
@@ -384,10 +386,10 @@ and ('bef, 'aft) instr =
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :
-      ('rest, Contract.t * 'rest) instr
+      ('rest, address * 'rest) instr
   | Sender :
-      ('rest, Contract.t * 'rest) instr
-  | Self : 'p ty ->
+      ('rest, address * 'rest) instr
+  | Self : 'p ty * string ->
     ('rest, 'p typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr

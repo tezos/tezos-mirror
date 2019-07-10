@@ -40,7 +40,7 @@ type ex_stack_ty = Ex_stack_ty : 'a stack_ty -> ex_stack_ty
 type tc_context =
   | Lambda : tc_context
   | Dip : 'a stack_ty * tc_context -> tc_context
-  | Toplevel : { storage_type : 'sto ty ; param_type : 'param ty } -> tc_context
+  | Toplevel : { storage_type : 'sto ty ; param_type : 'param ty ; root_name : string option } -> tc_context
 
 type unparsing_mode = Optimized | Readable
 
@@ -415,7 +415,12 @@ let compare_comparable
         else if Compare.Int.(res > 0) then 1
         else -1
     | Timestamp_key _ -> Script_timestamp.compare x y
-    | Address_key _ -> Contract.compare x y
+    | Address_key _ ->
+        let x, ex = x and y, ey = y in
+        let lres = Contract.compare x y in
+        if Compare.Int.(lres = 0) then
+          Compare.String.compare ex ey
+        else lres
     | Bytes_key _ -> MBytes.compare x y
 
 let empty_set
@@ -608,8 +613,8 @@ let rec unparse_ty_no_lwt
         unparse_ty_no_lwt ctxt uta >>? fun (ta, ctxt) ->
         unparse_ty_no_lwt ctxt utr >>? fun (tr, ctxt) ->
         return ctxt (T_lambda, [ ta; tr ], unparse_type_annot tname)
-    | Option_t ((ut, some_field), _none_field, tname) ->
-        let annot = unparse_type_annot tname in
+    | Option_t ((ut, some_field), none_field, tname) ->
+        let annot = unparse_type_annot tname @ unparse_field_annot none_field in
         unparse_ty_no_lwt ctxt ut >>? fun (ut, ctxt) ->
         let t = add_field_annot some_field None ut in
         return ctxt (T_option, [ t ], annot)
@@ -832,13 +837,6 @@ let merge_comparable_types
         Address_key annot
     | _, _ -> assert false (* FIXME: fix injectivity of some types *)
 
-let rec strip_annotations = function
-  | (Int (_,_) as i) -> i
-  | (String (_,_) as s) -> s
-  | (Bytes (_,_) as s) -> s
-  | Prim (loc, prim, args, _) -> Prim (loc, prim, List.map strip_annotations args, [])
-  | Seq (loc, items) -> Seq (loc, List.map strip_annotations items)
-
 let merge_types :
   type b. context -> Script.location -> b ty -> b ty -> (b ty * context) tzresult =
   let rec help : type a. context -> a ty -> a ty -> (a ty * context) tzresult
@@ -1051,6 +1049,12 @@ and parse_packable_ty :
   Script.node -> (ex_ty * context) tzresult
   = fun ctxt ~legacy ->
     parse_ty ctxt ~legacy ~allow_big_map:false ~allow_operation:false ~allow_contract:legacy
+
+and parse_parameter_ty :
+  context -> legacy:bool ->
+  Script.node -> (ex_ty * context) tzresult
+  = fun ctxt ~legacy ->
+    parse_ty ctxt ~legacy ~allow_big_map:false ~allow_operation:false ~allow_contract:true
 
 and parse_any_ty :
   context -> legacy:bool ->
@@ -1269,6 +1273,8 @@ type ex_script = Ex_script : ('a, 'c) script -> ex_script
 (* Lwt versions *)
 let parse_var_annot loc ?default annot =
   Lwt.return (parse_var_annot loc ?default annot)
+let parse_entrypoint_annot loc ?default annot =
+  Lwt.return (parse_entrypoint_annot loc ?default annot)
 let parse_constr_annot loc ?if_special_first ?if_special_second annot =
   Lwt.return (parse_constr_annot loc ?if_special_first ?if_special_second annot)
 let parse_two_var_annot loc annot =
@@ -1277,6 +1283,83 @@ let parse_destr_annot loc annot ~default_accessor ~field_name ~pair_annot ~value
   Lwt.return (parse_destr_annot loc annot ~default_accessor ~field_name ~pair_annot ~value_annot)
 let parse_var_type_annot loc annot =
   Lwt.return (parse_var_type_annot loc annot)
+
+
+let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
+  let rec find_entrypoint
+    : type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty)
+    = fun t entrypoint -> match t with
+      | Option_t ((t, a), anone, _) ->
+          if match a with None -> false | Some (`Field_annot l) -> Compare.String.(l = entrypoint) then
+            ((fun e -> Prim (0, D_Some, [ e ], [])), Ex_ty t)
+          else if match anone with None -> false | Some (`Field_annot r) -> Compare.String.(r = entrypoint) then
+            ((fun _e -> Prim (0, D_None, [], [])), Ex_ty (Unit_t None))
+          else
+            let f, t = find_entrypoint t entrypoint in
+            ((fun e -> Prim (0, D_Some, [ f e ], [])), t)
+      | Union_t ((tl, al), (tr, ar), _) ->
+          if match al with None -> false | Some (`Field_annot l) -> Compare.String.(l = entrypoint) then
+            ((fun e -> Prim (0, D_Left, [ e ], [])), Ex_ty tl)
+          else if match ar with None -> false | Some (`Field_annot r) -> Compare.String.(r = entrypoint) then
+            ((fun e -> Prim (0, D_Right, [ e ], [])), Ex_ty tr)
+          else begin try
+              let (f, t) = find_entrypoint tl entrypoint in
+              ((fun e -> Prim (0, D_Left, [ f e ], [])), t)
+            with Not_found ->
+              let (f, t) = find_entrypoint tr entrypoint in
+              ((fun e -> Prim (0, D_Right, [ f e ], [])), t)
+          end
+      | _ -> raise Not_found in
+  let entrypoint = if Compare.String.(entrypoint = "") then "default" else entrypoint in
+  match root_name with
+  | Some root_name when Compare.String.(entrypoint = root_name) ->
+      ok ((fun e -> e), Ex_ty full)
+  | _ ->
+      try ok (find_entrypoint full entrypoint) with Not_found ->
+      match entrypoint with
+      | "default" -> ok ((fun e -> e), Ex_ty full)
+      | _ -> error (No_such_entrypoint entrypoint)
+
+module Entrypoints = Set.Make (String)
+
+let well_formed_entrypoints (type full) (full : full ty) ~root_name =
+  let merge path annot (type t) (ty : t ty) reachable ((first_unreachable, all) as acc) =
+    match annot with
+    | None | Some (`Field_annot "") ->
+        if reachable then acc
+        else begin match ty with
+          | Union_t _ -> acc
+          | _ -> match first_unreachable with
+            | None -> (Some (List.rev path), all)
+            | Some _ -> acc
+        end
+    | Some (`Field_annot name) ->
+        if Entrypoints.mem name all then raise (Failure name)
+        else (first_unreachable, Entrypoints.add name all) in
+  let rec check
+    : type t. t ty -> prim list -> bool -> (prim list) option * Entrypoints.t -> (prim list) option * Entrypoints.t
+    = fun t path reachable acc ->
+      match t with
+      | Option_t ((t, a), anone, _) ->
+          let acc = merge (D_Some :: path) a t reachable acc in
+          let acc = merge (D_None :: path) anone (Unit_t None) reachable acc in
+          check t (D_Some :: path) (match a with Some _ -> true | None -> reachable) acc
+      | Union_t ((tl, al), (tr, ar), _) ->
+          let acc = merge (D_Left :: path) al tl reachable acc in
+          let acc = merge (D_Right :: path) ar tr reachable acc in
+          let acc = check tl (D_Left :: path) (match al with Some _ -> true | None -> reachable) acc in
+          check tr (D_Right :: path) (match ar with Some _ -> true | None -> reachable) acc
+      | _ -> acc in
+  try
+    let init, reachable = match root_name with
+      | None | Some "" -> Entrypoints.empty, false
+      | Some name -> Entrypoints.singleton name, true in
+    let first_unreachable, all = check full [] reachable (None, init) in
+    if not (Entrypoints.mem "default" all) then ok ()
+    else match first_unreachable with
+      | None -> ok ()
+      | Some path -> error (Unreachable_entrypoint path)
+  with (Failure name) -> error (Duplicate_entrypoint name)
 
 let rec parse_data
   : type a.
@@ -1453,35 +1536,77 @@ let rec parse_data
            the protocol should never parse the bytes of an operation *)
         assert false
     (* Addresses *)
-    | Address_t _, Bytes (_, bytes) (* As unparsed with [O[ptimized]. *) ->
+    | Address_t _, Bytes (loc, bytes) (* As unparsed with [O[ptimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          match Data_encoding.Binary.of_bytes Contract.encoding bytes with
-          | Some c -> return (c, ctxt)
+          match Data_encoding.Binary.of_bytes
+                  Data_encoding.(tup2 Contract.encoding Variable.string)
+                  bytes with
+          | Some (c, entrypoint) ->
+              if Compare.Int.(String.length entrypoint > 31) then
+                fail (Entrypoint_name_too_long entrypoint)
+              else
+                begin match entrypoint with
+                  | "" -> return "default"
+                  | "default" -> fail (Unexpected_annotation loc)
+                  | name -> return name end >>=? fun entrypoint ->
+                return ((c, entrypoint), ctxt)
           | None -> error () >>=? fail
         end
-    | Address_t _, String (_, s) (* As unparsed with [Readable]. *) ->
+    | Address_t _, String (loc, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
-        traced (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
-        return (c, ctxt)
+        begin match String.index_opt s '%' with
+          | None -> return (s, "default")
+          | Some pos ->
+              let len = String.length s - pos - 1 in
+              let name = String.sub s (pos + 1) len in
+              if Compare.Int.(len > 31) then
+                fail (Entrypoint_name_too_long name)
+              else
+                match String.sub s 0 pos, name with
+                | _, "default" -> traced (fail (Unexpected_annotation loc))
+                | addr_and_name -> return addr_and_name
+        end >>=? fun (addr, entrypoint) ->
+        Lwt.return (Contract.of_b58check addr) >>=? fun c ->
+        return ((c, entrypoint), ctxt)
     | Address_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Contracts *)
     | Contract_t (ty, _), Bytes (loc, bytes) (* As unparsed with [Optimized]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
         begin
-          match Data_encoding.Binary.of_bytes Contract.encoding bytes with
-          | Some c ->
-              traced (parse_contract ctxt loc ty c) >>=? fun (ctxt, _) ->
-              return ((ty, c), ctxt)
+          match Data_encoding.Binary.of_bytes
+                  Data_encoding.(tup2 Contract.encoding Variable.string)
+                  bytes with
+          | Some (c, entrypoint) ->
+              if Compare.Int.(String.length entrypoint > 31) then
+                fail (Entrypoint_name_too_long entrypoint)
+              else
+                begin match entrypoint with
+                  | "" -> return "default"
+                  | "default" -> traced (fail (Unexpected_annotation loc))
+                  | name -> return name end >>=? fun entrypoint ->
+                traced (parse_contract ctxt loc ty c ~entrypoint) >>=? fun (ctxt, _) ->
+                return ((ty, (c, entrypoint)), ctxt)
           | None -> error () >>=? fail
         end
     | Contract_t (ty, _), String (loc, s) (* As unparsed with [Readable]. *) ->
         Lwt.return (Gas.consume ctxt Typecheck_costs.contract) >>=? fun ctxt ->
-        traced @@
-        Lwt.return (Contract.of_b58check s) >>=? fun c ->
-        parse_contract ctxt loc ty c >>=? fun (ctxt, _) ->
-        return ((ty, c), ctxt)
+        begin match String.index_opt s '%' with
+          | None -> return (s, "default")
+          | Some pos ->
+              let len = String.length s - pos - 1 in
+              let name = String.sub s (pos + 1) len in
+              if Compare.Int.(len > 31) then
+                fail (Entrypoint_name_too_long name)
+              else
+                match String.sub s 0 pos, name with
+                | _, "default" -> traced (fail (Unexpected_annotation loc))
+                | addr_and_name -> return addr_and_name
+        end >>=? fun (addr, entrypoint) ->
+        traced (Lwt.return (Contract.of_b58check addr)) >>=? fun c ->
+        parse_contract ctxt loc ty c ~entrypoint >>=? fun (ctxt, _) ->
+        return ((ty, (c, entrypoint)), ctxt)
     | Contract_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ; Bytes_kind ], kind expr)))
     (* Pairs *)
@@ -1596,8 +1721,8 @@ and parse_returning
   : type arg ret.
     ?type_logger: type_logger ->
     tc_context -> context -> legacy:bool ->
-    arg ty * var_annot option -> ret ty -> Script.node ->
-    ((arg, ret) lambda * context) tzresult Lwt.t =
+  arg ty * var_annot option -> ret ty -> Script.node ->
+  ((arg, ret) lambda * context) tzresult Lwt.t =
   fun ?type_logger tc_context ctxt ~legacy (arg, arg_annot) ret script_instr ->
     parse_instr ?type_logger tc_context ctxt ~legacy
       script_instr (Item_t (arg, Empty_t, arg_annot)) >>=? function
@@ -1622,7 +1747,7 @@ and parse_instr
   : type bef.
     ?type_logger: type_logger ->
     tc_context -> context -> legacy: bool ->
-    Script.node -> bef stack_ty -> (bef judgement * context) tzresult Lwt.t =
+  Script.node -> bef stack_ty -> (bef judgement * context) tzresult Lwt.t =
   fun ?type_logger tc_context ctxt ~legacy script_instr stack_ty ->
     let check_item check loc name n m =
       trace_eval (fun () ->
@@ -2543,9 +2668,14 @@ and parse_instr
     | Prim (loc, I_CONTRACT, [ ty ], annot),
       Item_t (Address_t _, rest, addr_annot) ->
         Lwt.return @@ parse_ty ctxt ~legacy ~allow_big_map:false ~allow_operation:false ~allow_contract:true ty >>=? fun (Ex_ty t, ctxt) ->
-        parse_var_annot loc annot ~default:(gen_access_annot addr_annot default_contract_annot)
-        >>=? fun annot ->
-        typed ctxt loc (Contract t)
+        parse_entrypoint_annot loc annot ~default:(gen_access_annot addr_annot default_contract_annot)
+        >>=? fun (annot, entrypoint) ->
+        Lwt.return @@ begin match entrypoint with
+          | None -> Ok "default"
+          | Some (`Field_annot "default") -> error (Unexpected_annotation loc)
+          | Some (`Field_annot entrypoint) -> Ok entrypoint
+        end >>=? fun entrypoint ->
+        typed ctxt loc (Contract (t, entrypoint))
           (Item_t (Option_t ((Contract_t (t, None), None), None, None), rest, annot))
     | Prim (loc, I_TRANSFER_TOKENS, [], annot),
       Item_t (p, Item_t
@@ -2582,11 +2712,12 @@ and parse_instr
                        (ginit, rest, _), _), _), _), _), _) ->
         parse_two_var_annot loc annot >>=? fun (op_annot, addr_annot) ->
         let cannonical_code = fst @@ Micheline.extract_locations code in
-        Lwt.return @@ parse_toplevel cannonical_code >>=? fun (arg_type, storage_type, code_field) ->
+        Lwt.return @@ parse_toplevel ~legacy cannonical_code >>=? fun (arg_type, storage_type, code_field, root_name) ->
         trace
           (Ill_formed_type (Some "parameter", cannonical_code, location arg_type))
-          (Lwt.return @@ parse_packable_ty ctxt ~legacy arg_type)
+          (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
         >>=? fun (Ex_ty arg_type, ctxt) ->
+        Lwt.return (well_formed_entrypoints ~root_name arg_type) >>=? fun () ->
         trace
           (Ill_formed_type (Some "storage", cannonical_code, location storage_type))
           (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
@@ -2602,7 +2733,7 @@ and parse_instr
                   (storage_type, None, None), None) in
         trace
           (Ill_typed_contract (cannonical_code, []))
-          (parse_returning (Toplevel { storage_type ; param_type = arg_type })
+          (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name })
              ctxt ~legacy ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
         fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
                     aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda, ctxt) ->
@@ -2612,7 +2743,7 @@ and parse_instr
         Lwt.return @@ merge_types ctxt loc ret ret_type_full >>=? fun (_, ctxt) ->
         Lwt.return @@ ty_eq ctxt storage_type ginit >>=? fun (Eq, ctxt) ->
         Lwt.return @@ merge_types ctxt loc storage_type ginit >>=? fun (_, ctxt) ->
-        typed ctxt loc (Create_contract (storage_type, arg_type, lambda))
+        typed ctxt loc (Create_contract (storage_type, arg_type, lambda, root_name))
           (Item_t (Operation_t None, Item_t (Address_t None, rest, addr_annot), op_annot))
     | Prim (loc, I_NOW, [], annot),
       stack ->
@@ -2670,12 +2801,15 @@ and parse_instr
           (Item_t (Address_t None, stack, annot))
     | Prim (loc, I_SELF, [], annot),
       stack ->
-        parse_var_annot loc annot ~default:default_self_annot >>=? fun annot ->
+        parse_entrypoint_annot loc annot ~default:default_self_annot
+        >>=? fun (annot, entrypoint) ->
+        let entrypoint = Option.unopt_map ~f:(fun (`Field_annot annot) -> annot) ~default:"default" entrypoint in
         let rec get_toplevel_type : tc_context -> (bef judgement * context) tzresult Lwt.t = function
           | Lambda -> fail (Self_in_lambda loc)
           | Dip (_, prev) -> get_toplevel_type prev
-          | Toplevel { param_type ; _ } ->
-              typed ctxt loc (Self param_type)
+          | Toplevel { param_type ; root_name ; _ } ->
+              Lwt.return (find_entrypoint param_type ~root_name entrypoint) >>=? fun (_, Ex_ty param_type) ->
+              typed ctxt loc (Self (param_type, entrypoint))
                 (Item_t (Contract_t (param_type, None), stack, annot)) in
         get_toplevel_type tc_context
     (* Primitive parsing errors *)
@@ -2690,13 +2824,13 @@ and parse_instr
                  | I_COMPARE | I_EQ | I_NEQ
                  | I_LT | I_GT | I_LE | I_GE
                  | I_TRANSFER_TOKENS | I_CREATE_ACCOUNT
-                 | I_CREATE_CONTRACT | I_SET_DELEGATE | I_NOW
+                 | I_SET_DELEGATE | I_NOW
                  | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE
                  | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER
                  | I_BLAKE2B | I_SHA256 | I_SHA512 | I_STEPS_TO_QUOTA | I_ADDRESS
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
-    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
+    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER | I_CREATE_CONTRACT
                  | I_EMPTY_SET | I_DIP | I_LOOP | I_LOOP_LEFT | I_CONTRACT
                  as name), ([]
                            | _ :: _ :: _ as l), _), _ ->
@@ -2727,7 +2861,7 @@ and parse_instr
       stack ->
         serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->
         fail (Bad_stack (loc, name, 3, stack))
-    | Prim (loc, I_CREATE_CONTRACT, [], _),
+    | Prim (loc, I_CREATE_CONTRACT, _, _),
       stack ->
         serialize_stack_for_error ctxt stack >>=? fun (stack, _ctxt) ->
         fail (Bad_stack (loc, I_CREATE_CONTRACT, 7, stack))
@@ -2780,9 +2914,9 @@ and parse_instr
             I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SENDER ; I_SELF ; I_LAMBDA ]
 
 and parse_contract
-  : type arg. context -> Script.location -> arg ty -> Contract.t ->
-    (context * arg typed_contract) tzresult Lwt.t
-  = fun ctxt loc arg contract ->
+  : type arg. context -> Script.location -> arg ty -> Contract.t -> entrypoint:string ->
+  (context * arg typed_contract) tzresult Lwt.t
+  = fun ctxt loc arg contract ~entrypoint ->
     Lwt.return @@ Gas.consume ctxt Typecheck_costs.contract_exists >>=? fun ctxt ->
     Contract.exists ctxt contract >>=? function
     | false -> fail (Invalid_contract (loc, contract))
@@ -2794,26 +2928,32 @@ and parse_contract
         | None ->
             Lwt.return
               (ty_eq ctxt arg (Unit_t None) >>? fun (Eq, ctxt) ->
-               let contract : arg typed_contract = (arg, contract) in
-               ok (ctxt, contract))
+               match entrypoint with
+               | "default" ->
+                   let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+                   ok (ctxt, contract)
+               | entrypoint -> error (No_such_entrypoint entrypoint))
         | Some code ->
             Script.force_decode ctxt code >>=? fun (code, ctxt) ->
             Lwt.return
-              (parse_toplevel code >>? fun (arg_type, _, _) ->
-               parse_packable_ty ctxt ~legacy:true arg_type >>? fun (Ex_ty targ, ctxt) ->
+              (parse_toplevel ~legacy:true code >>? fun (arg_type, _, _, root_name) ->
+               parse_parameter_ty ctxt ~legacy:true arg_type >>? fun (Ex_ty targ, ctxt) ->
+               let return ctxt targ entrypoint =
+                 merge_types ctxt loc targ arg >>? fun (arg, ctxt) ->
+                 let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+                 ok (ctxt, contract) in
+               find_entrypoint targ root_name entrypoint >>? fun (_, Ex_ty targ) ->
                ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
-               merge_types ctxt loc targ arg >>? fun (arg, ctxt) ->
-               let contract : arg typed_contract = (arg, contract) in
-               ok (ctxt, contract))
+               return ctxt targ entrypoint)
 
 (* Same as the one above, but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
    returned and some overapproximation of the typechecking gas is consumed.
    This can still fail on gas exhaustion. *)
 and parse_contract_for_script
-  : type arg. context -> Script.location -> arg ty -> Contract.t ->
-    (context * arg typed_contract option) tzresult Lwt.t
-  = fun ctxt loc arg contract ->
+  : type arg. context -> Script.location -> arg ty -> Contract.t -> entrypoint:string ->
+  (context * arg typed_contract option) tzresult Lwt.t
+  = fun ctxt loc arg contract ~entrypoint ->
     Lwt.return @@ Gas.consume ctxt Typecheck_costs.contract_exists >>=? fun ctxt ->
     Contract.exists ctxt contract >>=? function
     | false -> return (ctxt, None)
@@ -2823,41 +2963,48 @@ and parse_contract_for_script
           (Invalid_contract (loc, contract)) @@
         Contract.get_script_code ctxt contract >>=? fun (ctxt, code) -> match code with (* can only fail because of gas *)
         | None ->
-            Lwt.return
-              (match ty_eq ctxt arg (Unit_t None) with
-               | Ok (Eq, ctxt) ->
-                   let contract : arg typed_contract = (arg, contract) in
-                   ok (ctxt, Some contract)
-               | Error _ ->
-                   Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
-                   ok (ctxt, None))
+            begin match entrypoint with
+              | "default" ->
+                  Lwt.return
+                    (match ty_eq ctxt arg (Unit_t None) with
+                     | Ok (Eq, ctxt) ->
+                         let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+                         ok (ctxt, Some contract)
+                     | Error _ ->
+                         Gas.consume ctxt Typecheck_costs.cycle >>? fun ctxt ->
+                         ok (ctxt, None))
+              | _ -> return (ctxt, None)
+            end
         | Some code ->
             Script.force_decode ctxt code >>=? fun (code, ctxt) -> (* can only fail because of gas *)
             Lwt.return
-              (match parse_toplevel code with
+              (match parse_toplevel ~legacy:true code with
                | Error _ -> error (Invalid_contract (loc, contract))
-               | Ok (arg_type, _, _) ->
-                   match parse_packable_ty ctxt ~legacy:true arg_type with
+               | Ok (arg_type, _, _, root_name) ->
+                   match parse_parameter_ty ctxt ~legacy:true arg_type with
                    | Error _ ->
                        error (Invalid_contract (loc, contract))
                    | Ok (Ex_ty targ, ctxt) ->
                        match
-                         (ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
-                          merge_types ctxt loc targ arg >>? fun (arg, ctxt) ->
-                          let contract : arg typed_contract = (arg, contract) in
-                          ok (ctxt, Some contract))
+                         let return ctxt targ entrypoint =
+                           merge_types ctxt loc targ arg >>? fun (arg, ctxt) ->
+                           let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+                           ok (ctxt, Some contract) in
+                         find_entrypoint targ ~root_name entrypoint >>? fun (_, Ex_ty targ) ->
+                         ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
+                         return ctxt targ entrypoint
                        with
                        | Ok res -> ok res
                        | Error _ ->
                            (* overapproximation by checking if targ = targ,
-                              can only fail because of gas *)
+                                                       can only fail because of gas *)
                            ty_eq ctxt targ targ >>? fun (Eq, ctxt) ->
                            merge_types ctxt loc targ targ >>? fun (_, ctxt) ->
                            ok (ctxt, None))
 
 and parse_toplevel
-  : Script.expr -> (Script.node * Script.node * Script.node) tzresult
-  = fun toplevel ->
+  : legacy: bool -> Script.expr -> (Script.node * Script.node * Script.node * string option) tzresult
+  = fun ~legacy toplevel ->
     record_trace (Ill_typed_contract (toplevel, [])) @@
     match root toplevel with
     | Int (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Int_kind))
@@ -2872,19 +3019,19 @@ and parse_toplevel
           | String (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], String_kind))
           | Bytes (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Bytes_kind))
           | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Seq_kind))
-          | Prim (loc, K_parameter, [ arg ], _) :: rest ->
+          | Prim (loc, K_parameter, [ arg ], annot) :: rest ->
               begin match p with
-                | None -> find_fields (Some arg) s c rest
+                | None -> find_fields (Some (arg, loc, annot)) s c rest
                 | Some _ -> error (Duplicate_field (loc, K_parameter))
               end
-          | Prim (loc, K_storage, [ arg ], _) :: rest ->
+          | Prim (loc, K_storage, [ arg ], annot) :: rest ->
               begin match s with
-                | None -> find_fields p (Some arg) c rest
+                | None -> find_fields p (Some (arg, loc, annot)) c rest
                 | Some _ -> error (Duplicate_field (loc, K_storage))
               end
-          | Prim (loc, K_code, [ arg ], _) :: rest ->
+          | Prim (loc, K_code, [ arg ], annot) :: rest ->
               begin match c with
-                | None -> find_fields p s (Some arg) rest
+                | None -> find_fields p s (Some (arg, loc, annot)) rest
                 | Some _ -> error (Duplicate_field (loc, K_code))
               end
           | Prim (loc, (K_parameter | K_storage | K_code as name), args, _) :: _ ->
@@ -2897,7 +3044,30 @@ and parse_toplevel
         | (None, _, _) -> error (Missing_field K_parameter)
         | (Some _, None, _) -> error (Missing_field K_storage)
         | (Some _, Some _, None) -> error (Missing_field K_code)
-        | (Some p, Some s, Some c) -> ok (p, s, c)
+        | (Some (p, ploc, pannot), Some (s, sloc, sannot), Some (c, cloc, carrot)) ->
+            let maybe_root_name =
+              (* root name can be attached to either the parameter
+                 primitive or the toplevel constructor *)
+              Script_ir_annot.extract_field_annot p >>? fun (p, root_name) ->
+              match root_name with
+              | Some (`Field_annot root_name) ->
+                  ok (p, pannot, Some root_name)
+              | None ->
+                  match pannot with
+                  | [ single ] when Compare.Int.(String.length single > 0) && Compare.Char.(String.get single 0 = '%') ->
+                      ok (p, [], Some (String.sub single 1 (String.length single - 1)))
+                  | _ -> ok (p, pannot, None) in
+            if legacy then
+              (* legacy semantics ignores spurious annotations *)
+              let p, root_name = match maybe_root_name with Ok (p, _, root_name) -> (p, root_name) | Error _ -> (p, None) in
+              ok (p, s, c, root_name)
+            else
+              (* only one field annot is allowed to set the root entrypoint name *)
+              maybe_root_name >>? fun (p, pannot, root_name) ->
+              Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
+              Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
+              Script_ir_annot.error_unexpected_annot sloc sannot >>? fun () ->
+              ok (p, s, c, root_name)
 
 let parse_script
   : ?type_logger: type_logger ->
@@ -2905,11 +3075,12 @@ let parse_script
   = fun ?type_logger ctxt ~legacy { code ; storage } ->
     Script.force_decode ctxt code >>=? fun (code, ctxt) ->
     Script.force_decode ctxt storage >>=? fun (storage, ctxt) ->
-    Lwt.return @@ parse_toplevel code >>=? fun (arg_type, storage_type, code_field) ->
+    Lwt.return @@ parse_toplevel ~legacy code >>=? fun (arg_type, storage_type, code_field, root_name) ->
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
-      (Lwt.return (parse_packable_ty ctxt ~legacy arg_type))
+      (Lwt.return (parse_parameter_ty ctxt ~legacy arg_type))
     >>=? fun (Ex_ty arg_type, ctxt) ->
+    Lwt.return (well_formed_entrypoints ~root_name arg_type) >>=? fun () ->
     trace
       (Ill_formed_type (Some "storage", code, location storage_type))
       (Lwt.return (parse_storage_ty ctxt ~legacy storage_type))
@@ -2930,21 +3101,21 @@ let parse_script
       (parse_data ?type_logger ctxt ~legacy storage_type (root storage)) >>=? fun (storage, ctxt) ->
     trace
       (Ill_typed_contract (code, []))
-      (parse_returning (Toplevel { storage_type ; param_type = arg_type })
+      (parse_returning (Toplevel { storage_type ; param_type = arg_type ; root_name })
          ctxt ~legacy ?type_logger (arg_type_full, None) ret_type_full code_field) >>=? fun (code, ctxt) ->
-    return (Ex_script { code ; arg_type ; storage ; storage_type }, ctxt)
+    return (Ex_script { code ; arg_type ; storage ; storage_type ; root_name }, ctxt)
 
 let typecheck_code
   : context -> Script.expr -> (type_map * context) tzresult Lwt.t
   = fun ctxt code ->
-    Lwt.return @@ parse_toplevel code >>=? fun (arg_type, storage_type, code_field) ->
     let legacy = false in
+    Lwt.return @@ parse_toplevel ~legacy code >>=? fun (arg_type, storage_type, code_field, root_name) ->
     let type_map = ref [] in
-    (* TODO: annotation checking *)
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
-      (Lwt.return (parse_packable_ty ctxt ~legacy  arg_type))
+      (Lwt.return (parse_parameter_ty ctxt ~legacy  arg_type))
     >>=? fun (Ex_ty arg_type, ctxt) ->
+    Lwt.return (well_formed_entrypoints ~root_name arg_type) >>=? fun () ->
     trace
       (Ill_formed_type (Some "storage", code, location storage_type))
       (Lwt.return (parse_storage_ty ctxt ~legacy storage_type))
@@ -2960,7 +3131,7 @@ let typecheck_code
               (storage_type, None, None), None) in
     let result =
       parse_returning
-        (Toplevel { storage_type ; param_type = arg_type })
+        (Toplevel { storage_type ; param_type = arg_type ; root_name })
         ctxt ~legacy
         ~type_logger: (fun loc bef aft -> type_map := (loc, (bef, aft)) :: !type_map)
         (arg_type_full, None) ret_type_full code_field in
@@ -3023,23 +3194,37 @@ let rec unparse_data
               | None -> return (Int (-1, Script_timestamp.to_zint t), ctxt)
               | Some s -> return (String (-1, s), ctxt)
         end
-    | Address_t _, c  ->
+    | Address_t _, (c, entrypoint)  ->
         Lwt.return (Gas.consume ctxt Unparse_costs.contract) >>=? fun ctxt ->
         begin
           match mode with
           | Optimized ->
-              let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
+              let entrypoint = match entrypoint with "default" -> "" | name -> name in
+              let bytes = Data_encoding.Binary.to_bytes_exn
+                  Data_encoding.(tup2 Contract.encoding Variable.string)
+                  (c, entrypoint) in
               return (Bytes (-1, bytes), ctxt)
-          | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
+          | Readable ->
+              let notation = match entrypoint with
+                | "default" -> Contract.to_b58check c
+                | entrypoint -> Contract.to_b58check c ^ "%" ^ entrypoint in
+              return (String (-1, notation), ctxt)
         end
-    | Contract_t _, (_, c)  ->
+    | Contract_t _, (_, (c, entrypoint))  ->
         Lwt.return (Gas.consume ctxt Unparse_costs.contract) >>=? fun ctxt ->
         begin
           match mode with
           | Optimized ->
-              let bytes = Data_encoding.Binary.to_bytes_exn Contract.encoding c in
+              let entrypoint = match entrypoint with "default" -> "" | name -> name in
+              let bytes = Data_encoding.Binary.to_bytes_exn
+                  Data_encoding.(tup2 Contract.encoding Variable.string)
+                  (c, entrypoint) in
               return (Bytes (-1, bytes), ctxt)
-          | Readable -> return (String (-1, Contract.to_b58check c), ctxt)
+          | Readable ->
+              let notation = match entrypoint with
+                | "default" -> Contract.to_b58check c
+                | entrypoint -> Contract.to_b58check c ^ "%" ^ entrypoint in
+              return (String (-1, notation), ctxt)
         end
     | Signature_t _, s ->
         Lwt.return (Gas.consume ctxt Unparse_costs.signature) >>=? fun ctxt ->
@@ -3162,12 +3347,13 @@ and unparse_code ctxt mode =
   | Int _ | String _ | Bytes _ as atom -> return (atom, ctxt)
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
+let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type ; root_name } =
   let Lam (_, original_code) = code in
   unparse_code ctxt mode (root original_code) >>=? fun (code, ctxt) ->
   unparse_data ctxt mode storage_type storage >>=? fun (storage, ctxt) ->
   unparse_ty ctxt arg_type >>=? fun (arg_type, ctxt) ->
   unparse_ty ctxt storage_type >>=? fun (storage_type, ctxt) ->
+  let arg_type = add_field_annot (Option.map ~f:(fun n -> `Field_annot n) root_name) None arg_type in
   let open Micheline in
   let code =
     Seq (-1, [ Prim (-1, K_parameter, [ arg_type ], []) ;
@@ -3182,8 +3368,7 @@ let unparse_script ctxt mode { code ; arg_type ; storage ; storage_type } =
             storage = lazy_expr (strip_locations storage) }, ctxt)
 
 let pack_data ctxt typ data =
-  unparse_data ctxt Optimized typ data >>=? fun (data, ctxt) ->
-  let unparsed = strip_annotations @@ data in
+  unparse_data ctxt Optimized typ data >>=? fun (unparsed, ctxt) ->
   let bytes = Data_encoding.Binary.to_bytes_exn expr_encoding (Micheline.strip_locations unparsed) in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes) >>=? fun ctxt ->
   let bytes = MBytes.concat "" [ MBytes.of_string "\005" ; bytes ] in

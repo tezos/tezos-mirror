@@ -40,7 +40,7 @@ module Scripts : sig
   val run_code:
     'a #RPC_context.simple ->
     'a -> Script.expr ->
-    (Script.expr * Script.expr * Tez.t * Contract.t option * Contract.t option * Z.t option) ->
+    (Script.expr * Script.expr * Tez.t * Contract.t option * Contract.t option * Z.t option * string) ->
     (Script.expr *
      packed_internal_operation list *
      Contract.big_map_diff option) shell_tzresult Lwt.t
@@ -48,7 +48,7 @@ module Scripts : sig
   val trace_code:
     'a #RPC_context.simple ->
     'a -> Script.expr ->
-    (Script.expr * Script.expr * Tez.t * Contract.t option * Contract.t option* Z.t option) ->
+    (Script.expr * Script.expr * Tez.t * Contract.t option * Contract.t option * Z.t option * string) ->
     (Script.expr *
      packed_internal_operation list *
      Script_interpreter.execution_trace *
@@ -106,6 +106,7 @@ module Forge : sig
       counter:counter ->
       amount:Tez.t ->
       destination:Contract.t ->
+      ?entrypoint:string ->
       ?parameters:Script.expr ->
       gas_limit:Z.t ->
       storage_limit:Z.t ->
