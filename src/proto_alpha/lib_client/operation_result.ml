@@ -31,7 +31,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
   ( match operation with
-  | Transaction {destination; amount; parameters} ->
+  | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:@,Amount: %s%a@,From: %a@,To: %a"
@@ -43,20 +43,22 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Contract.pp
         destination ;
-      ( match parameters with
-      | None ->
+      ( match entrypoint with
+      | "default" ->
           ()
-      | Some expr ->
-          let expr =
-            Option.unopt_exn
-              (Failure "ill-serialized argument")
-              (Data_encoding.force_decode expr)
-          in
-          Format.fprintf
-            ppf
-            "@,Parameter: @[<v 0>%a@]"
-            Michelson_v1_printer.print_expr
-            expr ) ;
+      | _ ->
+          Format.fprintf ppf "@,Entrypoint: %s" entrypoint ) ;
+      ( if not (Script_repr.is_unit_parameter parameters) then
+        let expr =
+          Option.unopt_exn
+            (Failure "ill-serialized argument")
+            (Data_encoding.force_decode parameters)
+        in
+        Format.fprintf
+          ppf
+          "@,Parameter: @[<v 0>%a@]"
+          Michelson_v1_printer.print_expr
+          expr ) ;
       pp_result ppf result ; Format.fprintf ppf "@]"
   | Origination
       {

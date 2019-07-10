@@ -170,6 +170,13 @@ let source_arg =
     ~doc:"source of the deposits to be paid\nMust be a known address."
     string_parameter
 
+let entrypoint_arg =
+  arg
+    ~long:"entrypoint"
+    ~placeholder:"name"
+    ~doc:"entrypoint of the smart contract"
+    string_parameter
+
 let spendable_switch =
   switch
     ~long:"spendable"

@@ -44,6 +44,8 @@ val arg_arg : (string option, full) Clic.arg
 
 val source_arg : (string option, full) Clic.arg
 
+val entrypoint_arg : (string option, full) Clic.arg
+
 val delegate_arg : (Signature.Public_key_hash.t option, full) Clic.arg
 
 val delegatable_switch : (bool, full) Clic.arg

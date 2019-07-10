@@ -160,7 +160,7 @@ module Scripts = struct
                    (req "script" Script.expr_encoding)
                    (dft "entrypoint" string "default"))
         ~output: (obj1
-                    (req "entrypoint_type" (option Script.expr_encoding)))
+                    (req "entrypoint_type" Script.expr_encoding))
         RPC_path.(path / "entrypoint")
 
 
@@ -364,11 +364,9 @@ module Scripts = struct
             ~allow_contract:true arg_type >>? fun (Ex_ty arg_type, _) ->
           Script_ir_translator.find_entrypoint ~root_name arg_type
             entrypoint
-        end >>= function
-        Ok (_f , Ex_ty ty)->
-          unparse_ty ctxt ty >>=? fun (ty_node, _) ->
-          return_some (Micheline.strip_locations ty_node)
-      | Error _ -> return_none
+        end >>=? fun (_f , Ex_ty ty)->
+      unparse_ty ctxt ty >>=? fun (ty_node, _) ->
+      return (Micheline.strip_locations ty_node)
     end ;
     register0 S.list_entrypoints begin fun ctxt () expr ->
       let ctxt = Gas.set_unlimited ctxt in

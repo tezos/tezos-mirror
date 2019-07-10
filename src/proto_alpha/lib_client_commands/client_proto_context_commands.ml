@@ -571,7 +571,7 @@ let commands version () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args14
+      (args15
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -585,7 +585,8 @@ let commands version () =
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
+         burn_cap_arg
+         entrypoint_arg)
       ( prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
@@ -610,7 +611,8 @@ let commands version () =
              minimal_nanotez_per_gas_unit,
              force_low_fee,
              fee_cap,
-             burn_cap )
+             burn_cap,
+             entrypoint )
            amount
            (_, source)
            (_, destination)
@@ -640,6 +642,7 @@ let commands version () =
           ~src_pk
           ~src_sk
           ~destination
+          ?entrypoint
           ?arg
           ~amount
           ?gas_limit

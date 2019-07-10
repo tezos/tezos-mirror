@@ -120,23 +120,25 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas () =
+    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
+    ?(entrypoint = "default") () =
   Alpha_services.Helpers.Scripts.run_code
     cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas)
+    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas () =
+    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
+    ?(entrypoint = "default") () =
   Alpha_services.Helpers.Scripts.trace_code
     cctxt
     (chain, block)
     program.expanded
-    (storage.expanded, input.expanded, amount, source, payer, gas)
+    (storage.expanded, input.expanded, amount, source, payer, gas, entrypoint)
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()

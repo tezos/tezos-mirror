@@ -74,7 +74,7 @@ module Scripts : sig
 
   val entrypoint_type:
     'a #RPC_context.simple ->
-    'a -> Script.expr * string -> Script.expr option shell_tzresult Lwt.t
+    'a -> Script.expr * string -> Script.expr shell_tzresult Lwt.t
 
   val list_entrypoints:
     'a #RPC_context.simple ->

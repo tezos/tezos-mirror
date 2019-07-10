@@ -42,6 +42,7 @@ val run :
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Z.t ->
+  ?entrypoint:string ->
   unit ->
   (Script.expr * packed_internal_operation list * Contract.big_map_diff option)
   tzresult
@@ -58,6 +59,7 @@ val trace :
   ?source:Contract.t ->
   ?payer:Contract.t ->
   ?gas:Z.t ->
+  ?entrypoint:string ->
   unit ->
   ( Script.expr
   * packed_internal_operation list

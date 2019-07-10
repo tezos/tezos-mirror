@@ -150,13 +150,14 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args6
+      (args7
          trace_stack_switch
          amount_arg
          source_arg
          payer_arg
          no_print_source_flag
-         custom_gas_flag)
+         custom_gas_flag
+         entrypoint_arg)
       ( prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
@@ -164,7 +165,7 @@ let commands () =
       @@ prefixes ["and"; "input"]
       @@ Clic.param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop )
-      (fun (trace_exec, amount, source, payer, no_print_source, gas)
+      (fun (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
            program
            storage
            input
@@ -186,6 +187,7 @@ let commands () =
             ?source
             ?payer
             ?gas
+            ?entrypoint
             ()
           >>= fun res ->
           print_trace_result cctxt ~show_source ~parsed:program res
@@ -201,6 +203,7 @@ let commands () =
             ?source
             ?payer
             ?gas
+            ?entrypoint
             ()
           >>= fun res ->
           print_run_result cctxt ~show_source ~parsed:program res);
