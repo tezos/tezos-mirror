@@ -38,6 +38,7 @@ files="$@"
 if [ -z "$files" ]; then
 files=` find . \( -name _build -or \
                   -name .git -or \
+                  -name vendors -or \
                   -name _opam -or \
                   -wholename ./src/environment/v1.ml -or \
                   -name ocplib-json-typed -or \
