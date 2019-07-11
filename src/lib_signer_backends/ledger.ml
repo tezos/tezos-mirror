@@ -364,7 +364,7 @@ module Ledger_uri = struct
 
   type t = [ `Ledger of Ledger_id.t | `Ledger_account of Ledger_account.t ]
 
-  let int32_of_path_element_exn ?(allow_weak = false) x =
+  let int32_of_path_element_exn ?(allow_weak = true) x =
     let failf ppf = Printf.ksprintf Pervasives.failwith ppf in
     let len = String.length x in
     match String.get x (len - 1) with
@@ -381,7 +381,6 @@ module Ledger_uri = struct
           | None -> failf "Path is not a non-hardened integer: %S" x
         end
     | _ ->
-        (* Future derivation schemes will support weak paths, not for now. *)
         failf "Non-hardened paths are not allowed (%S)" x
 
   let parse_animals animals =
