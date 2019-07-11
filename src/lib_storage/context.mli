@@ -87,8 +87,8 @@ val fold:
 val exists: index -> Context_hash.t -> bool Lwt.t
 val checkout: index -> Context_hash.t -> context option Lwt.t
 val checkout_exn: index -> Context_hash.t -> context Lwt.t
-val hash:   time:Time.Protocol.t ->
-  ?message:string -> t -> Context_hash.t Lwt.t
+val hash:   time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
+
 val commit:
   time:Time.Protocol.t ->
   ?message:string ->

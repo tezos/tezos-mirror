@@ -43,11 +43,12 @@ module type Dump_interface = sig
   type key = step list
   type commit_info
 
+  type batch
+  val batch : index -> (batch -> 'a Lwt.t) -> 'a Lwt.t
+
   val commit_info_encoding : commit_info Data_encoding.t
 
   val hash_encoding : hash Data_encoding.t
-  val blob_encoding : [ `Blob of MBytes.t ] Data_encoding.t
-  val node_encoding : [ `Node of MBytes.t ] Data_encoding.t
 
   module Block_header : sig
     type t = Block_header.t
@@ -87,18 +88,11 @@ module type Dump_interface = sig
     val encoding : t Data_encoding.t
   end
 
-  (* hash manipulation *)
-  val hash_export : hash -> [ `Node | `Blob ] * MBytes.t
-  val hash_import : [ `Node | `Blob ]  -> MBytes.t -> hash tzresult
-  val hash_equal : hash -> hash -> bool
-
   (* commit manipulation (for parents) *)
-  val context_parents : context -> Commit_hash.t list Lwt.t
+  val context_parents : context -> Commit_hash.t list
 
   (* Commit info *)
   val context_info : context -> commit_info
-  val context_info_export : commit_info -> ( Int64.t * string * string )
-  val context_info_import : ( Int64.t * string * string ) -> commit_info
 
   (* block header manipulation *)
   val get_context : index -> Block_header.t -> context option Lwt.t
@@ -109,17 +103,16 @@ module type Dump_interface = sig
 
   (* for dumping *)
   val context_tree : context -> tree
-  val tree_hash : context -> tree -> hash Lwt.t
+  val tree_hash : tree -> hash
   val sub_tree : tree -> key -> tree option Lwt.t
   val tree_list : tree -> ( step * [`Contents|`Node] ) list Lwt.t
-  val tree_content : tree -> MBytes.t option Lwt.t
+  val tree_content : tree -> string option Lwt.t
 
   (* for restoring *)
   val make_context : index -> context
   val update_context : context -> tree -> context
-  val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
-  val add_mbytes : index -> MBytes.t -> tree Lwt.t
-  val add_dir : index -> ( step * hash ) list -> tree option Lwt.t
+  val add_mbytes : batch -> string -> tree Lwt.t
+  val add_dir : batch -> ( step * hash ) list -> tree option Lwt.t
 
 end
 

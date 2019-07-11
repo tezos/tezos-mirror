@@ -584,7 +584,7 @@ let finalize_block_header
           return context
     | Forking _ -> fail Forking_test_chain
   end >>=? fun context ->
-  Context.hash ~time:timestamp ?message context >>= fun context ->
+  let context = Context.hash ~time:timestamp ?message context in
   let header =
     Tezos_base.Block_header.
       { shell_header with

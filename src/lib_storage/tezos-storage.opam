@@ -11,7 +11,8 @@ depends: [
   "dune" { build & >= "1.7" }
   "tezos-base"
   "lmdb"
-  "irmin-lmdb"
+  "irmin"
+  "irmin-pack"
   "tezos-shell-services"
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
