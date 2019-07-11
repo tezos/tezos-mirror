@@ -1333,6 +1333,8 @@ Domain specific data types
 
 -  ``signature``: A cryptographic signature.
 
+-  ``chain_id``: An identifier for a chain, used to distinguish the test and the main chains.
+
 Domain specific operations
 --------------------------
 
@@ -1575,6 +1577,13 @@ Special operations
 ::
 
     :: 'S   ->   timestamp : 'S
+
+- ``CHAIN_ID``: Push the chain identifier.
+
+::
+
+    :: 'S   ->   chain_id : 'S
+
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
@@ -2256,6 +2265,7 @@ The instructions which accept at most one variable annotation are:
    SELF
    CAST
    RENAME
+   CHAIN_ID
 
 The instructions which accept at most two variable annotations are:
 
@@ -2821,7 +2831,7 @@ using the Coq proof assistant.
            UNPAIR ;
            # pair the payload with the current contract address, to ensure signatures
            # can't be replayed accross different contracts if a key is reused.
-           DUP ; SELF ; ADDRESS ; PAIR ;
+           DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
            PACK ; # form the binary payload that we expect to be signed
            DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP
          } ;
@@ -2989,6 +2999,7 @@ Full grammar
       | SOURCE
       | SENDER
       | ADDRESS
+      | CHAIN_ID
     <type> ::=
       | <comparable type>
       | key
@@ -3004,6 +3015,7 @@ Full grammar
       | lambda <type> <type>
       | map <comparable type> <type>
       | big_map <comparable type> <type>
+      | chain_id
     <comparable type> ::=
       | int
       | nat
