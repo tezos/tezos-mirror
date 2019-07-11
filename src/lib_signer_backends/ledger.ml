@@ -369,7 +369,7 @@ module Ledger_uri = struct
     let len = String.length x in
     match String.get x (len - 1) with
     | exception _ -> failf "Empty path element"
-    | '\'' ->
+    | '\'' | 'h' ->
         let intpart = String.sub x 0 (len - 1) in
         begin match Int32.of_string_opt intpart with
           | Some i -> Bip32_path.hard i
