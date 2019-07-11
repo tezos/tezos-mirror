@@ -62,6 +62,10 @@ If you cannot reproduce the bug, we likely will not be able to either.
 If you had a problem while trying to build Tezos from source, please include the output of `opam list -i` and any error messages that you saw while building. 
 If you ran a second command which fixed the problem, provide us with the error you saw initially in addition to telling us how you fixed the bug.
 
+### History mode
+
+In which history mode are the node is running (full by default, archive, ...).
+
 ### Logs
 
 Please include logs with your bug report whenever possible.
