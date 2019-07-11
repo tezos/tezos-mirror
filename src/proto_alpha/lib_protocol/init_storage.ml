@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -90,7 +91,7 @@ let manager_script_storage: Signature.Public_key_hash.t -> Script_repr.lazy_expr
   Bytes (0, bytes)
 
 (* Process an individual contract *)
-let process_contract contract ctxt =
+let process_contract_add_manager contract ctxt =
   let open Legacy_script_support_repr in
   match Contract_repr.is_originated contract with
   | None -> return ctxt (* Only process originated contracts *)
@@ -116,7 +117,6 @@ let process_contract contract ctxt =
           else
             return ctxt
       | None -> begin
-          (* Check that the contract is spendable *)
           (* Get the manager of the originated contract *)
           Contract_storage.get_manager ctxt contract >>=? fun manager_pkh ->
           (* Initialize the script code for free *)
@@ -132,6 +132,80 @@ let process_contract contract ctxt =
         end
     end
 
+(* The [[update_contract_script]] function returns a copy of its
+   argument (the Micheline AST of a contract script) with "ADDRESS"
+   replaced by "ADDRESS; CHAIN_ID; PAIR".
+
+   [[Micheline.strip_locations]] should be called on the resulting
+   Micheline AST to get meaningful locations. *)
+
+let rec update_contract_script : ('l, 'p) Micheline.node -> ('l, 'p) Micheline.node
+  = function
+    | Micheline.Seq (_,
+                     Micheline.Prim (_, Michelson_v1_primitives.I_ADDRESS, [], []) ::
+                     l) ->
+        Micheline.Seq (0,
+                       Micheline.Prim (0, Michelson_v1_primitives.I_ADDRESS, [], []) ::
+                       Micheline.Prim (0, Michelson_v1_primitives.I_CHAIN_ID, [], []) ::
+                       Micheline.Prim (0, Michelson_v1_primitives.I_PAIR, [], []) :: l)
+    | Micheline.Seq (_, a :: l) ->
+        let a' = update_contract_script a in
+        let b = Micheline.Seq (0, l) in
+        let b' = update_contract_script b in
+        begin match b' with
+          | Micheline.Seq (_, l') ->
+              Micheline.Seq (0, a' :: l')
+          | _ -> assert false
+        end
+    | Micheline.Prim (_, p, l, annot) ->
+        Micheline.Prim (0, p, List.map update_contract_script l, annot)
+    | script -> script
+
+let migrate_multisig_script (ctxt : Raw_context.t) (contract : Contract_repr.t)
+    (code : Script_repr.expr) : Raw_context.t tzresult Lwt.t =
+  let migrated_code =
+    Script_repr.lazy_expr @@ Micheline.strip_locations @@
+    update_contract_script @@ Micheline.root code
+  in
+  Storage.Contract.Code.set_free ctxt contract migrated_code >>=? fun (ctxt, _code_size_diff) ->
+  (* Set the spendable and delegatable flags to false so that no entrypoint gets added by
+     the [[process_contract_add_manager]] function. *)
+  Storage.Contract.Spendable.set ctxt contract false >>= fun ctxt ->
+  Storage.Contract.Delegatable.set ctxt contract false >>= fun ctxt ->
+  return ctxt
+
+(* The hash of the multisig contract; only contracts with this exact
+   hash are going to be updated by the [[update_contract_script]]
+   function. *)
+let multisig_hash : Script_expr_hash.t =
+  Script_expr_hash.of_bytes_exn @@
+  MBytes.of_hex @@
+  `Hex "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31"
+
+let process_contract_multisig (contract : Contract_repr.t) (ctxt : Raw_context.t) =
+  Contract_storage.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+  match script_opt with
+  | None ->
+      (* Do nothing on scriptless contracts *)
+      return ctxt
+  | Some { Script_repr.code = code ; Script_repr.storage = _storage } ->
+      (* The contract has some script, only try to modify it if it has
+         the hash of the multisig contract *)
+      Lwt.return (Script_repr.force_decode code) >>=? fun (code, _gas_cost) ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding code
+      in
+      let hash = Script_expr_hash.hash_bytes [ bytes ] in
+      if Script_expr_hash.(hash = multisig_hash) then
+        migrate_multisig_script ctxt contract code
+      else
+        return ctxt
+
+(* Process an individual contract *)
+let process_contract contract ctxt =
+  process_contract_multisig contract ctxt >>=? fun ctxt ->
+  process_contract_add_manager contract ctxt >>=? fun ctxt ->
+  return ctxt
 
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block
