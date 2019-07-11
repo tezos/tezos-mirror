@@ -51,7 +51,7 @@ module Bip32_path = struct
 
   let pp_node ppf node =
     match is_hard node with
-    | true -> Fmt.pf ppf "%ld'" (unhard node)
+    | true -> Fmt.pf ppf "%ldh" (unhard node)
     | false -> Fmt.pf ppf "%ld" node
 
   let string_of_node = Fmt.to_to_string pp_node
@@ -721,7 +721,7 @@ let generic_commands group = Clic.[
                     List.iter (fun curve ->
                         fprintf ppf
                           "  tezos-client import secret key \
-                           ledger_%s \"ledger://%a/%a/0'/0'\""
+                           ledger_%s \"ledger://%a/%a/0h/0h\""
                           (Sys.getenv_opt "USER" |> Option.unopt ~default:"user")
                           Ledger_id.pp ledger_id
                           Ledgerwallet_tezos.pp_curve curve ;
