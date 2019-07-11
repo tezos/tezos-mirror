@@ -570,11 +570,35 @@ let use_ledger ?(filter : Filter.t = `None) f =
   in
   go ledgers
 
+let min_version_of_derivation_scheme = function
+  | Ledgerwallet_tezos.Ed25519 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Secp256k1 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Secp256r1 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Bip32_ed25519 -> (2, 1, 0)
+
+let is_derivation_scheme_supported version curve =
+  Ledgerwallet_tezos.Version.(
+    let { major ; minor ; patch ; _ } = version in
+    (major, minor, patch) >= min_version_of_derivation_scheme curve)
+
 let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
   use_ledger ?filter
     (fun hidapi (version, git_commit) device_info ledger_id ->
        Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
-           f hidapi (version, git_commit) device_info ledger_id))
+           let go () = f hidapi (version, git_commit) device_info ledger_id in
+           match ledger_uri with
+           | `Ledger_account { curve; _ } ->
+               if is_derivation_scheme_supported version curve
+               then go ()
+               else Ledgerwallet_tezos.(
+                   failwith "To use derivation scheme %a you need %a or later \
+                             but you're using %a."
+                     pp_curve curve
+                     Version.pp (let (a, b, c) = min_version_of_derivation_scheme curve in
+                                 { version with major = a ; minor = b ; patch = c })
+                     Version.pp version)
+           | _ -> go ()
+         ))
   >>=? function
   | Some o -> return o
   | None ->
@@ -735,7 +759,9 @@ let generic_commands group = Clic.[
                           Ledger_id.pp ledger_id
                           Ledgerwallet_tezos.pp_curve curve ;
                         pp_print_cut ppf ())
-                      [ Bip32_ed25519 ; Secp256k1 ; Secp256r1; Ed25519 ] ;
+                      (List.filter
+                         (is_derivation_scheme_supported version)
+                         [ Bip32_ed25519 ; Ed25519 ; Secp256k1 ; Secp256r1 ]);
                     pp_close_box ppf () ;
                     pp_print_newline ppf () )
               >>= fun () ->
