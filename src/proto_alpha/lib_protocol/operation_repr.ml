@@ -238,6 +238,9 @@ module Encoding = struct
           (fun n -> if Compare.String.(n = name) then Some () else None) (fun () -> name) in
       union [ builtin_case 0 "default" ;
               builtin_case 1 "root" ;
+              builtin_case 2 "do" ;
+              builtin_case 3 "set_delegate" ;
+              builtin_case 4 "remove_delegate" ;
               Data_encoding.case (Tag 255) ~title:"named" string (fun s -> Some s) (fun s -> s) ]
 
     let transaction_case =
