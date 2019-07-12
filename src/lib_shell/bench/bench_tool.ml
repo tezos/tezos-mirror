@@ -47,7 +47,7 @@ let default_args = {
   params = { bootstrap_accounts = [] ;
              commitments = [] ;
              bootstrap_contracts = [] ;
-             constants = Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet ;
+             constants = Default_parameters.constants_mainnet ;
              security_deposit_ramp_up_cycles = None ;
              no_reward_cycles = None ;
            }
@@ -324,7 +324,6 @@ let init () =
 
   let bootstrap_accounts =
     List.map (fun (Account.{ pk ; pkh ; _ }, amount) ->
-        let open Tezos_protocol_alpha_parameters in
         Default_parameters.make_bootstrap_account (pkh, pk, amount)
       ) initial_accounts
   in
