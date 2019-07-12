@@ -26,6 +26,8 @@
 open Proto_alpha
 open Alpha_context
 
+module Proto = Registerer.Registered
+
 type nanotez = Z.t
 let nanotez_enc =
   Data_encoding.def "nanotez"

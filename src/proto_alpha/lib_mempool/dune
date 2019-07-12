@@ -2,8 +2,10 @@
  (name tezos_mempool_alpha)
  (public_name tezos-mempool-alpha)
  (libraries tezos-base
+            tezos-embedded-protocol-alpha
             tezos-protocol-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_alpha
                    -open Tezos_protocol_alpha)))
 
 (alias
