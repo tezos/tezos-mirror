@@ -153,11 +153,6 @@ unit:p2p:banned_peers:
   script:
     - dune build @src/lib_p2p/runtest_p2p_banned_peers
 
-unit:client_alpha:vote:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_alpha/lib_delegate/runtest_vote
-
 unit:validation:
   <<: *test_definition
   script:

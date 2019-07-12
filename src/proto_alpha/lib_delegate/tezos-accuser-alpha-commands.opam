@@ -17,7 +17,6 @@ depends: [
   "tezos-client-commands"
   "tezos-client-alpha"
   "tezos-baking-alpha"
-  "tezos-signer-backends" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
