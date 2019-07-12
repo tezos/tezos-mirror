@@ -1,5 +1,5 @@
 open Internal_pervasives
-open Tezos_protocol_alpha.Proto_alpha
+open Proto_alpha
 
 module Key = struct
   module Of_name = struct
@@ -41,7 +41,7 @@ module Script = struct
     |> exn_tezos msg
 
   let parse exprs =
-    Tezos_client_alpha.Michelson_v1_parser.(
+    Michelson_v1_parser.(
       (parse_expression exprs |> fst).expanded)
 
   let code_of_json_exn s =

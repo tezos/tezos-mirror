@@ -15,6 +15,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-signer-backends"
   "tezos-client-alpha"
+  "tezos-protocol-alpha"
   "lwt"
 ]
 build: [

@@ -1,7 +1,7 @@
 (** Create and manipulate bootstrap-parameters and accounts. *)
 
 open Internal_pervasives
-open Tezos_protocol_alpha.Proto_alpha
+open Proto_alpha
 
 (** Manipulate public/private key pairs. *)
 module Key : sig
