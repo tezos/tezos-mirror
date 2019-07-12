@@ -27,7 +27,7 @@ depends: [
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }
-  "tezos-protocol-alpha-parameters" { with-test }
+  "tezos-protocol-004-Pt24m4xi-parameters" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
