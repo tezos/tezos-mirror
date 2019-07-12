@@ -33,7 +33,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                                 (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
 
 (rule
- (targets proto_genesis.ml)
+ (targets protocol.ml)
  (deps data.ml services.ml main.mli main.ml)
  (action
   (write-file %{targets}
@@ -79,7 +79,7 @@ include Tezos_raw_protocol_genesis.Main
  (flags -w "+a-4-6-7-9-29-40..42-44-45-48"
         -warn-error "-a+8"
         -nopervasives)
- (modules Proto_genesis))
+ (modules Protocol))
 
 (library
  (name tezos_protocol_genesis_functor)
