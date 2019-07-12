@@ -140,7 +140,8 @@ let commands () =
          return_unit) ;
 
     command ~group ~desc: "Ask the node to run a script."
-      (args6 trace_stack_switch amount_arg source_arg payer_arg no_print_source_flag custom_gas_flag)
+      (args7 trace_stack_switch amount_arg source_arg payer_arg
+         no_print_source_flag custom_gas_flag entrypoint_arg)
       (prefixes [ "run" ; "script" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
@@ -151,7 +152,7 @@ let commands () =
          data_parameter
        @@ stop)
       (fun
-        (trace_exec, amount, source, payer, no_print_source, gas)
+        (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
         program storage input cctxt ->
         let source = Option.map ~f:snd source in
         let payer = Option.map ~f:snd payer in
@@ -159,11 +160,11 @@ let commands () =
         let show_source = not no_print_source in
         (if trace_exec then
            trace cctxt ~chain:cctxt#chain ~block:cctxt#block
-             ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
+             ~amount ~program ~storage ~input ?source ?payer ?gas ?entrypoint () >>= fun res ->
            print_trace_result cctxt ~show_source ~parsed:program res
          else
            run cctxt ~chain:cctxt#chain ~block:cctxt#block
-             ~amount ~program ~storage ~input ?source ?payer ?gas () >>= fun res ->
+             ~amount ~program ~storage ~input ?source ?payer ?gas ?entrypoint () >>= fun res ->
            print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
