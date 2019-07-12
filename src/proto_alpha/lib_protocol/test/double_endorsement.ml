@@ -26,7 +26,7 @@
 (** Double endorsement evidence operation may happen when an endorser
     endorsed two different blocks on the same level. *)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 (****************************************************************)

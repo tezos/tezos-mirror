@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Test_utils
 
 (* missing stuff in Alpha_context.Vote *)

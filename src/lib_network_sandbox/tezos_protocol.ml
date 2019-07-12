@@ -1,5 +1,5 @@
 open Internal_pervasives
-open Proto_alpha
+open Protocol
 
 module Key = struct
   module Of_name = struct

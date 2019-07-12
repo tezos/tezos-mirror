@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 (* add a version to the pow *)
 let generate_proof_of_work_nonce () =

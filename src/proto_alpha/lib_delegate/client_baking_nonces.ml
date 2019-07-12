@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.name ^ ".baking.nonces"
+    let name = Protocol.name ^ ".baking.nonces"
   end)
 
 type t = Nonce.t Block_hash.Map.t

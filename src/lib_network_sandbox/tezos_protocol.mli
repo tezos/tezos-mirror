@@ -1,7 +1,7 @@
 (** Create and manipulate bootstrap-parameters and accounts. *)
 
 open Internal_pervasives
-open Proto_alpha
+open Protocol
 
 (** Manipulate public/private key pairs. *)
 module Key : sig

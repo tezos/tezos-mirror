@@ -35,7 +35,7 @@
     /scripts/create_genesis/create_genenis.py and should be coherent.
 *)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_utils
 open Test_tez

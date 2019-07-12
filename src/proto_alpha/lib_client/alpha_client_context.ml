@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Alpha_block_services = Block_services.Make(Proto_alpha)(Proto_alpha)
+module Alpha_block_services = Block_services.Make(Protocol)(Protocol)
 
 (** Client RPC context *)
 
 class type rpc_context = object
   inherit RPC_context.json
-  inherit [Shell_services.chain * Shell_services.block] Proto_alpha.Environment.RPC_context.simple
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
 end
 
 class wrap_rpc_context (t : RPC_context.json) : rpc_context = object
@@ -43,20 +43,20 @@ class wrap_rpc_context (t : RPC_context.json) : rpc_context = object
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = t#call_streamed_service
-  inherit [Shell_services.chain, Shell_services.block] Proto_alpha.Environment.proto_rpc_context
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
       (t :> RPC_context.t)
       Shell_services.Blocks.path
 end
 
 class type full = object
   inherit Client_context.full
-  inherit [Shell_services.chain * Shell_services.block] Proto_alpha.Environment.RPC_context.simple
-  inherit [Shell_services.chain, Shell_services.block] Proto_alpha.Environment.proto_rpc_context
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
 end
 
 class wrap_full (t : Client_context.full) : full = object
   inherit Client_context.proxy_context t
-  inherit [Shell_services.chain, Shell_services.block] Proto_alpha.Environment.proto_rpc_context
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
       (t :> RPC_context.t)
       Shell_services.Blocks.path
 end

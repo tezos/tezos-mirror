@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type error += Contract_has_no_script of Contract.t

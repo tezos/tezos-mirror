@@ -30,7 +30,7 @@
     endorser. This reward depends on the priority of the endorsed
     block. *)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_utils
 open Test_tez

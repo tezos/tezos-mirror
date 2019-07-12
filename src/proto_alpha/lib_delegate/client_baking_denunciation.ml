@@ -24,10 +24,10 @@
 (*****************************************************************************)
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.name ^ ".baking.denunciation"
+    let name = Protocol.name ^ ".baking.denunciation"
   end)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Alpha_client_context
 open Client_baking_blocks

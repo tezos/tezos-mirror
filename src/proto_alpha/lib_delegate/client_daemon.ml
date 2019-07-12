@@ -65,7 +65,7 @@ let monitor_fork_testchain (cctxt: #Alpha_client_context.full) ~cleanup_nonces  
           | _ -> false) l in
     match testchain with
     | Some (Active_test { protocol ; expiration_date ; _ })
-      when Protocol_hash.equal Proto_alpha.hash protocol -> begin
+      when Protocol_hash.equal Protocol.hash protocol -> begin
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
@@ -109,7 +109,7 @@ module Endorser = struct
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [ Proto_alpha.hash ])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Endorser started." >>= fun () ->
     Client_baking_endorsement.create cctxt
@@ -138,7 +138,7 @@ module Baker = struct
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [ Proto_alpha.hash ])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Baker started." >>= fun () ->
     Client_baking_forge.create cctxt
@@ -164,7 +164,7 @@ module Accuser = struct
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_valid_blocks
-      ~next_protocols:(Some [ Proto_alpha.hash ])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt ~chains:[ chain ] () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
     Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->

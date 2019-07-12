@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 include Internal_event.Legacy_logging.Make_semantic (struct
-    let name = Proto_alpha.name ^ ".baking.scheduling"
+    let name = Protocol.name ^ ".baking.scheduling"
   end)
 
 open Logging

@@ -25,12 +25,12 @@
 
 [@@@ocaml.warning "-30"]
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Alpha_client_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.name ^ ".baking.endorsement"
+    let name = Protocol.name ^ ".baking.endorsement"
   end)
 
 open Logging

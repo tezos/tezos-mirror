@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.name ^ ".baking.nonce_revelation"
+    let name = Protocol.name ^ ".baking.nonce_revelation"
   end)
 
 let inject_seed_nonce_revelation

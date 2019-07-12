@@ -29,7 +29,7 @@
       seed_nonce_hash
 *)
 
-open Proto_alpha
+open Protocol
 open Test_tez
 
 (** Tests that baking [blocks_per_commitment] blocks without a

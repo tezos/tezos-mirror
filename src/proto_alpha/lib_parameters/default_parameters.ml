@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 let constants_mainnet = Constants_repr.{
     preserved_cycles = 5 ;

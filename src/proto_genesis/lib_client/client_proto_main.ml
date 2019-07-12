@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_genesis
+open Protocol
 open Genesis_client_context
 
 let protocol =

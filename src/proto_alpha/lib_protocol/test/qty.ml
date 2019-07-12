@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 let known_ok_tez_litterals =
   [ 0L, "0" ;

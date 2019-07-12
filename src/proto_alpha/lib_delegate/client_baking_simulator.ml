@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type error += Failed_to_checkout_context
@@ -59,7 +59,7 @@ let () =
 type incremental = {
   predecessor: Client_baking_blocks.block_info ;
   context : Tezos_protocol_environment.Context.t ;
-  state: Proto_alpha.validation_state ;
+  state: Protocol.validation_state ;
   rev_operations: Operation.packed list ;
   header: Tezos_base.Block_header.shell_header ;
 }
@@ -92,7 +92,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
           context = Context_hash.zero ;
           operations_hash = Operation_list_list_hash.zero ;
         } in
-      Proto_alpha.begin_construction
+      Protocol.begin_construction
         ~chain_id: predecessor.chain_id
         ~predecessor_context: context
         ~predecessor_timestamp: predecessor.timestamp
@@ -111,8 +111,8 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
       }
 
 let add_operation st ( op : Operation.packed ) =
-  Proto_alpha.apply_operation st.state op >>=?? fun (state, receipt) ->
+  Protocol.apply_operation st.state op >>=?? fun (state, receipt) ->
   return ({ st with state ; rev_operations = op :: st.rev_operations }, receipt)
 
 let finalize_construction inc =
-  Proto_alpha.finalize_block inc.state >>=?? return
+  Protocol.finalize_block inc.state >>=?? return

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_genesis
+open Protocol
 
 val bake:
   #Client_context.full ->

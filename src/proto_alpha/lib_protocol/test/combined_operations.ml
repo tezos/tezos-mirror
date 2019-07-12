@@ -34,7 +34,7 @@
     Only manager operations are allowed in multiple transactions.
     They must all belong to the same manager as there is only one signature. *)
 
-open Proto_alpha
+open Protocol
 open Test_tez
 open Test_utils
 

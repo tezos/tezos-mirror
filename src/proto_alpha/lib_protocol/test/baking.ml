@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =

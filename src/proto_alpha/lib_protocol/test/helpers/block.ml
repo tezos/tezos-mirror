@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
 open Alpha_context
 

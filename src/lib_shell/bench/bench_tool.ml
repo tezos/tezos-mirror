@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Helpers_Nonce = Nonce
-open Proto_alpha
+open Protocol
 open Parameters_repr
 open Constants_repr
 open Alpha_context

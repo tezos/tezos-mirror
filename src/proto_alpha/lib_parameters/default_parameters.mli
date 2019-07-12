@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 val constants_mainnet: Constants_repr.parametric
 val constants_sandbox: Constants_repr.parametric

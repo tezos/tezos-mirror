@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Alpha_client_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.name ^ ".baking.forge"
+    let name = Protocol.name ^ ".baking.forge"
   end)
 
 open Logging
@@ -41,7 +41,7 @@ let [@warning "-32"] time_protocol__is__protocol_time
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
-(* Hypothesis : we suppose [List.length Proto_alpha.Main.validation_passes = 4] *)
+(* Hypothesis : we suppose [List.length Protocol.Main.validation_passes = 4] *)
 let endorsements_index = 0
 let votes_index = 1
 let anonymous_index = 2
@@ -523,8 +523,8 @@ let filter_and_apply_operations
   filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
   (* Retrieve the correct index order *)
-  let managers = List.sort Proto_alpha.compare_operations managers in
-  let overflowing_operations = List.sort Proto_alpha.compare_operations overflowing_operations in
+  let managers = List.sort Protocol.compare_operations managers in
+  let overflowing_operations = List.sort Protocol.compare_operations overflowing_operations in
   filter_valid_operations inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
   Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
@@ -551,7 +551,7 @@ let filter_and_apply_operations
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
-  let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
+  let accepted_managers = List.sort Protocol.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
   filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
@@ -988,7 +988,7 @@ let build_block
         | None -> bi.next_protocol
         | Some hash -> hash
       in
-      if Protocol_hash.(Proto_alpha.hash <> next_version) then
+      if Protocol_hash.(Protocol.hash <> next_version) then
         (* Let the shell validate this *)
         shell_prevalidation cctxt ~chain ~block seed_nonce_hash
           operations slot

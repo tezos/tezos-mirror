@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 (** A null proof-of-work nonce. This should only be used to non-sensical blocks
     of the correct size and shape. *)
