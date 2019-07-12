@@ -16,6 +16,7 @@
             tezos-protocol-alpha-parameters)
  (modules gen)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha_parameters
                    -linkall)))
 
 (rule

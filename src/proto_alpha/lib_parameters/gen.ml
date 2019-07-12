@@ -27,8 +27,6 @@
    $ dune utop src/proto_alpha/lib_protocol/test/helpers/ constants.ml
 *)
 
-open Tezos_protocol_alpha_parameters
-
 let () =
   let print_usage_and_fail s =
     Printf.eprintf "Usage: %s [ --sandbox | --test | --mainnet ]"
