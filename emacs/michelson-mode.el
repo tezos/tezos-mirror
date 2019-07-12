@@ -1,5 +1,6 @@
 ;; Major mode for editing Michelson smart contracts.
 
+(require 'cl)
 (require 'cl-lib)
 (require 'deferred)
 (require 'font-lock)
