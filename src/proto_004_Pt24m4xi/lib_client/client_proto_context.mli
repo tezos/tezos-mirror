@@ -23,24 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 val list_contract_labels:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   (string * string * string) list tzresult Lwt.t
 
 val get_storage:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
 val get_big_map_value:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
@@ -48,14 +48,14 @@ val get_big_map_value:
   Script.expr option tzresult Lwt.t
 
 val get_script:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 
 val get_manager:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
@@ -63,14 +63,14 @@ val get_manager:
    public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val get_balance:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
 val set_delegate:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -85,7 +85,7 @@ val set_delegate:
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
 val register_as_delegate:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -98,14 +98,14 @@ val register_as_delegate:
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
 val source_to_keys:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val originate_account :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -125,13 +125,13 @@ val originate_account :
 
 val save_contract :
   force:bool ->
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   string ->
   Contract.t ->
   unit tzresult Lwt.t
 
 val originate_contract:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -155,7 +155,7 @@ val originate_contract:
   unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val transfer :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -177,7 +177,7 @@ val transfer :
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
 val reveal :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -203,7 +203,7 @@ type activation_key =
 val activation_key_encoding: activation_key Data_encoding.t
 
 val activate_account:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -215,7 +215,7 @@ val activate_account:
   Kind.activate_account Injection.result tzresult Lwt.t
 
 val activate_existing_account:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -239,27 +239,27 @@ type ballots_info = {
 }
 
 val get_period_info :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   period_info tzresult Lwt.t
 
 val get_ballots_info :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ballots_info tzresult Lwt.t
 
 val get_proposals :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Int32.t Alpha_environment.Protocol_hash.Map.t tzresult Lwt.t
+  Int32.t Environment.Protocol_hash.Map.t tzresult Lwt.t
 
 val submit_proposals:
   ?dry_run:bool ->
   ?verbose_signing: bool ->
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -271,20 +271,20 @@ val submit_proposals:
 val submit_ballot:
   ?dry_run:bool ->
   ?verbose_signing: bool ->
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
   src_sk:Client_keys.sk_uri ->
   public_key_hash ->
   Protocol_hash.t ->
-  Proto_alpha.Alpha_context.Vote.ballot ->
+  Vote.ballot ->
   Kind.ballot Injection.result_list tzresult Lwt.t
 
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
 val display_receipt_for_operation:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->
   Operation_list_hash.elt ->

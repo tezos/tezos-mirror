@@ -23,25 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "004-Pt24m4xi" end
-module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
+module Alpha_block_services = Block_services.Make(Protocol)(Protocol)
 
-type alpha_error = Alpha_environment.Error_monad.error
-type 'a alpha_tzresult = 'a Alpha_environment.Error_monad.tzresult
+(** Client RPC context *)
 
-module Proto = Tezos_protocol_004_Pt24m4xi.Functor.Make(Alpha_environment)
-module Block_services = struct
-  include Block_services
-  include Block_services.Make(Proto)(Proto)
+class type rpc_context = object
+  inherit RPC_context.json
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
 end
-include Proto
 
-module M = Alpha_environment.Lift(Main)
+class wrap_rpc_context (t : RPC_context.json) : rpc_context = object
+  method base : Uri.t = t#base
+  method generic_json_call = t#generic_json_call
+  method call_service : 'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    'p -> 'q -> 'i -> 'o tzresult Lwt.t= t#call_service
+  method call_streamed_service : 'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    on_chunk: ('o -> unit) ->
+    on_close: (unit -> unit) ->
+    'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = t#call_streamed_service
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
+      (t :> RPC_context.t)
+      Shell_services.Blocks.path
+end
 
-let register_error_kind
-    category ~id ~title ~description ?pp
-    encoding from_error to_error =
-  let id = "client." ^ Name.name ^ "." ^ id in
-  register_error_kind
-    category ~id ~title ~description ?pp
-    encoding from_error to_error
+class type full = object
+  inherit Client_context.full
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
+end
+
+class wrap_full (t : Client_context.full) : full = object
+  inherit Client_context.proxy_context t
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
+      (t :> RPC_context.t)
+      Shell_services.Blocks.path
+end

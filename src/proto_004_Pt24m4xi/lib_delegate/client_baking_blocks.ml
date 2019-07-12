@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type block_info = {
@@ -61,6 +61,7 @@ let info cctxt ?(chain = `Main) block =
     cctxt ~chain ~block () >>=? fun shell_header  ->
   raw_info cctxt ~chain hash shell_header
 
+
 module Block_seen_event = struct
   type t = {
     hash : Block_hash.t ;
@@ -69,7 +70,7 @@ module Block_seen_event = struct
   }
   let make hash header occurrence () = { hash ; header ; occurrence }
   module Definition = struct
-    let name = "block-seen-" ^ Proto_alpha.Name.name
+    let name = "block-seen-" ^ Protocol.name
     type nonrec t = t
     let encoding =
       let open Data_encoding in
@@ -110,6 +111,7 @@ module Block_seen_event = struct
   end
   module Event = Internal_event.Make(Definition)
 end
+
 
 let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   Monitor_services.valid_blocks cctxt

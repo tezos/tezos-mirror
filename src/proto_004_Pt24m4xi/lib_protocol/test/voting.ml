@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Test_utils
 
 (* missing stuff in Alpha_context.Vote *)
@@ -83,9 +83,9 @@ let get_delegates_and_rolls_from_listings b =
 
 (* compute the rolls of each delegate *)
 let get_rolls b delegates loc =
+  Context.Vote.get_listings (B b) >>=? fun l ->
   map_s (fun delegate ->
       Context.Contract.pkh delegate >>=? fun pkh ->
-      Context.Vote.get_listings (B b) >>=? fun l ->
       match List.find_opt (fun (del,_) -> del = pkh) l with
       | None -> failwith "%s - Missing delegate" loc
       | Some (_, rolls) -> return rolls
@@ -93,7 +93,8 @@ let get_rolls b delegates loc =
 
 let test_successful_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,_) ->
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* no ballots in proposal period *)
   Context.Vote.get_ballots (B b) >>=? fun v ->
@@ -134,7 +135,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals at the beginning of proposal period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -159,7 +160,7 @@ let test_successful_vote num_delegates () =
   (* correctly count the double proposal for zero *)
   begin
     let weight = Int32.add (List.nth rolls_p1 0) (List.nth rolls_p1 1) in
-    match Alpha_environment.Protocol_hash.(Map.find_opt zero ps) with
+    match Environment.Protocol_hash.(Map.find_opt zero ps) with
     | Some v -> if v = weight then return_unit
         else failwith "%s - Wrong count %ld is not %ld" __LOC__ v weight
     | None -> failwith "%s - Missing proposal" __LOC__
@@ -210,7 +211,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals during testing_vote period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -312,7 +313,7 @@ let test_successful_vote num_delegates () =
 
   (* no proposals during promotion_vote period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  begin if Alpha_environment.Protocol_hash.Map.is_empty ps
+  begin if Environment.Protocol_hash.Map.is_empty ps
     then return_unit
     else failwith "%s - Unexpected proposals" __LOC__
   end >>=? fun () ->
@@ -398,7 +399,8 @@ let get_expected_quorum ?(min_participation=0) rolls voter_rolls old_quorum =
    go back to proposal period *)
 let test_not_enough_quorum_in_testing_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* proposal period *)
   let open Alpha_context in
@@ -461,7 +463,8 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
    go back to proposal period *)
 let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Context.init num_delegates >>=? fun (b,delegates) ->
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   Context.Vote.get_current_period_kind (B b) >>=? begin function
     | Proposal -> return_unit
@@ -577,7 +580,7 @@ let test_multiple_identical_proposals_count_as_one () =
 
   (* correctly count the double proposal for zero as one proposal *)
   let expected_weight_proposer = proposer_rolls in
-  match Alpha_environment.Protocol_hash.(Map.find_opt zero ps) with
+  match Environment.Protocol_hash.(Map.find_opt zero ps) with
   | Some v -> if v = expected_weight_proposer then return_unit
       else failwith
           "%s - Wrong count %ld is not %ld; identical proposals count as one"
@@ -590,7 +593,7 @@ let test_multiple_identical_proposals_count_as_one () =
 let test_supermajority_in_proposal there_is_a_winner () =
   Context.init ~initial_balances:[1L; 1L; 1L] 10 >>=? fun (b,delegates) ->
   Context.get_constants (B b)
-  >>=? fun { parametric = {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll} } ->
+  >>=? fun { parametric = {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll; _ } ; _ } ->
 
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
@@ -610,15 +613,15 @@ let test_supermajority_in_proposal there_is_a_winner () =
 
   Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
 
-  (* to avoid the bug where the listings are not initialized, we let
-     one voting period pass; we make sure that the three selected
-     delegates remain active and their number of rolls do not change *)
-  let amount = let open Test_tez in Tez.of_int 10 in
+  (* we let one voting period pass; we make sure that:
+     - the three selected delegates remain active by re-registering as delegates
+     - their number of rolls do not change *)
   fold_left_s (fun b _ ->
-      Op.transaction (B b) del1 del2 amount >>=? fun op1 ->
-      Op.transaction (B b) del2 del3 amount >>=? fun op2 ->
-      Op.transaction (B b) del3 del1 amount >>=? fun op3 ->
-      Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
+      Error_monad.map_s (fun del ->
+          Context.Contract.pkh del >>=? fun pkh ->
+          Op.delegation (B b) del (Some pkh)
+        ) delegates >>=? fun ops ->
+      Block.bake ~policy ~operations:ops b >>=? fun b ->
       Block.bake_until_cycle_end ~policy b
     ) b (1 --
          (Int32.to_int (Int32.div blocks_per_voting_period blocks_per_cycle))) >>=? fun b ->
@@ -647,7 +650,8 @@ let test_supermajority_in_proposal there_is_a_winner () =
 
 let test_supermajority_in_testing_vote supermajority () =
   Context.init 100 >>=? fun (b,delegates) ->
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   let del1 = List.nth delegates 0 in
   let proposal = protos.(0) in
@@ -711,7 +715,8 @@ let test_supermajority_in_testing_vote supermajority () =
 (* test also how the selection scales: all delegates propose max proposals *)
 let test_no_winning_proposal num_delegates () =
   Context.init num_delegates >>=? fun (b,_) ->
-  Context.get_constants (B b) >>=? fun { parametric = {blocks_per_voting_period} } ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = {blocks_per_voting_period ; _ } ; _ } ->
 
   (* beginning of proposal, denoted by _p1;
      take a snapshot of the active delegates and their rolls from listings *)

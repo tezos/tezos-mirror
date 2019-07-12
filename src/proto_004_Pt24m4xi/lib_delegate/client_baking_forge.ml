@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
+open Alpha_client_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.Name.name ^ ".client.baking"
+    let name = Protocol.name ^ ".baking.forge"
   end)
 
 open Logging
@@ -40,7 +41,7 @@ let [@warning "-32"] time_protocol__is__protocol_time
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
-(* Hypothesis : we suppose [List.length Proto_alpha.Main.validation_passes = 4] *)
+(* Hypothesis : we suppose [List.length Protocol.Main.validation_passes = 4] *)
 let endorsements_index = 0
 let votes_index = 1
 let anonymous_index = 2
@@ -104,7 +105,7 @@ let generate_seed_nonce () =
   | Ok nonce -> nonce
 
 let forge_block_header
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     block
     delegate_sk
@@ -215,7 +216,7 @@ let get_manager_operation_gas_and_fee op =
   let l = to_list (Contents_list contents) in
   fold_left_s (fun ((total_fee, total_gas) as acc) -> function
       | Contents (Manager_operation { fee ; gas_limit ; _ }) ->
-          Lwt.return @@ Alpha_environment.wrap_error @@
+          Lwt.return @@ Environment.wrap_error @@
           Tez.(total_fee +? fee) >>=? fun total_fee ->
           return (total_fee, (Z.add total_gas gas_limit))
       | _ -> return acc) (Tez.zero, Z.zero) l
@@ -228,7 +229,7 @@ let sort_manager_operations
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
-    (operations : Proto_alpha.operation list) =
+    (operations : packed_operation list) =
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     let size_f = Q.of_int size in
@@ -245,7 +246,7 @@ let sort_manager_operations
          return_none
        else
          let (size, gas, _ratio) as weight = compute_weight op (fee, gas) in
-         let open Alpha_environment in
+         let open Environment in
          let fees_in_nanotez =
            Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000) in
          let enough_fees_for_gas =
@@ -266,7 +267,7 @@ let sort_manager_operations
     (List.sort (fun (_, (_, _, w)) (_, (_, _, w')) -> Q.compare w' w) operations)
 
 let retain_operations_up_to_quota operations quota =
-  let { T.max_op ; max_size } = quota in
+  let { Tezos_protocol_environment.max_op ; max_size } = quota in
   let operations = match max_op with
     | Some n -> List.sub operations n
     | None -> operations
@@ -315,14 +316,14 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operatio
     - A desired set of operations to be included
     - Potentially overflowing operations *)
 let classify_operations
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     ~block
     ~hard_gas_limit_per_block
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
     ~minimal_nanotez_per_byte
-    (ops: Proto_alpha.operation list) =
+    (ops: packed_operation list) =
   Alpha_block_services.live_blocks cctxt ~chain ~block ()
   >>=? fun live_blocks ->
   (* Remove operations that are too old *)
@@ -331,10 +332,10 @@ let classify_operations
         Block_hash.Set.mem branch live_blocks
       ) ops
   in
-  let validation_passes_len = List.length Proto_alpha.Main.validation_passes in
+  let validation_passes_len = List.length Main.validation_passes in
   let t = Array.make validation_passes_len [] in
   List.iter
-    (fun (op: Proto_alpha.operation) ->
+    (fun (op : packed_operation) ->
        List.iter
          (fun pass -> t.(pass) <- op :: t.(pass))
          (Main.acceptable_passes op))
@@ -342,8 +343,8 @@ let classify_operations
   let t = Array.map List.rev t in
   (* Retrieve the optimist maximum paying manager operations *)
   let manager_operations = t.(managers_index) in
-  let { Alpha_environment.Updater.max_size ; _ } =
-    List.nth Proto_alpha.Main.validation_passes managers_index in
+  let { Environment.Updater.max_size ; _ } =
+    List.nth Main.validation_passes managers_index in
   sort_manager_operations
     ~max_size
     ~hard_gas_limit_per_block
@@ -522,13 +523,13 @@ let filter_and_apply_operations
   filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
   (* Retrieve the correct index order *)
-  let managers = List.sort Proto_alpha.compare_operations managers in
-  let overflowing_operations = List.sort Proto_alpha.compare_operations overflowing_operations in
+  let managers = List.sort Protocol.compare_operations managers in
+  let overflowing_operations = List.sort Protocol.compare_operations overflowing_operations in
   filter_valid_operations inc (managers @  overflowing_operations) >>= fun (inc, managers) ->
   (* Gives a chance to the endorser to fund their deposit in the current block *)
   Lwt_list.filter_map_s (is_valid_endorsement inc) endorsements >>= fun endorsements ->
   finalize_construction inc >>=? fun _ ->
-  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+  let quota : Environment.Updater.quota list = Main.validation_passes in
   let  { Constants.endorsers_per_block ; hard_gas_limit_per_block ; _ } =
     state.constants.parametric in
   let endorsements =
@@ -550,7 +551,7 @@ let filter_and_apply_operations
   trim_manager_operations ~max_size:(List.nth quota managers_index).max_size
     ~hard_gas_limit_per_block managers >>=? fun (accepted_managers, _overflowing_managers) ->
   (* Retrieve the correct index order *)
-  let accepted_managers = List.sort Proto_alpha.compare_operations accepted_managers in
+  let accepted_managers = List.sort Protocol.compare_operations accepted_managers in
   (* Make sure we only keep valid operations *)
   filter_valid_operations initial_inc votes >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous >>= fun (inc, anonymous) ->
@@ -573,8 +574,8 @@ let finalize_block_header
     ~timestamp
     validation_result
     operations =
-  let { T.context ; fitness ; message ; _ } = validation_result in
-  let validation_passes = List.length LiftedMain.validation_passes in
+  let { Tezos_protocol_environment.context ; fitness ; message ; _ } = validation_result in
+  let validation_passes = List.length Main.validation_passes in
   let operations_hash : Operation_list_list_hash.t =
     Operation_list_list_hash.compute
       (List.map
@@ -583,6 +584,7 @@ let finalize_block_header
               (List.map Operation.hash_packed sl)
          ) operations
       ) in
+  let context = Shell_context.unwrap_disk_context context in
   begin Context.get_test_chain context >>= function
     | Not_running -> return context
     | Running { expiration ; _ } ->
@@ -644,7 +646,7 @@ let forge_block
     operations_arg
   >>=? fun (operations, overflowing_ops) ->
   (* Ensure that we retain operations up to the quota *)
-  let quota : Alpha_environment.Updater.quota list = Main.validation_passes in
+  let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements = List.sub
       (List.nth operations endorsements_index)
       endorsers_per_block in
@@ -696,7 +698,8 @@ let forge_block
         filter_and_apply_operations ~timestamp ~protocol_data state bi (operations, overflowing_ops)
         >>=? fun (final_context, (validation_result, _), operations) ->
         let current_protocol = bi.next_protocol in
-        Context.get_protocol validation_result.context >>= fun next_protocol ->
+        let context = Shell_context.unwrap_disk_context validation_result.context in
+        Context.get_protocol context >>= fun next_protocol ->
         if Protocol_hash.equal current_protocol next_protocol then begin
           finalize_block_header final_context.header ~timestamp
             validation_result operations >>= function
@@ -727,7 +730,7 @@ let forge_block
       -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
       -% a fitness_tag shell_header.fitness) >>= fun () ->
 
-  begin match Alpha_environment.wrap_error (Raw_level.of_int32 shell_header.level) with
+  begin match Environment.wrap_error (Raw_level.of_int32 shell_header.level) with
     | Ok level -> return level
     | (Error errs) as err ->
         lwt_log_error Tag.DSL.(fun f ->
@@ -755,7 +758,7 @@ let forge_block
       Lwt.return error
 
 let shell_prevalidation
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     ~block
     seed_nonce_hash
@@ -836,7 +839,7 @@ let rec filter_limits tnow limits =
     mempool. If no endorsements are present in the initial set, it
     waits until [state.max_waiting_time] seconds after its injection range start date. *)
 let fetch_operations
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     state
     (timestamp, (head, priority, _delegate) as slot)
@@ -985,7 +988,7 @@ let build_block
         | None -> bi.next_protocol
         | Some hash -> hash
       in
-      if Protocol_hash.(Proto_alpha.hash <> next_version) then
+      if Protocol_hash.(Protocol.hash <> next_version) then
         (* Let the shell validate this *)
         shell_prevalidation cctxt ~chain ~block seed_nonce_hash
           operations slot
@@ -1012,7 +1015,8 @@ let build_block
                 -% s Client_keys.Logging.tag name
                 -% a timestamp_tag (Time.System.of_protocol_exn timestamp)) >>= fun () ->
             let current_protocol = bi.next_protocol in
-            Context.get_protocol validation_result.context >>= fun next_protocol ->
+            let context = Shell_context.unwrap_disk_context validation_result.context in
+            Context.get_protocol context >>= fun next_protocol ->
             if Protocol_hash.equal current_protocol next_protocol then begin
               finalize_block_header final_context.header ~timestamp validation_result operations >>= function
               | Error [ Forking_test_chain ] ->
@@ -1032,7 +1036,7 @@ let build_block
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Proto_alpha.full) ~chain state =
+let bake (cctxt : #Alpha_client_context.full) ~chain state =
   begin match state.best_slot with
     | None -> assert false (* unreachable *)
     | Some slot -> return slot end >>=? fun slot ->
@@ -1126,7 +1130,7 @@ let get_baking_slots cctxt
     wake up. *)
 let compute_best_slot_on_current_level
     ?max_priority
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     state
     new_head =
   get_delegates cctxt state >>=? fun delegates ->
@@ -1206,7 +1210,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain ~blo
     starts individual baking operations when baking-slots are available to any of
     the [delegates] *)
 let create
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte

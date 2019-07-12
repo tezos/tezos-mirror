@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type incremental = {
   predecessor: Client_baking_blocks.block_info ;
-  context : Context.t ;
-  state: Main.validation_state ;
+  context : Tezos_protocol_environment.Context.t ;
+  state: validation_state ;
   rev_operations: Operation.packed list ;
   header: Tezos_base.Block_header.shell_header ;
 }
@@ -41,6 +41,6 @@ val check_context_consistency : Context.index -> Context_hash.t -> unit tzresult
 
 val begin_construction : timestamp:Time.Protocol.t -> ?protocol_data: block_header_data -> Context.index -> Client_baking_blocks.block_info -> incremental tzresult Lwt.t
 
-val add_operation : incremental -> Operation.packed -> (incremental * LiftedMain.operation_receipt) tzresult Lwt.t
+val add_operation : incremental -> Operation.packed -> (incremental * operation_receipt) tzresult Lwt.t
 
-val finalize_construction : incremental -> (T.validation_result * LiftedMain.block_header_metadata) tzresult Lwt.t
+val finalize_construction : incremental -> (Tezos_protocol_environment.validation_result * block_header_metadata) tzresult Lwt.t

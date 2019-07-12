@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_environment
+open Protocol
 open Alpha_context
+open Environment
 
 type t =
   | B of Block.t
@@ -103,9 +103,7 @@ end
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init:
-  ?slow: bool ->
-  ?preserved_cycles:int ->
   ?endorsers_per_block:int ->
-  ?commitments:Commitment_repr.t list ->
+  ?with_commitments: bool ->
   ?initial_balances: int64 list ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

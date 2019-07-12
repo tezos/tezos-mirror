@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 module ContractEntity = struct
@@ -32,7 +32,7 @@ module ContractEntity = struct
   let of_source s =
     match Contract.of_b58check s with
     | Error _ as err ->
-        Lwt.return (Alpha_environment.wrap_error err)
+        Lwt.return (Environment.wrap_error err)
         |> trace (failure "bad contract notation")
     | Ok s -> return s
   let to_source s = return (Contract.to_b58check s)

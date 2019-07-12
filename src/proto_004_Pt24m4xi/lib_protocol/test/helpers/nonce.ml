@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 module Table = Hashtbl.Make(struct
     type t = Nonce_hash.t

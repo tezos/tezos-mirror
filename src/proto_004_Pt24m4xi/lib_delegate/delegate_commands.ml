@@ -123,7 +123,7 @@ let delegate_commands () =
       no_options
       (prefixes [ "filter" ; "orphan" ; "nonces" ]
        @@ stop)
-      (fun () (cctxt : #Proto_alpha.full) ->
+      (fun () (cctxt : #Alpha_client_context.full) ->
          cctxt#with_lock begin fun () ->
            let chain = cctxt#chain in
            Client_baking_files.resolve_location
@@ -160,7 +160,7 @@ let delegate_commands () =
       no_options
       (prefixes [ "list" ; "orphan" ; "nonces" ]
        @@ stop)
-      (fun () (cctxt : #Proto_alpha.full) ->
+      (fun () (cctxt : #Alpha_client_context.full) ->
          cctxt#with_lock begin fun () ->
            let open Client_baking_nonces in
            let orphan_nonces_file = "orphan_nonce" in

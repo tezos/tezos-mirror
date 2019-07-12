@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type t =
@@ -41,13 +41,13 @@ let level = function
 let get_level ctxt =
   level ctxt
   |> Raw_level.of_int32
-  |> Alpha_environment.wrap_error
+  |> Environment.wrap_error
   |> Lwt.return
 
 let rpc_ctxt = object
   method call_proto_service0 :
     'm 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, Alpha_environment.RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, Environment.RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
     t -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr q i ->
       match pr with
@@ -55,7 +55,7 @@ let rpc_ctxt = object
       | I b -> Incremental.rpc_ctxt#call_proto_service0 s b q i
   method call_proto_service1 :
     'm 'a 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, Alpha_environment.RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, Environment.RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a q i ->
       match pr with
@@ -63,7 +63,7 @@ let rpc_ctxt = object
       | I bl -> Incremental.rpc_ctxt#call_proto_service1 s bl a q i
   method call_proto_service2 :
     'm 'a 'b 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, (Alpha_environment.RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, (Environment.RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a b q i ->
       match pr with
@@ -71,7 +71,7 @@ let rpc_ctxt = object
       | I bl -> Incremental.rpc_ctxt#call_proto_service2 s bl a b q i
   method call_proto_service3 :
     'm 'a 'b 'c 'q 'i 'o.
-    ([< RPC_service.meth ] as 'm, Alpha_environment.RPC_context.t, ((Alpha_environment.RPC_context.t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
+    ([< RPC_service.meth ] as 'm, Environment.RPC_context.t, ((Environment.RPC_context.t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
     t -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s pr a b c q i ->
       match pr with
@@ -98,7 +98,7 @@ let get_bakers ctxt =
 let get_seed_nonce_hash ctxt =
   let header =
     match ctxt with
-    | B { header } -> header
+    | B { header ; _ } -> header
     | I i -> Incremental.header i in
   match header.protocol_data.contents.seed_nonce_hash with
   | None -> failwith "No committed nonce"
@@ -143,12 +143,7 @@ module Vote = struct
     Alpha_services.Voting.current_proposal rpc_ctxt ctxt
 
   let get_protocol (b:Block.t) =
-    Alpha_environment.Context.get b.context ["protocol"] >>= function
-    | None -> assert false
-    | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
-
-  let get_protocol (b:Block.t) =
-    Alpha_environment.Context.get b.context ["protocol"] >>= function
+    Tezos_protocol_environment.Context.get b.context ["protocol"] >>= function
     | None -> assert false
     | Some p -> Lwt.return (Protocol_hash.of_bytes_exn p)
 
@@ -227,31 +222,15 @@ module Delegate = struct
 end
 
 let init
-    ?(slow=false)
-    ?preserved_cycles
     ?endorsers_per_block
-    ?commitments
+    ?with_commitments
     ?(initial_balances = [])
     n =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts = List.map (fun (a, _) ->
       Alpha_context.Contract.implicit_contract Account.(a.pkh)) accounts in
-  begin
-    if slow then
-      Block.genesis
-        ?preserved_cycles
-        ?endorsers_per_block
-        ?commitments
-        accounts
-    else
-      Block.genesis
-        ?preserved_cycles
-        ~blocks_per_cycle:32l
-        ~blocks_per_commitment:4l
-        ~blocks_per_roll_snapshot:8l
-        ~blocks_per_voting_period:(Int32.mul 32l 8l)
-        ?endorsers_per_block
-        ?commitments
-        accounts
-  end >>=? fun blk ->
+  Block.genesis
+    ?endorsers_per_block
+    ?with_commitments
+    accounts >>=? fun blk ->
   return (blk, contracts)

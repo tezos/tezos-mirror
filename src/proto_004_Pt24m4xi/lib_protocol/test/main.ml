@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run "protocol_004_PsGn8G5U" [
+  Alcotest.run "protocol_004_Pt24m4xi" [
     "transfer", Transfer.tests ;
     "origination", Origination.tests ;
     "activation", Activation.tests ;

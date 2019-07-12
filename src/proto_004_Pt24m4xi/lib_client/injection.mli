@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Apply_results
 
@@ -42,7 +42,7 @@ type fee_parameter = {
 val dummy_fee_parameter: fee_parameter
 
 val preapply:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?verbose_signing:bool ->
@@ -56,7 +56,7 @@ type 'kind result_list =
   Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
 val inject_operation:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -73,7 +73,7 @@ type 'kind result =
   Operation_hash.t * 'kind contents * 'kind contents_result
 
 val inject_manager_operation:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?branch:int ->

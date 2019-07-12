@@ -23,12 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val fork_node:
-  ?exe:string -> ?timeout:int -> ?port:int ->
-  ?sandbox:Data_encoding.json ->
-  unit -> int
-(** [fork_node ()] forks a node in sandbox mode listening to rpc on
-    `localhost:port` (where the default port is 18732) and returns the
-    PID of the forked process. It waits `timeout` seconds (default 4)
-    before to return and it may fails with an exception whenever the node
-    died during the wait.  *)
+(* Prints the json encoding of the parametric constants of protocol alpha.
+   $ dune utop src/proto_alpha/lib_protocol/test/helpers/ constants.ml
+*)
+
+let () =
+  let print_usage_and_fail s =
+    Printf.eprintf "Usage: %s [ --sandbox | --test | --mainnet ]"
+      Sys.argv.(0) ;
+    raise (Invalid_argument s)
+  in
+  let dump parameters file =
+    let str = Data_encoding.Json.to_string
+        (Default_parameters.json_of_parameters parameters) in
+    let fd = open_out file in
+    output_string fd str ;
+    close_out fd
+  in
+  if Array.length Sys.argv < 2 then print_usage_and_fail "" else
+    match Sys.argv.(1) with
+    | "--sandbox" ->
+        dump
+          Default_parameters.(parameters_of_constants constants_sandbox)
+          "sandbox-parameters.json"
+    | "--test" ->
+        dump
+          Default_parameters.(parameters_of_constants ~with_commitments:true constants_sandbox)
+          "test-parameters.json"
+    | "--mainnet" ->
+        dump
+          Default_parameters.(parameters_of_constants ~with_commitments:true constants_mainnet)
+          "mainnet-parameters.json"
+    | s -> print_usage_and_fail s

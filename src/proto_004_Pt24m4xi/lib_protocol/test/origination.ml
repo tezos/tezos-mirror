@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Test_utils
 open Test_tez
 
@@ -45,7 +45,7 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
   (* fee + credit + block security deposit were debited from source *)
   Context.get_constants (B b) >>=? fun {parametric = { origination_size ;
                                                        cost_per_byte ;
-                                                       block_security_deposit }} ->
+                                                       block_security_deposit ; _ }; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
@@ -89,8 +89,8 @@ let test_origination_balances ~loc ?(fee=Tez.zero) ?(credit=Tez.zero)
         { origination_size ;
           cost_per_byte ;
           block_security_deposit
-        }
-    } ->
+        ; _ }
+    ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (
     Tez.(+?) credit block_security_deposit >>?
@@ -204,7 +204,7 @@ let undelegatable fee () =
     begin
       Incremental.add_operation i operation >>= fun res ->
       let not_enough_money = function
-        | Proto_alpha.Contract_storage.Balance_too_low _ -> true
+        | Contract_storage.Balance_too_low _ -> true
         | _ -> false
       in
       Assert.proto_error ~loc:__LOC__ res not_enough_money
@@ -213,7 +213,7 @@ let undelegatable fee () =
     (* delegation is processed ; but delegate does not change *)
     begin
       let expect_failure = function
-        | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
+        | Environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
             return_unit
         | _ ->
             failwith "The contract is not delegatable, it fails!"
@@ -241,7 +241,7 @@ let credit fee () =
     begin
       Incremental.add_operation i operation >>= fun res ->
       let not_enough_money = function
-        | Proto_alpha.Contract_storage.Balance_too_low _ -> true
+        | Contract_storage.Balance_too_low _ -> true
         | _ -> false
       in
       Assert.proto_error ~loc:__LOC__ res not_enough_money
@@ -249,7 +249,7 @@ let credit fee () =
   else
     begin
       let not_enough_money = function
-        | Alpha_environment.Ecoproto_error (Proto_alpha.Contract_storage.Balance_too_low _) :: _ ->
+        | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
             return_unit
         | _ -> failwith "The contract does not have enough money, it fails!"
       in
@@ -268,8 +268,11 @@ let register_origination_inc ~credit () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source_contract = List.hd contracts in
   Incremental.begin_construction b >>=? fun inc ->
+  Context.get_constants (B b) >>=?
+  fun { parametric = { origination_size ; _ } ; _ } ->
+
   Op.origination (I inc)
-    ~storage_limit:(Z.of_int Constants_repr.default.origination_size)
+    ~storage_limit:(Z.of_int origination_size)
     ~credit source_contract >>=? fun (operation, new_contract) ->
   Incremental.add_operation inc operation >>=? fun inc ->
   return (inc, source_contract, new_contract)
@@ -285,7 +288,7 @@ let origination_contract_from_origination_contract_not_enough_fund fee () =
   (* contract's balance is not enough to afford origination burn  *)
   Op.origination ~fee (I inc) ~credit:amount contract >>=? fun (operation, orig_contract) ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Alpha_context.Fees.Cannot_pay_storage_fee) :: _ ->
+    | Environment.Ecoproto_error (Alpha_context.Fees.Cannot_pay_storage_fee) :: _ ->
         return_unit
     | e ->
         failwith "The contract has not enough funds, it fails! %a"

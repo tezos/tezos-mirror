@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_tez
 open Test_utils
@@ -40,16 +40,16 @@ let expect_error err = function
   | _ -> failwith "Unexpected successful result"
 
 let expect_alpha_error err =
-  expect_error (Alpha_environment.Ecoproto_error err)
+  expect_error (Environment.Ecoproto_error err)
 
 let expect_non_delegatable_contract = function
-  | Alpha_environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
+  | Environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
       return_unit
   | _ ->
       failwith "Contract is not delegatable and operation should fail."
 
 let expect_no_deletion_pkh pkh = function
-  | Alpha_environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
+  | Environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
       return_unit
   | _ ->
       failwith "Delegate can not be deleted and operation should fail."
@@ -132,7 +132,7 @@ let bootstrap_manager_already_registered_delegate ~fee () =
   else
     begin
       Incremental.add_operation ~expect_failure:(function
-          |  Alpha_environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
+          |  Environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
               return_unit
           | _ ->
               failwith "Delegate is already active and operation should fail.")
@@ -151,7 +151,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
   Op.origination ~fee ~credit:Tez.zero ~delegate:manager.pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} -> (* 0.257tz *)
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } -> (* 0.257tz *)
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun total_fee ->
   if fee > balance then
@@ -165,7 +165,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* origination did not proceed; fee has been debited *)
     begin
       Incremental.add_operation i ~expect_failure:(function
-          |  Alpha_environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
+          |  Environment.Ecoproto_error Contract.Balance_too_low _ :: _ ->
               return_unit
           | _ ->
               failwith "Not enough balance for origination burn: operation should fail.")
@@ -325,7 +325,7 @@ Not credited:
 *)
 
 let expect_unregistered_key pkh = function
-  | Alpha_environment.Ecoproto_error Roll_storage.Unregistered_delegate pkh0 :: _
+  | Environment.Ecoproto_error Roll_storage.Unregistered_delegate pkh0 :: _
     when pkh = pkh0 -> return_unit
   | _ -> failwith "Delegate key is not registered: operation should fail."
 
@@ -339,7 +339,7 @@ let unregistered_delegate_key_init_origination ~fee () =
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
   Op.origination ~fee ~delegate:unregistered_pkh (I i) bootstrap >>=? fun (op, orig_contract) ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   Lwt.return (Tez.(+?) fee origination_burn) >>=? fun _total_fee -> (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
@@ -1065,7 +1065,7 @@ let registered_self_delegate_key_init_origination () =
   Op.delegation (I i) contract (Some pkh) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) contract >>=? fun balance ->
-  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ }} ->
+  Context.get_constants (I i) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   (* origination with delegate argument *)
   Op.origination ~delegate:pkh ~credit:Tez.one (I i) contract >>=? fun (op, orig_contract) ->

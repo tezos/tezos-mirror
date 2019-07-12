@@ -24,11 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 val forge_endorsement:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?async: bool ->
   chain: Chain_services.chain ->
   block: Block_services.block ->
@@ -41,7 +41,7 @@ val forge_endorsement:
 
 
 val create :
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   ?max_past: int64 (* number of seconds *) ->
   delay: int ->
   public_key_hash list ->

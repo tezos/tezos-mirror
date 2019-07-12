@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 let timestamp_tag = Tag.def ~doc:"Timestamp when event occurred" "timestamp" Time.System.pp_hum

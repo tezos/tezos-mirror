@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 include Internal_event.Legacy_logging.Make_semantic (struct
-    let name =  Proto_alpha.Name.name ^ ".client.scheduling"
+    let name = Protocol.name ^ ".baking.scheduling"
   end)
 
 open Logging
@@ -61,20 +61,20 @@ let log_errors_and_continue ~name p =
 
 let main
     ~(name: string)
-    ~(cctxt: #Proto_alpha.full)
+    ~(cctxt: #Alpha_client_context.full)
     ~(stream: 'event tzresult Lwt_stream.t)
     ~(state_maker: ('event ->
                     'state tzresult Lwt.t))
-    ~(pre_loop: (#Proto_alpha.full ->
+    ~(pre_loop: (#Alpha_client_context.full ->
                  'state ->
                  'event ->
                  unit tzresult Lwt.t))
     ~(compute_timeout: ('state -> 'timesup Lwt.t))
-    ~(timeout_k: (#Proto_alpha.full ->
+    ~(timeout_k: (#Alpha_client_context.full ->
                   'state ->
                   'timesup ->
                   unit tzresult Lwt.t))
-    ~(event_k: (#Proto_alpha.full ->
+    ~(event_k: (#Alpha_client_context.full ->
                 'state ->
                 'event ->
                 unit tzresult Lwt.t))
