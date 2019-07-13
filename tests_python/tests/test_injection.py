@@ -16,7 +16,7 @@ def clients(sandbox):
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
 COMPILER = (f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
             'main_native.exe')
-PARAMS = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
+PARAMS = ['-p', 'Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P']
 
 
 @pytest.mark.incremental
@@ -87,5 +87,5 @@ class TestActivation:
         assert client.get_level(params=PARAMS) == 1
 
     def test_protocol_genesis(self, client):
-        proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+        proto = 'Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P'
         assert client.get_protocol(params=PARAMS) == proto
