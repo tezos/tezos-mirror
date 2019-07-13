@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Error_monad
+open Alpha_client_context
 open Protocol
 open Alpha_context
 

@@ -60,3 +60,11 @@ class wrap_full (t : Client_context.full) : full = object
       (t :> RPC_context.t)
       Shell_services.Blocks.path
 end
+
+let register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error =
+  let id = "client." ^ Protocol.name ^ "." ^ id in
+  register_error_kind
+    category ~id ~title ~description ?pp
+    encoding from_error to_error
