@@ -9,6 +9,7 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-protocol-002-PsYLVpVv"
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
 ]

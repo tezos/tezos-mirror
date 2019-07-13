@@ -8,6 +8,7 @@ license: "MIT"
 depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
+  "tezos-protocol-000-Ps9mPmXa"
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
 ]
