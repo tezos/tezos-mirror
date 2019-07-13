@@ -12,6 +12,7 @@
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
+                   -open Tezos_protocol_000_Ps9mPmXa
                    -open Tezos_client_commands)))
 
 (alias
