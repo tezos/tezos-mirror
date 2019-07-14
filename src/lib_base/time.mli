@@ -165,6 +165,12 @@ module System : sig
   val stamp : time:t -> 'a -> 'a stamped
   (** [stamp d] is a timestamped version of [d]. *)
 
+  val pp_stamped :
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter ->
+    'a stamped ->
+    unit
+
   val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
   (** [recent a b] is either [a] or [b] (which ever carries the most recent
       timestamp), or [None] if both [a] and [b] are [None]. *)
