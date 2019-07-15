@@ -107,7 +107,7 @@ let commands () =
     command ~group ~desc: "Lists all scripts in the library."
       no_options
       (fixed [ "list" ; "known" ; "scripts" ])
-      (fun () (cctxt : Alpha_client_context.full) ->
+      (fun () (cctxt : Protocol_client_context.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return_unit) ;
@@ -134,7 +134,7 @@ let commands () =
       (prefixes [ "show" ; "known" ; "script" ]
        @@ Program.alias_param
        @@ stop)
-      (fun () (_, program) (cctxt : Alpha_client_context.full) ->
+      (fun () (_, program) (cctxt : Protocol_client_context.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
          return_unit) ;
@@ -318,7 +318,7 @@ let commands () =
          signature_parameter
        @@ stop)
       (fun quiet bytes (_, (key_locator, _)) signature
-        (cctxt : #Alpha_client_context.full) ->
+        (cctxt : #Protocol_client_context.full) ->
         Client_keys.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->

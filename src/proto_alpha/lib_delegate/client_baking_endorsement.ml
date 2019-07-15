@@ -27,7 +27,7 @@
 
 open Protocol
 open Alpha_context
-open Alpha_client_context
+open Protocol_client_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
     let name = Protocol.name ^ ".baking.endorsement"
@@ -44,7 +44,7 @@ let get_signing_slots cctxt ~chain ~block delegate level =
   | _ -> return_none
 
 let inject_endorsement
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ?async
     ~chain ~block
     hash level
@@ -79,7 +79,7 @@ let inject_endorsement
     fail (Level_previously_endorsed level)
 
 let forge_endorsement
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ?async
     ~chain ~block
     ~src_sk src_pk =
@@ -188,7 +188,7 @@ let allowed_to_endorse cctxt bi delegate  =
           return_false
       | true -> return_true
 
-let prepare_endorsement ~(max_past:int64) () (cctxt : #Alpha_client_context.full) state bi =
+let prepare_endorsement ~(max_past:int64) () (cctxt : #Protocol_client_context.full) state bi =
   let past =
     Time.Protocol.diff
       (Time.System.to_protocol (Systime_os.now ()))
@@ -240,7 +240,7 @@ let compute_timeout state =
           timeout >>= fun () -> Lwt.return (block, delegates)
 
 let create
-    (cctxt: #Alpha_client_context.full)
+    (cctxt: #Protocol_client_context.full)
     ?(max_past=110L)
     ~delay
     delegates

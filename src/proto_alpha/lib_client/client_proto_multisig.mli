@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 
 type multisig_action =
   | Transfer of Tez.t * Contract.t
@@ -40,7 +41,7 @@ type multisig_prepared_action =
   }
 
 val originate_multisig:
-  #Alpha_client_context.full ->
+  full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->
@@ -63,7 +64,7 @@ val originate_multisig:
   unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val prepare_multisig_transaction:
-  #Alpha_client_context.full ->
+  full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   multisig_contract: Contract.t ->
@@ -71,7 +72,7 @@ val prepare_multisig_transaction:
   unit -> multisig_prepared_action tzresult Lwt.t
 
 val call_multisig:
-  #Alpha_client_context.full ->
+  full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->
@@ -93,7 +94,7 @@ val call_multisig:
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
 val call_multisig_on_bytes:
-  #Alpha_client_context.full ->
+  full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->

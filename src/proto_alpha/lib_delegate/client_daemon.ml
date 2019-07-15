@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec retry (cctxt: #Alpha_client_context.full) ~delay ~tries f x =
+let rec retry (cctxt: #Protocol_client_context.full) ~delay ~tries f x =
   f x >>= function
   | Ok _ as r -> Lwt.return r
   | Error (RPC_client_errors.Request_failed
@@ -44,7 +44,7 @@ let rec retry (cctxt: #Alpha_client_context.full) ~delay ~tries f x =
   | Error _ as err ->
       Lwt.return err
 
-let await_bootstrapped_node (cctxt: #Alpha_client_context.full) =
+let await_bootstrapped_node (cctxt: #Protocol_client_context.full) =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the node to be synchronized with its \
                  peers..." >>= fun () ->
@@ -53,7 +53,7 @@ let await_bootstrapped_node (cctxt: #Alpha_client_context.full) =
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
-let monitor_fork_testchain (cctxt: #Alpha_client_context.full) ~cleanup_nonces  =
+let monitor_fork_testchain (cctxt: #Protocol_client_context.full) ~cleanup_nonces  =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the test chain to be forked..." >>= fun () ->
   Shell_services.Monitor.active_chains cctxt >>=? fun (stream, _) ->
@@ -102,7 +102,7 @@ let monitor_fork_testchain (cctxt: #Alpha_client_context.full) ~cleanup_nonces  
 
 module Endorser = struct
 
-  let run (cctxt : #Alpha_client_context.full) ~chain ~delay delegates =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:false
@@ -123,7 +123,7 @@ end
 module Baker = struct
 
   let run
-      (cctxt : #Alpha_client_context.full)
+      (cctxt : #Protocol_client_context.full)
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
@@ -157,7 +157,7 @@ end
 
 module Accuser = struct
 
-  let run (cctxt : #Alpha_client_context.full) ~chain ~preserved_levels =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:true

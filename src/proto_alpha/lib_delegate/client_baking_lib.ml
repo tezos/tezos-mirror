@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 
 let bake_block
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
@@ -116,7 +116,7 @@ let do_reveal cctxt ~chain ~block nonces =
     cctxt ~chain ~block nonces >>=? fun () ->
   return_unit
 
-let reveal_block_nonces (cctxt : #Alpha_client_context.full) ~chain ~block block_hashes =
+let reveal_block_nonces (cctxt : #Protocol_client_context.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     Client_baking_nonces.load cctxt nonces_location
@@ -147,7 +147,7 @@ let reveal_block_nonces (cctxt : #Alpha_client_context.full) ~chain ~block block
   let nonces = List.map snd nonces in
   do_reveal cctxt ~chain ~block nonces
 
-let reveal_nonces (cctxt : #Alpha_client_context.full) ~chain ~block () =
+let reveal_nonces (cctxt : #Protocol_client_context.full) ~chain ~block () =
   let open Client_baking_nonces in
   cctxt#with_lock begin fun () ->
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->

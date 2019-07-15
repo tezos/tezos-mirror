@@ -31,7 +31,7 @@ module Program : Client_aliases.Alias
   with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
 val run :
-  #Alpha_client_context.rpc_context ->
+  #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?amount:Tez.t ->
@@ -47,7 +47,7 @@ val run :
    Contract.big_map_diff option) tzresult Lwt.t
 
 val trace :
-  #Alpha_client_context.rpc_context ->
+  #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?amount:Tez.t ->
@@ -82,7 +82,7 @@ val print_trace_result :
     tzresult -> unit tzresult Lwt.t
 
 val typecheck_data :
-  #Alpha_client_context.rpc_context ->
+  #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?gas:Z.t ->
@@ -92,7 +92,7 @@ val typecheck_data :
   Gas.t tzresult Lwt.t
 
 val typecheck_program :
-  #Alpha_client_context.rpc_context ->
+  #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?gas:Z.t ->

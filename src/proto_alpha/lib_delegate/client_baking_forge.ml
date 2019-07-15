@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Alpha_client_context
+open Protocol_client_context
 
 include Internal_event.Legacy_logging.Make_semantic(struct
     let name = Protocol.name ^ ".baking.forge"
@@ -105,7 +105,7 @@ let generate_seed_nonce () =
   | Ok nonce -> nonce
 
 let forge_block_header
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ~chain
     block
     delegate_sk
@@ -316,7 +316,7 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block manager_operatio
     - A desired set of operations to be included
     - Potentially overflowing operations *)
 let classify_operations
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ~chain
     ~block
     ~hard_gas_limit_per_block
@@ -758,7 +758,7 @@ let forge_block
       Lwt.return error
 
 let shell_prevalidation
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ~chain
     ~block
     seed_nonce_hash
@@ -839,7 +839,7 @@ let rec filter_limits tnow limits =
     mempool. If no endorsements are present in the initial set, it
     waits until [state.max_waiting_time] seconds after its injection range start date. *)
 let fetch_operations
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ~chain
     state
     (timestamp, (head, priority, _delegate) as slot)
@@ -1036,7 +1036,7 @@ let build_block
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Alpha_client_context.full) ~chain state =
+let bake (cctxt : #Protocol_client_context.full) ~chain state =
   begin match state.best_slot with
     | None -> assert false (* unreachable *)
     | Some slot -> return slot end >>=? fun slot ->
@@ -1130,7 +1130,7 @@ let get_baking_slots cctxt
     wake up. *)
 let compute_best_slot_on_current_level
     ?max_priority
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     state
     new_head =
   get_delegates cctxt state >>=? fun delegates ->
@@ -1210,7 +1210,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain ~blo
     starts individual baking operations when baking-slots are available to any of
     the [delegates] *)
 let create
-    (cctxt : #Alpha_client_context.full)
+    (cctxt : #Protocol_client_context.full)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte

@@ -95,7 +95,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       print_errors cctxt errs ~show_source ~parsed
 
 let run
-    (cctxt : #Alpha_client_context.rpc_context)
+    (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)
@@ -112,7 +112,7 @@ let run
     (storage.expanded, input.expanded, amount, source, payer, gas)
 
 let trace
-    (cctxt : #Alpha_client_context.rpc_context)
+    (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)

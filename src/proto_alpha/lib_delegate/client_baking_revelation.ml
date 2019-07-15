@@ -30,7 +30,7 @@ include Internal_event.Legacy_logging.Make_semantic(struct
   end)
 
 let inject_seed_nonce_revelation
-    (cctxt: #Alpha_client_context.full)
+    (cctxt: #Protocol_client_context.full)
     ~chain ~block ?async nonces =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with

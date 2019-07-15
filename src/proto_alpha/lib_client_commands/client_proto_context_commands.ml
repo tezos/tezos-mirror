@@ -103,7 +103,7 @@ let commands version () =
       (args1
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun seconds (cctxt : Alpha_client_context.full) ->
+      begin fun seconds (cctxt : Protocol_client_context.full) ->
         Shell_services.Blocks.Header.shell_header
           cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v ; _ } ->
         begin
@@ -117,7 +117,7 @@ let commands version () =
     command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
-      begin fun () (cctxt : Alpha_client_context.full) ->
+      begin fun () (cctxt : Protocol_client_context.full) ->
         list_contract_labels cctxt
           ~chain:cctxt#chain ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
@@ -131,7 +131,7 @@ let commands version () =
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_balance cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun amount ->
@@ -144,7 +144,7 @@ let commands version () =
       (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_storage cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -166,7 +166,7 @@ let commands version () =
        @@ prefix "in"
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () key key_type (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
         get_big_map_value cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract (key.expanded, key_type.expanded) >>=? function
@@ -182,7 +182,7 @@ let commands version () =
       (prefixes [ "get" ; "script" ; "code" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_script cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -202,7 +202,7 @@ let commands version () =
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_manager cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun manager ->
@@ -218,7 +218,7 @@ let commands version () =
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -251,7 +251,7 @@ let commands version () =
       begin fun
         (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
          minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, contract) (_, delegate) (cctxt : Alpha_client_context.full) ->
+        (_, contract) (_, delegate) (cctxt : Protocol_client_context.full) ->
         let fee_parameter = {
           Injection.minimal_fees ;
           minimal_nanotez_per_byte ;
@@ -286,7 +286,7 @@ let commands version () =
        @@ stop)
       begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, contract) (cctxt : Alpha_client_context.full) ->
+        (_, contract) (cctxt : Protocol_client_context.full) ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun (src_pk, manager_sk) ->
@@ -331,7 +331,7 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, delegate, delegatable, force,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        new_contract manager_pkh balance (_, source) (cctxt : Alpha_client_context.full) ->
+        new_contract manager_pkh balance (_, source) (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
@@ -390,7 +390,7 @@ let commands version () =
                  delegate, force, delegatable, spendable, initial_storage,
                  no_print_source, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        alias_name manager balance (_, source) program (cctxt : Alpha_client_context.full) ->
+        alias_name manager balance (_, source) program (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code ; _ } ->
         source_to_keys cctxt
@@ -619,7 +619,7 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Alpha_client_context.full) ->
+      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Protocol_client_context.full) ->
         Client_confirmations.wait_for_operation_inclusion ctxt
           ~chain:ctxt#chain ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
@@ -643,7 +643,7 @@ let commands version () =
                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                | Some hash -> return hash))
        @@ stop)
-      begin fun predecessors operation_hash (ctxt : Alpha_client_context.full) ->
+      begin fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
         display_receipt_for_operation ctxt
           ~chain:ctxt#chain ~predecessors operation_hash >>=? fun _ ->
         return_unit
@@ -652,7 +652,7 @@ let commands version () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "block" ; "header" ])
-      begin fun () (cctxt : Alpha_client_context.full) ->
+      begin fun () (cctxt : Protocol_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -663,7 +663,7 @@ let commands version () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "operation" ])
-      begin fun () (cctxt : Alpha_client_context.full) ->
+      begin fun () (cctxt : Protocol_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -693,7 +693,7 @@ let commands version () =
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
       begin fun (dry_run, verbose_signing, force)
-        (_name, source) proposals (cctxt : Alpha_client_context.full) ->
+        (_name, source) proposals (cctxt : Protocol_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -825,7 +825,7 @@ let commands version () =
                | "pass" -> return Vote.Pass
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
-      begin fun dry_run (_name, source) proposal ballot (cctxt : Alpha_client_context.full) ->
+      begin fun dry_run (_name, source) proposal ballot (cctxt : Protocol_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
@@ -842,7 +842,7 @@ let commands version () =
     command ~group ~desc: "Summarize the current voting period"
       no_options
       (fixed [ "show" ; "voting" ; "period" ])
-      begin fun () (cctxt : Alpha_client_context.full) ->
+      begin fun () (cctxt : Protocol_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         cctxt#message "Current period: %a\n\
                        Blocks remaining until end of period: %ld"

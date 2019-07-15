@@ -42,7 +42,7 @@ type fee_parameter = {
 val dummy_fee_parameter: fee_parameter
 
 val preapply:
-  #Alpha_client_context.full ->
+  #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?verbose_signing:bool ->
@@ -56,7 +56,7 @@ type 'kind result_list =
   Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
 val inject_operation:
-  #Alpha_client_context.full ->
+  #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
@@ -73,7 +73,7 @@ type 'kind result =
   Operation_hash.t * 'kind contents * 'kind contents_result
 
 val inject_manager_operation:
-  #Alpha_client_context.full ->
+  #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?branch:int ->

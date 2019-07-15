@@ -34,7 +34,7 @@ val empty_proof_of_work_nonce: Cstruct.buffer
     to make the block. All the internal logic of generating nonces and checking
     for the proof-of-work threshold is handled by [mine]. *)
 val mine:
-  #Alpha_client_context.full ->
+  #Protocol_client_context.full ->
   Shell_services.chain ->
   Block_services.block ->
   Block_header.shell_header ->

@@ -27,9 +27,9 @@
 open Protocol
 open Alpha_context
 open Apply_results
-open Alpha_client_context
+open Protocol_client_context
 
-let get_branch (rpc_config: #Alpha_client_context.full)
+let get_branch (rpc_config: #Protocol_client_context.full)
     ~chain ~(block : Block_services.block) branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
   begin
@@ -89,7 +89,7 @@ let dummy_fee_parameter = {
 }
 
 let check_fees
-  : type t. #Alpha_client_context.full -> fee_parameter -> t contents_list -> int -> unit Lwt.t
+  : type t. #Protocol_client_context.full -> fee_parameter -> t contents_list -> int -> unit Lwt.t
   = fun cctxt config op size ->
     match get_manager_operation_gas_and_fee op with
     | Error _ -> assert false (* FIXME *)
@@ -176,7 +176,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
   pp_close_box ppf ()
 
 let preapply (type t)
-    (cctxt: #Alpha_client_context.full) ~chain ~block
+    (cctxt: #Protocol_client_context.full) ~chain ~block
     ?(verbose_signing = false)
     ?fee_parameter
     ?branch ?src_sk (contents : t contents_list) =
@@ -214,7 +214,7 @@ let preapply (type t)
         check_fees cctxt fee_parameter contents size
     | None -> Lwt.return_unit
   end >>= fun () ->
-  Alpha_client_context.Alpha_block_services.Helpers.Preapply.operations
+  Protocol_client_context.Alpha_block_services.Helpers.Preapply.operations
     cctxt ~chain ~block [Operation.pack op] >>=? function
   | [(Operation_data op', Operation_metadata result)] -> begin
       match Operation.equal
@@ -227,7 +227,7 @@ let preapply (type t)
   | _ -> failwith "Unexpected result"
 
 let simulate (type t)
-    (cctxt: #Alpha_client_context.full) ~chain ~block
+    (cctxt: #Protocol_client_context.full) ~chain ~block
     ?branch (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
@@ -385,7 +385,7 @@ let detect_script_failure :
   fun { contents } -> detect_script_failure contents
 
 let may_patch_limits
-    (type kind) (cctxt : #Alpha_client_context.full)
+    (type kind) (cctxt : #Protocol_client_context.full)
     ~fee_parameter
     ~chain ~block ?branch ?(compute_fee = false)
     (contents: kind contents_list) : kind contents_list tzresult Lwt.t =

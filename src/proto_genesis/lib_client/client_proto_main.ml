@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
-open Genesis_client_context
+open Protocol_client_context
 
 let protocol =
   Protocol_hash.of_b58check_exn

@@ -61,20 +61,20 @@ let log_errors_and_continue ~name p =
 
 let main
     ~(name: string)
-    ~(cctxt: #Alpha_client_context.full)
+    ~(cctxt: #Protocol_client_context.full)
     ~(stream: 'event tzresult Lwt_stream.t)
     ~(state_maker: ('event ->
                     'state tzresult Lwt.t))
-    ~(pre_loop: (#Alpha_client_context.full ->
+    ~(pre_loop: (#Protocol_client_context.full ->
                  'state ->
                  'event ->
                  unit tzresult Lwt.t))
     ~(compute_timeout: ('state -> 'timesup Lwt.t))
-    ~(timeout_k: (#Alpha_client_context.full ->
+    ~(timeout_k: (#Protocol_client_context.full ->
                   'state ->
                   'timesup ->
                   unit tzresult Lwt.t))
-    ~(event_k: (#Alpha_client_context.full ->
+    ~(event_k: (#Protocol_client_context.full ->
                 'state ->
                 'event ->
                 unit tzresult Lwt.t))

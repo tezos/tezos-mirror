@@ -26,7 +26,7 @@
 
 open Protocol
 open Alpha_context
-open Alpha_client_context
+open Protocol_client_context
 
 val tez_sym: string
 

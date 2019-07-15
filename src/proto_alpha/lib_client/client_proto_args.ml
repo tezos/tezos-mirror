@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_client_context
+open Protocol_client_context
 open Protocol
 open Alpha_context
 open Clic

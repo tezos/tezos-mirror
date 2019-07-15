@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 
 val inject_seed_nonce_revelation:
-  #Alpha_client_context.full ->
+  #Protocol_client_context.full ->
   chain: Chain_services.chain ->
   block: Block_services.block ->
   ?async:bool ->
