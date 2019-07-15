@@ -281,7 +281,7 @@ let requested_levels ~default ctxt cycles levels =
           Level.compare
           (List.concat (List.map (Level.from_raw ctxt) levels ::
                         List.map (Level.levels_in_cycle ctxt) cycles)) in
-      map_p
+      map_s
         (fun level ->
            let current_level = Level.current ctxt in
            if Level.(level <= current_level) then
@@ -410,7 +410,7 @@ module Baking_rights = struct
         match q.max_priority with
         | None -> 64
         | Some max -> max in
-      map_p (baking_priorities ctxt max_priority) levels >>=? fun rights ->
+      map_s (baking_priorities ctxt max_priority) levels >>=? fun rights ->
       let rights =
         if q.all then
           rights
@@ -516,7 +516,7 @@ module Endorsing_rights = struct
       requested_levels
         ~default: (Level.current ctxt, Some (Timestamp.current ctxt))
         ctxt q.cycles q.levels >>=? fun levels ->
-      map_p (endorsement_slots ctxt) levels >>=? fun rights ->
+      map_s (endorsement_slots ctxt) levels >>=? fun rights ->
       let rights = List.concat rights in
       match q.delegates with
       | [] -> return rights
