@@ -50,7 +50,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
     ~first_endorser_exec ~first_accuser_exec ~second_baker_exec
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
-    ~extra_dummy_proposals ~waiting_attempts test_variant () =
+    ~extra_dummy_proposals_batch_size ~extra_dummy_proposals_batch_levels
+    ~waiting_attempts test_variant () =
   Helpers.System_dependencies.precheck state `Or_fail
     ~protocol_paths:[new_protocol_path]
     ~executables:
@@ -244,22 +245,31 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       submit_prop acc client new_protocol_hash )
   >>= fun () ->
-  let extra_dummy_protocol_hashes =
+  let make_dummy_protocol_hashes t tag =
     List.map
-      (List.init extra_dummy_proposals ~f:(fun s -> sprintf "proto-%d" s))
-      ~f:(fun s -> Tezos_crypto.Protocol_hash.(hash_string [s] |> to_b58check))
+      (List.init extra_dummy_proposals_batch_size ~f:(fun s ->
+           sprintf "proto-%s-%d" tag s ))
+      ~f:(fun s ->
+        (t, Tezos_crypto.Protocol_hash.(hash_string [s] |> to_b58check)) )
+  in
+  let extra_dummy_protocols =
+    List.bind extra_dummy_proposals_batch_levels ~f:(fun l ->
+        make_dummy_protocol_hashes l (sprintf "%d" l) )
   in
   Console.say state
     EF.(
       wf "Going to also vote for %s"
-        (String.concat ~sep:", " extra_dummy_protocol_hashes))
+        (String.concat ~sep:", " (List.map extra_dummy_protocols ~f:snd)))
   >>= fun () ->
-  List_sequential.iteri extra_dummy_protocol_hashes ~f:(fun nth proto_hash ->
+  List_sequential.iteri extra_dummy_protocols
+    ~f:(fun nth (level, proto_hash) ->
       match List.nth keys_and_daemons (nth / 19) with
-      | Some (acc, client, _) -> submit_prop acc client proto_hash
       | None ->
           failf "Too many dummy protocols Vs available voting power (%d)" nth
-  )
+      | Some (acc, client, _) ->
+          wait_for_voting_period state ~client:client_0
+            ~attempts:waiting_attempts Proposal ~level_within_period:level
+          >>= fun _ -> submit_prop acc client proto_hash )
   >>= fun () ->
   wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
     Testing_vote
@@ -362,7 +372,9 @@ let cmd ~pp_error () =
         second_endorser_exec
         second_accuser_exec
         (`Protocol_path new_protocol_path)
-        (`Extra_dummy_proposals extra_dummy_proposals)
+        (`Extra_dummy_proposals_batch_size extra_dummy_proposals_batch_size)
+        (`Extra_dummy_proposals_batch_levels
+          extra_dummy_proposals_batch_levels)
         generate_kiln_config
         test_variant
         state
@@ -373,7 +385,8 @@ let cmd ~pp_error () =
               ~second_baker_exec ~second_endorser_exec ~second_accuser_exec
               ~admin_exec ?generate_kiln_config ~external_peer_ports
               ~no_daemons_for ~new_protocol_path test_variant ~waiting_attempts
-              ~extra_dummy_proposals
+              ~extra_dummy_proposals_batch_size
+              ~extra_dummy_proposals_batch_levels
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -419,11 +432,23 @@ let cmd ~pp_error () =
                (info [] ~doc:"The protocol to inject and vote on."
                   ~docv:"PROTOCOL-PATH")))
     $ Arg.(
-        pure (fun l -> `Extra_dummy_proposals l)
+        pure (fun l -> `Extra_dummy_proposals_batch_size l)
         $ value
             (opt int 0
-               (info ["extra-dummy-proposals"] ~docv:"NUMBER"
-                  ~doc:"Submit $(docv) extra proposals.")))
+               (info
+                  ["extra-dummy-proposals-batch-size"]
+                  ~docv:"NUMBER"
+                  ~doc:"Submit $(docv) extra proposals per batch.")))
+    $ Arg.(
+        pure (fun x -> `Extra_dummy_proposals_batch_levels x)
+        $ value
+            (opt (list ~sep:',' int) []
+               (info
+                  ["extra-dummy-proposals-batch-levels"]
+                  ~docv:"NUMBER"
+                  ~doc:
+                    "Set the levels within the proposal period where batches \
+                     of extra proposals appear, e.g. `3,5,7`.")))
     $ Kiln.Configuration_directory.cli_term ()
     $ Arg.(
         let doc =

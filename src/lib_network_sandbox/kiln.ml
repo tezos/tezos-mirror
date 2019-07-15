@@ -66,7 +66,8 @@ module Configuration_directory = struct
     System.write_file state ~perm:0o777 (path // "network")
       ~content:network_string
     >>= fun () ->
-    System.write_file state ~perm:0o777 (path // "enable-obsidian-node")
+    System.write_file state ~perm:0o777
+      (path // "enable-obsidian-node")
       ~content:(sprintf "%b" false)
     >>= fun () ->
     System.write_file state ~perm:0o777 (path // "binary-paths")
