@@ -4,18 +4,18 @@ open Console
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
-let wait_for_voting_period ?level_withing_period state ~client ~attempts period
+let wait_for_voting_period ?level_within_period state ~client ~attempts period
     =
   let period_name = Tezos_protocol.Voting_period.to_string period in
   let message =
     sprintf "Waiting for voting period: `%s`%s" period_name
-      (Option.value_map level_withing_period ~default:""
-         ~f:(sprintf " (and level-within-period ≤ %d)"))
+      (Option.value_map level_within_period ~default:""
+         ~f:(sprintf " (and level-within-period ≥ %d)"))
   in
   Console.say state EF.(wf "%s" message)
   >>= fun () ->
   Helpers.wait_for state ~attempts ~seconds:10. (fun nth ->
-      Asynchronous_result.map_option level_withing_period ~f:(fun lvl ->
+      Asynchronous_result.map_option level_within_period ~f:(fun lvl ->
           Tezos_client.rpc state ~client `Get
             ~path:"/chains/main/blocks/head/metadata"
           >>= fun json ->
@@ -25,7 +25,7 @@ let wait_for_voting_period ?level_withing_period state ~client ~attempts period
               |> Jqo.field ~k:"voting_period_position"
               |> Jqo.get_int
             in
-            return (voting_period_position <= lvl)
+            return (voting_period_position >= lvl)
           with e ->
             failf "Cannot get level.voting_period_position: %s"
               (Printexc.to_string e) )
@@ -228,7 +228,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ~force:true
   >>= fun () ->
   wait_for_voting_period state ~client:client_0 ~attempts:waiting_attempts
-    Proposal ~level_withing_period:3
+    Proposal ~level_within_period:3
   >>= fun _ ->
   let submit_prop acc client hash =
     Tezos_client.successful_client_cmd state ~client
