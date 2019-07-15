@@ -25,6 +25,9 @@
 (*****************************************************************************)
 
 module Message = Distributed_db_message
+module Logging =
+  Internal_event.Legacy_logging.Make
+    (struct let name = "node.distributed_db" end)
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type connection = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
@@ -97,12 +100,19 @@ module Make_raw
     table: Table.t ;
   }
 
+  let state_of_t { scheduler ; table } =
+    let table_length = Table.memory_table_length table in
+    let scheduler_length = Scheduler.memory_table_length scheduler in
+    { Chain_validator_worker_state.Distributed_db_state.
+      table_length ; scheduler_length }
+
   let create ?global_input request_param param =
     let scheduler = Scheduler.create request_param in
     let table = Table.create ?global_input scheduler param in
     { scheduler ; table }
 
   let shutdown { scheduler ; _ } =
+    Logging.lwt_log_notice "Shutting down the distributed data-base scheduler..." >>= fun () ->
     Scheduler.shutdown scheduler
 
 end
@@ -366,6 +376,27 @@ type t = db
 let state { disk ; _ } = disk
 let chain_state { chain_state ; _ } = chain_state
 let db { global_db ; _ } = global_db
+
+let information ({ global_db = { p2p_readers ;
+                                 active_chains ;  _ } ;
+                   operation_db ;
+                   operations_db  ;
+                   block_header_db ;
+                   operation_hashes_db ;
+                   active_connections ;
+                   active_peers ; _
+                 }  : chain_db)  =
+  { Chain_validator_worker_state.Distributed_db_state.
+    p2p_readers_length =  P2p_peer.Table.length p2p_readers ;
+    active_chains_length = Chain_id.Table.length active_chains ;
+    operation_db = Raw_operation.state_of_t operation_db ;
+    operations_db = Raw_operations.state_of_t operations_db ;
+    block_header_db = Raw_block_header.state_of_t block_header_db ;
+    operations_hashed_db = Raw_operation_hashes.state_of_t operation_hashes_db ;
+    active_connections_length = P2p_peer.Table.length active_connections ;
+    active_peers_length = P2p_peer.Set.cardinal !active_peers ;
+  }
+
 
 let my_peer_id chain_db = P2p.peer_id chain_db.global_db.p2p
 
@@ -918,7 +949,6 @@ let commit_block chain_db hash
   State.Block.store chain_db.chain_state
     header header_data operations operations_data result
     ~forking_testchain >>=? fun res ->
-  Raw_block_header.Table.resolve_pending chain_db.block_header_db.table hash header;
   clear_block chain_db hash header.shell.validation_passes ;
   return res
 
@@ -943,7 +973,7 @@ let watch_operation { operation_input ; _ } =
   Lwt_watcher.create_stream operation_input
 
 module Raw = struct
-  let encoding = P2p.Raw.encoding Message.cfg.encoding
+  let encoding = P2p_message.encoding Message.cfg.encoding
   let chain_name = Message.cfg.chain_name
   let distributed_db_versions = Message.cfg.distributed_db_versions
 end

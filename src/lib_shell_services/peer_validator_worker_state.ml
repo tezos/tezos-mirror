@@ -41,7 +41,7 @@ module Request = struct
           (obj3
              (req "request" (constant "new_branch"))
              (req "block" Block_hash.encoding)
-             (req "locator_length" uint16))
+             (req "locators" int31))
           (function New_branch (h, l) -> Some ((), h, l) | _ -> None)
           (fun ((), h, l) -> New_branch (h, l)) ]
 
@@ -106,28 +106,58 @@ module Event = struct
 end
 
 module Worker_state = struct
+  type pipeline_length = { fetched_header_length : int ;
+                           fetched_block_length : int ; }
+
+  let pipeline_length_encoding =
+    let open Data_encoding in
+    conv
+      (function
+          { fetched_header_length ;
+            fetched_block_length } ->
+            (fetched_header_length,
+             fetched_block_length))
+      (function (fetched_header_length,
+                 fetched_block_length) ->
+          {fetched_header_length ;
+           fetched_block_length })
+      (obj2
+         (req "fetched_headers" int31)
+         (req "fetched_blocks" int31)
+      )
+
+
   type view =
     { bootstrapped : bool ;
+      pipeline_length : pipeline_length ;
       mutable last_validated_head: Block_hash.t ;
       mutable last_advertised_head: Block_hash.t }
   let encoding =
     let open Data_encoding in
     conv
-      (function { bootstrapped ; last_validated_head ; last_advertised_head } ->
-         (bootstrapped, last_validated_head, last_advertised_head))
-      (function (bootstrapped, last_validated_head, last_advertised_head) ->
-         { bootstrapped ; last_validated_head ; last_advertised_head })
-      (obj3
+      (function { bootstrapped ; pipeline_length ;
+                  last_validated_head ; last_advertised_head } ->
+          (bootstrapped, pipeline_length,
+           last_validated_head, last_advertised_head))
+      (function (bootstrapped, pipeline_length,
+                 last_validated_head, last_advertised_head) ->
+          { bootstrapped ; pipeline_length ;
+            last_validated_head ; last_advertised_head })
+      (obj4
          (req "bootstrapped" bool)
+         (req "pipelines" pipeline_length_encoding)
          (req "last_validated_head" Block_hash.encoding)
          (req "last_advertised_head" Block_hash.encoding))
 
   let pp ppf state =
     Format.fprintf ppf
       "@[<v 0>Bootstrapped: %s@,\
+       Pipeline_length: %d - %d @,\
        Last validated head: %a@,\
        Last advertised head: %a@]"
       (if state.bootstrapped then "yes" else "no")
+      state.pipeline_length.fetched_header_length
+      state.pipeline_length.fetched_block_length
       Block_hash.pp state.last_validated_head
       Block_hash.pp state.last_advertised_head
 

@@ -30,7 +30,7 @@ type global_store = t
 
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
-val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
+val init: ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close: t -> unit
 
 val open_with_atomic_rw:

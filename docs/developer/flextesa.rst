@@ -18,8 +18,7 @@ There are testing-only ``opam`` dependencies: ``dum`` and ``genspio``
 Usage
 -----
 
-See ``./tezos-sandbox --help`` (or one can use
-``_build/default/src/bin_flextesa/main.exe``).
+See ``./tezos-sandbox --help``.
 
 When running (semi-)interactive tests, it is recommended to wrap the
 call with ``rlwrap`` or ``ledit``.
@@ -37,11 +36,11 @@ endorsers:
 
     rlwrap ./tezos-sandbox mini-network \
            --root-path /tmp/zz-mininet-test \
-           --tezos-node-binary _build/default/src/bin_node/main.exe \
-           --tezos-baker-alpha-binary _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe \
-           --tezos-endorser-alpha-binary _build/default/src/proto_alpha/bin_endorser/main_endorser_alpha.exe \
-           --tezos-accuser-alpha-binary _build/default/src/proto_alpha/bin_accuser/main_accuser_alpha.exe \
-           --tezos-client-binary _build/default/src/bin_client/main_client.exe
+           --tezos-node-binary ./tezos-node \
+           --tezos-baker-alpha-binary ./tezos-baker-alpha \
+           --tezos-endorser-alpha-binary ./tezos-endorser-alpha \
+           --tezos-accuser-alpha-binary ./tezos-accuser-alpha \
+           --tezos-client-binary ./tezos-client
 
 Once the network is started this test scenario becomes interactive:
 
@@ -72,35 +71,35 @@ sandbox before killing all the nodes.
          --pause-at-end=true
          
 
-This test among other ones can run
+This test among other ones can generate configuration files for
 `Kiln <https://gitlab.com/obsidian.systems/tezos-bake-monitor/>`__
-alongside the *Ꜩ-sandbox*, for instance:
-
-::
-
-    rlwrap ./tezos-sandbox accusations simple-double-endorsing --with-kiln
-
-See also the options ``--kiln-*`` for configuration, and the option
-``--starting-level`` (since Kiln assumes a long-running blockchain
-adding more, e.g. 40, bakes at the beginning of the test brings us to a
-more “normal” state).
+to run alongside the *Ꜩ-sandbox*, for instance:
 
 Voting With a Ledger Nano S
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    **Note:** this requires a ``tezos-client`` with the changes from
-    https://gitlab.com/tezos/tezos/merge_requests/848.
+The voting test tries to do a full round of voting and protocol switch,
+including baking on the test-chain, see documentation in
+``./tezos-sandbox voting --help``.
 
-The voting test for now goes up to the last block before the protocol is
-supposed to change to the election winner (see also
-``./tezos-sandbox voting --help``).
+The test can run in a simpler-to-setup, or “degraded,” mode of operation
+(cf. call in ``./src/bin_flextesa/dune`` for the version which
+run in Gitlab-CI pipelines). In this example, we run instead a full test
+with a Ledger Nano S as one of the bakers/voters. The test automatically
+becomes **interactive** because the user has to press buttons on the
+device, including for changing between apps.
 
-The test can use a Ledger Nano S as one of the voters (the test
-automatically becomes **interactive** then because the user has to press
-buttons on the device).
+To make the test work, you need to provide it with a ``tezos-client``
+which knows about the protocol which is tested and then wins the voting
+period.
 
-Get an URI for your ledger (the test requires both the Wallet and Baking
-apps):
+One example is this branch:
+```obsidian.systems/tezos#zeronet-with-proto042`` <https://gitlab.com/obsidian.systems/tezos/tree/zeronet-with-proto042>`__
+which allows one to build an Apr2019-Zeronet-like code base with an extra
+protocol, lets assume this is built at path ``$zeronet_042``.
+
+Also, get an URI for your ledger (the test requires both the Wallet and
+Baking apps):
 
 ::
 
@@ -110,27 +109,41 @@ And use the URI (no need to import it) for the ``--with-ledger`` option:
 
 ::
 
-    rlwrap ./tezos-sandbox voting ./src/bin_client/test/demo/ \
+    rlwrap ./tezos-sandbox voting \
+         $zeronet_042/src/proto_042_Pt1GS1Zi/lib_protocol/src \
+         ./src/bin_client/test/proto_test_injection/ \
          --with-ledger "ledger://crouching-tiger-hidden-dragon/ed25519/0'/0'" \
          --serialize-proposals \
-         --root $PWD/voting-test \
          --base-port=20_000 \
-         --tezos-client-binary ../mr848/tezos-client \
+         --current-node-binary $zeronet_042/tezos-node \
+         --current-client-binary $zeronet_042/tezos-client \
+         --winner-client-binary $zeronet_042/tezos-client \
+         --current-admin-client-binary $zeronet_042/tezos-admin-client \
          --pause-on-error=true
+
+-  The first path argument has to be the path to a valid protocol which
+   can be switched to from the current (``proto_alpha``) one.
+-  The second protocol, the looser, only needs to be valid for the
+   protocol compilation.
+-  The option ``--serialize-proposals`` tells the test to call
+   ``tezos-client submit proposals for ...`` one proposal at a time
+   which is the only method the ledger Baking app can really understand.
+-  The ``*-binary`` options allow to set the paths to the executables
+   for the different protocols: ``current`` and ``winner``.
 
 The test becomes interactive and guides you through the interactions
 with the ledger, e.g.:
 
 ::
 
-    Flextesa.voting:
-      Ledger-prompt 
-        
-          Setting up "ledger://crouching-tiger-hidden-dragon/ed25519/0'/0'" for
-          baking. The ledger should be showing the setup parameters (Address,
-          Main chain, HWMs).
-        
-         Please hit “✔” on the ledger. 
+   Flextesa.voting:
+     Ledger-prompt
+
+         Setting up "ledger://crouching-tiger-hidden-dragon/ed25519/0'/0'" for
+         baking. The ledger should be showing the setup parameters (Address,
+         Main chain, HWMs).
+
+        Please hit “✔” on the ledger.
 
 Implementation Considerations
 -----------------------------
@@ -161,8 +174,8 @@ See ``./src/lib_network_sandbox/internal_pervasives.ml``:
    ``@[<2,3>@{crazy}@ @<acronym>EDSLs@n@]``).
 -  Many standard modules are taken from Jane St Base (already a
    dependency of Tezos): List, String, Option, Int, Float.
--  Error monad uses *more typed* errors (polymorphic variants), cf.
-   module ``Asynchronous_result`` (and note that ``bind`` also calls
+-  Error monad uses *more typed* errors (polymorphic variants),
+   cf. module ``Asynchronous_result`` (and note that ``bind`` also calls
    ``Lwt_unix.auto_yield 0.005 ()``).
 -  All state is kept in a (*non-global*) value passed as argument
    everywhere needed. To simplify the dependency management the state
@@ -170,4 +183,4 @@ See ``./src/lib_network_sandbox/internal_pervasives.ml``:
    ``Console``, etc).
 
 Also, everything uses OCamlFormat instead of ``ocp-indent`` (see
-``./.ocamlformat``).
+``./src/lib_network_sandbox/.ocamlformat``).

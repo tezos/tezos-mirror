@@ -35,9 +35,12 @@ module Prevalidators = struct
         ~query: RPC_query.empty
         ~output:
           (list
-             (obj2
+             (obj4
                 (req "chain_id" Chain_id.encoding)
-                (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))))
+                (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))
+                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req "pipelines" int8)
+             ))
         RPC_path.(root / "workers" / "prevalidators")
 
     let state =
@@ -91,9 +94,12 @@ module Peer_validators = struct
         ~query: RPC_query.empty
         ~output:
           (list
-             (obj2
+             (obj4
                 (req "peer_id" P2p_peer.Id.encoding)
-                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
+                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
+                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req "pipelines" Peer_validator_worker_state.Worker_state.pipeline_length_encoding)
+             ))
         RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" )
 
     let state =
@@ -125,9 +131,12 @@ module Chain_validators = struct
         ~query: RPC_query.empty
         ~output:
           (list
-             (obj2
+             (obj4
                 (req "chain_id" Chain_id.encoding)
-                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
+                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
+                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req "pipelines" int8)
+             ))
         RPC_path.(root / "workers" / "chain_validators")
 
     let state =
@@ -141,10 +150,18 @@ module Chain_validators = struct
              RPC_error.encoding)
         RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg )
 
+    let ddb_state =
+      RPC_service.get_service
+        ~description:"Introspect the state of the DDB attached to a chain validator worker."
+        ~query: RPC_query.empty
+        ~output: Chain_validator_worker_state.Distributed_db_state.encoding
+        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "ddb")
+
   end
 
   open RPC_context
   let list ctxt = make_call S.list ctxt () () ()
   let state ctxt h = make_call1 S.state ctxt h () ()
+  let ddb_state ctxt h = make_call1 S.ddb_state ctxt h () ()
 
 end

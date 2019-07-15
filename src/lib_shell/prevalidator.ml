@@ -887,6 +887,16 @@ let parameters (t:t) =
   let module Prevalidator: T = (val t) in
   Prevalidator.parameters
 
+let information (t:t) =
+  let module Prevalidator: T = (val t) in
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.information w
+
+let pipeline_length (t:t) =
+  let module Prevalidator: T = (val t) in
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.Queue.pending_requests_length w
+
 let empty_rpc_directory : unit RPC_directory.t =
   RPC_directory.register
     RPC_directory.empty

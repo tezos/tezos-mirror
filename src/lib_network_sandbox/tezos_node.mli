@@ -4,14 +4,14 @@ type t = private
   ; rpc_port: int
   ; p2p_port: int
   ; peers: int list
-  ; exec: [`Node] Tezos_executable.t
+  ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t }
 
 val ef : t -> Easy_format.t
 val pp : Format.formatter -> t -> unit
 
 val make :
-     exec:[`Node] Tezos_executable.t
+     exec:Tezos_executable.t
   -> ?protocol:Tezos_protocol.t
   -> string
   -> expected_connections:int

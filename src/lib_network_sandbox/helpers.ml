@@ -83,3 +83,66 @@ module Counter_log = struct
           n )
     |> String.concat ~sep:"\n"
 end
+
+module System_dependencies = struct
+  module Error = struct
+    type t = [`Precheck_failure of string]
+
+    let pp fmt (`Precheck_failure f) =
+      Format.fprintf fmt "Failed precheck: %S" f
+
+    let failf fmt = Format.kasprintf (fun s -> fail (`Precheck_failure s)) fmt
+  end
+
+  open Error
+
+  let precheck ?(using_docker = false) ?(protocol_paths = [])
+      ?(executables : Tezos_executable.t list = []) state how_to_react =
+    let commands_to_check =
+      (if using_docker then ["docker"] else [])
+      @ ["jq"; "setsid"; "curl"; "netstat"]
+      @ List.map executables ~f:Tezos_executable.get
+    in
+    List.fold ~init:(return []) commands_to_check ~f:(fun prev_m cmd ->
+        prev_m
+        >>= fun prev ->
+        Running_processes.run_cmdf state "type %s" (Filename.quote cmd)
+        >>= fun result ->
+        match result#status with
+        | Unix.WEXITED 0 -> return prev
+        | _ -> return (`Missing_exec (cmd, result) :: prev) )
+    >>= fun errors_or_warnings ->
+    List.fold protocol_paths ~init:(return errors_or_warnings)
+      ~f:(fun prev_m path ->
+        prev_m
+        >>= fun prev ->
+        Lwt_exception.catch Lwt_unix.file_exists (path // "TEZOS_PROTOCOL")
+        >>= function
+        | true -> return prev
+        | false -> return (`Not_a_protocol_path path :: prev) )
+    >>= fun errors_or_warnings ->
+    match (errors_or_warnings, how_to_react) with
+    | [], _ -> return ()
+    | more, `Or_fail ->
+        Console.sayf state
+          Format.(
+            fun ppf () ->
+              pp_print_string ppf "System dependencies failed precheck:" ;
+              pp_print_space ppf () ;
+              pp_open_hvbox ppf 0 ;
+              List.iter more ~f:(fun item ->
+                  pp_print_if_newline ppf () ;
+                  pp_print_string ppf "* " ;
+                  pp_open_hovbox ppf 0 ;
+                  ( match item with
+                  | `Missing_exec (path, _) ->
+                      (* pp_open_hovbox ppf 0 ; *)
+                      pp_print_text ppf
+                        (sprintf "Missing executable: `%s`." path)
+                  | `Not_a_protocol_path path ->
+                      pp_print_text ppf
+                        (sprintf "Not a protocol path: `%s`." path) ) ;
+                  pp_close_box ppf () ; pp_print_space ppf () ) ;
+              pp_close_box ppf ())
+        >>= fun () -> failf "Error/Warnings were raised during precheck."
+end

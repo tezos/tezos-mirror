@@ -2,10 +2,12 @@
  (names bench_simple bench_tool)
  (libraries tezos-base
             tezos-shell
-            tezos_004_Pt24m4xi_bench_helpers)
+            tezos-004-Pt24m4xi-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
-                   -open Tezos_004_Pt24m4xi_bench_helpers)))
+                   -open Tezos_protocol_004_Pt24m4xi
+                   -open Tezos_protocol_004_Pt24m4xi_parameters
+                   -open Tezos_004_Pt24m4xi_test_helpers)))
 
 (alias
  (name buildtest)
@@ -22,6 +24,6 @@
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 
 (alias
- (name runtest_indent)
- (deps (glob_files *.ml*))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

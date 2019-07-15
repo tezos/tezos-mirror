@@ -1,0 +1,7 @@
+(library
+ (name tezos_tooling)
+ (public_name tezos-tooling))
+
+(install
+ (section libexec)
+ (files (lint.sh as lint.sh)))

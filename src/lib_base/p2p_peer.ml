@@ -26,6 +26,7 @@
 module Id = P2p_peer_id
 
 module Table = Id.Table
+module Error_table = Id.Error_table
 module Map = Id.Map
 module Set = Id.Set
 

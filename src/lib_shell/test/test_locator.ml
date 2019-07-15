@@ -33,7 +33,7 @@ let genesis_hash =
 
 let genesis_protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
+    "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let genesis_time = Time.Protocol.of_seconds 0L
 

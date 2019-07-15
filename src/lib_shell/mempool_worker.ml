@@ -434,6 +434,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data
     end >>=? fun protocol_data ->
+    let predecessor_context = Shell_context.wrap_disk_context predecessor_context in
     Proto.begin_construction
       ~chain_id: (State.Block.chain_id predecessor)
       ~predecessor_context
@@ -612,8 +613,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          let state = Worker.state w in
          let filter_result = function
            | Applied _ -> params#applied
-           | Refused _ -> params#branch_refused
-           | Branch_refused _ -> params#refused
+           | Refused _ -> params#refused
+           | Branch_refused _ -> params#branch_refused
            | Branch_delayed _ -> params#branch_delayed
            | _ -> false in
 

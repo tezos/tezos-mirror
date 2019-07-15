@@ -18,7 +18,7 @@ Three history modes are provided:
     + Keep all necessary information in order to reconstruct all the
       chain's ledger state (balances, contracts, etc..) since the
       genesis block.
-    + Does not require important disk storage.
+    + Requires little disk storage.
     + Suitable for bakers as you can still query any block information
       or operation at any level.
     + Help other nodes to bootstrap and synchronize with the chain.
@@ -60,7 +60,7 @@ Three history modes are provided:
 
   * Upsides
 
-    - The whole chain data is available.
+    + The whole chain data is available.
 
   * Downsides
 
@@ -141,7 +141,7 @@ or use your configuration file as described in :ref:`here <node-conf>`:
        "history_mode": "experimental-rolling"
    }}
 
-Please notice that the ``rolling`` mode is still an experimental feature.
+Please note that the ``rolling`` mode is still an experimental feature.
 
 In this mode, the new checkpoint RPC will also give you the save point
 (the oldest block that contains all the data) and caboose (the oldest

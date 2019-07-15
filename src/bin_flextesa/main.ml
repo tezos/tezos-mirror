@@ -34,6 +34,10 @@ module Small_utilities = struct
             , fun () ->
                 Test_scenario.Network.netstat_listening_ports state
                 >>= fun ports ->
+                let to_display =
+                  List.map ports ~f:(fun (p, _) -> p)
+                  |> List.sort ~compare:Int.compare
+                in
                 Console.sayf state
                   Fmt.(
                     hvbox ~indent:2 (fun ppf () ->
@@ -42,8 +46,8 @@ module Small_utilities = struct
                         box
                           (list
                              ~sep:(fun ppf () -> string ppf "," ; sp ppf ())
-                             (fun ppf (p, _) -> fmt "%d" ppf p))
-                          ppf ports )) ) )
+                             (fun ppf p -> fmt "%d" ppf p))
+                          ppf to_display )) ) )
       $ Test_command_line.cli_state ~disable_interactivity:true
           ~name:"netstat-ports" () )
       (info "netstat-listening-ports"
@@ -67,12 +71,16 @@ let () =
     | `Admin_command_error _ as e -> Tezos_admin_client.Command_error.pp fmt e
     | `Waiting_for (msg, `Time_out) ->
         Format.fprintf fmt "WAITING-FOR “%s”: Time-out" msg
+    | `Precheck_failure _ as p -> Helpers.System_dependencies.Error.pp fmt p
   in
   Term.exit
   @@ Term.eval_choice
        (help : unit Term.t * _)
        ( Small_utilities.all ~pp_error ()
        @ [ Command_mini_network.cmd () ~pp_error
+         ; Command_daemons_protocol_change.cmd () ~pp_error
          ; Command_voting.cmd () ~pp_error
          ; Command_accusations.cmd () ~pp_error
-         ; Command_prevalidation.cmd () ~pp_error ] )
+         ; Command_prevalidation.cmd () ~pp_error
+         ; Command_ledger_baking.cmd () ~pp_error
+         ; Command_ledger_wallet.cmd () ~pp_error ] )

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module RPC_client : RPC_client.S
+
 module Make(S : sig
     val default : Uri.t
     val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t

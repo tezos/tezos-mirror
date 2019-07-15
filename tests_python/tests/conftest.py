@@ -132,4 +132,6 @@ def sandbox_multibranch(log_dir, request):
                             log_dir=log_dir,
                             branch_map=branch_map) as sandbox:
         yield sandbox
+        # this assertion checks that deamons (baker, endorser, node...) didn't
+        # fail unexpected.
         assert sandbox.are_daemons_alive()

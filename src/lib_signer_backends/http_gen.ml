@@ -29,6 +29,8 @@ module Make(N : sig val scheme : string end) = struct
 
   let scheme = N.scheme
 
+  module RPC_client = RPC_client_unix
+
   module Make(P : sig
       val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
       val logger: RPC_client.logger

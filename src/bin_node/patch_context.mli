@@ -25,4 +25,4 @@
 (*****************************************************************************)
 
 
-val patch_context: Data_encoding.json option -> Context.t -> Context.t Lwt.t
+val patch_context: (string * Data_encoding.json) option -> Context.t -> Context.t Lwt.t

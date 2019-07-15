@@ -26,19 +26,22 @@
          --tezos-node-binary %{bin:tezos-node} )))
 
 (alias
-  (name runtest_sandbox_voting_demo)
-  (deps (package tezos-embedded-protocol-demo))
+  (name runtest_sandbox_voting_demo_noops)
+  (deps (package tezos-protocol-demo-noops))
   (locks /tcp-port/30000_range)
   (action
     (run %{exe:main.exe} voting
-         %{lib:tezos-embedded-protocol-demo:raw/TEZOS_PROTOCOL}
-         --root-path %{env:ROOT_PATH=/tmp/flextesa-voting-demo/}
+         %{lib:tezos-protocol-demo-noops:raw/TEZOS_PROTOCOL}
+         %{lib:tezos-protocol-demo-noops:raw/TEZOS_PROTOCOL}
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-voting-demo-noops/}
          --base-port 30_000
          --size 3
          --with-timestamp
-         --tezos-client-binary %{bin:tezos-client}
-         --tezos-admin-client-binary %{bin:tezos-admin-client}
-         --tezos-node-binary %{bin:tezos-node}
+         --winning-client-is-clueless
+         --winner-client-binary %{bin:tezos-client}
+         --current-client-binary %{bin:tezos-client}
+         --current-admin-client-binary %{bin:tezos-admin-client}
+         --current-node-binary %{bin:tezos-node}
          )))
 
 (alias
@@ -46,4 +49,4 @@
  (deps
   (alias runtest_sandbox_accusations_simple_double_baking)
   (alias runtest_sandbox_accusations_simple_double_endorsing)
-  (alias runtest_sandbox_voting_demo)))
+  (alias runtest_sandbox_voting_demo_noops)))

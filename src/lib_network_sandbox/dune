@@ -1,7 +1,9 @@
 (library
  (name tezos_network_sandbox)
  (public_name tezos-network-sandbox)
- (flags (:standard -safe-string))
+ (flags (:standard -safe-string
+                   -open Tezos_protocol_alpha
+                   -open Tezos_client_alpha))
  (libraries
     lwt.unix
     cmdliner

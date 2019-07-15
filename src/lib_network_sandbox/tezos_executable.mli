@@ -21,34 +21,37 @@ end
 type kind = [`Node | `Baker | `Endorser | `Accuser | `Client | `Admin]
 
 (** The wrapper of the tezos-executable. *)
-type 'kind t = private
-  { kind: 'kind
+type t = private
+  { kind: kind
   ; binary: string option
   ; unix_files_sink: Unix_files_sink.t option
   ; environment: (string * string) list }
 
-val node :
+val make :
      ?binary:string
   -> ?unix_files_sink:Unix_files_sink.t
   -> ?environment:(string * string) list
-  -> unit
-  -> [> `Node] t
+  -> kind
+  -> t
 (** Create a ["tezos-node"] executable. *)
 
-val kind_string : [< kind] -> string
+val kind_string : kind -> string
 (** Convert a [kind] to a [string]. *)
 
-val default_binary : [< kind] t -> string
+val default_binary : t -> string
 (** Get the path/name of the default binary for a given kind, e.g.,
     ["tezos-admin-client"]. *)
 
-val call : [< kind] t -> path:string -> string list -> unit Genspio.EDSL.t
+val get : t -> string
+(** The path to the executable. *)
+
+val call : t -> path:string -> string list -> unit Genspio.EDSL.t
 (** Build a [Genspio.EDSL.t] script to run a tezos command, the
     [~path] argument is used as a toplevel path for the unix-files
     event-sink (event-logging-framework) and for other local logging
     files. *)
 
-val cli_term : ([< kind] as 'a) -> string -> 'a t Cmdliner.Term.t
+val cli_term : kind -> string -> t Cmdliner.Term.t
 (** Build a [Cmdliner] term which creates tezos-executables, the
     second argument is a prefix of option names (e.g. ["tezos"] for the
     option ["--tezos-accuser-alpha-binary"]). *)

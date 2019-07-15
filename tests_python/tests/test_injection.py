@@ -1,6 +1,5 @@
 import os
 import subprocess
-import time
 import pytest
 from tools import utils, paths
 
@@ -10,13 +9,14 @@ def clients(sandbox):
     """Launches 2 nodes in sandbox mode (genesis, doesn't activate alpha)."""
     num_nodes = 2
     for i in range(num_nodes):
-        sandbox.add_node(i, params=['--connections', '5'])
+        sandbox.add_node(i, params=['--connections', '30'])
     yield sandbox.all_clients()
 
 
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
 COMPILER = (f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
             'main_native.exe')
+PARAMS = ['-p', 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im']
 
 
 @pytest.mark.incremental
@@ -52,9 +52,8 @@ class TestInjectionAndActivation:
 
     def test_check_protocol(self, clients, session):
         proto = session['proto_hash']
-        params = ['-p', 'Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P']
         for client in clients:
-            assert utils.check_protocol(client, proto, params=params)
+            assert utils.check_protocol(client, proto, params=PARAMS)
 
 
 @pytest.fixture(scope="class")
@@ -71,31 +70,22 @@ class TestActivation:
 
     def test_proto_known(self, client):
         res = client.list_protocols()
-        assert 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9' in res
+        assert 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp' in res
 
     def test_first_protocol(self, client):
         proto = 'PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i'
         assert client.get_protocol() == proto
 
     def test_activate_demo(self, client):
-        proto = 'ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9'
+        proto = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
         parameters = {}
         res = client.activate_protocol_json(proto, parameters, key='activator',
                                             fitness='1')
         assert res.block_hash
 
     def test_level1(self, client):
-        assert client.get_level() == 1
+        assert client.get_level(params=PARAMS) == 1
 
     def test_protocol_genesis(self, client):
-        proto = 'Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P'
-        assert client.get_protocol() == proto
-
-    def test_bake(self, client):
-        time.sleep(0.5)
-        # this a command of proto demo lib_client
-        res = client.run(['bake'])
-        assert res.startswith('Injected')
-
-    def test_level2(self, client):
-        assert client.get_level() == 2
+        proto = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+        assert client.get_protocol(params=PARAMS) == proto

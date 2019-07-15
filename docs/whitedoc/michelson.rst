@@ -1350,7 +1350,7 @@ contract.
 
 ::
 
-    :: 'p : mutez : contract 'p : 'S   ->   operation : S
+    :: 'p : mutez : contract 'p : 'S   ->   operation : 'S
 
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
@@ -1359,7 +1359,7 @@ contract, unit for an account.
 
 ::
 
-    :: option key_hash : 'S   ->   operation : S
+    :: option key_hash : 'S   ->   operation : 'S
 
 -  ``BALANCE``: Push the current amount of mutez of the current contract.
 
@@ -2490,422 +2490,117 @@ The simplest contract is the contract for which the ``parameter`` and
     storage unit;
     parameter unit;
 
-Reservoir contract
-~~~~~~~~~~~~~~~~~~
 
-We want to create a contract that stores tez until a timestamp ``T`` or
-a maximum amount ``N`` is reached. Whenever ``N`` is reached before
-``T``, all tokens are reversed to an account ``B`` (and the contract is
-automatically deleted). Any call to the contract's code performed after
-``T`` will otherwise transfer the tokens to another account ``A``.
+Multisig contract
+~~~~~~~~~~~~~~~~~
 
-We want to build this contract in a reusable manner, so we do not
-hard-code the parameters. Instead, we assume that the global data of the
-contract are ``(Pair (Pair T N) (Pair A B))``.
+The multisig is a typical access control contract. The ownership of
+the multisig contract is shared between ``N`` participants represented
+by their public keys in the contract's storage. Any action on the
+multisig contract needs to be signed by ``K`` participants where the
+threshold ``K`` is also stored in the storage.
 
-Hence, the global data of the contract has the following type
+To avoid replay of the signatures sent to the contract, the signed
+data include not only a description of the action to perform but also
+the address of the multisig contract and a counter that gets
+incremented at each successful call to the contract.
 
-::
+The multisig commands of `Tezos command line client
+<https://tezos.gitlab.io/mainnet/api/cli-commands.html>`__ use this
+smart contract. Moreover, `functional correctness of this contract has
+been verified
+<https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts_coq/multisig.v>`__
+using the Coq proof assistant.
 
-    'g =
-      pair
-        (pair timestamp mutez)
-        (pair (contract unit) (contract unit))
-
-Following the contract calling convention, the code is a lambda of type
-
-::
-
-    lambda
-      (pair unit 'g)
-      (pair (list operation) 'g)
-
-written as
 
 ::
 
-    lambda
-      (pair
-         unit
-         (pair
-           (pair timestamp mutez)
-           (pair (contract unit) (contract unit))))
-      (pair
-         (list operation)
-         (pair
-            (pair timestamp mutez)
-            (pair (contract unit) (contract unit))))
+   parameter (pair
+                (pair :payload
+                   (nat %counter) # counter, used to prevent replay attacks
+                   (or :action    # payload to sign, represents the requested action
+                      (pair :transfer    # transfer tokens
+                         (mutez %amount) # amount to transfer
+                         (contract %dest unit)) # destination to transfer to
+                      (or
+                         (option %delegate key_hash) # change the delegate to this address
+                         (pair %change_keys          # change the keys controlling the multisig
+                            (nat %threshold)         # new threshold
+                            (list %keys key)))))     # new list of keys
+                (list %sigs (option signature)));    # signatures
 
-The complete source ``reservoir.tz`` is:
+   storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
 
-::
+   code
+     {
+       UNPAIR ; SWAP ; DUP ; DIP { SWAP } ;
+       DIP
+         {
+           UNPAIR ;
+           # pair the payload with the current contract address, to ensure signatures
+           # can't be replayed accross different contracts if a key is reused.
+           DUP ; SELF ; ADDRESS ; PAIR ;
+           PACK ; # form the binary payload that we expect to be signed
+           DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP
+         } ;
 
-    parameter unit ;
-    storage
-      (pair
-         (pair (timestamp %T) (mutez %N)) # T N
-         (pair (contract %A unit) (contract %B unit))) ; # A B
-    code
-      { CDR ; DUP ; CAAR %T; # T
-        NOW ; COMPARE ; LE ;
-        IF { DUP ; CADR %N; # N
-             BALANCE ;
-             COMPARE ; LE ;
-             IF { NIL operation ; PAIR }
-                { DUP ; CDDR %B; # B
-                  BALANCE ; UNIT ;
-                  TRANSFER_TOKENS ;
-                  NIL operation ; SWAP ; CONS ;
-                  PAIR } }
-           { DUP ; CDAR %A; # A
-             BALANCE ;
-             UNIT ;
-             TRANSFER_TOKENS ;
-             NIL operation ; SWAP ; CONS ;
-             PAIR } }
+       # Check that the counters match
+       UNPAIR @stored_counter; DIP { SWAP };
+       ASSERT_CMPEQ ;
 
-Reservoir contract (variant with broker and status)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       # Compute the number of valid signatures
+       DIP { SWAP } ; UNPAIR @threshold @keys;
+       DIP
+         {
+           # Running count of valid signatures
+           PUSH @valid nat 0; SWAP ;
+           ITER
+             {
+               DIP { SWAP } ; SWAP ;
+               IF_CONS
+                 {
+                   IF_SOME
+                     { SWAP ;
+                       DIP
+                         {
+                           SWAP ; DIIP { DIP { DUP } ; SWAP } ;
+                           # Checks signatures, fails if invalid
+                           CHECK_SIGNATURE ; ASSERT ;
+                           PUSH nat 1 ; ADD @valid } }
+                     { SWAP ; DROP }
+                 }
+                 {
+                   # There were fewer signatures in the list
+                   # than keys. Not all signatures must be present, but
+                   # they should be marked as absent using the option type.
+                   FAIL
+                 } ;
+               SWAP
+             }
+         } ;
+       # Assert that the threshold is less than or equal to the
+       # number of valid signatures.
+       ASSERT_CMPLE ;
+       DROP ; DROP ;
 
-We basically want the same contract as the previous one, but instead of
-leaving it empty, we want to keep it alive, storing a flag ``S`` so that we
-can tell afterwards if the tokens have been transferred to ``A`` or
-``B``. We also want a broker ``X`` to get some fee ``P`` in any case.
+       # Increment counter and place in storage
+       DIP { UNPAIR ; PUSH nat 1 ; ADD @new_counter ; PAIR} ;
 
-We thus add variables ``P`` and ``S`` and ``X`` to the global data of
-the contract, now
-``(Pair (S, Pair (T, Pair (Pair P N) (Pair X (Pair A B)))))``. ``P`` is
-the fee for broker ``A``, ``S`` is the state, as a string ``"open"``,
-``"timeout"`` or ``"success"``.
+       # We have now handled the signature verification part,
+       # produce the operation requested by the signers.
+       NIL operation ; SWAP ;
+       IF_LEFT
+         { # Transfer tokens
+           UNPAIR ; UNIT ; TRANSFER_TOKENS ; CONS }
+         { IF_LEFT {
+                     # Change delegate
+                     SET_DELEGATE ; CONS }
+                   {
+                     # Change set of signatures
+                     DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;
+       PAIR }
 
-At the beginning of the transaction:
 
-::
-
-     S is accessible via a CDAR
-     T               via a CDDAR
-     P               via a CDDDAAR
-     N               via a CDDDADR
-     X               via a CDDDDAR
-     A               via a CDDDDDAR
-     B               via a CDDDDDDR
-
-The complete source ``scrutable_reservoir.tz`` is:
-
-::
-
-    parameter unit ;
-    storage
-      (pair
-         string # S
-         (pair
-            timestamp # T
-            (pair
-               (pair mutez mutez) # P N
-               (pair
-                  (contract unit) # X
-                  (pair (contract unit) (contract unit)))))) ; # A B
-    code
-      { DUP ; CDAR ; # S
-        PUSH string "open" ;
-        COMPARE ; NEQ ;
-        IF { FAIL } # on "success", "timeout" or a bad init value
-           { DUP ; CDDAR ; # T
-             NOW ;
-             COMPARE ; LT ;
-             IF { # Before timeout
-                  # We compute (P + N) mutez
-                  PUSH mutez 0 ;
-                  DIP { DUP ; CDDDAAR } ; ADD ; # P
-                  DIP { DUP ; CDDDADR } ; ADD ; # N
-                  # We compare to the cumulated amount
-                  BALANCE ;
-                  COMPARE; LT ;
-                  IF { # Not enough cash, we just accept the transaction
-                       # and leave the global untouched
-                       CDR ; NIL operation ; PAIR }
-                     { # Enough cash, successful ending
-                       # We update the global
-                       CDDR ; PUSH string "success" ; PAIR ;
-                       # We transfer the fee to the broker
-                       DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS ;
-                       # We transfer the rest to A
-                       DIP { DUP ; CDDADR ; # N
-                             DIP { DUP ; CDDDDAR } ; # A
-                             UNIT ; TRANSFER_TOKENS } ;
-                       NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
-                       PAIR } }
-                { # After timeout, we refund
-                  # We update the global
-                  CDDR ; PUSH string "timeout" ; PAIR ;
-                  # We try to transfer the fee to the broker
-                  BALANCE ; # available
-                  DIP { DUP ; CDDAAR } ; # P
-                  COMPARE ; LT ; # available < P
-                  IF { BALANCE ; # available
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS }
-                     { DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS } ;
-                  # We transfer the rest to B
-                  DIP { BALANCE ; # available
-                        DIP { DUP ; CDDDDDR } ; # B
-                        UNIT ; TRANSFER_TOKENS } ;
-                  NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
-                  PAIR } } }
-
-Forward contract
-~~~~~~~~~~~~~~~~
-
-We want to write a forward contract on dried peas. The contract takes as
-global data the tons of peas ``Q``, the expected delivery date ``T``,
-the contract agreement date ``Z``, a strike ``K``, a collateral ``C``
-per ton of dried peas, and the accounts of the buyer ``B``, the seller
-``S`` and the warehouse ``W``.
-
-These parameters as grouped in the global storage as follows:
-
-::
-
-    Pair
-      (Pair (Pair Q (Pair T Z)))
-      (Pair
-         (Pair K C)
-         (Pair (Pair B S) W))
-
-of type
-
-::
-
-    pair
-      (pair nat (pair timestamp timestamp))
-      (pair
-         (pair mutez mutez)
-         (pair (pair account account) account))
-
-The 24 hours after timestamp ``Z`` are for the buyer and seller to store
-their collateral ``(Q * C)``. For this, the contract takes a string as
-parameter, matching ``"buyer"`` or ``"seller"`` indicating the party for
-which the tokens are transferred. At the end of this day, each of them
-can send a transaction to send its tokens back. For this, we need to
-store who already paid and how much, as a ``(pair mutez mutez)`` where the
-left component is the buyer and the right one the seller.
-
-After the first day, nothing can happen until ``T``.
-
-During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
-contract, minus the amount already sent.
-
-After this day, if the buyer didn't pay enough then any transaction will
-send all the tokens to the seller.
-
-Otherwise, the seller must deliver at least ``Q`` tons of dried peas to
-the warehouse, in the next 24 hours. When the amount is equal to or
-exceeds ``Q``, all the tokens are transferred to the seller.
-For storing the quantity of peas already
-delivered, we add a counter of type ``nat`` in the global storage. For
-knowing this quantity, we accept messages from W with a partial amount
-of delivered peas as argument.
-
-After this day, any transaction will send all the tokens to the buyer
-(not enough peas have been delivered in time).
-
-Hence, the global storage is a pair, with the counters on the left, and
-the constant parameters on the right, initially as follows.
-
-::
-
-    Pair
-      (Pair 0 (Pair 0_00 0_00))
-      (Pair
-         (Pair (Pair Q (Pair T Z)))
-         (Pair
-            (Pair K C)
-            (Pair (Pair B S) W)))
-
-of type
-
-::
-
-    pair
-      (pair nat (pair mutez mutez))
-      (pair
-         (pair nat (pair timestamp timestamp))
-         (pair
-            (pair mutez mutez)
-            (pair (pair account account) account)))
-
-The parameter of the transaction will be either a transfer from the
-buyer or the seller or a delivery notification from the warehouse of
-type ``(or string nat)``.
-
-At the beginning of the transaction:
-
-::
-
-    Q is accessible via a CDDAAR
-    T               via a CDDADAR
-    Z               via a CDDADDR
-    K               via a CDDDAAR
-    C               via a CDDDADR
-    B               via a CDDDDAAR
-    S               via a CDDDDADR
-    W               via a CDDDDDR
-    the delivery counter via a CDAAR
-    the amount versed by the seller via a CDADDR
-    the argument via a CAR
-
-The complete source ``forward.tz`` is:
-
-::
-
-    parameter
-      (or string nat) ;
-    storage
-      (pair
-         (pair nat (pair mutez mutez)) # counter from_buyer from_seller
-         (pair
-            (pair nat (pair timestamp timestamp)) # Q T Z
-            (pair
-               (pair mutez mutez) # K C
-               (pair
-                  (pair (contract unit) (contract unit)) # B S
-                  (contract unit))))) ; # W
-    code
-      { DUP ; CDDADDR ; # Z
-        PUSH int 86400 ; SWAP ; ADD ; # one day in second
-        NOW ; COMPARE ; LT ;
-        IF { # Before Z + 24
-             DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
-             IF_LEFT
-               { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
-                 IF { DROP ;
-                      DUP ; CDADAR ; # amount already versed by the buyer
-                      DIP { AMOUNT } ; ADD ; # transaction
-                      #  then we rebuild the globals
-                      DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                      PUSH nat 0 ; PAIR ; # delivery counter at 0
-                      DIP { CDDR } ; PAIR ; # parameters
-                      # and return Unit
-                      NIL operation ; PAIR }
-                    { PUSH string "seller" ; COMPARE ; EQ ;
-                      IF { DUP ; CDADDR ; # amount already versed by the seller
-                           DIP { AMOUNT } ; ADD ; # transaction
-                           #  then we rebuild the globals
-                           DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
-                           PUSH nat 0 ; PAIR ; # delivery counter at 0
-                           DIP { CDDR } ; PAIR ; # parameters
-                           # and return Unit
-                           NIL operation ; PAIR }
-                         { FAIL } } } # (Left _)
-               { FAIL } } # (Right _)
-           { # After Z + 24
-             # if balance is emptied, just fail
-             BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
-             # test if the required amount is reached
-             DUP ; CDDAAR ; # Q
-             DIP { DUP ; CDDDADR } ; MUL ; # C
-             PUSH nat 2 ; MUL ;
-             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
-             IF { # refund the parties
-                  CDR ; DUP ; CADAR ; # amount versed by the buyer
-                  DIP { DUP ; CDDDAAR } ; # B
-                  UNIT ; TRANSFER_TOKENS ;
-                  NIL operation ; SWAP ; CONS ; SWAP ;
-                  DUP ; CADDR ; # amount versed by the seller
-                  DIP { DUP ; CDDDADR } ; # S
-                  UNIT ; TRANSFER_TOKENS ; SWAP ;
-                  DIP { CONS } ;
-                  DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
-                  BALANCE ; SUB ; # bonus to the warehouse
-                  DIP { DUP ; CDDDDR } ; # W
-                  UNIT ; TRANSFER_TOKENS ;
-                  DIP { SWAP } ; CONS ;
-                  # leave the storage as-is, as the balance is now 0
-                  PAIR }
-                { # otherwise continue
-                  DUP ; CDDADAR ; # T
-                  NOW ; COMPARE ; LT ;
-                  IF { FAIL } # Between Z + 24 and T
-                     { # after T
-                       DUP ; CDDADAR ; # T
-                       PUSH int 86400 ; ADD ; # one day in second
-                       NOW ; COMPARE ; LT ;
-                       IF { # Between T and T + 24
-                            # we only accept transactions from the buyer
-                            DUP ; CAR ; # we must receive (Left "buyer")
-                            IF_LEFT
-                              { PUSH string "buyer" ; COMPARE ; EQ ;
-                                IF { DUP ; CDADAR ; # amount already versed by the buyer
-                                     DIP { AMOUNT } ; ADD ; # transaction
-                                     # The amount must not exceed Q * K
-                                     DUP ;
-                                     DIIP { DUP ; CDDAAR ; # Q
-                                            DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
-                                     DIP { COMPARE ; GT ; # new amount > Q * K
-                                           IF { FAIL } { } } ; # abort or continue
-                                     #  then we rebuild the globals
-                                     DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                                     PUSH nat 0 ; PAIR ; # delivery counter at 0
-                                     DIP { CDDR } ; PAIR ; # parameters
-                                     # and return Unit
-                                     NIL operation ; PAIR }
-                                   { FAIL } } # (Left _)
-                              { FAIL } } # (Right _)
-                          { # After T + 24
-                            # test if the required payment is reached
-                            DUP ; CDDAAR ; # Q
-                            DIP { DUP ; CDDDAAR } ; MUL ; # K
-                            DIP { DUP ; CDADAR } ; # amount already versed by the buyer
-                            COMPARE ; NEQ ;
-                            IF { # not reached, pay the seller
-                                 BALANCE ;
-                                 DIP { DUP ; CDDDDADR } ; # S
-                                 DIIP { CDR } ;
-                                 UNIT ; TRANSFER_TOKENS ;
-                                 NIL operation ; SWAP ; CONS ; PAIR }
-                               { # otherwise continue
-                                 DUP ; CDDADAR ; # T
-                                 PUSH int 86400 ; ADD ;
-                                 PUSH int 86400 ; ADD ; # two days in second
-                                 NOW ; COMPARE ; LT ;
-                                 IF { # Between T + 24 and T + 48
-                                      # We accept only delivery notifications, from W
-                                      DUP ; CDDDDDR ; ADDRESS ; # W
-                                      SENDER ;
-                                      COMPARE ; NEQ ;
-                                      IF { FAIL } {} ; # fail if not the warehouse
-                                      DUP ; CAR ; # we must receive (Right amount)
-                                      IF_LEFT
-                                        { FAIL } # (Left _)
-                                        { # We increment the counter
-                                          DIP { DUP ; CDAAR } ; ADD ;
-                                          # And rebuild the globals in advance
-                                          DIP { DUP ; CDADR } ; PAIR ;
-                                          DIP { CDDR } ; PAIR ;
-                                          UNIT ; PAIR ;
-                                          # We test if enough have been delivered
-                                          DUP ; CDAAR ;
-                                          DIP { DUP ; CDDAAR } ;
-                                          COMPARE ; LT ; # counter < Q
-                                          IF { CDR ; NIL operation } # wait for more
-                                             { # Transfer all the money to the seller
-                                               BALANCE ;
-                                               DIP { DUP ; CDDDDADR } ; # S
-                                               DIIP { CDR } ;
-                                               UNIT ; TRANSFER_TOKENS ;
-                                               NIL operation ; SWAP ; CONS } } ;
-                                      PAIR }
-                                    { # after T + 48, transfer everything to the buyer
-                                      BALANCE ;
-                                      DIP { DUP ; CDDDDAAR } ; # B
-                                      DIIP { CDR } ;
-                                      UNIT ; TRANSFER_TOKENS ;
-                                      NIL operation ; SWAP ; CONS ;
-                                      PAIR} } } } } } }
 
 Full grammar
 ------------

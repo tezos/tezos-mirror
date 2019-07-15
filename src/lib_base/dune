@@ -23,8 +23,7 @@
             re.str
             ptime
             ezjsonm
-            lwt.unix
-            mtime.clock.os
+            lwt
             ipaddr.unix))
 
 (rule
@@ -33,6 +32,6 @@
     (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{deps}))))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

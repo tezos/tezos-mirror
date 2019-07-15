@@ -165,7 +165,7 @@ module Commands = struct
                       ]
                     :: prev) )
             >>= fun ef -> say state EF.(list ef)
-        | _other -> cmdline_fail "command expects 1 argument: name-prefix")
+        | _other -> cmdline_fail "command expects 1 argument: name-prefix" )
 
   let kill_all state =
     unit_loop_no_args
@@ -232,7 +232,7 @@ module Commands = struct
                         [ desc (af "output") (ocaml_string_list res)
                         ; desc (af "exn") (exn e) ])
                   >>= fun () -> return [] )
-              | `Error -> return [])
+              | `Error -> return [] )
         >>= fun contracts ->
         let balance block contract =
           let path =
@@ -481,12 +481,12 @@ module Pauser = struct
           say state EF.(wf "Test done, sleeping %.02f seconds" n)
           >>= fun () -> System.sleep n )
       >>= fun () -> finish () )
-      ~f:(fun {error_value; attachments} ->
+      ~f:(fun ~result error_value (* {error_value; attachments} *) ->
         generic state
           ~force:(Interactivity.pause_on_error state)
           EF.
             [ haf "Last pause before the test will Kill 'Em All and Quit."
             ; desc (shout "Error:") (af "%a" pp_error error_value) ]
         >>= fun () ->
-        finish () >>= fun () -> fail error_value ~attach:attachments )
+        finish () >>= fun () -> fail error_value ~attach:result.attachments )
 end

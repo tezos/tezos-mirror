@@ -37,7 +37,7 @@ let genesis_block =
 
 let genesis_protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
+    "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let genesis_time = Time.Protocol.of_seconds 0L
 
@@ -263,13 +263,8 @@ let test_dump { idx ; block3b; _ } =
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
-    Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
-      let root = base_dir // "store" in
-      Raw_store.init ~mapsize:4_096_000L root >>= function
-      | Error _ -> Assert.fail_msg "wrap_store_init"
-      | Ok store -> Lwt.return store end >>= fun store ->
-    Context.restore_contexts idx2 store
-      ~filename:dumpfile (fun _ _ -> return_unit)
+    Context.restore_contexts idx2
+      ~filename:dumpfile (fun _ -> return_unit)
       (fun _ _ _ -> return_unit)
     >>=? fun imported ->
     let (bh, _, _, _, _, _) = imported in

@@ -72,14 +72,14 @@ val authenticate:
   'meta metadata_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 (** (Low-level) (Cancelable) Authentication function of a remote
-    peer. Used in [P2p_connection_pool], to promote a
+    peer. Used in [P2p_pool], to promote a
     [P2P_io_scheduler.connection] into an [authenticated_connection] (auth
     correct, acceptation undecided). *)
 
 val kick: 'meta authenticated_connection -> unit Lwt.t
 (** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
     we refuse this connection and then closes [afd]. Used in
-    [P2p_connection_pool] to reject an [authenticated_connection] which we do
+    [P2p_pool] to reject an [authenticated_connection] which we do
     not want to connect to for some reason. *)
 
 val accept:
@@ -90,7 +90,7 @@ val accept:
   'meta authenticated_connection ->
   'msg Data_encoding.t -> ('msg, 'meta) t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an
-    authenticated_connection. Used in [P2p_connection_pool], to promote an
+    authenticated_connection. Used in [P2p_pool], to promote an
     [authenticated_connection] to the status of an active peer. *)
 
 val check_binary_chunks_size: int -> unit tzresult Lwt.t
@@ -108,7 +108,7 @@ val write: ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 val write_now: ('msg, 'meta) t -> 'msg -> bool tzresult
 (** [write_now conn msg] is [Ok true] if [msg] has been added to
     [conn]'s internal write queue, [Ok false] if [msg] has been
-    dropped, or fails with a correponding error otherwise. *)
+    dropped, or fails with a corresponding error otherwise. *)
 
 val write_sync: ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
 (** [write_sync conn msg] returns when [msg] has been successfully
@@ -131,7 +131,7 @@ val read: ('msg, 'meta) t -> (int * 'msg) tzresult Lwt.t
 
 val read_now: ('msg, 'meta) t -> (int * 'msg) tzresult option
 (** [read_now conn msg] is [Some msg] if [conn]'s internal read queue
-    is not empty, [None] if it is empty, or fails with a correponding
+    is not empty, [None] if it is empty, or fails with a corresponding
     error otherwise. *)
 
 val stat: ('msg, 'meta) t -> P2p_stat.t

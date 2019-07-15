@@ -26,12 +26,12 @@
 module type T = sig
   module P : sig
     val hash: Protocol_hash.t
-    include Tezos_protocol_environment_shell.PROTOCOL
+    include Tezos_protocol_environment.PROTOCOL
   end
   include (module type of (struct include P end))
   module Block_services :
     (module type of (struct include Block_services.Make(P)(P) end))
-  val complete_b58prefix : Context.t -> string -> string list Lwt.t
+  val complete_b58prefix : Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
 end
 
 type t = (module T)
@@ -41,7 +41,7 @@ let build_v1 hash =
   let module Name = struct
     let name = Protocol_hash.to_b58check hash
   end in
-  let module Env = Tezos_protocol_environment_shell.MakeV1(Name)() in
+  let module Env = Tezos_protocol_environment.MakeV1(Name)() in
   (module struct
     module Raw = F(Env)
     module P = struct
@@ -90,7 +90,7 @@ let get_embedded_sources hash =
   with Not_found -> None
 
 module Register_embedded
-    (Env : Tezos_protocol_environment_shell.V1)
+    (Env : Tezos_protocol_environment.V1)
     (Proto : Env.Updater.PROTOCOL)
     (Source : sig
        val hash: Protocol_hash.t option

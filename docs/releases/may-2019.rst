@@ -10,7 +10,7 @@ Activation of Athens
 strongly encourage bakers to run a node in full mode and rebuild
 their storage from a snapshot.**
 
-From our latest bench the time to validate the migration block on the
+From our latest benchmark the time to validate the migration block on the
 old storage can be as long as 15 minutes on a hdd, <4 minutes on a
 ssd, while a node from a full snapshot takes less than 5 minutes on
 hdd, <40 seconds on ssd.
@@ -26,8 +26,8 @@ performed at the launch of new Tezos node.
 For this reason, once the storage migrated, it will not be possible to
 use the old Tezos node.
 
-Here is an example migration from Mainnet April to a node in mode
-`full`. Assuming a running node from Mainnet April with default
+Here is an example migration from Mainnet April 2019 to a node in mode
+`full`. Assuming a running node from Mainnet April 2019 with default
 storage directory `~/.tezos-node`, begin by gracefully stopping the
 node.
 Back up your storage and upgrade it, it will only take a few seconds::
@@ -46,7 +46,7 @@ We can proceed to export a snapshot::
 
 The default is to snapshot the chain at the position of our last
 checkpoint, which is usually 5 cycles in the past.
-This is the safest option as the tezos-node guarantees that no
+This is the safest option as the Tezos node guarantees that no
 reorganization of the chain is possible earlier than a checkpoint.
 However it requires to synchronize from the network the last 5 cycles.
 
@@ -58,7 +58,7 @@ We can now delete our upgraded archive storage and import the snapshot
 (without forgetting, if you need, to save ``{identity,peers,config}.json``)::
 
     rm -r ~/.tezos-node
-    tezos-node snapshot import mainnet-*.full
+    tezos-node snapshot import ./mainnet-*.full
 
 There should be a rather smaller `~/.tezos-node` directory populated
 from which we can start our node::
@@ -261,7 +261,7 @@ BINS
 - support for test-chains
 - remove conflicting CLI options in client: ``-b``
 - manual upgrade of old file-formats with ``upgrade baking state`` command
-- better support for user interuption (CTRL-C), especially when forking test chain
+- better support for user interruption (CTRL-C), especially when forking test chain
 - add ``--force`` argument to client's ``submit proposals``
 - add ``--dry-run`` argument to client's ``submit proposals`` and ``submit ballot``
 - add ``list orphan nonces`` and ``filter orphan nonces`` commands for the baker
@@ -269,10 +269,9 @@ BINS
 - client's ``list protocols`` does not contain duplicates anymore
 - add ``--verbose-signing`` argument to all client commands that require signing
 - history modes
-- add ``show current checkopoint`` command to admin client
+- add ``show current checkpoint`` command to admin client
 - new data encoding version for the node (version 0.0.3)
 - add snapshot command
-
 - Commits:
     - ``b7c2546e5``: ``Daemon: await_bootstrapped_node now retries on Connection_failed``
     - ``2268a1164``: ``Client: break line after "No invalid blocks." message``

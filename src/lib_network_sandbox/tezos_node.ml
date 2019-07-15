@@ -7,7 +7,7 @@ type t =
   ; p2p_port: int
   ; (* Ports: *)
     peers: int list
-  ; exec: [`Node] Tezos_executable.t
+  ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t }
 
 let ef t =
@@ -64,8 +64,7 @@ let start_script t ~config =
       []
   in
   let tmp_config = tmp_file (config_file t ~config) in
-  check_sequence
-    ~verbosity:(`Announce (sprintf "Node-%s-start" t.id))
+  check_sequence ~verbosity:`Output_all
     [ (let opts = config_options t ~config in
        ( "config-init"
        , if_seq
@@ -77,7 +76,7 @@ let start_script t ~config =
           [ write_stdout ~path:tmp_config#path
               (exec
                  [ "jq"
-                 ; {jq|.p2p += { "limits" : { "connection-timeout" : 2, "swap-linger" : 2 } }|jq}
+                 ; {jq|.p2p += {  "limits" : { "maintenance-idle-time": 3, "connection-timeout" : 2, "swap-linger" : 2 } }|jq}
                  ; config_file t ~config ])
           ; call [str "mv"; tmp_config#path; str (config_file t ~config)] ] )
     ; ( "ensure-identity"

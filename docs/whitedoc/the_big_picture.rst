@@ -70,7 +70,7 @@ is fully inter-operable, and auto descriptive, using JSON schema.
 .. |Tezos architecture diagram| image:: octopus.svg
 
 
-Software Architecture and Package Relashionships
+Software Architecture and Packages Relationship
 ------------------------------------------------
 .. _packages:
 
@@ -157,7 +157,8 @@ protocols.
     into the client to call the services in a type-safe way, only the
     description of services is done here. The registration of handlers
     is done in the rest of the node's implementation.
-  - :package:`tezos-rpc-http` uses :opam:`cohttp` to implement the RPC
+  - :package:`tezos-rpc-http-client` and :package:`tezos-rpc-http-server`
+    use :opam:`cohttp` to implement the RPC
     over HTTP server and client, allowing to make actual use of
     services declared using :package:`tezos-rpc`.
   - :package:`tezos-p2p` is the in-house peer-to-peer layer.
@@ -197,17 +198,16 @@ protocol in alternative environment possible.
     standard library as parameter. This parameter can be filled with
     any of the implementations described in the two points below.
 
-  - :package:`tezos-protocol-environment-shell` is the instance of the
-    environment whose RPC service registration and storage access are
-    the ones of the node. This is the environment that is fed by the
-    node when loading new protocols.
+  - :package:`tezos-shell-context` implements a context representation
+     that is accepted by the protocol environment. The node uses this
+     instance to read and write data on disk.
 
-  - :package:`tezos-protocol-environment` contains three alternative
-    instances of the protocol environment: one whose context access
-    function are dummy ones which can be used when only the types and
-    non contextual functions of the protocol are needed, another that
-    simulates the key-value store in memory for testing, and a functor
-    that let you build an environment from a few context accessors.
+  - :package:`tezos-protocol-environment` contains the protocol
+    generic environment. It also defines two different context
+    instances: one that simulates the key-value store in memory for
+    testing, and one whose context function are dummy ones which can
+    be used when only the types and non contextual functions of the
+    protocol are needed.
 
   - ``tezos-embedded-protocol-xxx`` contains a version of protocol
     ``xxx`` whose standard library is pre-instantiated to the shell's
@@ -229,15 +229,15 @@ Three economic protocols are included in the main Tezos repository.
     (:package:`tezos-embedded-protocol-004-Pt24m4xi`) is the first real
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
     to start reading the protocol's code.
-  - :package:`tezos-protocol-demo`
-    (:package:`tezos-embedded-protocol-demo`) is just a demo protocol
+  - :package:`tezos-protocol-demo-noops`
+    (:package:`tezos-embedded-protocol-demo-noops`) is just a demo protocol
     that does nothing interesting but has the right shape.
 
 The Client Library
 ~~~~~~~~~~~~~~~~~~
 
 The client is split into many packages, to enforce three separation
-lines: shell vs economic protocol, Unix dependent vs Javascript
+lines: shell vs economic protocol, Unix dependent vs JavaScript
 compatible, and library vs command line interface.
 
   - :package:`tezos-client-base` define the client context, which is
@@ -310,7 +310,7 @@ The Final Executables
     readme).
   - :package:`tezos-client` provides the ``tezos-client`` and
     ``tezos-admin-client`` binaries. The former contains a small
-    comand line wallet, the latter an administration tool for the
+    command line wallet, the latter an administration tool for the
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
   - :package:`tezos-baker-004-Pt24m4xi` provides the ``tezos-baker-004-Pt24m4xi``

@@ -371,8 +371,8 @@ module Protocol = struct
 
 end
 
-let init ?mapsize dir =
-  Raw_store.init ?mapsize dir >>=? fun s ->
+let init ?readonly ?mapsize dir =
+  Raw_store.init ?readonly ?mapsize dir >>=? fun s ->
   Block.register s ;
   Protocol.register s ;
   return s

@@ -33,9 +33,9 @@ class TestOriginationCall:
         # fails sometimes with tezos-client crashing. Maybe caused with
         # subprocess captured of forked process output?
         #
-        # Safer to poll with `check_contain_operations`
-        assert utils.check_contains_operations(client,
-                                               [origination.operation_hash])
+        # Safer to poll with `check_block_contain_operations`
+        assert utils.check_block_contains_operations(
+            client, [origination.operation_hash])
 
     def test_call(self, client, session):
         contract = session['contract']
@@ -43,8 +43,8 @@ class TestOriginationCall:
         transfer = client.transfer(0, 'bootstrap2', contract,
                                    ['--arg', bootstrap3])
         client.bake('bootstrap5', BAKE_ARGS)
-        assert utils.check_contains_operations(client,
-                                               [transfer.operation_hash])
+        assert utils.check_block_contains_operations(client,
+                                                     [transfer.operation_hash])
 
     def test_balance(self, client):
         assert client.get_balance("bootstrap3") == 4000100

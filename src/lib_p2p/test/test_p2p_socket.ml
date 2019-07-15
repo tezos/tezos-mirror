@@ -447,7 +447,7 @@ let spec = Arg.[
 
   ]
 
-let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ()) 
+let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->

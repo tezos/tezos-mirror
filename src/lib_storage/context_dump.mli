@@ -137,8 +137,8 @@ module type S = sig
      (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
-  val restore_contexts_fd : index -> Raw_store.t -> fd:Lwt_unix.file_descr ->
-    (pruned_block -> Block_hash.t -> unit tzresult Lwt.t) ->
+  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+    ((Block_hash.t * pruned_block) list -> unit tzresult Lwt.t) ->
     (block_header option ->
      Block_hash.t -> pruned_block -> unit tzresult Lwt.t) ->
     (block_header * block_data * History_mode.t *

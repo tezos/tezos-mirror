@@ -6,14 +6,15 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-rpc-http"
+  "tezos-rpc-http-server"
   "tezos-p2p"
   "tezos-shell"
   "tezos-protocol-updater"
-  "tezos-embedded-protocol-demo"
+  "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-001-PtCJ7pwo"
   "tezos-embedded-protocol-002-PsYLVpVv"
@@ -22,8 +23,7 @@ depends: [
   "tezos-mempool-004-Pt24m4xi"
   "cmdliner"
   "tls"
-  "cstruct" { < "3.4.0" } ## Because "tls" depends on a version of "nocrypto"
-                          ## that is not compatible with recent "cstruct"
+  "cstruct"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

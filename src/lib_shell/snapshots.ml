@@ -476,29 +476,32 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
   let open Context in
   Lwt.try_bind
     (fun () ->
-       let k_store_pruned_block
-           { Context.Pruned_block.block_header ; operations ; operation_hashes }
-           pruned_header_hash =
-         Store.Block.Pruned_contents.store
-           (block_store, pruned_header_hash) { header = block_header } >>= fun () ->
-         Lwt_list.iter_s
-           (fun (i, v) -> Store.Block.Operations.store (block_store, pruned_header_hash) i v)
-           operations >>= fun () ->
-         Lwt_list.iter_s
-           (fun (i, v) -> Store.Block.Operation_hashes.store (block_store, pruned_header_hash) i v)
-           operation_hashes >>= fun () ->
-         return_unit
+       let k_store_pruned_blocks data =
+         Store.with_atomic_rw store begin fun () ->
+           Error_monad.iter_s begin fun (pruned_header_hash, pruned_block) ->
+             Store.Block.Pruned_contents.store
+               (block_store, pruned_header_hash)
+               { header = pruned_block.Context.Pruned_block.block_header } >>= fun () ->
+             Lwt_list.iter_s
+               (fun (i, v) -> Store.Block.Operations.store (block_store, pruned_header_hash) i v)
+               pruned_block.operations >>= fun () ->
+             Lwt_list.iter_s
+               (fun (i, v) -> Store.Block.Operation_hashes.store (block_store, pruned_header_hash) i v)
+               pruned_block.operation_hashes >>= fun () ->
+             return_unit
+           end data
+         end
        in
        (* Restore context and fetch data *)
        restore_contexts
-         context_index store ~filename k_store_pruned_block block_validation >>=?
+         context_index ~filename k_store_pruned_blocks block_validation >>=?
        fun (predecessor_block_header, meta, history_mode, oldest_header_opt,
             rev_block_hashes, protocol_data) ->
        let oldest_header = Option.unopt_assert ~loc:__POS__ oldest_header_opt in
        let block_hashes_arr = Array.of_list rev_block_hashes in
 
        let write_predecessors_table to_write =
-         Raw_store.with_atomic_rw store (fun () ->
+         Store.with_atomic_rw store (fun () ->
              Lwt_list.iter_s (fun (current_hash, predecessors_list) ->
                  Lwt_list.iter_s (fun (l, h) ->
                      Store.Block.Predecessors.store (block_store, current_hash) l h
@@ -511,7 +514,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
                to_write) in
 
        Lwt_list.fold_left_s (fun (cpt, to_write) current_hash ->
-           Tezos_stdlib.Utils.display_progress
+           Tezos_stdlib_unix.Utils.display_progress
              ~refresh_rate:(cpt, 1_000)
              "Computing predecessors table %dK elements%!"
              (cpt / 1_000);
@@ -527,7 +530,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
            Lwt.return (cpt + 1, (current_hash, predecessors_list) :: to_write)
          ) (0, []) rev_block_hashes >>= fun (_, to_write) ->
        write_predecessors_table to_write >>= fun () ->
-       Tezos_stdlib.Utils.display_progress_end () ;
+       Tezos_stdlib_unix.Utils.display_progress_end () ;
 
        (* Process data imported from snapshot *)
        let { Block_data.block_header ; operations } = meta in

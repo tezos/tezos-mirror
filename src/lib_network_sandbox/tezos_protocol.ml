@@ -1,4 +1,5 @@
 open Internal_pervasives
+open Protocol
 
 module Key = struct
   module Of_name = struct
@@ -36,11 +37,11 @@ module Script = struct
           Tezos_error_monad.Error_monad.pp_print_error el
 
   let exn_shell msg res =
-    Tezos_client_004_Pt24m4xi.Proto_alpha.Alpha_environment.wrap_error res
+    Environment.wrap_error res
     |> exn_tezos msg
 
   let parse exprs =
-    Tezos_client_004_Pt24m4xi.Michelson_v1_parser.(
+    Michelson_v1_parser.(
       (parse_expression exprs |> fst).expanded)
 
   let code_of_json_exn s =
@@ -48,19 +49,18 @@ module Script = struct
     | Ok json ->
         let repr =
           Tezos_data_encoding.Data_encoding.Json.destruct
-            Tezos_client_004_Pt24m4xi.Proto_alpha.Script_repr.encoding json
+            Script_repr.encoding json
         in
         let ( (expr_code :
-                Tezos_client_004_Pt24m4xi.Proto_alpha.Michelson_v1_primitives.prim
-                Tezos_micheline.Micheline.canonical)
+                 Michelson_v1_primitives.prim
+                   Tezos_micheline.Micheline.canonical)
             , _ ) =
-          Tezos_client_004_Pt24m4xi.Proto_alpha.Script_repr.(force_decode repr.code)
+          Script_repr.(force_decode repr.code)
           |> exn_shell "decoding script-repr"
         in
-        let module Alph = Tezos_client_004_Pt24m4xi.Proto_alpha in
         let strings_node =
-          Alph.Michelson_v1_primitives.strings_of_prims expr_code
-          |> Alph.Alpha_environment.Micheline.root
+          Michelson_v1_primitives.strings_of_prims expr_code
+          |> Environment.Micheline.root
         in
         Format.eprintf ">> %a\n%!" Tezos_micheline.Micheline_printer.print_expr
           (Tezos_micheline.Micheline.map_node
@@ -73,8 +73,8 @@ module Script = struct
   let json_script_repr code storage =
     match
       Tezos_data_encoding.Data_encoding.Json.construct
-        Tezos_client_004_Pt24m4xi.Proto_alpha.Script_repr.encoding
-        Tezos_client_004_Pt24m4xi.Proto_alpha.Script_repr.
+        Script_repr.encoding
+        Script_repr.
           {code= lazy_expr code; storage= lazy_expr storage}
     with
     | `O _ as o -> (o : Ezjsonm.t)
@@ -192,6 +192,23 @@ module Account = struct
     | Key_pair k -> k.private_key
 end
 
+module Voting_period = struct
+  type t = Alpha_context.Voting_period.kind =
+    | Proposal
+    | Testing_vote
+    | Testing
+    | Promotion_vote
+
+  let to_string (p : t) =
+    match
+      Tezos_data_encoding.Data_encoding.Json.construct
+        Alpha_context.Voting_period
+        .kind_encoding p
+    with
+    | `String s -> s
+    | _other -> assert false
+end
+
 type t =
   { id: string
   ; bootstrap_accounts: (Account.t * Int64.t) list
@@ -219,7 +236,7 @@ let default () =
   ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)]
   ; expected_pow= 1
   ; name= "alpha"
-  ; hash= "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
+  ; hash= "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   ; time_between_blocks= [2; 3]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16
@@ -289,12 +306,18 @@ let ensure t ~config =
   | 0 -> return ()
   | _other ->
       Lwt_exception.fail (Failure "sys.command non-zero")
-        ~attach:[("location", "Tezos_protocol.ensure")]
+        ~attach:[("location", `String_value "Tezos_protocol.ensure")]
 
 let cli_term () =
   let open Cmdliner in
   let open Term in
-  pure (fun remove_default_bas (`Time_between_blocks tbb) add_bootstraps ->
+  pure
+    (fun remove_default_bas
+    (`Blocks_per_voting_period bpvp)
+    (`Protocol_hash hashopt)
+    (`Time_between_blocks tbb)
+    add_bootstraps
+    ->
       let d = default () in
       let id =
         if add_bootstraps = [] && remove_default_bas = false then d.id
@@ -307,12 +330,33 @@ let cli_term () =
         add_bootstraps
         @ if remove_default_bas then [] else d.bootstrap_accounts
       in
-      {d with id; bootstrap_accounts; time_between_blocks} )
+      let blocks_per_voting_period =
+        match bpvp with Some v -> v | None -> d.blocks_per_voting_period
+      in
+      let hash = Option.value hashopt ~default:d.hash in
+      { d with
+        id
+      ; hash
+      ; bootstrap_accounts
+      ; time_between_blocks
+      ; blocks_per_voting_period } )
   $ Arg.(
       value
         (flag
            (info ~doc:"Do not create any of the default bootstrap accounts."
               ["remove-default-bootstrap-accounts"])))
+  $ Arg.(
+      pure (fun x -> `Blocks_per_voting_period x)
+      $ value
+          (opt (some int) None
+             (info
+                ["blocks-per-voting-period"]
+                ~doc:"Set the length of voting periods")))
+  $ Arg.(
+      pure (fun x -> `Protocol_hash x)
+      $ value
+          (opt (some string) None
+             (info ["protocol-hash"] ~doc:"Set the (starting) protocol hash.")))
   $ Arg.(
       pure (fun x -> `Time_between_blocks x)
       $ value

@@ -27,6 +27,8 @@ open Client_keys
 
 let scheme = "remote"
 
+module RPC_client = RPC_client_unix
+
 module Make(S : sig
     val default : Uri.t
     val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t

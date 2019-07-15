@@ -1,18 +1,19 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: a0ce95cd2089a4d5e8ec9771a15b88a11a44f8ed
+  build_deps_image_version: b98d1114e1bafbe50f017e619cbfcede77df0149
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: 1
+  GET_SOURCES_ATTEMPTS: 2
+  ARTIFACT_DOWNLOAD_ATTEMPTS: 2
 
 stages:
   - doc
   - build
-  - unittest
-  - integration
-  - documentation
+  - test
   - packaging
   - publish
-
 
 ############################################################
 ## Stage: build (only MR)                                 ##
@@ -32,7 +33,6 @@ stages:
     - zeronet-snapshots
     - mainnet-snapshots
   before_script:
-    - opam list
     - . ./scripts/version.sh
   tags:
     - gitlab-org
@@ -42,6 +42,7 @@ check_opam_deps:
   script:
     - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
         echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
     - ./scripts/opam-check.sh
@@ -52,21 +53,24 @@ check_opam_lint:
   script:
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
-check_indentation:
+check_linting:
   <<: *build_definition
   script:
-    - dune build @runtest_indent
+    - dune build @runtest_lint
 
 build:
   <<: *build_definition
   script:
+    - . ./scripts/version.sh
     - dune build @runtest_dune_template
-    - make all
+    - make all build-test
   artifacts:
+    name: "$CI_COMMIT_REF_NAME"
     paths:
-    - _build
+      - _build
     expire_in: 1 day
-
+  tags:
+    - gitlab-org
 
 ############################################################
 ## Stage: test (only MR)                                  ##
@@ -74,91 +78,87 @@ build:
 
 .test_template: &test_definition
   <<: *build_definition
-  stage: unittest
+  stage: test
   dependencies:
     - build
+  retry: 2
 
-test:stdlib:
+unit:stdlib:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib/runtest
 
-test:stdlib_unix:
+unit:stdlib_unix:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib_unix/runtest
 
-test:data_encoding:
+unit:data_encoding:
   <<: *test_definition
   script:
     - dune build @src/lib_data_encoding/runtest
 
-test:storage:
+unit:storage:
   <<: *test_definition
   script:
     - dune build @src/lib_storage/runtest
 
-test:crypto:
+unit:crypto:
   <<: *test_definition
   script:
     - dune build @src/lib_crypto/runtest
 
-test:shell:
+unit:shell:
   <<: *test_definition
   script:
     - dune build @src/lib_shell/runtest
 
-test:p2p:io-scheduler:
+unit:p2p:io-scheduler:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
 
-test:p2p:socket:
+unit:p2p:socket:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
 
-test:p2p:pool:
+unit:p2p:pool:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
 
-test:proto_alpha:lib_protocol:
+unit:proto_alpha:lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/proto_004_Pt24m4xi/lib_protocol/runtest
+    - dune build @src/proto_alpha/lib_protocol/runtest
 
-test:proto_alpha:lib_client:
+unit:proto_alpha:lib_client:
   <<: *test_definition
   script:
-    - dune build @src/proto_004_Pt24m4xi/lib_client/test/runtest
+    - dune build @src/proto_alpha/lib_client/test/runtest
 
-test:p2p:peerset:
+unit:p2p:peerset:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_peerset
 
-test:p2p:ipv6set:
+unit:p2p:ipv6set:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_ipv6set
 
-test:p2p:banned_peers:
+unit:p2p:banned_peers:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest_p2p_banned_peers
 
-test:client_alpha:vote:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_004_Pt24m4xi/lib_delegate/runtest_vote
-
-test:validation:
+unit:validation:
   <<: *test_definition
   script:
     - dune build @src/lib_validation/runtest
 
-test:micheline:
+unit:micheline:
   <<: *test_definition
   script:
     - dune build @src/lib_micheline/runtest
@@ -169,59 +169,55 @@ test:micheline:
 
 # definition for the environment to run all integration tests
 .integration_template: &integration_definition
-  <<: *build_definition
-  stage: integration
+  <<: *test_definition
   dependencies:
     - build
   before_script:
-    - sudo apk add py-pip python3 python3-dev
-    - sudo pip install --upgrade pip
-    - sudo pip3 install -r tests_python/requirements.txt
-    - make all
+    - make
   tags:
     - gitlab-org
 
-test:basic.sh:
+integration:basic.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_basic.sh
 
-test:contracts.sh:
+integration:contracts.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_contracts.sh
 
-test:contracts_opcode.sh:
+integration:contracts_opcode.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_contracts_opcode.sh
 
-test:contracts_macros.sh:
+integration:contracts_macros.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
 
-test:contracts_mini_scenarios.sh:
+integration:contracts_mini_scenarios.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
 
-test:multinode.sh:
+integration:multinode.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_multinode.sh
 
-test:inject.sh:
+integration:inject.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_injection.sh
 
-test:voting.sh:
+integration:voting.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_voting.sh
 
-test:proto:sandbox:
+integration:proto:sandbox:
   <<: *integration_definition
   script:
     - dune build @runtest_sandbox
@@ -230,18 +226,18 @@ test:proto:sandbox:
 ## Stage: run OCaml integration tests                     ##
 ############################################################
 
-test:sandboxes:voting:
+integration:sandboxes:voting:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-voting-demo dune build @src/bin_flextesa/runtest_sandbox_voting_demo
+    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_flextesa/runtest_sandbox_voting_demo_noops
   artifacts:
     paths:
-    - flextesa-voting-demo
+    - flextesa-voting-demo-noops
     expire_in: 1 day
     when: on_failure
   allow_failure: true # This test uses too much resources for GitLab's workers
 
-test:sandboxes:acc-baking:
+integration:sandboxes:acc-baking:
   <<: *integration_definition
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_baking
@@ -251,7 +247,7 @@ test:sandboxes:acc-baking:
     expire_in: 1 day
     when: on_failure
 
-test:sandboxes:acc-endorsement:
+integration:sandboxes:acc-endorsement:
   <<: *integration_definition
   script:
     - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_endorsing
@@ -264,11 +260,6 @@ test:sandboxes:acc-endorsement:
 ############################################################
 ## Stage: run python integration tests                    ##
 ############################################################
-
-integration:linter_python:
-  <<: *integration_definition
-  script:
-    - make -C tests_python lint_all
 
 ##BEGIN_INTEGRATION_PYTHON##
 integration:baker_endorser:
@@ -290,6 +281,11 @@ integration:contract_baker:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py
+
+integration:cors:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_cors.py
 
 integration:injection:
   <<: *integration_definition
@@ -321,20 +317,30 @@ integration:rpc:
   script:
     - pytest tests_python/tests/test_rpc.py
 
-integration:voting:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_voting.py
-
 integration:tls:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_tls.py
 
-integration:cors:
+integration:voting:
   <<: *integration_definition
   script:
-    - pytest tests_python/tests/test_cors.py
+    - pytest tests_python/tests/test_voting.py
+
+integration:double_endorsement:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_double_endorsement.py
+
+integration:snapshot:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode_snapshot.py
+
+integration:proto_demo_noops:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
 
 ##END_INTEGRATION_PYTHON##
 
@@ -342,24 +348,14 @@ integration:cors:
 ## Stage: run doc integration tests                       ##
 ############################################################
 
-test:documentation:
+documentation:build:
   <<: *test_definition
-  stage: documentation
   script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html
 
-test:linkcheck:
+documentation:linkcheck:
   <<: *test_definition
-  stage: documentation
   script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - make doc-html-and-linkcheck
   allow_failure: true
 
@@ -473,15 +469,15 @@ opam:17:tezos-base:
   variables:
     package: tezos-base
 
-opam:18:pbkdf:
-  <<: *opam_definition
-  variables:
-    package: pbkdf
-
-opam:19:ocplib-resto-cohttp:
+opam:18:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
+
+opam:19:pbkdf:
+  <<: *opam_definition
+  variables:
+    package: pbkdf
 
 opam:20:irmin-lmdb:
   <<: *opam_definition
@@ -498,290 +494,265 @@ opam:22:tezos-stdlib-unix:
   variables:
     package: tezos-stdlib-unix
 
-opam:23:bip39:
+opam:23:ocplib-resto-cohttp-client:
   <<: *opam_definition
   variables:
-    package: bip39
+    package: ocplib-resto-cohttp-client
 
 opam:24:tezos-rpc-http:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http
 
-opam:25:tezos-storage:
+opam:25:bip39:
+  <<: *opam_definition
+  variables:
+    package: bip39
+
+opam:26:tezos-storage:
   <<: *opam_definition
   variables:
     package: tezos-storage
 
-opam:26:ledgerwallet:
+opam:27:ledgerwallet:
   <<: *opam_definition
   variables:
     package: ledgerwallet
 
-opam:27:tezos-client-base:
+opam:28:tezos-rpc-http-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc-http-client
+
+opam:29:tezos-client-base:
   <<: *opam_definition
   variables:
     package: tezos-client-base
 
-opam:28:ledgerwallet-tezos:
+opam:30:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
 
-opam:29:tezos-signer-services:
+opam:31:tezos-rpc-http-client-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc-http-client-unix
+
+opam:32:tezos-signer-services:
   <<: *opam_definition
   variables:
     package: tezos-signer-services
 
-opam:30:tezos-protocol-environment-sigs:
+opam:33:tezos-protocol-environment-sigs:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment-sigs
 
-opam:31:tezos-signer-backends:
-  <<: *opam_definition
-  variables:
-    package: tezos-signer-backends
-
-opam:32:tezos-protocol-environment:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment
-
-opam:33:tezos-client-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-commands
-
-opam:34:tezos-protocol-compiler:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-compiler
-
-opam:35:tezos-protocol-environment-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment-shell
-
-opam:36:tezos-client-base-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-base-unix
-
-opam:37:tezos-protocol-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-003-PsddFKi3
-
-opam:38:tezos-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-004-Pt24m4xi
-
-opam:39:tezos-protocol-updater:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-updater
-
-opam:40:tezos-client-003-PsddFKi3:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-003-PsddFKi3
-
-opam:41:tezos-client-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-004-Pt24m4xi
-
-opam:42:tezos-p2p:
+opam:34:tezos-p2p:
   <<: *opam_definition
   variables:
     package: tezos-p2p
 
-opam:43:tezos-validation:
+opam:35:tezos-signer-backends:
   <<: *opam_definition
   variables:
-    package: tezos-validation
+    package: tezos-signer-backends
 
-opam:44:tezos-protocol-001-PtCJ7pwo:
+opam:36:tezos-protocol-environment:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-001-PtCJ7pwo
+    package: tezos-protocol-environment
 
-opam:45:tezos-protocol-002-PsYLVpVv:
+opam:37:tezos-client-commands:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-002-PsYLVpVv
+    package: tezos-client-commands
 
-opam:46:tezos-baking-004-Pt24m4xi:
+opam:38:tezos-protocol-compiler:
   <<: *opam_definition
   variables:
-    package: tezos-baking-004-Pt24m4xi
+    package: tezos-protocol-compiler
 
-opam:47:tezos-embedded-protocol-004-Pt24m4xi:
+opam:39:tezos-client-base-unix:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-004-Pt24m4xi
+    package: tezos-client-base-unix
 
-opam:48:tezos-shell:
+opam:40:tezos-protocol-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-shell
+    package: tezos-protocol-alpha
 
-opam:49:tezos-protocol-000-Ps9mPmXa:
+opam:41:tezos-shell-context:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-000-Ps9mPmXa
+    package: tezos-shell-context
 
-opam:50:tezos-client-001-PtCJ7pwo:
+opam:42:tezos-client-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-client-001-PtCJ7pwo
+    package: tezos-client-alpha
 
-opam:51:tezos-client-002-PsYLVpVv:
+opam:43:tezos-protocol-updater:
   <<: *opam_definition
   variables:
-    package: tezos-client-002-PsYLVpVv
+    package: tezos-protocol-updater
 
-opam:52:tezos-protocol-demo:
+opam:44:tezos-baking-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-demo
+    package: tezos-baking-alpha
 
-opam:53:ocplib-resto-json:
+opam:45:tezos-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis
+
+opam:46:ocplib-resto-json:
   <<: *opam_definition
   variables:
     package: ocplib-resto-json
 
-opam:54:tezos-baking-004-Pt24m4xi-commands:
+opam:47:tezos-validation:
   <<: *opam_definition
   variables:
-    package: tezos-baking-004-Pt24m4xi-commands
+    package: tezos-validation
 
-opam:55:tezos-embedded-protocol-000-Ps9mPmXa:
+opam:48:ocplib-resto-cohttp-server:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-000-Ps9mPmXa
+    package: ocplib-resto-cohttp-server
 
-opam:56:tezos-embedded-protocol-001-PtCJ7pwo:
+opam:49:tezos-protocol-demo-noops:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-001-PtCJ7pwo
+    package: tezos-protocol-demo-noops
 
-opam:57:tezos-embedded-protocol-002-PsYLVpVv:
+opam:50:tezos-baking-alpha-commands:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-002-PsYLVpVv
+    package: tezos-baking-alpha-commands
 
-opam:58:tezos-embedded-protocol-003-PsddFKi3:
+opam:51:tezos-client-alpha-commands:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-003-PsddFKi3
+    package: tezos-client-alpha-commands
 
-opam:59:tezos-embedded-protocol-demo:
+opam:52:tezos-client-genesis:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-demo
+    package: tezos-client-genesis
 
-opam:60:tezos-mempool-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-004-Pt24m4xi
-
-opam:61:tezos-client-000-Ps9mPmXa:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-000-Ps9mPmXa
-
-opam:62:tezos-client-001-PtCJ7pwo-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-001-PtCJ7pwo-commands
-
-opam:63:tezos-client-002-PsYLVpVv-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-002-PsYLVpVv-commands
-
-opam:64:tezos-client-003-PsddFKi3-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-003-PsddFKi3-commands
-
-opam:65:tezos-client-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-004-Pt24m4xi-commands
-
-opam:66:tezos-client-demo:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-demo
-
-opam:67:ocplib-ezresto:
+opam:53:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
 
-opam:68:tezos-accuser-004-Pt24m4xi:
+opam:54:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-004-Pt24m4xi
+    package: tezos-embedded-protocol-alpha
 
-opam:69:tezos-baker-004-Pt24m4xi:
+opam:55:tezos-shell:
   <<: *opam_definition
   variables:
-    package: tezos-baker-004-Pt24m4xi
+    package: tezos-shell
 
-opam:70:ocplib-json-typed-browser:
+opam:56:tezos-protocol-alpha-parameters:
   <<: *opam_definition
   variables:
-    package: ocplib-json-typed-browser
+    package: tezos-protocol-alpha-parameters
 
-opam:71:tezos-node:
+opam:57:tezos-rpc-http-server:
   <<: *opam_definition
   variables:
-    package: tezos-node
+    package: tezos-rpc-http-server
+
+opam:58:tezos-embedded-protocol-demo-noops:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo-noops
+
+opam:59:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:60:tezos-endorser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha-commands
+
+opam:61:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:62:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:63:tezos-accuser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha
+
+opam:64:tezos-mempool-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-alpha
+
+opam:65:tezos-tooling:
+  <<: *opam_definition
+  variables:
+    package: tezos-tooling
+
+opam:66:tezos-protocol-alpha-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-alpha-tests
+
+opam:67:tezos-alpha-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-alpha-test-helpers
+
+opam:68:tezos-endorser-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-alpha
+
+opam:69:tezos-accuser-alpha-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-alpha-commands
+
+opam:70:tezos-baker-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-alpha
+
+opam:71:tezos-network-sandbox:
+  <<: *opam_definition
+  variables:
+    package: tezos-network-sandbox
 
 opam:72:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:73:tezos-accuser-004-Pt24m4xi-commands:
+opam:73:tezos-node:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-004-Pt24m4xi-commands
+    package: tezos-node
 
-opam:74:tezos-client:
+opam:74:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
-    package: tezos-client
-
-opam:75:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:76:tezos-baker-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-004-Pt24m4xi-commands
-
-opam:77:tezos-endorser-004-Pt24m4xi-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi-commands
-
-opam:78:tezos-endorser-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-004-Pt24m4xi
-
-opam:79:tezos-network-sandbox:
-  <<: *opam_definition
-  variables:
-    package: tezos-network-sandbox
+    package: ocplib-json-typed-browser
 
 
 ##END_OPAM##
@@ -832,10 +803,7 @@ publish:doc:
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
   before_script:
-    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme openssh-client rsync
-    - sudo pip3 uninstall 'idna' --yes ## Fix up dependencies in alpine:3.8
-    - sudo pip3 install 'idna<2.7'
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - chmod 400 ~/.ssh/id_ed25519

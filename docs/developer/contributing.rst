@@ -26,15 +26,16 @@ First steps
 -----------
 
 First, make sure that you are proficient enough in OCaml. The community
-Website http://www.ocaml.org below gives a few pointer for that. In
+website http://www.ocaml.org below gives a few pointer for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
 
 Then, if you don’t know much about the Lwt library, that’s what you want
-to learn next. This library is used extensively throughout the code base, as
-that’s the one we use to handle concurrency; and Tezos is a very
-concurrent system. You can use the `online documentation <https://ocsigen.org/lwt/3.2.1/manual/manual>`__. The chapter on concurrency of `Real World
-OCaml <https://github.com/dkim/rwo-lwt>`__ has also been ported to Lwt.
+to learn next. This library is used extensively throughout the code base:
+we use it to handle concurrency. You can use the
+`online documentation <https://ocsigen.org/lwt/3.2.1/manual/manual>`__. The
+chapter on concurrency of `Real World OCaml <https://github.com/dkim/rwo-lwt>`__
+has also been ported to Lwt.
 
 After that, it is a good idea to read the tutorials for
 :ref:`error_monad<error_monad>` and
@@ -62,11 +63,11 @@ Then, there are many ways to use Git, here is ours.
 We mostly use merge requests for master, meaning that nobody should be pushing
 into master directly. Once a merge request is ready, it is reviewed and
 approved, then merged using the ``--fast-forward`` option of Git in order to
-maintain a linear history without merge patches.
+maintain a linear history without merge commits.
 
 For that to work, it means that merge requests must be direct suffixes
 of the master branch. So whenever ``origin/master`` changes, you have to
-rebase your branch on it, so that you patches always sit on top of
+rebase your branch on it, so that your patches always sit on top of
 master. When that happens, you may have to edit your patches during the
 rebase, and then use ``push -f`` in your branch to rewrite the history.
 
@@ -76,18 +77,17 @@ We also enforce a few hygiene rules, so make sure your MR respects them:
 -  Don’t mix refactoring and new features.
 -  Never mix reindentation, whitespace deletion, or other style changes
    with actual code changes.
--  Try as much as possible to make every patch compile, not only the
-   last.
+-  Try as much as possible to make every patch compile, not only the last one.
 -  If you add new functions into a documented interface, don’t forget to
    extend the documentation for your addition.
--  For parts whose specification is in the repository (e.g. Michelson),
+-  For parts that have specifications in the repository (e.g., Michelson),
    make sure to keep it in sync with the implementation.
 -  Try and mimic the style of commit messages, and for non trivial
    commits, add an extended commit message.
 
 As per the hygiene of MRs themselves:
 
--  Give appropriate titles to the MRs, and when non trivial add a
+-  Give appropriate titles to the MRs, and when non-trivial add a
    detailed motivated explanation.
 -  Give meaningful and consistent names to branches.
 -  Don’t forget to put a ``WIP:`` flag when it is a work in progress

@@ -40,15 +40,6 @@
     by the higher layers. Some messages are directly processed by an
     internal worker and thus never propagated above. *)
 
-type 'msg encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg encoding
-
 (** {1 Pool management} *)
 
 type ('msg, 'peer_meta, 'conn_meta) t
@@ -78,6 +69,9 @@ type config = {
       to/from peers whose addresses are in [trusted_peers], and inform
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
+
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+  (** The greylisting configuration. *)
 
   listening_port : P2p_addr.port option ;
   (** If provided, it will be passed to [P2p_connection.authenticate]
@@ -148,7 +142,7 @@ type 'peer_meta peer_meta_config = {
 }
 
 type 'msg message_config = {
-  encoding : 'msg encoding list ;
+  encoding : 'msg P2p_message.encoding list ;
   chain_name : Distributed_db_version.name ;
   distributed_db_versions : Distributed_db_version.t list ;
 }
@@ -291,6 +285,7 @@ end
 val on_new_connection:
   ('msg, 'peer_meta,'conn_meta) pool ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta,'conn_meta) connection -> unit) -> unit
+(** [on_new_connection pool f] installs [f] as a hook for new connections in [pool].   *)
 
 (** {1 I/O on connections} *)
 
@@ -428,19 +423,3 @@ val watch:
   P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 (** [watch pool] is a [stream, close] a [stream] of events and a
     [close] function for this stream. *)
-
-(**/**)
-
-module Message : sig
-
-  type 'msg t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'msg
-    | Disconnect
-
-  val encoding: 'msg encoding list -> 'msg t Data_encoding.t
-
-end

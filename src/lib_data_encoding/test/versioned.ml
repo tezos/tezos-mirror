@@ -29,9 +29,8 @@
 
 (** This module is a simple example of use of {!With_version}. *)
 module Documented_example = struct
-  (** 
-     Here we show how to {i "versionize"} a given random encoding (which
-     just happens to be very similar to {!Internal_event.Debug_event}). *)
+  (** Here we show how to {i "versionize"} a given random encoding (which
+      just happens to be very similar to {!Internal_event.Debug_event}). *)
 
   (** We are going to provide successive versions of a module
       implementing {!INTENDED_SIGNATURE} (which is similar to a
@@ -46,8 +45,7 @@ module Documented_example = struct
       the serialized values, it has to remain constant across versions: *)
   let name = "versioned-documented-example"
 
-  (** 
-     The first version has a [(string * string) list] field. *)
+  (** The first version has a [(string * string) list] field. *)
   module V0 = struct
     type t = { message : string ; attachment : (string * string) list }
 

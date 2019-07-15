@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +35,21 @@ let show { Node_config_file.data_dir ; _ } =
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return_unit
 
+let generate_with_animation ppf target =
+  let duration = 1200 / Animation.number_of_frames in
+  Animation.make_with_animation
+    ppf
+    ~make:(fun count ->
+        try Ok (P2p_identity.generate_with_bound ~max:count target)
+        with Not_found -> Error count)
+    ~on_retry:(fun time count ->
+        if Mtime.Span.(equal zero time) then
+          max 10 (count * 10)
+        else
+          let ms = int_of_float (Mtime.Span.to_ms time) in
+          count * duration / ms)
+    10000
+
 let generate { Node_config_file.data_dir ; p2p ; _ } =
   let identity_file = identity_file data_dir in
   if Sys.file_exists identity_file then
@@ -42,7 +58,7 @@ let generate { Node_config_file.data_dir ; p2p ; _ } =
     let target = Crypto_box.make_target p2p.expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " p2p.expected_pow ;
     let id =
-      P2p_identity.generate_with_animation Format.err_formatter target in
+      generate_with_animation Format.err_formatter target in
     Node_identity_file.write identity_file id >>=? fun () ->
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."

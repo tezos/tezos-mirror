@@ -31,6 +31,12 @@ class Sandbox:
 
     Whenever a node has been added with `add_node()`, we can access to a
     corresponding client object `client()` to interact with this node.
+
+    When the sandbox resources are cleaned (from a call `__exit__()`),
+    the sandbox checks all nodes/deamons started are still alive
+    to alert to user of unexpected failure. If you want to definitively
+    terminate a node within a sandbox, use `sandbox.rm_node()` instead
+    of `node.terminate()`.
     """
 
     def _wrap_path(self, binary: str, branch: str, proto="") -> str:
@@ -110,6 +116,7 @@ class Sandbox:
                  private: bool = True,
                  config_client: bool = True,
                  use_tls: Tuple[str, str] = None,
+                 snapshot: str = None,
                  branch: str = "") -> None:
         """ Launches new node with given node_id and initializes client
 
@@ -122,6 +129,9 @@ class Sandbox:
             private (bool): enable private mode, default=True
             config_client (bool): initialize client with sandbox identities,
                                   default=True
+            use_tls (list): couple of filenames containing
+                           (tezos.crt, tezos.k), default=None
+            snapshot (str): import snapshot  before initializing node
             branch (str): sub-dir where to lookup the node and client
                           binary, default = "". Allows execution of different
                           versions of nodes.
@@ -165,6 +175,15 @@ class Sandbox:
                     p2p_port=p2p_node, rpc_port=rpc_node,
                     peers=peers_rpc, log_file=log_file, params=params,
                     log_levels=log_levels, use_tls=use_tls)
+        if snapshot is None:
+            node.init_id()
+            node.init_config()
+        else:
+            assert os.path.isfile(snapshot)
+            node.snapshot_import(snapshot)
+            node.init_id()
+            node.init_config()
+        node.run()
         client = Client(local_client, local_admin_client, rpc_port=rpc_node,
                         use_tls=bool(use_tls))
         time.sleep(0.1)
@@ -324,7 +343,11 @@ class Sandbox:
         shutil.rmtree(self.sandbox_dir)
 
     def are_daemons_alive(self) -> bool:
-        """ Returns True iff all started deamons/nodes are still alive """
+        """ Returns True iff all started deamons/nodes are still alive.
+
+        Deamons/nodes must be removed explicitely to prevent this to
+        return false.
+        """
         daemons_alive = True
         for node_id, node in self.nodes.items():
             if node.poll() is not None:
@@ -412,8 +435,9 @@ class SandboxMultiBranch(Sandbox):
                  private: bool = True,
                  config_client: bool = True,
                  use_tls: Tuple[str, str] = None,
+                 snapshot: str = None,
                  branch: str = "") -> None:
         assert not branch
         branch = self._branch_map[node_id]
         super().add_node(node_id, peers, params, log_levels, private,
-                         config_client, use_tls, branch)
+                         config_client, use_tls, snapshot, branch)

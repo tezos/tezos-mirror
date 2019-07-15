@@ -164,7 +164,7 @@ let build_raw_rpc_directory
       max_block_header_length = Next_proto.max_block_length ;
       operation_list_quota =
         List.map
-          (fun { Tezos_protocol_environment_shell.max_size; max_op } ->
+          (fun { Tezos_protocol_environment.max_size; max_op } ->
              { Tezos_shell_services.Block_services.max_size ; max_op } )
           Next_proto.validation_passes ;
     } in
@@ -305,9 +305,10 @@ let build_raw_rpc_directory
     State.Block.context block >>= fun ctxt ->
     let predecessor = State.Block.hash block in
     let header = State.Block.shell_header block in
+    let predecessor_context = Shell_context.wrap_disk_context ctxt in
     Next_proto.begin_construction
       ~chain_id: (State.Block.chain_id block)
-      ~predecessor_context:ctxt
+      ~predecessor_context
       ~predecessor_timestamp:header.timestamp
       ~predecessor_level:header.level
       ~predecessor_fitness:header.fitness
@@ -325,6 +326,7 @@ let build_raw_rpc_directory
   register1 S.Helpers.complete begin fun block prefix () () ->
     State.Block.context block >>= fun ctxt ->
     Base58.complete prefix >>= fun l1 ->
+    let ctxt = Shell_context.wrap_disk_context ctxt in
     Next_proto.complete_b58prefix ctxt prefix >>= fun l2 ->
     return (l1 @ l2)
   end ;
@@ -344,7 +346,8 @@ let build_raw_rpc_directory
     (RPC_directory.map
        (fun block ->
           State.Block.context block >|= fun context ->
-          { Tezos_protocol_environment_shell.
+          let context = Shell_context.wrap_disk_context context in
+          { Tezos_protocol_environment.
             block_hash = State.Block.hash block ;
             block_header = State.Block.shell_header block ;
             context })
