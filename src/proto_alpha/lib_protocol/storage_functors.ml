@@ -803,10 +803,25 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       Raw_context.set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
       return (Raw_context.project c, size_diff)
+    let set_free s i v =
+      let c = pack s i in
+      let bytes = to_bytes v in
+      existing_size c >>=? fun prev_size ->
+      Raw_context.set c len_name (encode_len_value bytes) >>=? fun c ->
+      Raw_context.set c data_name bytes >>=? fun c ->
+      let size_diff = MBytes.length bytes - prev_size in
+      return (Raw_context.project c, size_diff)
     let init s i v =
       consume_write_gas Raw_context.init (pack s i) v >>=? fun (c, bytes) ->
       Raw_context.init c data_name bytes >>=? fun c ->
       let size = MBytes.length bytes in
+      return (Raw_context.project c, size)
+    let init_free s i v =
+      let c = pack s i in
+      let bytes = to_bytes v in
+      let size = MBytes.length bytes in
+      Raw_context.init c len_name (encode_len_value bytes) >>=? fun c ->
+      Raw_context.init c data_name bytes >>=? fun c ->
       return (Raw_context.project c, size)
     let init_set s i v =
       let init_set c k v = Raw_context.init_set c k v >>= return in

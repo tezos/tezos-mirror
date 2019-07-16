@@ -234,6 +234,14 @@ module Contract = struct
     let init_set ctxt contract value =
       consume_serialize_gas ctxt value >>=? fun ctxt ->
       I.init_set ctxt contract value
+
+    (** Only for used for 005 migration to avoid gas cost. *)
+    let init_free ctxt contract value =
+      I.init_free ctxt contract value
+
+    (** Only for used for 005 migration to avoid gas cost. *)
+    let set_free ctxt contract value =
+      I.set_free ctxt contract value
   end
 
   module Code =

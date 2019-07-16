@@ -190,15 +190,39 @@ module Contract : sig
      and type value = Z.t
      and type t := Raw_context.t
 
-  module Code : Non_iterable_indexed_carbonated_data_storage
-    with type key = Contract_repr.t
-     and type value = Script_repr.lazy_expr
-     and type t := Raw_context.t
+  module Code : sig
+    include Non_iterable_indexed_carbonated_data_storage
+      with type key = Contract_repr.t
+       and type value = Script_repr.lazy_expr
+       and type t := Raw_context.t
 
-  module Storage : Non_iterable_indexed_carbonated_data_storage
-    with type key = Contract_repr.t
-     and type value = Script_repr.lazy_expr
-     and type t := Raw_context.t
+    (** Only used for 005 migration to avoid gas cost.
+        Allocates a storage bucket at the given key and initializes it ;
+        returns a {!Storage_error Existing_key} if the bucket exists. *)
+    val init_free: Raw_context.t -> Contract_repr.t -> Script_repr.lazy_expr -> (Raw_context.t * int) tzresult Lwt.t
+
+    (** Only used for 005 migration to avoid gas cost.
+        Updates the content of a bucket ; returns A {!Storage_Error
+        Missing_key} if the value does not exists. *)
+    val set_free: Raw_context.t -> Contract_repr.t -> Script_repr.lazy_expr -> (Raw_context.t * int) tzresult Lwt.t
+  end
+
+  module Storage : sig
+    include Non_iterable_indexed_carbonated_data_storage
+      with type key = Contract_repr.t
+       and type value = Script_repr.lazy_expr
+       and type t := Raw_context.t
+
+    (** Only used for 005 migration to avoid gas cost.
+        Allocates a storage bucket at the given key and initializes it ;
+        returns a {!Storage_error Existing_key} if the bucket exists. *)
+    val init_free: Raw_context.t -> Contract_repr.t -> Script_repr.lazy_expr -> (Raw_context.t * int) tzresult Lwt.t
+
+    (** Only used for 005 migration to avoid gas cost.
+        Updates the content of a bucket ; returns A {!Storage_Error
+        Missing_key} if the value does not exists. *)
+    val set_free: Raw_context.t -> Contract_repr.t -> Script_repr.lazy_expr -> (Raw_context.t * int) tzresult Lwt.t
+  end
 
   (** Current storage space in bytes.
       Includes code, global storage and big map elements. *)

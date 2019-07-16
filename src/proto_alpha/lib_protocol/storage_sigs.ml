@@ -358,6 +358,20 @@ module type VALUE = sig
   val encoding: t Data_encoding.t
 end
 
+module type Non_iterable_indexed_carbonated_data_storage_with_free = sig
+  include Non_iterable_indexed_carbonated_data_storage
+
+  (** Only used for 005 migration to avoid gas cost.
+      Allocates a storage bucket at the given key and initializes it ;
+      returns a {!Storage_error Existing_key} if the bucket exists. *)
+  val init_free: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Only used for 005 migration to avoid gas cost.
+      Updates the content of a bucket ; returns A {!Storage_Error
+      Missing_key} if the value does not exists. *)
+  val set_free: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+end
+
 module type Indexed_raw_context = sig
 
   type t
@@ -383,7 +397,7 @@ module type Indexed_raw_context = sig
                             and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : VALUE)
-    : Non_iterable_indexed_carbonated_data_storage with type t = t
+    : Non_iterable_indexed_carbonated_data_storage_with_free with type t = t
                                                     and type key = key
                                                     and type value = V.t
 
