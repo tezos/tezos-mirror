@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_001_PtCJ7pwo
+open Protocol
 open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
@@ -60,7 +60,7 @@ let commands () =
       (args1
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun seconds (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun seconds (cctxt : Alpha_client_context.full) ->
         Shell_services.Blocks.Header.shell_header
           cctxt ~block:cctxt#block () >>=? fun { timestamp = v } ->
         begin
@@ -74,7 +74,7 @@ let commands () =
     command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
-      begin fun () (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         list_contract_labels cctxt
           ~chain:`Main ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
@@ -88,7 +88,7 @@ let commands () =
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_balance cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? fun amount ->
@@ -101,7 +101,7 @@ let commands () =
       (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_storage cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? function
@@ -112,12 +112,12 @@ let commands () =
             return_unit
       end ;
 
-    command ~group ~desc: "Get the storage of a contract."
+    command ~group ~desc: "Get the code of a contract."
       no_options
       (prefixes [ "get" ; "script" ; "code" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_script cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? function
@@ -125,7 +125,7 @@ let commands () =
             cctxt#error "This is not a smart contract."
         | Some { code ; storage = _ } ->
             match Script_repr.force_decode code with
-            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
+            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Environment.Error_monad.pp) errs
             | Ok (code, _) ->
                 begin cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped code >>= fun () ->
                   return_unit
@@ -137,7 +137,7 @@ let commands () =
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_manager cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? fun manager ->
@@ -153,7 +153,7 @@ let commands () =
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_delegate cctxt
           ~chain:`Main ~block:cctxt#block
           contract >>=? function
@@ -171,7 +171,7 @@ let commands () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "block" ; "header" ])
-      begin fun () (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -182,7 +182,7 @@ let commands () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "operation" ])
-      begin fun () (cctxt : Proto_001_PtCJ7pwo.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe

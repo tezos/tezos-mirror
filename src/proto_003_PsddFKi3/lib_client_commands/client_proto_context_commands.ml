@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Tezos_micheline
 open Client_proto_context
@@ -68,7 +68,7 @@ let commands () =
       (args1
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun seconds (cctxt : Proto_alpha.full) ->
+      begin fun seconds (cctxt : Alpha_client_context.full) ->
         Shell_services.Blocks.Header.shell_header
           cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v ; _ } ->
         begin
@@ -82,7 +82,7 @@ let commands () =
     command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         list_contract_labels cctxt
           ~chain:cctxt#chain ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
@@ -96,7 +96,7 @@ let commands () =
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_balance cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun amount ->
@@ -109,7 +109,7 @@ let commands () =
       (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_storage cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -131,7 +131,7 @@ let commands () =
        @@ prefix "in"
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () key key_type (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () key key_type (_, contract) (cctxt : Alpha_client_context.full) ->
         get_big_map_value cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract (key.expanded, key_type.expanded) >>=? function
@@ -147,7 +147,7 @@ let commands () =
       (prefixes [ "get" ; "script" ; "code" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_script cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -155,7 +155,7 @@ let commands () =
             cctxt#error "This is not a smart contract."
         | Some { code ; storage = _ } ->
             match Script_repr.force_decode code with
-            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
+            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Environment.Error_monad.pp) errs
             | Ok (code, _) ->
                 let { Michelson_v1_parser.source ; _ } =
                   Michelson_v1_printer.unparse_toplevel code in
@@ -167,7 +167,7 @@ let commands () =
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_manager cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun manager ->
@@ -183,7 +183,7 @@ let commands () =
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -216,7 +216,7 @@ let commands () =
                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                | Some hash -> return hash))
        @@ stop)
-      begin fun predecessors operation_hash (ctxt : Proto_alpha.full) ->
+      begin fun predecessors operation_hash (ctxt : Alpha_client_context.full) ->
         display_receipt_for_operation ctxt
           ~chain:ctxt#chain ~predecessors operation_hash >>=? fun _ ->
         return_unit
@@ -225,7 +225,7 @@ let commands () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "block" ; "header" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -236,7 +236,7 @@ let commands () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "operation" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -247,18 +247,18 @@ let commands () =
     command ~group ~desc: "Summarize the current voting period"
       no_options
       (fixed [ "show" ; "voting" ; "period" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         cctxt#message "Current period: %a\n\
                        Blocks remaining until end of period: %ld"
           Data_encoding.Json.pp
           (Data_encoding.Json.construct
-             Proto_alpha.Alpha_context.Voting_period.kind_encoding
+             Alpha_context.Voting_period.kind_encoding
              info.current_period_kind)
           info.remaining >>= fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun props ->
-        let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
+        let ranks = Environment.Protocol_hash.Map.bindings props |>
                     List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
         let print_proposal = function
           | None -> assert false (* not called during proposal phase *)

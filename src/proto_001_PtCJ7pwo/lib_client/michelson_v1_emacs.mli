@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_001_PtCJ7pwo
+open Protocol
 open Alpha_context
 
 val print_expr :

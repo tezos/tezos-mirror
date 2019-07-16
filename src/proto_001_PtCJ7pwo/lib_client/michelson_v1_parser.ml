@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_001_PtCJ7pwo
+open Protocol
 open Tezos_micheline
 open Micheline_parser
 open Micheline
@@ -63,7 +63,7 @@ let expand_all source ast errors =
          (l, (ploc, elocs)))
       (List.sort compare loc_table)
       (List.sort compare grouped) in
-  match Alpha_environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded) with
+  match Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded) with
   | Ok expanded ->
       { source ; unexpanded ; expanded ;
         expansion_table ; unexpansion_table },

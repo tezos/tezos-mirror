@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Alpha_client_context
+open Protocol
 open Alpha_context
 open Clic
 
@@ -55,7 +56,7 @@ let int_parameter =
       with _ -> failwith "Cannot read int")
 
 let bytes_parameter =
-  parameter (fun (_cctxt : full) s ->
+  parameter (fun _ s ->
       try
         if String.length s < 2
         || s.[0] <> '0' || s.[1] <> 'x' then

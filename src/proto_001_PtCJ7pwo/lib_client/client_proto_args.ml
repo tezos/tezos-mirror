@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_001_PtCJ7pwo
+open Alpha_client_context
+open Protocol
 open Alpha_context
 open Clic
 

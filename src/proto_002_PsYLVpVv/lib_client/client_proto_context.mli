@@ -23,24 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 val list_contract_labels:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   (string * string * string) list tzresult Lwt.t
 
 val get_storage:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
 val get_big_map_value:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
@@ -48,14 +48,14 @@ val get_big_map_value:
   Script.expr option tzresult Lwt.t
 
 val get_script:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 
 val get_manager:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
@@ -63,7 +63,7 @@ val get_manager:
    public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val get_balance:
-  #Proto_alpha.rpc_context ->
+  #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
@@ -71,9 +71,9 @@ val get_balance:
 
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
-val display_receipt_for_operation: 
-  #Proto_alpha.full ->
+val display_receipt_for_operation:
+  #Alpha_client_context.full ->
   chain:Block_services.chain ->
-  ?predecessors:int -> 
-  Operation_list_hash.elt -> 
+  ?predecessors:int ->
+  Operation_list_hash.elt ->
   unit tzresult Lwt.t

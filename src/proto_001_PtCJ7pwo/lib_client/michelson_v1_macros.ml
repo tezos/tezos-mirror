@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_client_context
 open Tezos_micheline
 open Micheline
 

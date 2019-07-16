@@ -23,15 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
+open Alpha_client_context
 
 val tez_sym: string
 
-val no_print_source_flag: (bool, Proto_alpha.full) Clic.arg
+val no_print_source_flag: (bool, full) Clic.arg
 
 val tez_arg :
   default:string ->
   parameter:string ->
   doc:string ->
-  (Tez.t, Proto_alpha.full) Clic.arg
+  (Tez.t, full) Clic.arg

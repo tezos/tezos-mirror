@@ -23,31 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
-open Tezos_micheline
+open Alpha_client_context
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_big_map_value (rpc : #Proto_alpha.rpc_context) ~chain ~block contract key =
+let get_big_map_value (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract key =
   Alpha_services.Contract.big_map_get_opt rpc (chain, block) contract key
 
-let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
-let parse_expression arg =
-  Lwt.return
-    (Micheline_parser.no_parsing_error
-       (Michelson_v1_parser.parse_expression arg))
-
 let list_contract_labels
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   map_s (fun h ->
@@ -73,11 +68,11 @@ let list_contract_labels
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Proto_alpha.full) name =
+let message_added_contract (cctxt : #Alpha_client_context.full) name =
   cctxt#message "Contract memorized as %s." name
 
 let get_manager
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block source =
   Client_proto_contracts.get_manager
     cctxt ~chain ~block source >>=? fun src_pkh ->
@@ -90,8 +85,8 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
       match Apply_results.kind_equal_list od.contents omd.contents
       with
       | Some Apply_results.Eq ->
-          Operation_result.pp_operation_result formatter 
-            (od.contents, omd.contents) 
+          Operation_result.pp_operation_result formatter
+            (od.contents, omd.contents)
       | None -> Pervasives.failwith "Unexpected result.")
   | _ -> Pervasives.failwith "Unexpected result."
 
@@ -101,28 +96,28 @@ let get_operation_from_block
     predecessors
     operation_hash =
   Client_confirmations.lookup_operation_in_previous_blocks
-    cctxt 
-    ~chain 
-    ~predecessors 
+    cctxt
+    ~chain
+    ~predecessors
     operation_hash
   >>=? function
   | None -> return_none
-  | Some (block, i, j) -> 
+  | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt 
-        ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
+      Alpha_client_context.Alpha_block_services.Operations.operation cctxt
+        ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     ?(predecessors = 10)
     operation_hash =
   get_operation_from_block cctxt ~chain predecessors operation_hash
-  >>=? function 
-  | None -> 
-      cctxt#message "Couldn't find operation" >>= fun () -> 
+  >>=? function
+  | None ->
+      cctxt#message "Couldn't find operation" >>= fun () ->
       return_unit
-  | Some op -> 
+  | Some op ->
       cctxt#message "%a" pp_operation op >>= fun () ->
       return_unit

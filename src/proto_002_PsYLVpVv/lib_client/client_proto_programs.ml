@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Tezos_micheline
 
@@ -95,7 +95,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       print_errors cctxt errs ~show_source ~parsed
 
 let run
-    (cctxt : #Proto_alpha.rpc_context)
+    (cctxt : #Alpha_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)
@@ -108,7 +108,7 @@ let run
     program.expanded (storage.expanded, input.expanded, amount)
 
 let trace
-    (cctxt : #Proto_alpha.rpc_context)
+    (cctxt : #Alpha_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)
@@ -146,7 +146,7 @@ let print_typecheck_result
   if emacs then
     let type_map, errs, _gas = match res with
       | Ok (type_map, gas) -> (type_map, [], Some gas)
-      | Error (Alpha_environment.Ecoproto_error
+      | Error (Environment.Ecoproto_error
                  (Script_tc_errors.Ill_typed_contract (_, type_map ))
                :: _ as errs) ->
           (type_map, errs, None)

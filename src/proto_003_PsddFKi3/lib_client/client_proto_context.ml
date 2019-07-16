@@ -23,25 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
+open Alpha_client_context
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_big_map_value (rpc : #Proto_alpha.rpc_context) ~chain ~block contract key =
+let get_big_map_value (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract key =
   Alpha_services.Contract.big_map_get_opt rpc (chain, block) contract key
 
-let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let list_contract_labels
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   map_s (fun h ->
@@ -68,7 +69,7 @@ let list_contract_labels
     contracts
 
 let get_manager
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block source =
   Client_proto_contracts.get_manager
     cctxt ~chain ~block source >>=? fun src_pkh ->
@@ -90,7 +91,7 @@ type ballots_info = {
 }
 
 let get_ballots_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -108,7 +109,7 @@ let get_ballots_info
            ballots }
 
 let get_period_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -125,7 +126,7 @@ let get_period_info
            current_proposal }
 
 let get_proposals
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Voting.proposals cctxt cb
@@ -156,11 +157,11 @@ let get_operation_from_block
   | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt
+      Alpha_client_context.Alpha_block_services.Operations.operation cctxt
         ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     ?(predecessors = 10)
     operation_hash =

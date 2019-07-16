@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 let () =
-  Client_commands.register Proto_001_PtCJ7pwo.hash @@ fun _network  ->
-  List.map (Clic.map_command (new Proto_001_PtCJ7pwo.wrap_full)) @@
+  Client_commands.register Protocol.hash @@ fun _network ->
+  List.map (Clic.map_command (new Alpha_client_context.wrap_full)) @@
   Client_proto_programs_commands.commands () @
   Client_proto_contracts_commands.commands () @
   Client_proto_context_commands.commands ()

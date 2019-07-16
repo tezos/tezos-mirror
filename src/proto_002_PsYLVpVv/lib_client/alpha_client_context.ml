@@ -23,22 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Name = struct let name = "001_PtCJ7pwo" end
-module T = Tezos_protocol_environment.Make(Tezos_storage.Context)
-module Alpha_environment = T.MakeV1(Name)()
+module Alpha_block_services = Block_services.Make(Protocol)(Protocol)
 
-module Proto = Tezos_protocol_001_PtCJ7pwo.Functor.Make(Alpha_environment)
-module Alpha_block_services = Block_services.Make(Proto)(Proto)
-
-include Proto
-module LiftedMain = Alpha_environment.Lift(Proto)
+(** Client RPC context *)
 
 class type rpc_context = object
   inherit RPC_context.json
-  inherit [Shell_services.chain * Shell_services.block] Alpha_environment.RPC_context.simple
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
 end
 
-class wrap_proto_context (t : RPC_context.json) : rpc_context = object
+class wrap_rpc_context (t : RPC_context.json) : rpc_context = object
   method base : Uri.t = t#base
   method generic_json_call = t#generic_json_call
   method call_service : 'm 'p 'q 'i 'o.
@@ -49,20 +43,20 @@ class wrap_proto_context (t : RPC_context.json) : rpc_context = object
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = t#call_streamed_service
-  inherit [Shell_services.chain,
-           Shell_services.block] Alpha_environment.proto_rpc_context
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
       (t :> RPC_context.t)
       Shell_services.Blocks.path
 end
 
 class type full = object
   inherit Client_context.full
-  inherit [Shell_services.chain * Shell_services.block] Alpha_environment.RPC_context.simple
+  inherit [Shell_services.chain * Shell_services.block] Protocol.Environment.RPC_context.simple
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
 end
 
 class wrap_full (t : Client_context.full) : full = object
   inherit Client_context.proxy_context t
-  inherit [Shell_services.chain, Shell_services.block] Alpha_environment.proto_rpc_context
+  inherit [Shell_services.chain, Shell_services.block] Protocol.Environment.proto_rpc_context
       (t :> RPC_context.t)
       Shell_services.Blocks.path
 end
@@ -70,7 +64,7 @@ end
 let register_error_kind
     category ~id ~title ~description ?pp
     encoding from_error to_error =
-  let id = "client." ^ Name.name ^ "." ^ id in
+  let id = "client." ^ Protocol.name ^ "." ^ id in
   register_error_kind
     category ~id ~title ~description ?pp
     encoding from_error to_error
