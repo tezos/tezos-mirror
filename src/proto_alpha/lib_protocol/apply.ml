@@ -537,10 +537,7 @@ let apply_manager_operation_content :
         else
           begin match script with
             | None ->
-                if internal then
-                  return (None, ctxt)
-                else
-                  fail Cannot_originate_without_script
+                fail Cannot_originate_without_script
             | Some script ->
                 if spendable then
                   fail Cannot_originate_spendable_smart_contract

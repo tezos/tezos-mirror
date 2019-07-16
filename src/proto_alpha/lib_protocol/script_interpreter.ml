@@ -773,13 +773,26 @@ let rec interp
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return (Item (Internal_operation { source = self ; operation ; nonce }, rest), ctxt)
         | Create_account,
-          Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
+          Item (manager, Item (delegate, Item (_delegatable, Item (credit, rest)))) ->
             Lwt.return (Gas.consume ctxt Interp_costs.create_account) >>=? fun ctxt ->
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            (* store in optimized binary representation - as unparsed with [Optimized]. *)
+            let manager_bytes =
+              Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding manager in
+            let storage =
+              Script_repr.lazy_expr @@ Micheline.strip_locations @@
+              Micheline.Bytes (0, manager_bytes) in
+            let script = Some
+                { code = Legacy_support.manager_script_code ;
+                  storage ;
+                } in
+            let manager = Signature.Public_key_hash.zero in
+            let delegatable = false in
+            let spendable = false in
             let operation =
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
-                  delegatable ; script = None ; spendable = true } in
+                  delegatable ; script ; spendable } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return (Item (Internal_operation { source = self ; operation ; nonce },
                                  Item ((contract, "default"), rest)), ctxt)
@@ -800,25 +813,34 @@ let rec interp
               Script_ir_translator.add_field_annot (Option.map ~f:(fun n -> `Field_annot n) root_name) None unparsed_param_type in
             unparse_ty ctxt storage_type >>=? fun (unparsed_storage_type, ctxt) ->
             let code =
+              Script.lazy_expr @@
               Micheline.strip_locations
                 (Seq (0, [ Prim (0, K_parameter, [ unparsed_param_type ], []) ;
                            Prim (0, K_storage, [ unparsed_storage_type ], []) ;
                            Prim (0, K_code, [ Micheline.root code ], []) ])) in
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
-            let storage = Micheline.strip_locations storage in
-            Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
-            let code = Script.lazy_expr code in
+            let storage = Script.lazy_expr @@ Micheline.strip_locations storage in
             begin
-              if Legacy_support.has_default_entrypoint code then
-                Legacy_support.add_root_entrypoint code
-              else return code
-            end >>=? fun code ->
+              if spendable then
+                Legacy_support.add_do ~manager_pkh:manager
+                  ~script_code:code ~script_storage:storage
+              else if delegatable then
+                Legacy_support.add_set_delegate ~manager_pkh:manager
+                  ~script_code:code ~script_storage:storage
+              else if Legacy_support.has_default_entrypoint code then
+                Legacy_support.add_root_entrypoint code >>=? fun code ->
+                return (code, storage)
+              else return (code, storage)
+            end >>=? fun (code, storage) ->
+            Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            let manager = Signature.Public_key_hash.zero in
+            let delegatable = false in
+            let spendable = false in
             let operation =
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; spendable ;
-                  script = Some { code ;
-                                  storage = Script.lazy_expr storage } } in
+                  script = Some { code ; storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
               (Item (Internal_operation { source = self ; operation ; nonce },
