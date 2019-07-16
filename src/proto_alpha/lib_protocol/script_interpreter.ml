@@ -855,7 +855,6 @@ let rec interp
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
-            (* Defaulting the removed arguments for now *)
             let operation =
               Origination
                 { credit ; delegate ; preorigination = Some contract ;

@@ -58,13 +58,12 @@ let transform_script:
    script_code: Script_repr.lazy_expr ->
    script_storage: Script_repr.lazy_expr ->
    (Script_repr.lazy_expr * Script_repr.lazy_expr) tzresult Lwt.t) ->
+  manager_pkh: Signature.Public_key_hash.t ->
   Raw_context.t ->
   Contract_repr.t ->
   Script_repr.lazy_expr ->
   Raw_context.t tzresult Lwt.t =
-  fun transformation ctxt contract code ->
-  (* Get the manager of the originated contract *)
-  Contract_storage.get_manager ctxt contract >>=? fun manager_pkh ->
+  fun transformation ~manager_pkh ctxt contract code ->
   Storage.Contract.Storage.get ctxt contract >>=? fun (_ctxt, storage) ->
   transformation manager_pkh code storage >>=? fun (migrated_code, migrated_storage) ->
   (* Set the migrated script code for free *)
@@ -96,10 +95,16 @@ let process_contract_add_manager contract ctxt =
   match Contract_repr.is_originated contract with
   | None -> return ctxt (* Only process originated contracts *)
   | Some _ -> begin
-      Storage.Contract.Spendable.mem ctxt contract >>= fun is_spendable ->
-      Storage.Contract.Delegatable.mem ctxt contract >>= fun is_delegatable ->
+      Storage.Contract.Counter.remove ctxt contract >>= fun ctxt ->
+      Storage.Contract.Spendable_004.mem ctxt contract >>= fun is_spendable ->
+      Storage.Contract.Delegatable_004.mem ctxt contract >>= fun is_delegatable ->
+      Storage.Contract.Spendable_004.del ctxt contract >>= fun ctxt ->
+      Storage.Contract.Delegatable_004.del ctxt contract >>= fun ctxt ->
       (* Try to get script code (ignore ctxt update to discard the initialization) *)
       Storage.Contract.Code.get_option ctxt contract >>=? fun (_ctxt, code) ->
+      (* Get the manager of the originated contract *)
+      Contract_storage.get_manager_004 ctxt contract >>=? fun manager_pkh ->
+      Storage.Contract.Manager.remove ctxt contract >>= fun ctxt ->
       match code with
       | Some code ->
           (*
@@ -111,20 +116,18 @@ let process_contract_add_manager contract ctxt =
           | false     | false       | nothing          |
           *)
           if is_spendable then
-            transform_script add_do ctxt contract code
+            transform_script add_do ~manager_pkh ctxt contract code
           else if is_delegatable then
-            transform_script add_set_delegate ctxt contract code
+            transform_script add_set_delegate ~manager_pkh ctxt contract code
           else if has_default_entrypoint code then
             transform_script
               (fun ~manager_pkh:_ ~script_code  ~script_storage ->
                  add_root_entrypoint script_code >>=? fun script_code ->
                  return (script_code, script_storage))
-              ctxt contract code
+              ~manager_pkh ctxt contract code
           else
             return ctxt
       | None -> begin
-          (* Get the manager of the originated contract *)
-          Contract_storage.get_manager ctxt contract >>=? fun manager_pkh ->
           (* Initialize the script code for free *)
           Storage.Contract.Code.init_free ctxt contract manager_script_code >>=? fun (ctxt, code_size) ->
           let storage = manager_script_storage manager_pkh in
@@ -176,8 +179,8 @@ let migrate_multisig_script (ctxt : Raw_context.t) (contract : Contract_repr.t)
   Storage.Contract.Code.set_free ctxt contract migrated_code >>=? fun (ctxt, _code_size_diff) ->
   (* Set the spendable and delegatable flags to false so that no entrypoint gets added by
      the [[process_contract_add_manager]] function. *)
-  Storage.Contract.Spendable.set ctxt contract false >>= fun ctxt ->
-  Storage.Contract.Delegatable.set ctxt contract false >>= fun ctxt ->
+  Storage.Contract.Spendable_004.set ctxt contract false >>= fun ctxt ->
+  Storage.Contract.Delegatable_004.set ctxt contract false >>= fun ctxt ->
   return ctxt
 
 (* The hash of the multisig contract; only contracts with this exact
