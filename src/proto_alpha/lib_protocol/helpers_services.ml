@@ -167,10 +167,7 @@ module Scripts = struct
         | None -> assert false in
       Contract.originate ctxt dummy_contract
         ~balance
-        ~manager: Signature.Public_key_hash.zero
         ~delegate: None
-        ~spendable: false
-        ~delegatable: false
         ~script: (script, None) >>=? fun ctxt ->
       return (ctxt, dummy_contract) in
     register0 S.run_code begin fun ctxt ()
@@ -257,7 +254,7 @@ module Scripts = struct
         Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
         let ctxt = Gas.set_limit ctxt gas_limit in
         Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
-        Contract.must_be_allocated ctxt source >>=? fun () ->
+        Contract.must_be_allocated ctxt (Contract.implicit_contract source) >>=? fun () ->
         Contract.check_counter_increment ctxt source counter >>=? fun () ->
         begin
           match operation with
@@ -275,7 +272,7 @@ module Scripts = struct
               (* Fail if not enough gas for complete deserialization cost *)
               trace Apply.Gas_quota_exceeded_init_deserialize @@
               Script.force_decode ctxt arg >>|? fun (_arg, ctxt) -> ctxt
-          | Origination { script = Some script ; _ } ->
+          | Origination { script = script ; _ } ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let script_bytes = Data_encoding.Binary.to_bytes_exn Script.encoding script in
               let script = match Data_encoding.Binary.of_bytes Script.encoding script_bytes with
@@ -295,7 +292,7 @@ module Scripts = struct
         Contract.get_manager_key ctxt source >>=? fun _public_key ->
         (* signature check unplugged from here *)
         Contract.increment_counter ctxt source >>=? fun ctxt ->
-        Contract.spend ctxt source fee >>=? fun ctxt ->
+        Contract.spend ctxt (Contract.implicit_contract source) fee >>=? fun ctxt ->
         return ctxt in
       let rec partial_precheck_manager_contents_list
         : type kind.
@@ -411,7 +408,7 @@ module Forge = struct
         ~gas_limit ~storage_limit operations =
       Contract_services.manager_key ctxt block source >>= function
       | Error _ as e -> Lwt.return e
-      | Ok (_, revealed) ->
+      | Ok revealed ->
           let ops =
             List.map
               (fun (Manager operation) ->
@@ -449,18 +446,13 @@ module Forge = struct
     let origination ctxt
         block ~branch
         ~source ?sourcePubKey ~counter
-        ~managerPubKey ~balance
-        ?(spendable = true)
-        ?(delegatable = true)
-        ?delegatePubKey ?script
+        ~balance
+        ?delegatePubKey ~script
         ~gas_limit ~storage_limit ~fee () =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        [Manager (Origination { manager = managerPubKey ;
-                                delegate = delegatePubKey ;
+        [Manager (Origination { delegate = delegatePubKey ;
                                 script ;
-                                spendable ;
-                                delegatable ;
                                 credit = balance ;
                                 preorigination = None })]
 

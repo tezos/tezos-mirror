@@ -590,21 +590,14 @@ module Contract : sig
 
   val list: context -> contract list Lwt.t
 
-  val get_manager:
-    context -> contract -> public_key_hash tzresult Lwt.t
-
   val get_manager_key:
-    context -> contract -> public_key tzresult Lwt.t
+    context -> public_key_hash -> public_key tzresult Lwt.t
   val is_manager_key_revealed:
-    context -> contract -> bool tzresult Lwt.t
+    context -> public_key_hash -> bool tzresult Lwt.t
 
   val reveal_manager_key:
-    context -> contract -> public_key -> context tzresult Lwt.t
+    context -> public_key_hash -> public_key -> context tzresult Lwt.t
 
-  val is_delegatable:
-    context -> contract -> bool tzresult Lwt.t
-  val is_spendable:
-    context -> contract -> bool tzresult Lwt.t
   val get_script_code:
     context -> contract -> (context * Script.lazy_expr option) tzresult Lwt.t
   val get_script:
@@ -612,7 +605,7 @@ module Contract : sig
   val get_storage:
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter: context -> contract -> Z.t tzresult Lwt.t
+  val get_counter: context -> public_key_hash -> Z.t tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
@@ -632,17 +625,13 @@ module Contract : sig
   val originate:
     context -> contract ->
     balance: Tez.t ->
-    manager: public_key_hash ->
-    ?script: (Script.t * big_map_diff option) ->
+    script: (Script.t * big_map_diff option) ->
     delegate: public_key_hash option ->
-    spendable: bool ->
-    delegatable: bool -> context tzresult Lwt.t
+    context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
 
   val spend:
-    context -> contract -> Tez.t -> context tzresult Lwt.t
-  val spend_from_script:
     context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val credit:
@@ -656,10 +645,10 @@ module Contract : sig
   val used_storage_space: context -> t -> Z.t tzresult Lwt.t
 
   val increment_counter:
-    context -> contract -> context tzresult Lwt.t
+    context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment:
-    context -> contract -> Z.t -> unit tzresult Lwt.t
+    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
   module Big_map : sig
     val mem:
@@ -697,9 +686,6 @@ module Delegate : sig
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
-    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
-
-  val set_from_script:
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
   val fold:
@@ -936,7 +922,7 @@ and _ contents =
       ballot: Vote.ballot ;
     } -> Kind.ballot contents
   | Manager_operation : {
-      source: Contract.contract ;
+      source: Signature.Public_key_hash.t ;
       fee: Tez.tez ;
       counter: counter ;
       operation: 'kind manager_operation ;
@@ -953,11 +939,8 @@ and _ manager_operation =
       destination: Contract.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
-      manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
-      script: Script.t option ;
-      spendable: bool ;
-      delegatable: bool ;
+      script: Script.t ;
       credit: Tez.tez ;
       preorigination: Contract.t option ;
     } -> Kind.origination manager_operation

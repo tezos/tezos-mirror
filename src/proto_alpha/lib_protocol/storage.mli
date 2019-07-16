@@ -177,11 +177,11 @@ module Contract : sig
      and type value = Cycle_repr.t
      and type t := Raw_context.t
 
-  module Spendable : Data_set_storage
+  module Spendable_004 : Data_set_storage
     with type elt = Contract_repr.t
      and type t := Raw_context.t
 
-  module Delegatable : Data_set_storage
+  module Delegatable_004 : Data_set_storage
     with type elt = Contract_repr.t
      and type t := Raw_context.t
 

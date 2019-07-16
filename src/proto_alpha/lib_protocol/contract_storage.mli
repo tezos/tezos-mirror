@@ -47,30 +47,25 @@ val must_be_allocated: Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list: Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment:
-  Raw_context.t -> Contract_repr.t -> Z.t -> unit tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Z.t -> unit tzresult Lwt.t
 
 val increment_counter:
-  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-val is_delegatable:
-  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
-
-val is_spendable: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
-
-val get_manager:
+val get_manager_004:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t tzresult Lwt.t
 
 val get_manager_key:
-  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Signature.Public_key.t tzresult Lwt.t
 val is_manager_key_revealed:
-  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
 val reveal_manager_key:
-  Raw_context.t -> Contract_repr.t -> Signature.Public_key.t  ->
+  Raw_context.t -> Signature.Public_key_hash.t -> Signature.Public_key.t  ->
   Raw_context.t tzresult Lwt.t
 
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
-val get_counter: Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
+val get_counter: Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
 
 val get_script_code:
   Raw_context.t -> Contract_repr.t -> (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
@@ -98,13 +93,7 @@ val credit:
   Raw_context.t -> Contract_repr.t -> Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-(** checks that the contract is spendable and decrease_balance *)
 val spend:
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
-(** decrease_balance even if the contract is not spendable *)
-val spend_from_script:
   Raw_context.t -> Contract_repr.t -> Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -113,11 +102,8 @@ val originate:
   ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
   balance:Tez_repr.t ->
-  manager:Signature.Public_key_hash.t ->
-  ?script:(Script_repr.t * big_map_diff option) ->
+  script:(Script_repr.t * big_map_diff option) ->
   delegate:Signature.Public_key_hash.t option ->
-  spendable:bool ->
-  delegatable:bool ->
   Raw_context.t tzresult Lwt.t
 
 val fresh_contract_from_current_nonce :

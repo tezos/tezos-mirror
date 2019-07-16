@@ -29,34 +29,24 @@ let custom_root =
   (RPC_path.(open_root / "context" / "contracts") : RPC_context.t RPC_path.context)
 
 type info = {
-  manager: public_key_hash ;
   balance: Tez.t ;
-  spendable: bool ;
-  delegate: bool * public_key_hash option ;
-  counter: counter ;
+  delegate: public_key_hash option ;
+  counter: counter option ;
   script: Script.t option ;
 }
 
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun {manager ; balance ; spendable ; delegate ;
-          script ; counter } ->
-      (manager, balance, spendable, delegate,
-       script, counter))
-    (fun (manager, balance, spendable, delegate,
-          script, counter) ->
-      {manager ; balance ; spendable ; delegate ;
-       script ; counter}) @@
-  obj6
-    (req "manager" Signature.Public_key_hash.encoding)
+    (fun {balance ; delegate ; script ; counter } ->
+      (balance, delegate, script, counter))
+    (fun (balance, delegate, script, counter) ->
+      {balance ; delegate ; script ; counter}) @@
+  obj4
     (req "balance" Tez.encoding)
-    (req "spendable" bool)
-    (req "delegate" @@ obj2
-       (req "setable" bool)
-       (opt "value" Signature.Public_key_hash.encoding))
+    (opt "delegate" Signature.Public_key_hash.encoding)
     (opt "script" Script.encoding)
-    (req "counter" n)
+    (opt "counter" n)
 
 module S = struct
 
@@ -69,20 +59,11 @@ module S = struct
       ~output: Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance")
 
-  let manager =
-    RPC_service.get_service
-      ~description: "Access the manager of a contract."
-      ~query: RPC_query.empty
-      ~output: Signature.Public_key_hash.encoding
-      RPC_path.(custom_root /: Contract.rpc_arg / "manager")
-
   let manager_key =
     RPC_service.get_service
       ~description: "Access the manager of a contract."
       ~query: RPC_query.empty
-      ~output: (obj2
-                  (req "manager" Signature.Public_key_hash.encoding)
-                  (opt "key" Signature.Public_key.encoding))
+      ~output: (option Signature.Public_key.encoding)
       RPC_path.(custom_root /: Contract.rpc_arg / "manager_key")
 
   let delegate =
@@ -98,20 +79,6 @@ module S = struct
       ~query: RPC_query.empty
       ~output: z
       RPC_path.(custom_root /: Contract.rpc_arg / "counter")
-
-  let spendable =
-    RPC_service.get_service
-      ~description: "Tells if the contract tokens can be spent by the manager."
-      ~query: RPC_query.empty
-      ~output: bool
-      RPC_path.(custom_root /: Contract.rpc_arg / "spendable")
-
-  let delegatable =
-    RPC_service.get_service
-      ~description: "Tells if the contract delegate can be changed."
-      ~query: RPC_query.empty
-      ~output: bool
-      RPC_path.(custom_root /: Contract.rpc_arg / "delegatable")
 
   let script =
     RPC_service.get_service
@@ -171,19 +138,20 @@ let register () =
          | None -> raise Not_found
          | Some v -> return v) in
   register_field S.balance Contract.get_balance ;
-  register_field S.manager Contract.get_manager ;
-  register_field S.manager_key
-    (fun ctxt c ->
-       Contract.get_manager ctxt c >>=? fun mgr ->
-       Contract.is_manager_key_revealed ctxt c >>=? fun revealed ->
-       if revealed then
-         Contract.get_manager_key ctxt c >>=? fun key ->
-         return (mgr, Some key)
-       else return (mgr, None)) ;
+  register1 S.manager_key
+    (fun ctxt contract () () ->
+       match Contract.is_implicit contract with
+       | None -> raise Not_found
+       | Some mgr ->
+           Contract.is_manager_key_revealed ctxt mgr >>=? function
+           | false -> return_none
+           | true -> Contract.get_manager_key ctxt mgr >>=? return_some) ;
   register_opt_field S.delegate Delegate.get ;
-  register_field S.counter Contract.get_counter ;
-  register_field S.spendable Contract.is_spendable ;
-  register_field S.delegatable Contract.is_delegatable ;
+  register1 S.counter
+    (fun ctxt contract () () ->
+       match Contract.is_implicit contract with
+       | None -> raise Not_found
+       | Some mgr -> Contract.get_counter ctxt mgr) ;
   register_opt_field S.script
     (fun c v -> Contract.get_script c v >>=? fun (_, v) -> return v) ;
   register_opt_field S.storage (fun ctxt contract ->
@@ -208,11 +176,13 @@ let register () =
       return value) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
-      Contract.get_manager ctxt contract >>=? fun manager ->
       Delegate.get ctxt contract >>=? fun delegate ->
-      Contract.get_counter ctxt contract >>=? fun counter ->
-      Contract.is_delegatable ctxt contract >>=? fun delegatable ->
-      Contract.is_spendable ctxt contract >>=? fun spendable ->
+      begin match Contract.is_implicit contract with
+        | Some manager ->
+            Contract.get_counter ctxt manager >>=? fun counter ->
+            return_some counter
+        | None -> return None
+      end >>=? fun counter ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       begin match script with
         | None -> return (None, ctxt)
@@ -223,9 +193,7 @@ let register () =
             unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
             return (Some script, ctxt)
       end >>=? fun (script, _ctxt) ->
-      return { manager ; balance ;
-               spendable ; delegate = (delegatable, delegate) ;
-               script ; counter })
+      return { balance ; delegate ; script ; counter })
 
 let list ctxt block =
   RPC_context.make_call0 S.list ctxt block () ()
@@ -236,11 +204,8 @@ let info ctxt block contract =
 let balance ctxt block contract =
   RPC_context.make_call1 S.balance ctxt block contract () ()
 
-let manager ctxt block contract =
-  RPC_context.make_call1 S.manager ctxt block contract () ()
-
-let manager_key ctxt block contract =
-  RPC_context.make_call1 S.manager_key ctxt block contract () ()
+let manager_key ctxt block mgr =
+  RPC_context.make_call1 S.manager_key ctxt block (Contract.implicit_contract mgr) () ()
 
 let delegate ctxt block contract =
   RPC_context.make_call1 S.delegate ctxt block contract () ()
@@ -248,14 +213,8 @@ let delegate ctxt block contract =
 let delegate_opt ctxt block contract =
   RPC_context.make_opt_call1 S.delegate ctxt block contract () ()
 
-let counter ctxt block contract =
-  RPC_context.make_call1 S.counter ctxt block contract () ()
-
-let is_delegatable ctxt block contract =
-  RPC_context.make_call1 S.delegatable ctxt block contract () ()
-
-let is_spendable ctxt block contract =
-  RPC_context.make_call1 S.spendable ctxt block contract () ()
+let counter ctxt block mgr =
+  RPC_context.make_call1 S.counter ctxt block (Contract.implicit_contract mgr) () ()
 
 let script ctxt block contract =
   RPC_context.make_call1 S.script ctxt block contract () ()

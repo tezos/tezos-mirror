@@ -99,7 +99,7 @@ and _ contents =
       ballot: Vote_repr.ballot ;
     } -> Kind.ballot contents
   | Manager_operation : {
-      source: Contract_repr.contract ;
+      source: Signature.public_key_hash ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operation: 'kind manager_operation ;
@@ -116,11 +116,8 @@ and _ manager_operation =
       destination: Contract_repr.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
-      manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
-      script: Script_repr.t option ;
-      spendable: bool ;
-      delegatable: bool ;
+      script: Script_repr.t ;
       credit: Tez_repr.tez ;
       preorigination: Contract_repr.t option ;
     } -> Kind.origination manager_operation
@@ -281,32 +278,26 @@ module Encoding = struct
         tag = 2 ;
         name = "origination" ;
         encoding =
-          (obj6
-             (req "manager_pubkey" Signature.Public_key_hash.encoding)
+          (obj3
              (req "balance" Tez_repr.encoding)
-             (dft "spendable" bool true)
-             (dft "delegatable" bool true)
              (opt "delegate" Signature.Public_key_hash.encoding)
-             (opt "script" Script_repr.encoding)) ;
+             (req "script" Script_repr.encoding)) ;
         select =
           (function
             | Manager (Origination _ as op) -> Some op
             | _ -> None) ;
         proj =
           (function
-            | Origination { manager ; credit ; spendable ;
-                            delegatable ; delegate ; script ;
+            | Origination { credit ; delegate ; script ;
                             preorigination = _
                             (* the hash is only used internally
                                when originating from smart
                                contracts, don't serialize it *) } ->
-                (manager, credit, spendable,
-                 delegatable, delegate, script)) ;
+                (credit, delegate, script)) ;
         inj =
-          (fun (manager, credit, spendable, delegatable, delegate, script) ->
+          (fun (credit, delegate, script) ->
              Origination
-               {manager ; credit ; spendable ; delegatable ;
-                delegate ; script ; preorigination = None })
+               {credit ; delegate ; script ; preorigination = None })
       }
 
     let delegation_case =
@@ -512,7 +503,7 @@ module Encoding = struct
 
   let manager_encoding =
     (obj5
-       (req "source" Contract_repr.encoding)
+       (req "source" Signature.Public_key_hash.encoding)
        (req "fee" Tez_repr.encoding)
        (req "counter" (check_size 10 n))
        (req "gas_limit" (check_size 10 n))

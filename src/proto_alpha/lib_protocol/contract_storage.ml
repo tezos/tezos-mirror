@@ -242,20 +242,22 @@ let update_script_big_map c contract = function
 let create_base c
     ?(prepaid_bootstrap_storage=false) (* Free space for bootstrap contracts *)
     contract
-    ~balance ~manager ~delegate ?script ~spendable ~delegatable =
+    ~balance ~manager ~delegate ?script () =
   (match Contract_repr.is_implicit contract with
    | None -> return Z.zero
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
-  Storage.Contract.Manager.init c contract (Manager_repr.Hash manager) >>=? fun c ->
+  begin match manager with
+    | Some manager ->
+        Storage.Contract.Manager.init c contract (Manager_repr.Hash manager)
+    | None -> return c
+  end >>=? fun c ->
   begin
     match delegate with
     | None -> return c
     | Some delegate ->
         Delegate_storage.init c contract delegate
   end >>=? fun c ->
-  Storage.Contract.Spendable.set c contract spendable >>= fun c ->
-  Storage.Contract.Delegatable.set c contract delegatable >>= fun c ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
    | Some ({ Script_repr.code ; storage }, big_map_diff) ->
@@ -284,14 +286,13 @@ let create_base c
   return c
 
 let originate c ?prepaid_bootstrap_storage contract
-    ~balance ~manager ?script ~delegate ~spendable ~delegatable =
-  create_base c ?prepaid_bootstrap_storage contract ~balance ~manager
-    ~delegate ?script ~spendable ~delegatable
+    ~balance ~script ~delegate =
+  create_base c ?prepaid_bootstrap_storage contract ~balance
+    ~manager:None ~delegate ~script ()
 
 let create_implicit c manager ~balance =
   create_base c (Contract_repr.implicit_contract manager)
-    ~balance ~manager ?script:None ~delegate:None
-    ~spendable:true ~delegatable:false
+    ~balance ~manager:(Some manager) ?script:None ~delegate:None ()
 
 let delete c contract =
   match Contract_repr.is_implicit contract with
@@ -302,8 +303,6 @@ let delete c contract =
       Delegate_storage.remove c contract >>=? fun c ->
       Storage.Contract.Balance.delete c contract >>=? fun c ->
       Storage.Contract.Manager.delete c contract >>=? fun c ->
-      Storage.Contract.Spendable.del c contract >>= fun c ->
-      Storage.Contract.Delegatable.del c contract >>= fun c ->
       Storage.Contract.Counter.delete c contract >>=? fun c ->
       Storage.Contract.Code.remove c contract >>=? fun (c, _) ->
       Storage.Contract.Storage.remove c contract >>=? fun (c, _) ->
@@ -349,7 +348,8 @@ let originated_from_current_nonce ~since: ctxt_since ~until: ctxt_until =
        | false -> return_none)
     (Contract_repr.originated_contracts ~since ~until)
 
-let check_counter_increment c contract counter =
+let check_counter_increment c manager counter =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter)
@@ -359,7 +359,8 @@ let check_counter_increment c contract counter =
   else
     fail (Counter_in_the_future (contract, expected, counter))
 
-let increment_counter c contract =
+let increment_counter c manager =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
   Storage.Contract.Global_counter.set c (Z.succ global_counter) >>=? fun c ->
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
@@ -384,7 +385,8 @@ let get_storage ctxt contract =
       Lwt.return (Raw_context.consume_gas ctxt cost) >>=? fun ctxt ->
       return (ctxt, Some storage)
 
-let get_counter c contract =
+let get_counter c manager =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Counter.get_option c contract >>=? function
   | None -> begin
       match Contract_repr.is_implicit contract with
@@ -393,7 +395,7 @@ let get_counter c contract =
     end
   | Some v -> return v
 
-let get_manager c contract =
+let get_manager_004 c contract =
   Storage.Contract.Manager.get_option c contract >>=? function
   | None -> begin
       match Contract_repr.is_implicit contract with
@@ -403,19 +405,22 @@ let get_manager c contract =
   | Some (Manager_repr.Hash v) -> return v
   | Some (Manager_repr.Public_key v) -> return (Signature.Public_key.hash v)
 
-let get_manager_key c contract =
+let get_manager_key c manager =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Manager.get_option c contract >>=? function
   | None -> failwith "get_manager_key"
   | Some (Manager_repr.Hash _) -> fail (Unrevealed_manager_key contract)
   | Some (Manager_repr.Public_key v) -> return v
 
-let is_manager_key_revealed c contract =
+let is_manager_key_revealed c manager =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Manager.get_option c contract >>=? function
   | None -> return_false
   | Some (Manager_repr.Hash _) -> return_false
   | Some (Manager_repr.Public_key _) -> return_true
 
-let reveal_manager_key c contract public_key =
+let reveal_manager_key c manager public_key =
+  let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Manager.get c contract >>=? function
   | Public_key _ -> fail (Previously_revealed_key contract)
   | Hash v ->
@@ -435,13 +440,6 @@ let get_balance c contract =
     end
   | Some v -> return v
 
-let is_delegatable = Delegate_storage.is_delegatable
-let is_spendable c contract =
-  match Contract_repr.is_implicit contract with
-  | Some _ -> return_true
-  | None ->
-      Storage.Contract.Spendable.mem c contract >>= return
-
 let update_script_storage c contract storage big_map_diff =
   let storage = Script_repr.lazy_expr storage in
   update_script_big_map c contract big_map_diff >>=? fun (c, big_map_size_diff) ->
@@ -450,7 +448,7 @@ let update_script_storage c contract storage big_map_diff =
   let new_size = Z.add previous_size (Z.add big_map_size_diff (Z.of_int size_diff)) in
   Storage.Contract.Used_storage_space.set c contract new_size
 
-let spend_from_script c contract amount =
+let spend c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
   match Tez_repr.(balance -? amount) with
   | Error _ ->
@@ -492,12 +490,6 @@ let credit c contract amount =
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
       Storage.Contract.Balance.set c contract balance >>=? fun c ->
       Roll_storage.Contract.add_amount c contract amount
-
-let spend c contract amount =
-  is_spendable c contract >>=? fun spendable ->
-  if not spendable
-  then fail (Unspendable_contract contract)
-  else spend_from_script c contract amount
 
 let init c =
   Storage.Contract.Global_counter.init c Z.zero

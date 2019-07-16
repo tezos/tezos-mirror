@@ -29,11 +29,9 @@ val list:
   'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
-  manager: public_key_hash ;
   balance: Tez.t ;
-  spendable: bool ;
-  delegate: bool * public_key_hash option ;
-  counter: counter ;
+  delegate: public_key_hash option ;
+  counter: counter option ;
   script: Script.t option ;
 }
 
@@ -45,11 +43,8 @@ val info:
 val balance:
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
-val manager:
-  'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash shell_tzresult Lwt.t
-
 val manager_key:
-  'a #RPC_context.simple -> 'a -> Contract.t -> (public_key_hash * public_key option) shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> public_key_hash -> public_key option shell_tzresult Lwt.t
 
 val delegate:
   'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash shell_tzresult Lwt.t
@@ -57,14 +52,8 @@ val delegate:
 val delegate_opt:
   'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash option shell_tzresult Lwt.t
 
-val is_delegatable:
-  'a #RPC_context.simple -> 'a -> Contract.t -> bool shell_tzresult Lwt.t
-
-val is_spendable:
-  'a #RPC_context.simple -> 'a -> Contract.t -> bool shell_tzresult Lwt.t
-
 val counter:
-  'a #RPC_context.simple -> 'a -> Contract.t -> counter shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> public_key_hash -> counter shell_tzresult Lwt.t
 
 val script:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.t shell_tzresult Lwt.t

@@ -33,10 +33,6 @@ type error += Duplicate_endorsement of Signature.Public_key_hash.t (* `Branch *)
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 type error += Internal_operation_replay of packed_internal_operation
-type error += Cannot_originate_spendable_smart_contract (* `Permanent *)
-type error += Cannot_originate_with_manager (* `Permanent *)
-type error += Cannot_originate_without_script (* `Permanent *)
-type error += Cannot_set_delegate_for_originated_contract (* `Permanent *)
 
 type error += Invalid_double_endorsement_evidence (* `Permanent *)
 type error += Inconsistent_double_endorsement_evidence
@@ -143,30 +139,6 @@ let () =
     Operation.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
-  register_error_kind
-    `Permanent
-    ~id:"cannot_originate_spendable_smart_contract"
-    ~title:"Cannot originate spendable smart contract"
-    ~description:"An origination was attempted \
-                  that would create a spendable scripted contract"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "It is not possible anymore to originate \
-                            a scripted contract that is spendable.")
-    Data_encoding.empty
-    (function Cannot_originate_spendable_smart_contract -> Some () | _ -> None)
-    (fun () -> Cannot_originate_spendable_smart_contract) ;
-  register_error_kind
-    `Permanent
-    ~id:"cannot_originate_with_manager"
-    ~title:"Cannot originate with a manager"
-    ~description:"An origination was attempted that would create a contract \
-                  with a manager"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "It is not possible anymore to originate \
-                            a contract with a manager.")
-    Data_encoding.empty
-    (function Cannot_originate_with_manager -> Some () | _ -> None)
-    (fun () -> Cannot_originate_with_manager) ;
   register_error_kind
     `Permanent
     ~id:"block.invalid_double_endorsement_evidence"
@@ -401,31 +373,7 @@ let () =
         Some (required, endorsements, priority, timestamp) | _ -> None)
     (fun (required, endorsements, priority, timestamp) ->
        Not_enough_endorsements_for_priority
-         { required ; endorsements ; priority ; timestamp }) ;
-  register_error_kind
-    `Permanent
-    ~id:"cannot_originate_without_script"
-    ~title:"Cannot originate without a script"
-    ~description:"An origination was attempted \
-                  that would create a contract without script"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "It is not possible anymore to originate \
-                            a contract without a script.")
-    Data_encoding.empty
-    (function Cannot_originate_without_script -> Some () | _ -> None)
-    (fun () -> Cannot_originate_without_script) ;
-  register_error_kind
-    `Permanent
-    ~id:"cannot_set_delegate_for_originated_contract"
-    ~title:"Cannot set or withdraw delegate for originated contract"
-    ~description:"Attempted to set or withdraw delegate for originated \
-                  contract"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "It is not possible anymore to set or withdraw \
-                            delegate for originated contract.")
-    Data_encoding.empty
-    (function Cannot_set_delegate_for_originated_contract -> Some () | _ -> None)
-    (fun () -> Cannot_set_delegate_for_originated_contract) ;
+         { required ; endorsements ; priority ; timestamp })
 
 open Apply_results
 
@@ -440,19 +388,13 @@ let apply_manager_operation_content :
          gas consumption and originations for the operation result. *)
       ctxt in
     Contract.must_exist ctxt source >>=? fun () ->
-    let spend =
-      (* Ignore the spendable flag for smart contracts. *)
-      if internal then Contract.spend_from_script else Contract.spend in
-    let set_delegate =
-      (* Ignore the delegatable flag for smart contracts. *)
-      if internal then Delegate.set_from_script else Delegate.set in
     Lwt.return (Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation) >>=? fun ctxt ->
     match operation with
     | Reveal _ ->
         return (* No-op: action already performed by `precheck_manager_contents`. *)
           (ctxt, (Reveal_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt } : kind successful_manager_operation_result), [])
     | Transaction { amount ; parameters ; destination ; entrypoint  } -> begin
-        spend ctxt source amount >>=? fun ctxt ->
+        Contract.spend ctxt source amount >>=? fun ctxt ->
         begin match Contract.is_implicit destination with
           | None -> return (ctxt, [], false)
           | Some _ ->
@@ -530,27 +472,14 @@ let apply_manager_operation_content :
                   allocated_destination_contract } in
             return (ctxt, result, operations)
       end
-    | Origination { manager ; delegate ; script ; preorigination ;
-                    spendable ; delegatable ; credit } ->
-        if not Signature.Public_key_hash.(equal zero manager) && not internal then
-          fail Cannot_originate_with_manager
-        else
-          begin match script with
-            | None ->
-                fail Cannot_originate_without_script
-            | Some script ->
-                if spendable then
-                  fail Cannot_originate_spendable_smart_contract
-                else
-                  Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
-                  Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
-                  Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
-                  Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
-                  Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
-                  Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
-                  return (Some (script, big_map_diff), ctxt)
-          end >>=? fun (script, ctxt) ->
-        spend ctxt source credit >>=? fun ctxt ->
+    | Origination { delegate ; script ; preorigination ; credit } ->
+        Script.force_decode ctxt script.storage >>=? fun (unparsed_storage, ctxt) -> (* see [note] *)
+        Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_storage)) >>=? fun ctxt ->
+        Script.force_decode ctxt script.code >>=? fun (unparsed_code, ctxt) -> (* see [note] *)
+        Lwt.return (Gas.consume ctxt (Script.deserialized_cost unparsed_code)) >>=? fun ctxt ->
+        Script_ir_translator.parse_script ctxt ~legacy:false script >>=? fun (ex_script, ctxt) ->
+        Script_ir_translator.big_map_initialization ctxt Optimized ex_script >>=? fun (big_map_diff, ctxt) ->
+        Contract.spend ctxt source credit >>=? fun ctxt ->
         begin match preorigination with
           | Some contract ->
               assert internal ;
@@ -562,9 +491,8 @@ let apply_manager_operation_content :
               Contract.fresh_contract_from_current_nonce ctxt
         end >>=? fun (ctxt, contract) ->
         Contract.originate ctxt contract
-          ~manager ~delegate ~balance:credit
-          ?script
-          ~spendable ~delegatable >>=? fun ctxt ->
+          ~delegate ~balance:credit
+          ~script:(script, big_map_diff) >>=? fun ctxt ->
         Fees.origination_burn ctxt >>=? fun (ctxt, origination_burn) ->
         Fees.record_paid_storage_space ctxt contract >>=? fun (ctxt, size, paid_storage_size_diff, fees) ->
         let result =
@@ -581,13 +509,8 @@ let apply_manager_operation_content :
               paid_storage_size_diff } in
         return (ctxt, result, [])
     | Delegation delegate ->
-        match Contract.is_implicit source with
-        | None when not internal ->
-            (* Originated contract can only set delegate with script instruction (internal). *)
-            fail Cannot_set_delegate_for_originated_contract
-        | _ ->
-            set_delegate ctxt source delegate >>=? fun ctxt ->
-            return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
+        Delegate.set ctxt source delegate >>=? fun ctxt ->
+        return (ctxt, Delegation_result { consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt }, [])
 
 let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
@@ -625,7 +548,7 @@ let precheck_manager_contents
   Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
-  Contract.must_be_allocated ctxt source >>=? fun () ->
+  Contract.must_be_allocated ctxt (Contract.implicit_contract source) >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
   begin
     match operation with
@@ -638,7 +561,7 @@ let precheck_manager_contents
         (* Fail if not enough gas for complete deserialization cost *)
         trace Gas_quota_exceeded_init_deserialize @@
         Script.force_decode ctxt parameters >>|? fun (_arg, ctxt) -> ctxt
-    | Origination { script = Some script ; _ } ->
+    | Origination { script ; _ } ->
         (* Fail quickly if not enough gas for minimal deserialization cost *)
         Lwt.return @@ record_trace Gas_quota_exceeded_init_deserialize @@
         (Gas.consume ctxt (Script.minimal_deserialize_cost script.code) >>? fun ctxt ->
@@ -658,7 +581,7 @@ let precheck_manager_contents
      sequence of transactions.  *)
   Operation.check_signature public_key chain_id raw_operation >>=? fun () ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
-  Contract.spend ctxt source fee >>=? fun ctxt ->
+  Contract.spend ctxt (Contract.implicit_contract source) fee >>=? fun ctxt ->
   add_fees ctxt fee >>=? fun ctxt ->
   return ctxt
 
@@ -671,6 +594,7 @@ let apply_manager_contents
       { source ; operation ; gas_limit ; storage_limit } = op in
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
+  let source = Contract.implicit_contract source in
   apply_manager_operation_content ctxt mode
     ~source ~payer:source ~internal:false ~chain_id operation >>= function
   | Ok (ctxt, operation_results, internal_operations) -> begin
@@ -706,6 +630,7 @@ let rec mark_skipped
     baker : Signature.Public_key_hash.t -> Level.t -> kind Kind.manager contents_list ->
   kind Kind.manager contents_result_list = fun ~baker level -> function
   | Single (Manager_operation { source ; fee ; operation } ) ->
+      let source = Contract.implicit_contract source in
       Single_result
         (Manager_operation_result
            { balance_updates =
@@ -715,6 +640,7 @@ let rec mark_skipped
              operation_result = skipped_operation_result operation ;
              internal_operation_results = [] })
   | Cons (Manager_operation { source ; fee ; operation } , rest) ->
+      let source = Contract.implicit_contract source in
       Cons_result
         (Manager_operation_result {
             balance_updates =
@@ -747,6 +673,7 @@ let rec apply_manager_contents_list_rec
     let level = Level.current ctxt in
     match contents_list with
     | Single (Manager_operation { source ; fee ; _ } as op) -> begin
+        let source = Contract.implicit_contract source in
         apply_manager_contents ctxt mode chain_id op
         >>= fun (ctxt_result, operation_result, internal_operation_results) ->
         let result =
@@ -761,6 +688,7 @@ let rec apply_manager_contents_list_rec
         Lwt.return (ctxt_result, Single_result (result))
       end
     | Cons (Manager_operation { source ; fee ; _ } as op, rest) ->
+        let source = Contract.implicit_contract source in
         apply_manager_contents ctxt mode chain_id op >>= function
         | (`Failure, operation_result, internal_operation_results) ->
             let result =

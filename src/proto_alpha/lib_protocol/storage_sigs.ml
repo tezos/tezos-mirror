@@ -358,6 +358,8 @@ module type VALUE = sig
   val encoding: t Data_encoding.t
 end
 
+module type REGISTER = sig val ghost : bool end
+
 module type Non_iterable_indexed_carbonated_data_storage_with_free = sig
   include Non_iterable_indexed_carbonated_data_storage
 
@@ -387,7 +389,7 @@ module type Indexed_raw_context = sig
 
   val resolve: context -> string list -> key list Lwt.t
 
-  module Make_set (N : NAME)
+  module Make_set (R : REGISTER) (N : NAME)
     : Data_set_storage with type t = t
                         and type elt = key
 

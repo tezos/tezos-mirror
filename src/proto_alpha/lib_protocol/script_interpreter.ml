@@ -782,17 +782,13 @@ let rec interp
             let storage =
               Script_repr.lazy_expr @@ Micheline.strip_locations @@
               Micheline.Bytes (0, manager_bytes) in
-            let script = Some
-                { code = Legacy_support.manager_script_code ;
-                  storage ;
-                } in
-            let manager = Signature.Public_key_hash.zero in
-            let delegatable = false in
-            let spendable = false in
+            let script =
+              { code = Legacy_support.manager_script_code ;
+                storage ;
+              } in
             let operation =
               Origination
-                { credit ; manager ; delegate ; preorigination = Some contract ;
-                  delegatable ; script ; spendable } in
+                { credit ; delegate ; preorigination = Some contract ; script } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return (Item (Internal_operation { source = self ; operation ; nonce },
                                  Item ((contract, "default"), rest)), ctxt)
@@ -833,14 +829,10 @@ let rec interp
               else return (code, storage)
             end >>=? fun (code, storage) ->
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
-            let manager = Signature.Public_key_hash.zero in
-            let delegatable = false in
-            let spendable = false in
             let operation =
               Origination
-                { credit ; manager ; delegate ; preorigination = Some contract ;
-                  delegatable ; spendable ;
-                  script = Some { code ; storage } } in
+                { credit ; delegate ; preorigination = Some contract ;
+                  script = { code ; storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
               (Item (Internal_operation { source = self ; operation ; nonce },
@@ -864,15 +856,11 @@ let rec interp
             let storage = Micheline.strip_locations storage in
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
             (* Defaulting the removed arguments for now *)
-            let manager = Signature.Public_key_hash.zero in
-            let delegatable = false in
-            let spendable = false in
             let operation =
               Origination
-                { credit ; manager ; delegate ; preorigination = Some contract ;
-                  delegatable ; spendable ;
-                  script = Some { code = Script.lazy_expr code ;
-                                  storage = Script.lazy_expr storage } } in
+                { credit ; delegate ; preorigination = Some contract ;
+                  script = { code = Script.lazy_expr code ;
+                             storage = Script.lazy_expr storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
               (Item (Internal_operation { source = self ; operation ; nonce },
