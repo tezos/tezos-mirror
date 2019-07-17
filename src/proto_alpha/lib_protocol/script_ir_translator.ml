@@ -1381,6 +1381,27 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
         | "default" -> ok ((fun e -> e), Ex_ty full)
         | _ -> error (No_such_entrypoint entrypoint)
 
+let find_entrypoint_for_type
+    (type full) (type exp) ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint ctxt
+  : (context * string * exp ty) tzresult =
+  match entrypoint, root_name with
+  | "default", Some "root" ->
+      begin match find_entrypoint full ~root_name entrypoint with
+        | Error _ as err -> err
+        | Ok (f, Ex_ty ty) ->
+            match ty_eq ctxt expected ty with
+            | Ok (Eq, ctxt) ->
+                ok (ctxt, "default", (ty : exp ty))
+            | Error _ ->
+                ty_eq ctxt expected full >>? fun (Eq, ctxt) ->
+                ok (ctxt, "root", (full : exp ty))
+      end
+  | _ ->
+      find_entrypoint full ~root_name entrypoint >>? fun (_, Ex_ty ty) ->
+      ty_eq ctxt expected ty >>? fun (Eq, ctxt) ->
+      ok (ctxt, entrypoint, (ty : exp ty))
+
+
 module Entrypoints = Set.Make (String)
 
 exception Duplicate of string
@@ -3181,8 +3202,7 @@ and parse_contract
                  merge_types ~legacy ctxt loc targ arg >>? fun (arg, ctxt) ->
                  let contract : arg typed_contract = (arg, (contract, entrypoint)) in
                  ok (ctxt, contract) in
-               find_entrypoint targ root_name entrypoint >>? fun (_, Ex_ty targ) ->
-               ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
+               find_entrypoint_for_type ~full:targ ~expected:arg ~root_name entrypoint ctxt >>? fun (ctxt, entrypoint, targ) ->
                merge_types ~legacy ctxt loc targ arg >>? fun (targ, ctxt) ->
                return ctxt targ entrypoint)
 
@@ -3226,14 +3246,11 @@ and parse_contract_for_script
                        error (Invalid_contract (loc, contract))
                    | Ok (Ex_ty targ, ctxt) ->
                        match
-                         let return ctxt targ entrypoint =
-                           merge_types ~legacy ctxt loc targ arg >>? fun (arg, ctxt) ->
-                           let contract : arg typed_contract = (arg, (contract, entrypoint)) in
-                           ok (ctxt, Some contract) in
-                         find_entrypoint targ ~root_name entrypoint >>? fun (_, Ex_ty targ) ->
-                         ty_eq ctxt targ arg >>? fun (Eq, ctxt) ->
+                         find_entrypoint_for_type ~full:targ ~expected:arg ~root_name entrypoint ctxt >>? fun (ctxt, entrypoint, targ) ->
                          merge_types ~legacy ctxt loc targ arg >>? fun (targ, ctxt) ->
-                         return ctxt targ entrypoint
+                         merge_types ~legacy ctxt loc targ arg >>? fun (arg, ctxt) ->
+                         let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+                         ok (ctxt, Some contract)
                        with
                        | Ok res -> ok res
                        | Error _ ->

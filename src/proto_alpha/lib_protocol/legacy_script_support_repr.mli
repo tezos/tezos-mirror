@@ -56,3 +56,14 @@ val add_set_delegate:
   script_code: Script_repr.lazy_expr ->
   script_storage: Script_repr.lazy_expr ->
   (Script_repr.lazy_expr * Script_repr.lazy_expr) tzresult Lwt.t
+
+(** Checks if a contract was declaring a default entrypoint somewhere
+   else than at the root, in which case its type changes when
+   entrypoints are activated. *)
+val has_default_entrypoint:
+  Script_repr.lazy_expr -> bool
+
+(** Adds a [%root] annotation on the toplevel parameter construct. *)
+val add_root_entrypoint:
+  script_code: Script_repr.lazy_expr ->
+  Script_repr.lazy_expr tzresult Lwt.t

@@ -359,6 +359,10 @@ module Script : sig
       script_code: lazy_expr ->
       script_storage: lazy_expr ->
       (lazy_expr * lazy_expr) tzresult Lwt.t
+    val has_default_entrypoint: lazy_expr -> bool
+    val add_root_entrypoint:
+      script_code: lazy_expr ->
+      lazy_expr tzresult Lwt.t
   end
 
 end

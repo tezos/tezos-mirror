@@ -479,3 +479,54 @@ let add_set_delegate:
       end
   | _ ->
       script_code, script_storage
+
+let has_default_entrypoint expr =
+  let open Micheline in
+  let open Michelson_v1_primitives in
+  match Script_repr.force_decode expr with
+  | Error _ -> false
+  | Ok (expr, _) ->
+      match root expr with
+      | Seq (_, toplevel) -> begin
+          match find_toplevel K_parameter toplevel with
+          | Some (Prim (_, K_parameter, [ _ ], [ "%default" ])) -> false
+          | Some (Prim (_, K_parameter, [ parameter_expr ], _)) ->
+              let rec has_default = function
+                | Prim (_, T_or, [ l ; r ], annots) ->
+                    List.exists (String.equal "%default") annots || has_default l || has_default r
+                | Prim (_, _, _, annots) ->
+                    List.exists (String.equal "%default") annots
+                | _ -> false
+              in
+              has_default parameter_expr
+          | Some _ | None -> false
+        end
+      | _ -> false
+
+let add_root_entrypoint
+  : script_code: Script_repr.lazy_expr -> Script_repr.lazy_expr tzresult Lwt.t
+  = fun ~script_code ->
+    let open Micheline in
+    let open Michelson_v1_primitives in
+    Lwt.return (Script_repr.force_decode script_code) >>|? fun (script_code_expr, _gas_cost) ->
+    match root script_code_expr with
+    | Seq (_, toplevel) ->
+        let migrated_code =
+          Seq (0, List.map (function
+              | Prim (_, K_parameter, [ parameter_expr ], _) ->
+                  Prim (0, K_parameter, [ parameter_expr ], [ "%root" ])
+              | Prim (_, K_code, exprs, annots) ->
+                  let rec rewrite_self = function
+                    | Int _ | String _ | Bytes _ | Prim (_, I_CREATE_CONTRACT, _, _) as leaf -> leaf
+                    | Prim (_, I_SELF, [], annots) ->
+                        Prim (0, I_SELF, [], "%root" :: annots)
+                    | Prim (_, name, args, annots) ->
+                        Prim (0, name, List.map rewrite_self args, annots)
+                    | Seq (_, args) ->
+                        Seq (0, List.map rewrite_self args) in
+                  Prim (0, K_code, List.map rewrite_self exprs, annots)
+              | other -> other)
+              toplevel) in
+        Script_repr.lazy_expr @@ strip_locations migrated_code
+    | _ ->
+        script_code

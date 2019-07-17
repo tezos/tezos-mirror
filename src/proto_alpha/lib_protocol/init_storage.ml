@@ -114,6 +114,12 @@ let process_contract_add_manager contract ctxt =
             transform_script add_do ctxt contract code
           else if is_delegatable then
             transform_script add_set_delegate ctxt contract code
+          else if has_default_entrypoint code then
+            transform_script
+              (fun ~manager_pkh:_ ~script_code  ~script_storage ->
+                 add_root_entrypoint script_code >>=? fun script_code ->
+                 return (script_code, script_storage))
+              ctxt contract code
           else
             return ctxt
       | None -> begin
