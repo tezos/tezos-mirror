@@ -197,22 +197,6 @@ let commands version () =
                 cctxt#answer "%a" Format.pp_print_text source >>= return
       end ;
 
-    command ~group ~desc: "Get the manager of a contract."
-      no_options
-      (prefixes [ "get" ; "manager" ; "for" ]
-       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-       @@ stop)
-      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        Client_proto_contracts.get_manager cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          contract >>=? fun manager ->
-        Public_key_hash.rev_find cctxt manager >>=? fun mn ->
-        Public_key_hash.to_source manager >>=? fun m ->
-        cctxt#message "%s (%s)" m
-          (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-        return_unit
-      end ;
-
     command ~group ~desc: "Get the delegate of a contract."
       no_options
       (prefixes [ "get" ; "delegate" ; "for" ]
@@ -260,16 +244,17 @@ let commands version () =
           fee_cap ;
           burn_cap ;
         } in
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          contract >>=? fun (src_pk, manager_sk) ->
-        set_delegate cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ~fee_parameter
-          ?fee
-          contract (Some delegate) ~src_pk ~manager_sk >>=? fun _ ->
-        return_unit
+        match Contract.is_implicit contract with
+        | None -> failwith "only implicit accounts can be delegated"
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            set_delegate cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              ?fee
+              mgr (Some delegate) ~src_pk ~manager_sk >>=? fun _ ->
+            return_unit
       end ;
 
     command ~group ~desc: "Withdraw the delegate from a contract."
@@ -287,23 +272,24 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (cctxt : Protocol_client_context.full) ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          contract >>=? fun (src_pk, manager_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        set_delegate cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ~fee_parameter
-          contract None ?fee ~src_pk ~manager_sk >>=? fun _ ->
-        return_unit
+        match Contract.is_implicit contract with
+        | None -> failwith "only implicit accounts can be delegated"
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            let fee_parameter = {
+              Injection.minimal_fees ;
+              minimal_nanotez_per_byte ;
+              minimal_nanotez_per_gas_unit ;
+              force_low_fee ;
+              fee_cap ;
+              burn_cap ;
+            } in
+            set_delegate cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              mgr None ?fee ~src_pk ~manager_sk >>=? fun _ ->
+            return_unit
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
@@ -339,32 +325,33 @@ let commands version () =
         alias_name balance (_, source) program (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code ; _ } ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_pk, src_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        originate_contract cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ?fee ?gas_limit ?storage_limit ~delegate ~initial_storage
-          ~balance ~source ~src_pk ~src_sk ~code
-          ~fee_parameter
-          () >>= fun errors ->
-        report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
-        | None -> return_unit
-        | Some (_res, contract) ->
-            if dry_run then
-              return_unit
-            else
-              save_contract ~force cctxt alias_name contract >>=? fun () ->
-              return_unit
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can be the source of an origination"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter = {
+              Injection.minimal_fees ;
+              minimal_nanotez_per_byte ;
+              minimal_nanotez_per_gas_unit ;
+              force_low_fee ;
+              fee_cap ;
+              burn_cap ;
+            } in
+            originate_contract cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ?fee ?gas_limit ?storage_limit ~delegate ~initial_storage
+              ~balance ~source ~src_pk ~src_sk ~code
+              ~fee_parameter
+              () >>= fun errors ->
+            report_michelson_errors ~no_print_source ~msg:"origination simulation failed" cctxt errors >>= function
+            | None -> return_unit
+            | Some (_res, contract) ->
+                if dry_run then
+                  return_unit
+                else
+                  save_contract ~force cctxt alias_name contract >>=? fun () ->
+                  return_unit
       end ;
 
     command ~group ~desc: "Transfer tokens / call a smart contract."
@@ -392,26 +379,27 @@ let commands version () =
                  minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
                  force_low_fee, fee_cap, burn_cap, entrypoint)
         amount (_, source) (_, destination) cctxt ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_pk, src_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        transfer cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ~fee_parameter
-          ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
-        report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
-        | None -> return_unit
-        | Some (_res, _contracts) ->
-            return_unit
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can be the source of a transfer"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter = {
+              Injection.minimal_fees ;
+              minimal_nanotez_per_byte ;
+              minimal_nanotez_per_gas_unit ;
+              force_low_fee ;
+              fee_cap ;
+              burn_cap ;
+            } in
+            transfer cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
+            report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
+            | None -> return_unit
+            | Some (_res, _contracts) ->
+                return_unit
       end;
 
     command ~group ~desc: "Call a smart contract (same as 'transfer 0')."
@@ -436,27 +424,28 @@ let commands version () =
                  minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
                  force_low_fee, fee_cap, burn_cap)
         (_, source) (_, destination) cctxt ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_pk, src_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        let amount = Tez.zero in
-        transfer cctxt
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~dry_run ~verbose_signing
-          ~fee_parameter
-          ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
-        report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
-        | None -> return_unit
-        | Some (_res, _contracts) ->
-            return_unit
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can be the source of a transfer"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter = {
+              Injection.minimal_fees ;
+              minimal_nanotez_per_byte ;
+              minimal_nanotez_per_gas_unit ;
+              force_low_fee ;
+              fee_cap ;
+              burn_cap ;
+            } in
+            let amount = Tez.zero in
+            transfer cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
+            report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
+            | None -> return_unit
+            | Some (_res, _contracts) ->
+                return_unit
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."
@@ -474,23 +463,24 @@ let commands version () =
        @@ stop)
       begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap) (_, source) cctxt ->
-        source_to_keys cctxt
-          ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_pk, src_sk) ->
-        let fee_parameter = {
-          Injection.minimal_fees ;
-          minimal_nanotez_per_byte ;
-          minimal_nanotez_per_gas_unit ;
-          force_low_fee ;
-          fee_cap ;
-          burn_cap ;
-        } in
-        reveal cctxt ~dry_run ~verbose_signing
-          ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-          ~source ?fee ~src_pk ~src_sk
-          ~fee_parameter
-          () >>=? fun _res ->
-        return_unit
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can be revealed"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter = {
+              Injection.minimal_fees ;
+              minimal_nanotez_per_byte ;
+              minimal_nanotez_per_gas_unit ;
+              force_low_fee ;
+              fee_cap ;
+              burn_cap ;
+            } in
+            reveal cctxt ~dry_run ~verbose_signing
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~source ?fee ~src_pk ~src_sk
+              ~fee_parameter
+              () >>=? fun _res ->
+            return_unit
       end;
 
     command ~group ~desc: "Register the public key hash as a delegate."
@@ -672,7 +662,7 @@ let commands version () =
                   from shooting themselves in the foot do."
             ~long:"force" ()))
       (prefixes [ "submit" ; "proposals" ; "for" ]
-       @@ ContractAlias.destination_param
+       @@ Client_keys.Secret_key.alias_param
          ~name: "delegate"
          ~desc: "the delegate who makes the proposal"
        @@ seq_of_param
@@ -685,7 +675,11 @@ let commands version () =
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
       begin fun (dry_run, verbose_signing, force)
-        (_name, source) proposals (cctxt : Protocol_client_context.full) ->
+        (src_name, src_sk) proposals (cctxt : Protocol_client_context.full) ->
+        Client_keys.neuterize src_sk >>=? fun src_pk ->
+        Client_keys.public_key_hash
+          ~interactive:(cctxt :> Client_context.io_wallet)
+          src_pk >>=? fun (src_pkh, _) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -694,9 +688,6 @@ let commands version () =
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun known_proposals ->
         Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block) >>=? fun listings ->
-        Client_proto_context.get_manager
-          cctxt ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (src_name, src_pkh, _src_pk, src_sk) ->
         (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
@@ -794,7 +785,7 @@ let commands version () =
     command ~group ~desc: "Submit a ballot"
       (args1 dry_run_switch)
       (prefixes [ "submit" ; "ballot" ; "for" ]
-       @@ ContractAlias.destination_param
+       @@ Client_keys.Secret_key.alias_param
          ~name: "delegate"
          ~desc: "the delegate who votes"
        @@ param
@@ -817,15 +808,16 @@ let commands version () =
                | "pass" -> return Vote.Pass
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
-      begin fun dry_run (_name, source) proposal ballot (cctxt : Protocol_client_context.full) ->
+      begin fun dry_run (_, src_sk) proposal ballot (cctxt : Protocol_client_context.full) ->
+        Client_keys.neuterize src_sk >>=? fun src_pk ->
+        Client_keys.public_key_hash
+          ~interactive:(cctxt :> Client_context.io_wallet)
+          src_pk >>=? fun (src_pkh, _) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
           | _ -> cctxt#error "Not in a Testing_vote or Promotion_vote period"
         end >>=? fun () ->
-        Client_proto_context.get_manager
-          cctxt ~chain:cctxt#chain ~block:cctxt#block
-          source >>=? fun (_src_name, src_pkh, _src_pk, src_sk) ->
         submit_ballot cctxt ~chain:cctxt#chain ~block:cctxt#block ~src_sk src_pkh
           ~dry_run proposal ballot >>=? fun _res ->
         return_unit

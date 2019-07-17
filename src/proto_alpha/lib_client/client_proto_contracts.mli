@@ -62,13 +62,6 @@ val list_contracts:
   #Client_context.wallet ->
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
-val get_manager:
-  #Protocol_client_context.rpc_context ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Contract.t ->
-  public_key_hash tzresult Lwt.t
-
 val get_delegate:
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->

@@ -54,14 +54,6 @@ val get_script:
   Contract.t ->
   Script.t option tzresult Lwt.t
 
-val get_manager:
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Contract.t ->
-  (string * public_key_hash *
-   public_key * Client_keys.sk_uri) tzresult Lwt.t
-
 val get_balance:
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -77,7 +69,7 @@ val set_delegate:
   ?dry_run:bool ->
   ?verbose_signing: bool ->
   ?fee:Tez.tez ->
-  Contract.t ->
+  public_key_hash ->
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -96,13 +88,6 @@ val register_as_delegate:
   fee_parameter:Injection.fee_parameter ->
   public_key ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
-
-val source_to_keys:
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Contract.t ->
-  (public_key * Client_keys.sk_uri) tzresult Lwt.t
 
 val save_contract :
   force:bool ->
@@ -125,7 +110,7 @@ val originate_contract:
   delegate:public_key_hash option ->
   initial_storage:string ->
   balance:Tez.t ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
@@ -140,7 +125,7 @@ val transfer :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?branch:int ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   destination:Contract.t ->
@@ -163,7 +148,7 @@ val reveal :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?branch:int ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->

@@ -87,7 +87,7 @@ let reveal cctxt
     cctxt (chain, block) source >>=? fun pcounter ->
   let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key
-    cctxt (chain, block) source >>=? fun (_, key) ->
+    cctxt (chain, block) source >>=? fun key ->
   match key with
   | Some _ ->
       failwith "The manager key was previously revealed."
@@ -153,14 +153,6 @@ let list_contract_labels cctxt ~chain ~block =
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager
-    (cctxt : #full)
-    ~chain ~block source =
-  Client_proto_contracts.get_manager
-    cctxt ~chain ~block source >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-  return (src_name, src_pkh, src_pk, src_sk)
-
 let set_delegate
     cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
@@ -184,15 +176,9 @@ let register_as_delegate
   delegate_contract
     cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ?fee
+    ~source ~src_pk ~src_sk:manager_sk ?fee
     ~fee_parameter
     (Some source)
-
-let source_to_keys (wallet : #full) ~chain ~block source =
-  get_manager
-    wallet ~chain ~block
-    source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-  return (src_pk, src_sk)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
@@ -219,19 +205,13 @@ let originate_contract
     () =
   (* With the change of making implicit accounts delegatable, the following
      3 arguments are being defaulted before they can be safely removed. *)
-  let manager = Signature.Public_key_hash.zero in
-  let delegatable = false in
-  let spendable = false in
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage ; _ } ->
   let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
   let origination =
-    Origination { manager ;
-                  delegate ;
-                  script = Some { code ; storage } ;
-                  spendable ;
-                  delegatable ;
+    Origination { delegate ;
+                  script = { code ; storage } ;
                   credit = balance ;
                   preorigination = None } in
   Injection.inject_manager_operation

@@ -80,7 +80,7 @@ val inject_manager_operation:
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
-  source:Contract.t ->
+  source:Signature.Public_key_hash.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->

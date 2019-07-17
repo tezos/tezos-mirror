@@ -668,7 +668,7 @@ let inject_manager_operation
         return counter
   end >>=? fun counter ->
   Alpha_services.Contract.manager_key
-    cctxt (chain, block) source >>=? fun (_, key) ->
+    cctxt (chain, block) source >>=? fun key ->
   let is_reveal : type kind. kind manager_operation -> bool = function
     | Reveal _ -> true
     | _ -> false in

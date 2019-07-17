@@ -56,7 +56,7 @@ val originate_multisig:
   threshold:Z.t ->
   keys:public_key list ->
   balance:Tez.t ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -77,7 +77,7 @@ val call_multisig:
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   multisig_contract: Contract.t ->
@@ -99,7 +99,7 @@ val call_multisig_on_bytes:
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
-  source:Contract.t ->
+  source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   multisig_contract: Contract.t ->

@@ -58,41 +58,33 @@ let pp_manager_operation_content
         end ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
-    | Origination { manager ; delegate ; credit ; spendable ; delegatable ; script ; preorigination = _ } ->
+    | Origination { delegate ; credit ; script = { code ; storage } ; preorigination = _ } ->
         Format.fprintf ppf "@[<v 2>%s:@,\
                             From: %a@,\
-                            For: %a@,\
                             Credit: %s%a"
           (if internal then "Internal origination" else "Origination")
           Contract.pp source
-          Signature.Public_key_hash.pp manager
           Client_proto_args.tez_sym
           Tez.pp credit ;
-        begin match script with
-          | None -> Format.fprintf ppf "@,No script (accepts all transactions)"
-          | Some { code ; storage } ->
-              let code =
-                Option.unopt_exn
-                  (Failure "ill-serialized code")
-                  (Data_encoding.force_decode code)
-              and storage =
-                Option.unopt_exn
-                  (Failure "ill-serialized storage")
-                  (Data_encoding.force_decode storage) in
-              let { Michelson_v1_parser.source ; _ } =
-                Michelson_v1_printer.unparse_toplevel code in
-              Format.fprintf ppf
-                "@,@[<hv 2>Script:@ @[<h>%a@]\
-                 @,@[<hv 2>Initial storage:@ %a@]"
-                Format.pp_print_text source
-                Michelson_v1_printer.print_expr storage
-        end ;
+        let code =
+          Option.unopt_exn
+            (Failure "ill-serialized code")
+            (Data_encoding.force_decode code)
+        and storage =
+          Option.unopt_exn
+            (Failure "ill-serialized storage")
+            (Data_encoding.force_decode storage) in
+        let { Michelson_v1_parser.source ; _ } =
+          Michelson_v1_printer.unparse_toplevel code in
+        Format.fprintf ppf
+          "@,@[<hv 2>Script:@ @[<h>%a@]\
+           @,@[<hv 2>Initial storage:@ %a@]"
+          Format.pp_print_text source
+          Michelson_v1_printer.print_expr storage ;
         begin match delegate with
           | None -> Format.fprintf ppf "@,No delegate for this contract"
           | Some delegate -> Format.fprintf ppf "@,Delegate: %a" Signature.Public_key_hash.pp delegate
         end ;
-        if spendable then Format.fprintf ppf "@,Spendable by the manager" ;
-        if delegatable then Format.fprintf ppf "@,Delegate can be changed by the manager" ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
     | Reveal key ->
@@ -284,7 +276,7 @@ let pp_manager_operation_contents_and_result ppf
      Expected counter: %s@,\
      Gas limit: %s@,\
      Storage limit: %s bytes"
-    Contract.pp source
+    Signature.Public_key_hash.pp source
     Client_proto_args.tez_sym
     Tez.pp fee
     (Z.to_string counter)
@@ -299,7 +291,7 @@ let pp_manager_operation_contents_and_result ppf
   end ;
   Format.fprintf ppf
     "@,%a"
-    (pp_manager_operation_content source false pp_result)
+    (pp_manager_operation_content (Contract.implicit_contract source) false pp_result)
     (operation, operation_result) ;
   begin
     match internal_operation_results with
