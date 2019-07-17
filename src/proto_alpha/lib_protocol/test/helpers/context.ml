@@ -223,15 +223,22 @@ module Contract = struct
     end
 
   let counter ctxt contract =
-    Alpha_services.Contract.counter rpc_ctxt ctxt contract
+    match Contract.is_implicit contract with
+    | None -> invalid_arg "Helpers.Context.counter"
+    | Some mgr ->
+        Alpha_services.Contract.counter rpc_ctxt ctxt mgr
 
-  let manager ctxt contract =
-    Alpha_services.Contract.manager rpc_ctxt ctxt contract >>=? fun pkh ->
-    Account.find pkh
+  let manager _ contract =
+    match Contract.is_implicit contract with
+    | None -> invalid_arg "Helpers.Context.manager"
+    | Some pkh -> Account.find pkh
 
   let is_manager_key_revealed ctxt contract =
-    Alpha_services.Contract.manager_key rpc_ctxt ctxt contract >>=? fun (_, res) ->
-    return (res <> None)
+    match Contract.is_implicit contract with
+    | None -> invalid_arg "Helpers.Context.is_manager_key_revealed"
+    | Some mgr ->
+        Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr >>=? fun res ->
+        return (res <> None)
 
   let delegate ctxt contract =
     Alpha_services.Contract.delegate rpc_ctxt ctxt contract

@@ -59,12 +59,9 @@ val revelation:
 val origination:
   ?counter: Z.t ->
   ?delegate:public_key_hash ->
-  ?script:Script.t ->
-  ?spendable:bool ->
-  ?delegatable:bool ->
+  script:Script.t ->
   ?preorigination: Contract.contract option ->
   ?public_key:public_key ->
-  ?manager:public_key_hash ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
   ?gas_limit:Z.t ->

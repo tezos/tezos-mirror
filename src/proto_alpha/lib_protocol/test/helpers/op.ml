@@ -94,7 +94,7 @@ let combine_operations
   begin Context.Contract.is_manager_key_revealed ctxt source >>=? function
     | false ->
         let reveal_op = Manager_operation {
-            source ;
+            source = Signature.Public_key.hash public_key ;
             fee = Tez.zero ;
             counter ;
             operation = Reveal public_key ;
@@ -143,7 +143,7 @@ let manager_operation
   | true ->
       let op =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key ;
           fee ;
           counter ;
           operation ;
@@ -154,7 +154,7 @@ let manager_operation
   | false ->
       let op_reveal =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key;
           fee = Tez.zero ;
           counter ;
           operation = Reveal public_key ;
@@ -163,7 +163,7 @@ let manager_operation
         } in
       let op =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key ;
           fee ;
           counter = Z.succ counter ;
           operation ;
@@ -182,7 +182,7 @@ let revelation ctxt public_key =
     Contents_list
       (Single
          (Manager_operation {
-             source ;
+             source = Signature.Public_key.hash public_key ;
              fee = Tez.zero ;
              counter ;
              operation = Reveal public_key ;
@@ -197,21 +197,17 @@ let originated_contract op =
 
 exception Impossible
 
-let origination ?counter ?delegate ?script
-    ?(spendable = false) ?(delegatable = true) ?(preorigination = None)
-    ?public_key ?manager ?credit ?fee ?gas_limit ?storage_limit ctxt source =
+let origination ?counter ?delegate ~script
+    ?(preorigination = None)
+    ?public_key ?credit ?fee ?gas_limit ?storage_limit ctxt source =
   Context.Contract.manager ctxt source >>=? fun account ->
-  let manager = Option.unopt ~default:Signature.Public_key_hash.zero manager in
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit = Option.unopt_exn Impossible default_credit in
   let credit = Option.unopt ~default:default_credit credit in
   let operation =
     Origination {
-      manager ;
       delegate ;
       script ;
-      spendable ;
-      delegatable ;
       credit ;
       preorigination ;
     } in

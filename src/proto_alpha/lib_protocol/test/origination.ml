@@ -35,11 +35,11 @@ let ten_tez = Tez.of_int 10
     send to this originated contract; spendable default is set to true
     meaning that this contract is spendable; delegatable default is
     set to true meaning that this contract is able to delegate. *)
-let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegatable () =
+let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) () =
   Context.init 1 >>=? fun (b, contracts) ->
   let source = List.hd contracts in
   Context.Contract.balance (B b) source >>=? fun source_balance ->
-  Op.origination (B b) source ~fee ~credit ?spendable ?delegatable ~script:Op.dummy_script
+  Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b >>=? fun b ->
   (* fee + credit + block security deposit were debited from source *)
@@ -72,12 +72,11 @@ let register_origination ?(fee=Tez.zero) ?(credit=Tez.zero) ?spendable ?delegata
    originated operation valid.
    - the source contract has payed all the fees
    - the originated has been credited correctly *)
-let test_origination_balances ~loc:_ ?(fee=Tez.zero) ?(credit=Tez.zero)
-    ?delegatable () =
+let test_origination_balances ~loc:_ ?(fee=Tez.zero) ?(credit=Tez.zero) () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = List.hd contracts in
   Context.Contract.balance (B b) contract >>=? fun balance ->
-  Op.origination (B b) contract ~fee ~credit ?delegatable ~script:Op.dummy_script
+  Op.origination (B b) contract ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   (* The possible fees are: a given credit, an origination burn fee
      (constants_repr.default.origination_burn = 257 mtez),
@@ -132,7 +131,7 @@ let balances_credit_fee () =
   test_origination_balances ~loc:__LOC__ ~credit:(Tez.of_int 2) ~fee:ten_tez ()
 
 let balances_undelegatable () =
-  test_origination_balances ~loc:__LOC__ ~delegatable:false ()
+  test_origination_balances ~loc:__LOC__ ()
 
 (*******************)
 (** ask source contract to pay a fee when originating a contract *)
@@ -145,56 +144,6 @@ let pay_fee () =
 (******************************************************)
 (** Errors *)
 (******************************************************)
-
-(*******************)
-(** Originating a contract w/o code raises an error. *)
-(*******************)
-
-let without_script () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let source = List.hd contracts in
-  Op.origination (I i) source ~fee:Tez.zero ~credit:Tez.one >>=? fun (operation, _contract) ->
-  Incremental.add_operation i operation >>= fun res ->
-  let cannot_originate = function
-    | Apply.Cannot_originate_without_script -> true
-    | _ -> false
-  in
-  Assert.proto_error ~loc:__LOC__ res cannot_originate
-
-(*******************)
-(** Originating a contract with manager raises an error. *)
-(*******************)
-
-let with_manager () =
-  Context.init 2 >>=? fun (b, contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let source = List.hd contracts in
-  let manager = List.nth contracts 1 |> Alpha_context.Contract.is_implicit in
-  Op.origination (I i) source ~fee:Tez.zero ~credit:Tez.one ?manager
-  >>=? fun (operation, _contract) ->
-  Incremental.add_operation i operation >>= fun res ->
-  let cannot_originate = function
-    | Apply.Cannot_originate_with_manager -> true
-    | _ -> false
-  in
-  Assert.proto_error ~loc:__LOC__ res cannot_originate
-
-(*******************)
-(** Originating a spendable contract with code raises an error. *)
-(*******************)
-
-let spendable_with_script () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  Incremental.begin_construction b >>=? fun i ->
-  let source = List.hd contracts in
-  Op.origination (I i) source ~fee:Tez.zero ~credit:Tez.one ~spendable:true ~script:Op.dummy_script >>=? fun (operation, _contract) ->
-  Incremental.add_operation i operation >>= fun res ->
-  let cannot_originate = function
-    | Apply.Cannot_originate_spendable_smart_contract -> true
-    | _ -> false
-  in
-  Assert.proto_error ~loc:__LOC__ res cannot_originate
 
 (*******************)
 (** create an originate contract where the contract
@@ -215,7 +164,7 @@ let not_tez_in_contract_to_pay_fee () =
   >>=? fun _ ->
   (* use this source contract to create an originate contract where it requires
      to pay a fee and add an amount of credit into this new contract *)
-  Op.origination (I inc) ~fee:ten_tez ~credit:Tez.one contract_1 >>=? fun (op, _) ->
+  Op.origination (I inc) ~fee:ten_tez ~credit:Tez.one contract_1 ~script:Op.dummy_script >>=? fun (op, _) ->
   Incremental.add_operation inc op >>= fun inc ->
   Assert.proto_error ~loc:__LOC__ inc begin function
     | Contract_storage.Balance_too_low _ -> true
@@ -239,9 +188,9 @@ let register_contract_get_endorser () =
     ask contract to pay the fee *)
 (*******************)
 
-let n_originations n ?credit ?fee ?spendable ?delegatable () =
+let n_originations n ?credit ?fee () =
   fold_left_s (fun new_contracts _ ->
-      register_origination ?fee ?credit ?spendable ?delegatable () >>=? fun (_b, _source, new_contract) ->
+      register_origination ?fee ?credit () >>=? fun (_b, _source, new_contract) ->
 
       let contracts = new_contract :: new_contracts in
       return contracts
@@ -278,9 +227,6 @@ let tests = [
 
   Test.tztest "pay_fee" `Quick pay_fee;
 
-  Test.tztest "without script" `Quick without_script ;
-  Test.tztest "with manager" `Quick with_manager ;
-  Test.tztest "spendable with script" `Quick spendable_with_script ;
   Test.tztest "not enough tez in contract to pay fee" `Quick not_tez_in_contract_to_pay_fee;
 
   Test.tztest "multiple originations" `Quick multiple_originations;

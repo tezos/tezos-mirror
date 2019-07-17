@@ -42,12 +42,6 @@ let expect_error err = function
 let expect_alpha_error err =
   expect_error (Environment.Ecoproto_error err)
 
-let expect_non_delegatable_contract = function
-  | Environment.Ecoproto_error (Delegate_storage.Non_delegatable_contract _) :: _ ->
-      return_unit
-  | _ ->
-      failwith "Contract is not delegatable and operation should fail."
-
 let expect_no_change_registered_delegate_pkh pkh = function
   | Environment.Ecoproto_error (Delegate_storage.No_deletion pkh0) :: _ when pkh0 = pkh ->
       return_unit
