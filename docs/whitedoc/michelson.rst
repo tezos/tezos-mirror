@@ -977,6 +977,20 @@ Operations on pairs
 
     > CDR / (Pair _ b) : S  =>  b : S
 
+-  ``COMPARE``: Lexicographic comparison.
+
+::
+
+    :: pair 'a 'b : pair 'a 'b : 'S   ->   int : 'S
+
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  -1 : S
+        iff COMPARE / sa : ta : S => -1 : S
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  1 : S
+        iff COMPARE / sa : ta : S => 1 : S
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  r : S
+        iff COMPARE / sa : ta : S => 0 : S
+            COMPARE / sb : tb : S => r : S
+
 Operations on sets
 ~~~~~~~~~~~~~~~~~~
 
@@ -3017,6 +3031,9 @@ Full grammar
       | big_map <comparable type> <type>
       | chain_id
     <comparable type> ::=
+      | <simple comparable type>
+      | pair <simple comparable type> <comparable type>
+    <simple comparable type> ::=
       | int
       | nat
       | string
@@ -3026,6 +3043,7 @@ Full grammar
       | key_hash
       | timestamp
       | address
+
 
 Reference implementation
 ------------------------
