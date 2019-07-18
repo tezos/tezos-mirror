@@ -237,17 +237,6 @@ let rec interp
           fun descr (op, arg) cost_func rest ctxt ->
             Lwt.return (Gas.consume ctxt (cost_func arg)) >>=? fun ctxt ->
             logged_return descr (Item (op arg, rest), ctxt) in
-        let consume_gaz_comparison :
-          type t rest.
-          (t * (t * rest), Script_int.z Script_int.num * rest) descr ->
-          t comparable_ty ->
-          (t -> t -> Gas.cost) ->
-          t -> t ->
-          rest stack ->
-          ((Script_int.z Script_int.num * rest) stack * context) tzresult Lwt.t =
-          fun descr ty cost x1 x2 rest ->
-            Lwt.return (Gas.consume ctxt (cost x1 x2)) >>=? fun ctxt ->
-            logged_return descr (Item (Script_int.of_int @@ Script_ir_translator.compare_comparable ty x1 x2, rest), ctxt) in
         let logged_return :
           a stack * context ->
           (a stack * context) tzresult Lwt.t =
@@ -671,24 +660,9 @@ let rec interp
         | Nop, stack ->
             logged_return (stack, ctxt)
         (* comparison *)
-        | Compare (Bool_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_bool a b rest
-        | Compare (String_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_string a b rest
-        | Compare (Bytes_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_bytes a b rest
-        | Compare (Mutez_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_tez a b rest
-        | Compare (Int_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_int a b rest
-        | Compare (Nat_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_nat a b rest
-        | Compare (Key_hash_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_key_hash a b rest
-        | Compare (Timestamp_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_timestamp a b rest
-        | Compare (Address_key _ as ty), Item (a, Item (b, rest)) ->
-            consume_gaz_comparison descr ty Interp_costs.compare_address a b rest
+        | Compare ty, Item (a, Item (b, rest)) ->
+            Lwt.return (Gas.consume ctxt (Interp_costs.compare ty a b)) >>=? fun ctxt ->
+            logged_return (Item (Script_int.of_int @@ Script_ir_translator.compare_comparable ty a b, rest), ctxt)
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in

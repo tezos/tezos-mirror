@@ -36,17 +36,29 @@ type annot = [ var_annot | type_annot | field_annot ]
 
 type address = Contract.t * string
 
-type 'ty comparable_ty =
-  | Int_key : type_annot option -> (z num) comparable_ty
-  | Nat_key : type_annot option -> (n num) comparable_ty
-  | String_key : type_annot option -> string comparable_ty
-  | Bytes_key : type_annot option -> MBytes.t comparable_ty
-  | Mutez_key : type_annot option -> Tez.t comparable_ty
-  | Bool_key : type_annot option -> bool comparable_ty
-  | Key_hash_key : type_annot option -> public_key_hash comparable_ty
-  | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
-  | Address_key : type_annot option -> address comparable_ty
+type ('a, 'b) pair = 'a * 'b
 
+type ('a, 'b) union = L of 'a | R of 'b
+
+type comb = Comb
+type leaf = Leaf
+
+type (_, _) comparable_struct =
+  | Int_key : type_annot option -> (z num, _) comparable_struct
+  | Nat_key : type_annot option -> (n num, _) comparable_struct
+  | String_key : type_annot option -> (string, _) comparable_struct
+  | Bytes_key : type_annot option -> (MBytes.t, _) comparable_struct
+  | Mutez_key : type_annot option -> (Tez.t, _) comparable_struct
+  | Bool_key : type_annot option -> (bool, _) comparable_struct
+  | Key_hash_key : type_annot option -> (public_key_hash, _) comparable_struct
+  | Timestamp_key : type_annot option -> (Script_timestamp.t, _) comparable_struct
+  | Address_key : type_annot option -> (address, _) comparable_struct
+  | Pair_key :
+      (('a, leaf) comparable_struct * field_annot option) *
+      (('b, _) comparable_struct * field_annot option) *
+      type_annot option -> (('a, 'b) pair, comb) comparable_struct
+
+type 'a comparable_ty = ('a, comb) comparable_struct
 
 module type Boxed_set = sig
   type elt
@@ -73,10 +85,6 @@ type ('arg, 'storage) script =
     storage : 'storage ;
     storage_type : 'storage ty ;
     root_name : string option }
-
-and ('a, 'b) pair = 'a * 'b
-
-and ('a, 'b) union = L of 'a | R of 'b
 
 and end_of_stack = unit
 

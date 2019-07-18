@@ -227,18 +227,31 @@ module Cost_of = struct
   let self = step_cost 1
   let amount = step_cost 1
   let chain_id = step_cost 1
-  let compare_bool _ _ = step_cost 1
-  let compare_string s1 s2 =
-    step_cost ((7 + Compare.Int.max (String.length s1) (String.length s2)) / 8) +@ step_cost 1
-  let compare_bytes s1 s2 =
-    step_cost ((7 + Compare.Int.max (MBytes.length s1) (MBytes.length s2)) / 8) +@ step_cost 1
-  let compare_tez _ _ = step_cost 1
   let compare_zint n1 n2 = step_cost ((7 + Compare.Int.max (Z.numbits n1) (Z.numbits n2)) / 8) +@ step_cost 1
-  let compare_int n1 n2 = compare_zint (Script_int.to_zint n1) (Script_int.to_zint n2)
-  let compare_nat = compare_int
-  let compare_key_hash _ _ = alloc_bytes_cost 36
-  let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
-  let compare_address _ _ = step_cost 20
+  let rec compare : type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost = fun ty x y ->
+    match ty with
+    | Bool_key _ ->
+        step_cost 1
+    | String_key _ ->
+        step_cost ((7 + Compare.Int.max (String.length x) (String.length y)) / 8) +@ step_cost 1
+    | Bytes_key _ ->
+        step_cost ((7 + Compare.Int.max (MBytes.length x) (MBytes.length y)) / 8) +@ step_cost 1
+    | Mutez_key _ ->
+        step_cost 1
+    | Int_key _ ->
+        compare_zint (Script_int.to_zint x) (Script_int.to_zint y)
+    | Nat_key _ ->
+        compare_zint (Script_int.to_zint x) (Script_int.to_zint y)
+    | Key_hash_key _ ->
+        alloc_bytes_cost 36
+    | Timestamp_key _ ->
+        compare_zint (Script_timestamp.to_zint x) (Script_timestamp.to_zint y)
+    | Address_key _ ->
+        step_cost 20
+    | Pair_key ((tl, _), (tr, _), _) ->
+        (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+        let (xl, xr) = x and (yl, yr) = y in
+        compare tl xl yl +@ compare tr xr yr
 
   let manager_operation = step_cost 10_000
 
