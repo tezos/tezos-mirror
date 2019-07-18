@@ -55,8 +55,7 @@ let add_dip ty annot prev =
 
 (* ---- Type size accounting ------------------------------------------------*)
 
-(* TODO include annot in size ? *)
-let comparable_type_size : type t. t comparable_ty -> int = fun ty ->
+let rec comparable_type_size : type t a. (t, a) comparable_struct -> int = fun ty ->
   (* No wildcard to force the update when comparable_ty chages. *)
   match ty with
   | Int_key _ -> 1
@@ -68,8 +67,8 @@ let comparable_type_size : type t. t comparable_ty -> int = fun ty ->
   | Key_hash_key _ -> 1
   | Timestamp_key _ -> 1
   | Address_key _ -> 1
+  | Pair_key (_, (t, _), _) -> 1 + comparable_type_size t
 
-(* TODO include annot in size ? *)
 let rec type_size : type t. t ty -> int =
   fun ty -> match ty with
     | Unit_t _ -> 1
@@ -415,8 +414,8 @@ let wrap_compare compare a b =
   else if Compare.Int.(res > 0) then 1
   else -1
 
-let compare_comparable
-  : type a. a comparable_ty -> a -> a -> int
+let rec compare_comparable
+  : type a s. (a, s) comparable_struct -> a -> a -> int
   = fun kind -> match kind with
     | String_key _ -> wrap_compare Compare.String.compare
     | Bool_key _ -> wrap_compare Compare.Bool.compare
@@ -432,6 +431,12 @@ let compare_comparable
           Compare.String.compare ex ey
         else lres
     | Bytes_key _ -> wrap_compare MBytes.compare
+    | Pair_key ((tl, _), (tr, _), _) ->
+        fun (lx, rx) (ly, ry) ->
+          let lres = compare_comparable tl lx ly in
+          if Compare.Int.(lres = 0) then
+            compare_comparable tr rx ry
+          else lres
 
 let empty_set
   : type a. a comparable_ty -> a set
@@ -549,8 +554,8 @@ let map_size
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
-let ty_of_comparable_ty
-  : type a. a comparable_ty -> a ty
+let rec ty_of_comparable_ty
+  : type a s. (a, s) comparable_struct -> a ty
   = function
     | Int_key tname -> Int_t tname
     | Nat_key tname -> Nat_t tname
@@ -561,8 +566,10 @@ let ty_of_comparable_ty
     | Key_hash_key tname -> Key_hash_t tname
     | Timestamp_key tname -> Timestamp_t tname
     | Address_key tname -> Address_t tname
+    | Pair_key ((l, al), (r, ar), tname) ->
+        Pair_t ((ty_of_comparable_ty l, al, None), (ty_of_comparable_ty r, ar, None), tname)
 
-let comparable_ty_of_ty
+let rec comparable_ty_of_ty
   : type a. a ty -> a comparable_ty option
   = function
     | Int_t tname -> Some (Int_key tname)
@@ -574,10 +581,32 @@ let comparable_ty_of_ty
     | Key_hash_t tname -> Some (Key_hash_key tname)
     | Timestamp_t tname -> Some (Timestamp_key tname)
     | Address_t tname -> Some (Address_key tname)
+    | Pair_t ((l, al, _), (r, ar, _), pname) ->
+        begin match comparable_ty_of_ty r with
+        | None -> None
+        | Some rty ->
+            match comparable_ty_of_ty l with
+            | None -> None
+            | Some (Pair_key _) -> None (* not a comb *)
+            | Some (Int_key tname) -> Some (Pair_key ((Int_key tname, al), (rty, ar), pname))
+            | Some (Nat_key tname) -> Some (Pair_key ((Nat_key tname, al), (rty, ar), pname))
+            | Some (String_key tname) -> Some (Pair_key ((String_key tname, al), (rty, ar), pname))
+            | Some (Bytes_key tname) -> Some (Pair_key ((Bytes_key tname, al), (rty, ar), pname))
+            | Some (Mutez_key tname) -> Some (Pair_key ((Mutez_key tname, al), (rty, ar), pname))
+            | Some (Bool_key tname) -> Some (Pair_key ((Bool_key tname, al), (rty, ar), pname))
+            | Some (Key_hash_key tname) ->  Some (Pair_key ((Key_hash_key tname, al), (rty, ar), pname))
+            | Some (Timestamp_key tname) -> Some (Pair_key ((Timestamp_key tname, al), (rty, ar), pname))
+            | Some (Address_key tname) -> Some (Pair_key ((Address_key tname, al), (rty, ar), pname))
+        end
     | _ -> None
 
-let unparse_comparable_ty
-  : type a. a comparable_ty -> Script.node
+let add_field_annot a var = function
+  | Prim (loc, prim, args, annots) ->
+      Prim (loc, prim, args, annots @ unparse_field_annot a @ unparse_var_annot var )
+  | expr -> expr
+
+let rec unparse_comparable_ty
+  : type a s. (a, s) comparable_struct -> Script.node
   = function
     | Int_key tname -> Prim (-1, T_int, [], unparse_type_annot tname)
     | Nat_key tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
@@ -588,11 +617,10 @@ let unparse_comparable_ty
     | Key_hash_key tname -> Prim (-1, T_key_hash, [], unparse_type_annot tname)
     | Timestamp_key tname -> Prim (-1, T_timestamp, [], unparse_type_annot tname)
     | Address_key tname -> Prim (-1, T_address, [], unparse_type_annot tname)
-
-let add_field_annot a var = function
-  | Prim (loc, prim, args, annots) ->
-      Prim (loc, prim, args, annots @ unparse_field_annot a @ unparse_var_annot var )
-  | expr -> expr
+    | Pair_key ((l, al), (r, ar), pname) ->
+        let tl = add_field_annot al None (unparse_comparable_ty l) in
+        let tr = add_field_annot ar None (unparse_comparable_ty r) in
+        Prim (-1, T_pair, [ tl ; tr ], unparse_type_annot pname)
 
 let rec unparse_ty_no_lwt
   : type a. context -> a ty -> (Script.node * context) tzresult
@@ -2795,59 +2823,17 @@ and parse_instr
           (Item_t (Int_t None, rest, annot))
     (* comparison *)
     | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ->
+      Item_t (t1, Item_t (t2, rest, _), _) ->
         parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Int_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Nat_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Bool_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (String_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Mutez_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Key_hash_t tn1, Item_t (Key_hash_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Key_hash_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Timestamp_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Timestamp_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Address_t tn1, Item_t (Address_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Address_key tname))
-          (Item_t (Int_t None, rest, annot))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ->
-        parse_var_annot loc annot >>=? fun annot ->
-        Lwt.return @@ merge_type_annot ~legacy tn1 tn2 >>=? fun tname ->
-        typed ctxt loc (Compare (Bytes_key tname))
-          (Item_t (Int_t None, rest, annot))
+        check_item_ty ctxt t1 t2 loc I_COMPARE 1 2 >>=? fun (Eq, t, ctxt) ->
+        begin match comparable_ty_of_ty t with
+          | None ->
+              Lwt.return (serialize_ty_for_error ctxt t) >>=? fun (t, _ctxt) ->
+              fail (Comparable_type_expected (loc, t))
+          | Some key ->
+              typed ctxt loc (Compare key)
+                (Item_t (Int_t None, rest, annot))
+        end
     (* comparators *)
     | Prim (loc, I_EQ, [], annot),
       Item_t (Int_t _, rest, _) ->
@@ -3166,8 +3152,7 @@ and parse_instr
         fail (Invalid_arity (loc, I_LAMBDA, 3, List.length l))
     (* Stack errors *)
     | Prim (loc, (I_ADD | I_SUB | I_MUL | I_EDIV
-                 | I_AND | I_OR | I_XOR | I_LSL | I_LSR
-                 | I_COMPARE as name), [], _),
+                 | I_AND | I_OR | I_XOR | I_LSL | I_LSR as name), [], _),
       Item_t (ta, Item_t (tb, _, _), _) ->
         Lwt.return @@ serialize_ty_for_error ctxt ta >>=? fun (ta, ctxt) ->
         Lwt.return @@ serialize_ty_for_error ctxt tb >>=? fun (tb, _ctxt) ->
