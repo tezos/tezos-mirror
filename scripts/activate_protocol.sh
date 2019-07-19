@@ -70,21 +70,34 @@ if [[ "$ans" == "Y" || "$ans" == "y" || -z "$ans" ]]; then
                           src/bin_node/{dune,tezos-node.opam}
 fi
 
-read -p "User-activated update in 3 blocks? (Y/n) " ans
+read -p "User-activated update? (Y/n) " ans
 if [[ "$ans" == "Y" || "$ans" == "y" || -z "$ans" ]]; then
-    # clean existing lines, if any
-    awk -i inplace '
-    BEGIN{found=0}{
-    if (!found && $0 ~ "let forced_protocol_upgrades")
-      {found=1; print}
-      else {
-        if (found && $0 ~ "^]")
-        {found=0; print }
-        else
-        { if (!found){print}}
-       }}' src/lib_base/block_header.ml
 
-    sed -i.old '/let forced_protocol_upgrades/ a \ \ 3l, Protocol_hash.of_b58check_exn '${full_hash}' ;' \
+    read -p "At what level? (e.g. 3 for sandbox): " level
+
+    if [[ $level < 28082 ]]; then
+        # we are testing in sandbox so we clean existing lines
+        awk -i inplace '
+        BEGIN{found=0}{
+        if (!found && $0 ~ "let forced_protocol_upgrades")
+          {found=1; print}
+          else {
+            if (found && $0 ~ "^]")
+            {found=0; print }
+            else
+            { if (!found){print}}
+           }}' src/lib_base/block_header.ml
+    fi
+
+    sed -i.old '/let forced_protocol_upgrades/ a \ \ '${level}'l, Protocol_hash.of_b58check_exn '${full_hash}' ;' \
         src/lib_base/block_header.ml
     rm src/lib_base/block_header.ml.old
+
+    patch -p1 < scripts/yes-node.patch
+    cd src/proto_${old_version}_${old_hash}
+    patch -p3 < ../../scripts/yes-delegate${old_version}.patch
+    cd ../..
+    cd src/proto_${new_version}_${new_hash}
+    patch -p3 < ../../scripts/yes-delegate${new_version}.patch
+
 fi

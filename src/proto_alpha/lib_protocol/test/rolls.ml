@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_tez
 open Test_utils
@@ -32,7 +32,7 @@ let account_pair = function
   | [a1; a2] -> (a1, a2)
   | _ -> assert false
 
-let wrap e = Lwt.return (Alpha_environment.wrap_error e)
+let wrap e = Lwt.return (Environment.wrap_error e)
 let traverse_rolls ctxt head =
   let rec loop acc roll =
     Storage.Roll.Successor.get_option ctxt roll >>= wrap >>=? function
@@ -106,7 +106,7 @@ let check_activate_staking_balance ~loc ~deactivated b (a, (m:Account.t)) =
   Assert.equal_tez ~loc Test_tez.Tez.(balance + deposit) info.staking_balance
 
 let run_until_deactivation () =
-  Context.init ~preserved_cycles:2 2 >>=? fun (b,accounts) ->
+  Context.init 2 >>=? fun (b,accounts) ->
   let (a1, a2) = account_pair accounts in
 
   Context.Contract.balance (B b) a1 >>=? fun balance_start ->

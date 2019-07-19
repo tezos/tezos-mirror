@@ -55,10 +55,10 @@ module Request = struct
 end
 
 type limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Time.System.Span.t ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits: Worker_types.limits
 }
 
@@ -79,13 +79,19 @@ module Types = struct
     peer_id: P2p_peer.Id.t ;
     parameters : parameters ;
     mutable bootstrapped: bool ;
+    mutable pipeline : Bootstrap_pipeline.t option ;
     mutable last_validated_head: Block_header.t ;
     mutable last_advertised_head: Block_header.t ;
   }
 
+  let pipeline_length = function
+    | None -> Bootstrap_pipeline.length_zero
+    | Some p -> Bootstrap_pipeline.length p
+
   let view (state : state) _ : view =
-    let { bootstrapped ; last_validated_head ; last_advertised_head ; _ } = state in
-    { bootstrapped ;
+    let { bootstrapped ; pipeline ;
+          last_validated_head ; last_advertised_head ; _ } = state in
+    { bootstrapped ; pipeline_length = pipeline_length pipeline ;
       last_validated_head = Block_header.hash last_validated_head ;
       last_advertised_head = Block_header.hash last_advertised_head }
 
@@ -123,15 +129,18 @@ let bootstrap_new_branch w _head unknown_prefix =
       ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
       pv.parameters.block_validator
       pv.peer_id pv.parameters.chain_db unknown_prefix in
+  pv.pipeline <- Some pipeline ;
   Worker.protect w
     ~on_error:begin fun error ->
       (* if the peer_validator is killed, let's cancel the pipeline *)
+      pv.pipeline <- None ;
       Bootstrap_pipeline.cancel pipeline >>= fun () ->
       Lwt.return_error error
     end
     begin fun () ->
       Bootstrap_pipeline.wait pipeline
     end >>=? fun () ->
+  pv.pipeline <- None ;
   set_bootstrapped pv ;
   debug w
     "done validating new branch from peer %a."
@@ -261,7 +270,7 @@ let on_no_request w =
   let pv = Worker.state w in
   debug w "no new head from peer %a for %g seconds."
     P2p_peer.Id.pp_short pv.peer_id
-    pv.parameters.limits.new_head_request_timeout ;
+    (Ptime.Span.to_float_s pv.parameters.limits.new_head_request_timeout) ;
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   return_unit
 
@@ -298,7 +307,7 @@ let on_error w r st errs =
       debug w "%a" Error_monad.pp_print_error errors ;
       Worker.trigger_shutdown w ;
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
   | [Block_validator_errors.System_error _ ] as errs ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
       return_unit
@@ -320,7 +329,7 @@ let on_error w r st errs =
             P2p_peer.Id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol ;
           Worker.record_event w (Event.Request (r, st, Some errs)) ;
-          Lwt.return (Error errs)
+          Lwt.return_error errs
     end
   | [ Validation_errors.Too_short_locator _ ] ->
       debug w
@@ -331,7 +340,7 @@ let on_error w r st errs =
       return_unit
   | _ ->
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return (Error errs)
+      Lwt.return_error errs
 
 let on_close w =
   let pv = Worker.state w in
@@ -347,6 +356,7 @@ let on_launch _ name parameters =
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;
     bootstrapped = false ;
+    pipeline = None ;
     last_validated_head = State.Block.header genesis ;
     last_advertised_head = State.Block.header genesis ;
   }
@@ -432,9 +442,14 @@ let current_head w =
   pv.last_validated_head
 
 let status = Worker.status
+let information = Worker.information
 
 let running_workers () = Worker.list table
 
 let current_request t = Worker.current_request t
 
 let last_events = Worker.last_events
+
+let pipeline_length w =
+  let state = Worker.state w in
+  Types.pipeline_length state.pipeline

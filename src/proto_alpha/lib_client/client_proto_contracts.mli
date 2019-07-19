@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Clic
 
@@ -44,6 +44,11 @@ module ContractAlias : sig
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (string * Contract.t -> 'a, 'wallet) params
+  val destination_arg:
+    ?name:string ->
+    ?doc:string ->
+    unit ->
+    ((string * Contract.t) option, #Client_context.wallet) Clic.arg
   val rev_find:
     #Client_context.wallet ->
     Contract.t -> string option tzresult Lwt.t
@@ -57,15 +62,8 @@ val list_contracts:
   #Client_context.wallet ->
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
-val get_manager:
-  #Proto_alpha.rpc_context ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  Contract.t ->
-  public_key_hash tzresult Lwt.t
-
 val get_delegate:
-  #Proto_alpha.rpc_context ->
+  #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->

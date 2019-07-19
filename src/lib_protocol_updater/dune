@@ -5,7 +5,8 @@
             tezos-stdlib-unix
             tezos-micheline
             tezos-shell-services
-            tezos-protocol-environment-shell
+            tezos-protocol-environment
+            tezos-shell-context
             tezos-protocol-compiler.registerer
             tezos-protocol-compiler.native
             tezos-storage
@@ -17,6 +18,6 @@
                    -open Tezos_storage)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

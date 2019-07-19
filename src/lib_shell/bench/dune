@@ -2,10 +2,12 @@
  (names bench_simple bench_tool)
  (libraries tezos-base
             tezos-shell
-            tezos_alpha_bench_helpers)
+            tezos-alpha-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
-                   -open Tezos_alpha_bench_helpers)))
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_alpha_parameters
+                   -open Tezos_alpha_test_helpers)))
 
 (alias
  (name buildtest)
@@ -22,6 +24,6 @@
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 
 (alias
- (name runtest_indent)
- (deps (glob_files *.ml*))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

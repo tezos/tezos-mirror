@@ -6,7 +6,7 @@ BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 CHAIN_ID = "main"
 BLOCK_ID = "head"
 PKH = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-PROTOCOL_HASH = "PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v"
+PROTOCOL_HASH = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
@@ -59,6 +59,7 @@ class TestRPCs:
     def test_describe(self, sandbox):
         sandbox.client(1).rpc('get', f'/describe')
 
+    @pytest.mark.skip(reason="bug on double encoding registration")
     def test_errors(self, sandbox):
         sandbox.client(1).rpc('get', '/errors')
 
@@ -138,6 +139,10 @@ class TestRPCs:
     def test_network_stat(self, sandbox):
         sandbox.client(1).rpc('get', f'/network/stat')
 
+    def test_network_version(self, sandbox):
+        sandbox.client(1).rpc('get', f'/network/version')
+
+    @pytest.mark.skip
     def test_network_versions(self, sandbox):
         sandbox.client(1).rpc('get', f'/network/versions')
 
@@ -156,6 +161,10 @@ class TestRPCs:
     def test_workers_chain_validator(self, sandbox):
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}')
+
+    def test_workers_chain_validator_ddb(self, sandbox):
+        sandbox.client(1).rpc('get',
+                              f'/workers/chain_validators/{CHAIN_ID}/ddb')
 
     def test_workers_chain_validator_peers_validators(self,
                                                       sandbox):
@@ -497,3 +506,9 @@ class TestRPCs:
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'votes/proposals')
+
+    def test_stat_gc(self, sandbox):
+        assert sandbox.client(1).rpc('get', "/stats/gc")
+
+    def test_stat_memory(self, sandbox):
+        assert sandbox.client(1).rpc('get', "/stats/memory")

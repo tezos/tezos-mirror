@@ -2,10 +2,15 @@ open Tezos_network_sandbox
 open Internal_pervasives
 open Console
 
-let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
-    endorser_exec accuser_exec () =
-  Test_scenario.network_with_protocol ~protocol ~size ~base_port state
-    ~node_exec ~client_exec
+let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
+    ?generate_kiln_config node_exec client_exec baker_exec endorser_exec
+    accuser_exec () =
+  Helpers.System_dependencies.precheck state `Or_fail
+    ~executables:
+      [node_exec; client_exec; baker_exec; endorser_exec; accuser_exec]
+  >>= fun () ->
+  Test_scenario.network_with_protocol ?external_peer_ports ~protocol ~size
+    ~base_port state ~node_exec ~client_exec
   >>= fun (nodes, protocol) ->
   Tezos_client.rpc state
     ~client:(Tezos_client.of_node (List.hd_exn nodes) ~exec:client_exec)
@@ -14,16 +19,20 @@ let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
   let network_id =
     match chain_id_json with `String s -> s | _ -> assert false
   in
-  Asynchronous_result.map_option kiln ~f:(fun k ->
-      Kiln.start state ~network_id k
+  Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
+      Kiln.Configuration_directory.generate state kiln_config
+        ~peers:(List.map nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
+        ~sandbox_json:(Tezos_protocol.sandbox_path ~config:state protocol)
+        ~nodes:
+          (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
+               sprintf "http://localhost:%d" rpc_port ))
         ~bakers:
           (List.map protocol.Tezos_protocol.bootstrap_accounts
              ~f:(fun (account, _) ->
-                 Tezos_protocol.Account.(name account, pubkey_hash account) ))
-        ~node_uris:
-          (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
-               sprintf "http://localhost:%d" rpc_port ))
-      >>= fun (pg, kiln) -> return () )
+               Tezos_protocol.Account.(name account, pubkey_hash account) ))
+        ~network_string:network_id ~node_exec ~client_exec
+        ~protocol_execs:
+          [(protocol.Tezos_protocol.hash, baker_exec, endorser_exec)] )
   >>= fun (_ : unit option) ->
   let accusers =
     List.map nodes ~f:(fun node ->
@@ -41,14 +50,17 @@ let run state ~protocol ~size ~base_port ?kiln node_exec client_exec baker_exec
       | None -> assert false
     in
     Tezos_protocol.bootstrap_accounts protocol
-    |> List.mapi ~f:(fun idx acc ->
-        let node, client = pick_a_node_and_client idx in
-        let key = Tezos_protocol.Account.name acc in
-        ( acc
-        , client
-        , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
-          ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client node
-              ~key ] ) )
+    |> List.filter_mapi ~f:(fun idx acc ->
+           let node, client = pick_a_node_and_client idx in
+           let key = Tezos_protocol.Account.name acc in
+           if List.mem ~equal:String.equal no_daemons_for key then None
+           else
+             Some
+               ( acc
+               , client
+               , [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key
+                 ; Tezos_daemon.endorser_of_node ~exec:endorser_exec ~client
+                     node ~key ] ) )
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -90,26 +102,52 @@ let cmd ~pp_error () =
   let open Cmdliner in
   let open Term in
   Test_command_line.Run_command.make ~pp_error
-    ( pure (fun size base_port protocol bnod bcli bak endo accu kiln state ->
+    ( pure
+        (fun size
+        base_port
+        (`External_peers external_peer_ports)
+        (`No_daemons_for no_daemons_for)
+        protocol
+        bnod
+        bcli
+        bak
+        endo
+        accu
+        generate_kiln_config
+        state
+        ->
           let actual_test =
-            run state ~size ~base_port ~protocol bnod bcli bak endo accu ?kiln
+            run state ~size ~base_port ~protocol bnod bcli bak endo accu
+              ?generate_kiln_config ~external_peer_ports ~no_daemons_for
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
-        )
-      $ Arg.(
-          value & opt int 5
-          & info ["size"; "S"] ~doc:"Set the size of the network.")
-      $ Arg.(
-          value & opt int 20_000
-          & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
-      $ Tezos_protocol.cli_term ()
-      $ Tezos_executable.cli_term `Node "tezos"
-      $ Tezos_executable.cli_term `Client "tezos"
-      $ Tezos_executable.cli_term `Baker "tezos"
-      $ Tezos_executable.cli_term `Endorser "tezos"
-      $ Tezos_executable.cli_term `Accuser "tezos"
-      $ Kiln.cli_term ()
-      $ Test_command_line.cli_state ~name:"mininet" () )
+      )
+    $ Arg.(
+        value & opt int 5
+        & info ["size"; "S"] ~doc:"Set the size of the network.")
+    $ Arg.(
+        value & opt int 20_000
+        & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+    $ Arg.(
+        pure (fun l -> `External_peers l)
+        $ value
+            (opt_all int []
+               (info ["add-external-peer-port"] ~docv:"PORT-NUMBER"
+                  ~doc:"Add $(docv) to the peers of the network nodes.")))
+    $ Arg.(
+        pure (fun l -> `No_daemons_for l)
+        $ value
+            (opt_all string []
+               (info ["no-daemons-for"] ~docv:"ACCOUNT-NAME"
+                  ~doc:"Do not start daemons for $(docv).")))
+    $ Tezos_protocol.cli_term ()
+    $ Tezos_executable.cli_term `Node "tezos"
+    $ Tezos_executable.cli_term `Client "tezos"
+    $ Tezos_executable.cli_term `Baker "tezos"
+    $ Tezos_executable.cli_term `Endorser "tezos"
+    $ Tezos_executable.cli_term `Accuser "tezos"
+    $ Kiln.Configuration_directory.cli_term ()
+    $ Test_command_line.cli_state ~name:"mininet" () )
     (let doc = "Small network sandbox with bakers, endorsers, and accusers." in
      let man : Manpage.block list =
        [ `P

@@ -34,8 +34,8 @@ module Id : sig
   val pp_opt : Format.formatter -> t option -> unit
   val pp_list : Format.formatter -> t list -> unit
 
-  val of_string_exn : string -> t
-  val of_string : string -> (t, string) result
+  val of_string_exn : ?default_port:int -> string -> t
+  val of_string : ?default_port:int -> string -> (t, string) result
   val to_string : t -> string
   val encoding : t Data_encoding.t
   val is_local : t -> bool
@@ -83,14 +83,14 @@ module Info : sig
 
   type t = {
     trusted : bool ;
-    greylisted_until : Time.t ;
+    greylisted_until : Time.System.t ;
     state : State.t ;
-    last_failed_connection : Time.t option ;
-    last_rejected_connection : (P2p_peer_id.t * Time.t) option ;
-    last_established_connection : (P2p_peer_id.t * Time.t) option ;
-    last_disconnection : (P2p_peer_id.t * Time.t) option ;
-    last_seen : (P2p_peer_id.t * Time.t) option ;
-    last_miss : Time.t option ;
+    last_failed_connection : Time.System.t option ;
+    last_rejected_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_established_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_disconnection : (P2p_peer_id.t * Time.System.t) option ;
+    last_seen : (P2p_peer_id.t * Time.System.t) option ;
+    last_miss : Time.System.t option ;
   }
 
   val encoding: t Data_encoding.t
@@ -115,10 +115,7 @@ module Pool_event : sig
     | External_disconnection of P2p_peer_id.t
     (** The connection was closed for external reason. *)
 
-  type t = {
-    kind : kind ;
-    timestamp : Time.t ;
-  }
+  type t = kind Time.System.stamped
 
   val encoding : t Data_encoding.t
 

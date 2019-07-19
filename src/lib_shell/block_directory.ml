@@ -154,8 +154,8 @@ let build_raw_rpc_directory
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
         metadata in
-    State.Block.max_operations_ttl block >>=? fun max_operations_ttl ->
     State.Block.test_chain block >>= fun (test_chain_status, _) ->
+    State.Block.max_operations_ttl block >>=? fun max_operations_ttl ->
     return {
       Block_services.protocol_data ;
       test_chain_status ;
@@ -164,7 +164,7 @@ let build_raw_rpc_directory
       max_block_header_length = Next_proto.max_block_length ;
       operation_list_quota =
         List.map
-          (fun { Tezos_protocol_environment_shell.max_size; max_op } ->
+          (fun { Tezos_protocol_environment.max_size; max_op } ->
              { Tezos_shell_services.Block_services.max_size ; max_op } )
           Next_proto.validation_passes ;
     } in
@@ -232,8 +232,7 @@ let build_raw_rpc_directory
   end ;
 
   register2 S.Operation_hashes.operation_hash begin fun block i j () () ->
-    begin
-      try
+    begin try
         State.Block.operation_hashes block i >>= fun (ops, _) ->
         Lwt.return (List.nth ops j)
       with _ -> Lwt.fail Not_found end >>= fun op ->
@@ -259,7 +258,6 @@ let build_raw_rpc_directory
   (* info *)
 
   register0 S.info begin fun block () () ->
-    (* TODO allow to send partial information *)
     let chain_id = State.Block.chain_id block in
     let hash = State.Block.hash block in
     let header = State.Block.header block in
@@ -280,7 +278,7 @@ let build_raw_rpc_directory
   register0 S.Helpers.Preapply.block begin fun block q p ->
     let timestamp =
       match q#timestamp with
-      | None -> Time.now ()
+      | None -> Time.System.to_protocol (Systime_os.now ())
       | Some time -> time in
     let protocol_data =
       Data_encoding.Binary.to_bytes_exn
@@ -307,14 +305,15 @@ let build_raw_rpc_directory
     State.Block.context block >>= fun ctxt ->
     let predecessor = State.Block.hash block in
     let header = State.Block.shell_header block in
+    let predecessor_context = Shell_context.wrap_disk_context ctxt in
     Next_proto.begin_construction
       ~chain_id: (State.Block.chain_id block)
-      ~predecessor_context:ctxt
+      ~predecessor_context
       ~predecessor_timestamp:header.timestamp
       ~predecessor_level:header.level
       ~predecessor_fitness:header.fitness
       ~predecessor
-      ~timestamp:(Time.now ()) () >>=? fun state ->
+      ~timestamp:(Time.System.to_protocol (Systime_os.now ())) () >>=? fun state ->
     fold_left_s
       (fun (state, acc) op ->
          Next_proto.apply_operation state op >>=? fun (state, result) ->
@@ -327,6 +326,7 @@ let build_raw_rpc_directory
   register1 S.Helpers.complete begin fun block prefix () () ->
     State.Block.context block >>= fun ctxt ->
     Base58.complete prefix >>= fun l1 ->
+    let ctxt = Shell_context.wrap_disk_context ctxt in
     Next_proto.complete_b58prefix ctxt prefix >>= fun l2 ->
     return (l1 @ l2)
   end ;
@@ -346,7 +346,8 @@ let build_raw_rpc_directory
     (RPC_directory.map
        (fun block ->
           State.Block.context block >|= fun context ->
-          { Tezos_protocol_environment_shell.
+          let context = Shell_context.wrap_disk_context context in
+          { Tezos_protocol_environment.
             block_hash = State.Block.hash block ;
             block_header = State.Block.shell_header block ;
             context })
@@ -359,7 +360,7 @@ let get_protocol hash =
   | None -> raise Not_found
   | Some protocol -> protocol
 
-let get_directory block =
+let get_directory chain_state block =
   State.Block.get_rpc_directory block >>= function
   | Some dir -> Lwt.return dir
   | None ->
@@ -371,7 +372,14 @@ let get_directory block =
                         (module Block_services.Fake_protocol)
                         next_protocol)
       | Some pred ->
-          State.Block.protocol_hash pred >>= fun protocol_hash ->
+          State.Chain.save_point chain_state >>= fun (save_point_level, _) ->
+          begin
+            if Compare.Int32.(State.Block.level pred < save_point_level) then
+              State.Chain.get_level_indexed_protocol
+                chain_state (State.Block.header pred)
+            else
+              State.Block.protocol_hash pred
+          end >>= fun protocol_hash ->
           let (module Proto) = get_protocol protocol_hash in
           State.Block.get_rpc_directory block >>= function
           | Some dir -> Lwt.return dir
@@ -381,34 +389,27 @@ let get_directory block =
               Lwt.return dir
 
 let get_header_directory chain_state header =
-  if header.Block_header.shell.level = 0l then
-    Lwt.return
-      (build_raw_header_rpc_directory (module Block_services.Fake_protocol))
-  else
-    State.Block.header_of_hash chain_state header.Block_header.shell.predecessor
-    >>= function
-    | None ->
-        Lwt.return
-          (build_raw_header_rpc_directory (module Block_services.Fake_protocol))
-    | Some pred ->
-        State.Chain.get_level_indexed_protocol
-          chain_state pred >>= fun protocol_hash ->
-        let (module Proto) = get_protocol protocol_hash in
-        State.Block.get_header_rpc_directory chain_state header >>= function
-        | Some dir ->
-            Lwt.return dir
-        | None ->
-            let dir = build_raw_header_rpc_directory (module Proto) in
-            State.Block.set_header_rpc_directory
-              chain_state header dir >>= fun () ->
-            Lwt.return dir
+  State.Block.header_of_hash chain_state header.Block_header.shell.predecessor
+  >>= function
+  | None -> (* should not happen *)
+      Lwt.fail Not_found
+  | Some pred ->
+      State.Chain.get_level_indexed_protocol
+        chain_state pred >>= fun protocol_hash ->
+      let (module Proto) = get_protocol protocol_hash in
+      State.Block.get_header_rpc_directory chain_state header >>= function
+      | Some dir ->
+          Lwt.return dir
+      | None ->
+          let dir = build_raw_header_rpc_directory (module Proto) in
+          State.Block.set_header_rpc_directory
+            chain_state header dir >>= fun () ->
+          Lwt.return dir
 
 let get_block chain_state = function
   | `Genesis ->
-      Chain.genesis chain_state >>= begin function
-        | Some b -> Lwt.return_some b
-        | None -> Lwt.return_none
-      end
+      Chain.genesis chain_state >>= fun genesis ->
+      Lwt.return_some genesis
   | `Head n ->
       Chain.head chain_state >>= fun head ->
       if n < 0 then
@@ -438,11 +439,19 @@ let get_block chain_state = function
         let block_level = State.Block.level block in
         let target =
           Int32.(to_int (sub head_level (sub block_level (of_int n)))) in
-        if target < 0 then
-          Lwt.return_none
+        begin if target < 0 then
+            Lwt.return_none
+          else
+            State.Block.read_predecessor
+              chain_state ~pred:target ~below_save_point:true (State.Block.hash head) end
+      else if n = 0 then
+        Chain.genesis chain_state >>= fun genesis ->
+        let genesis_hash = State.Block.hash genesis in
+        if Block_hash.equal hash genesis_hash then
+          Lwt.return_some genesis
         else
           State.Block.read_predecessor
-            chain_state ~pred:target ~below_save_point:true (State.Block.hash head)
+            chain_state ~pred:0 ~below_save_point:true hash
       else
         State.Block.read_predecessor
           chain_state ~pred:n ~below_save_point:true hash
@@ -460,14 +469,15 @@ let build_rpc_directory chain_state block =
   | None ->
       Lwt.fail Not_found
   | Some b ->
-      State.Chain.save_point chain_state >>= fun (level_save_point, _) ->
-      if State.Block.level b >= level_save_point then begin
-        get_directory b >>= fun dir ->
+      State.Chain.save_point chain_state >>= fun (save_point_level, _) ->
+      let block_level = State.Block.level b in
+      let block_hash = State.Block.hash b in
+      let genesis = State.Chain.genesis chain_state in
+      if block_level >= save_point_level || Block_hash.equal block_hash genesis.block then
+        get_directory chain_state b >>= fun dir ->
         Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
-      end
-      else begin
+      else
         let header = State.Block.header b in
         let hash = State.Block.hash b in
         get_header_directory chain_state header >>= fun dir ->
         Lwt.return (RPC_directory.map (fun _ -> Lwt.return (chain_state, hash, header)) dir)
-      end

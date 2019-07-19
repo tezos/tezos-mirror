@@ -36,7 +36,7 @@ module Int32 = struct
 end
 
 module Z = struct
-  type t = Z.t
+  include Z
   let encoding = Data_encoding.z
 end
 
@@ -66,8 +66,15 @@ module Make_index(H : Storage_description.INDEX)
     }
 end
 
+module Block_priority =
+  Make_single_data_storage(Registered)
+    (Raw_context)
+    (struct let name = ["block_priority"] end)
+    (Int)
+
+(* Only for migration from 004 *)
 module Last_block_priority =
-  Make_single_data_storage
+  Make_single_data_storage(Ghost)
     (Raw_context)
     (struct let name = ["last_block_priority"] end)
     (Int)
@@ -77,17 +84,17 @@ module Last_block_priority =
 module Contract = struct
 
   module Raw_context =
-    Make_subcontext(Raw_context)(struct let name = ["contracts"] end)
+    Make_subcontext(Registered)(Raw_context)(struct let name = ["contracts"] end)
 
   module Global_counter =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["global_counter"] end)
       (Z)
 
   module Indexed_context =
     Make_indexed_subcontext
-      (Make_subcontext(Raw_context)(struct let name = ["index"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["index"] end))
       (Make_index(Contract_repr.Index))
 
   let fold = Indexed_context.fold_keys
@@ -100,7 +107,7 @@ module Contract = struct
 
   module Frozen_balance_index =
     Make_indexed_subcontext
-      (Make_subcontext
+      (Make_subcontext(Registered)
          (Indexed_context.Raw_context)
          (struct let name = ["frozen_balance"] end))
       (Make_index(Cycle_repr.Index))
@@ -125,12 +132,12 @@ module Contract = struct
       (struct let name = ["manager"] end)
       (Manager_repr)
 
-  module Spendable =
-    Indexed_context.Make_set
+  module Spendable_004 =
+    Indexed_context.Make_set(Ghost)
       (struct let name = ["spendable"] end)
 
-  module Delegatable =
-    Indexed_context.Make_set
+  module Delegatable_004 =
+    Indexed_context.Make_set(Ghost)
       (struct let name = ["delegatable"] end)
 
   module Delegate =
@@ -139,7 +146,7 @@ module Contract = struct
       (Signature.Public_key_hash)
 
   module Inactive_delegate =
-    Indexed_context.Make_set
+    Indexed_context.Make_set(Registered)
       (struct let name = ["inactive_delegate"] end)
 
   module Delegate_desactivation =
@@ -149,9 +156,17 @@ module Contract = struct
 
   module Delegated =
     Make_data_set_storage
-      (Make_subcontext
+      (Make_subcontext(Registered)
          (Indexed_context.Raw_context)
          (struct let name = ["delegated"] end))
+      (Make_index(Contract_repr.Index))
+
+  (** Only for migration from proto_004  *)
+  module Delegated_004 =
+    Make_data_set_storage
+      (Make_subcontext(Ghost)
+         (Indexed_context.Raw_context)
+         (struct let name = ["delegated_004"] end))
       (Make_index(Contract_hash))
 
   module Counter =
@@ -219,6 +234,14 @@ module Contract = struct
     let init_set ctxt contract value =
       consume_serialize_gas ctxt value >>=? fun ctxt ->
       I.init_set ctxt contract value
+
+    (** Only for used for 005 migration to avoid gas cost. *)
+    let init_free ctxt contract value =
+      I.init_free ctxt contract value
+
+    (** Only for used for 005 migration to avoid gas cost. *)
+    let set_free ctxt contract value =
+      I.set_free ctxt contract value
   end
 
   module Code =
@@ -229,15 +252,146 @@ module Contract = struct
     Make_carbonated_map_expr
       (struct let name = ["storage"] end)
 
-  type bigmap_key = Raw_context.t * Contract_repr.t
+  module Paid_storage_space =
+    Indexed_context.Make_map
+      (struct let name = ["paid_bytes"] end)
+      (Z)
 
-  (* Consume gas for serilization and deserialization of expr in this
-     module *)
-  module Big_map = struct
+  module Used_storage_space =
+    Indexed_context.Make_map
+      (struct let name = ["used_bytes"] end)
+      (Z)
+
+  module Roll_list =
+    Indexed_context.Make_map
+      (struct let name = ["roll_list"] end)
+      (Roll_repr)
+
+  module Change =
+    Indexed_context.Make_map
+      (struct let name = ["change"] end)
+      (Tez_repr)
+
+end
+
+(** Big maps handling *)
+
+module Big_map = struct
+  module Raw_context =
+    Make_subcontext(Registered)(Raw_context)(struct let name = ["big_maps"] end)
+
+  module Next = struct
+    include
+      Make_single_data_storage(Registered)
+        (Raw_context)
+        (struct let name = ["next"] end)
+        (Z)
+    let incr ctxt =
+      get ctxt >>=? fun i ->
+      set ctxt (Z.succ i) >>=? fun ctxt ->
+      return (ctxt, i)
+    let init ctxt = init ctxt Z.zero
+  end
+
+  module Index = struct
+    type t = Z.t
+
+    let rpc_arg =
+      let construct = Z.to_string in
+      let destruct hash =
+        match Z.of_string hash with
+        | exception _ -> Error "Cannot parse big map id"
+        | id -> Ok id in
+      RPC_arg.make
+        ~descr: "A big map identifier"
+        ~name: "big_map_id"
+        ~construct
+        ~destruct
+        ()
+
+    let encoding =
+      Data_encoding.def "big_map_id"
+        ~title:"Big map identifier"
+        ~description: "A big map identifier"
+        Z.encoding
+    let compare = Compare.Z.compare
+
+    let path_length = 7
+
+    let to_path c l =
+      let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+      let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+      String.sub index_key 0 2 ::
+      String.sub index_key 2 2 ::
+      String.sub index_key 4 2 ::
+      String.sub index_key 6 2 ::
+      String.sub index_key 8 2 ::
+      String.sub index_key 10 2 ::
+      Z.to_string c ::
+      l
+
+    let of_path = function
+      | [] | [_] | [_;_] | [_;_;_] | [_;_;_;_] | [_;_;_;_;_] | [_;_;_;_;_;_]
+      | _::_::_::_::_::_::_::_::_ ->
+          None
+      | [ index1 ; index2 ; index3 ; index4 ; index5 ; index6 ; key ] ->
+          let c = Z.of_string key in
+          let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+          let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+          assert Compare.String.(String.sub index_key 0 2 = index1) ;
+          assert Compare.String.(String.sub index_key 2 2 = index2) ;
+          assert Compare.String.(String.sub index_key 4 2 = index3) ;
+          assert Compare.String.(String.sub index_key 6 2 = index4) ;
+          assert Compare.String.(String.sub index_key 8 2 = index5) ;
+          assert Compare.String.(String.sub index_key 10 2 = index6) ;
+          Some c
+  end
+
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["index"] end))
+      (Make_index(Index))
+
+  let rpc_arg = Index.rpc_arg
+
+  let fold = Indexed_context.fold_keys
+  let list = Indexed_context.keys
+
+  let remove_rec ctxt n =
+    Indexed_context.remove_rec ctxt n
+
+  let copy ctxt ~from ~to_ =
+    Indexed_context.copy ctxt ~from ~to_
+
+  type key = Raw_context.t * Z.t
+
+  module Total_bytes =
+    Indexed_context.Make_map
+      (struct let name = ["total_bytes"] end)
+      (Z)
+
+  module Key_type =
+    Indexed_context.Make_map
+      (struct let name = ["key_type"] end)
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+  module Value_type =
+    Indexed_context.Make_map
+      (struct let name = ["value_type"] end)
+        (struct
+          type t = Script_repr.expr
+          let encoding = Script_repr.expr_encoding
+        end)
+
+  module Contents = struct
+
     module I = Storage_functors.Make_indexed_carbonated_data_storage
-        (Make_subcontext
+        (Make_subcontext(Registered)
            (Indexed_context.Raw_context)
-           (struct let name = ["big_map"] end))
+           (struct let name = ["contents"] end))
         (Make_index(Script_expr_hash))
         (struct
           type t = Script_repr.expr
@@ -274,41 +428,21 @@ module Contract = struct
           (ctxt, value_opt)
   end
 
-  module Paid_storage_space =
-    Indexed_context.Make_map
-      (struct let name = ["paid_bytes"] end)
-      (Z)
-
-  module Used_storage_space =
-    Indexed_context.Make_map
-      (struct let name = ["used_bytes"] end)
-      (Z)
-
-  module Roll_list =
-    Indexed_context.Make_map
-      (struct let name = ["roll_list"] end)
-      (Roll_repr)
-
-  module Change =
-    Indexed_context.Make_map
-      (struct let name = ["change"] end)
-      (Tez_repr)
-
 end
 
 module Delegates =
   Make_data_set_storage
-    (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
+    (Make_subcontext(Registered)(Raw_context)(struct let name = ["delegates"] end))
     (Make_index(Signature.Public_key_hash))
 
 module Active_delegates_with_rolls =
   Make_data_set_storage
-    (Make_subcontext(Raw_context)(struct let name = ["active_delegates_with_rolls"] end))
+    (Make_subcontext(Registered)(Raw_context)(struct let name = ["active_delegates_with_rolls"] end))
     (Make_index(Signature.Public_key_hash))
 
 module Delegates_with_frozen_balance_index =
   Make_indexed_subcontext
-    (Make_subcontext(Raw_context)
+    (Make_subcontext(Registered)(Raw_context)
        (struct let name = ["delegates_with_frozen_balance"] end))
     (Make_index(Cycle_repr.Index))
 
@@ -323,12 +457,12 @@ module Cycle = struct
 
   module Indexed_context =
     Make_indexed_subcontext
-      (Make_subcontext(Raw_context)(struct let name = ["cycle"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["cycle"] end))
       (Make_index(Cycle_repr.Index))
 
   module Last_roll =
     Make_indexed_data_storage
-      (Make_subcontext
+      (Make_subcontext(Registered)
          (Indexed_context.Raw_context)
          (struct let name = ["last_roll"] end))
       (Int_index)
@@ -377,7 +511,7 @@ module Cycle = struct
 
   module Nonce =
     Make_indexed_data_storage
-      (Make_subcontext
+      (Make_subcontext(Registered)
          (Indexed_context.Raw_context)
          (struct let name = ["nonces"] end))
       (Make_index(Raw_level_repr.Index))
@@ -399,21 +533,21 @@ end
 module Roll = struct
 
   module Raw_context =
-    Make_subcontext(Raw_context)(struct let name = ["rolls"] end)
+    Make_subcontext(Registered)(Raw_context)(struct let name = ["rolls"] end)
 
   module Indexed_context =
     Make_indexed_subcontext
-      (Make_subcontext(Raw_context)(struct let name = ["index"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["index"] end))
       (Make_index(Roll_repr.Index))
 
   module Next =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["next"] end)
       (Roll_repr)
 
   module Limbo =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["limbo"] end)
       (Roll_repr)
@@ -469,7 +603,7 @@ module Roll = struct
 
   module Owner =
     Make_indexed_data_snapshotable_storage
-      (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["owner"] end))
       (Snapshoted_owner_index)
       (Make_index(Roll_repr.Index))
       (Signature.Public_key)
@@ -486,10 +620,10 @@ end
 module Vote = struct
 
   module Raw_context =
-    Make_subcontext(Raw_context)(struct let name = ["votes"] end)
+    Make_subcontext(Registered)(Raw_context)(struct let name = ["votes"] end)
 
   module Current_period_kind =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["current_period_kind"] end)
       (struct
@@ -497,45 +631,51 @@ module Vote = struct
         let encoding = Voting_period_repr.kind_encoding
       end)
 
-  module Current_quorum =
-    Make_single_data_storage
+  module Current_quorum_004 =
+    Make_single_data_storage(Ghost)
       (Raw_context)
       (struct let name = ["current_quorum"] end)
       (Int32)
 
+  module Participation_ema =
+    Make_single_data_storage(Registered)
+      (Raw_context)
+      (struct let name = ["participation_ema"] end)
+      (Int32)
+
   module Current_proposal =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["current_proposal"] end)
       (Protocol_hash)
 
   module Listings_size =
-    Make_single_data_storage
+    Make_single_data_storage(Registered)
       (Raw_context)
       (struct let name = ["listings_size"] end)
       (Int32)
 
   module Listings =
     Make_indexed_data_storage
-      (Make_subcontext(Raw_context)(struct let name = ["listings"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["listings"] end))
       (Make_index(Signature.Public_key_hash))
       (Int32)
 
   module Proposals =
     Make_data_set_storage
-      (Make_subcontext(Raw_context)(struct let name = ["proposals"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["proposals"] end))
       (Pair(Make_index(Protocol_hash))(Make_index(Signature.Public_key_hash)))
 
   module Proposals_count =
     Make_indexed_data_storage
-      (Make_subcontext(Raw_context)
+      (Make_subcontext(Registered)(Raw_context)
          (struct let name = ["proposals_count"] end))
       (Make_index(Signature.Public_key_hash))
       (Int)
 
   module Ballots =
     Make_indexed_data_storage
-      (Make_subcontext(Raw_context)(struct let name = ["ballots"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["ballots"] end))
       (Make_index(Signature.Public_key_hash))
       (struct
         type t = Vote_repr.ballot
@@ -580,7 +720,7 @@ end
 
 module Commitments =
   Make_indexed_data_storage
-    (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
+    (Make_subcontext(Registered)(Raw_context)(struct let name = ["commitments"] end))
     (Make_index(Blinded_public_key_hash.Index))
     (Tez_repr)
 
@@ -590,7 +730,7 @@ module Ramp_up = struct
 
   module Rewards =
     Make_indexed_data_storage
-      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["ramp_up"; "rewards"] end))
       (Make_index(Cycle_repr.Index))
       (struct
         type t = Tez_repr.t * Tez_repr.t
@@ -599,7 +739,7 @@ module Ramp_up = struct
 
   module Security_deposits =
     Make_indexed_data_storage
-      (Make_subcontext(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
+      (Make_subcontext(Registered)(Raw_context)(struct let name = ["ramp_up"; "deposits"] end))
       (Make_index(Cycle_repr.Index))
       (struct
         type t = Tez_repr.t * Tez_repr.t
@@ -607,50 +747,3 @@ module Ramp_up = struct
       end)
 
 end
-
-(** Resolver *)
-
-let () =
-  Raw_context.register_resolvers
-    Contract_hash.b58check_encoding
-    (fun ctxt p ->
-       let p = Contract_repr.Index.contract_prefix p in
-       Contract.Indexed_context.resolve ctxt p >|= fun l ->
-       List.map
-         (function
-           | Contract_repr.Implicit _ -> assert false
-           | Contract_repr.Originated s -> s)
-         l) ;
-  Raw_context.register_resolvers
-    Ed25519.Public_key_hash.b58check_encoding
-    (fun ctxt p ->
-       let p = Contract_repr.Index.pkh_prefix_ed25519 p in
-       Contract.Indexed_context.resolve ctxt p >|= fun l ->
-       List.map
-         (function
-           | Contract_repr.Implicit (Ed25519 pkh) -> pkh
-           | Contract_repr.Implicit _ -> assert false
-           | Contract_repr.Originated _ -> assert false)
-         l) ;
-  Raw_context.register_resolvers
-    Secp256k1.Public_key_hash.b58check_encoding
-    (fun ctxt p ->
-       let p = Contract_repr.Index.pkh_prefix_secp256k1 p in
-       Contract.Indexed_context.resolve ctxt p >|= fun l ->
-       List.map
-         (function
-           | Contract_repr.Implicit (Secp256k1 pkh) -> pkh
-           | Contract_repr.Implicit _ -> assert false
-           | Contract_repr.Originated _ -> assert false)
-         l) ;
-  Raw_context.register_resolvers
-    P256.Public_key_hash.b58check_encoding
-    (fun ctxt p ->
-       let p = Contract_repr.Index.pkh_prefix_p256 p in
-       Contract.Indexed_context.resolve ctxt p >|= fun l ->
-       List.map
-         (function
-           | Contract_repr.Implicit (P256 pkh) -> pkh
-           | Contract_repr.Implicit _ -> assert false
-           | Contract_repr.Originated _ -> assert false)
-         l)

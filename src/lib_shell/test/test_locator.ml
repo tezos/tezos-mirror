@@ -33,9 +33,9 @@ let genesis_hash =
 
 let genesis_protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
+    "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
-let genesis_time = Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 let state_genesis_block =
   {
@@ -49,7 +49,7 @@ let chain_id = Chain_id.of_block_hash genesis_hash
 module Proto = (val Registered_protocol.get_exn genesis_protocol)
 
 let incr_timestamp timestamp =
-  Time.add timestamp (Int64.add 1L (Random.int64 10L))
+  Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))
 
 let incr_fitness fitness =
   let new_fitness =
@@ -201,7 +201,7 @@ let print_chain chain bh =
 let linear_predecessor_n (chain:State.Chain.t) (bh:Block_hash.t) (distance:int)
   : Block_hash.t option Lwt.t =
   (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)
-  if distance < 1 then invalid_arg "distance < 1" else
+  if distance < 1 then invalid_arg "distance<1" else
     let rec loop bh distance =
       if distance = 0
       then Lwt.return_some bh   (* reached distance *)
@@ -231,7 +231,7 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
     match lin_res,exp_res with
     | None, None ->
         Lwt.return_unit
-    | Some _, None | None, Some _ ->
+    | None,Some _ | Some _,None ->
         Assert.fail_msg "mismatch between exponential and linear predecessor_n"
     | Some lin_res, Some exp_res ->
         (* check that the two results are the same *)

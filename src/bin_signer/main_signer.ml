@@ -324,10 +324,10 @@ struct
       ~other_commands ~require_auth =
     commands base_dir require_auth @ other_commands
 
-  let logger = Some (RPC_client.full_logger Format.err_formatter)
+  let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
 end
 
 let () =
   Client_main_run.run
     (module C)
-    ~select_commands:(fun _ _ -> return [])
+    ~select_commands:(fun _ _ -> return_nil)

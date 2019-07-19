@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 let error ~loc v f =
   match v with
@@ -37,7 +37,7 @@ let error ~loc v f =
 let proto_error ~loc v f =
   error ~loc v
     (function
-      | Alpha_environment.Ecoproto_error err -> f err
+      | Environment.Ecoproto_error err -> f err
       | _ -> false)
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b  =
@@ -102,7 +102,7 @@ let balance_is ~loc b contract ?(kind = Contract.Main) expected =
     [Rewards] for the others. *)
 let balance_was_operated ~(operand) ~loc b contract ?(kind = Contract.Main) old_balance amount =
   operand old_balance amount |>
-  Alpha_environment.wrap_error |> Lwt.return >>=? fun expected ->
+  Environment.wrap_error |> Lwt.return >>=? fun expected ->
   balance_is ~loc b contract ~kind expected
 
 let balance_was_credited = balance_was_operated ~operand:Alpha_context.Tez.(+?)

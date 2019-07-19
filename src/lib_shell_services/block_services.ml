@@ -104,8 +104,12 @@ let parse_block s =
             Some h -> Ok (`Hash (h , 0))
           | None ->
               let l = Int32.of_string s in
-              if Int32.(compare l (of_int 0)) < 0 then raise Exit
-              else Ok (`Level (Int32.of_string s))
+              if Compare.Int32.(l < 0l) then
+                raise Exit
+              else if Compare.Int32.(l = 0l) then
+                Ok `Genesis
+              else
+                Ok (`Level (Int32.of_string s))
         end
     | ([h ; n], '~') | ([h ; n], '-') ->
         Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
@@ -253,10 +257,8 @@ let raw_protocol_encoding =
 
 module Make(Proto : PROTO)(Next_proto : PROTO) = struct
 
-  let protocol_hash =
-    Protocol_hash.to_b58check Proto.hash
-  let next_protocol_hash =
-    Protocol_hash.to_b58check Next_proto.hash
+  let protocol_hash = Protocol_hash.to_b58check Proto.hash
+  let next_protocol_hash = Protocol_hash.to_b58check Next_proto.hash
 
   type raw_block_header = {
     shell: Block_header.shell_header ;
@@ -596,7 +598,7 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                   method timestamp = timestamp
                 end)
           |+ flag "sort" (fun t -> t#sort_operations)
-          |+ opt_field "timestamp" Time.rpc_arg (fun t -> t#timestamp)
+          |+ opt_field "timestamp" Time.Protocol.rpc_arg (fun t -> t#timestamp)
           |> seal
 
         let block =
@@ -743,14 +745,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                 method branch_refused = branch_refused
                 method branch_delayed = branch_delayed
               end)
-        |+ flag ~descr:"Include applied operations (set by default)"
-          "applied" (fun t -> t#applied)
-        |+ flag ~descr:"Include refused operations"
-          "refused" (fun t -> t#refused)
-        |+ flag ~descr:"Include branch refused operations"
-          "branch_refused" (fun t -> t#branch_refused)
-        |+ flag ~descr:"Include branch delayed operations (set by default)"
-          "branch_delayed" (fun t -> t#branch_delayed)
+        |+ field ~descr:"Include applied operations (set by default)"
+          "applied" RPC_arg.bool true (fun t -> t#applied)
+        |+ field ~descr:"Include refused operations"
+          "refused" RPC_arg.bool false (fun t -> t#refused)
+        |+ field ~descr:"Include branch refused operations"
+          "branch_refused" RPC_arg.bool false (fun t -> t#branch_refused)
+        |+ field ~descr:"Include branch delayed operations (set by default)"
+          "branch_delayed" RPC_arg.bool true (fun t -> t#branch_delayed)
         |> seal
 
       let monitor_operations path =
@@ -991,25 +993,23 @@ end
 
 module Fake_protocol = struct
   let hash = Protocol_hash.zero
-  type block_header_data = MBytes.t
-  let block_header_data_encoding =
-    (obj1 (req "raw_protocol_data" Data_encoding.Variable.bytes))
+  type block_header_data = unit
+  let block_header_data_encoding = Data_encoding.empty
   type block_header_metadata = unit
   let block_header_metadata_encoding = Data_encoding.empty
-  type operation_data = MBytes.t
+  type operation_data = unit
   type operation_receipt = unit
   type operation = {
     shell: Operation.shell_header ;
     protocol_data: operation_data ;
   }
-  let operation_data_encoding =
-    (obj1 (req "raw_protocol_data" Data_encoding.Variable.bytes))
+  let operation_data_encoding = Data_encoding.empty
   let operation_receipt_encoding = Data_encoding.empty
   let operation_data_and_receipt_encoding =
     Data_encoding.conv
-      (fun (b, ()) -> b)
-      (fun b -> (b, ()))
-      operation_data_encoding
+      (fun ((), ()) -> ())
+      (fun () -> ((), ()))
+      Data_encoding.empty
 end
 
 module Empty = Make(Fake_protocol)(Fake_protocol)

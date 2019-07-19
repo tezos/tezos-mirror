@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands: unit -> Proto_alpha.full Clic.command list
+val commands: unit -> Protocol_client_context.full Clic.command list

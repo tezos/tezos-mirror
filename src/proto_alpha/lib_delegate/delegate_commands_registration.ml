@@ -24,6 +24,6 @@
 (*****************************************************************************)
 
 let () =
-  Client_commands.register Proto_alpha.hash @@ fun _network ->
-  List.map (Clic.map_command (new Proto_alpha.wrap_full)) @@
+  Client_commands.register Protocol.hash @@ fun _network ->
+  List.map (Clic.map_command (new Protocol_client_context.wrap_full)) @@
   Delegate_commands.delegate_commands ()

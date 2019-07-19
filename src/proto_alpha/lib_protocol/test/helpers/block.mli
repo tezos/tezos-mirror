@@ -23,18 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
   operations : Operation.packed list ;
-  context : Tezos_protocol_environment_memory.Context.t ; (** Resulting context *)
+  context : Tezos_protocol_environment.Context.t ; (** Resulting context *)
 }
 type block = t
 
-val rpc_ctxt: t Alpha_environment.RPC_context.simple
+val rpc_ctxt: t Environment.RPC_context.simple
 
 (** Policies to select the next baker:
     - [By_priority p] selects the baker at priority [p]
@@ -50,7 +50,9 @@ type baker_policy =
     a policy, defaults to By_priority 0. *)
 val get_next_baker:
   ?policy:baker_policy ->
-  t -> (public_key_hash * int * Time.t) tzresult Lwt.t
+  t -> (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
+
+val get_endorsing_power: block -> int tzresult Lwt.t
 
 module Forge : sig
 
@@ -66,6 +68,7 @@ module Forge : sig
       The header can then be modified and applied with [apply]. *)
   val forge_header:
     ?policy:baker_policy ->
+    ?timestamp: Timestamp.time ->
     ?operations: Operation.packed list ->
     t -> header tzresult Lwt.t
 
@@ -90,35 +93,13 @@ end
     associated amounts.
 *)
 val genesis:
-  ?preserved_cycles:int ->
-  ?blocks_per_cycle:int32 ->
-  ?blocks_per_commitment:int32 ->
-  ?blocks_per_roll_snapshot:int32 ->
-  ?blocks_per_voting_period:int32 ->
-  ?time_between_blocks:Period_repr.t list ->
+  ?with_commitments:bool ->
   ?endorsers_per_block:int ->
-  ?minimum_endorsements_per_priority:int list ->
-  ?hard_gas_limit_per_operation:Z.t ->
-  ?hard_gas_limit_per_block:Z.t ->
-  ?proof_of_work_threshold:int64 ->
-  ?tokens_per_roll:Tez_repr.tez ->
-  ?michelson_maximum_type_size:int ->
-  ?seed_nonce_revelation_tip:Tez_repr.tez ->
-  ?origination_size:int ->
-  ?block_security_deposit:Tez_repr.tez ->
-  ?endorsement_security_deposit:Tez_repr.tez ->
-  ?block_reward:Tez_repr.tez ->
-  ?endorsement_reward:Tez_repr.tez ->
-  ?cost_per_byte: Tez_repr.t ->
-  ?hard_storage_limit_per_operation: Z.t ->
-  ?commitments:Commitment_repr.t list ->
-  ?security_deposit_ramp_up_cycles: int option ->
-  ?no_reward_cycles: int option ->
-  ?endorsement_reward_priority_bonus : Proto_alpha.Tez_repr.tez ->
-  ?endorsement_bonus_intercept : int ->
-  ?endorsement_bonus_slope : int ->
-  ?delay_per_missing_endorsement : Proto_alpha.Period_repr.t ->
+  ?initial_endorsers: int ->
+  ?min_proposal_quorum: int32 ->
   (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
+
+val genesis_with_parameters: Parameters_repr.t -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and
     obtains a new block *)
@@ -137,6 +118,7 @@ val apply:
 *)
 val bake:
   ?policy: baker_policy ->
+  ?timestamp: Timestamp.time ->
   ?operation: Operation.packed ->
   ?operations: Operation.packed list ->
   t -> t tzresult Lwt.t

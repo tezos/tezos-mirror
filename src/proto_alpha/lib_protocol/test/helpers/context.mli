@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
-open Alpha_environment
+open Protocol
 open Alpha_context
+open Environment
 
 type t =
   | B of Block.t
@@ -49,6 +49,12 @@ val get_seed: t -> Seed.seed tzresult Lwt.t
 (** Returns all the constants of the protocol *)
 val get_constants: t -> Constants.t tzresult Lwt.t
 
+val get_minimal_valid_time: t -> priority:int -> endorsing_power:int -> Time.t tzresult Lwt.t
+
+val get_baking_reward: t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+
+val get_endorsing_reward: t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+
 module Vote : sig
   val get_ballots: t -> Vote.ballots tzresult Lwt.t
   val get_ballot_list: t -> (Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
@@ -56,10 +62,12 @@ module Vote : sig
   val get_voting_period_position: t -> Int32.t tzresult Lwt.t
   val get_current_period_kind: t -> Voting_period.kind tzresult Lwt.t
   val get_current_quorum: t -> Int32.t tzresult Lwt.t
+  val get_participation_ema: Block.t -> Int32.t tzresult Lwt.t
   val get_listings: t -> (Signature.Public_key_hash.t * int32) list tzresult Lwt.t
   val get_proposals: t -> Int32.t Protocol_hash.Map.t tzresult Lwt.t
   val get_current_proposal: t -> Protocol_hash.t option tzresult Lwt.t
   val get_protocol : Block.t -> Protocol_hash.t Lwt.t
+  val set_participation_ema : Block.t -> int32 -> Block.t Lwt.t
 end
 
 module Contract : sig
@@ -71,7 +79,7 @@ module Contract : sig
 
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:
-      deposit, fees ot rewards. *)
+      deposit, fees or rewards. *)
   val balance: ?kind:balance_kind -> t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val counter: t -> Contract.t -> Z.t tzresult Lwt.t
@@ -90,7 +98,7 @@ module Delegate : sig
     frozen_balance: Tez.t ;
     frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
     staking_balance: Tez.t ;
-    delegated_contracts: Contract_hash.t list ;
+    delegated_contracts: Contract_repr.t list ;
     delegated_balance: Tez.t ;
     deactivated: bool ;
     grace_period: Cycle.t ;
@@ -103,10 +111,9 @@ end
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init:
-  ?slow: bool ->
-  ?preserved_cycles:int ->
-  ?endorsers_per_block:int ->
-  ?commitments:Commitment_repr.t list ->
+  ?endorsers_per_block: int ->
+  ?with_commitments: bool ->
   ?initial_balances: int64 list ->
-  ?minimum_endorsements_per_priority: int list ->
+  ?initial_endorsers: int ->
+  ?min_proposal_quorum: int32 ->
   int -> (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

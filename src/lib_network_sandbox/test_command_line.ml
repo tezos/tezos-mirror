@@ -4,11 +4,12 @@ module Run_command = struct
   let or_hard_fail state main ~pp_error : unit =
     let open Asynchronous_result in
     run_application (fun () ->
-        bind_on_error (main ()) ~f:(fun e ->
+        bind_on_error (main ()) ~f:(fun ~result _ ->
             transform_error
-              ~f:(fun (`Lwt_exn _) _ -> die 3)
+              ~f:(fun (`Lwt_exn _) -> `Die 3)
               (Console.say state
-                 EF.(custom (fun fmt -> (Error.pp ~error:pp_error) fmt e)))
+                 EF.(
+                   custom (fun ppf -> Attached_result.pp ppf result ~pp_error)))
             >>= fun () -> die 2 ) )
 
   let term ~pp_error () =
@@ -18,7 +19,7 @@ module Run_command = struct
 end
 
 let cli_state ?default_interactivity ?(disable_interactivity = false) ~name ()
-  =
+    =
   let runner = Running_processes.State.make () in
   let default_root = sprintf "/tmp/%s-test" name in
   let app = sprintf "Flextesa.%s" name in

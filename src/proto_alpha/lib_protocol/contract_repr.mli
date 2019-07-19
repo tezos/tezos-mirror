@@ -34,6 +34,9 @@ include Compare.S with type t := contract
 
 val implicit_contract : Signature.Public_key_hash.t -> contract
 
+(** Only for migration from proto_004  *)
+val originated_contract_004 : Contract_hash.t -> contract
+
 val is_implicit : contract -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} *)
@@ -76,10 +79,4 @@ val origination_nonce_encoding : origination_nonce Data_encoding.t
 
 val rpc_arg : contract RPC_arg.arg
 
-module Index : sig
-  include Storage_description.INDEX with type t = t
-  val contract_prefix: string -> string list
-  val pkh_prefix_ed25519: string -> string list
-  val pkh_prefix_secp256k1: string -> string list
-  val pkh_prefix_p256: string -> string list
-end
+module Index : Storage_description.INDEX with type t = t

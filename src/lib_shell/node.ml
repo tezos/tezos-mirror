@@ -138,21 +138,21 @@ type config = {
 }
 
 and peer_validator_limits = Peer_validator.limits = {
-  new_head_request_timeout: float ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
-  protocol_timeout: float ;
+  new_head_request_timeout: Time.System.Span.t ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits: Worker_types.limits
 }
 
 and prevalidator_limits = Prevalidator.limits = {
   max_refused_operations: int ;
-  operation_timeout: float ;
+  operation_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 
 and block_validator_limits = Block_validator.limits = {
-  protocol_timeout: float ;
+  protocol_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
 }
 
@@ -162,14 +162,14 @@ and chain_validator_limits = Chain_validator.limits = {
 }
 
 let default_block_validator_limits = {
-  protocol_timeout = 120. ;
+  protocol_timeout = Time.System.Span.of_seconds_exn 120. ;
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Debug ;
   }
 }
 let default_prevalidator_limits = {
-  operation_timeout = 10. ;
+  operation_timeout = Time.System.Span.of_seconds_exn 10. ;
   max_refused_operations = 1000 ;
   worker_limits = {
     backlog_size = 1000 ;
@@ -177,10 +177,10 @@ let default_prevalidator_limits = {
   }
 }
 let default_peer_validator_limits = {
-  block_header_timeout = 60. ;
-  block_operations_timeout = 60. ;
-  protocol_timeout = 120. ;
-  new_head_request_timeout = 90. ;
+  block_header_timeout = Time.System.Span.of_seconds_exn 60. ;
+  block_operations_timeout = Time.System.Span.of_seconds_exn 60. ;
+  protocol_timeout = Time.System.Span.of_seconds_exn 120. ;
+  new_head_request_timeout = Time.System.Span.of_seconds_exn 90. ;
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
@@ -197,14 +197,15 @@ let default_chain_validator_limits = {
 let may_update_checkpoint chain_state checkpoint history_mode =
   match checkpoint with
   | None ->
-      Lwt.return_unit
+      return_unit
   | Some checkpoint ->
       State.best_known_head_for_checkpoint
         chain_state checkpoint >>= fun new_head ->
       Chain.set_head chain_state new_head >>= fun _old_head ->
       begin match history_mode with
         | History_mode.Archive ->
-            State.Chain.set_checkpoint chain_state checkpoint
+            State.Chain.set_checkpoint chain_state checkpoint >>= fun () ->
+            return_unit
         | Full ->
             State.Chain.set_checkpoint_then_purge_full chain_state checkpoint
         | Rolling ->
@@ -276,7 +277,7 @@ let create
   State.init
     ~store_root ~context_root ?history_mode ?patch_context
     genesis >>=? fun (state, mainchain_state, context_index, history_mode) ->
-  may_update_checkpoint mainchain_state checkpoint history_mode >>= fun () ->
+  may_update_checkpoint mainchain_state checkpoint history_mode >>=? fun () ->
   let distributed_db = Distributed_db.create state p2p in
   store_known_protocols state >>= fun () ->
   Validator.create state distributed_db
@@ -292,11 +293,23 @@ let create
     ?max_child_ttl ~start_prevalidator
     mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
+    let open Local_logging in
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the p2p layer..."
+        -% t event "shutdown") >>= fun () ->
     P2p.shutdown p2p >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the distributed database..."
+        -% t event "shutdown") >>= fun () ->
     Distributed_db.shutdown distributed_db >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the validator..."
+        -% t event "shutdown") >>= fun () ->
     Validator.shutdown validator >>= fun () ->
-    State.close state >>= fun () ->
-    Lwt.return_unit
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Closing down the state..."
+        -% t event "shutdown") >>= fun () ->
+    State.close state
   in
   return {
     state ;
@@ -321,8 +334,10 @@ let build_rpc_directory node =
            node.validator node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
   merge (Chain_directory.build_rpc_directory node.validator) ;
-  merge (P2p.build_rpc_directory node.p2p) ;
+  merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.state) ;
+
+  merge (Stat_directory.rpc_directory ()) ;
 
   register0 RPC_service.error_service begin fun () () ->
     return (Data_encoding.Json.schema Error_monad.error_encoding)

@@ -23,17 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let wrap_thread thread =
-  Lwt.pick
-    [ (thread >|= fun v -> `End v) ;
-      (Lwt_exit.termination_thread >|= fun _ -> `Killed) ] >>= function
-  | `End v -> Lwt.return v
-  | `Killed -> Lwt_exit.exit 1
-
-let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
+let rec retry (cctxt: #Protocol_client_context.full) ~delay ~tries f x =
   f x >>= function
   | Ok _ as r -> Lwt.return r
-  | Error (RPC_client.Request_failed
+  | Error (RPC_client_errors.Request_failed
              { error = Connection_failed _ ; _ } :: _) as err
     when tries > 0 -> begin
       cctxt#message
@@ -51,7 +44,7 @@ let rec retry (cctxt: #Proto_alpha.full) ~delay ~tries f x =
   | Error _ as err ->
       Lwt.return err
 
-let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
+let await_bootstrapped_node (cctxt: #Protocol_client_context.full) =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the node to be synchronized with its \
                  peers..." >>= fun () ->
@@ -60,7 +53,7 @@ let await_bootstrapped_node (cctxt: #Proto_alpha.full) =
   cctxt#message "Node synchronized." >>= fun () ->
   return_unit
 
-let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
+let monitor_fork_testchain (cctxt: #Protocol_client_context.full) ~cleanup_nonces  =
   (* Waiting for the node to be synchronized *)
   cctxt#message "Waiting for the test chain to be forked..." >>= fun () ->
   Shell_services.Monitor.active_chains cctxt >>=? fun (stream, _) ->
@@ -72,11 +65,11 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
           | _ -> false) l in
     match testchain with
     | Some (Active_test { protocol ; expiration_date ; _ })
-      when Protocol_hash.equal Proto_alpha.hash protocol -> begin
+      when Protocol_hash.equal Protocol.hash protocol -> begin
         let abort_daemon () =
           cctxt#message "Test chain's expiration date reached \
                          (%a)... Stopping the daemon.@."
-            Time.pp_hum expiration_date >>= fun () ->
+            Time.Protocol.pp_hum expiration_date >>= fun () ->
           if cleanup_nonces then
             (* Clean-up existing nonces *)
             cctxt#with_lock begin fun () ->
@@ -88,7 +81,8 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
             exit 0 in
         let canceler = Lwt_canceler.create () in
         Lwt_canceler.on_cancel canceler (fun () -> abort_daemon () >>= function _ -> Lwt.return_unit) ;
-        let delay = Int64.to_int Time.(diff expiration_date (now ())) in
+        let now = Time.System.(to_protocol (Systime_os.now ())) in
+        let delay = Int64.to_int (Time.Protocol.diff expiration_date now) in
         if delay <= 0 then
           (* Testchain already expired... Retrying. *)
           loop ()
@@ -108,21 +102,20 @@ let monitor_fork_testchain (cctxt: #Proto_alpha.full) ~cleanup_nonces  =
 
 module Endorser = struct
 
-  let run (cctxt : #Proto_alpha.full) ~chain ~delay delegates =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~delay delegates =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:false
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [Proto_alpha.hash])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Endorser started." >>= fun () ->
-    let endorser_thread = Client_baking_endorsement.create cctxt
-        ~delay
-        delegates
-        block_stream in
-    wrap_thread endorser_thread >>=? fun () ->
+    Client_baking_endorsement.create cctxt
+      ~delay
+      delegates
+      block_stream >>=? fun () ->
     return_unit
 
 end
@@ -130,7 +123,7 @@ end
 module Baker = struct
 
   let run
-      (cctxt : #Proto_alpha.full)
+      (cctxt : #Protocol_client_context.full)
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
@@ -144,38 +137,35 @@ module Baker = struct
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [Proto_alpha.hash])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt chain >>=? fun block_stream ->
     cctxt#message "Baker started." >>= fun () ->
-
-    let baker_thread = Client_baking_forge.create cctxt
-        ?minimal_fees
-        ?minimal_nanotez_per_gas_unit
-        ?minimal_nanotez_per_byte
-        ?max_priority
-        ~chain
-        ~context_path
-        delegates
-        block_stream in
-    wrap_thread baker_thread >>=? fun () ->
+    Client_baking_forge.create cctxt
+      ?minimal_fees
+      ?minimal_nanotez_per_gas_unit
+      ?minimal_nanotez_per_byte
+      ?max_priority
+      ~chain
+      ~context_path
+      delegates
+      block_stream >>=? fun () ->
     return_unit
 
 end
 
 module Accuser = struct
 
-  let run (cctxt : #Proto_alpha.full) ~chain ~preserved_levels =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels =
     await_bootstrapped_node cctxt >>=? fun _ ->
     begin if chain = `Test then
         monitor_fork_testchain cctxt ~cleanup_nonces:true
       else
         return_unit end >>=? fun () ->
     Client_baking_blocks.monitor_valid_blocks
-      ~next_protocols:(Some [Proto_alpha.hash])
+      ~next_protocols:(Some [ Protocol.hash ])
       cctxt ~chains:[ chain ] () >>=? fun valid_blocks_stream ->
     cctxt#message "Accuser started." >>= fun () ->
-    let accuser_thread = Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream in
-    wrap_thread accuser_thread >>=? fun () ->
+    Client_baking_denunciation.create cctxt ~preserved_levels valid_blocks_stream >>=? fun () ->
     return_unit
 
 end

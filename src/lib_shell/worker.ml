@@ -169,7 +169,7 @@ module type T = sig
   (** Creates a new worker instance.
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
-    'kind table -> ?timeout:float ->
+    'kind table -> ?timeout:Time.System.Span.t ->
     Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t tzresult Lwt.t
@@ -188,7 +188,7 @@ module type T = sig
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
-    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
@@ -236,6 +236,8 @@ module type T = sig
   (** Access the event backlog. *)
   val last_events : _ t -> (Internal_event.level * Event.t list) list
 
+  (** Introspect the message queue, gives the times requests were pushed. *)
+  val pending_requests : _ queue t -> (Time.System.t * Request.view) list
 
   (** Get the running status of a worker. *)
   val status : _ t -> Worker_types.worker_status
@@ -243,7 +245,7 @@ module type T = sig
   (** Get the request being treated by a worker.
       Gives the time the request was pushed, and the time its
       treatment started. *)
-  val current_request : _ t -> (Time.t * Time.t * Request.view) option
+  val current_request : _ t -> (Time.System.t * Time.System.t * Request.view) option
 
   val information : _ t -> Worker_types.worker_information
 
@@ -288,12 +290,13 @@ module Make
   and any_request = Any_request : _ Request.t -> any_request
 
   and _ buffer =
-    | Queue_buffer : (Time.t * message) Lwt_pipe.t -> infinite queue buffer
-    | Bounded_buffer : (Time.t * message) Lwt_pipe.t -> bounded queue buffer
-    | Dropbox_buffer : (Time.t * message) Lwt_dropbox.t -> dropbox buffer
+    | Queue_buffer : (Time.System.t * message) Lwt_pipe.t -> infinite queue buffer
+    | Bounded_buffer : (Time.System.t * message) Lwt_pipe.t -> bounded queue buffer
+    | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
+
   and 'kind t = {
     limits : Worker_types.limits ;
-    timeout : float option ;
+    timeout : Time.System.Span.t option ;
     parameters : Types.parameters ;
     mutable (* only for init *) worker : unit Lwt.t ;
     mutable (* only for init *) state : Types.state option ;
@@ -304,7 +307,7 @@ module Make
     name : Name.t ;
     id : int ;
     mutable status : Worker_types.worker_status ;
-    mutable current_request : (Time.t * Time.t * Request.view) option ;
+    mutable current_request : (Time.System.t * Time.System.t * Request.view) option ;
     table : 'kind table ;
   }
   and 'kind table = {
@@ -314,7 +317,7 @@ module Make
   }
 
   let queue_item ?u r =
-    Time.now (),
+    Systime_os.now (),
     Message (r, u)
 
   let drop_request w merge message_box request =
@@ -329,7 +332,7 @@ module Make
       with
       | None -> ()
       | Some (Any_request neu) ->
-          Lwt_dropbox.put message_box (Time.now (), Message (neu, None))
+          Lwt_dropbox.put message_box (Systime_os.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
 
   let push_request_and_wait w message_queue request =
@@ -365,7 +368,7 @@ module Make
     type 'a t
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
-    val pending_requests : 'a t -> (Time.t * Request.view) list
+    val pending_requests : 'a t -> (Time.System.t * Request.view) list
     val pending_requests_length : 'a t -> int
   end
   module type BOUNDED_QUEUE = sig
@@ -450,21 +453,21 @@ module Make
           return_some m
       | Some timeout ->
           Lwt_pipe.pop_with_timeout
-            (Lwt_unix.sleep timeout) message_queue >>= fun m ->
-          return m in
-    let pop_dropbox message_box =
-      match w.timeout with
-      | None ->
-          Lwt_dropbox.take message_box >>= fun m ->
-          return_some m
-      | Some timeout ->
-          Lwt_dropbox.take_with_timeout
-            (Lwt_unix.sleep timeout) message_box >>= fun m ->
+            (Systime_os.sleep timeout) message_queue >>= fun m ->
           return m in
     match w.buffer with
     | Queue_buffer message_queue -> pop_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
-    | Dropbox_buffer message_box -> pop_dropbox message_box
+    | Dropbox_buffer message_box ->
+        match w.timeout with
+        | None ->
+            Lwt_dropbox.take message_box >>= fun m ->
+            return_some m
+        | Some timeout ->
+            Lwt_dropbox.take_with_timeout
+              (Systime_os.sleep timeout) message_box >>= fun m ->
+            return m
+
   let trigger_shutdown w =
     Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -517,10 +520,10 @@ module Make
       let t0 = match w.status with
         | Running t0 -> t0
         | Launching _ | Closing _ | Closed _ -> assert false in
-      w.status <- Closing (t0, Time.now ()) ;
+      w.status <- Closing (t0, Systime_os.now ()) ;
       close w ;
       Lwt_canceler.cancel w.canceler >>= fun () ->
-      w.status <- Closed (t0, Time.now (), errs) ;
+      w.status <- Closed (t0, Systime_os.now (), errs) ;
       Hashtbl.remove w.table.instances w.name ;
       Handlers.on_close w >>= fun () ->
       w.state <- None ;
@@ -536,14 +539,14 @@ module Make
         | None -> Handlers.on_no_request w
         | Some (pushed, Message (request, u)) ->
             let current_request = Request.view request in
-            let treated = Time.now () in
+            let treated = Systime_os.now () in
             w.current_request <- Some (pushed, treated, current_request) ;
             Logger.debug "@[<v 2>Request:@,%a@]"
               Request.pp current_request ;
             match u with
             | None ->
                 Handlers.on_request w request >>=? fun res ->
-                let completed = Time.now () in
+                let completed = Systime_os.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
@@ -552,7 +555,7 @@ module Make
                 Handlers.on_request w request >>= fun res ->
                 Lwt.wakeup_later u res ;
                 Lwt.return res >>=? fun res ->
-                let completed = Time.now () in
+                let completed = Systime_os.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
                   request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
@@ -568,7 +571,7 @@ module Make
       | Error errs ->
           begin match w.current_request with
             | Some (pushed, treated, request) ->
-                let completed = Time.now () in
+                let completed = Systime_os.now () in
                 w.current_request <- None ;
                 Handlers.on_error w
                   request Worker_types.{ pushed ; treated ; completed } errs
@@ -591,7 +594,7 @@ module Make
 
   let launch
     : type kind.
-      kind table -> ?timeout:float ->
+      kind table -> ?timeout:Time.System.Span.t ->
       Worker_types.limits -> Name.t -> Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t tzresult Lwt.t
@@ -600,56 +603,57 @@ module Make
         Format.asprintf "%a" Name.pp name in
       let full_name =
         if name_s = "" then base_name else Format.asprintf "%s_%s" base_name name_s in
-      let id =
-        table.last_id <- table.last_id + 1 ;
-        table.last_id in
-      let id_name =
-        if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id in
       if Hashtbl.mem table.instances name then
-        invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name) ;
-      let canceler = Lwt_canceler.create () in
-      let buffer : kind buffer =
-        match table.buffer_kind with
-        | Queue ->
-            Queue_buffer (Lwt_pipe.create ())
-        | Bounded { size } ->
-            Bounded_buffer (Lwt_pipe.create ~size:(size, (fun _ -> 1)) ())
-        | Dropbox _ ->
-            Dropbox_buffer (Lwt_dropbox.create ()) in
-      let event_log =
-        let levels =
-          Internal_event.[
-            Debug ; Info ; Notice ; Warning ; Error ; Fatal
-          ] in
-        List.map (fun l -> l, Ring.create limits.backlog_size) levels in
-      let module Logger =
-        Internal_event.Legacy_logging.Make(struct
-          let name = id_name
-        end) in
-      let w = { limits ; parameters ; name ; canceler ;
-                table ; buffer ; logger = (module Logger) ;
-                state = None ; id ;
-                worker = Lwt.return_unit ;
-                event_log ; timeout ;
-                current_request = None ;
-                status = Launching (Time.now ())} in
-      Hashtbl.add table.instances name w ;
-      begin
-        if id_name = base_name then
-          Logger.lwt_log_notice "Worker started"
-        else
-          Logger.lwt_log_notice "Worker started for %s" name_s
-      end >>= fun () ->
-      Handlers.on_launch w name parameters >>=? fun state ->
-      w.status <- Running (Time.now ()) ;
-      w.state <- Some state ;
-      w.worker <-
-        Lwt_utils.worker
-          full_name
-          ~on_event:Internal_event.Lwt_worker_event.on_event
-          ~run:(fun () -> worker_loop (module Handlers) w)
-          ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
-      return w
+        invalid_arg (Format.asprintf "Worker.launch: duplicate worker %s" full_name)
+      else
+        let id =
+          table.last_id <- table.last_id + 1 ;
+          table.last_id in
+        let id_name =
+          if name_s = "" then base_name else Format.asprintf "%s_%d" base_name id in
+        let canceler = Lwt_canceler.create () in
+        let buffer : kind buffer =
+          match table.buffer_kind with
+          | Queue ->
+              Queue_buffer (Lwt_pipe.create ())
+          | Bounded { size } ->
+              Bounded_buffer (Lwt_pipe.create ~size:(size, (fun _ -> 1)) ())
+          | Dropbox _ ->
+              Dropbox_buffer (Lwt_dropbox.create ()) in
+        let event_log =
+          let levels =
+            Internal_event.[
+              Debug ; Info ; Notice ; Warning ; Error ; Fatal
+            ] in
+          List.map (fun l -> l, Ring.create limits.backlog_size) levels in
+        let module Logger =
+          Internal_event.Legacy_logging.Make(struct
+            let name = id_name
+          end) in
+        let w = { limits ; parameters ; name ; canceler ;
+                  table ; buffer ; logger = (module Logger) ;
+                  state = None ; id ;
+                  worker = Lwt.return_unit ;
+                  event_log ; timeout ;
+                  current_request = None ;
+                  status = Launching (Systime_os.now ())} in
+        Hashtbl.add table.instances name w ;
+        begin
+          if id_name = base_name then
+            Logger.lwt_log_notice "Worker started"
+          else
+            Logger.lwt_log_notice "Worker started for %s" name_s
+        end >>= fun () ->
+        Handlers.on_launch w name parameters >>=? fun state ->
+        w.status <- Running (Systime_os.now ()) ;
+        w.state <- Some state ;
+        w.worker <-
+          Lwt_utils.worker
+            full_name
+            ~on_event:Internal_event.Lwt_worker_event.on_event
+            ~run:(fun () -> worker_loop (module Handlers) w)
+            ~cancel:(fun () -> Lwt_canceler.cancel w.canceler) ;
+        return w
 
   let shutdown w =
     let (module Logger) = w.logger in
@@ -673,6 +677,9 @@ module Make
              base_name Name.pp w.name)
     | None, _  -> assert false
     | Some state, _ -> state
+
+  let pending_requests q =
+    Queue.pending_requests q
 
   let last_events w =
     List.map
@@ -703,6 +710,7 @@ module Make
   let find_opt { instances ; _ } =
     Hashtbl.find_opt instances
 
+  (* TODO? add a list of cancelers for nested protection ? *)
   let protect { canceler ; _ } ?on_error f =
     protect ?on_error ~canceler f
 

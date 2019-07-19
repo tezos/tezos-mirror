@@ -1,6 +1,6 @@
 open Internal_pervasives
 
-type t = {id: string; port: int; exec: [`Admin] Tezos_executable.t}
+type t = {id: string; port: int; exec: Tezos_executable.t}
 
 let base_dir t ~state = Paths.root state // sprintf "Admin-client-base-%s" t.id
 
@@ -38,10 +38,22 @@ open Command_error
 let successful_command admin state args =
   Running_processes.run_cmdf state "sh -c %s"
     ( make_command admin state args
-      |> Genspio.Compile.to_one_liner |> Filename.quote )
+    |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
   >>= function
   | true -> return res
   | false ->
       failf ~args "Admin-command failure: %s" (String.concat ~sep:" " args)
+
+let inject_protocol admin state ~path =
+  successful_command admin state ["inject"; "protocol"; path]
+  >>= fun res ->
+  String.concat ~sep:" " res#out
+  |> String.split ~on:' ' |> List.map ~f:String.strip
+  |> (function
+       | _ :: _ :: hash :: _ when hash.[0] = 'P' -> return hash
+       | _ ->
+           failf "inject protocol: cannot parse hash of protocol: %s"
+             (String.concat ~sep:", " (List.map ~f:(sprintf "%S") res#out)) )
+  >>= fun hash -> return (res, hash)

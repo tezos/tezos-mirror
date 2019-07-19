@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type block_info = {
@@ -31,7 +31,7 @@ type block_info = {
   chain_id: Chain_id.t ;
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
-  timestamp: Time.t ;
+  timestamp: Time.Protocol.t ;
   protocol: Protocol_hash.t ;
   next_protocol: Protocol_hash.t ;
   proto_level: int ;
@@ -70,7 +70,7 @@ module Block_seen_event = struct
   }
   let make hash header occurrence () = { hash ; header ; occurrence }
   module Definition = struct
-    let name = "block-seen"
+    let name = "block-seen-" ^ Protocol.name
     type nonrec t = t
     let encoding =
       let open Data_encoding in
@@ -141,7 +141,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
     cctxt ~chain ~block () >>=? fun { level ; _ } ->
   Alpha_services.Helpers.levels_in_current_cycle
     cctxt ~offset (chain, block) >>= function
-  | Error [RPC_context.Not_found _] ->
+  | Error (RPC_context.Not_found _ :: _) ->
       return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->

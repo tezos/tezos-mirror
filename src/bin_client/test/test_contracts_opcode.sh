@@ -6,41 +6,6 @@ set -o pipefail
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 
-parameters_file=$test_dir/protocol_parameters.json
-
-if ! [ -f "$parameters_file" ]; then
-	cat > "$parameters_file" <<EOF
-{ "bootstrap_accounts":
-  [
-      [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
-      [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
-      [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
-      [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-      [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "commitments": [
-    [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
-    [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
-    [ "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
-    [ "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
-    [ "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
-    [ "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
-    [ "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
-    [ "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
-    [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
-    [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
-  ],
-  "time_between_blocks" : [ "1", "0" ],
-  "blocks_per_cycle" : 128,
-  "blocks_per_roll_snapshot" : 32,
-  "blocks_per_voting_period" : 256,
-  "preserved_cycles" : 1,
-  "proof_of_work_threshold": "-1",
-  "minimum_endorsements_per_priority": []
-}
-EOF
-fi
-
 start_node 1
 activate_alpha
 
@@ -71,6 +36,11 @@ fi
 # NB: noop.tz is tested in test_basic.sh
 
 assert_storage $contract_op_dir/ret_int.tz None Unit '(Some 300)'
+
+assert_storage $contract_op_dir/dign.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '5'
+assert_storage $contract_op_dir/dugn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '1'
+assert_storage $contract_op_dir/dropn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '5'
+assert_storage $contract_op_dir/dipn.tz '0' '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)' '6'
 
 # Map block on lists
 assert_storage $contract_op_dir/list_map_block.tz '{0}' '{}' '{}'
@@ -245,7 +215,7 @@ assert_fails $client run script $contract_op_dir/packunpack.tz on storage Unit a
                '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)'
 
 # Get current steps to quota
-assert_storage $contract_op_dir/steps_to_quota.tz 111 Unit 399813
+assert_storage $contract_op_dir/steps_to_quota.tz 111 Unit 799819
 
 # Get the current balance of the contract
 assert_storage $contract_op_dir/balance.tz '111' Unit '4000000000000'
@@ -300,23 +270,23 @@ assert_balance $key1 "1000 ꜩ"
 assert_balance $key2 "2000 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
-init_with_transfer $contract_op_dir/store_input.tz $key1 '""' 100 bootstrap1
+init_with_transfer $contract_op_dir/store_input.tz '""' 100 bootstrap1
 bake_after $client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"' --burn-cap 10
 assert_balance store_input "200 ꜩ"
 assert_storage_contains store_input '"abcdefg"'
 bake_after $client transfer 100 from bootstrap1 to store_input -arg '"xyz"' --burn-cap 10
 assert_storage_contains store_input '"xyz"'
 
-init_with_transfer $contract_op_dir/transfer_amount.tz $key1 '0' "100" bootstrap1
+init_with_transfer $contract_op_dir/transfer_amount.tz '0' "100" bootstrap1
 bake_after $client transfer 500 from bootstrap1 to transfer_amount -arg Unit --burn-cap 10
 assert_storage_contains transfer_amount 500
 
 
 # This tests the `NOW` instruction.
 # This test may fail if timings are marginal, though I have not yet seen this happen
-init_with_transfer $contract_op_dir/store_now.tz $key1 '"2017-07-13T09:19:01Z"' "100" bootstrap1
+init_with_transfer $contract_op_dir/store_now.tz '"2017-07-13T09:19:01Z"' "100" bootstrap1
 bake_after $client transfer 500 from bootstrap1 to store_now -arg Unit --burn-cap 10
-assert_storage_contains store_now "$($client get timestamp)"
+assert_storage_contains store_now "$(get_NOW)"
 
 # Test timestamp operations
 assert_storage $contract_op_dir/add_timestamp_delta.tz None '(Pair 100 100)' '(Some "1970-01-01T00:03:20Z")'
@@ -337,25 +307,25 @@ assert_storage $contract_op_dir/diff_timestamps.tz 111 '(Pair 1 0)' 1
 assert_storage $contract_op_dir/diff_timestamps.tz 111 '(Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z")' 200
 
 # Tests TRANSFER_TOKENS
-bake_after $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1 --burn-cap 10
-bake_after $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1 --burn-cap 10
-init_with_transfer $contract_op_dir/transfer_tokens.tz $key2 Unit 1,000 bootstrap1
-assert_balance test_transfer_account1 "100 ꜩ"
+bake_after $client originate contract "test_transfer_contract1" transferring 100 from bootstrap1 running file:contracts/opcodes/noop.tz --burn-cap 10
+bake_after $client originate contract "test_transfer_contract2" transferring 20 from bootstrap1 running file:contracts/opcodes/noop.tz --burn-cap 10
+init_with_transfer $contract_op_dir/transfer_tokens.tz Unit 1,000 bootstrap1
+assert_balance test_transfer_contract1 "100 ꜩ"
 bake_after $client transfer 100 from bootstrap1 to transfer_tokens \
-           -arg "\"$(get_contract_addr test_transfer_account1)\"" --burn-cap 10
-assert_balance test_transfer_account1 "200 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
+           -arg "\"$(get_contract_addr test_transfer_contract1)\"" --burn-cap 10
+assert_balance test_transfer_contract1 "200 ꜩ"
 bake_after $client transfer 100 from bootstrap1 to transfer_tokens \
-            -arg "\"$(get_contract_addr test_transfer_account2)\"" --burn-cap 10
-assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
+            -arg "\"$(get_contract_addr test_transfer_contract2)\"" --burn-cap 10
+assert_balance test_transfer_contract2 "120 ꜩ"
 
 # Test SELF
-init_with_transfer $contract_op_dir/self.tz $key1 \
+init_with_transfer $contract_op_dir/self.tz \
 				   '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' 1,000 bootstrap1
 bake_after $client transfer 0 from bootstrap1 to self --burn-cap 10
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
 # Test SLICE and SIZE on bytes
-init_with_transfer $contract_op_dir/slices.tz bootstrap1 \
+init_with_transfer $contract_op_dir/slices.tz \
 				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
 
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
@@ -372,14 +342,14 @@ assert_success $client transfer 0 from bootstrap1 to slices -arg \
         '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "spsig1PPUFZucuAQybs5wsqsNQ68QNgFaBnVKMFaoZZfi1BtNnuCAWnmL9wVy5HfHkR6AeodjVGxpBVVSYcJKyMURn6K1yknYLm")' --burn-cap 10
 bake
 
-init_with_transfer $contract_op_dir/split_string.tz bootstrap1 '{}' 1,000 bootstrap1
+init_with_transfer $contract_op_dir/split_string.tz '{}' 1,000 bootstrap1
 
 bake_after $client transfer 0 from bootstrap1 to split_string -arg '"abc"' --burn-cap 10
 assert_storage_contains split_string '{ "a" ; "b" ; "c" }'
 bake_after $client transfer 0 from bootstrap1 to split_string -arg '"def"' --burn-cap 10
 assert_storage_contains split_string '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
 
-init_with_transfer $contract_op_dir/split_bytes.tz bootstrap1 '{}' 1,000 bootstrap1
+init_with_transfer $contract_op_dir/split_bytes.tz '{}' 1,000 bootstrap1
 
 bake_after $client transfer 0 from bootstrap1 to split_bytes -arg '0xaabbcc' --burn-cap 10
 assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc }'

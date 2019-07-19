@@ -36,7 +36,7 @@ type info = {
   frozen_balance: Tez.t ;
   frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
   staking_balance: Tez.t ;
-  delegated_contracts: Contract_hash.t list ;
+  delegated_contracts: Contract_repr.t list ;
   delegated_balance: Tez.t ;
   deactivated: bool ;
   grace_period: Cycle.t ;
@@ -72,7 +72,7 @@ val staking_balance:
 val delegated_contracts:
   'a #RPC_context.simple -> 'a ->
   Signature.Public_key_hash.t ->
-  Contract_hash.t list shell_tzresult Lwt.t
+  Contract_repr.t list shell_tzresult Lwt.t
 
 val delegated_balance:
   'a #RPC_context.simple -> 'a ->
@@ -175,7 +175,7 @@ module Required_endorsements : sig
 
   val get:
     'a #RPC_context.simple -> 'a ->
-    int -> Period.t -> int shell_tzresult Lwt.t
+    Period.t -> int shell_tzresult Lwt.t
 
 end
 
@@ -205,7 +205,6 @@ val endorsing_power:
 
 val required_endorsements:
   Alpha_context.t ->
-  int ->
   Alpha_context.Period.t ->
   int tzresult Lwt.t
 
@@ -214,4 +213,5 @@ val minimal_valid_time:
   int ->
   int ->
   Time.t tzresult Lwt.t
+
 val register: unit -> unit

@@ -41,9 +41,11 @@ type t = {
   rewards: Tez_repr.t ;
   block_gas: Z.t ;
   operation_gas: Gas_limit_repr.t ;
+  internal_gas: Gas_limit_repr.internal_gas ;
   storage_space_to_pay: Z.t option ;
   allocated_contracts: int option ;
   origination_nonce: Contract_repr.origination_nonce option ;
+  temporary_big_map: Z.t ;
   internal_nonce: int ;
   internal_nonces_used: Int_set.t ;
 }
@@ -81,8 +83,7 @@ let init_endorsements ctxt allowed_endorsements =
 let allowed_endorsements ctxt =
   ctxt.allowed_endorsements
 
-let included_endorsements ctxt =
-  ctxt.included_endorsements
+let included_endorsements ctxt = ctxt.included_endorsements
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -191,16 +192,22 @@ let check_gas_limit ctxt remaining =
   else
     ok ()
 let set_gas_limit ctxt remaining =
-  { ctxt with operation_gas = Limited { remaining } }
+  { ctxt with operation_gas = Limited { remaining } ;
+              internal_gas = Gas_limit_repr.internal_gas_zero }
 let set_gas_unlimited ctxt =
   { ctxt with operation_gas = Unaccounted }
 let consume_gas ctxt cost =
-  Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost >>? fun (block_gas, operation_gas) ->
-  ok { ctxt with block_gas ; operation_gas }
+  Gas_limit_repr.consume
+    ctxt.block_gas
+    ctxt.operation_gas
+    ctxt.internal_gas
+    cost >>? fun (block_gas, operation_gas, internal_gas) ->
+  ok { ctxt with block_gas ; operation_gas ; internal_gas }
 let check_enough_gas ctxt cost =
-  Gas_limit_repr.check_enough ctxt.block_gas ctxt.operation_gas cost
+  Gas_limit_repr.check_enough ctxt.block_gas ctxt.operation_gas ctxt.internal_gas cost
 let gas_level ctxt = ctxt.operation_gas
 let block_gas_level ctxt = ctxt.block_gas
+
 let gas_consumed ~since ~until =
   match gas_level since, gas_level until with
   | Limited { remaining = before }, Limited { remaining = after } -> Z.sub before after
@@ -407,7 +414,7 @@ let get_proto_param ctxt =
 let set_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Parameters_repr.constants_encoding constants in
+      Constants_repr.parametric_encoding constants in
   Context.set ctxt constants_key bytes
 
 let get_constants ctxt =
@@ -416,7 +423,20 @@ let get_constants ctxt =
       failwith "Internal error: cannot read constants in context."
   | Some bytes ->
       match
-        Data_encoding.Binary.of_bytes Parameters_repr.constants_encoding bytes
+        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
+      with
+      | None ->
+          failwith "Internal error: cannot parse constants in context."
+      | Some constants -> return constants
+
+(* only for migration from 004 to 005 *)
+let get_004_constants ctxt =
+  Context.get ctxt constants_key >>= function
+  | None ->
+      failwith "Internal error: cannot read constants in context."
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Parameters_repr.Proto_004.constants_encoding bytes
       with
       | None ->
           failwith "Internal error: cannot parse constants in context."
@@ -461,48 +481,84 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
     rewards = Tez_repr.zero ;
     deposits = Signature.Public_key_hash.Map.empty ;
     operation_gas = Unaccounted ;
+    internal_gas = Gas_limit_repr.internal_gas_zero ;
     storage_space_to_pay = None ;
     allocated_contracts = None ;
     block_gas = constants.Constants_repr.hard_gas_limit_per_block ;
     origination_nonce = None ;
+    temporary_big_map = Z.sub Z.zero Z.one ;
     internal_nonce = 0 ;
     internal_nonces_used = Int_set.empty ;
   }
 
-type 'a previous_protocol =
-  | Genesis of 'a
+type previous_protocol =
+  | Genesis of Parameters_repr.t
   | Alpha_previous
 
-let check_first_block ctxt =
-  Context.get ctxt version_key >>= function
-  | None ->
-      failwith "Internal error: un-initialized context in check_first_block."
-  | Some bytes ->
-      let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value) then
-        failwith "Internal error: previously initialized context."
-      else if Compare.String.(s = "genesis") then
-        return (Genesis ())
-      else if Compare.String.(s = "alpha_previous") then
-        return Alpha_previous
-      else
-        storage_error (Incompatible_protocol_version s)
-
-let prepare_first_block ~level ~timestamp ~fitness ctxt =
-  check_first_block ctxt >>=? fun previous_protocol ->
+let check_and_update_protocol_version ctxt =
   begin
-    match previous_protocol with
-    | Genesis () ->
-        Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
-        get_proto_param ctxt >>=? fun (param, ctxt) ->
-        set_first_level ctxt first_level >>=? fun ctxt ->
-        set_constants ctxt param.constants >>= fun ctxt ->
-        return (Genesis param, ctxt)
-    | Alpha_previous ->
-        return (Alpha_previous, ctxt)
+    Context.get ctxt version_key >>= function
+    | None ->
+        failwith "Internal error: un-initialized context in check_first_block."
+    | Some bytes ->
+        let s = MBytes.to_string bytes in
+        if Compare.String.(s = version_value) then
+          failwith "Internal error: previously initialized context."
+        else if Compare.String.(s = "genesis") then
+          get_proto_param ctxt >>=? fun (param, ctxt) ->
+          return (Genesis param, ctxt)
+        else if Compare.String.(s = "alpha_previous") then
+          return (Alpha_previous, ctxt)
+        else
+          storage_error (Incompatible_protocol_version s)
   end >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key
     (MBytes.of_string version_value) >>= fun ctxt ->
+  return (previous_proto, ctxt)
+
+let prepare_first_block ~level ~timestamp ~fitness ctxt =
+  check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
+  begin
+    match previous_proto with
+    | Genesis param ->
+        Lwt.return (Raw_level_repr.of_int32 level) >>=? fun first_level ->
+        set_first_level ctxt first_level >>=? fun ctxt ->
+        set_constants ctxt param.constants >>= fun ctxt ->
+        return ctxt
+    | Alpha_previous ->
+        get_004_constants ctxt >>=? fun c ->
+        let constants = Constants_repr.{
+            preserved_cycles = c.preserved_cycles ;
+            blocks_per_cycle = c.blocks_per_cycle ;
+            blocks_per_commitment = c.blocks_per_commitment ;
+            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot ;
+            blocks_per_voting_period = c.blocks_per_voting_period ;
+            time_between_blocks =
+              List.map Period_repr.of_seconds_exn [ 60L ; 40L ] ;
+            endorsers_per_block = c.endorsers_per_block ;
+            hard_gas_limit_per_operation = c.hard_gas_limit_per_operation ;
+            hard_gas_limit_per_block = c.hard_gas_limit_per_block ;
+            proof_of_work_threshold = c.proof_of_work_threshold ;
+            tokens_per_roll = c.tokens_per_roll ;
+            michelson_maximum_type_size = c.michelson_maximum_type_size;
+            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip ;
+            origination_size = c.origination_size ;
+            block_security_deposit = c.block_security_deposit ;
+            endorsement_security_deposit = c.endorsement_security_deposit ;
+            block_reward = c.block_reward ;
+            endorsement_reward = c.endorsement_reward ;
+            cost_per_byte = c.cost_per_byte ;
+            hard_storage_limit_per_operation = c.hard_storage_limit_per_operation ;
+            test_chain_duration = c.test_chain_duration ;
+            quorum_min = 30_00l ; (* quorum is in centile of a percentage *)
+            quorum_max = 70_00l ;
+            min_proposal_quorum = 5_00l ;
+            initial_endorsers = 24 ;
+            delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
+          } in
+        set_constants ctxt constants >>= fun ctxt ->
+        return ctxt
+  end >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness >>=? fun ctxt ->
   return (previous_proto, ctxt)
 
@@ -512,32 +568,6 @@ let activate ({ context = c ; _ } as s) h =
 let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
-
-let register_resolvers enc resolve =
-  let resolve context str =
-    let faked_context = {
-      context ;
-      constants = Constants_repr.default ;
-      first_level = Raw_level_repr.root ;
-      level =  Level_repr.root Raw_level_repr.root ;
-      predecessor_timestamp = Time.of_seconds 0L ;
-      timestamp = Time.of_seconds 0L ;
-      fitness = 0L ;
-      allowed_endorsements = Signature.Public_key_hash.Map.empty ;
-      included_endorsements = 0 ;
-      storage_space_to_pay = None ;
-      allocated_contracts = None ;
-      fees = Tez_repr.zero ;
-      rewards = Tez_repr.zero ;
-      deposits = Signature.Public_key_hash.Map.empty ;
-      block_gas = Constants_repr.default.hard_gas_limit_per_block ;
-      operation_gas = Unaccounted ;
-      origination_nonce = None ;
-      internal_nonce = 0 ;
-      internal_nonces_used = Int_set.empty ;
-    } in
-    resolve faked_context str in
-  Context.register_resolver enc  resolve
 
 (* Generic context ********************************************************)
 
@@ -658,3 +688,19 @@ let project x = x
 let absolute_key _ k = k
 
 let description = Storage_description.create ()
+
+let fresh_temporary_big_map ctxt =
+  { ctxt with temporary_big_map = Z.sub ctxt.temporary_big_map Z.one },
+  ctxt.temporary_big_map
+
+let reset_temporary_big_map ctxt =
+  { ctxt with temporary_big_map = Z.sub Z.zero Z.one }
+
+let temporary_big_maps ctxt f acc =
+  let rec iter acc id =
+    if Z.equal id ctxt.temporary_big_map then
+      Lwt.return acc
+    else
+      f acc id >>= fun acc ->
+      iter acc (Z.sub id Z.one) in
+  iter acc (Z.sub Z.zero Z.one)

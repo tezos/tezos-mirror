@@ -27,13 +27,15 @@ type t
 
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->
-  block_header_timeout:float ->
-  block_operations_timeout: float ->
+  block_header_timeout:Time.System.Span.t ->
+  block_operations_timeout: Time.System.Span.t ->
   Block_validator.t ->
   P2p_peer.Id.t -> Distributed_db.chain_db ->
-  Block_locator.t ->
-  t
+  Block_locator.t -> t
 
 val wait: t -> unit tzresult Lwt.t
 
 val cancel: t -> unit Lwt.t
+
+val length : t -> Peer_validator_worker_state.Worker_state.pipeline_length
+val length_zero : Peer_validator_worker_state.Worker_state.pipeline_length

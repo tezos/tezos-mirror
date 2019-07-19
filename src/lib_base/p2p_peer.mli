@@ -28,6 +28,8 @@ module Id = P2p_peer_id
 module Map = Id.Map
 module Set = Id.Set
 module Table = Id.Table
+module Error_table : Error_table.S
+  with type key = Table.key
 
 module Filter : sig
 
@@ -64,12 +66,12 @@ module Info : sig
     state : State.t ;
     id_point : P2p_connection.Id.t option ;
     stat : P2p_stat.t ;
-    last_failed_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_rejected_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_established_connection : (P2p_connection.Id.t * Time.t) option ;
-    last_disconnection : (P2p_connection.Id.t * Time.t) option ;
-    last_seen : (P2p_connection.Id.t * Time.t) option ;
-    last_miss : (P2p_connection.Id.t * Time.t) option ;
+    last_failed_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_rejected_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_established_connection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_disconnection : (P2p_connection.Id.t * Time.System.t) option ;
+    last_seen : (P2p_connection.Id.t * Time.System.t) option ;
+    last_miss : (P2p_connection.Id.t * Time.System.t) option ;
   }
 
   val encoding : 'peer_meta Data_encoding.t ->
@@ -95,7 +97,7 @@ module Pool_event : sig
 
   type t = {
     kind : kind ;
-    timestamp : Time.t ;
+    timestamp : Time.System.t ;
     point : P2p_connection.Id.t ;
   }
 

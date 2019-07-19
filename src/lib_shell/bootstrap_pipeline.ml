@@ -26,15 +26,20 @@
 include Internal_event.Legacy_logging.Make_semantic
     (struct let name = "node.validator.bootstrap_pipeline" end)
 
-let node_time_tag = Tag.def ~doc:"local time at this node" "node_time" Time.pp_hum
-let block_time_tag = Tag.def ~doc:"claimed creation time of block" "block_time" Time.pp_hum
+let node_time_tag =
+  Tag.def ~doc:"local time at this node" "node_time" Time.System.pp_hum
+let block_time_tag =
+  Tag.def
+    ~doc:"claimed creation time of block"
+    "block_time"
+    (fun fmt prot_time -> Time.System.(pp_hum fmt (of_protocol_exn prot_time)))
 
 open Validation_errors
 
 type t = {
   canceler: Lwt_canceler.t ;
-  block_header_timeout: float ;
-  block_operations_timeout: float ;
+  block_header_timeout: Time.System.Span.t ;
+  block_operations_timeout: Time.System.Span.t ;
   mutable headers_fetch_worker: unit Lwt.t ;
   mutable operations_fetch_worker: unit Lwt.t ;
   mutable validation_worker: unit Lwt.t ;
@@ -55,11 +60,13 @@ let operations_index_tag = Tag.def ~doc:"Operations index" "operations_index" Fo
 
 let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
-  let time_now = Time.now () in
+  let time_now = Systime_os.now () in
   fail_unless
-    (Time.(add time_now 15L >= header.shell.timestamp))
-    (Future_block_header { block = hash ;
-                           time = time_now ;
+    (Time.Protocol.compare
+       (Time.Protocol.add (Time.System.to_protocol (Systime_os.now ())) 15L)
+       header.shell.timestamp
+     >= 0)
+    (Future_block_header { block = hash; time = time_now;
                            block_time = header.shell.timestamp }) >>=? fun () ->
   State.Chain.checkpoint chain_state >>= fun checkpoint ->
   fail_when
@@ -389,3 +396,15 @@ let wait pipeline =
 let cancel pipeline =
   Lwt_canceler.cancel pipeline.canceler >>= fun () ->
   wait_workers pipeline
+
+let length pipeline =
+  Peer_validator_worker_state.Worker_state.{
+    fetched_header_length = Lwt_pipe.length pipeline.fetched_headers;
+    fetched_block_length = Lwt_pipe.length pipeline.fetched_blocks ;
+  }
+
+let length_zero =
+  Peer_validator_worker_state.Worker_state.{
+    fetched_header_length = 0 ;
+    fetched_block_length = 0 ;
+  }

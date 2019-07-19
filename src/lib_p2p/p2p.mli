@@ -44,17 +44,8 @@ type 'conn_meta conn_meta_config = {
   private_node : 'conn_meta -> bool ;
 }
 
-type 'msg app_message_encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg app_message_encoding
-
 type 'msg message_config = {
-  encoding : 'msg app_message_encoding list ;
+  encoding : 'msg P2p_message.encoding list ;
   chain_name : Distributed_db_version.name ;
   distributed_db_versions : Distributed_db_version.t list ;
 }
@@ -105,21 +96,24 @@ type config = {
 
   disable_testchain : bool ;
   (** If [true], testchain related messages will be ignored. *)
+
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+  (** The greylisting configuration. *)
 }
 
 (** Network capacities *)
 type limits = {
 
-  connection_timeout : float ;
+  connection_timeout : Time.System.Span.t ;
   (** Maximum time allowed to the establishment of a connection. *)
 
-  authentication_timeout : float ;
+  authentication_timeout : Time.System.Span.t ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
-  greylist_timeout : int ;
+  greylist_timeout : Time.System.Span.t ;
   (** GC delay for the grelists tables, in seconds. *)
 
-  maintenance_idle_time: float ;
+  maintenance_idle_time: Time.System.Span.t ;
   (** How long to wait at most, in seconds, before running a maintenance loop. *)
 
   min_connections : int ;
@@ -161,7 +155,7 @@ type limits = {
   max_known_points : (int * int) option ;
   (** Optional limitation of internal hashtables (max, target) *)
 
-  swap_linger : float ;
+  swap_linger : Time.System.Span.t ;
   (** Peer swapping does not occur more than once during a timespan of
       [swap_linger] seconds. *)
 
@@ -178,6 +172,10 @@ type limits = {
 *)
 type ('msg, 'peer_meta, 'conn_meta) t
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
+
+val announced_version :  ('msg, 'peer_meta, 'conn_meta) net -> Network_version.t
+
+val pool :  ('msg, 'peer_meta, 'conn_meta) net -> ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option
 
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
@@ -298,21 +296,5 @@ val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
   (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
 
-val build_rpc_directory :
-  (_, Peer_metadata.t , Connection_metadata.t) t -> unit RPC_directory.t
-
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
-
-(**/**)
-
-module Raw : sig
-  type 'a t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'a
-    | Disconnect
-  val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t
-end

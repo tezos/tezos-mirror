@@ -34,7 +34,6 @@ val export:
   unit tzresult Lwt.t
 
 val import:
-  ?reconstruct:bool ->
   data_dir:string ->
   dir_cleaner:(string -> unit Lwt.t) ->
   patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
@@ -42,11 +41,3 @@ val import:
   string ->
   string option ->
   unit tzresult Lwt.t
-
-val snapshot_export_rpc:
-  export_rolling:bool ->
-  chain_state:State.Chain.t ->
-  genesis:Block_hash.t ->
-  string ->
-  string option ->
-  string tzresult Lwt.t

@@ -59,11 +59,16 @@ module Scripts = struct
     let path = RPC_path.(path / "scripts")
 
     let run_code_input_encoding =
-      (obj4
+      (obj9
          (req "script" Script.expr_encoding)
          (req "storage" Script.expr_encoding)
          (req "input" Script.expr_encoding)
-         (req "amount" Tez.encoding))
+         (req "amount" Tez.encoding)
+         (req "chain_id" Chain_id.encoding)
+         (opt "source" Contract.encoding)
+         (opt "payer" Contract.encoding)
+         (opt "gas" z)
+         (dft "entrypoint" string "default"))
 
     let trace_encoding =
       def "scripted.trace" @@
@@ -144,7 +149,9 @@ module Scripts = struct
         ~description:
           "Run an operation without signature checks"
         ~query: RPC_query.empty
-        ~input: Operation.encoding
+        ~input: (obj2
+                   (req "operation" Operation.encoding)
+                   (req "chain_id" Chain_id.encoding))
         ~output: Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
@@ -160,38 +167,55 @@ module Scripts = struct
         | None -> assert false in
       Contract.originate ctxt dummy_contract
         ~balance
-        ~manager: Signature.Public_key_hash.zero
         ~delegate: None
-        ~spendable: false
-        ~delegatable: false
         ~script: (script, None) >>=? fun ctxt ->
       return (ctxt, dummy_contract) in
     register0 S.run_code begin fun ctxt ()
-      (code, storage, parameter, amount) ->
+      (code, storage, parameter, amount, chain_id, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
+      let source, payer = match source, payer with
+        | Some source, Some payer -> source, payer
+        | Some source, None -> source, source
+        | None, Some payer -> payer, payer
+        | None, None -> dummy_contract, dummy_contract in
+      let gas = match gas with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt in
+      let ctxt = Gas.set_limit ctxt gas in
       Script_interpreter.execute
         ctxt Readable
-        ~source:dummy_contract
-        ~payer:dummy_contract
+        ~source
+        ~payer
+        ~chain_id
         ~self:(dummy_contract, { storage ; code })
+        ~entrypoint
         ~amount ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
     register0 S.trace_code begin fun ctxt ()
-      (code, storage, parameter, amount) ->
+      (code, storage, parameter, amount, chain_id, source, payer, gas, entrypoint) ->
       let storage = Script.lazy_expr storage in
       let code = Script.lazy_expr code in
       originate_dummy_contract ctxt { storage ; code } >>=? fun (ctxt, dummy_contract) ->
-      let ctxt = Gas.set_limit ctxt (Constants.hard_gas_limit_per_operation ctxt) in
+      let source, payer = match source, payer with
+        | Some source, Some payer -> source, payer
+        | Some source, None -> source, source
+        | None, Some payer -> payer, payer
+        | None, None -> dummy_contract, dummy_contract in
+      let gas = match gas with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt in
+      let ctxt = Gas.set_limit ctxt gas in
       Script_interpreter.trace
         ctxt Readable
-        ~source:dummy_contract
-        ~payer:dummy_contract
+        ~source
+        ~payer
+        ~chain_id
         ~self:(dummy_contract, { storage ; code })
+        ~entrypoint
         ~amount ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
       return (storage, operations, trace, big_map_diff)
@@ -215,13 +239,13 @@ module Scripts = struct
       let ctxt = match maybe_gas with
         | None -> Gas.set_unlimited ctxt
         | Some gas -> Gas.set_limit ctxt gas in
-      Lwt.return (parse_ty ctxt ~allow_big_map:false ~allow_operation:false (Micheline.root typ)) >>=? fun (Ex_ty typ, ctxt) ->
-      parse_data ctxt typ (Micheline.root expr) >>=? fun (data, ctxt) ->
+      Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root typ)) >>=? fun (Ex_ty typ, ctxt) ->
+      parse_data ctxt ~legacy:true typ (Micheline.root expr) >>=? fun (data, ctxt) ->
       Script_ir_translator.pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
       return (bytes, Gas.level ctxt)
     end ;
     register0 S.run_operation begin fun ctxt ()
-      { shell ; protocol_data = Operation_data protocol_data } ->
+      ({ shell ; protocol_data = Operation_data protocol_data }, chain_id) ->
       (* this code is a duplicate of Apply without signature check *)
       let partial_precheck_manager_contents
           (type kind) ctxt (op : kind Kind.manager contents)
@@ -230,15 +254,15 @@ module Scripts = struct
         Lwt.return (Gas.check_limit ctxt gas_limit) >>=? fun () ->
         let ctxt = Gas.set_limit ctxt gas_limit in
         Lwt.return (Fees.check_storage_limit ctxt storage_limit) >>=? fun () ->
-        Contract.must_be_allocated ctxt source >>=? fun () ->
+        Contract.must_be_allocated ctxt (Contract.implicit_contract source) >>=? fun () ->
         Contract.check_counter_increment ctxt source counter >>=? fun () ->
         begin
           match operation with
           | Reveal pk ->
               Contract.reveal_manager_key ctxt source pk
-          | Transaction { parameters = Some arg ; _ } ->
+          | Transaction { parameters ; _ } ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-              let arg_bytes = Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding arg in
+              let arg_bytes = Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding parameters in
               let arg = match Data_encoding.Binary.of_bytes Script.lazy_expr_encoding arg_bytes with
                 | Some arg -> arg
                 | None -> assert false in
@@ -248,7 +272,7 @@ module Scripts = struct
               (* Fail if not enough gas for complete deserialization cost *)
               trace Apply.Gas_quota_exceeded_init_deserialize @@
               Script.force_decode ctxt arg >>|? fun (_arg, ctxt) -> ctxt
-          | Origination { script = Some script ; _ } ->
+          | Origination { script = script ; _ } ->
               (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
               let script_bytes = Data_encoding.Binary.to_bytes_exn Script.encoding script in
               let script = match Data_encoding.Binary.of_bytes Script.encoding script_bytes with
@@ -268,7 +292,7 @@ module Scripts = struct
         Contract.get_manager_key ctxt source >>=? fun _public_key ->
         (* signature check unplugged from here *)
         Contract.increment_counter ctxt source >>=? fun ctxt ->
-        Contract.spend ctxt source fee >>=? fun ctxt ->
+        Contract.spend ctxt (Contract.implicit_contract source) fee >>=? fun ctxt ->
         return ctxt in
       let rec partial_precheck_manager_contents_list
         : type kind.
@@ -291,27 +315,27 @@ module Scripts = struct
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op >>= fun (_ctxt, result) ->
           return result
       | Cons (Manager_operation _, _) as op ->
           partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
-          Apply.apply_manager_contents_list ctxt Optimized baker op >>= fun (_ctxt, result) ->
+          Apply.apply_manager_contents_list ctxt Optimized baker chain_id op >>= fun (_ctxt, result) ->
           return result
       | _ ->
           Apply.apply_contents_list
-            ctxt Chain_id.zero Optimized shell.branch baker operation
+            ctxt chain_id Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
 
     end
 
-  let run_code ctxt block code (storage, input, amount) =
+  let run_code ctxt block code (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.run_code ctxt
-      block () (code, storage, input, amount)
+      block () (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
 
-  let trace_code ctxt block code (storage, input, amount) =
+  let trace_code ctxt block code (storage, input, amount, chain_id, source, payer, gas, entrypoint) =
     RPC_context.make_call0 S.trace_code ctxt
-      block () (code, storage, input, amount)
+      block () (code, storage, input, amount, chain_id, source, payer, gas, entrypoint)
 
   let typecheck_code ctxt block =
     RPC_context.make_call0 S.typecheck_code ctxt block ()
@@ -384,7 +408,7 @@ module Forge = struct
         ~gas_limit ~storage_limit operations =
       Contract_services.manager_key ctxt block source >>= function
       | Error _ as e -> Lwt.return e
-      | Ok (_, revealed) ->
+      | Ok revealed ->
           let ops =
             List.map
               (fun (Manager operation) ->
@@ -412,28 +436,23 @@ module Forge = struct
 
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
-        ~amount ~destination ?parameters
+        ~amount ~destination ?(entrypoint = "default") ?parameters
         ~gas_limit ~storage_limit ~fee ()=
-      let parameters = Option.map ~f:Script.lazy_expr parameters in
+      let parameters = Option.unopt_map ~f:Script.lazy_expr ~default:Script.unit_parameter parameters in
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        [Manager (Transaction { amount ; parameters ; destination })]
+        [Manager (Transaction { amount ; parameters ; destination ; entrypoint })]
 
     let origination ctxt
         block ~branch
         ~source ?sourcePubKey ~counter
-        ~managerPubKey ~balance
-        ?(spendable = true)
-        ?(delegatable = true)
-        ?delegatePubKey ?script
+        ~balance
+        ?delegatePubKey ~script
         ~gas_limit ~storage_limit ~fee () =
       operations ctxt block ~branch ~source ?sourcePubKey ~counter
         ~fee ~gas_limit ~storage_limit
-        [Manager (Origination { manager = managerPubKey ;
-                                delegate = delegatePubKey ;
+        [Manager (Origination { delegate = delegatePubKey ;
                                 script ;
-                                spendable ;
-                                delegatable ;
                                 credit = balance ;
                                 preorigination = None })]
 

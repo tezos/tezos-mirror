@@ -12,11 +12,15 @@ def format_command(cmd: List[str], color=True) -> str:
     return f'{color_code}# {cmd_str}{endc}' if color else f'# {cmd_str}'
 
 
-def prepare_log(cmd: List[str], log_file: Optional[str]):
+def prepare_log(cmd: List[str],
+                log_file: Optional[str],
+                overwrite: bool = True):
+    """ By default overwrite old log, append otherwise """
     stdout = 0  # type: Union[int, TextIO]
     cmd_str = format_command(cmd, color=False)
     if log_file:
-        stdout = open(log_file, 'w')
+        flag = 'w' if overwrite else 'a+'
+        stdout = open(log_file, flag)
         stdout.write(cmd_str + '\n')
         stderr = subprocess.STDOUT
     else:

@@ -1,5 +1,5 @@
 {
-    "hash": "PtG6cmhhWF8AY5gVQhCaUASbgu8CGebkGPdNSX26m3CSnxvih9v",
+    "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
         "Storage_description",
@@ -25,6 +25,7 @@
         "Script_timestamp_repr",
         "Michelson_v1_primitives",
         "Script_repr",
+        "Legacy_script_support_repr",
         "Contract_repr",
         "Roll_repr",
         "Vote_repr",

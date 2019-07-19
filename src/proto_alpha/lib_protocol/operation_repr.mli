@@ -100,7 +100,7 @@ and _ contents =
       ballot: Vote_repr.ballot ;
     } -> Kind.ballot contents
   | Manager_operation : {
-      source: Contract_repr.contract ;
+      source: Signature.Public_key_hash.t ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operation: 'kind manager_operation ;
@@ -112,15 +112,13 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.lazy_expr option ;
+      parameters: Script_repr.lazy_expr ;
+      entrypoint: string ;
       destination: Contract_repr.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
-      manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
-      script: Script_repr.t option ;
-      spendable: bool ;
-      delegatable: bool ;
+      script: Script_repr.t ;
       credit: Tez_repr.tez ;
       preorigination: Contract_repr.t option ;
     } -> Kind.origination manager_operation

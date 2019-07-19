@@ -96,9 +96,9 @@ module Event = struct
           Fitness.pp req.fitness ;
         Format.fprintf ppf
           "Pushed: %a, Treated: %a, Completed: %a@]"
-          Time.pp_hum req.request_status.pushed
-          Time.pp_hum req.request_status.treated
-          Time.pp_hum req.request_status.completed
+          Time.System.pp_hum req.request_status.pushed
+          Time.System.pp_hum req.request_status.treated
+          Time.System.pp_hum req.request_status.completed
     | Could_not_switch_testchain err ->
         Format.fprintf ppf "@[<v 0>Error while switching test chain:@ %a@]"
           (Format.pp_print_list Error_monad.pp) err
@@ -132,4 +132,100 @@ module Worker_state = struct
       active_peers
       (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
       bootstrapped_peers
+end
+
+module Distributed_db_state = struct
+
+  type table_scheduler = {
+    table_length : int ;
+    scheduler_length : int ;
+  }
+
+  type view = {
+    p2p_readers_length: int ;
+    active_chains_length: int ;
+
+    operation_db : table_scheduler ;
+    operations_db : table_scheduler ;
+    block_header_db : table_scheduler ;
+    operations_hashed_db : table_scheduler ;
+
+    active_connections_length: int ;
+    active_peers_length: int ;
+  }
+
+
+
+  let table_scheduler_encoding =
+    let open Data_encoding in
+    conv
+      (fun {table_length ; scheduler_length } ->
+         (table_length, scheduler_length))
+      (fun (table_length, scheduler_length) ->
+         {table_length ; scheduler_length })
+      (obj2
+         (req "table_length" int31)
+         (req "scheduler_length" int31)
+      )
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+         p2p_readers_length ;
+         active_chains_length ;
+
+         operation_db ;
+         operations_db ;
+         block_header_db ;
+         operations_hashed_db ;
+
+         active_connections_length ;
+         active_peers_length ;
+       } ->
+         ( p2p_readers_length ,
+           active_chains_length ,
+           operation_db ,
+           operations_db ,
+           block_header_db,
+           operations_hashed_db,
+           active_connections_length ,
+           active_peers_length
+         ))
+      (fun
+        ( p2p_readers_length ,
+          active_chains_length ,
+          operation_db ,
+          operations_db ,
+          block_header_db,
+          operations_hashed_db,
+          active_connections_length ,
+          active_peers_length
+        ) ->
+        {
+          p2p_readers_length ;
+          active_chains_length ;
+
+          operation_db ;
+          operations_db ;
+          block_header_db ;
+          operations_hashed_db ;
+
+          active_connections_length ;
+          active_peers_length ;
+        }
+      )
+      (obj8
+         (req "p2p_readers" int31)
+         (req "active_chains" int31)
+
+         (req "operation_db" table_scheduler_encoding)
+         (req "operations_db" table_scheduler_encoding)
+         (req "block_header_db" table_scheduler_encoding)
+         (req "operations_hashed_db" table_scheduler_encoding)
+
+         (req "active_connections" int31)
+         (req "active_peers" int31)
+      )
+
 end

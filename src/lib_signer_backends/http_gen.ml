@@ -29,6 +29,8 @@ module Make(N : sig val scheme : string end) = struct
 
   let scheme = N.scheme
 
+  module RPC_client = RPC_client_unix
+
   module Make(P : sig
       val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
       val logger: RPC_client.logger
@@ -160,7 +162,7 @@ module Make(N : sig val scheme : string end) = struct
         Media_type.all_media_types
         ~base Signer_services.supports_deterministic_nonces ((), pkh) () () >>= function
       | Ok ans -> return ans
-      | Error ((RPC_context.Not_found _) :: _) -> return false
+      | Error ((RPC_context.Not_found _) :: _) -> return_false
       | Error _ as res -> Lwt.return res
 
 

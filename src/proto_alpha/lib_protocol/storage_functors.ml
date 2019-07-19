@@ -25,10 +25,13 @@
 
 open Storage_sigs
 
+module Registered = struct let ghost = false end
+module Ghost = struct let ghost = true end
+
 module Make_encoder (V : VALUE) = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes V.encoding b with
-    | None -> Error [Raw_context.Storage_error (Corrupted_data key)]
+    | None -> error (Raw_context.Storage_error (Corrupted_data key))
     | Some v -> Ok v
   let to_bytes v =
     match Data_encoding.Binary.to_bytes V.encoding v with
@@ -54,7 +57,7 @@ let map_key f = function
   | `Key k -> `Key (f k)
   | `Dir k -> `Dir (f k)
 
-module Make_subcontext (C : Raw_context.T) (N : NAME)
+module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME)
   : Raw_context.T with type t = C.t = struct
   type t = C.t
   type context = t
@@ -84,10 +87,12 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let consume_gas = C.consume_gas
   let check_enough_gas = C.check_enough_gas
   let description =
-    Storage_description.register_named_subcontext C.description N.name
+    let description = if R.ghost then Storage_description.create ()
+      else C.description in
+    Storage_description.register_named_subcontext description N.name
 end
 
-module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
+module Make_single_data_storage (R : REGISTER) (C : Raw_context.T) (N : NAME) (V : VALUE)
   : Single_data_storage with type t = C.t
                          and type value = V.t = struct
   type t = C.t
@@ -129,9 +134,11 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
 
   let () =
     let open Storage_description in
+    let description = if R.ghost then Storage_description.create ()
+      else C.description in
     register_value
       ~get:get_option
-      (register_named_subcontext C.description N.name)
+      (register_named_subcontext description N.name)
       V.encoding
 
 end
@@ -329,76 +336,76 @@ module Make_indexed_carbonated_data_storage
   type key = I.t
   type value = V.t
   include Make_encoder(V)
-  let name i =
+  let data_key i =
     I.to_path i [data_name]
-  let len_name i =
+  let len_key i =
     I.to_path i [len_name]
   let consume_mem_gas c =
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
   let existing_size c i =
-    C.get_option c (len_name i) >>= function
-    | None -> return 0
-    | Some len -> decode_len_value (len_name i) len
+    C.get_option c (len_key i) >>= function
+    | None -> return (0, false)
+    | Some len -> decode_len_value (len_key i) len >>=? fun len -> return (len, true)
   let consume_read_gas get c i =
-    get c (len_name i) >>=? fun len ->
-    decode_len_value (len_name i) len >>=? fun len ->
+    get c (len_key i) >>=? fun len ->
+    decode_len_value (len_key i) len >>=? fun len ->
     Lwt.return (C.consume_gas c (Gas_limit_repr.read_bytes_cost (Z.of_int len)))
   let consume_serialize_write_gas set c i v =
     let bytes = to_bytes v in
     let len = MBytes.length bytes in
     Lwt.return (C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len)) >>=? fun c ->
     Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost (Z.of_int len))) >>=? fun c ->
-    set c (len_name i) (encode_len_value bytes) >>=? fun c ->
+    set c (len_key i) (encode_len_value bytes) >>=? fun c ->
     return (c, bytes)
   let consume_remove_gas del c i =
     Lwt.return (C.consume_gas c (Gas_limit_repr.write_bytes_cost Z.zero)) >>=? fun c ->
-    del c (len_name i)
+    del c (len_key i)
   let mem s i =
     consume_mem_gas s >>=? fun s ->
-    C.mem s (name i) >>= fun exists ->
+    C.mem s (data_key i) >>= fun exists ->
     return (C.project s, exists)
   let get s i =
     consume_read_gas C.get s i >>=? fun s ->
-    C.get s (name i) >>=? fun b ->
-    let key = C.absolute_key s (name i) in
+    C.get s (data_key i) >>=? fun b ->
+    let key = C.absolute_key s (data_key i) in
     Lwt.return (of_bytes ~key b) >>=? fun v ->
     return (C.project s, v)
   let get_option s i =
     consume_mem_gas s >>=? fun s ->
-    C.mem s (name i) >>= fun exists ->
+    C.mem s (data_key i) >>= fun exists ->
     if exists then
       get s i >>=? fun (s, v) ->
       return (s, Some v)
     else
       return (C.project s, None)
   let set s i v =
-    existing_size s i >>=? fun prev_size ->
+    existing_size s i >>=? fun (prev_size, _) ->
     consume_serialize_write_gas C.set s i v >>=? fun (s, bytes) ->
-    C.set s (name i) bytes >>=? fun t ->
+    C.set s (data_key i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
     return (C.project t, size_diff)
   let init s i v =
     consume_serialize_write_gas C.init s i v >>=? fun (s, bytes) ->
-    C.init s (name i) bytes >>=? fun t ->
+    C.init s (data_key i) bytes >>=? fun t ->
     let size = MBytes.length bytes in
     return (C.project t, size)
   let init_set s i v =
     let init_set s i v = C.init_set s i v >>= return in
-    existing_size s i >>=? fun prev_size ->
+    existing_size s i >>=? fun (prev_size, existed) ->
     consume_serialize_write_gas init_set s i v >>=? fun (s, bytes) ->
-    init_set s (name i) bytes >>=? fun t ->
+    init_set s (data_key i) bytes >>=? fun t ->
     let size_diff = MBytes.length bytes - prev_size in
-    return (C.project t, size_diff)
+    return (C.project t, size_diff, existed)
   let remove s i =
     let remove s i = C.remove s i >>= return in
-    existing_size s i >>=? fun prev_size ->
+    existing_size s i >>=? fun (prev_size, existed) ->
     consume_remove_gas remove s i >>=? fun s ->
-    remove s (name i) >>=? fun t ->
-    return (C.project t, prev_size)
+    remove s (data_key i) >>=? fun t ->
+    return (C.project t, prev_size, existed)
   let delete s i =
-    existing_size s i >>=? fun prev_size ->
+    existing_size s i >>=? fun (prev_size, _) ->
     consume_remove_gas C.delete s i >>=? fun s ->
-    C.delete s (name i) >>=? fun t ->
+    C.delete s (data_key i) >>=? fun t ->
     return (C.project t, prev_size)
   let set_option s i v =
     match v with
@@ -407,14 +414,21 @@ module Make_indexed_carbonated_data_storage
 
   let fold_keys_unaccounted s ~init ~f =
     let rec dig i path acc =
-      if Compare.Int.(i <= 1) then
+      if Compare.Int.(i <= 0) then
         C.fold s path ~init:acc ~f:begin fun k acc ->
           match k with
           | `Dir _ -> Lwt.return acc
           | `Key file ->
-              match I.of_path file with
-              | None -> assert false
-              | Some path -> f path acc
+              match List.rev file with
+              | last :: _ when Compare.String.(last = len_name) ->
+                  Lwt.return acc
+              | last :: rest when Compare.String.(last = data_name) ->
+                  let file = List.rev rest in
+                  begin match I.of_path file with
+                    | None -> assert false
+                    | Some path -> f path acc
+                  end
+              | _ -> assert false
         end
       else
         C.fold s path ~init:acc ~f:begin fun k acc ->
@@ -422,7 +436,7 @@ module Make_indexed_carbonated_data_storage
           | `Dir k -> dig (i-1) k acc
           | `Key _ -> Lwt.return acc
         end in
-    dig I.path_length [data_name] init
+    dig I.path_length [] init
 
   let keys_unaccounted s =
     fold_keys_unaccounted s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
@@ -455,8 +469,8 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
   let data_name = ["current"]
   let snapshot_name = ["snapshot"]
 
-  module C_data = Make_subcontext(C)(struct let name = data_name end)
-  module C_snapshot = Make_subcontext(C)(struct let name = snapshot_name end)
+  module C_data = Make_subcontext(Registered)(C)(struct let name = data_name end)
+  module C_snapshot = Make_subcontext(Registered)(C)(struct let name = snapshot_name end)
 
   include Make_indexed_data_storage(C_data)(I) (V)
   module Snapshot = Make_indexed_data_storage(C_snapshot)(Pair(Snapshot_index)(I))(V)
@@ -509,6 +523,12 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     fold_keys t ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
 
   let list t k = C.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+
+  let remove_rec t k =
+    C.remove_rec t (I.to_path k [])
+
+  let copy t ~from ~to_ =
+    C.copy t ~from:(I.to_path from []) ~to_:(I.to_path to_ [])
 
   let description =
     Storage_description.register_indexed_subcontext
@@ -587,13 +607,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
         end
       | [] ->
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_p (function
+          Lwt_list.map_s (function
               | `Key prefix | `Dir prefix -> loop (i+1) prefix []) prefixes
           >|= List.flatten
       | [d] when Compare.Int.(i = I.path_length - 1) ->
           if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_p (function
+          Lwt_list.map_s (function
               | `Key prefix | `Dir prefix ->
                   match Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
                   | None -> Lwt.return_nil
@@ -602,7 +622,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           >|= List.flatten
       | "" :: ds ->
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_p (function
+          Lwt_list.map_s (function
               | `Key prefix | `Dir prefix -> loop (i+1) prefix ds) prefixes
           >|= List.flatten
       | d :: ds ->
@@ -612,7 +632,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
           | false -> Lwt.return_nil in
     loop 0 [] prefix
 
-  module Make_set (N : NAME) = struct
+  module Make_set (R : REGISTER) (N : NAME) = struct
     type t = C.t
     type context = t
     type elt = I.t
@@ -650,13 +670,15 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description = if R.ghost then Storage_description.create ()
+        else Raw_context.description in
       register_value
         ~get:(fun c ->
             let (c, k) = unpack c in
             mem c k >>= function
             | true -> return_some true
             | false -> return_none)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         Data_encoding.bool
 
   end
@@ -755,8 +777,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       Lwt.return (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
     let existing_size c =
       Raw_context.get_option c len_name >>= function
-      | None -> return 0
-      | Some len -> decode_len_value len_name len
+      | None -> return (0, false)
+      | Some len -> decode_len_value len_name len >>=? fun len -> return (len, true)
     let consume_read_gas get c =
       get c (len_name) >>=? fun len ->
       decode_len_value len_name len >>=? fun len ->
@@ -790,8 +812,16 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       else
         return (C.project s, None)
     let set s i v =
-      existing_size (pack s i) >>=? fun prev_size ->
+      existing_size (pack s i) >>=? fun (prev_size, _) ->
       consume_write_gas Raw_context.set (pack s i) v >>=? fun (c, bytes) ->
+      Raw_context.set c data_name bytes >>=? fun c ->
+      let size_diff = MBytes.length bytes - prev_size in
+      return (Raw_context.project c, size_diff)
+    let set_free s i v =
+      let c = pack s i in
+      let bytes = to_bytes v in
+      existing_size c >>=? fun (prev_size, _) ->
+      Raw_context.set c len_name (encode_len_value bytes) >>=? fun c ->
       Raw_context.set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
       return (Raw_context.project c, size_diff)
@@ -800,21 +830,28 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       Raw_context.init c data_name bytes >>=? fun c ->
       let size = MBytes.length bytes in
       return (Raw_context.project c, size)
+    let init_free s i v =
+      let c = pack s i in
+      let bytes = to_bytes v in
+      let size = MBytes.length bytes in
+      Raw_context.init c len_name (encode_len_value bytes) >>=? fun c ->
+      Raw_context.init c data_name bytes >>=? fun c ->
+      return (Raw_context.project c, size)
     let init_set s i v =
       let init_set c k v = Raw_context.init_set c k v >>= return in
-      existing_size (pack s i) >>=? fun prev_size ->
+      existing_size (pack s i) >>=? fun (prev_size, existed) ->
       consume_write_gas init_set (pack s i) v >>=? fun (c, bytes) ->
       init_set c data_name bytes >>=? fun c ->
       let size_diff = MBytes.length bytes - prev_size in
-      return (Raw_context.project c, size_diff)
+      return (Raw_context.project c, size_diff, existed)
     let remove s i =
       let remove c k = Raw_context.remove c k >>= return in
-      existing_size (pack s i) >>=? fun prev_size ->
+      existing_size (pack s i) >>=? fun (prev_size, existed) ->
       consume_remove_gas remove (pack s i) >>=? fun c ->
       remove c data_name >>=? fun c ->
-      return (Raw_context.project c, prev_size)
+      return (Raw_context.project c, prev_size, existed)
     let delete s i =
-      existing_size (pack s i) >>=? fun prev_size ->
+      existing_size (pack s i) >>=? fun (prev_size, _) ->
       consume_remove_gas Raw_context.delete (pack s i) >>=? fun c ->
       Raw_context.delete c data_name >>=? fun c ->
       return (Raw_context.project c, prev_size)

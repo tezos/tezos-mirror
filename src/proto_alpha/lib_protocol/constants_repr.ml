@@ -92,51 +92,15 @@ type parametric = {
   endorsement_security_deposit: Tez_repr.t ;
   block_reward: Tez_repr.t ;
   endorsement_reward: Tez_repr.t ;
-  endorsement_reward_priority_bonus: Tez_repr.t ;
-  endorsement_bonus_intercept: int ;
-  endorsement_bonus_slope: int ;
   cost_per_byte: Tez_repr.t ;
   hard_storage_limit_per_operation: Z.t ;
-  minimum_endorsements_per_priority: int list ;
+  test_chain_duration: int64 ;  (* in seconds *)
+  quorum_min: int32 ;
+  quorum_max: int32 ;
+  min_proposal_quorum: int32 ;
+  initial_endorsers: int ;
   delay_per_missing_endorsement: Period_repr.t ;
 }
-
-let default = {
-  preserved_cycles = 5 ;
-  blocks_per_cycle = 4096l ;
-  blocks_per_commitment = 32l ;
-  blocks_per_roll_snapshot = 256l ;
-  blocks_per_voting_period = 32768l ;
-  time_between_blocks =
-    List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
-  endorsers_per_block = 32 ;
-  hard_gas_limit_per_operation = Z.of_int 400_000 ;
-  hard_gas_limit_per_block = Z.of_int 4_000_000 ;
-  proof_of_work_threshold =
-    Int64.(sub (shift_left 1L 46) 1L) ;
-  tokens_per_roll =
-    Tez_repr.(mul_exn one 10_000) ;
-  michelson_maximum_type_size = 1000 ;
-  seed_nonce_revelation_tip = begin
-    match Tez_repr.(one /? 8L) with
-    | Ok c -> c
-    | Error _ -> assert false
-  end ;
-  origination_size = 257 ;
-  block_security_deposit = Tez_repr.(mul_exn one 576) ;
-  endorsement_security_deposit = Tez_repr.(mul_exn one 72) ;
-  block_reward = Tez_repr.(mul_exn one 12) ;
-  endorsement_reward = Tez_repr.(mul_exn one 1) ;
-  endorsement_reward_priority_bonus = Tez_repr.(mul_exn one 1) ;
-  endorsement_bonus_intercept = 1024 ;
-  endorsement_bonus_slope = 16 ;
-  hard_storage_limit_per_operation = Z.of_int 60_000 ;
-  cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
-  minimum_endorsements_per_priority = [ 24; 17; 8; 0; ] ;
-  delay_per_missing_endorsement = Period_repr.of_seconds_exn 8L ;
-}
-
-module CompareListInt = Compare.List (Compare.Int)
 
 let parametric_encoding =
   let open Data_encoding in
@@ -160,13 +124,15 @@ let parametric_encoding =
           c.endorsement_security_deposit,
           c.block_reward),
          (c.endorsement_reward,
-          c.endorsement_reward_priority_bonus,
-          c.endorsement_bonus_intercept,
-          c.endorsement_bonus_slope,
           c.cost_per_byte,
           c.hard_storage_limit_per_operation,
-          c.minimum_endorsements_per_priority,
-          c.delay_per_missing_endorsement))) )
+          c.test_chain_duration,
+          c.quorum_min,
+          c.quorum_max,
+          c.min_proposal_quorum,
+          c.initial_endorsers,
+          c.delay_per_missing_endorsement
+         ))) )
     (fun (( preserved_cycles,
             blocks_per_cycle,
             blocks_per_commitment,
@@ -185,12 +151,13 @@ let parametric_encoding =
             endorsement_security_deposit,
             block_reward),
            (endorsement_reward,
-            endorsement_reward_priority_bonus,
-            endorsement_bonus_intercept,
-            endorsement_bonus_slope,
             cost_per_byte,
             hard_storage_limit_per_operation,
-            minimum_endorsements_per_priority,
+            test_chain_duration,
+            quorum_min,
+            quorum_max,
+            min_proposal_quorum,
+            initial_endorsers,
             delay_per_missing_endorsement))) ->
       { preserved_cycles ;
         blocks_per_cycle ;
@@ -199,8 +166,6 @@ let parametric_encoding =
         blocks_per_voting_period ;
         time_between_blocks ;
         endorsers_per_block ;
-        minimum_endorsements_per_priority ;
-        delay_per_missing_endorsement ;
         hard_gas_limit_per_operation ;
         hard_gas_limit_per_block ;
         proof_of_work_threshold ;
@@ -212,11 +177,14 @@ let parametric_encoding =
         endorsement_security_deposit ;
         block_reward ;
         endorsement_reward ;
-        endorsement_reward_priority_bonus ;
-        endorsement_bonus_intercept ;
-        endorsement_bonus_slope ;
         cost_per_byte ;
         hard_storage_limit_per_operation ;
+        test_chain_duration ;
+        quorum_min ;
+        quorum_max ;
+        min_proposal_quorum ;
+        initial_endorsers ;
+        delay_per_missing_endorsement ;
       } )
     (merge_objs
        (obj9
@@ -239,15 +207,17 @@ let parametric_encoding =
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
              (req "block_reward" Tez_repr.encoding))
-          (obj8
+          (obj9
              (req "endorsement_reward" Tez_repr.encoding)
-             (req "endorsement_reward_priority_bonus" Tez_repr.encoding)
-             (req "endorsement_bonus_intercept" uint16)
-             (req "endorsement_bonus_slope " uint16)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
-             (req "minimum_endorsements_per_priority" (list uint16))
-             (req "delay_per_missing_endorsement" Period_repr.encoding))))
+             (req "test_chain_duration" int64)
+             (req "quorum_min" int32)
+             (req "quorum_max" int32)
+             (req "min_proposal_quorum" int32)
+             (req "initial_endorsers" uint16)
+             (req "delay_per_missing_endorsement" Period_repr.encoding)
+          )))
 
 type t = {
   fixed : fixed ;

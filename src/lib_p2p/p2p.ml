@@ -40,7 +40,7 @@ type 'conn_meta conn_meta_config = 'conn_meta P2p_socket.metadata_config = {
   private_node : 'conn_meta -> bool ;
 }
 
-type 'msg app_message_encoding = 'msg P2p_pool.encoding =
+type 'msg app_message_encoding = 'msg P2p_message.encoding =
     Encoding : {
       tag: int ;
       title: string ;
@@ -69,14 +69,15 @@ type config = {
   disable_mempool : bool ;
   trust_discovered_peers : bool ;
   disable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 type limits = {
 
-  connection_timeout : float ;
-  authentication_timeout : float ;
-  greylist_timeout : int ;
-  maintenance_idle_time : float ;
+  connection_timeout : Time.System.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
+  greylist_timeout : Time.System.Span.t ;
+  maintenance_idle_time : Time.System.Span.t ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -100,7 +101,7 @@ type limits = {
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
 
-  swap_linger : float ;
+  swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
 }
@@ -126,6 +127,7 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg io_sched
     trusted_points = config.trusted_points ;
     peers_file = config.peers_file ;
     private_mode = config.private_mode ;
+    greylisting_config = config.greylisting_config ;
     min_connections = limits.min_connections ;
     max_connections = limits.max_connections ;
     max_incoming_connections = limits.max_incoming_connections ;
@@ -246,9 +248,13 @@ module Real = struct
   (* returns when all workers have shutted down in the opposite
      creation order. *)
   let shutdown net () =
+    lwt_log_notice "Shutting down the p2p's welcome worker..." >>= fun () ->
     Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome >>= fun () ->
+    lwt_log_notice "Shutting down the p2p's network maintenance worker..." >>= fun () ->
     P2p_maintenance.shutdown net.maintenance >>= fun () ->
+    lwt_log_notice "Shutting down the p2p connection pool..." >>= fun () ->
     P2p_pool.destroy net.pool >>= fun () ->
+    lwt_log_notice "Shutting down the p2p scheduler..." >>= fun () ->
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections { pool ; _ } () =
@@ -320,7 +326,7 @@ module Real = struct
           P2p_peer.Id.pp
           (P2p_pool.Connection.info conn).peer_id
           pp_print_error err >>= fun () ->
-        Lwt.return (Error err)
+        Lwt.return_error err
 
   let try_send _net conn v =
     match P2p_pool.write_now conn v with
@@ -417,15 +423,21 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
 }
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
+let announced_version net = net.announced_version
+
+let pool net = net.pool
+
 let check_limits =
   let fail_1 v orig =
-    if not (v <= 0.) then return_unit
+    if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative or null@."
         orig
   in
   let fail_2 v orig =
-    if not (v < 0) then return_unit
+    if not (v < 0) then
+      return_unit
     else
       Error_monad.failwith "value of option %S cannot be negative@." orig
   in
@@ -556,393 +568,3 @@ let greylist_addr net addr =
   Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_addr pool addr)
 let greylist_peer net peer_id =
   Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_peer pool peer_id)
-
-module Raw = struct
-  type 'a t = 'a P2p_pool.Message.t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'a
-    | Disconnect
-  let encoding = P2p_pool.Message.encoding
-end
-
-let info_of_point_info i =
-  let open P2p_point.Info in
-  let open P2p_point.State in
-  let state = match P2p_point_state.get i with
-    | Requested _ -> Requested
-    | Accepted { current_peer_id ; _ } -> Accepted current_peer_id
-    | Running { current_peer_id ; _ } -> Running current_peer_id
-    | Disconnected -> Disconnected in
-  P2p_point_state.Info.{
-    trusted = trusted i ;
-    state ;
-    greylisted_until = greylisted_until i ;
-    last_failed_connection = last_failed_connection i ;
-    last_rejected_connection = last_rejected_connection i ;
-    last_established_connection = last_established_connection i ;
-    last_disconnection = last_disconnection i ;
-    last_seen = last_seen i ;
-    last_miss = last_miss i ;
-  }
-
-let info_of_peer_info pool i =
-  let open P2p_peer.Info in
-  let open P2p_peer.State in
-  let state, id_point = match P2p_peer_state.get i with
-    | Accepted { current_point ; _ } -> Accepted, Some current_point
-    | Running { current_point ; _ } -> Running, Some current_point
-    | Disconnected -> Disconnected, None in
-  let peer_id = P2p_peer_state.Info.peer_id i in
-  let score = P2p_pool.Peers.get_score pool peer_id in
-  let conn_opt = P2p_pool.Connection.find_by_peer_id pool peer_id in
-  let stat =
-    match conn_opt with
-    | None -> P2p_stat.empty
-    | Some conn -> P2p_pool.Connection.stat conn in
-  let meta_opt =
-    match conn_opt with
-    | None -> None
-    | Some conn -> Some (P2p_pool.Connection.remote_metadata conn) in
-  P2p_peer_state.Info.{
-    score ;
-    trusted = trusted i ;
-    conn_metadata = meta_opt ;
-    peer_metadata = peer_metadata i;
-    state ;
-    id_point ;
-    stat ;
-    last_failed_connection = last_failed_connection i ;
-    last_rejected_connection = last_rejected_connection i ;
-    last_established_connection = last_established_connection i ;
-    last_disconnection = last_disconnection i ;
-    last_seen = last_seen i ;
-    last_miss = last_miss i ;
-  }
-
-let build_rpc_directory net =
-
-  let dir = RPC_directory.empty in
-
-  (* Network : Global *)
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.S.versions begin fun () () ->
-      return [net.announced_version]
-    end in
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.S.self begin fun () () ->
-      match net.pool with
-      | None -> failwith "The P2P layer is disabled."
-      | Some pool -> return (P2p_pool.config pool).identity.peer_id
-    end in
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.S.stat begin fun () () ->
-      match net.pool with
-      | None -> return P2p_stat.empty
-      | Some pool -> return (P2p_pool.pool_stat pool)
-    end in
-
-  let dir =
-    RPC_directory.gen_register0 dir P2p_services.S.events begin fun () () ->
-      let stream, stopper =
-        match net.pool with
-        | None -> Lwt_watcher.create_fake_stream ()
-        | Some pool -> P2p_pool.watch pool in
-      let shutdown () = Lwt_watcher.shutdown stopper in
-      let next () = Lwt_stream.get stream in
-      RPC_answer.return_stream { next ; shutdown }
-    end in
-
-  let dir =
-    RPC_directory.register1 dir P2p_services.S.connect begin fun point q () ->
-      match net.pool with
-      | None -> failwith "The P2P layer is disabled."
-      | Some pool ->
-          P2p_pool.connect ~timeout:q#timeout pool point >>=? fun _conn ->
-          return_unit
-    end in
-
-  (* Network : Connection *)
-
-  let dir =
-    RPC_directory.opt_register1 dir P2p_services.Connections.S.info
-      begin fun peer_id () () ->
-        return @@
-        Option.apply net.pool ~f: begin fun pool ->
-          Option.map ~f:P2p_pool.Connection.info
-            (P2p_pool.Connection.find_by_peer_id pool peer_id)
-        end
-      end in
-
-  let dir =
-    RPC_directory.lwt_register1 dir P2p_services.Connections.S.kick
-      begin fun peer_id q () ->
-        match net.pool with
-        | None -> Lwt.return_unit
-        | Some pool ->
-            match P2p_pool.Connection.find_by_peer_id pool peer_id with
-            | None -> Lwt.return_unit
-            | Some conn -> P2p_pool.disconnect ~wait:q#wait conn
-      end in
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.Connections.S.list
-      begin fun () () ->
-        match net.pool with
-        | None -> return_nil
-        | Some pool ->
-            return @@
-            P2p_pool.Connection.fold
-              pool ~init:[]
-              ~f:begin fun _peer_id c acc ->
-                P2p_pool.Connection.info c :: acc
-              end
-      end in
-
-  (* Network : Peer_id *)
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.Peers.S.list
-      begin fun q () ->
-        match net.pool with
-        | None -> return_nil
-        | Some pool ->
-            return @@
-            P2p_pool.Peers.fold_known pool
-              ~init:[]
-              ~f:begin fun peer_id i a ->
-                let info = info_of_peer_info pool i in
-                match q#filters with
-                | [] -> (peer_id, info) :: a
-                | filters when P2p_peer.State.filter filters info.state ->
-                    (peer_id, info) :: a
-                | _ -> a
-              end
-      end in
-
-  let dir =
-    RPC_directory.opt_register1 dir P2p_services.Peers.S.info
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> return_none
-        | Some pool ->
-            return @@
-            Option.map ~f:(info_of_peer_info pool)
-              (P2p_pool.Peers.info pool peer_id)
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.events
-      begin fun peer_id q () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            match P2p_pool.Peers.info pool peer_id with
-            | None -> RPC_answer.return []
-            | Some gi ->
-                let rev = false and max = max_int in
-                let evts =
-                  P2p_peer_state.Info.fold gi ~init:[]
-                    ~f:(fun a e -> e :: a) in
-                let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not q#monitor then
-                  RPC_answer.return evts
-                else
-                  let stream, stopper = P2p_peer_state.Info.watch gi in
-                  let shutdown () = Lwt_watcher.shutdown stopper in
-                  let first_request = ref true in
-                  let next () =
-                    if not !first_request then begin
-                      Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
-                    end else begin
-                      first_request := false ;
-                      Lwt.return_some evts
-                    end in
-                  RPC_answer.return_stream { next ; shutdown }
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.ban
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Peers.untrust pool peer_id ;
-            P2p_pool.Peers.ban pool peer_id ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.unban
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Peers.unban pool peer_id ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.trust
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Peers.trust pool peer_id ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.untrust
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Peers.untrust pool peer_id ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.register1 dir P2p_services.Peers.S.banned
-      begin fun peer_id () () ->
-        match net.pool with
-        | None -> return_false
-        | Some pool when (P2p_pool.Peers.get_trusted pool peer_id) ->
-            return_false
-        | Some pool ->
-            return (P2p_pool.Peers.banned pool peer_id)
-      end in
-
-  (* Network : Point *)
-
-  let dir =
-    RPC_directory.register0 dir P2p_services.Points.S.list
-      begin fun q () ->
-        match net.pool with
-        | None -> return_nil
-        | Some pool ->
-            return @@
-            P2p_pool.Points.fold_known
-              pool ~init:[]
-              ~f:begin fun point i a ->
-                let info = info_of_point_info i in
-                match q#filters with
-                | [] -> (point, info) :: a
-                | filters when P2p_point.State.filter filters info.state ->
-                    (point, info) :: a
-                | _ -> a
-              end
-      end in
-
-  let dir =
-    RPC_directory.opt_register1 dir P2p_services.Points.S.info
-      begin fun point () () ->
-        match net.pool with
-        | None -> return_none
-        | Some pool ->
-            return @@
-            Option.map
-              (P2p_pool.Points.info pool point)
-              ~f:info_of_point_info
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.events
-      begin fun point_id q () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            match P2p_pool.Points.info pool point_id with
-            | None -> RPC_answer.return []
-            | Some gi ->
-                let rev = false and max = max_int in
-                let evts =
-                  P2p_point_state.Info.fold gi ~init:[]
-                    ~f:(fun a e -> e :: a) in
-                let evts = (if rev then List.rev_sub else List.sub) evts max in
-                if not q#monitor then
-                  RPC_answer.return evts
-                else
-                  let stream, stopper = P2p_point_state.Info.watch gi in
-                  let shutdown () = Lwt_watcher.shutdown stopper in
-                  let first_request = ref true in
-                  let next () =
-                    if not !first_request then begin
-                      Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
-                    end else begin
-                      first_request := false ;
-                      Lwt.return_some evts
-                    end in
-                  RPC_answer.return_stream { next ; shutdown }
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.ban
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Points.untrust pool point;
-            P2p_pool.Points.ban pool point;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.unban
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Points.unban pool point;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.trust
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Points.trust pool point ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.untrust
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool ->
-            P2p_pool.Points.untrust pool point ;
-            RPC_answer.return_unit
-      end in
-
-  let dir =
-    RPC_directory.gen_register1 dir P2p_services.Points.S.banned
-      begin fun point () () ->
-        match net.pool with
-        | None -> RPC_answer.not_found
-        | Some pool when (P2p_pool.Points.get_trusted pool point) ->
-            RPC_answer.return false
-        | Some pool ->
-            RPC_answer.return (P2p_pool.Points.banned pool point)
-      end in
-
-  (* Network : Greylist *)
-
-  let dir =
-    RPC_directory.register dir P2p_services.ACL.S.clear
-      begin fun () () () ->
-        match net.pool with
-        | None -> return_unit
-        | Some pool ->
-            P2p_pool.acl_clear pool ;
-            return_unit
-      end in
-
-  dir

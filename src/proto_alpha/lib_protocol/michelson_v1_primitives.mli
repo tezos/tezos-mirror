@@ -52,6 +52,7 @@ type prim =
   | I_BALANCE
   | I_CAR
   | I_CDR
+  | I_CHAIN_ID
   | I_CHECK_SIGNATURE
   | I_COMPARE
   | I_CONCAT
@@ -63,6 +64,7 @@ type prim =
   | I_DROP
   | I_DUP
   | I_EDIV
+  | I_EMPTY_BIG_MAP
   | I_EMPTY_MAP
   | I_EMPTY_SET
   | I_EQ
@@ -118,6 +120,8 @@ type prim =
   | I_ISNAT
   | I_CAST
   | I_RENAME
+  | I_DIG
+  | I_DUG
   | T_bool
   | T_contract
   | T_int
@@ -140,6 +144,7 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_chain_id
 
 val prim_encoding : prim Data_encoding.encoding
 

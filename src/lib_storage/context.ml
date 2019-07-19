@@ -100,7 +100,6 @@ and context = {
   parents: GitStore.Commit.t list ;
   tree: GitStore.tree ;
 }
-
 type t = context
 
 (*-- Version Access and Update -----------------------------------------------*)
@@ -129,7 +128,7 @@ let checkout_exn index key =
 
 let raw_commit ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message in
   GitStore.Commit.v
     context.index.repo ~info ~parents:context.parents context.tree
 
@@ -324,7 +323,7 @@ let tree_hash: GitStore.tree -> GitStore.Tree.hash = function
 
 let hash ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
   in
   let parents = List.map (fun c -> GitStore.Commit.hash c) context.parents in
   let node = match tree_hash context.tree with
@@ -343,7 +342,7 @@ let commit ~time ?message context =
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
-let data_key key = "data" :: key
+let data_key key = current_data_key @ key
 
 type key = string list
 type value = MBytes.t
@@ -434,6 +433,7 @@ let init ?patch_context ?mapsize ?readonly root =
 
 let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
+
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = GitStore.Tree.empty in
   let ctxt = { index ; tree ; parents = [] } in
@@ -473,6 +473,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
   let branch = get_branch chain_id in
   GitStore.Branch.set ctxt.index.repo branch commit >>= fun () ->
   Lwt.return genesis_header
+
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)
@@ -515,11 +516,11 @@ module Pruned_block = struct
          (req "block_header" Block_header.encoding)
       )
 
-  let to_bytes =
-    Data_encoding.Binary.to_bytes_exn encoding
+  let to_bytes pruned_block =
+    Data_encoding.Binary.to_bytes_exn encoding pruned_block
 
-  let of_bytes =
-    Data_encoding.Binary.of_bytes encoding
+  let of_bytes pruned_block =
+    Data_encoding.Binary.of_bytes encoding pruned_block
 
   let header { block_header } = block_header
 
@@ -556,23 +557,6 @@ module Block_data = struct
   let of_bytes =
     Data_encoding.Binary.of_bytes encoding
 
-  let empty = {
-    block_header =
-      Block_header.{
-        protocol_data = MBytes.empty;
-        shell = {
-          level = 0l;
-          proto_level = 0;
-          predecessor = Block_hash.zero;
-          timestamp = Time.epoch;
-          validation_passes = 0;
-          operations_hash = Operation_list_list_hash.zero;
-          fitness = [];
-          context = Context_hash.zero;
-        } };
-    operations = [[]] ;
-  }
-
 end
 
 module Protocol_data = struct
@@ -580,7 +564,7 @@ module Protocol_data = struct
   type info = {
     author : string ;
     message : string ;
-    timestamp : Time.t ;
+    timestamp : Time.Protocol.t ;
   }
 
   let info_encoding =
@@ -593,7 +577,7 @@ module Protocol_data = struct
       (obj3
          (req "author" string)
          (req "message" string)
-         (req "timestamp" Time.encoding))
+         (req "timestamp" Time.Protocol.encoding))
 
   type data = {
     info : info ;
@@ -624,21 +608,6 @@ module Protocol_data = struct
     tup2
       int32
       data_encoding
-
-  let empty =
-    let info = {
-      author = "" ;
-      message = "" ;
-      timestamp = Time.now ()
-    } in
-    let data = {
-      info ;
-      protocol_hash = Protocol_hash.zero ;
-      test_chain_status = Test_chain_status.Not_running ;
-      data_key = Context_hash.zero ;
-      parents = [ Context_hash.zero ] ;
-    } in
-    (0l, data)
 
   let to_bytes =
     Data_encoding.Binary.to_bytes_exn encoding
@@ -761,25 +730,26 @@ module Dumpable_context = struct
         GitStore.Tree.add_tree tree key sub_tree >>=
         Lwt.return_some
 
-  let add_mbytes index tree key bytes =
-    GitStore.Tree.hash index.repo (`Contents (bytes, ())) >>= fun _ignored  ->
-    GitStore.Tree.add tree key bytes
+  let add_mbytes index bytes =
+    let tree = GitStore.Tree.of_contents bytes in
+    GitStore.Tree.hash index.repo tree >|= fun _ ->
+    tree
 
-  let add_dir index tree key l =
+  let add_dir index l =
     let rec fold_list sub_tree = function
       | [] -> Lwt.return_some sub_tree
       | ( step, hash ) :: tl ->
           begin
-            add_hash index sub_tree [step] hash >>= function
+            add_hash index sub_tree [step]hash >>= function
             | None -> Lwt.return_none
             | Some sub_tree -> fold_list sub_tree tl
           end
     in
     fold_list GitStore.Tree.empty l >>= function
     | None -> Lwt.return_none
-    | Some sub_tree ->
-        GitStore.Tree.add_tree tree key sub_tree
-        >>= Lwt.return_some
+    | Some tree ->
+        GitStore.Tree.hash index.repo tree >>= fun _ ->
+        Lwt.return_some tree
 
   module Commit_hash = Context_hash
   module Block_header = Block_header
@@ -819,7 +789,7 @@ let get_protocol_data_from_header index block_header =
   let author = Irmin.Info.author irmin_info in
   let message = Irmin.Info.message irmin_info in
   let info = {
-    Protocol_data.timestamp = Time.of_seconds date ;
+    Protocol_data.timestamp = Time.Protocol.of_seconds date ;
     author ;
     message ;
   } in
@@ -886,7 +856,7 @@ let validate_context_hash_consistency_and_commit
   let tree = GitStore.Tree.empty in
   GitStore.Tree.add tree current_protocol_key protocol_value >>= fun tree ->
   GitStore.Tree.add tree current_test_chain_key test_chain_value >>= fun tree ->
-  let info = Irmin.Info.v ~date:(Time.to_seconds timestamp) ~author message in
+  let info = Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message in
   let o_tree = Hack.cast (match tree with `Node n -> n | _ -> assert false) in
   let map = match o_tree with Map m -> m | _ -> assert false in
   let data_tree = Hack.Key data_hash in
@@ -970,7 +940,7 @@ let dump_contexts idx datas ~filename =
   >>=? fun fd ->
   dump_contexts_fd idx datas ~fd
 
-let restore_contexts idx ~filename =
+let restore_contexts idx ~filename k_store_pruned_block pipeline_validation =
   let file_init () =
     Lwt_unix.openfile filename Lwt_unix.[O_RDONLY;] 0o600
     >>= return
@@ -984,7 +954,7 @@ let restore_contexts idx ~filename =
   >>=? fun fd ->
   Lwt.finalize
     (fun () ->
-       restore_contexts_fd idx ~fd
+       restore_contexts_fd idx ~fd k_store_pruned_block pipeline_validation
        >>=? fun result ->
        Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR
        >>= fun current ->

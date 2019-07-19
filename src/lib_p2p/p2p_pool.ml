@@ -34,158 +34,6 @@
 
 include Internal_event.Legacy_logging.Make (struct let name = "p2p.connection-pool" end)
 
-type 'msg encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg encoding
-
-module Message = struct
-
-  type 'msg t =
-    | Bootstrap
-    | Advertise of P2p_point.Id.t list
-    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-    | Message of 'msg
-    | Disconnect
-
-  let encoding msg_encoding =
-    let open Data_encoding in
-    dynamic_size @@
-    union ~tag_size:`Uint16
-      ([ case (Tag 0x01) ~title:"Disconnect"
-           (obj1 (req "kind" (constant "Disconnect")))
-           (function Disconnect -> Some () | _ -> None)
-           (fun () -> Disconnect);
-         case (Tag 0x02) ~title:"Bootstrap"
-           (obj1 (req "kind" (constant "Bootstrap")))
-           (function Bootstrap -> Some () | _ -> None)
-           (fun () -> Bootstrap);
-         case (Tag 0x03) ~title:"Advertise"
-           (obj2
-              (req "id" (Variable.list P2p_point.Id.encoding))
-              (req "kind" (constant "Advertise")))
-           (function Advertise points -> Some (points, ()) | _ -> None)
-           (fun (points, ()) -> Advertise points);
-         case (Tag 0x04) ~title:"Swap_request"
-           (obj3
-              (req "point" P2p_point.Id.encoding)
-              (req "peer_id" P2p_peer.Id.encoding)
-              (req "kind" (constant "Swap_request")))
-           (function
-             | Swap_request (point, peer_id) -> Some (point, peer_id, ())
-             | _ -> None)
-           (fun (point, peer_id, ()) -> Swap_request (point, peer_id)) ;
-         case (Tag 0x05)
-           ~title:"Swap_ack"
-           (obj3
-              (req "point" P2p_point.Id.encoding)
-              (req "peer_id" P2p_peer.Id.encoding)
-              (req "kind" (constant "Swap_ack")))
-           (function
-             | Swap_ack (point, peer_id) -> Some (point, peer_id, ())
-             | _ -> None)
-           (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ;
-       ] @
-       ListLabels.map msg_encoding
-         ~f:(function Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length = _ (* ?? *) } ->
-             Data_encoding.case (Tag tag)
-               ~title
-               encoding
-               (function Message msg -> unwrap msg | _ -> None)
-               (fun msg -> Message (wrap msg))))
-
-end
-
-
-module Answerer = struct
-
-  type 'msg callback = {
-    bootstrap: unit -> P2p_point.Id.t list Lwt.t ;
-    advertise: P2p_point.Id.t list -> unit Lwt.t ;
-    message: int -> 'msg -> unit Lwt.t ;
-    swap_request: P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t ;
-    swap_ack: P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t ;
-  }
-
-  type ('msg, 'meta) t = {
-    canceler: Lwt_canceler.t ;
-    conn: ('msg Message.t, 'meta) P2p_socket.t ;
-    callback: 'msg callback ;
-    mutable worker: unit Lwt.t ;
-  }
-
-  let rec worker_loop st =
-    Lwt_unix.yield () >>= fun () ->
-    protect ~canceler:st.canceler begin fun () ->
-      P2p_socket.read st.conn
-    end >>= function
-    | Ok (_, Bootstrap) -> begin
-        (* st.callback.bootstrap will return an empty list if the node
-           is in private mode *)
-        st.callback.bootstrap () >>= function
-        | [] ->
-            worker_loop st
-        | points ->
-            match P2p_socket.write_now st.conn (Advertise points) with
-            | Ok _sent ->
-                (* if not sent then ?? TODO count dropped message ?? *)
-                worker_loop st
-            | Error _ ->
-                Lwt_canceler.cancel st.canceler >>= fun () ->
-                Lwt.return_unit
-      end
-    | Ok (_, Advertise points) ->
-        (* st.callback.advertise will ignore the points if the node is
-           in private mode *)
-        st.callback.advertise points >>= fun () ->
-        worker_loop st
-    | Ok (_, Swap_request (point, peer)) ->
-        st.callback.swap_request point peer >>= fun () ->
-        worker_loop st
-    | Ok (_, Swap_ack (point, peer)) ->
-        st.callback.swap_ack point peer >>= fun () ->
-        worker_loop st
-    | Ok (size, Message msg) ->
-        st.callback.message size msg >>= fun () ->
-        worker_loop st
-    | Ok (_, Disconnect) | Error [P2p_errors.Connection_closed] ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
-    | Error [P2p_errors.Decoding_error] ->
-        (* TODO: Penalize peer... *)
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
-    | Error [ Canceled ] ->
-        Lwt.return_unit
-    | Error err ->
-        lwt_log_error "@[Answerer unexpected error:@ %a@]"
-          Error_monad.pp_print_error err >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
-
-  let run conn canceler callback =
-    let st = {
-      canceler ; conn ; callback ;
-      worker = Lwt.return_unit ;
-    } in
-    st.worker <-
-      Lwt_utils.worker "answerer"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
-    st
-
-  let shutdown st =
-    Lwt_canceler.cancel st.canceler >>= fun () ->
-    st.worker
-
-end
-
 type config = {
 
   identity : P2p_identity.t ;
@@ -195,12 +43,14 @@ type config = {
   peers_file : string ;
   private_mode : bool ;
 
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
+
   listening_port : P2p_addr.port option ;
   min_connections : int ;
   max_connections : int ;
   max_incoming_connections : int ;
-  connection_timeout : float ;
-  authentication_timeout : float ;
+  connection_timeout : Time.System.Span.t ;
+  authentication_timeout : Time.System.Span.t ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -211,9 +61,10 @@ type config = {
   max_known_points : (int * int) option ; (* max, gc target *)
   max_known_peer_ids : (int * int) option ; (* max, gc target *)
 
-  swap_linger : float ;
+  swap_linger : Time.System.Span.t ;
 
   binary_chunks_size : int option ;
+
 }
 
 type 'peer_meta peer_meta_config = {
@@ -223,7 +74,7 @@ type 'peer_meta peer_meta_config = {
 }
 
 type 'msg message_config = {
-  encoding : 'msg encoding list ;
+  encoding : 'msg P2p_message.encoding list ;
   chain_name : Distributed_db_version.name ;
   distributed_db_versions : Distributed_db_version.t list ;
 }
@@ -232,6 +83,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   config : config ;
   announced_version : Network_version.t ;
   custom_p2p_versions : P2p_version.t list ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
   peer_meta_config : 'peer_meta peer_meta_config ;
   conn_meta_config : 'conn_meta P2p_socket.metadata_config ;
   message_config : 'msg message_config ;
@@ -250,14 +102,14 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t P2p_point.Table.t ;
   incoming : Lwt_canceler.t P2p_point.Table.t ;
   io_sched : P2p_io_scheduler.t ;
-  encoding : 'msg Message.t Data_encoding.t ;
+  encoding : 'msg P2p_message.t Data_encoding.t ;
   events : events ;
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
   acl : P2p_acl.t ;
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) list ;
-  mutable latest_accepted_swap : Time.t ;
-  mutable latest_succesfull_swap : Time.t ;
+  mutable latest_accepted_swap : Time.System.t ;
+  mutable latest_succesfull_swap : Time.System.t  ;
 }
 
 and events = {
@@ -271,14 +123,14 @@ and events = {
 and ('msg, 'peer_meta, 'conn_meta) connection = {
   canceler : Lwt_canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
-  conn : ('msg Message.t, 'conn_meta) P2p_socket.t ;
+  conn : ('msg P2p_message.t, 'conn_meta) P2p_socket.t ;
   peer_info :
     (('msg, 'peer_meta, 'conn_meta) connection, 'peer_meta, 'conn_meta) P2p_peer_state.Info.t ;
   point_info :
     ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t option ;
   negotiated_version : Network_version.t ;
-  answerer : ('msg, 'conn_meta) Answerer.t Lazy.t ;
-  mutable last_sent_swap_request : (Time.t * P2p_peer.Id.t) option ;
+  answerer : ('msg, 'conn_meta) P2p_answerer.t Lazy.t ;
+  mutable last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option ;
   mutable wait_close : bool ;
 }
 
@@ -303,8 +155,8 @@ let private_node_warn fmt =
   Format.kasprintf (fun s -> lwt_warn "[private node] %s" s) fmt
 
 module Gc_point_set = List.Bounded(struct
-    type t = Time.t * P2p_point.Id.t
-    let compare (x, _) (y, _) = - (Time.compare x y)
+    type t = Time.System.t * P2p_point.Id.t
+    let compare (x, _) (y, _) = - (Time.System.compare x y)
   end)
 
 let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool) =
@@ -314,7 +166,7 @@ let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool)
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then
         let to_remove_target = current_size - target in
-        let now = Time.now () in (* TODO: maybe time of discovery? *)
+        let now = Systime_os.now () in (* TODO: maybe time of discovery? *)
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter (fun p point_info ->
             if P2p_point_state.is_disconnected point_info then
@@ -330,10 +182,13 @@ let gc_points ({ config = { max_known_points ; _ } ; known_points ; _ } as pool)
         end ;
         log pool Gc_points
 
-let register_point pool ?trusted _source_peer_id (addr, port as point) =
+let register_point ?trusted pool _source_peer_id (addr, port as point) =
   match P2p_point.Table.find_opt pool.known_points point with
   | None ->
-      let point_info = P2p_point_state.Info.create ?trusted addr port in
+      let point_info =
+        P2p_point_state.Info.create
+          ?trusted
+          addr port in
       Option.iter pool.config.max_known_points ~f:begin fun (max, _) ->
         if P2p_point.Table.length pool.known_points >= max then gc_points pool
       end ;
@@ -345,7 +200,8 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
       begin
         match trusted with
         | Some true -> P2p_point_state.Info.set_trusted point_info ;
-        | _ -> ()
+        | Some false -> P2p_point_state.Info.unset_trusted point_info ;
+        | None -> ()
       end ;
       point_info
 
@@ -364,10 +220,10 @@ let may_register_my_id_point pool = function
    to peer_ids with the same (low) score and removing the most recent ones
    ensure that older (and probably legit) peer_id infos are kept. *)
 module Gc_peer_set = List.Bounded(struct
-    type t = float * Time.t * P2p_peer.Id.t
+    type t = float * Time.System.t * P2p_peer.Id.t
     let compare (s, t, _) (s', t', _) =
       let score_cmp = Pervasives.compare s s' in
-      if score_cmp = 0 then Time.compare t t' else - score_cmp
+      if score_cmp = 0 then Time.System.compare t t' else - score_cmp
   end)
 
 let gc_peer_ids ({ peer_meta_config = { score ; _ } ;
@@ -501,8 +357,7 @@ module Points = struct
       (P2p_point.Table.find_opt pool.known_points point)
 
   let set_trusted pool point =
-    P2p_point_state.Info.set_trusted
-      (register_point pool pool.config.identity.peer_id point)
+    ignore @@ register_point ~trusted:true pool pool.config.identity.peer_id point
 
   let unset_trusted pool point =
     Option.iter ~f:P2p_point_state.Info.unset_trusted
@@ -522,7 +377,7 @@ module Points = struct
     (* Kick [addr]:* if it is in `Running` state. *)
     List.iter (fun conn ->
         conn.wait_close <- false ;
-        Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
+        Lwt.async (fun () -> P2p_answerer.shutdown (Lazy.force conn.answerer))
       ) (connections_of_addr pool addr)
 
   let unban pool (addr, _port) =
@@ -579,7 +434,7 @@ module Peers = struct
     (* Kick [peer] if it is in `Running` state. *)
     Option.iter (connection_of_peer_id pool peer) ~f:begin fun conn ->
       conn.wait_close <- false ;
-      Lwt.async (fun () -> Answerer.shutdown (Lazy.force conn.answerer))
+      Lwt.async (fun () -> P2p_answerer.shutdown (Lazy.force conn.answerer))
     end
 
   let unban pool peer =
@@ -685,7 +540,7 @@ module Connection = struct
 end
 
 let greylist_addr pool addr =
-  P2p_acl.IPGreylist.add pool.acl addr (Time.now ())
+  P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
 
 let greylist_peer pool peer =
   Option.iter (get_addr pool peer) ~f:begin fun (addr, _port) ->
@@ -713,6 +568,37 @@ let fail_unless_disconnected_point point_info =
   | Disconnected -> return_unit
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
   | Running _ -> fail P2p_errors.Connected
+
+(* [sample best other points] return a list of elements selected in [points].
+   The [best] first elements are taken, then [other] elements are chosen
+   randomly in the rest of the list.
+   Note that it might select fewer elements than [other] if it the same index
+   close to the end of the list is picked multiple times. *)
+let sample best other points =
+  let l = List.length points in
+  if l <= best + other then
+    points
+  else
+    let best_indexes = List.init best (fun i -> i) in
+    let other_indexes =
+      List.sort compare
+      @@ List.init other (fun _ -> best + Random.int (l - best)) in
+    let indexes = best_indexes @ other_indexes in
+    (* Note: we are doing a [fold_left_i] by hand, passing [i] manually *)
+    (fun (_, _, result) -> result) @@ List.fold_left
+      (fun (i, indexes, acc) point ->
+         match indexes with
+         | [] -> (0, [], acc) (* TODO: early return *)
+         | index :: indexes when i >= index ->
+             (* We compare `i >= index` (rather than `i = index`) to avoid a
+                corner case whereby two identical `index`es are present in the
+                list. In that case, using `>=` makes it so that if `i` overtakes
+                `index` we still pick elements. *)
+             (succ i, indexes, point :: acc)
+         | _ ->
+             (succ i, indexes, acc))
+      (0, indexes, [])
+      points
 
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)
@@ -743,7 +629,7 @@ let rec connect ?timeout pool point =
     (active_connections pool <= pool.config.max_connections)
     P2p_errors.Too_many_connections >>=? fun () ->
   let canceler = Lwt_canceler.create () in
-  with_timeout ~canceler (Lwt_unix.sleep timeout) begin fun canceler ->
+  with_timeout ~canceler (Systime_os.sleep timeout) begin fun canceler ->
     let point_info =
       register_point pool pool.config.identity.peer_id point in
     let addr, port as point = P2p_point_state.Info.point point_info in
@@ -762,12 +648,12 @@ let rec connect ?timeout pool point =
       return_unit
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
-      P2p_point_state.set_disconnected point_info ;
+      P2p_point_state.set_disconnected pool.greylisting_config point_info ;
       P2p_fd.close fd >>= fun () ->
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
           fail P2p_errors.Connection_refused
-      | err -> Lwt.return (Error err)
+      | err -> Lwt.return_error err
     end >>=? fun () ->
     lwt_debug "connect: %a -> authenticate" P2p_point.Id.pp point >>= fun () ->
     authenticate pool ~point_info canceler fd point
@@ -825,8 +711,10 @@ and raw_authenticate pool ?point_info canceler fd point =
     if incoming then
       P2p_point.Table.remove pool.incoming point
     else
-      Option.iter ~f:P2p_point_state.set_disconnected point_info ;
-    Lwt.return (Error err)
+      Option.iter
+        ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+        point_info ;
+    Lwt.return_error err
   end >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
   lwt_debug "authenticate: %a -> auth %a"
@@ -885,8 +773,12 @@ and raw_authenticate pool ?point_info canceler fd point =
      incoming connections, thus giving an entry point for dos attack
      by giving late Nack.
   *)
-  if incoming then
-    P2p_point.Table.remove pool.incoming point ;
+  if incoming then P2p_point.Table.remove pool.incoming point ;
+  Option.iter connection_point_info
+    ~f:(fun point_info ->
+        (* set the point to private or not, depending on the [info] gethered
+           during authentication *)
+        P2p_point_state.set_private point_info info.private_node) ;
   match acceptable_version with
   | Some version when acceptable_peer_id && acceptable_point -> begin
       log pool (Accepting_request (point, info.id_point, info.peer_id)) ;
@@ -916,9 +808,9 @@ and raw_authenticate pool ?point_info canceler fd point =
           P2p_point.Id.pp point
           P2p_peer.Id.pp info.peer_id >>= fun () ->
         Option.iter connection_point_info
-          ~f:P2p_point_state.set_disconnected ;
+          ~f:(P2p_point_state.set_disconnected pool.greylisting_config) ;
         P2p_peer_state.set_disconnected peer_info ;
-        Lwt.return (Error err)
+        Lwt.return_error err
       end >>=? fun conn ->
       let id_point =
         match info.id_point, Option.map ~f:P2p_point_state.Info.point point_info with
@@ -937,7 +829,9 @@ and raw_authenticate pool ?point_info canceler fd point =
         acceptable_point acceptable_peer_id >>= fun () ->
       P2p_socket.kick auth_fd >>= fun () ->
       if not incoming then begin
-        Option.iter ~f:P2p_point_state.set_disconnected point_info ;
+        Option.iter
+          ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+          point_info ;
         (* FIXME P2p_peer_state.set_disconnected ~requested:true peer_info ; *)
       end ;
       match acceptable_version with
@@ -969,22 +863,22 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
   let messages = Lwt_pipe.create ?size () in
 
   let rec callback_default =
-    { Answerer.message =
+    { P2p_answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise =
-        (fun points -> register_new_points pool conn points ) ;
+        (fun points -> register_new_points pool conn points ; Lwt.return_unit) ;
       bootstrap =
         (fun () -> list_known_points ~ignore_private:true pool conn) ;
       swap_request =
-        (fun point peer_id -> swap_request pool conn point peer_id ) ;
+        (fun point peer_id -> swap_request pool conn point peer_id) ;
       swap_ack =
-        (fun point peer_id -> swap_ack pool conn point peer_id ) ;
+        (fun point peer_id -> swap_ack pool conn point peer_id) ;
     }
 
   (* when the node is in private mode: deactivate advertising,
      peers_swap and sending list of peers in callback *)
   and callback_private =
-    { Answerer.message =
+    { P2p_answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise =
         (fun _points ->
@@ -1018,7 +912,7 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
 
   and answerer =
     lazy (
-      Answerer.run p2p_conn canceler @@
+      P2p_answerer.run p2p_conn canceler @@
       if pool.config.private_mode then callback_private else callback_default
     )
 
@@ -1032,7 +926,6 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
   Option.iter point_info ~f:begin fun point_info ->
     let point = P2p_point_state.Info.point point_info in
     P2p_point_state.set_running
-      ~known_private:(pool.conn_meta_config.private_node conn_meta)
       point_info peer_id conn;
     P2p_point.Table.add pool.connected_points point point_info ;
   end ;
@@ -1043,7 +936,9 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
   Lwt_canceler.on_cancel canceler begin fun () ->
     lwt_debug "Disconnect: %a (%a)"
       P2p_peer.Id.pp peer_id P2p_connection.Id.pp id_point >>= fun () ->
-    Option.iter ~f:P2p_point_state.set_disconnected point_info ;
+    Option.iter
+      ~f:(P2p_point_state.set_disconnected pool.greylisting_config)
+      point_info ;
     log pool (Disconnection peer_id) ;
     P2p_peer_state.set_disconnected peer_info ;
     Option.iter point_info ~f:begin fun point_info ->
@@ -1066,13 +961,12 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
 
 and disconnect ?(wait = false) conn =
   conn.wait_close <- wait ;
-  Answerer.shutdown (Lazy.force conn.answerer)
+  P2p_answerer.shutdown (Lazy.force conn.answerer)
 
 and register_new_points ?trusted pool conn =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
   fun points ->
-    List.iter (register_new_point ?trusted pool source_peer_id) points ;
-    Lwt.return_unit
+    List.iter (register_new_point ?trusted pool source_peer_id) points
 
 and register_new_point ?trusted pool source_peer_id point =
   if not (P2p_point.Table.mem pool.my_id_points point) then
@@ -1084,16 +978,18 @@ and list_known_points ?(ignore_private = false) pool conn =
       P2p_peer.Id.pp (P2p_peer_state.Info.peer_id conn.peer_info) >>= fun () ->
     Lwt.return_nil
   else
-    let knowns =
-      P2p_point.Table.fold
-        (fun _ point_info acc ->
-           if ignore_private &&
-              not (P2p_point_state.Info.known_public point_info) then acc
-           else point_info :: acc)
-        pool.known_points [] in
-    let best_knowns =
-      List.take_n ~compare:compare_known_point_info 50 knowns in
-    Lwt.return (List.map P2p_point_state.Info.point best_knowns)
+    P2p_point.Table.fold
+      (fun point_id point_info acc ->
+         if (ignore_private &&
+             not (P2p_point_state.Info.known_public point_info))
+         || Points.banned pool point_id
+         then acc
+         else point_info :: acc)
+      pool.known_points []
+    |> List.sort compare_known_point_info
+    |> sample 30 20
+    |> List.map P2p_point_state.Info.point
+    |> Lwt.return
 
 and active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
@@ -1104,13 +1000,12 @@ and swap_request pool conn new_point _new_peer_id =
     "Swap request received from %a" P2p_peer.Id.pp source_peer_id >>= fun () ->
   (* Ignore if already connected to peer or already swapped less
      than <swap_linger> seconds ago. *)
-  let now = Time.now () in
   let span_since_last_swap =
-    Int64.to_int @@
-    Time.diff now
-      (Time.max pool.latest_succesfull_swap pool.latest_accepted_swap) in
+    Ptime.diff
+      (Systime_os.now ())
+      (Time.System.max pool.latest_succesfull_swap pool.latest_accepted_swap) in
   let new_point_info = register_point pool source_peer_id new_point in
-  if span_since_last_swap < int_of_float pool.config.swap_linger
+  if Ptime.Span.compare span_since_last_swap pool.config.swap_linger < 0
   || not (P2p_point_state.is_disconnected new_point_info) then begin
     log pool (Swap_request_ignored { source = source_peer_id }) ;
     lwt_log_info "Ignoring swap request from %a" P2p_peer.Id.pp source_peer_id
@@ -1151,10 +1046,10 @@ and swap_ack pool conn new_point _new_peer_id =
 
 and swap pool conn current_peer_id new_point =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
-  pool.latest_accepted_swap <- Time.now () ;
+  pool.latest_accepted_swap <- Systime_os.now () ;
   connect pool new_point >>= function
   | Ok _new_conn -> begin
-      pool.latest_succesfull_swap <- Time.now () ;
+      pool.latest_succesfull_swap <- Systime_os.now () ;
       log pool (Swap_success { source = source_peer_id }) ;
       lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point >>= fun () ->
       match Connection.find_by_peer_id pool current_peer_id with
@@ -1193,7 +1088,7 @@ let accept pool fd point =
     P2p_point.Table.add pool.incoming point canceler ;
     Lwt.async begin fun () ->
       with_timeout
-        ~canceler (Lwt_unix.sleep pool.config.authentication_timeout)
+        ~canceler (Systime_os.sleep pool.config.authentication_timeout)
         (fun canceler -> authenticate pool canceler fd point)
     end
 
@@ -1210,7 +1105,7 @@ let send_swap_request pool =
       | Some (proposed_point, proposed_peer_id, _proposed_conn) ->
           log pool (Swap_request_sent { source = recipient_peer_id }) ;
           recipient.last_sent_swap_request <-
-            Some (Time.now (), proposed_peer_id) ;
+            Some (Systime_os.now (), proposed_peer_id) ;
           ignore (P2p_socket.write_now recipient.conn
                     (Swap_request (proposed_point, proposed_peer_id)))
     end
@@ -1230,6 +1125,7 @@ let create
   } in
   let pool = {
     config ; peer_meta_config ; conn_meta_config ; message_config ;
+    greylisting_config = config.greylisting_config ;
     announced_version =
       Network_version.announced
         ~chain_name: message_config.chain_name
@@ -1243,13 +1139,13 @@ let create
     connected_points = P2p_point.Table.create 53 ;
     incoming = P2p_point.Table.create 53 ;
     io_sched ;
-    encoding = Message.encoding message_config.encoding ;
+    encoding = P2p_message.encoding message_config.encoding ;
     events ;
     watcher = Lwt_watcher.create_input () ;
     acl = P2p_acl.create 1023;
     new_connection_hook = [] ;
-    latest_accepted_swap = Time.epoch ;
-    latest_succesfull_swap = Time.epoch ;
+    latest_accepted_swap = Ptime.epoch ;
+    latest_succesfull_swap = Ptime.epoch ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
   P2p_peer_state.Info.File.load
@@ -1302,4 +1198,3 @@ let destroy ({ config ; peer_meta_config ; _ } as pool) =
 
 let on_new_connection pool f =
   pool.new_connection_hook <- f :: pool.new_connection_hook
-

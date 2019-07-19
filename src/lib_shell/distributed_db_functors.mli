@@ -69,7 +69,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> unit
 
   (** Return the value if it is known locally, or block until the data
@@ -89,7 +89,7 @@ module type DISTRIBUTED_DB = sig
   val fetch:
     t ->
     ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
+    ?timeout:Time.System.Span.t ->
     key -> param -> value tzresult Lwt.t
 
   (** Remove the data from the local index or cancel all pending
@@ -133,6 +133,7 @@ module type MEMORY_TABLE = sig
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val length : 'a t -> int
 end
 
 module type SCHEDULER_EVENTS = sig
@@ -144,6 +145,7 @@ module type SCHEDULER_EVENTS = sig
   val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
   val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
   val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
+  val memory_table_length : t -> int
 end
 
 module type PRECHECK = sig
@@ -174,13 +176,14 @@ module Make_table
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val memory_table_length : t -> int
 
 end
 
 module type REQUEST = sig
   type key
   type param
-  val initial_delay : float
+  val initial_delay : Time.System.Span.t
   val active : param -> P2p_peer.Set.t
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end

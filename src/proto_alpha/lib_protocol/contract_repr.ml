@@ -109,6 +109,8 @@ let () =
 
 let implicit_contract id = Implicit id
 
+let originated_contract_004 id = Originated id
+
 let is_implicit = function
   | Implicit m -> Some m
   | Originated _ -> None
@@ -172,39 +174,41 @@ let rpc_arg =
     ()
 
 module Index = struct
-  type t = contract
-  let path_length =
 
-    assert Compare.Int.(Signature.Public_key_hash.path_length =
-                        1 + Contract_hash.path_length) ;
-    Signature.Public_key_hash.path_length
+  type t = contract
+
+  let path_length = 7
+
   let to_path c l =
-    match c with
-    | Implicit k ->
-        Signature.Public_key_hash.to_path k l
-    | Originated h ->
-        "originated" :: Contract_hash.to_path h l
+    let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+    let `Hex key = MBytes.to_hex raw_key in
+    let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+    String.sub index_key 0 2 ::
+    String.sub index_key 2 2 ::
+    String.sub index_key 4 2 ::
+    String.sub index_key 6 2 ::
+    String.sub index_key 8 2 ::
+    String.sub index_key 10 2 ::
+    key ::
+    l
+
   let of_path = function
-    | "originated" :: key -> begin
-        match Contract_hash.of_path key with
-        | None -> None
-        | Some h -> Some (Originated h)
-      end
-    | key -> begin
-        match Signature.Public_key_hash.of_path key with
-        | None -> None
-        | Some h -> Some (Implicit h)
-      end
-  let contract_prefix s =
-    "originated" :: Contract_hash.prefix_path s
-  let pkh_prefix_ed25519 s =
-    Ed25519.Public_key_hash.prefix_path s
-  let pkh_prefix_secp256k1 s =
-    Secp256k1.Public_key_hash.prefix_path s
-  let pkh_prefix_p256 s =
-    P256.Public_key_hash.prefix_path s
+    | [] | [_] | [_;_] | [_;_;_] | [_;_;_;_] | [_;_;_;_;_] | [_;_;_;_;_;_]
+    | _::_::_::_::_::_::_::_::_ ->
+        None
+    | [ index1 ; index2 ; index3 ; index4 ; index5 ; index6 ; key ] ->
+        let raw_key = MBytes.of_hex (`Hex key) in
+        let `Hex index_key = MBytes.to_hex (Raw_hashes.blake2b raw_key) in
+        assert Compare.String.(String.sub index_key 0 2 = index1) ;
+        assert Compare.String.(String.sub index_key 2 2 = index2) ;
+        assert Compare.String.(String.sub index_key 4 2 = index3) ;
+        assert Compare.String.(String.sub index_key 6 2 = index4) ;
+        assert Compare.String.(String.sub index_key 8 2 = index5) ;
+        assert Compare.String.(String.sub index_key 10 2 = index6) ;
+        Data_encoding.Binary.of_bytes encoding raw_key
 
   let rpc_arg = rpc_arg
   let encoding = encoding
   let compare = compare
+
 end

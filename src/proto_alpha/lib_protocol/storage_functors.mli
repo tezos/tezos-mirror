@@ -27,11 +27,14 @@
 
 open Storage_sigs
 
-module Make_subcontext (C : Raw_context.T) (N : NAME)
+module Registered : REGISTER
+module Ghost : REGISTER
+
+module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME)
   : Raw_context.T with type t = C.t
 
 module Make_single_data_storage
-    (C : Raw_context.T) (N : NAME) (V : VALUE)
+    (R : REGISTER) (C : Raw_context.T) (N : NAME) (V : VALUE)
   : Single_data_storage with type t = C.t
                          and type value = V.t
 

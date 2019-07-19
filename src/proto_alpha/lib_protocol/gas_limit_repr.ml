@@ -27,6 +27,8 @@ type t =
   | Unaccounted
   | Limited of { remaining : Z.t }
 
+type internal_gas = Z.t
+
 type cost =
   { allocations : Z.t ;
     steps : Z.t ;
@@ -85,42 +87,65 @@ type error += Operation_quota_exceeded (* `Temporary *)
 
 let allocation_weight = Z.of_int 2
 let step_weight = Z.of_int 1
-let read_base_weight = Z.of_int 50
-let write_base_weight = Z.of_int 80
+let read_base_weight = Z.of_int 100
+let write_base_weight = Z.of_int 160
 let byte_read_weight = Z.of_int 10
 let byte_written_weight = Z.of_int 15
 
-let consume block_gas operation_gas cost = match operation_gas with
-  | Unaccounted -> ok (block_gas, Unaccounted)
-  | Limited { remaining } ->
-      let weighted_cost =
-        Z.add
-          (Z.add
-             (Z.mul allocation_weight cost.allocations)
-             (Z.mul step_weight cost.steps))
-          (Z.add
-             (Z.add
-                (Z.mul read_base_weight cost.reads)
-                (Z.mul write_base_weight cost.writes))
-             (Z.add
-                (Z.mul byte_read_weight cost.bytes_read)
-                (Z.mul byte_written_weight cost.bytes_written))) in
-      let remaining =
-        Z.sub remaining weighted_cost in
-      let block_remaining =
-        Z.sub block_gas weighted_cost in
-      if Compare.Z.(remaining < Z.zero)
-      then error Operation_quota_exceeded
-      else if Compare.Z.(block_remaining < Z.zero)
-      then error Block_quota_exceeded
-      else ok (block_remaining, Limited { remaining })
+let rescaling_bits = 7
+let rescaling_mask =
+  Z.sub (Z.shift_left Z.one rescaling_bits) Z.one
 
-let check_enough block_gas operation_gas cost =
-  consume block_gas operation_gas cost
-  >|? fun (_block_remainig, _remaining) -> ()
+let scale (z : Z.t) = Z.shift_left z rescaling_bits
+let rescale (z : Z.t) = Z.shift_right z rescaling_bits
+
+let cost_to_internal_gas (cost : cost) : internal_gas =
+  Z.add
+    (Z.add
+       (Z.mul cost.allocations allocation_weight)
+       (Z.mul cost.steps step_weight))
+    (Z.add
+       (Z.add
+          (Z.mul cost.reads read_base_weight)
+          (Z.mul cost.writes write_base_weight))
+       (Z.add
+          (Z.mul cost.bytes_read byte_read_weight)
+          (Z.mul cost.bytes_written byte_written_weight)))
+
+let internal_gas_to_gas internal_gas : Z.t * internal_gas =
+  let gas  = rescale internal_gas in
+  let rest = Z.logand internal_gas rescaling_mask in
+  (gas, rest)
+
+let consume block_gas operation_gas internal_gas cost =
+  match operation_gas with
+  | Unaccounted -> ok (block_gas, Unaccounted, internal_gas)
+  | Limited { remaining } ->
+      let cost_internal_gas  = cost_to_internal_gas cost in
+      let total_internal_gas =
+        Z.add cost_internal_gas internal_gas in
+      let gas, rest = internal_gas_to_gas total_internal_gas in
+      if Compare.Z.(gas > Z.zero) then
+        let remaining =
+          Z.sub remaining gas in
+        let block_remaining =
+          Z.sub block_gas gas in
+        if Compare.Z.(remaining < Z.zero)
+        then error Operation_quota_exceeded
+        else if Compare.Z.(block_remaining < Z.zero)
+        then error Block_quota_exceeded
+        else ok (block_remaining, Limited { remaining }, rest)
+      else
+        ok (block_gas, operation_gas, total_internal_gas)
+
+let check_enough block_gas operation_gas internal_gas cost =
+  consume block_gas operation_gas internal_gas cost
+  >|? fun (_block_remainig, _remaining, _internal_gas) -> ()
+
+let internal_gas_zero : internal_gas = Z.zero
 
 let alloc_cost n =
-  { allocations = Z.of_int (n + 1) ;
+  { allocations = scale (Z.of_int (n + 1)) ;
     steps = Z.zero ;
     reads = Z.zero ;
     writes = Z.zero ;
@@ -133,9 +158,17 @@ let alloc_bytes_cost n =
 let alloc_bits_cost n =
   alloc_cost ((n + 63) / 64)
 
+let atomic_step_cost n =
+  { allocations = Z.zero ;
+    steps = Z.of_int (2 * n) ;
+    reads = Z.zero ;
+    writes = Z.zero ;
+    bytes_read = Z.zero ;
+    bytes_written = Z.zero }
+
 let step_cost n =
   { allocations = Z.zero ;
-    steps = Z.of_int n ;
+    steps = scale (Z.of_int n) ;
     reads = Z.zero ;
     writes = Z.zero ;
     bytes_read = Z.zero ;
@@ -152,9 +185,9 @@ let free =
 let read_bytes_cost n =
   { allocations = Z.zero ;
     steps = Z.zero ;
-    reads = Z.one ;
+    reads = scale Z.one ;
     writes = Z.zero ;
-    bytes_read = n ;
+    bytes_read = scale n ;
     bytes_written = Z.zero }
 
 let write_bytes_cost n =
@@ -163,7 +196,7 @@ let write_bytes_cost n =
     reads = Z.zero ;
     writes = Z.one ;
     bytes_read = Z.zero ;
-    bytes_written = n }
+    bytes_written = scale n }
 
 let ( +@ ) x y =
   { allocations = Z.add x.allocations y.allocations ;

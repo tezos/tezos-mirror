@@ -63,18 +63,23 @@ module Status = struct
     string_fs := f :: !string_fs
 
   let to_string = function
-    | Invalid_pin i -> "Invalid pin " ^  string_of_int i
-    | Incorrect_length -> "Incorrect length"
-    | Incompatible_file_structure -> "Incompatible file structure"
-    | Security_status_unsatisfied -> "Security status unsatisfied"
     | Conditions_of_use_not_satisfied -> "Conditions of use not satisfied"
-    | Incorrect_data -> "Incorrect data"
     | File_not_found -> "File not found"
-    | Incorrect_params -> "Incorrect params"
+    | Hid_required -> "HID required"
+    | Incompatible_file_structure -> "Incompatible file structure"
+    | Incorrect_class -> "Incorrect class"
+    | Incorrect_data -> "Incorrect data"
+    | Incorrect_length -> "Incorrect length"
+    | Incorrect_length_for_ins -> "Incorrect length for instruction"
+    | Incorrect_params -> "Incorrect parameters"
     | Ins_not_supported -> "Instruction not supported"
-    | Technical_problem i -> "Technical problem " ^ string_of_int i
-    | Referenced_data_not_found -> "Referenced data not found"
+    | Invalid_pin i -> "Invalid pin " ^ string_of_int i
+    | Memory_error -> "Memory error"
     | Ok -> "Ok"
+    | Parse_error -> "Parse error"
+    | Referenced_data_not_found -> "Referenced data not found"
+    | Security_status_unsatisfied -> "Security status unsatisfied"
+    | Technical_problem i -> "Technical problem " ^ string_of_int i
     | Unknown i -> Printf.sprintf "Unknown status code 0x%x" i
     | t ->
         try
@@ -82,6 +87,20 @@ module Status = struct
             match f t with Some s -> failwith s | None -> a
           end "Unregistered status message" !string_fs
         with Failure s -> s
+
+  let to_help_suggestion = function
+    | Conditions_of_use_not_satisfied ->
+        Some "Either you rejected the operation or you waited long enough \
+              to respond that the device rejected it for you."
+    | Incorrect_class ->
+        Some "A Tezos application wasn't found on the device. Is the Tezos \
+              Wallet or Tezos Baking application open on the device? Is the \
+              device busy talking to another process?"
+    | Security_status_unsatisfied ->
+        Some "The operation was automatically rejected for security reasons. \
+              If baking, you may need to setup the device or reset the \
+              high-water mark."
+    | _ -> None
 
   let show t = to_string t
 
@@ -180,8 +199,13 @@ let apdu_error r =
 
 let pp_error ppf = function
   | AppError { status ; msg } ->
-      Format.fprintf ppf "Application level error (%s): %a"
+      Format.fprintf ppf "Application level error (%s): %a%a"
         msg Status.pp status
+        (fun ppf -> function
+           | None -> Format.fprintf ppf ""
+           | Some s -> Format.fprintf ppf " - %a" Format.pp_print_text s
+        )
+        (Status.to_help_suggestion status)
   | ApduError e ->
       Format.fprintf ppf "APDU level error: %a" Header.Error.pp e
   | TransportError e ->

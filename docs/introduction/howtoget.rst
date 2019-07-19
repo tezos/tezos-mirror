@@ -27,24 +27,18 @@ with success in the past on windows/mac/linux.
 The same script can be used to run Mainnet, Alphanet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Alphanet:
-
-::
+For example, to run Alphanet::
 
     wget https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
     chmod +x alphanet.sh
 
-Alternatively, to run Mainnet:
-
-::
+Alternatively, to run Mainnet::
 
     wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
     chmod +x mainnet.sh
 
 In the following we assume you are running Alphanet.
-You are now one step away from a working node:
-
-::
+You are now one step away from a working node::
 
     ./alphanet.sh start
 
@@ -57,16 +51,12 @@ considering the chain takes up several gigabytes of data. See
 
 Every call to ``alphanet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
-run:
-
-::
+run::
 
     ./alphanet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
-set an environment variable:
-
-::
+set an environment variable::
 
     export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
@@ -81,13 +71,11 @@ can be executed using ``./alphanet.sh admin-client``.
 Build from sources
 ------------------
 
-**TL;DR**: Typically you want to do:
+**TL;DR**: Typically you want to do::
 
-::
-
-   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget libev-dev libgmp-dev pkg-config libhidapi-dev which
-   wget https://github.com/ocaml/opam/releases/download/2.0.1/opam-2.0.1-x86_64-linux
-   sudo cp opam-2.0.1-x86_64-linux /usr/local/bin/opam
+   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
+   wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
+   sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
    sudo chmod a+x /usr/local/bin/opam
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
@@ -143,9 +131,11 @@ Install OPAM
 ~~~~~~~~~~~~
 
 To compile Tezos, you need the `OPAM <https://opam.ocaml.org/>`__
-package manager, version *2.0*. The build script will take
-care of setting-up OPAM, download the right version of the OCaml
-compiler, and so on.
+package manager, version *2.0*.
+For other versions check the `release page
+<https://github.com/ocaml/opam/releases/latest>`_.
+The build script will take care of setting-up OPAM, download the right
+version of the OCaml compiler, and so on.
 
 Use ``opam init --bare`` to avoid compiling the OCaml compiler now: it
 will be done in the next step.
@@ -154,9 +144,7 @@ will be done in the next step.
 Install Tezos dependencies with OPAM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Install the OCaml compiler and the libraries which Tezos depends on:
-
-::
+Install the OCaml compiler and the libraries which Tezos depends on::
 
    make build-deps
 
@@ -179,9 +167,7 @@ able to suggest a call to the system package manager but it currently
 does not handle version check.
 
 Once the dependencies are done we can update opam's environment to
-refer to the new switch and compile the project:
-
-::
+refer to the new switch and compile the project::
 
    eval $(opam env)
    make

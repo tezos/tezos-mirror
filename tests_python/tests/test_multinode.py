@@ -5,6 +5,7 @@ from tools import utils
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
 
+# TODO  test doesn't pass with n=2 (--bootstrap-treshold?)
 @pytest.mark.multinode
 @pytest.mark.parametrize("clients", [3], indirect=True)
 @pytest.mark.incremental
@@ -15,10 +16,8 @@ class TestManualBaking:
     . check inclusion of transfer and endorsement operations
     """
 
-    def test_level(self, clients, session):
+    def test_level(self, clients):
         level = 1
-        session["init_bal"] = clients[0].get_balance(
-            'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
         for client in clients:
             assert utils.check_level(client, level)
 
@@ -38,30 +37,28 @@ class TestManualBaking:
 
     def test_transfer(self, clients, session):
         client_id = 3 % len(clients)
-        session["transfer_sum"] = 500
-        transfer = clients[client_id].transfer(session["transfer_sum"],
-                                               'bootstrap1',
-                                               'bootstrap3')
+        transfer = clients[client_id].transfer(500, 'bootstrap1', 'bootstrap3')
         session["transfer_hash"] = transfer.operation_hash
 
-    def test_bake(self, clients):
-        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
-
-    def test_contains_endorse_and_transfer(self, clients, session):
+    def test_mempool_contains_endorse_and_transfer(self, clients, session):
         endorse_hash = session["endorse_hash"]
         transfer_hash = session["transfer_hash"]
         operation_hashes = [endorse_hash, transfer_hash]
         for client in clients:
-            assert utils.check_contains_operations(client, operation_hashes)
+            assert utils.check_mempool_contains_operations(
+                client, operation_hashes)
 
-    def test_balance(self, clients, session):
+    def test_bake(self, clients):
+        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
+
+    def test_block_contains_endorse_and_transfer(self, clients, session):
+        endorse_hash = session["endorse_hash"]
+        transfer_hash = session["transfer_hash"]
+        operation_hashes = [endorse_hash, transfer_hash]
+        for client in clients:
+            assert utils.check_block_contains_operations(
+                client, operation_hashes)
+
+    def test_balance(self, clients):
         bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
-        constants = clients[0].rpc(
-            'get',
-            '/chains/main/blocks/head/context/constants')
-        bsd = float(constants['block_security_deposit'])/1000000
-        transaction_fee = 0.001273
-        b_a = session["init_bal"] - bsd
-        b_a = b_a - transaction_fee
-        b_a = b_a - session["transfer_sum"]
-        assert bal == b_a
+        assert bal == 3998987.998717

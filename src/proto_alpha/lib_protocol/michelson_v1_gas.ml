@@ -27,48 +27,6 @@ open Alpha_context
 open Gas
 
 module Cost_of = struct
-  let cycle = step_cost 1
-  let nop = free
-
-  let stack_op = step_cost 1
-
-  let bool_binop _ _ = step_cost 1
-  let bool_unop _ = step_cost 1
-
-  let pair = alloc_cost 2
-  let pair_access = step_cost 1
-
-  let cons = alloc_cost 2
-
-  let variant_no_data = alloc_cost 1
-
-  let branch = step_cost 2
-
-  let string length =
-    alloc_bytes_cost length
-
-  let bytes length =
-    alloc_mbytes_cost length
-
-  let zint z =
-    alloc_bits_cost (Z.numbits z)
-
-  let concat cost length ss =
-    let rec cum acc = function
-      | [] -> acc
-      | s :: ss -> cum (cost (length s) +@ acc) ss in
-    cum free ss
-
-  let concat_string ss = concat string String.length ss
-  let concat_bytes ss = concat bytes MBytes.length ss
-
-  let slice_string length = string length
-  let slice_bytes = alloc_cost 0
-
-  (* Cost per cycle of a loop, fold, etc *)
-  let loop_cycle = step_cost 2
-
-  let list_size = step_cost 1
 
   let log2 =
     let rec help acc = function
@@ -76,166 +34,256 @@ module Cost_of = struct
       | n -> help (acc + 1) (n / 2)
     in help 1
 
-  let module_cost = alloc_cost 10
+  let z_bytes (z : Z.t) =
+    let bits = Z.numbits z in
+    (7 + bits) / 8
 
-  let map_access : type key value. (key, value) Script_typed_ir.map -> int
-    = fun (module Box) ->
-      log2 (snd Box.boxed)
+  let int_bytes (z : 'a Script_int.num) =
+    z_bytes (Script_int.to_zint z)
 
-  let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost
-    = fun (module Box) ->
-      let size = snd Box.boxed in
-      3 *@ alloc_cost size
+  let timestamp_bytes (t : Script_timestamp.t) =
+    let z = Script_timestamp.to_zint t in
+    z_bytes z
 
-  let map_mem _key map = step_cost (map_access map)
+  (* For now, returns size in bytes, but this could get more complicated... *)
+  let rec size_of_comparable : type a b. (a, b) Script_typed_ir.comparable_struct -> a -> int =
+    fun wit v ->
+      match wit with
+      | Int_key _ -> int_bytes v
+      | Nat_key _ -> int_bytes v
+      | String_key _ -> String.length v
+      | Bytes_key _ -> MBytes.length v
+      | Bool_key _ -> 8
+      | Key_hash_key _ -> Signature.Public_key_hash.size
+      | Timestamp_key _ -> timestamp_bytes v
+      | Address_key _ -> Signature.Public_key_hash.size
+      | Mutez_key _ -> 8
+      | Pair_key ((l, _), (r, _), _) ->
+          let (lval, rval) = v in
+          size_of_comparable l lval + size_of_comparable r rval
 
-  let map_get = map_mem
+  let string length =
+    alloc_bytes_cost length
 
-  let map_update _ _ map =
-    map_access map *@ alloc_cost 3
-
-  let map_size = step_cost 2
-
-  let big_map_mem _key _map = step_cost 50
-  let big_map_get _key _map = step_cost 50
-  let big_map_update _key _value _map = step_cost 10
-
-  let set_access : type elt. elt -> elt Script_typed_ir.set -> int
-    = fun _key (module Box) ->
-      log2 @@ Box.size
-
-  let set_mem key set = step_cost (set_access key set)
-
-  let set_update key _presence set =
-    set_access key set *@ alloc_cost 3
-
-  (* for LEFT, RIGHT, SOME *)
-  let wrap = alloc_cost 1
-
-  let mul n1 n2 =
-    let steps =
-      (Z.numbits (Script_int.to_zint n1))
-      * (Z.numbits (Script_int.to_zint n2)) in
-    let bits =
-      (Z.numbits (Script_int.to_zint n1))
-      + (Z.numbits (Script_int.to_zint n2)) in
-    step_cost steps +@ alloc_bits_cost bits
-
-  let div n1 n2 =
-    mul n1 n2 +@ alloc_cost 2
-
-  let add_sub_z n1 n2 =
-    let bits =
-      Compare.Int.max (Z.numbits n1) (Z.numbits n2) in
-    step_cost bits +@ alloc_cost bits
-
-  let add n1 n2 =
-    add_sub_z (Script_int.to_zint n1) (Script_int.to_zint n2)
-
-  let sub = add
-
-  let abs n =
-    alloc_bits_cost (Z.numbits @@ Script_int.to_zint n)
-
-  let neg = abs
-  let int _ = step_cost 1
-
-  let add_timestamp t n =
-    add_sub_z (Script_timestamp.to_zint t) (Script_int.to_zint n)
-
-  let sub_timestamp t n =
-    add_sub_z (Script_timestamp.to_zint t) (Script_int.to_zint n)
-
-  let diff_timestamps t1 t2 =
-    add_sub_z (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
-
-  let empty_set = module_cost
-
-  let set_size = step_cost 2
-
-  let set_to_list : type item. item Script_typed_ir.set -> cost
-    = fun (module Box) ->
-      alloc_cost @@ Pervasives.(Box.size * 2)
-
-  let empty_map = module_cost
-
-  let int64_op = step_cost 1 +@ alloc_cost 1
-
-  let z_to_int64 = step_cost 2 +@ alloc_cost 1
-
-  let int64_to_z = step_cost 2 +@ alloc_cost 1
-
-  let bitwise_binop n1 n2 =
-    let bits = Compare.Int.max (Z.numbits (Script_int.to_zint n1)) (Z.numbits (Script_int.to_zint n2)) in
-    step_cost bits +@ alloc_bits_cost bits
-
-  let logor = bitwise_binop
-  let logand = bitwise_binop
-  let logxor = bitwise_binop
-  let lognot n =
-    let bits = Z.numbits @@ Script_int.to_zint n in
-    step_cost bits +@ alloc_cost bits
-
-  let unopt ~default = function
-    | None -> default
-    | Some x -> x
-
-  let max_int = 1073741823
-
-  let shift_left x y =
-    alloc_bits_cost
-      (Z.numbits (Script_int.to_zint x) +
-       (unopt (Script_int.to_int y) ~default:max_int))
-
-  let shift_right x y =
-    alloc_bits_cost
-      (Compare.Int.max 1
-         (Z.numbits (Script_int.to_zint x) -
-          unopt (Script_int.to_int y) ~default:max_int))
-
-  let exec = step_cost 1
-
-  let push = step_cost 1
-
-  let compare_res = step_cost 1
-
-  let unpack_failed bytes =
-    (* We cannot instrument failed deserialization,
-       so we take worst case fees: a set of size 1 bytes values. *)
-    let len = MBytes.length bytes in
-    (len *@ alloc_mbytes_cost 1) +@
-    (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
-
-  let address = step_cost 1
-  let contract = Gas.read_bytes_cost Z.zero +@ step_cost 10000
-  let transfer = step_cost 10
-  let create_account = step_cost 10
-  let create_contract = step_cost 10
-  let implicit_account = step_cost 10
-  let set_delegate = step_cost 10 +@ write_bytes_cost (Z.of_int 32)
-  let balance = step_cost 1 +@ read_bytes_cost (Z.of_int 8)
-  let now = step_cost 5
-  let check_signature = step_cost 1000
-  let hash_key = step_cost 3 +@ bytes 20
-  let hash data len = 10 *@ step_cost (MBytes.length data) +@ bytes len
-  let steps_to_quota = step_cost 1
-  let source = step_cost 1
-  let self = step_cost 1
-  let amount = step_cost 1
-  let compare_bool _ _ = step_cost 1
-  let compare_string s1 s2 =
-    step_cost ((7 + Compare.Int.max (String.length s1) (String.length s2)) / 8) +@ step_cost 1
-  let compare_bytes s1 s2 =
-    step_cost ((7 + Compare.Int.max (MBytes.length s1) (MBytes.length s2)) / 8) +@ step_cost 1
-  let compare_tez _ _ = step_cost 1
-  let compare_zint n1 n2 = step_cost ((7 + Compare.Int.max (Z.numbits n1) (Z.numbits n2)) / 8) +@ step_cost 1
-  let compare_int n1 n2 = compare_zint (Script_int.to_zint n1) (Script_int.to_zint n2)
-  let compare_nat = compare_int
-  let compare_key_hash _ _ = alloc_bytes_cost 36
-  let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
-  let compare_address _ _ = step_cost 20
+  let bytes length =
+    alloc_mbytes_cost length
 
   let manager_operation = step_cost 10_000
+
+  module Legacy = struct
+    let zint z =
+      alloc_bits_cost (Z.numbits z)
+
+    let set_to_list : type item. item Script_typed_ir.set -> cost
+      = fun (module Box) ->
+        alloc_cost @@ Pervasives.(Box.size * 2)
+
+    let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost
+      = fun (module Box) ->
+        let size = snd Box.boxed in
+        3 *@ alloc_cost size
+
+    let z_to_int64 = step_cost 2 +@ alloc_cost 1
+
+    let hash data len = 10 *@ step_cost (MBytes.length data) +@ bytes len
+
+    let set_access : type elt. elt -> elt Script_typed_ir.set -> int
+      = fun _key (module Box) ->
+        log2 @@ Box.size
+
+    let set_update key _presence set =
+      set_access key set *@ alloc_cost 3
+  end
+
+  module Interpreter = struct
+    let cycle = atomic_step_cost 10
+    let nop = free
+    let stack_op = atomic_step_cost 10
+    let push = atomic_step_cost 10
+    let wrap = atomic_step_cost 10
+    let variant_no_data = atomic_step_cost 10
+    let branch = atomic_step_cost 10
+    let pair = atomic_step_cost 10
+    let pair_access = atomic_step_cost 10
+    let cons = atomic_step_cost 10
+    let loop_size = atomic_step_cost 5
+    let loop_cycle = atomic_step_cost 10
+    let loop_iter = atomic_step_cost 20
+    let loop_map = atomic_step_cost 30
+    let empty_set = atomic_step_cost 10
+    let set_to_list : type elt. elt Script_typed_ir.set -> cost =
+      fun (module Box) ->
+        atomic_step_cost (Box.size * 20)
+
+    let set_mem : type elt. elt -> elt Script_typed_ir.set -> cost =
+      fun elt (module Box) ->
+        let elt_bytes = size_of_comparable Box.elt_ty elt in
+        atomic_step_cost ((1 + (elt_bytes / 82)) * log2 Box.size)
+
+    let set_update : type elt. elt -> bool -> elt Script_typed_ir.set -> cost =
+      fun elt _ (module Box) ->
+        let elt_bytes = size_of_comparable Box.elt_ty elt in
+        atomic_step_cost ((1 + (elt_bytes / 82)) * log2 Box.size)
+
+    let set_size = atomic_step_cost 10
+    let empty_map = atomic_step_cost 10
+    let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost =
+      fun (module Box) ->
+        let size = snd Box.boxed in
+        atomic_step_cost (size * 20)
+
+    let map_access : type key value. key -> (key, value) Script_typed_ir.map -> cost
+      = fun key (module Box) ->
+        let map_card  = snd Box.boxed in
+        let key_bytes = size_of_comparable Box.key_ty key in
+        atomic_step_cost ((1 + (key_bytes / 70)) * log2 map_card)
+
+    let map_mem = map_access
+    let map_get = map_access
+
+    let map_update : type key value. key -> value option -> (key, value) Script_typed_ir.map -> cost
+      = fun key _value (module Box) ->
+        let map_card  = snd Box.boxed in
+        let key_bytes = size_of_comparable Box.key_ty key in
+        atomic_step_cost ((1 + (key_bytes / 38)) * log2 map_card)
+
+    let map_size = atomic_step_cost 10
+
+    let add_timestamp (t1 : Script_timestamp.t) (t2 : 'a Script_int.num) =
+      let bytes1 = timestamp_bytes t1 in
+      let bytes2 = int_bytes t2 in
+      atomic_step_cost (51 + (Compare.Int.max bytes1 bytes2 / 62))
+    let sub_timestamp = add_timestamp
+    let diff_timestamps (t1 : Script_timestamp.t) (t2 : Script_timestamp.t) =
+      let bytes1 = timestamp_bytes t1 in
+      let bytes2 = timestamp_bytes t2 in
+      atomic_step_cost (51 + (Compare.Int.max bytes1 bytes2 / 62))
+
+    let rec concat_loop l acc =
+      match l with
+      | [] -> 30
+      | _ :: tl -> concat_loop tl (acc + 30)
+
+    let concat_string string_list =
+      atomic_step_cost (concat_loop string_list 0)
+
+    let slice_string string_length =
+      atomic_step_cost (40 + (string_length / 70))
+
+    let concat_bytes bytes_list =
+      atomic_step_cost (concat_loop bytes_list 0)
+
+    let int64_op = atomic_step_cost 61
+    let z_to_int64 = atomic_step_cost 20
+    let int64_to_z = atomic_step_cost 20
+    let bool_binop _ _ = atomic_step_cost 10
+    let bool_unop _ = atomic_step_cost 10
+
+    let abs int = atomic_step_cost (61 + ((int_bytes int) / 70))
+    let int _int = free
+    let neg = abs
+    let add i1 i2 = atomic_step_cost (51 + (Compare.Int.max (int_bytes i1) (int_bytes i2) / 62))
+    let sub = add
+
+    let mul i1 i2 =
+      let bytes = Compare.Int.max (int_bytes i1) (int_bytes i2) in
+      atomic_step_cost (51 + (bytes / 6 * log2 bytes))
+
+    let indic_lt x y = if Compare.Int.(x < y) then 1 else 0
+
+    let div i1 i2 =
+      let bytes1 = int_bytes i1 in
+      let bytes2 = int_bytes i2 in
+      let cost = indic_lt bytes2 bytes1 * (bytes1 - bytes2) * bytes2 in
+      atomic_step_cost (51 + (cost / 3151))
+
+    let shift_left _i _shift_bits = atomic_step_cost 30
+    let shift_right _i _shift_bits = atomic_step_cost 30
+    let logor i1 i2 =
+      let bytes1 = int_bytes i1 in
+      let bytes2 = int_bytes i2 in
+      atomic_step_cost (51 + ((Compare.Int.max bytes1 bytes2) / 70))
+    let logand i1 i2 =
+      let bytes1 = int_bytes i1 in
+      let bytes2 = int_bytes i2 in
+      atomic_step_cost (51 + ((Compare.Int.min bytes1 bytes2) / 70))
+    let logxor = logor
+    let lognot i = atomic_step_cost (51 + ((int_bytes i) / 20))
+    let exec = atomic_step_cost 10
+    let compare_bool _ _ = atomic_step_cost 30
+
+    let compare_string s1 s2 =
+      let bytes1 = String.length s1 in
+      let bytes2 = String.length s2 in
+      atomic_step_cost (30 + ((Compare.Int.min bytes1 bytes2) / 123))
+    let compare_bytes b1 b2 =
+      let bytes1 = MBytes.length b1 in
+      let bytes2 = MBytes.length b2 in
+      atomic_step_cost (30 + ((Compare.Int.min bytes1 bytes2) / 123))
+    let compare_tez _ _ = atomic_step_cost 30
+    let compare_zint i1 i2 =
+      atomic_step_cost (51 + ((Compare.Int.min (int_bytes i1) (int_bytes i2)) / 82))
+    let compare_key_hash _ _ = atomic_step_cost 92
+
+    let compare_timestamp t1 t2 =
+      let bytes1 = timestamp_bytes t1 in
+      let bytes2 = timestamp_bytes t2 in
+      atomic_step_cost (51 + ((Compare.Int.min bytes1 bytes2) / 82))
+
+    let compare_address _ _ = atomic_step_cost 92
+    let compare_res = atomic_step_cost 30
+    let unpack_failed bytes =
+      (* We cannot instrument failed deserialization,
+         so we take worst case fees: a set of size 1 bytes values. *)
+      let len = MBytes.length bytes in
+      (len *@ alloc_mbytes_cost 1) +@
+      (len *@ (log2 len *@ (alloc_cost 3 +@ step_cost 1)))
+    let address = atomic_step_cost 10
+    let contract = step_cost 10000
+    let transfer = step_cost 10
+    let create_account = step_cost 10
+    let create_contract = step_cost 10
+    let implicit_account = step_cost 10
+    let set_delegate = step_cost 10 +@ write_bytes_cost (Z.of_int 32)
+    let balance = atomic_step_cost 10
+    let now = atomic_step_cost 10
+    let check_signature_secp256k1 bytes = atomic_step_cost (10342 + (bytes / 5))
+    let check_signature_ed25519 bytes = atomic_step_cost (36864 + (bytes / 5))
+    let check_signature_p256 bytes = atomic_step_cost (36864 + (bytes / 5))
+    let check_signature (pkey : Signature.public_key) bytes =
+      match pkey with
+      | Ed25519 _ -> check_signature_ed25519 (MBytes.length bytes)
+      | Secp256k1 _ -> check_signature_secp256k1 (MBytes.length bytes)
+      | P256 _ ->  check_signature_p256 (MBytes.length bytes)
+    let hash_key = atomic_step_cost 30
+    let hash_blake2b b = atomic_step_cost (102 + ((MBytes.length b) / 5))
+    let hash_sha256 b = atomic_step_cost (409 + (MBytes.length b))
+    let hash_sha512 b =
+      let bytes = MBytes.length b in atomic_step_cost (409 + ((bytes lsr 1) + (bytes lsr 4)))
+    let steps_to_quota = atomic_step_cost 10
+    let source = atomic_step_cost 10
+    let self = atomic_step_cost 10
+    let amount = atomic_step_cost 10
+    let chain_id = step_cost 1
+    let stack_n_op n = atomic_step_cost (20 + (((n lsr 1) + (n lsr 2)) + (n lsr 4)))
+
+    let rec compare : type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost = fun ty x y ->
+      match ty with
+      | Bool_key _ -> compare_bool x y
+      | String_key _ -> compare_string x y
+      | Bytes_key _ -> compare_bytes x y
+      | Mutez_key _ -> compare_tez x y
+      | Int_key _ -> compare_zint x y
+      | Nat_key _ -> compare_zint x y
+      | Key_hash_key _ -> compare_key_hash x y
+      | Timestamp_key _ -> compare_timestamp x y
+      | Address_key _ -> compare_address x y
+      | Pair_key ((tl, _), (tr, _), _) ->
+          (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+          let (xl, xr) = x and (yl, yr) = y in
+          compare tl xl yl +@ compare tr xr yr
+
+  end
 
   module Typechecking = struct
     let cycle = step_cost 1
@@ -243,7 +291,7 @@ module Cost_of = struct
     let unit = free
     let string = string
     let bytes = bytes
-    let z = zint
+    let z = Legacy.zint
     let int_of_string str =
       alloc_cost @@ (Pervasives.(/) (String.length str) 5)
     let tez = step_cost 1 +@ alloc_cost 1
@@ -251,6 +299,7 @@ module Cost_of = struct
     let key = step_cost 3 +@ alloc_cost 3
     let key_hash = step_cost 1 +@ alloc_cost 1
     let signature = step_cost 1 +@ alloc_cost 1
+    let chain_id = step_cost 1 +@ alloc_cost 1
     let contract = step_cost 5
     let get_script = step_cost 20 +@ alloc_cost 5
     let contract_exists = step_cost 15 +@ alloc_cost 5
@@ -308,6 +357,7 @@ module Cost_of = struct
         | Map_get -> alloc_cost 1
         | Map_update -> alloc_cost 1
         | Map_size -> alloc_cost 1
+        | Empty_big_map _ -> alloc_cost 2
         | Big_map_mem -> alloc_cost 1
         | Big_map_get -> alloc_cost 1
         | Big_map_update -> alloc_cost 1
@@ -381,6 +431,12 @@ module Cost_of = struct
         | Create_account -> alloc_cost 2
         | Implicit_account -> alloc_cost 1
         | Create_contract _ -> alloc_cost 8
+        (* Deducted the cost of removed arguments manager, spendable and delegatable:
+           - manager: key_hash = 1
+           - spendable: bool = 0
+           - delegatable: bool = 0
+        *)
+        | Create_contract_2 _ -> alloc_cost 7
         | Set_delegate -> alloc_cost 1
         | Now -> alloc_cost 1
         | Balance -> alloc_cost 1
@@ -396,6 +452,11 @@ module Cost_of = struct
         | Sender -> alloc_cost 1
         | Self _ -> alloc_cost 2
         | Amount -> alloc_cost 1
+        | Dig (n,_) -> n *@ alloc_cost 1 (* _ is a unary development of n *)
+        | Dug (n,_) -> n *@ alloc_cost 1
+        | Dipn (n,_,_) -> n *@ alloc_cost 1
+        | Dropn (n,_) -> n *@ alloc_cost 1
+        | ChainId -> alloc_cost 1
   end
 
   module Unparse = struct
@@ -415,6 +476,7 @@ module Cost_of = struct
     let tez = Script.int_node_cost_of_numbits 60 (* int64 bound *)
     let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
     let operation bytes = Script.bytes_node_cost bytes
+    let chain_id bytes = Script.bytes_node_cost bytes
     let key = string_cost 54
     let key_hash = string_cost 36
     let signature = string_cost 128
@@ -429,8 +491,8 @@ module Cost_of = struct
     let one_arg_type = prim_cost 1
     let two_arg_type = prim_cost 2
 
-    let set_to_list = set_to_list
-    let map_to_list = map_to_list
+    let set_to_list = Legacy.set_to_list
+    let map_to_list = Legacy.map_to_list
   end
 
 end

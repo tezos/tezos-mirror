@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Tezos_micheline
 
@@ -51,31 +51,12 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
   cctxt#error "error running script" >>= fun () ->
   return_unit
 
-let print_big_map_diff ppf = function
-  | None -> ()
-  | Some diff ->
-      Format.fprintf ppf
-        "@[<v 2>map diff:@,%a@]@,"
-        (Format.pp_print_list
-           ~pp_sep:Format.pp_print_space
-           (fun ppf Contract.{ diff_key ; diff_value ; _ } ->
-              Format.fprintf ppf "%s %a%a"
-                (match diff_value with
-                 | None -> "-"
-                 | Some _ -> "+")
-                print_expr diff_key
-                (fun ppf -> function
-                   | None -> ()
-                   | Some x -> Format.fprintf ppf "-> %a" print_expr x)
-                diff_value))
-        diff
-
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = function
   | Ok (storage, operations, maybe_diff) ->
-      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>emitted operations@,%a@]@,@[%a@]@]@."
+      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>emitted operations@,%a@]@,@[<v 2>big_map diff%a@]@]@."
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
-        print_big_map_diff maybe_diff >>= fun () ->
+        (fun ppf -> function None -> () | Some diff -> print_big_map_diff ppf diff) maybe_diff >>= fun () ->
       return_unit
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
@@ -85,40 +66,52 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   | Ok (storage, operations, trace, maybe_big_map_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,%a@]@,\
-         @[<v 2>emitted operations@,%a@]@,%a@[<v 2>@[<v 2>trace@,%a@]@]@."
+         @[<v 2>emitted operations@,%a@]@,@[<v 2>big_map diff@,%a@[<v 2>trace@,%a@]@]@."
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
-        print_big_map_diff maybe_big_map_diff
+        (fun ppf -> function None -> () | Some diff -> print_big_map_diff ppf diff) maybe_big_map_diff
         print_execution_trace trace >>= fun () ->
       return_unit
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
 let run
-    (cctxt : #Proto_alpha.rpc_context)
+    (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
+    ?source
+    ?payer
+    ?gas
+    ?(entrypoint = "default")
     () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.run_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount)
+    program.expanded
+    (storage.expanded, input.expanded, amount, chain_id, source, payer, gas, entrypoint)
 
 let trace
-    (cctxt : #Proto_alpha.rpc_context)
+    (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain)
     ~block
     ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
+    ?source
+    ?payer
+    ?gas
+    ?(entrypoint = "default")
     () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Helpers.Scripts.trace_code cctxt
     (chain, block)
-    program.expanded (storage.expanded, input.expanded, amount)
+    program.expanded
+    (storage.expanded, input.expanded, amount, chain_id, source, payer, gas, entrypoint)
 
 let typecheck_data
     cctxt
@@ -146,7 +139,7 @@ let print_typecheck_result
   if emacs then
     let type_map, errs, _gas = match res with
       | Ok (type_map, gas) -> (type_map, [], Some gas)
-      | Error (Alpha_environment.Ecoproto_error
+      | Error (Environment.Ecoproto_error
                  (Script_tc_errors.Ill_typed_contract (_, type_map ))
                :: _ as errs) ->
           (type_map, errs, None)

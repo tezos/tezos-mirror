@@ -39,7 +39,7 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   discovery_addr: string option ;
-  rpc_listen_addr: string option ;
+  rpc_listen_addrs: string list ;
   private_mode: bool ;
   disable_mempool: bool ;
   disable_testchain: bool ;
@@ -66,3 +66,4 @@ module Manpage : sig
   val args: Cmdliner.Manpage.block list
   val bugs: Cmdliner.Manpage.block list
 end
+

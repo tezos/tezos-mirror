@@ -85,229 +85,6 @@ let bootstrap_contract_encoding =
        (req "amount" Tez_repr.encoding)
        (req "script" Script_repr.encoding))
 
-(* This encoding is used to read configuration files (e.g. sandbox.json)
-   where some fields can be missing, in that case they are replaced by
-   the default. *)
-let constants_encoding =
-  let open Data_encoding in
-  conv
-    (fun (c : Constants_repr.parametric) ->
-       let module Compare_time_between_blocks = Compare.List (Period_repr) in
-       let module Compare_minimum_endorsements_per_priority = Compare.List (Compare.Int) in
-       let module Compare_keys = Compare.List (Ed25519.Public_key) in
-       let opt (=) def v = if def = v then None else Some v in
-       let default = Constants_repr.default in
-       let preserved_cycles =
-         opt Compare.Int.(=)
-           default.preserved_cycles c.preserved_cycles
-       and blocks_per_cycle =
-         opt Compare.Int32.(=)
-           default.blocks_per_cycle c.blocks_per_cycle
-       and blocks_per_commitment =
-         opt Compare.Int32.(=)
-           default.blocks_per_commitment c.blocks_per_commitment
-       and blocks_per_roll_snapshot =
-         opt Compare.Int32.(=)
-           default.blocks_per_roll_snapshot c.blocks_per_roll_snapshot
-       and blocks_per_voting_period =
-         opt Compare.Int32.(=)
-           default.blocks_per_voting_period c.blocks_per_voting_period
-       and time_between_blocks =
-         opt Compare_time_between_blocks.(=)
-           default.time_between_blocks c.time_between_blocks
-       and endorsers_per_block =
-         opt Compare.Int.(=)
-           default.endorsers_per_block c.endorsers_per_block
-       and hard_gas_limit_per_operation =
-         opt Compare.Z.(=)
-           default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
-       and hard_gas_limit_per_block =
-         opt Compare.Z.(=)
-           default.hard_gas_limit_per_block c.hard_gas_limit_per_block
-       and proof_of_work_threshold =
-         opt Compare.Int64.(=)
-           default.proof_of_work_threshold c.proof_of_work_threshold
-       and tokens_per_roll =
-         opt Tez_repr.(=)
-           default.tokens_per_roll c.tokens_per_roll
-       and michelson_maximum_type_size =
-         opt Compare.Int.(=)
-           default.michelson_maximum_type_size c.michelson_maximum_type_size
-       and seed_nonce_revelation_tip =
-         opt Tez_repr.(=)
-           default.seed_nonce_revelation_tip c.seed_nonce_revelation_tip
-       and origination_size =
-         opt Compare.Int.(=)
-           default.origination_size c.origination_size
-       and block_security_deposit =
-         opt Tez_repr.(=)
-           default.block_security_deposit c.block_security_deposit
-       and endorsement_security_deposit =
-         opt Tez_repr.(=)
-           default.endorsement_security_deposit c.endorsement_security_deposit
-       and block_reward =
-         opt Tez_repr.(=)
-           default.block_reward c.block_reward
-       and endorsement_reward =
-         opt Tez_repr.(=)
-           default.endorsement_reward c.endorsement_reward
-       and endorsement_reward_priority_bonus =
-         opt Tez_repr.(=)
-           default.endorsement_reward_priority_bonus c.endorsement_reward_priority_bonus
-       and endorsement_bonus_intercept =
-         opt Compare.Int.(=)
-           default.endorsement_bonus_intercept c.endorsement_bonus_intercept
-       and endorsement_bonus_slope  =
-         opt Compare.Int.(=)
-           default.endorsement_bonus_slope c.endorsement_bonus_slope
-       and cost_per_byte =
-         opt Tez_repr.(=)
-           default.cost_per_byte c.cost_per_byte
-       and hard_storage_limit_per_operation =
-         opt Compare.Z.(=)
-           default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
-       and minimum_endorsements_per_priority =
-         opt Compare_minimum_endorsements_per_priority.(=)
-           default.minimum_endorsements_per_priority c.minimum_endorsements_per_priority
-       and delay_per_missing_endorsement =
-         opt Period_repr.(=)
-           default.delay_per_missing_endorsement c.delay_per_missing_endorsement
-       in
-       (( preserved_cycles,
-          blocks_per_cycle,
-          blocks_per_commitment,
-          blocks_per_roll_snapshot,
-          blocks_per_voting_period,
-          time_between_blocks,
-          endorsers_per_block,
-          hard_gas_limit_per_operation,
-          hard_gas_limit_per_block),
-        ((proof_of_work_threshold,
-          tokens_per_roll,
-          michelson_maximum_type_size,
-          seed_nonce_revelation_tip,
-          origination_size,
-          block_security_deposit,
-          endorsement_security_deposit,
-          block_reward),
-         (endorsement_reward,
-          endorsement_reward_priority_bonus,
-          endorsement_bonus_intercept,
-          endorsement_bonus_slope,
-          cost_per_byte,
-          hard_storage_limit_per_operation,
-          minimum_endorsements_per_priority,
-          delay_per_missing_endorsement))))
-    (fun (( preserved_cycles,
-            blocks_per_cycle,
-            blocks_per_commitment,
-            blocks_per_roll_snapshot,
-            blocks_per_voting_period,
-            time_between_blocks,
-            endorsers_per_block,
-            hard_gas_limit_per_operation,
-            hard_gas_limit_per_block),
-          ((proof_of_work_threshold,
-            tokens_per_roll,
-            michelson_maximum_type_size,
-            seed_nonce_revelation_tip,
-            origination_size,
-            block_security_deposit,
-            endorsement_security_deposit,
-            block_reward),
-           (endorsement_reward,
-            endorsement_reward_priority_bonus,
-            endorsement_bonus_intercept,
-            endorsement_bonus_slope,
-            cost_per_byte,
-            hard_storage_limit_per_operation,
-            minimum_endorsements_per_priority,
-            delay_per_missing_endorsement))) ->
-      let unopt def = function None -> def | Some v -> v in
-      let default = Constants_repr.default in
-      { Constants_repr.preserved_cycles =
-          unopt default.preserved_cycles preserved_cycles ;
-        blocks_per_cycle =
-          unopt default.blocks_per_cycle blocks_per_cycle ;
-        blocks_per_commitment =
-          unopt default.blocks_per_commitment blocks_per_commitment ;
-        blocks_per_roll_snapshot =
-          unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
-        blocks_per_voting_period =
-          unopt default.blocks_per_voting_period blocks_per_voting_period ;
-        time_between_blocks =
-          unopt default.time_between_blocks @@
-          time_between_blocks ;
-        endorsers_per_block =
-          unopt default.endorsers_per_block endorsers_per_block ;
-        hard_gas_limit_per_operation =
-          unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
-        hard_gas_limit_per_block =
-          unopt default.hard_gas_limit_per_block hard_gas_limit_per_block ;
-        proof_of_work_threshold =
-          unopt default.proof_of_work_threshold proof_of_work_threshold ;
-        tokens_per_roll =
-          unopt default.tokens_per_roll tokens_per_roll ;
-        michelson_maximum_type_size =
-          unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
-        seed_nonce_revelation_tip =
-          unopt default.seed_nonce_revelation_tip seed_nonce_revelation_tip ;
-        origination_size =
-          unopt default.origination_size origination_size ;
-        block_security_deposit =
-          unopt default.block_security_deposit block_security_deposit ;
-        endorsement_security_deposit =
-          unopt default.endorsement_security_deposit endorsement_security_deposit ;
-        block_reward =
-          unopt default.block_reward block_reward ;
-        endorsement_reward =
-          unopt default.endorsement_reward endorsement_reward ;
-        endorsement_reward_priority_bonus =
-          unopt default.endorsement_reward_priority_bonus endorsement_reward_priority_bonus ;
-        endorsement_bonus_intercept =
-          unopt default.endorsement_bonus_intercept endorsement_bonus_intercept ;
-        endorsement_bonus_slope  =
-          unopt default.endorsement_bonus_slope endorsement_bonus_slope ;
-        cost_per_byte =
-          unopt default.cost_per_byte cost_per_byte ;
-        hard_storage_limit_per_operation =
-          unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
-        minimum_endorsements_per_priority =
-          unopt default.minimum_endorsements_per_priority minimum_endorsements_per_priority ;
-        delay_per_missing_endorsement =
-          unopt default.delay_per_missing_endorsement delay_per_missing_endorsement ;
-      } )
-    (merge_objs
-       (obj9
-          (opt "preserved_cycles" uint8)
-          (opt "blocks_per_cycle" int32)
-          (opt "blocks_per_commitment" int32)
-          (opt "blocks_per_roll_snapshot" int32)
-          (opt "blocks_per_voting_period" int32)
-          (opt "time_between_blocks" (list Period_repr.encoding))
-          (opt "endorsers_per_block" uint16)
-          (opt "hard_gas_limit_per_operation" z)
-          (opt "hard_gas_limit_per_block" z))
-       (merge_objs
-          (obj8
-             (opt "proof_of_work_threshold" int64)
-             (opt "tokens_per_roll" Tez_repr.encoding)
-             (opt "michelson_maximum_type_size" uint16)
-             (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
-             (opt "origination_size" int31)
-             (opt "block_security_deposit" Tez_repr.encoding)
-             (opt "endorsement_security_deposit" Tez_repr.encoding)
-             (opt "block_reward" Tez_repr.encoding))
-          (obj8
-             (opt "endorsement_reward" Tez_repr.encoding)
-             (opt "endorsement_reward_priority_bonus" Tez_repr.encoding)
-             (opt "endorsement_bonus_intercept" uint16)
-             (opt "endorsement_bonus_slope" uint16)
-             (opt "cost_per_byte" Tez_repr.encoding)
-             (opt "hard_storage_limit_per_operation" z)
-             (opt "minimum_endorsements_per_priority" (list uint16))
-             (opt "delay_per_missing_endorsement" Period_repr.encoding))))
-
 let encoding =
   let open Data_encoding in
   conv
@@ -328,4 +105,254 @@ let encoding =
           (dft "commitments" (list Commitment_repr.encoding) [])
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))
-       constants_encoding)
+       Constants_repr.parametric_encoding)
+
+
+(* Only for migration from 004 to 005 *)
+
+module Proto_004 = struct
+
+  type parametric = {
+    preserved_cycles: int ;
+    blocks_per_cycle: int32 ;
+    blocks_per_commitment: int32 ;
+    blocks_per_roll_snapshot: int32 ;
+    blocks_per_voting_period: int32 ;
+    time_between_blocks: Period_repr.t list ;
+    endorsers_per_block: int ;
+    hard_gas_limit_per_operation: Z.t ;
+    hard_gas_limit_per_block: Z.t ;
+    proof_of_work_threshold: int64 ;
+    tokens_per_roll: Tez_repr.t ;
+    michelson_maximum_type_size: int;
+    seed_nonce_revelation_tip: Tez_repr.t ;
+    origination_size: int ;
+    block_security_deposit: Tez_repr.t ;
+    endorsement_security_deposit: Tez_repr.t ;
+    block_reward: Tez_repr.t ;
+    endorsement_reward: Tez_repr.t ;
+    cost_per_byte: Tez_repr.t ;
+    hard_storage_limit_per_operation: Z.t ;
+    test_chain_duration: int64 ;  (* in seconds *)
+  }
+
+  let default = {
+    preserved_cycles = 5 ;
+    blocks_per_cycle = 4096l ;
+    blocks_per_commitment = 32l ;
+    blocks_per_roll_snapshot = 256l ;
+    blocks_per_voting_period = 32768l ;
+    time_between_blocks =
+      List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
+    endorsers_per_block = 32 ;
+    hard_gas_limit_per_operation = Z.of_int 800_000 ;
+    hard_gas_limit_per_block = Z.of_int 8_000_000 ;
+    proof_of_work_threshold =
+      Int64.(sub (shift_left 1L 46) 1L) ;
+    tokens_per_roll =
+      Tez_repr.(mul_exn one 8_000) ;
+    michelson_maximum_type_size = 1000 ;
+    seed_nonce_revelation_tip = begin
+      match Tez_repr.(one /? 8L) with
+      | Ok c -> c
+      | Error _ -> assert false
+    end ;
+    origination_size = 257 ;
+    block_security_deposit = Tez_repr.(mul_exn one 512) ;
+    endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
+    block_reward = Tez_repr.(mul_exn one 16) ;
+    endorsement_reward = Tez_repr.(mul_exn one 2) ;
+    hard_storage_limit_per_operation = Z.of_int 60_000 ;
+    cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
+    test_chain_duration = Int64.mul 32768L 60L;
+  }
+
+  (* This encoding is used to read configuration files (e.g. sandbox.json)
+     where some fields can be missing, in that case they are replaced by
+     the default. *)
+  let constants_encoding =
+    let open Data_encoding in
+    conv
+      (fun (c : parametric) ->
+         let module Compare_time_between_blocks = Compare.List (Period_repr) in
+         let module Compare_keys = Compare.List (Ed25519.Public_key) in
+         let opt (=) def v = if def = v then None else Some v in
+         let preserved_cycles =
+           opt Compare.Int.(=)
+             default.preserved_cycles c.preserved_cycles
+         and blocks_per_cycle =
+           opt Compare.Int32.(=)
+             default.blocks_per_cycle c.blocks_per_cycle
+         and blocks_per_commitment =
+           opt Compare.Int32.(=)
+             default.blocks_per_commitment c.blocks_per_commitment
+         and blocks_per_roll_snapshot =
+           opt Compare.Int32.(=)
+             default.blocks_per_roll_snapshot c.blocks_per_roll_snapshot
+         and blocks_per_voting_period =
+           opt Compare.Int32.(=)
+             default.blocks_per_voting_period c.blocks_per_voting_period
+         and time_between_blocks =
+           opt Compare_time_between_blocks.(=)
+             default.time_between_blocks c.time_between_blocks
+         and endorsers_per_block =
+           opt Compare.Int.(=)
+             default.endorsers_per_block c.endorsers_per_block
+         and hard_gas_limit_per_operation =
+           opt Compare.Z.(=)
+             default.hard_gas_limit_per_operation c.hard_gas_limit_per_operation
+         and hard_gas_limit_per_block =
+           opt Compare.Z.(=)
+             default.hard_gas_limit_per_block c.hard_gas_limit_per_block
+         and proof_of_work_threshold =
+           opt Compare.Int64.(=)
+             default.proof_of_work_threshold c.proof_of_work_threshold
+         and tokens_per_roll =
+           opt Tez_repr.(=)
+             default.tokens_per_roll c.tokens_per_roll
+         and michelson_maximum_type_size =
+           opt Compare.Int.(=)
+             default.michelson_maximum_type_size c.michelson_maximum_type_size
+         and seed_nonce_revelation_tip =
+           opt Tez_repr.(=)
+             default.seed_nonce_revelation_tip c.seed_nonce_revelation_tip
+         and origination_size =
+           opt Compare.Int.(=)
+             default.origination_size c.origination_size
+         and block_security_deposit =
+           opt Tez_repr.(=)
+             default.block_security_deposit c.block_security_deposit
+         and endorsement_security_deposit =
+           opt Tez_repr.(=)
+             default.endorsement_security_deposit c.endorsement_security_deposit
+         and block_reward =
+           opt Tez_repr.(=)
+             default.block_reward c.block_reward
+         and endorsement_reward =
+           opt Tez_repr.(=)
+             default.endorsement_reward c.endorsement_reward
+         and cost_per_byte =
+           opt Tez_repr.(=)
+             default.cost_per_byte c.cost_per_byte
+         and hard_storage_limit_per_operation =
+           opt Compare.Z.(=)
+             default.hard_storage_limit_per_operation c.hard_storage_limit_per_operation
+         and test_chain_duration =
+           opt Compare.Int64.(=)
+             default.test_chain_duration c.test_chain_duration
+         in
+         (( preserved_cycles,
+            blocks_per_cycle,
+            blocks_per_commitment,
+            blocks_per_roll_snapshot,
+            blocks_per_voting_period,
+            time_between_blocks,
+            endorsers_per_block,
+            hard_gas_limit_per_operation,
+            hard_gas_limit_per_block),
+          ((proof_of_work_threshold,
+            tokens_per_roll,
+            michelson_maximum_type_size,
+            seed_nonce_revelation_tip,
+            origination_size,
+            block_security_deposit,
+            endorsement_security_deposit,
+            block_reward),
+           (endorsement_reward,
+            cost_per_byte,
+            hard_storage_limit_per_operation,
+            test_chain_duration))))
+      (fun (( preserved_cycles,
+              blocks_per_cycle,
+              blocks_per_commitment,
+              blocks_per_roll_snapshot,
+              blocks_per_voting_period,
+              time_between_blocks,
+              endorsers_per_block,
+              hard_gas_limit_per_operation,
+              hard_gas_limit_per_block),
+            ((proof_of_work_threshold,
+              tokens_per_roll,
+              michelson_maximum_type_size,
+              seed_nonce_revelation_tip,
+              origination_size,
+              block_security_deposit,
+              endorsement_security_deposit,
+              block_reward),
+             (endorsement_reward,
+              cost_per_byte,
+              hard_storage_limit_per_operation,
+              test_chain_duration))) ->
+        let unopt def = function None -> def | Some v -> v in
+        { preserved_cycles =
+            unopt default.preserved_cycles preserved_cycles ;
+          blocks_per_cycle =
+            unopt default.blocks_per_cycle blocks_per_cycle ;
+          blocks_per_commitment =
+            unopt default.blocks_per_commitment blocks_per_commitment ;
+          blocks_per_roll_snapshot =
+            unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
+          blocks_per_voting_period =
+            unopt default.blocks_per_voting_period blocks_per_voting_period ;
+          time_between_blocks =
+            unopt default.time_between_blocks @@
+            time_between_blocks ;
+          endorsers_per_block =
+            unopt default.endorsers_per_block endorsers_per_block ;
+          hard_gas_limit_per_operation =
+            unopt default.hard_gas_limit_per_operation hard_gas_limit_per_operation ;
+          hard_gas_limit_per_block =
+            unopt default.hard_gas_limit_per_block hard_gas_limit_per_block ;
+          proof_of_work_threshold =
+            unopt default.proof_of_work_threshold proof_of_work_threshold ;
+          tokens_per_roll =
+            unopt default.tokens_per_roll tokens_per_roll ;
+          michelson_maximum_type_size =
+            unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
+          seed_nonce_revelation_tip =
+            unopt default.seed_nonce_revelation_tip seed_nonce_revelation_tip ;
+          origination_size =
+            unopt default.origination_size origination_size ;
+          block_security_deposit =
+            unopt default.block_security_deposit block_security_deposit ;
+          endorsement_security_deposit =
+            unopt default.endorsement_security_deposit endorsement_security_deposit ;
+          block_reward =
+            unopt default.block_reward block_reward ;
+          endorsement_reward =
+            unopt default.endorsement_reward endorsement_reward ;
+          cost_per_byte =
+            unopt default.cost_per_byte cost_per_byte ;
+          hard_storage_limit_per_operation =
+            unopt default.hard_storage_limit_per_operation hard_storage_limit_per_operation ;
+          test_chain_duration =
+            unopt default.test_chain_duration test_chain_duration ;
+        } )
+      (merge_objs
+         (obj9
+            (opt "preserved_cycles" uint8)
+            (opt "blocks_per_cycle" int32)
+            (opt "blocks_per_commitment" int32)
+            (opt "blocks_per_roll_snapshot" int32)
+            (opt "blocks_per_voting_period" int32)
+            (opt "time_between_blocks" (list Period_repr.encoding))
+            (opt "endorsers_per_block" uint16)
+            (opt "hard_gas_limit_per_operation" z)
+            (opt "hard_gas_limit_per_block" z))
+         (merge_objs
+            (obj8
+               (opt "proof_of_work_threshold" int64)
+               (opt "tokens_per_roll" Tez_repr.encoding)
+               (opt "michelson_maximum_type_size" uint16)
+               (opt "seed_nonce_revelation_tip" Tez_repr.encoding)
+               (opt "origination_size" int31)
+               (opt "block_security_deposit" Tez_repr.encoding)
+               (opt "endorsement_security_deposit" Tez_repr.encoding)
+               (opt "block_reward" Tez_repr.encoding))
+            (obj4
+               (opt "endorsement_reward" Tez_repr.encoding)
+               (opt "cost_per_byte" Tez_repr.encoding)
+               (opt "hard_storage_limit_per_operation" z)
+               (opt "test_chain_duration" int64))))
+
+end

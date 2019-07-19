@@ -23,17 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The way a node stores its history. [Archive] keeps everything,
-    including receipts and the full context at each block. [Full] is
-    the default mode, keeping all the chain history, but losing old
-    receipts and contexts for blocks before the current checkpoint.
-    [Rolling] forgets the past before the current checkpoint to save
-    disk space. *)
 type t = Archive | Full | Rolling
 
 val encoding : t RPC_encoding.t
 
-val equal : t * t -> bool
+val equal : t -> t -> bool
 
 val pp : Format.formatter -> t -> unit
 

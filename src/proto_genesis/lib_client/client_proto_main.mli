@@ -23,13 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_genesis
+open Protocol
 
 val bake:
   #Client_context.full ->
-  ?timestamp: Time.t ->
+  ?timestamp: Time.Protocol.t ->
   Shell_services.block ->
   Data.Command.t ->
   Client_keys.sk_uri ->
   Block_hash.t tzresult Lwt.t
-

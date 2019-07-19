@@ -15,16 +15,14 @@ end
 
 type kind = [`Node | `Baker | `Endorser | `Accuser | `Client | `Admin]
 
-type 'kind t =
-  { kind:
-      'kind
-  (* if needed, it's easy to remove this overengineered type parameter. *)
+type t =
+  { kind: kind
   ; binary: string option
   ; unix_files_sink: Unix_files_sink.t option
   ; environment: (string * string) list }
 
-let node ?binary ?unix_files_sink ?(environment = []) () =
-  {kind= `Node; binary; unix_files_sink; environment}
+let make ?binary ?unix_files_sink ?(environment = []) (kind : [< kind]) =
+  {kind; binary; unix_files_sink; environment}
 
 let kind_string (kind : [< kind]) =
   match kind with
@@ -36,22 +34,23 @@ let kind_string (kind : [< kind]) =
   | `Admin -> "admin-client"
 
 let default_binary t = sprintf "tezos-%s" (kind_string t.kind)
+let get t = Option.value t.binary ~default:(default_binary t)
 
-let call (t : [< kind] t) ~path args =
+let call t ~path args =
   let open Genspio.EDSL in
   seq
     ( Option.value_map t.unix_files_sink ~default:[] ~f:(function
-          | {matches= None; level_at_least} ->
-              [ setenv
-                  ~var:(str "TEZOS_EVENTS_CONFIG")
-                  (ksprintf str "unix-files://%s?level-at-least=%s"
-                     (path // "events") level_at_least) ]
-          | _other -> assert false )
-      @ [ exec ["mkdir"; "-p"; path]
-        ; write_stdout
-            ~path:(path // "last-cmd" |> str)
-            (printf (str "ARGS: %s\\n") [str (String.concat ~sep:" " args)])
-        ; exec (Option.value t.binary ~default:(default_binary t) :: args) ] )
+        | {matches= None; level_at_least} ->
+            [ setenv
+                ~var:(str "TEZOS_EVENTS_CONFIG")
+                (ksprintf str "unix-files://%s?level-at-least=%s"
+                   (path // "events") level_at_least) ]
+        | _other -> assert false )
+    @ [ exec ["mkdir"; "-p"; path]
+      ; write_stdout
+          ~path:(path // "last-cmd" |> str)
+          (printf (str "ARGS: %s\\n") [str (String.concat ~sep:" " args)])
+      ; exec (get t :: args) ] )
 
 let cli_term kind prefix =
   let open Cmdliner in
@@ -65,5 +64,5 @@ let cli_term kind prefix =
       value
       & opt (some string) None
       & info
-        [sprintf "%s-%s-binary" prefix (kind_string kind)]
-        ~doc:(sprintf "Binary for the `tezos-%s` to use." (kind_string kind)))
+          [sprintf "%s-%s-binary" prefix (kind_string kind)]
+          ~doc:(sprintf "Binary for the `tezos-%s` to use." (kind_string kind)))

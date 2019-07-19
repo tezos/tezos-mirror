@@ -7,7 +7,7 @@ type t =
   ; p2p_port: int
   ; (* Ports: *)
     peers: int list
-  ; exec: [`Node] Tezos_executable.t
+  ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t }
 
 let ef t =
@@ -37,9 +37,9 @@ open Tezos_executable.Make_cli
 let node_command t ~config cmd options =
   Tezos_executable.call t.exec ~path:(exec_path t ~config)
     ( cmd
-      @ opt "config-file" (config_file ~config t)
-      @ opt "data-dir" (data_dir ~config t)
-      @ options )
+    @ opt "config-file" (config_file ~config t)
+    @ opt "data-dir" (data_dir ~config t)
+    @ options )
 
 let config_options t ~config =
   opt "log-output" (log_output ~config t)
@@ -51,9 +51,9 @@ let run_command t ~config =
   let peers = List.concat_map t.peers ~f:(optf "peer" "127.0.0.1:%d") in
   node_command t ~config ["run"]
     ( flag "private-mode" @ flag "no-bootstrap-peers" @ peers
-      @ optf "bootstrap-threshold" "0"
-      @ optf "connections" "%d" t.expected_connections
-      @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )
+    @ optf "bootstrap-threshold" "0"
+    @ optf "connections" "%d" t.expected_connections
+    @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )
 
 let start_script t ~config =
   let open Genspio.EDSL in
@@ -64,8 +64,7 @@ let start_script t ~config =
       []
   in
   let tmp_config = tmp_file (config_file t ~config) in
-  check_sequence
-    ~verbosity:(`Announce (sprintf "Node-%s-start" t.id))
+  check_sequence ~verbosity:`Output_all
     [ (let opts = config_options t ~config in
        ( "config-init"
        , if_seq
@@ -77,7 +76,7 @@ let start_script t ~config =
           [ write_stdout ~path:tmp_config#path
               (exec
                  [ "jq"
-                 ; {jq|.p2p += { "limits" : { "connection-timeout" : 2, "swap-linger" : 2 } }|jq}
+                 ; {jq|.p2p += {  "limits" : { "maintenance-idle-time": 3, "connection-timeout" : 2, "swap-linger" : 2 } }|jq}
                  ; config_file t ~config ])
           ; call [str "mv"; tmp_config#path; str (config_file t ~config)] ] )
     ; ( "ensure-identity"

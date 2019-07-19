@@ -63,8 +63,15 @@ val check_endorsement_rights:
   context -> Kind.endorsement Operation.t ->
   (public_key_hash * int list * bool) tzresult Lwt.t
 
-(** Returns the endorsement reward calculated w.r.t a given priority.  *)
-val endorsement_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
+(** Returns the baking reward calculated w.r.t a given priority [p] and a
+    number [e] of included endorsements as follows:
+      (block_reward / (p+1)) * (0.8 + 0.2 * e / endorsers_per_block)
+*)
+val baking_reward: context ->
+  block_priority:int -> included_endorsements:int -> Tez.t tzresult Lwt.t
+
+(** Returns the endorsing reward calculated w.r.t a given priority.  *)
+val endorsing_reward: context -> block_priority:int -> int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
@@ -107,28 +114,36 @@ val dawn_of_a_new_cycle: context -> Cycle.t option tzresult Lwt.t
 
 val earlier_predecessor_timestamp: context -> Level.t -> Timestamp.t tzresult Lwt.t
 
-(** Since Emmy-B
+(** Since Emmy+
 
-    A block is valid only if it contains a minimal amount of
-    endorsments that depends on the block's priority and the delay
-    between the minimal time allowed for baking at that priority and
-    the actual timestamp of the block.
+    A block is valid only if its timestamp has a minimal delay with
+    respect to the previous block's timestamp, and this minimal delay
+    depends not only on the block's priority but also on the number of
+    endorsement operations included in the block.
 
-    In Emmy-B, blocks' fitness increases by one unit with each level.
+    In Emmy+, blocks' fitness increases by one unit with each level.
 
-    In this way, Emmy-B simplifies the optimal baking strategy: The
+    In this way, Emmy+ simplifies the optimal baking strategy: The
     bakers used to have to choose whether to wait for more endorsements
     to include in their block, or to publish the block immediately,
     without waiting. The incentive for including more endorsements was
     to increase the fitness and win against unknown blocks. However,
     when a block was produced too late in the priority period, there
     was the risk that the block did not reach endorsers before the
-    block of next priority. In Emmy-B, the baker does not need to take
+    block of next priority. In Emmy+, the baker does not need to take
     such a decision, because the baker cannot publish a block too
     early. *)
 
-val minimum_allowed_endorsements: context -> block_priority:int -> block_delay:Period.t -> int
+(** Given a delay of a block's timestamp with respect to the minimum
+    time to bake at the block's priority (as returned by
+    `minimum_time`), it returns the minimum number of endorsements that
+    the block has to contain *)
+val minimum_allowed_endorsements: context -> block_delay:Period.t -> int
 
+(** This is the somehow the dual of the previous function. Given a
+    block priority and a number of endorsement slots (given by the
+    `endorsing_power` argument), it returns the minimum time at which
+    the next block can be baked. *)
 val minimal_valid_time:
   context ->
   priority:int ->

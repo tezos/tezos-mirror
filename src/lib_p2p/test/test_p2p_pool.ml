@@ -33,7 +33,7 @@ type message =
 
 let msg_config : message P2p_pool.message_config = {
   encoding = [
-    P2p_pool.Encoding {
+    P2p_message.Encoding {
       tag = 0x10 ;
       title = "Ping" ;
       encoding = Data_encoding.empty ;
@@ -96,8 +96,8 @@ let detach_node f points n =
       min_connections = nb_points ;
       max_connections = nb_points ;
       max_incoming_connections = nb_points ;
-      connection_timeout = 10. ;
-      authentication_timeout = 2. ;
+      connection_timeout = Time.System.Span.of_seconds_exn 10. ;
+      authentication_timeout = Time.System.Span.of_seconds_exn 2. ;
       incoming_app_message_queue_size = None ;
       incoming_message_queue_size = None ;
       outgoing_message_queue_size = None ;
@@ -105,8 +105,9 @@ let detach_node f points n =
       known_points_history_size = 100 ;
       max_known_points = None ;
       max_known_peer_ids = None ;
-      swap_linger = 0. ;
-      binary_chunks_size = None
+      swap_linger = Time.System.Span.of_seconds_exn 0. ;
+      binary_chunks_size = None ;
+      greylisting_config = P2p_point_state.Info.default_greylisting_config ;
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
@@ -192,7 +193,7 @@ module Simple = struct
     Lwt_list.iter_p P2p_pool.disconnect conns
 
   let node channel pool points =
-    connect_all ~timeout:2. pool points >>=? fun conns ->
+    connect_all ~timeout:(Time.System.Span.of_seconds_exn 2.) pool points >>=? fun conns ->
     lwt_log_info "Bootstrap OK" >>= fun () ->
     sync channel >>=? fun () ->
     write_all conns Ping >>=? fun () ->
@@ -213,7 +214,7 @@ module Random_connections = struct
 
   let rec connect_random pool total rem point n =
     Lwt_unix.sleep (0.2 +. Random.float 1.0) >>= fun () ->
-    (trace Connect @@ Simple.connect ~timeout:2. pool point) >>=? fun conn ->
+    (trace Connect @@ Simple.connect ~timeout:(Time.System.Span.of_seconds_exn 2.) pool point) >>=? fun conn ->
     (trace Write @@ P2p_pool.write conn Ping) >>= fun _ ->
     (trace Read @@ P2p_pool.read conn) >>=? fun Ping ->
     Lwt_unix.sleep (0.2 +. Random.float 1.0) >>= fun () ->
@@ -262,7 +263,7 @@ module Garbled = struct
       conns
 
   let node ch pool points =
-    Simple.connect_all ~timeout:2. pool points >>=? fun conns ->
+    Simple.connect_all ~timeout:(Time.System.Span.of_seconds_exn 2.) pool points >>=? fun conns ->
     sync ch >>=? fun () ->
     begin
       write_bad_all conns >>=? fun () ->
@@ -280,6 +281,7 @@ let addr = ref Ipaddr.V6.localhost
 let port = ref (1024 + Random.int 8192)
 let clients = ref 10
 let repeat_connections = ref 5
+let log_config = ref None
 
 let spec = Arg.[
 
@@ -295,19 +297,26 @@ let spec = Arg.[
 
 
     "-v", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection-pool" Info) ;
-        Lwt_log_core.(add_rule "p2p.connection-pool" Info)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection-pool -> info; p2p.connection-pool -> info")
+              () )),
     " Log up to info msgs" ;
 
     "-vv", Unit (fun () ->
-        Lwt_log_core.(add_rule "test.p2p.connection-pool" Debug) ;
-        Lwt_log_core.(add_rule "p2p.connection-pool" Debug)),
+        log_config := Some (
+            Lwt_log_sink_unix.create_cfg
+              ~rules:("test.p2p.connection-pool -> debug; p2p.connection-pool -> debug")
+              () )),
     " Log up to debug msgs";
 
   ]
 
+let init_logs = lazy (Internal_event_unix.init  ?lwt_log_sink:!log_config  ())
+
 let wrap n f =
   Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lazy.force init_logs >>= fun () ->
     f () >>= function
     | Ok () -> Lwt.return_unit
     | Error error ->

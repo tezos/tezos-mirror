@@ -25,11 +25,10 @@
 
 open State_logging
 
-let block_hash_tag = Tag.def ~doc:"Block hash" "block_hash" Block_hash.pp_short
-
 let genesis chain_state =
   let genesis = State.Chain.genesis chain_state in
   State.Block.read_opt chain_state genesis.block
+  >|= Option.unopt_assert ~loc:__POS__
 
 let known_heads chain_state =
   State.read_chain_data chain_state begin fun chain_store _data ->
@@ -79,7 +78,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
       lwt_debug Tag.DSL.(fun f ->
           f "pop_block %a"
           -% t event "pop_block"
-          -% a block_hash_tag hash) >>= fun () ->
+          -% a Block_hash.Logging.tag hash) >>= fun () ->
       Store.Chain_data.In_main_branch.remove (chain_store, hash) >>= fun () ->
       State.Block.predecessor block >>= function
       | Some predecessor ->
@@ -91,7 +90,7 @@ let locked_set_head chain_store data block live_blocks live_operations =
     lwt_debug Tag.DSL.(fun f ->
         f "push_block %a"
         -% t event "push_block"
-        -% a block_hash_tag hash) >>= fun () ->
+        -% a Block_hash.Logging.tag hash) >>= fun () ->
     Store.Chain_data.In_main_branch.store
       (chain_store, pred_hash) hash >>= fun () ->
     Lwt.return hash

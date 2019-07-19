@@ -25,52 +25,82 @@
 
 open Alpha_context
 
-let () = ()
-
-let select_winning_proposal proposals =
+(** Returns the proposal submitted by the most delegates.
+    Returns None in case of a tie, if proposal quorum is below required
+    minimum or if there are no proposals. *)
+let select_winning_proposal ctxt =
+  Vote.get_proposals ctxt >>=? fun proposals ->
   let merge proposal vote winners =
     match winners with
     | None -> Some ([proposal], vote)
     | Some (winners, winners_vote) as previous ->
         if Compare.Int32.(vote = winners_vote) then
           Some (proposal :: winners, winners_vote)
-        else if Compare.Int32.(vote >= winners_vote) then
+        else if Compare.Int32.(vote > winners_vote) then
           Some ([proposal], vote)
         else
           previous in
   match Protocol_hash.Map.fold merge proposals None with
-  | None -> None
-  | Some ([proposal], _) -> Some proposal
-  | Some _ -> None (* in case of a tie, lets do nothing. *)
+  | Some ([proposal], vote) ->
+      Vote.listing_size ctxt >>=? fun max_vote ->
+      let min_proposal_quorum = Constants.min_proposal_quorum ctxt in
+      let min_vote_to_pass =
+        Int32.div (Int32.mul min_proposal_quorum max_vote) 100_00l in
+      if Compare.Int32.(vote >= min_vote_to_pass) then
+        return_some proposal
+      else
+        return_none
+  | _ ->
+      return_none (* in case of a tie, let's do nothing. *)
 
-let check_approval_and_update_quorum ctxt =
+(** A proposal is approved if it has supermajority and the participation reaches
+    the current quorum.
+    Supermajority means the yays are more 8/10 of casted votes.
+    The participation is the ratio of all received votes, including passes, with
+    respect to the number of possible votes.
+    The participation EMA (exponential moving average) uses the last
+    participation EMA and the current participation./
+    The expected quorum is calculated using the last participation EMA, capped
+    by the min/max quorum protocol constants. *)
+let check_approval_and_update_participation_ema ctxt =
   Vote.get_ballots ctxt >>=? fun ballots ->
   Vote.listing_size ctxt >>=? fun maximum_vote ->
+  Vote.get_participation_ema ctxt >>=? fun participation_ema ->
   Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
-  (* FIXME check overflow ??? *)
-  let casted_vote = Int32.add ballots.yay ballots.nay in
-  let actual_vote = Int32.add casted_vote ballots.pass in
-  let actual_quorum =
-    Int32.div (Int32.mul actual_vote 100_00l) maximum_vote in
-  let supermajority = Int32.div (Int32.mul 8l casted_vote) 10l in
-  let updated_quorum =
-    Int32.div
-      (Int32.add (Int32.mul 8l expected_quorum)
-         (Int32.mul 2l actual_quorum))
-      10l in
-  Vote.set_current_quorum ctxt updated_quorum >>=? fun ctxt ->
-  return
-    (ctxt,
-     Compare.Int32.(actual_quorum >= expected_quorum
-                    && ballots.yay >= supermajority))
+  (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
+     small as 1e3, there is a maximum of 8e5 rolls and thus votes.
+     In 'participation' an Int64 is used because in the worst case 'all_votes is
+     8e5 and after the multiplication is 8e9, making it potentially overflow a
+     signed Int32 which is 2e9. *)
+  let casted_votes = Int32.add ballots.yay ballots.nay in
+  let all_votes = Int32.add casted_votes ballots.pass in
+  let supermajority = Int32.div (Int32.mul 8l casted_votes) 10l in
+  let participation = (* in centile of percentage *)
+    Int64.(to_int32
+             (div
+                (mul (of_int32 all_votes) 100_00L)
+                (of_int32 maximum_vote))) in
+  let outcome = Compare.Int32.(participation >= expected_quorum &&
+                               ballots.yay >= supermajority) in
+  let new_participation_ema =
+    Int32.(div (add
+                  (mul 8l participation_ema)
+                  (mul 2l participation))
+             10l) in
+  Vote.set_participation_ema ctxt new_participation_ema >>=? fun ctxt ->
+  return (ctxt, outcome)
 
-let start_new_voting_cycle ctxt =
+(** Implements the state machine of the amendment procedure.
+    Note that [freeze_listings], that computes the vote weight of each delegate,
+    is run at the beginning of each voting period.
+*)
+let start_new_voting_period ctxt =
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal -> begin
-      Vote.get_proposals ctxt >>=? fun proposals ->
+      select_winning_proposal ctxt >>=? fun proposal ->
       Vote.clear_proposals ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
-      match select_winning_proposal proposals with
+      match proposal with
       | None ->
           Vote.freeze_listings ctxt >>=? fun ctxt ->
           return ctxt
@@ -81,12 +111,12 @@ let start_new_voting_cycle ctxt =
           return ctxt
     end
   | Testing_vote ->
-      check_approval_and_update_quorum ctxt >>=? fun (ctxt, approved) ->
+      check_approval_and_update_participation_ema ctxt >>=? fun (ctxt, approved) ->
       Vote.clear_ballots ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
       if approved then
         let expiration = (* in two days maximum... *)
-          Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
+          Time.add (Timestamp.current ctxt) (Constants.test_chain_duration ctxt) in
         Vote.get_current_proposal ctxt >>=? fun proposal ->
         fork_test_chain ctxt proposal expiration >>= fun ctxt ->
         Vote.set_current_period_kind ctxt Testing >>=? fun ctxt ->
@@ -101,7 +131,7 @@ let start_new_voting_cycle ctxt =
       Vote.set_current_period_kind ctxt Promotion_vote >>=? fun ctxt ->
       return ctxt
   | Promotion_vote ->
-      check_approval_and_update_quorum ctxt >>=? fun (ctxt, approved) ->
+      check_approval_and_update_participation_ema ctxt >>=? fun (ctxt, approved) ->
       begin
         if approved then
           Vote.get_current_proposal ctxt >>=? fun proposal ->
@@ -212,7 +242,7 @@ let rec longer_than l n =
 let record_proposals ctxt delegate proposals =
   begin match proposals with
     | [] -> fail Empty_proposal
-    | _ :: _ -> return ()
+    | _ :: _ -> return_unit
   end >>=? fun () ->
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal ->
@@ -252,9 +282,9 @@ let last_of_a_voting_period ctxt l =
   Compare.Int32.(Int32.succ l.Level.voting_period_position =
                  Constants.blocks_per_voting_period ctxt )
 
-let may_start_new_voting_cycle ctxt =
+let may_start_new_voting_period ctxt =
   let level = Level.current ctxt in
   if last_of_a_voting_period ctxt level then
-    start_new_voting_cycle ctxt
+    start_new_voting_period ctxt
   else
     return ctxt

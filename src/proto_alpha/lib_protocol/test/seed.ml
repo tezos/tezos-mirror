@@ -29,7 +29,7 @@
       seed_nonce_hash
 *)
 
-open Proto_alpha
+open Protocol
 open Test_tez
 
 (** Tests that baking [blocks_per_commitment] blocks without a
@@ -53,6 +53,12 @@ let no_commitment () =
     | _ -> false
   end
 
+let baking_reward ctxt (b: Block.t) =
+  let priority = b.header.protocol_data.contents.priority in
+  Block.get_endorsing_power b >>=? fun endorsing_power ->
+  Context.get_baking_reward ctxt ~priority ~endorsing_power
+
+
 (** Choose a baker, denote it by id. In the first cycle, make id bake only once.
     Test that:
     - after id bakes with a commitment the bond is frozen and the reward allocated
@@ -69,7 +75,6 @@ let revelation_early_wrong_right_twice () =
   Context.init 5 >>=? fun (b,_) ->
   Context.get_constants (B b) >>=? fun csts ->
   let bond = csts.parametric.block_security_deposit in
-  let reward = csts.parametric.block_reward in
   let tip = csts.parametric.seed_nonce_revelation_tip in
   let blocks_per_commitment = Int32.to_int csts.parametric.blocks_per_commitment in
   let preserved_cycles = csts.parametric.preserved_cycles in
@@ -88,6 +93,7 @@ let revelation_early_wrong_right_twice () =
   Block.bake ~policy:(Block.By_account pkh) b >>=? fun b ->
   Context.get_level (B b) >>=? fun level_commitment ->
   Context.get_seed_nonce_hash (B b) >>=? fun committed_hash ->
+  baking_reward (B b) b >>=? fun reward ->
 
   (* test that the bond was frozen and the reward allocated *)
   balance_was_debited ~loc:__LOC__
@@ -128,13 +134,14 @@ let revelation_early_wrong_right_twice () =
 
   (* bake the operation in a block *)
   Block.bake ~policy ~operation b >>=? fun b ->
+  baking_reward (B b) b >>=? fun baker_reward ->
 
   (* test that the baker gets the tip reward *)
   balance_was_debited ~loc:__LOC__
     (B b) baker ~kind:Main baker_bal_main bond >>=? fun () ->
   balance_was_credited ~loc:__LOC__
     (B b) baker ~kind:Deposit baker_bal_deposit bond >>=? fun () ->
-  Lwt.return @@ Tez.(+?) reward tip >>=? fun expected_rewards ->
+  Lwt.return @@ Tez.(+?) baker_reward tip >>=? fun expected_rewards ->
   balance_was_credited ~loc:__LOC__
     (B b) baker ~kind:Rewards baker_bal_rewards expected_rewards >>=? fun () ->
 
@@ -172,7 +179,7 @@ let revelation_missing_and_late () =
 
   Context.init 5 >>=? fun (b,_) ->
   get_constants (B b) >>=? fun csts ->
-  let reward = csts.parametric.block_reward in
+  baking_reward (B b) b >>=? fun reward ->
   let blocks_per_commitment = Int32.to_int csts.parametric.blocks_per_commitment in
 
   (* bake until commitment *)

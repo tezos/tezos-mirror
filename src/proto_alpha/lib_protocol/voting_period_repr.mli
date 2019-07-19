@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A voting period can be of 4 kinds and is uniquely identified as a counter
+    since the root. *)
+
 type t
 type voting_period = t
 val encoding: voting_period Data_encoding.t
@@ -37,9 +40,9 @@ val root: voting_period
 val succ: voting_period -> voting_period
 
 type kind =
-  | Proposal
-  | Testing_vote
-  | Testing
-  | Promotion_vote
+  | Proposal       (** protocols can be proposed *)
+  | Testing_vote   (** a proposal can be voted *)
+  | Testing        (** winning proposal is forked on a testnet *)
+  | Promotion_vote (** activation can be voted *)
 
 val kind_encoding: kind Data_encoding.t

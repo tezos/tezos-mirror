@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 module ContractEntity = struct
@@ -32,7 +32,7 @@ module ContractEntity = struct
   let of_source s =
     match Contract.of_b58check s with
     | Error _ as err ->
-        Lwt.return (Alpha_environment.wrap_error err)
+        Lwt.return (Environment.wrap_error err)
         |> trace (failure "bad contract notation")
     | Ok s -> return s
   let to_source s = return (Contract.to_b58check s)
@@ -88,36 +88,47 @@ module ContractAlias = struct
            (fun cctxt p -> get_contract cctxt p))
         next)
 
+  let destination_parameter () =
+    Clic.parameter
+      ~autocomplete:(fun cctxt ->
+          autocomplete cctxt >>=? fun list1 ->
+          Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
+          return (list1 @ list2))
+      (fun cctxt s ->
+         begin
+           match String.split ~limit:1 ':' s with
+           | [ "alias" ; alias ]->
+               find cctxt alias
+           | [ "key" ; text ] ->
+               Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+               return (s, Contract.implicit_contract v)
+           | _ ->
+               find cctxt s >>= function
+               | Ok v -> return v
+               | Error k_errs ->
+                   ContractEntity.of_source s >>= function
+                   | Ok v -> return (s, v)
+                   | Error c_errs ->
+                       Lwt.return_error (k_errs @ c_errs)
+         end)
+
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
-      desc ^ "\n"
-      ^ "Can be an alias, a key, or a literal (autodetected in order).\n\
-         Use 'text:literal', 'alias:name', 'key:name' to force." in
-    Clic.(
-      param ~name ~desc
-        (parameter
-           ~autocomplete:(fun cctxt ->
-               autocomplete cctxt >>=? fun list1 ->
-               Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
-               return (list1 @ list2))
-           (fun cctxt s ->
-              begin
-                match String.split ~limit:1 ':' s with
-                | [ "alias" ; alias ]->
-                    find cctxt alias
-                | [ "key" ; text ] ->
-                    Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-                    return (s, Contract.implicit_contract v)
-                | _ ->
-                    find cctxt s >>= function
-                    | Ok v -> return v
-                    | Error k_errs ->
-                        ContractEntity.of_source s >>= function
-                        | Ok v -> return (s, v)
-                        | Error c_errs ->
-                            Lwt.return (Error (k_errs @ c_errs))
-              end)))
-      next
+      String.concat "\n" [
+        desc ;
+        "Can be an alias, a key, or a literal (autodetected in order).\n\
+         Use 'text:literal', 'alias:name', 'key:name' to force."
+      ] in
+    Clic.param ~name ~desc (destination_parameter ()) next
+
+  let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
+    let doc =
+      String.concat "\n" [
+        doc ;
+        "Can be an alias, a key, or a literal (autodetected in order).\n\
+         Use 'text:literal', 'alias:name', 'key:name' to force."
+      ] in
+    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 
   let name cctxt contract =
     rev_find cctxt contract >>=? function
@@ -140,11 +151,6 @@ let list_contracts cctxt =
       return (p, n, v'))
     keys >>=? fun accounts ->
   return (contracts @ accounts)
-
-let get_manager cctxt ~chain ~block source =
-  match Contract.is_implicit source with
-  | Some hash -> return hash
-  | None -> Alpha_services.Contract.manager cctxt (chain, block) source
 
 let get_delegate cctxt ~chain ~block source =
   Alpha_services.Contract.delegate_opt cctxt (chain, block) source

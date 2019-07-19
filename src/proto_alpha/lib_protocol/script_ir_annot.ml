@@ -101,26 +101,26 @@ let gen_access_annot
         Some (`Var_annot (String.concat "." [v; f]))
 
 let merge_type_annot
-  : type_annot option -> type_annot option -> type_annot option tzresult
-  = fun annot1 annot2 ->
+  : legacy: bool -> type_annot option -> type_annot option -> type_annot option tzresult
+  = fun ~legacy annot1 annot2 ->
     match annot1, annot2 with
     | None, None
     | Some _, None
     | None, Some _ -> ok None
     | Some `Type_annot a1, Some `Type_annot a2 ->
-        if String.equal a1 a2
+        if legacy || String.equal a1 a2
         then ok annot1
         else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
 
 let merge_field_annot
-  : field_annot option -> field_annot option -> field_annot option tzresult
-  = fun annot1 annot2 ->
+  : legacy: bool -> field_annot option -> field_annot option -> field_annot option tzresult
+  = fun ~legacy annot1 annot2 ->
     match annot1, annot2 with
     | None, None
     | Some _, None
     | None, Some _ -> ok None
     | Some `Field_annot a1, Some `Field_annot a2 ->
-        if String.equal a1 a2
+        if legacy || String.equal a1 a2
         then ok annot1
         else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
 
@@ -257,26 +257,6 @@ let parse_composed_type_annot
     get_two_annot loc fields >|? fun (f1, f2) ->
     (t, f1, f2)
 
-let check_const_type_annot
-  : int -> string list -> type_annot option -> field_annot option list -> unit tzresult Lwt.t
-  = fun loc annot expected_name expected_fields ->
-    Lwt.return
-      (parse_composed_type_annot loc annot >>? fun (ty_name, field1, field2) ->
-       merge_type_annot expected_name ty_name >>? fun _ ->
-       match expected_fields, field1, field2 with
-       | [], Some _, _ | [], _, Some _ | [_], Some _, Some _ ->
-           (* Too many annotations *)
-           error (Unexpected_annotation loc)
-       | _ :: _ :: _ :: _, _, _ | [_], None, Some _ ->
-           error (Unexpected_annotation loc)
-       | [], None, None -> ok ()
-       | [ f1; f2 ], _,  _ ->
-           merge_field_annot f1 field1 >>? fun _ ->
-           merge_field_annot f2 field2 >|? fun _ -> ()
-       | [ f1 ], _,  None ->
-           merge_field_annot f1 field1 >|? fun _ -> ()
-      )
-
 let parse_field_annot
   : int -> string list -> field_annot option tzresult
   = fun loc annot ->
@@ -290,12 +270,18 @@ let extract_field_annot
   : Script.node -> (Script.node * field_annot option) tzresult
   = function
     | Prim (loc, prim, args, annot) ->
-        let field_annots, annot = List.partition (fun s ->
-            Compare.Int.(String.length s > 0) &&
-            Compare.Char.(s.[0] = '%')
-          ) annot in
-        parse_field_annot loc field_annots >|? fun field_annot ->
-        Prim (loc, prim, args, annot), field_annot
+        let rec extract_first acc = function
+          | [] -> None, annot
+          | s :: rest ->
+              if Compare.Int.(String.length s > 0) &&
+                 Compare.Char.(s.[0] = '%') then
+                Some s, List.rev_append acc rest
+              else extract_first (s :: acc) rest in
+        let field_annot, annot = extract_first [] annot in
+        let field_annot = match field_annot with
+          | None -> None
+          | Some field_annot -> Some (`Field_annot (String.sub field_annot 1 (String.length field_annot - 1))) in
+        ok (Prim (loc, prim, args, annot), field_annot)
     | expr -> ok (expr, None)
 
 let check_correct_field
@@ -401,6 +387,19 @@ let parse_destr_annot
       | Some _ -> v
       | None -> value_annot in
     (v, f)
+
+let parse_entrypoint_annot
+  : int -> ?default:var_annot option -> string list -> (var_annot option * field_annot option) tzresult
+  = fun loc ?default annot ->
+    parse_annots loc annot >>?
+    classify_annot loc >>? fun (vars, types, fields) ->
+    error_unexpected_annot loc types >>? fun () ->
+    get_one_annot loc fields >>? fun f ->
+    get_one_annot loc vars >|? function
+    | Some _ as a -> (a, f)
+    | None -> match default with
+      | Some a -> (a, f)
+      | None -> (None, f)
 
 let parse_var_type_annot
   : int -> string list -> (var_annot option * type_annot option) tzresult

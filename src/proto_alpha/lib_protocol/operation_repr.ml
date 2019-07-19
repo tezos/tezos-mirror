@@ -99,7 +99,7 @@ and _ contents =
       ballot: Vote_repr.ballot ;
     } -> Kind.ballot contents
   | Manager_operation : {
-      source: Contract_repr.contract ;
+      source: Signature.public_key_hash ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operation: 'kind manager_operation ;
@@ -111,15 +111,13 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
       amount: Tez_repr.tez ;
-      parameters: Script_repr.lazy_expr option ;
+      parameters: Script_repr.lazy_expr ;
+      entrypoint: string ;
       destination: Contract_repr.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
-      manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
-      script: Script_repr.t option ;
-      spendable: bool ;
-      delegatable: bool ;
+      script: Script_repr.t ;
       credit: Tez_repr.tez ;
       preorigination: Contract_repr.t option ;
     } -> Kind.origination manager_operation
@@ -226,6 +224,22 @@ module Encoding = struct
           (fun pkh -> Reveal pkh)
       }
 
+    let entrypoint_encoding =
+      def
+        ~title:"entrypoint"
+        ~description:"Named entrypoint to a Michelson smart contract"
+        "entrypoint" @@
+      let builtin_case tag name =
+        Data_encoding.case (Tag tag) ~title:name
+          (constant name)
+          (fun n -> if Compare.String.(n = name) then Some () else None) (fun () -> name) in
+      union [ builtin_case 0 "default" ;
+              builtin_case 1 "root" ;
+              builtin_case 2 "do" ;
+              builtin_case 3 "set_delegate" ;
+              builtin_case 4 "remove_delegate" ;
+              Data_encoding.case (Tag 255) ~title:"named" string (fun s -> Some s) (fun s -> s) ]
+
     let transaction_case =
       MCase {
         tag = 1 ;
@@ -234,18 +248,29 @@ module Encoding = struct
           (obj3
              (req "amount" Tez_repr.encoding)
              (req "destination" Contract_repr.encoding)
-             (opt "parameters" Script_repr.lazy_expr_encoding)) ;
+             (opt "parameters"
+                (obj2
+                   (req "entrypoint" entrypoint_encoding)
+                   (req "value" Script_repr.lazy_expr_encoding)))) ;
         select =
           (function
             | Manager (Transaction _ as op) -> Some op
             | _ -> None) ;
         proj =
           (function
-            | Transaction { amount ; destination ; parameters } ->
+            | Transaction { amount ; destination ; parameters ; entrypoint } ->
+                let parameters =
+                  if Script_repr.is_unit_parameter parameters && Compare.String.(entrypoint = "default") then
+                    None
+                  else
+                    Some (entrypoint, parameters) in
                 (amount, destination, parameters)) ;
         inj =
           (fun (amount, destination, parameters) ->
-             Transaction { amount ; destination ; parameters })
+             let entrypoint, parameters = match parameters with
+               | None -> "default", Script_repr.unit_parameter
+               | Some (entrypoint, value) -> entrypoint, value in
+             Transaction { amount ; destination ; parameters ; entrypoint })
       }
 
     let origination_case =
@@ -253,32 +278,26 @@ module Encoding = struct
         tag = 2 ;
         name = "origination" ;
         encoding =
-          (obj6
-             (req "managerPubkey" Signature.Public_key_hash.encoding)
+          (obj3
              (req "balance" Tez_repr.encoding)
-             (dft "spendable" bool true)
-             (dft "delegatable" bool true)
              (opt "delegate" Signature.Public_key_hash.encoding)
-             (opt "script" Script_repr.encoding)) ;
+             (req "script" Script_repr.encoding)) ;
         select =
           (function
             | Manager (Origination _ as op) -> Some op
             | _ -> None) ;
         proj =
           (function
-            | Origination { manager ; credit ; spendable ;
-                            delegatable ; delegate ; script ;
+            | Origination { credit ; delegate ; script ;
                             preorigination = _
                             (* the hash is only used internally
                                when originating from smart
                                contracts, don't serialize it *) } ->
-                (manager, credit, spendable,
-                 delegatable, delegate, script)) ;
+                (credit, delegate, script)) ;
         inj =
-          (fun (manager, credit, spendable, delegatable, delegate, script) ->
+          (fun (credit, delegate, script) ->
              Origination
-               {manager ; credit ; spendable ; delegatable ;
-                delegate ; script ; preorigination = None })
+               {credit ; delegate ; script ; preorigination = None })
       }
 
     let delegation_case =
@@ -484,7 +503,7 @@ module Encoding = struct
 
   let manager_encoding =
     (obj5
-       (req "source" Contract_repr.encoding)
+       (req "source" Signature.Public_key_hash.encoding)
        (req "fee" Tez_repr.encoding)
        (req "counter" (check_size 10 n))
        (req "gas_limit" (check_size 10 n))
@@ -670,12 +689,12 @@ let check_signature_sync (type kind) key chain_id ({ shell ; protocol_data } : k
     if Signature.check ~watermark key signature unsigned_operation then
       Ok ()
     else
-      Error [Invalid_signature] in
+      error Invalid_signature in
   match protocol_data.contents, protocol_data.signature with
   | Single _, None ->
-      Error [Missing_signature]
+      error Missing_signature
   | Cons _, None ->
-      Error [Missing_signature]
+      error Missing_signature
   | Single (Endorsement _) as contents, Some signature ->
       check ~watermark:(Endorsement chain_id) (Contents_list contents) signature
   | Single _ as contents, Some signature ->

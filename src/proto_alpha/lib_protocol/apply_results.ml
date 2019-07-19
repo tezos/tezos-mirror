@@ -56,7 +56,8 @@ type _ successful_manager_operation_result =
         allocated_destination_contract : bool ;
       } -> Kind.transaction successful_manager_operation_result
   | Origination_result :
-      { balance_updates : Delegate.balance_updates ;
+      { big_map_diff : Contract.big_map_diff option ;
+        balance_updates : Delegate.balance_updates ;
         originated_contracts : Contract.t list ;
         consumed_gas : Z.t ;
         storage_size : Z.t ;
@@ -215,7 +216,8 @@ module Manager_result = struct
     make
       ~op_case: Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj5
+        (obj6
+           (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
@@ -234,19 +236,19 @@ module Manager_result = struct
       ~proj:
         (function
           | Origination_result
-              { balance_updates ;
+              { big_map_diff ; balance_updates ;
                 originated_contracts ; consumed_gas ;
                 storage_size ; paid_storage_size_diff } ->
-              (balance_updates,
+              (big_map_diff, balance_updates,
                originated_contracts, consumed_gas,
                storage_size, paid_storage_size_diff))
       ~kind: Kind.Origination_manager_kind
       ~inj:
-        (fun (balance_updates,
+        (fun (big_map_diff, balance_updates,
               originated_contracts, consumed_gas,
               storage_size, paid_storage_size_diff) ->
           Origination_result
-            { balance_updates ;
+            { big_map_diff ; balance_updates ;
               originated_contracts ; consumed_gas ;
               storage_size ; paid_storage_size_diff })
 

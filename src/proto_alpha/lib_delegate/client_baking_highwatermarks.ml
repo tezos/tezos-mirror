@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol_client_context
+open Protocol
 open Alpha_context
 
 type error += Level_previously_endorsed of Raw_level.t
@@ -71,16 +72,16 @@ let encoding =
 let empty = []
 
 (* We do not lock these functions. The caller will be already locked. *)
-let load_highwatermarks (cctxt : #Proto_alpha.full) filename : t tzresult Lwt.t =
+let load_highwatermarks (cctxt : #Protocol_client_context.full) filename : t tzresult Lwt.t =
   cctxt#load filename encoding ~default:empty
 
-let save_highwatermarks (cctxt : #Proto_alpha.full) filename highwatermarks : unit tzresult Lwt.t =
+let save_highwatermarks (cctxt : #Protocol_client_context.full) filename highwatermarks : unit tzresult Lwt.t =
   cctxt#write filename highwatermarks encoding
 
 let retrieve_highwatermark cctxt filename =
   load_highwatermarks cctxt filename
 
-let may_inject (cctxt : #Proto_alpha.full) location ~delegate level =
+let may_inject (cctxt : #Protocol_client_context.full) location ~delegate level =
   retrieve_highwatermark cctxt (Client_baking_files.filename location) >>=? fun highwatermark ->
   let delegate = Signature.Public_key_hash.to_short_b58check delegate in
   List.find_opt
@@ -92,7 +93,7 @@ let may_inject (cctxt : #Proto_alpha.full) location ~delegate level =
 let may_inject_block = may_inject
 let may_inject_endorsement = may_inject
 
-let record (cctxt : #Proto_alpha.full) location ~delegate level =
+let record (cctxt : #Protocol_client_context.full) location ~delegate level =
   let filename = Client_baking_files.filename location in
   let delegate = Signature.Public_key_hash.to_short_b58check delegate in
   load_highwatermarks cctxt filename >>=? fun highwatermarks ->

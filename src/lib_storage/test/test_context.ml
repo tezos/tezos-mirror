@@ -37,16 +37,15 @@ let genesis_block =
 
 let genesis_protocol =
   Protocol_hash.of_b58check_exn
-    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
+    "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
-let genesis_time =
-  Time.of_seconds 0L
+let genesis_time = Time.Protocol.of_seconds 0L
 
 let chain_id = Chain_id.of_block_hash genesis_block
 
 (** Context creation *)
 
-let commit = commit ~time:Time.epoch ~message:""
+let commit = commit ~time:Time.Protocol.epoch ~message:""
 
 let block2 =
   Block_hash.of_hex_exn
@@ -238,7 +237,7 @@ let test_dump { idx ; block3b; _ } =
           level = 0l;
           proto_level = 0;
           predecessor = Block_hash.zero;
-          timestamp = Time.epoch;
+          timestamp = Time.Protocol.epoch;
           validation_passes = 0;
           operations_hash = Operation_list_list_hash.zero;
           fitness = [];
@@ -249,10 +248,14 @@ let test_dump { idx ; block3b; _ } =
         operations = [] ;
         operation_hashes = [] ;
       } : Context.Pruned_block.t) in
+    let empty = {
+      Context.Block_data.block_header = empty_block_header Context_hash.zero ;
+      operations = [[]] ;
+    } in
     let bhs =
       (fun context ->
          empty_block_header context,
-         Context.Block_data.empty,
+         empty,
          history_mode,
          (fun _ -> return (None, None))
       ) ctxt_hash
@@ -260,8 +263,12 @@ let test_dump { idx ; block3b; _ } =
     Context.dump_contexts idx bhs ~filename:dumpfile >>=? fun () ->
     let root = base_dir2 // "context" in
     Context.init ?patch_context:None root >>= fun idx2 ->
-    Context.restore_contexts idx2 ~filename:dumpfile >>=? fun imported ->
-    let expected_ctxt_hash = (fun (bh,_,_, _,_) -> bh.Block_header.shell.context) imported in
+    Context.restore_contexts idx2
+      ~filename:dumpfile (fun _ -> return_unit)
+      (fun _ _ _ -> return_unit)
+    >>=? fun imported ->
+    let (bh, _, _, _, _, _) = imported in
+    let expected_ctxt_hash = bh.Block_header.shell.context in
     assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
     return ()
   end

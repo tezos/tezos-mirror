@@ -39,7 +39,8 @@ module Scripts : sig
 
   val run_code:
     'a #RPC_context.simple ->
-    'a -> Script.expr -> (Script.expr * Script.expr * Tez.t) ->
+    'a -> Script.expr ->
+    (Script.expr * Script.expr * Tez.t * Chain_id.t * Contract.t option * Contract.t option * Z.t option * string) ->
     (Script.expr *
      packed_internal_operation list *
      Contract.big_map_diff option) shell_tzresult Lwt.t
@@ -47,7 +48,7 @@ module Scripts : sig
   val trace_code:
     'a #RPC_context.simple ->
     'a -> Script.expr ->
-    (Script.expr * Script.expr * Tez.t) ->
+    (Script.expr * Script.expr * Tez.t * Chain_id.t * Contract.t option * Contract.t option * Z.t option * string) ->
     (Script.expr *
      packed_internal_operation list *
      Script_interpreter.execution_trace *
@@ -68,7 +69,7 @@ module Scripts : sig
 
   val run_operation:
     'a #RPC_context.simple ->
-    'a -> packed_operation ->
+    'a -> packed_operation * Chain_id.t ->
     (packed_protocol_data * Apply_results.packed_operation_metadata) shell_tzresult Lwt.t
 
 end
@@ -80,7 +81,7 @@ module Forge : sig
     val operations:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
@@ -91,7 +92,7 @@ module Forge : sig
     val reveal:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->
@@ -100,11 +101,12 @@ module Forge : sig
     val transaction:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       amount:Tez.t ->
       destination:Contract.t ->
+      ?entrypoint:string ->
       ?parameters:Script.expr ->
       gas_limit:Z.t ->
       storage_limit:Z.t ->
@@ -114,15 +116,12 @@ module Forge : sig
     val origination:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
-      managerPubKey:public_key_hash ->
       balance:Tez.t ->
-      ?spendable:bool ->
-      ?delegatable:bool ->
       ?delegatePubKey: public_key_hash ->
-      ?script:Script.t ->
+      script:Script.t ->
       gas_limit:Z.t ->
       storage_limit:Z.t ->
       fee:Tez.t->
@@ -131,7 +130,7 @@ module Forge : sig
     val delegation:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:Contract.t ->
+      source:public_key_hash ->
       ?sourcePubKey:public_key ->
       counter:counter ->
       fee:Tez.t ->

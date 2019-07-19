@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** a protocol change proposal *)
 type proposal = Protocol_hash.t
 
+(** votes can be for, against or neutral.
+    Neutral serves to count towards a quorum *)
 type ballot = Yay | Nay | Pass
 val ballot_encoding: ballot Data_encoding.t

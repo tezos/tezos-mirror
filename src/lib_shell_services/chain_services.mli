@@ -55,19 +55,6 @@ val checkpoint:
   ?chain:chain ->
   unit -> (Block_header.t * int32 * int32 * History_mode.t) tzresult Lwt.t
 
-val snapshot_export_block:
-  #simple ->
-  ?chain:chain ->
-  export_mode: string ->
-  block_hash: string ->
-  string tzresult Lwt.t
-
-val snapshot_export_last_checkpoint:
-  #simple ->
-  ?chain:chain ->
-  export_mode: string ->
-  string tzresult Lwt.t
-
 module Mempool = Block_services.Empty.Mempool
 
 module Blocks : sig
@@ -77,7 +64,7 @@ module Blocks : sig
     ?chain:chain ->
     ?heads:Block_hash.t list ->
     ?length:int ->
-    ?min_date:Time.t ->
+    ?min_date:Time.Protocol.t ->
     unit -> Block_hash.t list list tzresult Lwt.t
 
   include (module type of Block_services.Empty)
@@ -124,16 +111,6 @@ module S : sig
      prefix, unit, unit,
      Block_header.t * int32 * int32 * History_mode.t) RPC_service.t
 
-  val snapshot_export_block:
-    ([ `GET ], prefix,
-     (prefix * string) * string, unit, unit,
-     string) RPC_service.t
-
-  val snapshot_export_last_checkpoint:
-    ([ `GET ], prefix,
-     prefix * string, unit, unit,
-     string) RPC_service.t
-
   module Blocks : sig
 
     val path: (prefix, prefix) RPC_path.t
@@ -142,7 +119,7 @@ module S : sig
       ([ `GET ], prefix,
        prefix, < heads : Block_hash.t list;
                  length : int option;
-                 min_date : Time.t option >, unit,
+                 min_date : Time.Protocol.t option >, unit,
        Block_hash.t list list) RPC_service.t
 
   end

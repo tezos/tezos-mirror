@@ -93,12 +93,13 @@ let sources_name (c : Protocol.component) =
   | Some _ ->
       Printf.sprintf "%s.mli %s.ml" name name
 
-let process ~template ~destination (protocol : Protocol.t) lib_version =
+let process ~template ~destination (protocol : Protocol.t) lib_version hash =
   let version = String.concat "-" (String.split_on_char '_' lib_version) in
   let vars =
     StringMap.empty |>
     StringMap.add "VERSION" version |>
     StringMap.add "LIB_VERSION" lib_version |>
+    StringMap.add "HASH" (Protocol_hash.to_b58check hash) |>
     StringMap.add "MODULES"
       (String.concat " " (List.map module_name protocol.components)) |>
     StringMap.add "SOURCES"
@@ -129,8 +130,8 @@ let main () =
   let version =
     try Sys.argv.(3)
     with _ -> guess_version () in
-  let _hash, proto = read_proto destination in
-  process ~template ~destination proto version
+  let hash, proto = read_proto destination in
+  process ~template ~destination proto version hash
 
 let () =
   main ()

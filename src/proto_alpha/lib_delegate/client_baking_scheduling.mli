@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
-val sleep_until: Time.t -> unit Lwt.t option
+val sleep_until: Time.Protocol.t -> unit Lwt.t option
 
 val wait_for_first_event:
   name:string ->
@@ -33,7 +32,7 @@ val wait_for_first_event:
 
 val main :
   name:string ->
-  cctxt:(#Proto_alpha.full as 'a) ->
+  cctxt:(#Protocol_client_context.full as 'a) ->
   stream:'event tzresult Lwt_stream.t ->
   state_maker:('event -> 'state tzresult Lwt.t) ->
   pre_loop:('a -> 'state -> 'event -> unit tzresult Lwt.t) ->

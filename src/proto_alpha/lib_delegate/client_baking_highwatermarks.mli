@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type error += Level_previously_endorsed of Raw_level.t
@@ -34,28 +34,28 @@ type t
 val encoding: t Data_encoding.t
 
 val may_inject_block:
-  #Proto_alpha.full ->
+  #Protocol_client_context.full ->
   [ `Block ] Client_baking_files.location ->
   delegate: Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val may_inject_endorsement:
-  #Proto_alpha.full ->
+  #Protocol_client_context.full ->
   [ `Endorsement ] Client_baking_files.location ->
   delegate: Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val record_block:
-  #Proto_alpha.full ->
+  #Protocol_client_context.full ->
   [ `Block ] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t
 
 val record_endorsement:
-  #Proto_alpha.full ->
+  #Protocol_client_context.full ->
   [ `Endorsement ] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->

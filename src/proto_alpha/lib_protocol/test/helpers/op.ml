@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 let sign ?(watermark = Signature.Generic_operation)
@@ -94,7 +94,7 @@ let combine_operations
   begin Context.Contract.is_manager_key_revealed ctxt source >>=? function
     | false ->
         let reveal_op = Manager_operation {
-            source ;
+            source = Signature.Public_key.hash public_key ;
             fee = Tez.zero ;
             counter ;
             operation = Reveal public_key ;
@@ -124,13 +124,18 @@ let combine_operations
 let manager_operation
     ?counter
     ?(fee = Tez.zero)
-    ?(gas_limit = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(storage_limit = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(gas_limit)
+    ?(storage_limit)
     ?public_key ~source ctxt operation =
   begin match counter with
     | Some counter -> return counter
     | None ->  Context.Contract.counter ctxt source end
   >>=? fun counter ->
+  Context.get_constants ctxt >>=? fun c ->
+  let gas_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation gas_limit in
+  let storage_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation storage_limit in
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.unopt ~default:account.pk public_key in
   let counter = Z.succ counter in
@@ -138,7 +143,7 @@ let manager_operation
   | true ->
       let op =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key ;
           fee ;
           counter ;
           operation ;
@@ -149,7 +154,7 @@ let manager_operation
   | false ->
       let op_reveal =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key;
           fee = Tez.zero ;
           counter ;
           operation = Reveal public_key ;
@@ -158,7 +163,7 @@ let manager_operation
         } in
       let op =
         Manager_operation {
-          source ;
+          source = Signature.Public_key.hash public_key ;
           fee ;
           counter = Z.succ counter ;
           operation ;
@@ -177,7 +182,7 @@ let revelation ctxt public_key =
     Contents_list
       (Single
          (Manager_operation {
-             source ;
+             source = Signature.Public_key.hash public_key ;
              fee = Tez.zero ;
              counter ;
              operation = Reveal public_key ;
@@ -192,21 +197,17 @@ let originated_contract op =
 
 exception Impossible
 
-let origination ?counter ?delegate ?script
-    ?(spendable = true) ?(delegatable = true) ?(preorigination = None)
-    ?public_key ?manager ?credit ?fee ?gas_limit ?storage_limit ctxt source =
+let origination ?counter ?delegate ~script
+    ?(preorigination = None)
+    ?public_key ?credit ?fee ?gas_limit ?storage_limit ctxt source =
   Context.Contract.manager ctxt source >>=? fun account ->
-  let manager = Option.unopt ~default:account.pkh manager in
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit = Option.unopt_exn Impossible default_credit in
   let credit = Option.unopt ~default:default_credit credit in
   let operation =
     Origination {
-      manager ;
       delegate ;
       script ;
-      spendable ;
-      delegatable ;
       credit ;
       preorigination ;
     } in
@@ -225,13 +226,14 @@ let miss_signed_endorsement ?level ctxt  =
   let delegate = Account.find_alternate real_delegate_pkh in
   endorsement ~delegate:(delegate.pkh, List.hd slots) ~level ctxt ()
 
-let transaction ?fee ?gas_limit ?storage_limit ?parameters ctxt
+let transaction ?fee ?gas_limit ?storage_limit ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
     (src:Contract.t) (dst:Contract.t)
     (amount:Tez.t) =
   let top = Transaction {
       amount;
       parameters;
       destination=dst;
+      entrypoint;
     } in
   manager_operation ?fee ?gas_limit ?storage_limit
     ~source:src ctxt top >>=? fun sop ->
@@ -315,3 +317,21 @@ let ballot ctxt (pkh: Contract.t) proposal ballot =
            } in
   Account.find source >>=? fun account ->
   return (sign account.sk ctxt (Contents_list (Single op)))
+
+let dummy_script =
+  let open Micheline in
+  Script.({
+      code = lazy_expr (strip_locations (Seq (0, [
+          Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []) ;
+          Prim (0, K_storage, [Prim (0, T_unit, [], [])], []) ;
+          Prim (0, K_code, [
+              Seq (0, [
+                  Prim (0, I_CDR, [], []) ;
+                  Prim (0, I_NIL, [Prim (0, T_operation, [], [])], []) ;
+                  Prim (0, I_PAIR, [], []) ;
+                ])], []) ;
+        ]))) ;
+      storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], []))) ;
+    })
+
+let dummy_script_cost = Test_tez.Tez.of_mutez_exn 38_000L

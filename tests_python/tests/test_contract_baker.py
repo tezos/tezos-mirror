@@ -23,7 +23,7 @@ class TestOriginationCall:
         path = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes'
         contract = f'{path}/transfer_tokens.tz'
         args = ['--init', initial_storage, '--burn-cap', '0.400']
-        origination = client.originate('foobar', 'bootstrap1', 1000,
+        origination = client.originate('foobar', 1000,
                                        'bootstrap1', contract, args)
         session['contract'] = origination.contract
         client.bake('bootstrap5', BAKE_ARGS)
@@ -33,9 +33,9 @@ class TestOriginationCall:
         # fails sometimes with tezos-client crashing. Maybe caused with
         # subprocess captured of forked process output?
         #
-        # Safer to poll with `check_contain_operations`
-        assert utils.check_contains_operations(client,
-                                               [origination.operation_hash])
+        # Safer to poll with `check_block_contain_operations`
+        assert utils.check_block_contains_operations(
+            client, [origination.operation_hash])
 
     def test_call(self, client, session):
         contract = session['contract']
@@ -43,8 +43,8 @@ class TestOriginationCall:
         transfer = client.transfer(0, 'bootstrap2', contract,
                                    ['--arg', bootstrap3])
         client.bake('bootstrap5', BAKE_ARGS)
-        assert utils.check_contains_operations(client,
-                                               [transfer.operation_hash])
+        assert utils.check_block_contains_operations(client,
+                                                     [transfer.operation_hash])
 
     def test_balance(self, client):
         assert client.get_balance("bootstrap3") == 4000100

@@ -57,6 +57,7 @@ let commands () =
                Block_hash.pp_short hash >>= fun () ->
              return_unit)
            invalid_blocks) ;
+
     command ~group
       ~desc: "Retrieve the current checkpoint and display it in a \
               format compatible with node argument `--checkpoint`."
@@ -66,7 +67,7 @@ let commands () =
          Shell_services.Chain.checkpoint cctxt ~chain:cctxt#chain ()
          >>=? fun (block_header, save_point, caboose, history_mode) ->
          cctxt#message
-           "@[<v 0>Checkpoint hash: %s@,\
+           "@[<v 0>Checkpoint: %s@,\
             Checkpoint level: %ld@,\
             History mode: %a@,\
             Save point level: %ld@,\

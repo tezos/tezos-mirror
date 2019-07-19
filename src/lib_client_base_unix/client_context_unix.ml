@@ -24,11 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Client_context
 include Internal_event.Legacy_logging.Make_semantic
     (struct let name = "client.context.unix" end)
 
-class unix_wallet ~base_dir ~password_filename : wallet = object (self)
+class unix_wallet ~base_dir ~password_filename : Client_context.wallet = object (self)
 
   method load_passwords = match password_filename with
     | None -> None
@@ -102,15 +101,15 @@ class unix_wallet ~base_dir ~password_filename : wallet = object (self)
       |> generic_trace "could not write the %s alias file." alias_name
 end
 
-class unix_prompter = object
-  method prompt : type a. (a, string tzresult) lwt_format -> a =
+class unix_prompter : Client_context.prompter = object
+  method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = read_line () in
       return line
     end
 
-  method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a =
+  method prompt_password : type a. (a, MBytes.t tzresult) Client_context.lwt_format -> a =
     Format.kasprintf begin fun msg ->
       print_string msg ;
       let line = Lwt_utils_unix.getpass () in
@@ -118,11 +117,8 @@ class unix_prompter = object
     end
 end
 
-class unix_logger ~base_dir =
-  let startup =
-    CalendarLib.Printer.Precise_Calendar.sprint
-      "%Y-%m-%dT%H:%M:%SZ"
-      (CalendarLib.Calendar.Precise.now ()) in
+class unix_logger ~base_dir : Client_context.printer =
+  let startup = Format.asprintf "%a" Time.System.pp_hum (Systime_os.now ()) in
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;
@@ -142,8 +138,8 @@ class unix_logger ~base_dir =
     inherit Client_context.simple_printer log
   end
 
-class unix_ui = object
-  method sleep = Lwt_unix.sleep
+class unix_ui : Client_context.ui = object
+  method sleep f = Lwt_unix.sleep f
 end
 
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_config : Client_context.full =
@@ -151,7 +147,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_c
     inherit unix_logger ~base_dir
     inherit unix_prompter
     inherit unix_wallet ~base_dir ~password_filename
-    inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
+    inherit RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
     inherit unix_ui
     method chain = chain
     method block = block

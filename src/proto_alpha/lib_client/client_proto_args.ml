@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol_client_context
+open Protocol
 open Alpha_context
 open Clic
 
@@ -107,6 +109,23 @@ let tez_sym =
 let string_parameter =
   parameter (fun _ x -> return x)
 
+let int_parameter =
+  parameter (fun _ p ->
+      try return (int_of_string p)
+      with _ -> failwith "Cannot read int")
+
+let bytes_parameter =
+  parameter (fun _ s ->
+      try
+        if String.length s < 2
+        || s.[0] <> '0' || s.[1] <> 'x' then
+          raise Exit
+        else
+          return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+      with _ ->
+        failwith "Invalid bytes, expecting hexadecimal notation \
+                  (e.g. 0x1234abcd)")
+
 let init_arg =
   default_arg
     ~long:"init"
@@ -136,6 +155,13 @@ let source_arg =
     ~placeholder:"address"
     ~doc:"source of the deposits to be paid\n\
           Must be a known address."
+    string_parameter
+
+let entrypoint_arg =
+  arg
+    ~long:"entrypoint"
+    ~placeholder:"name"
+    ~doc:"entrypoint of the smart contract"
     string_parameter
 
 let spendable_switch =
@@ -278,7 +304,7 @@ let minimal_nanotez_per_byte_arg =
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
     ~default:(Z.to_string default_minimal_nanotez_per_byte)
-    ~doc:"exclude operations with fees per byte lower than this threshold (in tez)"
+    ~doc:"exclude operations with fees per byte lower than this threshold (in nanotez)"
     (parameter (fun _ s ->
          try return (Z.of_string s)
          with _ -> fail (Bad_minimal_fees s)))
@@ -368,6 +394,13 @@ let no_confirmation =
     ~long:"no-confirmation"
     ~doc:"don't print wait for the operation to be confirmed."
     ()
+
+let signature_parameter =
+  parameter
+    (fun _cctxt s ->
+       match Signature.of_b58check_opt s with
+       | Some s -> return s
+       | None -> failwith "Not given a valid signature")
 
 module Daemon = struct
   let baking_switch =

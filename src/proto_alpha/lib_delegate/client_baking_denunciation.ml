@@ -24,12 +24,12 @@
 (*****************************************************************************)
 
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Proto_alpha.Name.name ^ ".client.denunciation"
+    let name = Protocol.name ^ ".baking.denunciation"
   end)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
-
+open Protocol_client_context
 open Client_baking_blocks
 open Logging
 
@@ -62,7 +62,7 @@ let create_state ~preserved_levels =
 (* We choose a previous offset (5 blocks from head) to ensure that the
    injected operation is branched from a valid predecessor. *)
 let get_block_offset level =
-  match Alpha_environment.wrap_error (Raw_level.of_int32 5l) with
+  match Environment.wrap_error (Raw_level.of_int32 5l) with
   | Ok min_level ->
       Lwt.return
         (if Raw_level.(level < min_level) then
@@ -76,7 +76,7 @@ let get_block_offset level =
           -% a errs_tag errs) >>= fun () ->
       Lwt.return (`Head 0)
 
-let process_endorsements (cctxt : #Proto_alpha.full) state
+let process_endorsements (cctxt : #Protocol_client_context.full) state
     (endorsements : Alpha_block_services.operation list) level =
   iter_s (fun { Alpha_block_services.shell ; chain_id ; receipt ; hash ; protocol_data ; _ } ->
       let chain = `Hash chain_id in
@@ -129,7 +129,7 @@ let process_endorsements (cctxt : #Proto_alpha.full) state
     ) endorsements >>=? fun () ->
   return_unit
 
-let process_block (cctxt : #Proto_alpha.full) state (header : Alpha_block_services.block_info) =
+let process_block (cctxt : #Protocol_client_context.full) state (header : Alpha_block_services.block_info) =
   let { Alpha_block_services.chain_id ; hash ;
         metadata = { protocol_data = { baker ; level = { level ; _ } ; _ } ; _ } ; _ } = header in
   let chain = `Hash chain_id in
@@ -206,7 +206,7 @@ let endorsements_index = 0
    - Checking that every endorser operated only once at this level
    - Checking that every baker injected only once at this level
 *)
-let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; level ; protocol ; next_protocol ; _ } =
+let process_new_block (cctxt : #Protocol_client_context.full) state { hash ; chain_id ; level ; protocol ; next_protocol ; _ } =
   if Protocol_hash.(protocol <> next_protocol) then
     lwt_log_error Tag.DSL.(fun f ->
         f "Protocol changing detected. Skipping the block."
@@ -254,7 +254,7 @@ let process_new_block (cctxt : #Proto_alpha.full) state { hash ; chain_id ; leve
     cleanup_old_operations state ;
     return_unit
 
-let create (cctxt : #Proto_alpha.full) ~preserved_levels valid_blocks_stream =
+let create (cctxt : #Protocol_client_context.full) ~preserved_levels valid_blocks_stream =
 
   let process_block cctxt state bi =
     process_new_block cctxt state bi >>= function

@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 val inject_seed_nonce_revelation:
-  #Proto_alpha.full ->
+  #Protocol_client_context.full ->
   chain: Chain_services.chain ->
   block: Block_services.block ->
   ?async:bool ->

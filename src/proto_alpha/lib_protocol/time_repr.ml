@@ -60,11 +60,9 @@ let to_seconds_string s = Int64.to_string (to_seconds s)
 let pp = pp_hum
 
 let (+?) x y =
-  (* TODO check overflow *)
   try ok (add x (Period_repr.to_seconds y))
-  with _exn -> Error [ Timestamp_add ]
+  with _exn -> error Timestamp_add
 
 let (-?) x y =
-  (* TODO check overflow *)
   record_trace Timestamp_sub
     (Period_repr.of_seconds (diff x y))

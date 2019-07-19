@@ -41,13 +41,13 @@ module Term = struct
     Lwt_utils_unix.remove_dir @@ store_dir data_dir >>= fun () ->
     Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-  let process subcommand args file block export_rolling reconstruct =
+  let process subcommand args snapshot_file block export_rolling =
     let run =
+      Internal_event_unix.init () >>= fun () ->
       Node_shared_arg.read_data_dir args >>=? fun data_dir ->
       let genesis = Genesis_chain.genesis in
       match subcommand with
       | Export ->
-          Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir data_dir >>=? fun () ->
           let context_root = context_dir data_dir in
           let store_root = store_dir data_dir in
@@ -57,17 +57,15 @@ module Term = struct
             ~export_rolling
             ~context_index
             ~store
-            ~genesis:genesis.block file block >>=? fun () ->
+            ~genesis:genesis.block snapshot_file block >>=? fun () ->
           Store.close store |> return
       | Import ->
-          Internal_event_unix.init () >>= fun () ->
           Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
           Lwt_lock_file.create ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir) >>=? fun () ->
-          Snapshots.import
-            ~reconstruct ~data_dir:data_dir ~dir_cleaner
+          Snapshots.import ~data_dir ~dir_cleaner
             ~genesis ~patch_context:Patch_context.patch_context
-            file block
+            snapshot_file block
     in
     match Lwt_main.run run with
     | Ok () -> `Ok ()
@@ -105,22 +103,13 @@ module Term = struct
     Arg.(value & flag &
          info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
 
-  let reconstruct =
-    let open Cmdliner in
-    let doc =
-      "Forces the reconstruction of all the contexts from the genesis during the \
-       import phase. This operation can take a while." in
-    Arg.(value & flag &
-         info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
-
   let term =
     let open Cmdliner.Term in
     ret (const process $ subcommand_arg
          $ Node_shared_arg.Term.args
          $ file_arg
          $ blocks
-         $ export_rolling
-         $ reconstruct)
+         $ export_rolling)
 
 end
 

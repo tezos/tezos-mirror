@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 (** Returns a fresh nonce and its corresponding hash (and stores them). *)
 val generate: unit -> Nonce_hash.t * Alpha_context.Nonce.t

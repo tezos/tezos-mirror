@@ -25,7 +25,9 @@
 
 val init:
   Raw_context.t ->
-  typecheck:(Raw_context.t -> Script_repr.t -> Raw_context.t tzresult Lwt.t) ->
+  typecheck:(Raw_context.t -> Script_repr.t ->
+             ((Script_repr.t * Contract_storage.big_map_diff option) * Raw_context.t)
+               tzresult Lwt.t) ->
   ?ramp_up_cycles:int ->
   ?no_reward_cycles:int ->
   Parameters_repr.bootstrap_account list ->

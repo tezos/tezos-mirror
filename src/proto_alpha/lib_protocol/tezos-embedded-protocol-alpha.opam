@@ -6,9 +6,11 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-protocol-alpha"
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
 ]
@@ -21,4 +23,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: alpha (economic-protocol definition, embedded in `tezos-node`)"
+synopsis: "Tezos/Protocol: economic-protocol definition, embedded in `tezos-node`"

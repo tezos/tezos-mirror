@@ -59,21 +59,18 @@ val prepare:
   fitness: Fitness.t ->
   Context.t -> context tzresult Lwt.t
 
-type 'a previous_protocol =
-  | Genesis of 'a
+type previous_protocol =
+  | Genesis of Parameters_repr.t
   | Alpha_previous
 
 val prepare_first_block:
   level:int32 ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  Context.t -> (Parameters_repr.t previous_protocol * context) tzresult Lwt.t
+  Context.t -> (previous_protocol * context) tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> t Lwt.t
 val fork_test_chain: context -> Protocol_hash.t -> Time.t -> t Lwt.t
-
-val register_resolvers:
-  'a Base58.encoding -> (context -> string -> 'a list Lwt.t) -> unit
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)
@@ -244,8 +241,7 @@ val allowed_endorsements:
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
 
 (** Keep track of the number of endorsements that are included in a block *)
-val included_endorsements:
-  context -> int
+val included_endorsements: context -> int
 
 (** Initializes the map of allowed endorsements, this function must only be
     called once. *)
@@ -257,3 +253,12 @@ val init_endorsements:
 (** Marks an endorsment in the map as used. *)
 val record_endorsement:
   context -> Signature.Public_key_hash.t -> context
+
+(** Provide a fresh identifier for a temporary big map (negative index). *)
+val fresh_temporary_big_map: context -> context * Z.t
+
+(** Reset the temporary big_map identifier generator to [-1]. *)
+val reset_temporary_big_map: context -> context
+
+(** Iterate over all created temporary big maps since the last {!reset_temporary_big_map}. *)
+val temporary_big_maps: context -> ('a -> Z.t -> 'a Lwt.t) -> 'a -> 'a Lwt.t

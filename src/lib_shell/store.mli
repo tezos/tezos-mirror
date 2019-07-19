@@ -30,7 +30,7 @@ type global_store = t
 
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
-val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
+val init: ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close: t -> unit
 
 val open_with_atomic_rw:
@@ -68,7 +68,7 @@ module Chain : sig
 
   module Genesis_time : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Genesis_protocol : SINGLE_STORE
     with type t := store
@@ -80,16 +80,16 @@ module Chain : sig
 
   module Expiration : SINGLE_STORE
     with type t := store
-     and type value := Time.t
+     and type value := Time.Protocol.t
 
   module Allow_forked_chain : SET_STORE
     with type t := t
      and type elt := Chain_id.t
 
-  module Protocol_hash : MAP_STORE
+  module Protocol_info : MAP_STORE
     with type t = store
      and type key = int
-     and type value = Protocol_hash.t
+     and type value = Protocol_hash.t * Int32.t
 
 end
 
@@ -126,10 +126,6 @@ module Chain_data : sig
     with type t := store
      and type value := Int32.t * Block_hash.t
 
-  module Checkpoint_0_0_1 : SINGLE_STORE
-    with type t := store
-     and type value := Int32.t * Block_hash.t
-
 end
 
 
@@ -139,9 +135,6 @@ module Block : sig
 
   type store
   val get: Chain.store -> store
-
-  val fold: store -> init:'a -> f:(Block_hash.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-  val iter: store -> (Block_hash.t -> unit Lwt.t) -> unit Lwt.t
 
   type contents = {
     header: Block_header.t ;
@@ -224,6 +217,7 @@ module Protocol : sig
   module RawContents : SINGLE_STORE
     with type t = store * Protocol_hash.t
      and type value := MBytes.t
+
 end
 
 (** {2 Temporary test chain forking block store} *)

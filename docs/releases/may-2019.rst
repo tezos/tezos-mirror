@@ -1,0 +1,534 @@
+.. _mainnet-may-2019:
+
+Mainnet May 2019
+================
+
+Activation of Athens
+--------------------
+
+**In anticipation of the activation of Athens on May 29th, we
+strongly encourage bakers to run a node in full mode and rebuild
+their storage from a snapshot.**
+
+From our latest benchmark the time to validate the migration block on the
+old storage can be as long as 15 minutes on a hdd, <4 minutes on a
+ssd, while a node from a full snapshot takes less than 5 minutes on
+hdd, <40 seconds on ssd.
+This is due to our current storage backend that will be improved in the
+`near future <https://tarides.com/blog/2019-05-13-on-the-road-to-irmin-v2.html>`_.
+
+
+Storage Migration
+-----------------
+
+The new node requires an upgrade of the storage format that is
+performed at the launch of new Tezos node.
+For this reason, once the storage migrated, it will not be possible to
+use the old Tezos node.
+
+Here is an example migration from Mainnet April 2019 to a node in mode
+`full`. Assuming a running node from Mainnet April 2019 with default
+storage directory `~/.tezos-node`, begin by gracefully stopping the
+node.
+Back up your storage and upgrade it, it will only take a few seconds::
+
+  cp -r ~/.tezos-node tezos-node-$(date +%Y%m%d)
+  tezos-node upgrade storage
+
+We now have the option to restart the node and it will automatically
+run in `archive` mode.
+This mode is useful only in specific cases and most users should run a
+`full` node.
+
+We can proceed to export a snapshot::
+
+  tezos-node snapshot export mainnet-$(date +%Y%m%d).full
+
+The default is to snapshot the chain at the position of our last
+checkpoint, which is usually 5 cycles in the past.
+This is the safest option as the Tezos node guarantees that no
+reorganization of the chain is possible earlier than a checkpoint.
+However it requires to synchronize from the network the last 5 cycles.
+
+Alternatively we can also specify the block to snapshot::
+
+  tezos-node snapshot export mainnet-$HASH.full --block $HASH
+
+We can now delete our upgraded archive storage and import the snapshot
+(without forgetting, if you need, to save ``{identity,peers,config}.json``)::
+
+    rm -r ~/.tezos-node
+    tezos-node snapshot import ./mainnet-*.full
+
+There should be a rather smaller `~/.tezos-node` directory populated
+from which we can start our node::
+
+    tezos-node run
+
+It is good practice to snapshot regularly our own node, for example
+with a cron job, once compressed the files are rather small.
+
+
+Docker
+~~~~~~
+
+If you are running Docker with the helper script `mainnet.sh` there
+are two new commands.
+The node storage can be upgraded, before running the new node in
+archive mode, using::
+
+  ./mainnet.sh upgrade
+
+Otherwise you can delete your storage altogether and import a fresh
+snapshot using::
+
+  ./mainnet.sh clear
+  ./mainnet.sh snapshot import mainnet-*.full
+
+
+Known issues
+~~~~~~~~~~~~
+
+In principle it is possible to export a snapshot while the node is
+running but again because of our current storage it doesn't work for now.
+It will be fixed soon.
+For the time being, you should stop your node, export a snapshot and
+restart it.
+
+Changelog
+---------
+
+RPC
+~~~
+
+- Note: new RPCs providing access to the shell are listed with SHELL changes
+- Commits:
+    - ``c866f8e1e``: ``Client RPC : adding support for PUT and DELETE on the command line.``
+    - ``7513853e8``: ``client RPC: Rebuild errors from json and print them``
+
+P2P
+~~~
+
+- Fixes
+- Better handling of private and trusted nodes
+- Change version negotiation system
+- new ``network/version`` RPC
+- ``network/versions`` RPC is deprecated, use ``network/version`` instead
+- Commits:
+    - ``10c37f153``: ``Make 2-min sleep configurable (P2p_maintenance)``
+    - ``9abcd0e55``: ``P2p: change configuration of P2p_maintenance``
+    - ``7e4a70fac``: ``Remove peer from active_peers when Peer_validator.create has failed``
+    - ``52b196a72``: ``P2p: Fix error message from improve cancelation``
+    - ``983bdee01``: ``P2p: don't kick node which are private and trusted on too_many_connections``
+    - ``01d0c880c``: ``p2p: trusted_node is trusted by peer or by point``
+    - ``134e1d7a7``: ``P2p: change version selection``
+    - ``0b4d7fa75``: ``P2p, Shell: write Time.System types instead of equal types``
+    - ``83f3f16f0``: ``Shell_services: return P2P version as is``
+    - ``59b0624df``: ``P2p: earlier detection of "public" nodes.``
+    - ``e88888707``: ``P2p: Don't announce banned points``
+    - ``84cdbcea5``: ``P2p : random and parallel kill strategy on too_many_connection``
+
+CRYPTO
+~~~~~~
+
+- Commits:
+    - ``c393f7f27``: ``Crypto: add Signature.pp_watermark``
+
+SHELL
+~~~~~
+
+- Fixes
+- Support for test-chains
+- new RPC: ``active_chains``
+- RPCs return new and more specific errors (chain expired, block parsing error)
+- new parameter ``--disable-testchain`` to node executable
+- new ``stats/gc`` RPC to get info about memory consumption
+- new ``stats/memory`` RPC to get info about process memory consumption
+- support for history modes
+- new ``checkpoint`` RPC to get the current checkpoint for a chain
+- Commits:
+    - ``a3379065e``: ``Distributed_db: fix concurency issue on Peer_validator creation``
+    - ``3e2172b2d``: ``Distributed_db: don't fail when receiving a notification for a closing worker``
+    - ``6aec720b0``: ``Shell: propagate prevalidation error (#432)``
+    - ``6a7c05118``: ``Shell: ensure that the chain exists when calling the valid_blocks RPC``
+    - ``186c96484``: ``Shell: fix typo in error title``
+    - ``3ac0ca16c``: ``Shell: reorganize mutually recursive datatype``
+    - ``85dea244b``: ``Shell_services: fix error string typo``
+    - ``ada9581b5``: ``Shell: changes the genesis hypothesis => it is genesis if its predecessor is itself``
+    - ``4edc3df14``: ``Shell/Testchain: correctly register the test chain into the global store and initialize the test protocol``
+    - ``44e00f3ea``: ``Shell/RPCs: add unhandled cases``
+    - ``0c12ca0d5``: ``Shell/RPCs: fix typo``
+    - ``448c54089``: ``Shell: improved faked genesis block for testnet``
+    - ``dbb0d5782``: ``Shell/testnet: preserve the hash of the forked context in the main context``
+    - ``a87212941``: ``Shell/Testchain: fetch the missing protocol when forking a test chain``
+    - ``188f94a0b``: ``Shell: revert breaking hash computation change in test chain blocks``
+    - ``a2a428a26``: ``Shell: cleanup the test chain header temporary table``
+    - ``09596d5c9``: ``Shell/Testchain: unset chain's child on testchain destruction``
+    - ``a7e374492``: ``Shell: add a parameter to disable the testchain``
+    - ``12881f1ce``: ``Shell/Test: change chain_id's testchain``
+    - ``d33923d0e``: ``Shell: make the testchain start on the forking block``
+    - ``189344bce``: ``Shell: replace the temporary table contents with the forking block's hash and move the test protocol initialisation to Chain_validator``
+    - ``2fe41b04a``: ``Shell: switch testchain to not_running on current block's timestamp to ensure mainnet compatibility``
+    - ``578b1610c``: ``Shell: set the testchain to the mainchain when the testchain state is already in store``
+    - ``e47acdf0d``: ``Fix race condition in Distributed_functor.Memory_table``
+    - ``54edb7748``: ``shell: adds static link protocols in store``
+    - ``d8efc14c3``: ``Shell: fixes lwt logs for protocol store``
+    - ``77db3f69e``: ``Shell: refactor outputs and don't store protocols with fake hashes``
+    - ``9f69abe82``: ``Shell: refactor protocol fetching``
+    - ``0617232cb``: ``Shell: Replace read_exn with read_opt``
+    - ``28e489077``: ``Shell/test: replace read_exn with read_opt``
+    - ``be4cb3494``: ``Shell: cosmetic patch``
+    - ``c8cd7b058``: ``Shell: remove unused read_exn``
+    - ``a6ee34981``: ``Shell: add pipeline library``
+    - ``a27728c41``: ``Shell: tests for the pipeline``
+    - ``931a61ca0``: ``Shell: drop some dead read_exn functions``
+    - ``829d06785``: ``Shell/Worker: remove zombies``
+    - ``bfa9cba01``: ``Shell/Workers: refactoring``
+    - ``84bbf11a1``: ``Shell/Worker: add find_opt function``
+    - ``611d2ca60``: ``Shell/Worker: add information function and encoding (for future RPCs)``
+    - ``6e07e5ab8``: ``Shell: minor renaming``
+    - ``38add10ad``: ``Shell/worker: expand wildcard patterns``
+    - ``f842bf1c5``: ``Shell/worker: minor documentation fix``
+    - ``1fdbe9f94``: ``Shell: add RPC to query GC stats``
+    - ``4c99b0c78``: ``Shell: add RPC to query proc_statm info``
+    - ``ca439ecf3``: ``Shell/Stat_services: add page_size in proc_statm``
+    - ``e3d34f72e``: ``Shell/Stat_services: better handling of stats when running on a darwin (OSX) os``
+    - ``6329d47e9``: ``Shell_services/Stats: small renaming``
+    - ``a51e7ad5d``: ``RPCs: refactor memory services (split into three parts in stdlib/stdlib_unix and lib_shell)``
+    - ``71ed49e88``: ``Shell: don't use float for time, use Ptime``
+    - ``0b4d7fa75``: ``P2p, Shell: write Time.System types instead of equal types``
+    - ``83f3f16f0``: ``Shell_services: return P2P version as is``
+    - ``ecc358771``: ``Shell/RPC: export a Base58Check representation of block headers``
+    - ``af1f9a7ae``: ``Shell: use private type for State.Block.Header.t``
+    - ``c02aa1052``: ``Shell: store the full block header of the checkpoint``
+    - ``d187be487``: ``Shell: remove test made incoherent by new checkpoint repr``
+    - ``c54bfbec0``: ``Shell: use "atomic" upgrade of disk storage``
+    - ``4f10f7872``: ``Shell: extend atomic storage operations``
+    - ``f0ef5d1d6``: ``Shell_services: introduce history modes``
+    - ``facff17fd``: ``Shell: add header field in contents type``
+    - ``ebd67f2f8``: ``Shell: remove contents field in block type``
+    - ``0bec5d75e``: ``Shell: remove type hashed_header``
+    - ``9292450e7``: ``Shell: replace block header abstraction``
+    - ``e040cb7cd``: ``Shell: remove Store.Block.Header``
+    - ``a26faf595``: ``Shell: a block is known and known_valid if we know its header``
+    - ``7fd92971e``: ``Shell: add Save_point and Caboose in store``
+    - ``6d7653f3b``: ``Shell: init node with caboose and save_point values``
+    - ``bdc448711``: ``Shell: update block_locator so it handles partial chain``
+    - ``709e71c3a``: ``Shell: known_ancestor, unknown_prefix handle partial chain``
+    - ``36da9092e``: ``Shell: unopt genesis accessor``
+    - ``d138d4594``: ``Shell: Block_validator avoid validation under save_point``
+    - ``8887080b9``: ``Shell: dismiss locators from rolling peers whose caboose is too far ahead``
+    - ``e8e6197da``: ``Shell: use tzresult and chain_traversal handles partial chain``
+    - ``65e21bb55``: ``Shell: fail with error when reading contents and header in state``
+    - ``b255226fd``: ``Shell: Chain_validator, move init_head in create``
+    - ``38446f867``: ``Shell: remove Operation_path from store``
+    - ``08dd93c7c``: ``Shell: add Protocol_hash in store``
+    - ``6d3873f00``: ``Shell: populate Protocol_hash``
+    - ``cc65da9ce``: ``RPCs: add rpc_header_directory``
+    - ``7d0c1e5b0``: ``Shell: relax with_atomic_rw type signature``
+    - ``ed7ddf1d0``: ``Shell: remove invalid heads operation metadata``
+    - ``e1d40755d``: ``Shell: add Chain.store in state``
+    - ``9c32743c6``: ``Shell: full/rolling purge when setting a new checkpoint``
+    - ``485cfa6bc``: ``Shell: improve logging``
+    - ``aa02c8580``: ``Shell: delete block when cuting alternative heads``
+    - ``ef3d7c84d``: ``Shell: check and save history mode``
+    - ``9025412e7``: ``Shell: disallow switching from an history-mode to another``
+    - ``47c36a01f``: ``Shell: use contents_not_found error when reading block contents``
+    - ``0bea9ed83``: ``Shell/RPC: replace Level 0 with Genesis``
+    - ``780388c1a``: ``Shell: remove useless include``
+
+
+PROTO
+~~~~~
+
+- add ``fitness`` argument to ``activate protocol`` command
+- add ``parameters`` argument to ``activate protocol`` command
+- add ``delay`` argument to the ``fork test protocol`` command
+- Fixes
+- Commits:
+    - ``53b7c9d21``: ``Proto/Genesis: add fitness to Activate_testchain operation``
+    - ``cc7b39ea7``: ``Proto/Genesis: add a delay argument to the fork testchain command``
+    - ``015f402b1``: ``Michelson: Fix macro unexpansion``
+    - ``afbcb71df``: ``ProtoDemo: set the last_allowed_fork_level to 0 to make sure the previous blocks are not pruned``
+
+
+BINS
+~~~~
+
+- Fixes
+- Improved logs
+- New ``chain`` argument for the client
+- support for test-chains
+- remove conflicting CLI options in client: ``-b``
+- manual upgrade of old file-formats with ``upgrade baking state`` command
+- better support for user interruption (CTRL-C), especially when forking test chain
+- add ``--force`` argument to client's ``submit proposals``
+- add ``--dry-run`` argument to client's ``submit proposals`` and ``submit ballot``
+- add ``list orphan nonces`` and ``filter orphan nonces`` commands for the baker
+- add ``fetch protocol`` command in client
+- client's ``list protocols`` does not contain duplicates anymore
+- add ``--verbose-signing`` argument to all client commands that require signing
+- history modes
+- add ``show current checkpoint`` command to admin client
+- new data encoding version for the node (version 0.0.3)
+- add snapshot command
+- Commits:
+    - ``b7c2546e5``: ``Daemon: await_bootstrapped_node now retries on Connection_failed``
+    - ``2268a1164``: ``Client: break line after "No invalid blocks." message``
+    - ``fbf4c8492``: ``Functorize Client_main_run and use it for the signer``
+    - ``234bf416b``: ``src/lib_client_base_unix/client_main_run.ml: apply global_options once for all``
+    - ``d99603af8``: ``remove useless maps``
+    - ``7966e9006``: ``simplifications``
+    - ``2188d3c34``: ``add some comments``
+    - ``ea997b541``: ``rebase on master``
+    - ``d5bf06fff``: ``add some code documentation``
+    - ``3967e43b7``: ``sandboxed-node: preverse context if DATA_DIR variable is defined``
+    - ``09d1822a8``: ``sandboxed-node: document DATA_DIR capability``
+    - ``9f0a9b621``: ``Alpha/Accuser: handle different chain ids for double baking/endorsing``
+    - ``580b7aea6``: ``Alpha/Accuser: increase the number of considered levels to a cycle (i.e. 4096)``
+    - ``a1849ab69``: ``Alpha/Endorser: allow endorsements on different chain ids``
+    - ``ef202674b``: ``Alpha/Baker: allow baking on different chain ids``
+    - ``ed22cae07``: ``Alpha/Daemons: lift the chain id selection to the Delegate_commands``
+    - ``12f6b9838``: ``Client/Base: add a chain argument to the client``
+    - ``333782792``: ``Alpha/Daemons: use the tezos-client context to select the chain``
+    - ``98bdbbedb``: ``Baking/Alpha: fix block listing rpc call``
+    - ``46bd72176``: ``Baker: handle test chain forking cases``
+    - ``e15250809``: ``Daemons/State: replace the daemon state functor with a highwatermark system``
+    - ``9ff061976``: ``Baker/Nonces: add chain_id to nonces file and functionalize the representation``
+    - ``18a96d1f1``: ``Baker/Nonces: change logging priority for nonce injection``
+    - ``53f16df32``: ``Baker/Nonces: clean and refactor nonce revelations``
+    - ``7b5e73729``: ``Endorser/Alpha: improve the endorser's logging and improve double-endorsing security``
+    - ``444024497``: ``Baker: letting the shell handle a protocol upgrade``
+    - ``2e6887997``: ``Alpha/Daemon: monitor the active chains to start and stop the daemons on the test chain``
+    - ``4ccf071e8``: ``Alpha/Daemons: refactor some code``
+    - ``6139762f7``: ``Client/CLI: improve the documentation and remove conflicting shortname option``
+    - ``ba4c8ef7d``: ``Baker: index nonces by chain_id and not chain alias``
+    - ``3da7836a2``: ``Baker: clean up testchain's nonces on testchain termination``
+    - ``e7cfd698c``: ``Alpha/Daemons: handle migration from legacy files to new highwatermarks mechanism``
+    - ``6c933dba4``: ``Delegates: enforce manual upgrade of the baking state when detecting older file formats``
+    - ``552edf7c7``: ``Client: remove intrusive error message``
+    - ``e107fb92d``: ``Daemon: remove the files upgrade from the daemons``
+    - ``2ed2078bb``: ``Daemon: refactor highwatermarks``
+    - ``5245cb1b8``: ``Baker: replace metadata RPC calls to header calls to handle purged blocks metadata``
+    - ``8ef52cb8d``: ``Accuser: remove dead-code``
+    - ``b2748ed4c``: ``Baker: update baker's state structure``
+    - ``659d1fe65``: ``Accuser: ensure the test chain is launched before starting``
+    - ``2c1fd0270``: ``Baker: improve logging info for endorsement waiting``
+    - ``3ecda1d96``: ``Daemon: allow to ^C baker/endorser while waiting for the testchain``
+    - ``ff78a6119``: ``Client/Alpha: fix the client's RPCs to use the correct chain id``
+    - ``2d8e8b17d``: ``Daemons: restore nonces file retrocompatibility``
+    - ``57f17e50c``: ``Daemons: restore highwatermarks file retrocompatibility``
+    - ``52b00f650``: ``Baker: restore the --force option for the 'bake for' command``
+    - ``e3b604c03``: ``Baker: factor out some code``
+    - ``858afda30``: ``Node: escape doclang in doc``
+    - ``304bb75d8``: ``Client: add --force to submit proposals``
+    - ``bed959b23``: ``Client: improve Too many proposals error message``
+    - ``a17b42214``: ``Client: check for duplicate proposals``
+    - ``be46b7394``: ``Client: improve display of proposal errors``
+    - ``6728bbb1f``: ``Client: improve display of proposals (show voting)``
+    - ``58ee0418a``: ``Client: fix punctuation of submit proposals``
+    - ``cd1898a14``: ``Client: add --dry-run to submit proposals``
+    - ``ca5b13057``: ``Client: add --dry-run to submit ballot``
+    - ``187d24e64``: ``Client: improve voting error display``
+    - ``1aecd5ff0``: ``Client: mention “yea” and add Oxford comma in help``
+    - ``c24b7e927``: ``Baker/Nonces: filter out nonces associated to blocks that cannot be found in the chain``
+    - ``66638cac6``: ``Baker: enforce chain arguments through the API``
+    - ``92f00dc93``: ``Baker/Nonces: do not remove orphan nonces anymore but warn users instead``
+    - ``f4d4628ca``: ``Baker/Commands: add a command to filter orphans from the nonce file``
+    - ``6bcf7213e``: ``Baker: add a command to display filtered orphan nonces``
+    - ``8c62ad12d``: ``Baker: prevent spurious error message while filtering orphan nonces``
+    - ``c6f5fb4c7``: ``Baker: saving orphan nonces file before overwriting the nonces file``
+    - ``f4da04129``: ``Client: add protocol fetch command``
+    - ``f22148117``: ``Client: test string prefix directly rather than with split``
+    - ``c2ddac4be``: ``Admin client: no duplicate in list protocols output``
+    - ``6f653d703``: ``Client: fix missing chain argument to rpc``
+    - ``05ce3229e``: ``Client: add option --verbose-signing``
+    - ``dc569b812``: ``Client: add code comments (verbose-signing !994)``
+    - ``227799e4f``: ``Baker: improve the notification in case of a new block while waiting for endorsement``
+    - ``473ee0cbe``: ``Client: reduce the dependency of lib_client_base over Unix by parameterizing Unix function calls in the wallet objects``
+    - ``090a1073a``: ``Client: simpler password retrieval``
+    - ``b2658722f``: ``Endorser: remove duplicate addresses for which an endorser endorses``
+    - ``e98447e9f``: ``Bin_node: use a module for the main chain genesis``
+    - ``6c473044b``: ``Bin_node: add bare option to ensure_data_dir``
+    - ``02ce2047b``: ``Node: history mode node initialization``
+    - ``ace8497a1``: ``Bin_node: typo``
+    - ``5fe11e227``: ``Bin_node: use a module for patch context``
+    - ``7fd70e063``: ``Shell: add checkpoint client admin command``
+    - ``249bbd86e``: ``Node: properly display an error message when trying to switching history-mode``
+    - ``db85a7e38``: ``Bin_node: add read_data_dir config file``
+    - ``7f4f2e2e7``: ``Bin_node: update node data version handling``
+    - ``db85a7e38``: ``Bin_node: add read_data_dir config file``
+    - ``7f4f2e2e7``: ``Bin_node: update node data version handling``
+    - ``3155bc7e7``: ``Shell/Snapshots: Add snapshot export/import features``
+    - ``cb18ba9f0``: ``Bin_node: Upgrade data_version of storage (0.0.2 -> 0.0.3)``
+    - ``142680262``: ``Bin_node: change rolling history-mode to experimental-rolling``
+
+LEDGER
+~~~~~~
+
+- Drop support for Wallet and Baking apps older than 1.4.0.
+- Drop support for firmware older that 1.4.0
+- CLI and performance improvements.
+- Baking: support test-chain high-water mark, improve configuration (`setup ledger ...`).
+- APDU support
+- Commits:
+    - ``6ce10791b``: ``Ledger: add deauth APDU support, better get-authorized-key support, and friendlier CLI``
+    - ``dc87b9a7c``: ``Ledger: clean-up bip32 module``
+    - ``4714daaed``: ``Ledger: create Signer_implementation module``
+    - ``391126533``: ``Ledger: switch to new API``
+    - ``d5b08fd98``: ``Ledger: improve output of --test-sign``
+    - ``2a640e1d0``: ``Ledger: explicitly forbid versions < 1.4.0``
+    - ``2bc9b7497``: ``Ledger: fix display of get authorized path``
+
+MISC
+~~~~
+
+- Fixes
+- Commits:
+    - ``d7ba8bb07``: ``Resto: Fix #480: Keep the host: set by the user with TEZOS_SIGNER_HTTP_HEADERS``
+    - ``35727d4ac``: ``Clic: stop being colorless.``
+    - ``0034c8df9``: ``Resto: log exception and continue when catching an unexpected exception in resto``
+    - ``c2b2f2002``: ``Resto: client: Remove parameters (as 'charset') after 'type/subtype' in Content-Type header before matching against expected media type``
+    - ``f9b5ad7a6``: ``StdLib/Ring: add add_and_return_erased function``
+    - ``a54855c20``: ``StdLib/WeakRingTable: hide internal key handling from users``
+    - ``aa987cc35``: ``StdLib/WeakRingTable: add WeakRingTable to available iterators/iterable``
+    - ``5fcf5a337``: ``StdLib/hashPtree: typo in comment``
+    - ``e8ac45375``: ``Stdlib: improve WeakRingTable fold/iter``
+    - ``f3e85a9a6``: ``Clic: add args17``
+    - ``3df9d715d``: ``lmdb: specify the correct env var in error message``
+    - ``1ae97b84f``: ``StdLib: Typo``
+    - ``323d1e12d``: ``Base/Time: rewrite Time``
+    - ``ab7f0c6cc``: ``Base/Time: documentation of new interface``
+    - ``8e81069f8``: ``Separate unix dependency``
+    - ``c921903c0``: ``client_base: move unix dependent code into client_base_unix``
+    - ``6d8145acd``: ``Base/time: tweak pretty-printing for backwards compatibility``
+    - ``9ba57b815``: ``Everywhere: use built-in return operators``
+    - ``0b8575b46``: ``Crypto: make Base58.encode tail recursive``
+    - ``32e04d814``: ``Store: add Pruned_contents``
+    - ``bc4c485bc``: ``Storage: add comments``
+    - ``63d11dd1e``: ``Stdlib: add progress display``
+    - ``a63daf798``: ``Stdlib_unix: add read/write_string``
+    - ``6037d0edc``: ``Lib_storage: add context export/import feature``
+    - ``ba968354c``: ``Storage: Add export/import tests``
+
+TOOLING/DOC/TESTS/BUILD/CI/ETC.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixes
+- More tests (including two new test frameworks)
+- Contributing guidelines
+- OCaml 4.07.1 and other dependencies update
+- Commits:
+    - ``b4b97dada``: ``Fix identity.json preservation in docker images after a reset``
+    - ``e4a5d3c45``: ``test for check point``
+    - ``32a1d2647``: ``Opam: remove unused dependencies from alpha-{baker,endorser,accuser}``
+    - ``f9cbdf911``: ``docker: improve argument passing``
+    - ``c3dd98dc0``: ``Dune: do not use the infamous "OCaml syntax" anymore``
+    - ``28f680ab9``: ``Dune: remove src in proto_*/lib_protocol``
+    - ``0796b0355``: ``CI: test that the various dune.inc are up-to-date``
+    - ``eba7f5ac8``: ``Dune: fix dune.inc for added file in proto demo``
+    - ``c842ef6a2``: ``Opam: fix protocol packaging``
+    - ``16ae0ced7``: ``Opam: add synopsis in all packages``
+    - ``0883ee314``: ``Mostly cosmetic changes in Michelson doc``
+    - ``f5c50c8ba``: ``Update example commands + add extra doc``
+    - ``f45067cf3``: ``doc: typo fix``
+    - ``e6710ef87``: ``fix documentation CSS``
+    - ``d503ebb1b``: ``proto_compiler: remove useless jbuild_templates``
+    - ``6805d11af``: ``emacs: michelson-mode, changing tmp file mode to access it from vagrant``
+    - ``9eb46932c``: ``Scripts: change default parameters used by sandbox to include nonces``
+    - ``01665c65b``: ``Docker: add test baker commands``
+    - ``920a7f7bd``: ``Docker: update docker file removal``
+    - ``3c301d68d``: ``add install in opam files for lib_resto-directory & lib_resto``
+    - ``a7e37439c``: ``Docker: fix docker scripts``
+    - ``70d171b86``: ``Docker: update alphanet.sh script``
+    - ``3ddbc0e5e``: ``Test: adapt voting test to new 'list protocol' semantics``
+    - ``f1f0f8ce2``: ``Typo in "Howtouse"``
+    - ``cffd27e80``: ``Add all autogenerated files to the gitignore file``
+    - ``39d1f229c``: ``Only publish docker/docs on tezos/tezos``
+    - ``82190b65c``: ``CI: publish docker images for *net-snapshots branches``
+    - ``5a14c1f4a``: ``Michelson:Test: Add two simple unexpansion tests``
+    - ``181a70235``: ``Doc: add page for Mainnet April release``
+    - ``1577b71cb``: ``Stdlib-unix: Fix concurrency bug in create_dir``
+    - ``19b925db8``: ``Data-encoding: Add the With_version module``
+    - ``db0bbfa5f``: ``Clic: Add Scriptable (for --for-script)``
+    - ``30816ed09``: ``Build,CI: Add the tezos-event-logging library``
+    - ``3c53dbc7d``: ``Event-logging: Add module Internal_event_unix``
+    - ``b425a3e9d``: ``Stdlib-unix: Add module File_event_sink``
+    - ``622b7312b``: ``Baker: Use structured logging in Client_baking_blocks``
+    - ``2939dac72``: ``Admin-client: Add event-logging commands``
+    - ``25ff4e037``: ``Replace legacy logging with Internal_event``
+    - ``f117848d4``: ``Event-logging: Make section a private string list``
+    - ``b2b3f04ba``: ``Event-logging: Forbid '.' in event names``
+    - ``a1ac99c1a``: ``Event-logging: Make check_name_exn safer``
+    - ``8f07970f8``: ``Data-encoding: Fix type signature``
+    - ``1f27dbf2b``: ``Event-logging: Rename Error_event.to_lwt``
+    - ``9db735b12``: ``Data-encoding: Add implementation comment``
+    - ``ed5e135df``: ``CI: Fix build (dune package version)``
+    - ``5de3487f0``: ``Lib_delegate: make logging event names unique``
+    - ``74e85db30``: ``gitlab-ci: run ./scripts/update_opam_test.sh``
+    - ``af3c5222e``: ``Event logging: improve mli doc``
+    - ``7f7c12796``: ``Event logging: use only ascii characters in comments``
+    - ``1ee47493b``: ``Use POSIX compliant flags with sed``
+    - ``49055d897``: ``Delete CREATE_CONTRACT without literal from docs``
+    - ``1f4c074c3``: ``Doc: add contributing.md, improve contributing doc``
+    - ``e5c396997``: ``[bin client]: remove wrong dependency to tezos-shell``
+    - ``af5ed9cd9``: ``Opam: update dependencies``
+    - ``1491675ea``: ``Account for ocaml.4.07.1 changes in Tezos``
+    - ``38a3e629a``: ``Opam: force external dependencies on react and reactiveData``
+    - ``9c3ea6f78``: ``Docs: clean index to fix warning``
+    - ``e7940dae2``: ``Vendor/ledger-wallet: depend on hidapi 1.0``
+    - ``c3f0fbfb1``: ``Opam repository: put git final git hashes``
+    - ``b80790013``: ``CI: Add "opam lint" on all opam files in CI``
+    - ``b1afd8078``: ``[Opam]: add synopsis to tezos-event-logging``
+    - ``be5ce3cc4``: ``[opam]: fix opam-version in event-logging``
+    - ``11e6c05e0``: ``[dune files] Various changes to compile packages via opam``
+    - ``b1cc7b331``: ``Fix tezos-client-demo.opam``
+    - ``0365eb175``: ``CI: quotes in lint command``
+    - ``b5782b875``: ``vendors/*.opam: use [[ ]] in run-test``
+    - ``9535096ff``: ``Docs: fix ASSERT macros in Michelson specification``
+    - ``e860a7bb1``: ``build-deps: really install and use opam-depext``
+    - ``708286ab5``: ``add more build dependencies``
+    - ``1479bb40d``: ``expand``
+    - ``2b1d15340``: ``add 'which' build dep``
+    - ``7a5fca120``: ``Scripts: fix snapshot_alpha and activate_protocol``
+    - ``ddbe199ea``: ``Doc: fix many odoc errors``
+    - ``69d174f5d``: ``Makefile: make clean removes the dune-project files``
+    - ``cf678dd40``: ``Fix LSR documentation``
+    - ``b58af9893``: ``Documentation: minor fixes``
+    - ``22c3e7255``: ``P2P versioning: adapt reset_chain.sh``
+    - ``4a6f85740``: ``Docs: don't linkcheck reddit to avoid rate limit errors``
+    - ``f3b064e2b``: ``Tests: rename demo to proto_test_injection``
+    - ``af1613a0b``: ``Dune: use the same set of warnings everywhere``
+    - ``ea8470542``: ``Various: bugfixes after (re)activating warning 32.``
+    - ``7d5ff87da``: ``Various: remove dead code after activating warning 32``
+    - ``e0a9d1365``: ``Various: activate the infamous warning 9``
+    - ``50da261f9``: ``Protocol compiler: remove safe-string from dune_protocol.template``
+    - ``9aebc957c``: ``Tests: add python framework``
+    - ``54195fe81``: ``Doc: fix undefined label and linkcheck``
+    - ``82e06dab9``: ``Tests: add OCaml framewwork flextesa``
+    - ``236c779fa``: ``Tests: basic RPC test``
+    - ``936e06273``: ``Tests: porting test_tls.sh to test_tls.py``
+    - ``05e863295``: ``Tests: test tls added to CI``
+    - ``e16ba18f5``: ``Fix logging in tests``
+    - ``3d511057b``: ``Doc: add glossary``
+    - ``f03711b5d``: ``Tests: add test for stats rpcs``
+    - ``98d553db9``: ``version/CI: update opam hash``
+    - ``8c7fa7499``: ``Test/OCaml: adapt framework with the new time system``
+    - ``7eab940d1``: ``Test/Python: change time between blocks``
+    - ``a99612569``: ``build: remove merge artifact in src/lib_shell/dune``
+    - ``a711ac1fc``: ``CI: update opam test``
+    - ``18eeec0b4``: ``Alpha/Client: update opam``
+    - ``d6a3b46f1``: ``Opam packaging: install TEZOS_PROTOCOL as part of tezos-embedded-protocol-%.raw``
+    - ``4511710d4``: ``Flextesa: voting commmand takes the TEZOS_PROTOCOL file as argument``
+    - ``b6619de3a``: ``lib_network_sandbox: Make it 32bits arch compatible``
+    - ``6e91d5ec2``: ``Opam packaging: fix tezos-client-alpha-commands deps``
+    - ``38e4ae8ed``: ``Opam packaging: fix flextesa build``
+    - ``772907364``: ``Tests/Flextesa: remove .opam``
+    - ``e648fc42e``: ``Test/Python: correct time between blocks - multiple bakers``
+    - ``3f6c6c2f7``: ``Tests: ported test_cors.sh to test_cors.py``
+    - ``c6998296f``: ``Tests: test_cors.py added to CI``
+    - ``7eaea17ea``: ``Tests/python: remove numbering in CI``
+    - ``21bb2dbd6``: ``Doc: the Michelson type address is actually comparable``
+    - ``e9e816d0d``: ``Flextesa accusation test: fix``
+    - ``44f655783``: ``Shell: add testsuite for prune and delete``
+    - ``6ffabdd8b``: ``CI: update opam``

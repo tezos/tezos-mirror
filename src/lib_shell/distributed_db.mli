@@ -77,6 +77,8 @@ val greylist: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 val chain_state: chain_db -> State.Chain.t
 val db: chain_db -> db
 
+val information : chain_db -> Chain_validator_worker_state.Distributed_db_state.view
+
 (** Return the peer id of the node *)
 val my_peer_id: chain_db -> P2p_peer.Id.t
 
@@ -201,7 +203,7 @@ val commit_protocol:
 (**/**)
 
 module Raw : sig
-  val encoding: Message.t P2p.Raw.t Data_encoding.t
+  val encoding: Message.t P2p_message.t Data_encoding.t
   val chain_name: Distributed_db_version.name
   val distributed_db_versions: Distributed_db_version.t list
 end

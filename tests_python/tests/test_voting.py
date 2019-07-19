@@ -26,9 +26,6 @@ class TestManualBaking:
     def test_period_position(self, client):
         assert client.get_period_position() == 1
 
-    def test_listings(self, client):
-        assert client.get_listings() == []
-
     def test_bake_one_block(self, client):
         client.bake('bootstrap1', BAKE_ARGS)
 

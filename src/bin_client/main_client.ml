@@ -74,11 +74,9 @@ let sandbox () =
        You should not see this message if you are not a developer.@]@\n@."
 
 let check_network ctxt =
-  Shell_services.P2p.versions ctxt >>= function
-  | Error _
-  | Ok [] ->
-      Lwt.return_none
-  | Ok (version :: _) ->
+  Shell_services.P2p.version ctxt >>= function
+  | Error _ -> Lwt.return_none
+  | Ok version ->
       let has_prefix prefix =
         String.has_prefix ~prefix (version.chain_name :> string) in
       if has_prefix "SANDBOXED" then begin
@@ -134,7 +132,6 @@ let select_commands ctxt { chain ; block ; protocol ; _ } =
   Tezos_signer_backends.Ledger.commands () @
   Client_keys_commands.commands network @
   Client_helpers_commands.commands () @
-  Client_snapshot_commands.commands () @
   commands_for_version
 
 let () = Client_main_run.run (module Client_config) ~select_commands

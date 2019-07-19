@@ -27,7 +27,7 @@ let (//) = Filename.concat
 
 type t = string
 
-let data_version = "0.0.2"
+let data_version = "0.0.3"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -35,9 +35,6 @@ let data_version = "0.0.2"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version = [
-  "0.0.1", begin fun ~store_root ~context_root:_ ~protocol_root:_ ->
-    State.upgrade_0_0_1 ~store_root ()
-  end ;
 ]
 
 let store_dir data_dir = data_dir // "store"
@@ -167,11 +164,20 @@ let write_version data_dir =
     (Data_encoding.Json.construct version_encoding data_version)
 
 let ensure_data_dir bare data_dir =
-  let write_version () = write_version data_dir >>=? fun () -> return_none in
-  try if Sys.file_exists data_dir then
+  let write_version () =
+    write_version data_dir >>=? fun () -> return_none in
+  try
+    if Sys.file_exists data_dir then
       match Sys.readdir data_dir with
       | [||] -> write_version ()
-      | [| single |] when single = default_identity_file_name -> write_version ()
+      | [| single |] when single = default_identity_file_name ->
+          write_version ()
+      | [| file_a ; file_b |] when bare &&
+                                   (file_a = version_file_name &&
+                                    file_b = default_identity_file_name) ||
+                                   (file_b = version_file_name &&
+                                    file_a = default_identity_file_name) ->
+          write_version ()
       | files when bare ->
           let files =
             List.filter
@@ -190,25 +196,9 @@ let ensure_data_dir bare data_dir =
       Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
       write_version ()
     end
-  with Sys_error _ | Unix.Unix_error _ ->
-    fail (Invalid_data_dir data_dir)
-
-let upgrade_data_dir data_dir =
-  ensure_data_dir false data_dir >>=? function
-  | None ->
-      Format.printf "Node data dir is up-to-date.@." ;
-      return_unit
-  | Some (version, upgrade) ->
-      Format.printf
-        "Upgrading node data dir from %s to %s...@."
-        version data_version ;
-      upgrade
-        ~store_root:(store_dir data_dir)
-        ~context_root:(context_dir data_dir)
-        ~protocol_root:(protocol_dir data_dir) >>=? fun () ->
-      write_version data_dir >>=? fun () ->
-      Format.printf "The node data dir is now up-to-date!@." ;
-      write_version data_dir
+  with
+  | Sys_error _ | Unix.Unix_error _ ->
+      fail (Invalid_data_dir data_dir)
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir >>=? function

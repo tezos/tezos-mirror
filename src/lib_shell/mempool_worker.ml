@@ -221,12 +221,12 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Completed: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
       | Request (view, { pushed ; treated ; completed }, Some errors)  ->
           Format.fprintf ppf
             "@[<v 0>%a@,Pushed: %a, Treated: %a, Failed: %a@,Errors: %a@]"
             Request.pp view
-            Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
+            Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
             (Format.pp_print_list Error_monad.pp) errors
   end
 
@@ -434,6 +434,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data
     end >>=? fun protocol_data ->
+    let predecessor_context = Shell_context.wrap_disk_context predecessor_context in
     Proto.begin_construction
       ~chain_id: (State.Block.chain_id predecessor)
       ~predecessor_context
@@ -546,7 +547,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
   let on_error w r st errs =
     Worker.record_event w (Event.Request (r, st, Some errs)) ;
-    Lwt.return (Error errs)
+    Lwt.return_error errs
 
   let on_completion w r _ st =
     Worker.record_event w (Event.Request (Request.view r, st, None)) ;
@@ -567,7 +568,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
       let on_request = on_request
     end in
     Chain.data chain_state >>= fun { current_head = predecessor ; _ } ->
-    let timestamp = Time.now () in
+    let timestamp = Time.System.to_protocol (Systime_os.now ()) in
     create ~predecessor ~timestamp () >>=? fun validation_state ->
     Worker.launch
       table
@@ -612,8 +613,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          let state = Worker.state w in
          let filter_result = function
            | Applied _ -> params#applied
-           | Refused _ -> params#branch_refused
-           | Branch_refused _ -> params#refused
+           | Refused _ -> params#refused
+           | Branch_refused _ -> params#branch_refused
            | Branch_delayed _ -> params#branch_delayed
            | _ -> false in
 

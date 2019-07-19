@@ -30,7 +30,7 @@ type info = {
   frozen_balance: Tez.t ;
   frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
   staking_balance: Tez.t ;
-  delegated_contracts: Contract_hash.t list ;
+  delegated_contracts: Contract_repr.t list ;
   delegated_balance: Tez.t ;
   deactivated: bool ;
   grace_period: Cycle.t ;
@@ -56,7 +56,7 @@ let info_encoding =
        (req "frozen_balance" Tez.encoding)
        (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
        (req "staking_balance" Tez.encoding)
-       (req "delegated_contracts" (list Contract_hash.encoding))
+       (req "delegated_contracts" (list Contract_repr.encoding))
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding))
@@ -140,7 +140,7 @@ module S = struct
       ~description:
         "Returns the list of contracts that delegate to a given delegate."
       ~query: RPC_query.empty
-      ~output: (list Contract_hash.encoding)
+      ~output: (list Contract_repr.encoding)
       RPC_path.(path / "delegated_contracts")
 
   let delegated_balance =
@@ -281,7 +281,7 @@ let requested_levels ~default ctxt cycles levels =
           Level.compare
           (List.concat (List.map (Level.from_raw ctxt) levels ::
                         List.map (Level.levels_in_cycle ctxt) cycles)) in
-      map_p
+      map_s
         (fun level ->
            let current_level = Level.current ctxt in
            if Level.(level <= current_level) then
@@ -410,7 +410,7 @@ module Baking_rights = struct
         match q.max_priority with
         | None -> 64
         | Some max -> max in
-      map_p (baking_priorities ctxt max_priority) levels >>=? fun rights ->
+      map_s (baking_priorities ctxt max_priority) levels >>=? fun rights ->
       let rights =
         if q.all then
           rights
@@ -516,7 +516,7 @@ module Endorsing_rights = struct
       requested_levels
         ~default: (Level.current ctxt, Some (Timestamp.current ctxt))
         ctxt q.cycles q.levels >>=? fun levels ->
-      map_p (endorsement_slots ctxt) levels >>=? fun rights ->
+      map_s (endorsement_slots ctxt) levels >>=? fun rights ->
       let rights = List.concat rights in
       match q.delegates with
       | [] -> return rights
@@ -536,7 +536,7 @@ end
 
 module Endorsing_power = struct
 
-  let endorsing_power ctxt (operation:packed_operation) =
+  let endorsing_power ctxt operation =
     let Operation_data data = operation.protocol_data in
     match data.contents with
     | Single Endorsement _ ->
@@ -552,7 +552,8 @@ module Endorsing_power = struct
     let endorsing_power =
       let open Data_encoding in
       RPC_service.post_service
-        ~description:"Count the endorsing power of an operation."
+        ~description:"Get the endorsing power of an endorsement, that is, \
+                      the number of slots that the endorser has"
         ~query: RPC_query.empty
         ~input: Operation.encoding
         ~output: int31
@@ -572,30 +573,26 @@ end
 
 module Required_endorsements = struct
 
-  let required_endorsements ctxt block_priority block_delay =
-    let minimum =
-      Baking.minimum_allowed_endorsements
-        ctxt ~block_priority ~block_delay
-    in
-    return minimum
+  let required_endorsements ctxt block_delay =
+    return (Baking.minimum_allowed_endorsements ctxt ~block_delay)
 
   module S = struct
 
-    type t = { priority : int ;
-               block_delay : Period.t }
+    type t = { block_delay : Period.t }
 
     let required_endorsements_query =
       let open RPC_query in
-      query (fun priority block_delay ->
-          { priority ; block_delay })
-      |+ field "priority" RPC_arg.int 0 (fun t -> t.priority)
+      query (fun block_delay -> { block_delay })
       |+ field "block_delay" Period.rpc_arg Period.zero (fun t -> t.block_delay)
       |> seal
 
     let required_endorsements =
       let open Data_encoding in
       RPC_service.get_service
-        ~description:"Minimum number of endorsements for a block to be valid."
+        ~description:"Minimum number of endorsements for a block to be \
+                      valid, given a delay of the block's timestamp with \
+                      respect to the minimum time to bake at the \
+                      block's priority"
         ~query: required_endorsements_query
         ~output: int31
         RPC_path.(open_root / "required_endorsements")
@@ -603,12 +600,12 @@ module Required_endorsements = struct
 
   let register () =
     let open Services_registration in
-    register0 S.required_endorsements begin fun ctxt ({ priority ; block_delay }) () ->
-      required_endorsements ctxt priority block_delay
+    register0 S.required_endorsements begin fun ctxt ({ block_delay }) () ->
+      required_endorsements ctxt block_delay
     end
 
-  let get ctxt block priority block_delay =
-    RPC_context.make_call0 S.required_endorsements ctxt block { priority ; block_delay } ()
+  let get ctxt block block_delay =
+    RPC_context.make_call0 S.required_endorsements ctxt block { block_delay } ()
 
 end
 
@@ -674,8 +671,8 @@ let baking_rights ctxt max_priority =
 let endorsing_power ctxt operation =
   Endorsing_power.endorsing_power ctxt operation
 
-let required_endorsements ctxt priority delay =
-  Required_endorsements.required_endorsements ctxt priority delay
+let required_endorsements ctxt delay =
+  Required_endorsements.required_endorsements ctxt delay
 
 let minimal_valid_time ctxt priority endorsing_power =
   Minimal_valid_time.minimal_valid_time ctxt priority endorsing_power

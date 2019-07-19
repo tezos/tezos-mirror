@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Tezos_micheline
 open Micheline
 
@@ -107,6 +107,7 @@ let first_error_location errs =
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
       | Invalid_constant (loc, _, _)
+      | Invalid_syntactic_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
       | Michelson_v1_primitives.Invalid_primitive_name (_, loc)) :: _ -> loc
@@ -117,7 +118,7 @@ let report_errors ppf (parsed, errs) =
   let eco, out =
     List.fold_left
       (fun (eco, out) -> function
-         | Alpha_environment.Ecoproto_error err -> (err :: eco, out)
+         | Environment.Ecoproto_error err -> (err :: eco, out)
          | err -> (eco, err :: out))
       ([], []) errs in
   let eco, out = List.rev eco, List.rev out in
@@ -130,7 +131,7 @@ let report_errors ppf (parsed, errs) =
        | top :: errs ->
            let errs, loc =
              List.map
-               (fun e -> Alpha_environment.Ecoproto_error e)
+               (fun e -> Environment.Ecoproto_error e)
                (top :: errs),
              match top with
              | Ill_typed_contract (expr, _)

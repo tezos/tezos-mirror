@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Apply_results
 
@@ -32,7 +32,7 @@ let pp_manager_operation_content
     ppf (operation, result : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
   begin match operation with
-    | Transaction { destination ; amount ; parameters } ->
+    | Transaction { destination ; amount ; parameters ; entrypoint } ->
         Format.fprintf ppf
           "@[<v 2>%s:@,\
            Amount: %s%a@,\
@@ -43,54 +43,48 @@ let pp_manager_operation_content
           Tez.pp amount
           Contract.pp source
           Contract.pp destination ;
-        begin match parameters with
-          | None -> ()
-          | Some expr ->
-              let expr =
-                Option.unopt_exn
-                  (Failure "ill-serialized argument")
-                  (Data_encoding.force_decode expr) in
-              Format.fprintf ppf
-                "@,Parameter: @[<v 0>%a@]"
-                Michelson_v1_printer.print_expr expr
+        begin match entrypoint with
+          | "default" -> ()
+          | _ -> Format.fprintf ppf "@,Entrypoint: %s" entrypoint
+        end ;
+        begin if not (Script_repr.is_unit_parameter parameters) then
+            let expr =
+              Option.unopt_exn
+                (Failure "ill-serialized argument")
+                (Data_encoding.force_decode parameters) in
+            Format.fprintf ppf
+              "@,Parameter: @[<v 0>%a@]"
+              Michelson_v1_printer.print_expr expr
         end ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
-    | Origination { manager ; delegate ; credit ; spendable ; delegatable ; script ; preorigination = _ } ->
+    | Origination { delegate ; credit ; script = { code ; storage } ; preorigination = _ } ->
         Format.fprintf ppf "@[<v 2>%s:@,\
                             From: %a@,\
-                            For: %a@,\
                             Credit: %s%a"
           (if internal then "Internal origination" else "Origination")
           Contract.pp source
-          Signature.Public_key_hash.pp manager
           Client_proto_args.tez_sym
           Tez.pp credit ;
-        begin match script with
-          | None -> Format.fprintf ppf "@,No script (accepts all transactions)"
-          | Some { code ; storage } ->
-              let code =
-                Option.unopt_exn
-                  (Failure "ill-serialized code")
-                  (Data_encoding.force_decode code)
-              and storage =
-                Option.unopt_exn
-                  (Failure "ill-serialized storage")
-                  (Data_encoding.force_decode storage) in
-              let { Michelson_v1_parser.source ; _ } =
-                Michelson_v1_printer.unparse_toplevel code in
-              Format.fprintf ppf
-                "@,@[<hv 2>Script:@ @[<h>%a@]\
-                 @,@[<hv 2>Initial storage:@ %a@]"
-                Format.pp_print_text source
-                Michelson_v1_printer.print_expr storage
-        end ;
+        let code =
+          Option.unopt_exn
+            (Failure "ill-serialized code")
+            (Data_encoding.force_decode code)
+        and storage =
+          Option.unopt_exn
+            (Failure "ill-serialized storage")
+            (Data_encoding.force_decode storage) in
+        let { Michelson_v1_parser.source ; _ } =
+          Michelson_v1_printer.unparse_toplevel code in
+        Format.fprintf ppf
+          "@,@[<hv 2>Script:@ @[<h>%a@]\
+           @,@[<hv 2>Initial storage:@ %a@]"
+          Format.pp_print_text source
+          Michelson_v1_printer.print_expr storage ;
         begin match delegate with
           | None -> Format.fprintf ppf "@,No delegate for this contract"
           | Some delegate -> Format.fprintf ppf "@,Delegate: %a" Signature.Public_key_hash.pp delegate
         end ;
-        if spendable then Format.fprintf ppf "@,Spendable by the manager" ;
-        if delegatable then Format.fprintf ppf "@,Delegate can be changed by the manager" ;
         pp_result ppf result ;
         Format.fprintf ppf "@]" ;
     | Reveal key ->
@@ -164,7 +158,7 @@ let pp_manager_operation_contents_and_result ppf
                             storage ;
                             originated_contracts ;
                             storage_size ; paid_storage_size_diff ;
-                            big_map_diff = _ ;
+                            big_map_diff ;
                             allocated_destination_contract = _ }) =
     begin match originated_contracts with
       | [] -> ()
@@ -177,6 +171,12 @@ let pp_manager_operation_contents_and_result ppf
       | Some expr ->
           Format.fprintf ppf "@,@[<hv 2>Updated storage:@ %a@]"
             Michelson_v1_printer.print_expr expr
+    end ;
+    begin match big_map_diff with
+      | None | Some [] -> ()
+      | Some diff ->
+          Format.fprintf ppf "@,@[<v 2>Updated big_maps:@ %a@]"
+            Michelson_v1_printer.print_big_map_diff diff
     end ;
     begin if storage_size <> Z.zero then
         Format.fprintf ppf
@@ -199,7 +199,7 @@ let pp_manager_operation_contents_and_result ppf
             pp_balance_updates balance_updates
     end in
   let pp_origination_result
-      (Origination_result { balance_updates ; consumed_gas ;
+      (Origination_result { big_map_diff ; balance_updates ; consumed_gas ;
                             originated_contracts ;
                             storage_size ; paid_storage_size_diff }) =
     begin match originated_contracts with
@@ -212,6 +212,12 @@ let pp_manager_operation_contents_and_result ppf
         Format.fprintf ppf
           "@,Storage size: %s bytes"
           (Z.to_string storage_size)
+    end ;
+    begin match big_map_diff with
+      | None | Some [] -> ()
+      | Some diff ->
+          Format.fprintf ppf "@,@[<v 2>Updated big_maps:@ %a@]"
+            Michelson_v1_printer.print_big_map_diff diff
     end ;
     begin if paid_storage_size_diff <> Z.zero then
         Format.fprintf ppf
@@ -282,7 +288,7 @@ let pp_manager_operation_contents_and_result ppf
      Expected counter: %s@,\
      Gas limit: %s@,\
      Storage limit: %s bytes"
-    Contract.pp source
+    Signature.Public_key_hash.pp source
     Client_proto_args.tez_sym
     Tez.pp fee
     (Z.to_string counter)
@@ -297,7 +303,7 @@ let pp_manager_operation_contents_and_result ppf
   end ;
   Format.fprintf ppf
     "@,%a"
-    (pp_manager_operation_content source false pp_result)
+    (pp_manager_operation_content (Contract.implicit_contract source) false pp_result)
     (operation, operation_result) ;
   begin
     match internal_operation_results with

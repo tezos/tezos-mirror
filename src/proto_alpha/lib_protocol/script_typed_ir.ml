@@ -34,20 +34,35 @@ type field_annot = [ `Field_annot of string ]
 
 type annot = [ var_annot | type_annot | field_annot ]
 
-type 'ty comparable_ty =
-  | Int_key : type_annot option -> (z num) comparable_ty
-  | Nat_key : type_annot option -> (n num) comparable_ty
-  | String_key : type_annot option -> string comparable_ty
-  | Bytes_key : type_annot option -> MBytes.t comparable_ty
-  | Mutez_key : type_annot option -> Tez.t comparable_ty
-  | Bool_key : type_annot option -> bool comparable_ty
-  | Key_hash_key : type_annot option -> public_key_hash comparable_ty
-  | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
-  | Address_key : type_annot option -> Contract.t comparable_ty
+type address = Contract.t * string
 
+type ('a, 'b) pair = 'a * 'b
+
+type ('a, 'b) union = L of 'a | R of 'b
+
+type comb = Comb
+type leaf = Leaf
+
+type (_, _) comparable_struct =
+  | Int_key : type_annot option -> (z num, _) comparable_struct
+  | Nat_key : type_annot option -> (n num, _) comparable_struct
+  | String_key : type_annot option -> (string, _) comparable_struct
+  | Bytes_key : type_annot option -> (MBytes.t, _) comparable_struct
+  | Mutez_key : type_annot option -> (Tez.t, _) comparable_struct
+  | Bool_key : type_annot option -> (bool, _) comparable_struct
+  | Key_hash_key : type_annot option -> (public_key_hash, _) comparable_struct
+  | Timestamp_key : type_annot option -> (Script_timestamp.t, _) comparable_struct
+  | Address_key : type_annot option -> (address, _) comparable_struct
+  | Pair_key :
+      (('a, leaf) comparable_struct * field_annot option) *
+      (('b, _) comparable_struct * field_annot option) *
+      type_annot option -> (('a, 'b) pair, comb) comparable_struct
+
+type 'a comparable_ty = ('a, comb) comparable_struct
 
 module type Boxed_set = sig
   type elt
+  val elt_ty : elt comparable_ty
   module OPS : S.SET with type elt = elt
   val boxed : OPS.t
   val size : int
@@ -65,23 +80,21 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
+type operation = packed_internal_operation * Contract.big_map_diff option
+
 type ('arg, 'storage) script =
-  { code : (('arg, 'storage) pair, (packed_internal_operation list, 'storage) pair) lambda ;
+  { code : (('arg, 'storage) pair, (operation list, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     storage : 'storage ;
-    storage_type : 'storage ty }
-
-and ('a, 'b) pair = 'a * 'b
-
-and ('a, 'b) union = L of 'a | R of 'b
+    storage_type : 'storage ty ;
+    root_name : string option }
 
 and end_of_stack = unit
 
 and ('arg, 'ret) lambda =
     Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
 
-and 'arg typed_contract =
-  'arg ty * Contract.t
+and 'arg typed_contract = 'arg ty * address
 
 and 'ty ty =
   | Unit_t : type_annot option -> unit ty
@@ -94,39 +107,48 @@ and 'ty ty =
   | Key_hash_t : type_annot option -> public_key_hash ty
   | Key_t : type_annot option -> public_key ty
   | Timestamp_t : type_annot option -> Script_timestamp.t ty
-  | Address_t : type_annot option -> Contract.t ty
+  | Address_t : type_annot option -> address ty
   | Bool_t : type_annot option -> bool ty
   | Pair_t :
       ('a ty * field_annot option * var_annot option) *
       ('b ty * field_annot option * var_annot option) *
-      type_annot option -> ('a, 'b) pair ty
-  | Union_t : ('a ty * field_annot option) * ('b ty * field_annot option) * type_annot option  -> ('a, 'b) union ty
+      type_annot option *
+      bool -> ('a, 'b) pair ty
+  | Union_t :
+      ('a ty * field_annot option) *
+      ('b ty * field_annot option) *
+      type_annot option *
+      bool -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty * type_annot option  -> ('arg, 'ret) lambda ty
-  | Option_t : ('v ty * field_annot option) * field_annot option * type_annot option  -> 'v option ty
-  | List_t : 'v ty * type_annot option -> 'v list ty
+  | Option_t : 'v ty * type_annot option * bool  -> 'v option ty
+  | List_t : 'v ty * type_annot option * bool -> 'v list ty
   | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option * bool -> ('k, 'v) map ty
   | Big_map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
-  | Operation_t : type_annot option -> packed_internal_operation ty
+  | Operation_t : type_annot option -> operation ty
+  | Chain_id_t : type_annot option -> Chain_id.t ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * var_annot option -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
 
-and ('key, 'value) big_map = { diff : ('key, 'value option) map ;
+and ('key, 'value) big_map = { id : Z.t option ;
+                               diff : ('key, 'value option) map ;
                                key_type : 'key ty ;
                                value_type : 'value ty }
 
 (* ---- Instructions --------------------------------------------------------*)
 
 (* The low-level, typed instructions, as a GADT whose parameters
-   encode the typing rules. The left parameter is the typed shape of
-   the stack before the instruction, the right one the shape
-   after. Any program whose construction is accepted by OCaml's
-   type-checker is guaranteed to be type-safe.  Overloadings of the
-   concrete syntax are already resolved in this representation, either
-   by using different constructors or type witness parameters. *)
+   encode the typing rules.
+
+   The left parameter is the typed shape of the stack before the
+   instruction, the right one the shape after. Any program whose
+   construction is accepted by OCaml's type-checker is guaranteed to
+   be type-safe. Overloadings of the concrete syntax are already
+   resolved in this representation, either by using different
+   constructors or type witness parameters. *)
 and ('bef, 'aft) instr =
   (* stack ops *)
   | Drop :
@@ -195,6 +217,8 @@ and ('bef, 'aft) instr =
       ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
   | Map_size : (('a, 'b) map * 'rest, n num * 'rest) instr
   (* big maps *)
+  | Empty_big_map : 'a comparable_ty * 'v ty ->
+    ('rest, ('a, 'v) big_map * 'rest) instr
   | Big_map_mem :
       ('a * (('a, 'v) big_map * 'rest), bool * 'rest) instr
   | Big_map_get :
@@ -232,10 +256,7 @@ and ('bef, 'aft) instr =
   | Diff_timestamps :
       (Script_timestamp.t * (Script_timestamp.t * 'rest),
        z num * 'rest) instr
-  (* currency operations *)
-  (* TODO: we can either just have conversions to/from integers and
-     do all operations on integers, or we need more operations on
-     Tez. Also Sub_tez should return Tez.t option (if negative) and *)
+  (* tez operations *)
   | Add_tez :
       (Tez.t * (Tez.t * 'rest), Tez.t * 'rest) instr
   | Sub_tez :
@@ -345,24 +366,25 @@ and ('bef, 'aft) instr =
       (z num * 'rest, bool * 'rest) instr
   | Ge :
       (z num * 'rest, bool * 'rest) instr
-
   (* protocol *)
   | Address :
-      (_ typed_contract * 'rest, Contract.t * 'rest) instr
-  | Contract : 'p ty ->
-    (Contract.t * 'rest, 'p typed_contract option * 'rest) instr
+      (_ typed_contract * 'rest, address * 'rest) instr
+  | Contract : 'p ty * string ->
+    (address * 'rest, 'p typed_contract option * 'rest) instr
   | Transfer_tokens :
-      ('arg * (Tez.t * ('arg typed_contract * 'rest)), packed_internal_operation * 'rest) instr
+      ('arg * (Tez.t * ('arg typed_contract * 'rest)), operation * 'rest) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-       packed_internal_operation * (Contract.t * 'rest)) instr
+       operation * (address * 'rest)) instr
   | Implicit_account :
       (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract : 'g ty * 'p ty * ('p * 'g, packed_internal_operation list * 'g) lambda  ->
+  | Create_contract : 'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-     packed_internal_operation * (Contract.t * 'rest)) instr
+     operation * (address * 'rest)) instr
+  | Create_contract_2 : 'g ty * 'p ty * ('p * 'g, operation list * 'g) lambda * string option  ->
+    (public_key_hash option * (Tez.t * ('g * 'rest)), operation * (address * 'rest)) instr
   | Set_delegate :
-      (public_key_hash option * 'rest, packed_internal_operation * 'rest) instr
+      (public_key_hash option * 'rest, operation * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :
@@ -384,13 +406,35 @@ and ('bef, 'aft) instr =
   | Steps_to_quota : (* TODO: check that it always returns a nat *)
       ('rest, n num * 'rest) instr
   | Source :
-      ('rest, Contract.t * 'rest) instr
+      ('rest, address * 'rest) instr
   | Sender :
-      ('rest, Contract.t * 'rest) instr
-  | Self : 'p ty ->
+      ('rest, address * 'rest) instr
+  | Self : 'p ty * string ->
     ('rest, 'p typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
+  | Dig   : int * ('x * 'rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
+    ('bef, 'x * 'aft) instr
+  | Dug   : int * ('rest, 'x * 'rest, 'bef, 'aft) stack_prefix_preservation_witness ->
+    ('x * 'bef, 'aft) instr
+  | Dipn  : int * ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness * ('fbef, 'faft) descr ->
+    ('bef, 'aft) instr
+  | Dropn : int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness ->
+    ('bef, 'rest) instr
+  | ChainId :
+      ('rest, Chain_id.t * 'rest) instr
+
+(* Type witness for operations that work deep in the stack ignoring
+   (and preserving) a prefix.
+
+   The two right parameters are the shape of the stack with the (same)
+   prefix before and after the transformation. The two left
+   parameters are the shape of the stack without the prefix before and
+   after. The inductive definition makes it so by construction. *)
+and ('bef, 'aft, 'bef_suffix, 'aft_suffix) stack_prefix_preservation_witness =
+  | Prefix : ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness
+    -> ('fbef, 'faft, 'x * 'bef, 'x * 'aft) stack_prefix_preservation_witness
+  | Rest : ('bef, 'aft, 'bef, 'aft) stack_prefix_preservation_witness
 
 and ('bef, 'aft) descr =
   { loc : Script.location ;

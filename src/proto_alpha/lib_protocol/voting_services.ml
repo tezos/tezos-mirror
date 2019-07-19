@@ -111,9 +111,9 @@ let register () =
   register0 S.current_proposal begin fun ctxt () () ->
     (* this would be better implemented using get_option in get_current_proposal *)
     Vote.get_current_proposal ctxt >>= function
-    | Ok p -> return (Some p)
-    | Error [Raw_context.Storage_error (Missing_key _)] -> return None
-    | (Error _ as e) -> Lwt.return e
+    | Ok p -> return_some p
+    | Error (Raw_context.Storage_error (Missing_key _) :: _) -> return_none
+    | Error _ as e -> Lwt.return e
   end
 
 let ballots ctxt block =

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 let group =
   { Clic.name = "scripts" ;
@@ -32,6 +33,7 @@ let group =
 open Tezos_micheline
 open Client_proto_programs
 open Client_proto_args
+open Client_proto_contracts
 
 let commands () =
   let open Clic in
@@ -57,6 +59,16 @@ let commands () =
       ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
+  let source_arg =
+    ContractAlias.destination_arg
+      ~name: "source"
+      ~doc: "name of the source (i.e. SENDER) contract for the transaction"
+      () in
+  let payer_arg =
+    ContractAlias.destination_arg
+      ~name: "payer"
+      ~doc: "name of the payer (i.e. SOURCE) contract for the transaction"
+      () in
   let custom_gas_flag =
     arg
       ~long:"gas"
@@ -82,17 +94,8 @@ let commands () =
         Lwt.return (Micheline_parser.no_parsing_error
                     @@ Michelson_v1_parser.parse_expression data)) in
   let bytes_parameter ~name ~desc =
-    Clic.param ~name ~desc
-      (parameter (fun (_cctxt : full) s ->
-           try
-             if String.length s < 2
-             || s.[0] <> '0' || s.[1] <> 'x' then
-               raise Exit
-             else
-               return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
-           with _ ->
-             failwith "Invalid bytes, expecting hexadecimal \
-                       notation (e.g. 0x1234abcd)" )) in
+    Clic.param ~name ~desc Client_proto_args.bytes_parameter
+  in
   let signature_parameter =
     Clic.parameter
       (fun _cctxt s ->
@@ -104,7 +107,7 @@ let commands () =
     command ~group ~desc: "Lists all scripts in the library."
       no_options
       (fixed [ "list" ; "known" ; "scripts" ])
-      (fun () (cctxt : Proto_alpha.full) ->
+      (fun () (cctxt : Protocol_client_context.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return_unit) ;
@@ -131,31 +134,38 @@ let commands () =
       (prefixes [ "show" ; "known" ; "script" ]
        @@ Program.alias_param
        @@ stop)
-      (fun () (_, program) (cctxt : Proto_alpha.full) ->
+      (fun () (_, program) (cctxt : Protocol_client_context.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
          return_unit) ;
 
     command ~group ~desc: "Ask the node to run a script."
-      (args3 trace_stack_switch amount_arg no_print_source_flag)
+      (args7 trace_stack_switch amount_arg source_arg payer_arg
+         no_print_source_flag custom_gas_flag entrypoint_arg)
       (prefixes [ "run" ; "script" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
        @@ Clic.param ~name:"storage" ~desc:"the storage data"
          data_parameter
        @@ prefixes [ "and" ; "input" ]
-       @@ Clic.param ~name:"storage" ~desc:"the input data"
+       @@ Clic.param ~name:"input" ~desc:"the input data"
          data_parameter
        @@ stop)
-      (fun (trace_exec, amount, no_print_source) program storage input cctxt ->
-         Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
-         let show_source = not no_print_source in
-         (if trace_exec then
-            trace cctxt ~chain:cctxt#chain ~block:cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
-            print_trace_result cctxt ~show_source ~parsed:program res
-          else
-            run cctxt ~chain:cctxt#chain ~block:cctxt#block ~amount ~program ~storage ~input () >>= fun res ->
-            print_run_result cctxt ~show_source ~parsed:program res)) ;
+      (fun
+        (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
+        program storage input cctxt ->
+        let source = Option.map ~f:snd source in
+        let payer = Option.map ~f:snd payer in
+        Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
+        let show_source = not no_print_source in
+        (if trace_exec then
+           trace cctxt ~chain:cctxt#chain ~block:cctxt#block
+             ~amount ~program ~storage ~input ?source ?payer ?gas ?entrypoint () >>= fun res ->
+           print_trace_result cctxt ~show_source ~parsed:program res
+         else
+           run cctxt ~chain:cctxt#chain ~block:cctxt#block
+             ~amount ~program ~storage ~input ?source ?payer ?gas ?entrypoint () >>= fun res ->
+           print_run_result cctxt ~show_source ~parsed:program res)) ;
     command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
       (prefixes [ "typecheck" ; "script" ]
@@ -204,7 +214,7 @@ let commands () =
            ~gas:original_gas ~data ~ty () >>= function
          | Ok gas ->
              cctxt#message "@[<v 0>Well typed@,Gas remaining: %a@]"
-               Proto_alpha.Alpha_context.Gas.pp gas >>= fun () ->
+               Alpha_context.Gas.pp gas >>= fun () ->
              return_unit
          | Error errs ->
              cctxt#warning "%a"
@@ -244,9 +254,9 @@ let commands () =
                MBytes.pp_hex bytes
                Script_expr_hash.pp hash
                MBytes.pp_hex (Script_expr_hash.to_bytes hash)
-               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha256 bytes)
-               MBytes.pp_hex (Alpha_environment.Raw_hashes.sha512 bytes)
-               Proto_alpha.Alpha_context.Gas.pp remaining_gas >>= fun () ->
+               MBytes.pp_hex (Environment.Raw_hashes.sha256 bytes)
+               MBytes.pp_hex (Environment.Raw_hashes.sha512 bytes)
+               Alpha_context.Gas.pp remaining_gas >>= fun () ->
              return_unit
          | Error errs ->
              cctxt#warning "%a"
@@ -308,15 +318,16 @@ let commands () =
        @@ Clic.param ~name:"signature" ~desc:"the signature to check"
          signature_parameter
        @@ stop)
-      (fun quiet bytes (_, (key_locator, _)) signature (cctxt : #Proto_alpha.full) ->
-         Client_keys.check key_locator signature bytes >>=? function
-         | false -> cctxt#error "invalid signature"
-         | true ->
-             if quiet then
-               return_unit
-             else
-               cctxt#message "Signature check successfull." >>= fun () ->
-               return_unit
+      (fun quiet bytes (_, (key_locator, _)) signature
+        (cctxt : #Protocol_client_context.full) ->
+        Client_keys.check key_locator signature bytes >>=? function
+        | false -> cctxt#error "invalid signature"
+        | true ->
+            if quiet then
+              return_unit
+            else
+              cctxt#message "Signature check successfull." >>= fun () ->
+              return_unit
       ) ;
 
   ]

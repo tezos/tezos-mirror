@@ -62,7 +62,7 @@ let lazy_expr expr =
 
 type t = {
   code : lazy_expr ;
-  storage : lazy_expr
+  storage : lazy_expr ;
 }
 
 let encoding =
@@ -195,3 +195,25 @@ let minimal_deserialize_cost lexpr =
     ~fun_bytes:(fun b -> serialized_cost b)
     ~fun_combine:(fun c_free _ -> c_free)
     lexpr
+
+let unit =
+  Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+
+let unit_parameter =
+  lazy_expr unit
+
+let is_unit_parameter =
+  let unit_bytes = Data_encoding.force_bytes unit_parameter in
+  Data_encoding.apply_lazy
+    ~fun_value:(fun v -> match Micheline.root v with Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true | _ -> false)
+    ~fun_bytes:(fun b -> MBytes.(=) b unit_bytes)
+    ~fun_combine:(fun res _ -> res)
+
+let rec strip_annotations node =
+  let open Micheline in
+  match node with
+  | Int (_, _) | String (_, _) | Bytes (_, _) as leaf -> leaf
+  | Prim (loc, name, args, _) ->
+      Prim (loc, name, List.map strip_annotations args, [])
+  | Seq (loc, args) ->
+      Seq (loc, List.map strip_annotations args)

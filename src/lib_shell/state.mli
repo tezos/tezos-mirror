@@ -46,7 +46,7 @@ module Chain : sig
 
   (** The chain starts from a genesis block associated to a seed protocol *)
   type genesis = {
-    time: Time.t ;
+    time: Time.Protocol.t ;
     block: Block_hash.t ;
     protocol: Protocol_hash.t ;
   }
@@ -86,15 +86,13 @@ module Chain : sig
   val faked_genesis_hash: chain_state -> Block_hash.t
 
   (** Return the expiration timestamp of a test chain. *)
-  val expiration: chain_state -> Time.t option
+  val expiration: chain_state -> Time.Protocol.t option
   val allow_forked_chain: chain_state -> bool
 
   val checkpoint: chain_state -> Block_header.t Lwt.t
 
   val save_point: chain_state -> (Int32.t * Block_hash.t) Lwt.t
   val caboose: chain_state -> (Int32.t * Block_hash.t) Lwt.t
-
-  val index: chain_state -> Context.index Lwt.t
 
   val store: chain_state -> Store.t Lwt.t
 
@@ -104,15 +102,16 @@ module Chain : sig
       invalid alternate heads are removed from the disk, either
       completely (when `level <= checkpoint`) or still tagged as
       invalid (when `level > checkpoint`). *)
-  val set_checkpoint: chain_state -> Block_header.t -> unit Lwt.t
+  val set_checkpoint:
+    chain_state -> Block_header.t -> unit Lwt.t
 
   (** Apply [set_checkpoint] then [purge_full] (see {!History_mode.t}). *)
   val set_checkpoint_then_purge_full: chain_state -> Block_header.t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   (** Apply [set_checkpoint] then [purge_rolling] (see {!History_mode.t}). *)
   val set_checkpoint_then_purge_rolling: chain_state -> Block_header.t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   (** Check that a block is compatible with the current checkpoint.
       This function assumes that the predecessor is known valid. *)
@@ -121,15 +120,19 @@ module Chain : sig
   (** Get the level indexed chain protocol store for the given header. *)
   val get_level_indexed_protocol: chain_state -> Block_header.t -> Protocol_hash.t Lwt.t
 
-  (** Update the level indexed chain protocol store so that block can easily access
-      the corresponding protocol hash from the protocol level in its header. *)
-  val update_level_indexed_protocol_store: chain_state -> Chain_id.t -> int -> Protocol_hash.t -> unit Lwt.t
+  (** Update the level indexed chain protocol store so that the block can easily access
+      its corresponding protocol hash from the protocol level in its header.
+      Also stores the transition block level.
+  *)
+  val update_level_indexed_protocol_store: chain_state -> Chain_id.t -> int ->
+    Protocol_hash.t -> Block_header.t -> unit Lwt.t
 
 end
 
-type error += Missing_block of Block_hash.t
-
 (** {2 Block database} *)
+
+type error += Block_not_found of Block_hash.t
+type error += Block_contents_not_found of Block_hash.t
 
 module Block : sig
 
@@ -179,7 +182,7 @@ module Block : sig
     Operation.t list list -> MBytes.t list list ->
     validation_store ->
     forking_testchain: bool ->
-    t option tzresult Lwt.t
+    block option tzresult Lwt.t
 
   val store_invalid:
     Chain.t ->
@@ -194,7 +197,7 @@ module Block : sig
   val header: t -> Block_header.t
   val header_of_hash: Chain.t -> Block_hash.t -> Block_header.t option Lwt.t
   val shell_header: t -> Block_header.shell_header
-  val timestamp: t -> Time.t
+  val timestamp: t -> Time.Protocol.t
   val fitness: t -> Fitness.t
   val validation_passes: t -> int
   val chain_id: t -> Chain_id.t
@@ -231,7 +234,7 @@ module Block : sig
     t -> int -> MBytes.t list Lwt.t
   val all_operations_metadata: t -> MBytes.t list list Lwt.t
 
-  val watcher: Chain.t -> t Lwt_stream.t * Lwt_watcher.stopper
+  val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
   (** [known_ancestor chain_state locator] computes the unknown prefix in
       the [locator] according to [chain_state].
@@ -282,7 +285,7 @@ val update_testchain:
 val fork_testchain:
   Block.t ->
   Chain_id.t -> Block_hash.t -> Block_header.t ->
-  Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
+  Protocol_hash.t -> Time.Protocol.t -> Chain.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;
@@ -343,12 +346,10 @@ module Current_mempool : sig
 
 end
 
-val history_mode: global_state -> History_mode.t Lwt.t
+type error += Incorrect_history_mode_switch of
+    { previous_mode: History_mode.t ; next_mode: History_mode.t }
 
-val upgrade_0_0_1:
-  ?store_mapsize:Int64.t ->
-  store_root:string ->
-  unit -> unit tzresult Lwt.t
+val history_mode: global_state -> History_mode.t Lwt.t
 
 (** Read the internal state of the node and initialize
     the databases. *)

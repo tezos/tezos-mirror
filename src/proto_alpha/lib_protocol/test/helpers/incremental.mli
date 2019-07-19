@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type t
@@ -36,7 +36,8 @@ val level: incremental -> int32
 
 val begin_construction:
   ?priority:int ->
-  ?timestamp:Time.t ->
+  ?timestamp:Time.Protocol.t ->
+  ?seed_nonce_hash: Nonce_hash.t ->
   ?policy:Block.baker_policy ->
   Block.t ->
   incremental tzresult Lwt.t
@@ -47,4 +48,4 @@ val add_operation:
 
 val finalize_block: incremental -> Block.t tzresult Lwt.t
 
-val rpc_ctxt: incremental Alpha_environment.RPC_context.simple
+val rpc_ctxt: incremental Environment.RPC_context.simple

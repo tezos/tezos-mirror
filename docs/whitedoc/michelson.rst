@@ -3,6 +3,10 @@
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
+This specification gives a detailed formal semantics of the Michelson
+language, and a short explanation of how smart contracts are executed
+and interact in the blockchain.
+
 The language is stack-based, with high level data types and primitives
 and strict static type checking. Its design cherry picks traits from
 several language families. Vigilant readers will notice direct
@@ -14,30 +18,154 @@ previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
 
-A Michelson program receives as input a stack containing a single pair whose
-first element is an input value and second element the content of a storage
-space. It must return a stack containing a single pair whose first element is
-a list of internal operations, and second element the new contents of the
-storage space. Alternatively, a Michelson program can fail, explicitly using
-a specific opcode, or because something went wrong that could not be caught
-by the type system (e.g. division by zero, gas exhaustion).
-
-The types of the input, output and storage are fixed and monomorphic,
+The types of the input and output stack are fixed and monomorphic,
 and the program is typechecked before being introduced into the system.
 No smart contract execution can fail because an instruction has been
 executed on a stack of unexpected length or contents.
 
 This specification gives the complete instruction set, type system and
 semantics of the language. It is meant as a precise reference manual,
-not an easy introduction. Even though, some examples are provided at the
-end of the document and can be read first or at the same time as the
-specification.
+not an easy introduction. Even though, some examples are provided at
+the end of the document and can be read first or at the same time as
+the specification. The document also starts with a less formal
+explanation of the context: how Michelson code interacts with the
+blockchain.
 
-Semantics
----------
+Semantics of smart contracts and transactions
+---------------------------------------------
 
-This specification gives a detailed formal semantics of the Michelson
-language. It explains in a symbolic way the computation performed by the
+The Tezos ledger currently has two types of accounts that can hold
+tokens (and be the destinations of transactions).
+
+  - An implicit account is a non programmable account, whose tokens
+    are spendable and delegatable by a public key. Its address is
+    directly the public key hash, and starts with ``tz1``, ``tz2`` or
+    ``tz3``.
+  - A smart contract is a programmable account. A transaction to such
+    an address can provide data, and can fail for reasons decided by
+    its Michelson code. Its address is a unique hash that depends on
+    the operation that led to its creation, and starts with ``KT1``.
+
+From Michelson, they are indistinguishable. A safe way to think about
+this is to consider that implicit accounts are smart contracts that
+always succeed to receive tokens, and does nothing else.
+
+Intra-transaction semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Alongside their tokens, smart contracts keep a piece of storage. Both
+are ruled by a specific logic specified by a Michelson program. A
+transaction to smart contract will provide an input value and in
+option some tokens, and in return, the smart contract can modify its
+storage and transfer its tokens.
+
+The Michelson program receives as input a stack containing a single
+pair whose first element is an input value and second element the
+content of the storage space. It must return a stack containing a
+single pair whose first element is the list of internal operations
+that it wants to emit, and second element is the new contents of the
+storage space. Alternatively, a Michelson program can fail, explicitly
+using a specific opcode, or because something went wrong that could
+not be caught by the type system (e.g. gas exhaustion).
+
+A bit of polymorphism can be used at contract level, with a
+lightweight system of named entrypoints: instead of an input value,
+the contract can be called with an entrypoint name and an argument,
+and these two component are transformed automatically in a simple and
+deterministic way to an input value. This feature is available both
+for users and from Michelson code. See the dedicated section.
+
+Inter-transaction semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An operation included in the blockchain is a sequence of "external
+operations" signed as a whole by a source address. These operations
+are of three kinds:
+
+  - Transactions to transfer tokens to implicit accounts or tokens and
+    parameters to a smart contract (or, optionally, to a specified
+    entrypoint of a smart contract).
+  - Originations to create new smart contracts from its Michelson
+    source code, an initial amount of tokens transferred from the
+    source, and an initial storage contents.
+  - Delegations to assign the tokens of the source to the stake of
+    another implicit account (without transferring any tokens).
+
+Smart contracts can also emit "internal operations". These are run
+in sequence after the external transaction completes, as in the
+following schema for a sequence of two external operations.
+
+::
+
+    +------+----------------+-------+----------------+
+    | op 1 | internal ops 1 |  op 2 | internal ops 2 |
+    +------+----------------+-------+----------------+
+
+Smart contracts called by internal transactions can in turn also emit
+internal operation. The interpretation of the internal operations
+of a given external operation use a queue, as in the following
+example, also with two external operations.
+
+::
+
+   +-----------+---------------+--------------------------+
+   | executing | emissions     | resulting queue          |
+   +-----------+---------------+--------------------------+
+   | op 1      | 1a, 1b, 1c    | 1a, 1b, 1c               |
+   | op 1a     | 1ai, 1aj      | 1b, 1c, 1ai, 1aj         |
+   | op 1b     | 1bi           | 1c, 1ai, 1aj, 1bi        |
+   | op 1c     |               | 1ai, 1aj, 1bi            |
+   | op 1ai    |               | 1aj, 1bi                 |
+   | op 1aj    |               | 1bi                      |
+   | op 1bi    |               |                          |
+   | op 2      | 2a, 2b        | 2a, 2b                   |
+   | op 2a     | 2ai           | 2b, 2ai                  |
+   | op 2b     |               | 2ai                      |
+   | op 2ai    | 2ai1          | 2ai1                     |
+   | op 2a1    | 2ai2          | 2ai2                     |
+   | op 2a2    | 2ai3          | 2ai3                     |
+   | op 2a3    |               |                          |
+   +-----------+---------------+--------------------------+
+
+Failures
+~~~~~~~~
+
+All transactions can fail for a few reasons, mostly:
+
+  - Not enough tokens in the source to spend the specified amount.
+  - The script took too many execution steps.
+  - The script failed programmatically using the ``FAILWITH`` instruction.
+
+External transactions can also fail for these additional reasons:
+
+  - The signature of the external operations was wrong.
+  - The code or initial storage in an origination did not typecheck.
+  - The parameter in a transfer did not typecheck.
+  - The destination did not exist.
+  - The specified entrypoint did not exist.
+
+All these errors cannot happen in internal transactions, as the type
+system catches them at operation creation time. In particular,
+Michelson has two types to talk about other accounts: ``address`` and
+``contract t``. The ``address`` type merely gives the guarantee that
+the value has the form of a Tezos address. The ``contract t`` type, on
+the other hand, guarantees that the value is indeed a valid, existing
+account whose parameter type is ``t``. To make a transaction from
+Michelson, a value of type ``contract t`` must be provided, and the
+type system checks that the argument to the transaction is indeed of
+type ``t``. Hence, all transactions made from Michelson are well
+formed by construction.
+
+In any case, when a failure happens, either total success or total
+failure is guaranteed. If a transaction (internal or external) fails,
+then the whole sequence fails and all the effects up to the failure
+are reverted. These transactions can still be included in blocks, and
+the transaction fees given to the implicit account who baked the block.
+
+Language semantics
+------------------
+
+This specification explains in a symbolic way the computation performed by the
 Michelson interpreter on a given program and initial stack to produce
 the corresponding resulting stack. The Michelson interpreter is a pure
 function: it only builds a result stack from the elements of an initial
@@ -357,11 +485,10 @@ Core data types and notations
 
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
    ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ; ... }``,
-   with keys sorted.  These maps should be used if you intend to store
+   with keys sorted. These maps should be used if you intend to store
    large amounts of data in a map. They have higher gas costs than
-   standard maps as data is lazily deserialized.  You are limited to a
-   single ``big_map`` per program, which must appear on the left hand
-   side of a pair in the contract's storage.
+   standard maps as data is lazily deserialized. A ``big_map`` cannot
+   appear inside another ``big_map``.
 
 Core instructions
 -----------------
@@ -849,6 +976,20 @@ Operations on pairs
 
     > CDR / (Pair _ b) : S  =>  b : S
 
+-  ``COMPARE``: Lexicographic comparison.
+
+::
+
+    :: pair 'a 'b : pair 'a 'b : 'S   ->   int : 'S
+
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  -1 : S
+        iff COMPARE / sa : ta : S => -1 : S
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  1 : S
+        iff COMPARE / sa : ta : S => 1 : S
+    > COMPARE / (Pair sa sb) : (Pair ta tb) : S  =>  r : S
+        iff COMPARE / sa : ta : S => 0 : S
+            COMPARE / sb : tb : S => r : S
+
 Operations on sets
 ~~~~~~~~~~~~~~~~~~
 
@@ -1029,6 +1170,15 @@ The behavior of these operations is the same as if they were normal
 maps, except that under the hood, the elements are loaded and
 deserialized on demand.
 
+-  ``EMPTY_BIG_MAP 'key 'val``: Build a new, empty big map from keys of a
+   given type to values of another given type.
+
+   The ``'key`` type must be comparable (the ``COMPARE`` primitive must
+   be defined over it).
+
+::
+
+    :: 'S -> map 'key 'val : 'S
 
 -  ``GET``: Access an element in a ``big_map``, returns an optional value to be
    checked with ``IF_SOME``.
@@ -1192,9 +1342,10 @@ Domain specific data types
 
 -  ``mutez``: A specific type for manipulating tokens.
 
--  ``contract 'param``: A contract, with the type of its code.
+-  ``address``: An untyped address (implicit account or smart contract).
 
--  ``address``: An untyped contract address.
+-  ``contract 'param``: A contract, with the type of its code,
+   ``contract unit`` for implicit accounts.
 
 -  ``operation``: An internal operation emitted by a contract.
 
@@ -1203,6 +1354,8 @@ Domain specific data types
 -  ``key_hash``: The hash of a public cryptography key.
 
 -  ``signature``: A cryptographic signature.
+
+-  ``chain_id``: An identifier for a chain, used to distinguish the test and the main chains.
 
 Domain specific operations
 --------------------------
@@ -1350,7 +1503,7 @@ contract.
 
 ::
 
-    :: 'p : mutez : contract 'p : 'S   ->   operation : S
+    :: 'p : mutez : contract 'p : 'S   ->   operation : 'S
 
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
@@ -1359,7 +1512,7 @@ contract, unit for an account.
 
 ::
 
-    :: option key_hash : 'S   ->   operation : S
+    :: option key_hash : 'S   ->   operation : 'S
 
 -  ``BALANCE``: Push the current amount of mutez of the current contract.
 
@@ -1446,6 +1599,13 @@ Special operations
 ::
 
     :: 'S   ->   timestamp : 'S
+
+- ``CHAIN_ID``: Push the chain identifier.
+
+::
+
+    :: 'S   ->   chain_id : 'S
+
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
@@ -1936,10 +2096,14 @@ line can also be written, using C-like delimiters (``/* ... */``).
 Annotations
 -----------
 
-The annotation mechanism of Michelson provides ways to better track data
-on the stack and to give additional type constraints. Annotations are
-only here to add constraints, *i.e.* they cannot turn an otherwise
-rejected program into an accepted one.
+The annotation mechanism of Michelson provides ways to better track
+data on the stack and to give additional type constraints. Except for
+a single exception specified just after, annotations are only here to
+add constraints, *i.e.* they cannot turn an otherwise rejected program
+into an accepted one. The notable exception to this rule is for
+entrypoints: the `CONTRACT` instruction semantics varies depending on
+its constructor annotation, and some contract origination may fail due
+to invalid entrypoint constructor annotations.
 
 Stack visualization tools like the Michelson's Emacs mode print
 annotations associated with each type in the program, as propagated by
@@ -2016,6 +2180,9 @@ type on top.
    EMPTY_MAP :t 'key 'val
    :: 'S -> (map :t 'key 'val) : 'S
 
+   EMPTY_BIG_MAP :t 'key 'val
+   :: 'S -> (big_map :t 'key 'val) : 'S
+
 
 A no-op instruction ``CAST`` ensures the top of the stack has the
 specified type, and change its type if it is compatible. In particular,
@@ -2081,6 +2248,7 @@ The instructions which accept at most one variable annotation are:
    MEM
    EMPTY_SET
    EMPTY_MAP
+   EMPTY_BIG_MAP
    UPDATE
    GET
    LAMBDA
@@ -2123,6 +2291,7 @@ The instructions which accept at most one variable annotation are:
    SELF
    CAST
    RENAME
+   CHAIN_ID
 
 The instructions which accept at most two variable annotations are:
 
@@ -2219,12 +2388,6 @@ and variable annotations).
 
    RIGHT %left %right 'a
    :: 'b : 'S -> (or ('a %left) ('b %right)) : 'S
-
-   NONE %some 'a
-   :: 'S -> (option ('a %some))
-
-   Some %some
-   :: 'a : 'S -> (option ('a %some))
 
 To improve readability and robustness, instructions ``CAR`` and ``CDR``
 accept one field annotation. For the contract to type check, the name of
@@ -2432,6 +2595,144 @@ treatment of annotations with `.`.
    :: @p.x 'a : @p.y 'b : 'S   ->  @p (pair ('a %x) ('b %y)) : 'S
    :: @p.x 'a : @q.y 'b : 'S   ->  (pair ('a %x) ('b %y)) : 'S
 
+Entrypoints
+-----------
+
+The specification up to this point has been mostly ignoring existence
+of entrypoints: a mechanism of contract level polymorphism. This
+mechanism is optional, non intrusive, and transparent to smart
+contracts that don't use them. This section is to be read as a patch
+over the rest of the specification, introducing rules that apply only
+in presence of contracts that make use of entrypoints.
+
+Defining and calling entrypoints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Entrypoints piggyback on the constructor annotations. A contract with
+entrypoints is basically a contract that takes a disjunctive type (a
+nesting of ``or`` types) as the root of its input parameter, decorated
+with constructor annotations. An extra check is performed on these
+constructor annotations: a contract cannot define two entrypoints with
+the same name.
+
+An external transaction can include an entrypoint name alongside the
+parameter value. In that case, if there is a constructor annotation
+with this name at any position in the nesting of ``or`` types, the
+value is automatically wrapped into the according constructors. If the
+transaction specifies an entrypoint, but there is no such constructor
+annotation, the transaction fails.
+
+For instance, suppose the following input type.
+
+``parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))``
+
+The input values will be wrapped as in the following examples.
+
+::
+
+   +------------+-----------+---------------------------------+
+   | entrypoint | input     | wrapped input                   |
+   +------------+-----------+---------------------------------+
+   | %A         | 3         | Left (Left 3)                   |
+   | %B         | False     | Left (Right False)              |
+   | %C         | "bob"     | Right (Right "bob")             |
+   | %Z         | Unit      | Right (Left Unit)               |
+   | %maybe_C   | Right "x" | Right (Right "x")               |
+   | %maybe_C   | Left Unit | Right (Left Unit)               |
+   +------------+-----------+---------------------------------+
+   | not given  | value     | value (untouched)               |
+   | %BAD       | _         | failure, contract not called    |
+   +------------+-----------+---------------------------------+
+
+The ``default`` entrypoint
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A special semantics is assigned to the ``default`` entrypoint. If the
+contract does not explicitly declare a ``default`` entrypoint, then it
+is automatically assigned to the root of the parameter
+type. Conversely, if the contract is called without specifying an
+entrypoint, then it is assumed to be called with the ``default``
+entrypoint. This behaviour makes the entrypoint system completely
+transparent to contracts that do not use it.
+
+This is the case for the previous example, for instance. If a value is
+passed to such a contract specifying entrypoint ``default``, then the
+value is fed to the contract untouched, exactly as if no entrypoint
+was given.
+
+A non enforced convention is to make the entrypoint ``default`` of
+type unit, and to implement the crediting operation (just receive the
+transferred tokens).
+
+A consequence of this semantics is that if the contract uses the
+entrypoint system and defines a ``default`` entrypoint somewhere else
+than at the root of the parameter type, then it must provide an
+entrypoint for all the paths in the toplevel disjunction. Otherwise,
+some parts of the contracts would be dead code.
+
+Another consequence of setting the entrypoint somewhere else than at
+the root is that it makes it impossible to send the raw values of the
+full parameter type to a contract. A trivial solution for that is to
+name the root of the type. The conventional name for that is ``root``.
+
+Let us recapitulate this by tweaking the names of the previous example.
+
+``parameter %root (or (or (nat %A) (bool %B)) (or (unit %default) string))``
+
+The input values will be wrapped as in the following examples.
+
+::
+
+   +------------+---------------------+-----------------------+
+   | entrypoint | input               | wrapped input         |
+   +------------+---------------------+-----------------------+
+   | %A         | 3                   | Left (Left 3)         |
+   | %B         | False               | Left (Right False)    |
+   | %default   | Unit                | Right (Left Unit)     |
+   | %root      | Right (Right "bob") | Right (Right "bob")   |
+   +------------+---------------------+-----------------------+
+   | not given  | Unit                | Right Unit            |
+   | %BAD       | _                   | failure, contract not |
+   +------------+---------------------+-----------------------+
+
+Calling entrypoints from Michelson
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Michelson code can also produce transactions to a specific entrypoint.
+
+For this, both types ``address`` and ``contract`` have the ability to
+denote not just an address, but a pair of an address and an
+entrypoint. The concrete notation is ``"address%entrypoint"``.
+Note that ``"address"`` is strictly equivalent to ``"address%default"``,
+and for clarity, the second variant is forbidden in the concrete syntax.
+
+When the ``TRANSFER_TOKENS`` instruction is called, it places the
+entrypoint provided in the contract handle in the transaction.
+
+The ``CONTRACT t`` instruction has a variant ``CONTRACT %entrypoint
+t``, that works as follows. Note that ``CONTRACT t`` is strictly
+equivalent to ``CONTRACT %default t``, and for clarity, the second
+variant is forbidden in the concrete syntax.
+
+::
+
+   +---------------+---------------------+------------------------------------------+
+   | input address | instruction         | output contract                          |
+   +---------------+---------------------+------------------------------------------+
+   | "addr"        | CONTRACT t          | (Some "addr") if contract exists, has a  |
+   |               |                     | default entrypoint of type t, or has no  |
+   |               |                     | default entrypoint and parameter type t  |
+   +---------------+---------------------+------------------------------------------+
+   | "addr%name"   | CONTRACT t          | (Some "addr%name") if addr exists and    |
+   +---------------+---------------------+ has an entrypoint %name of type t        |
+   | "addr"        | CONTRACT %name t    |                                          |
+   +---------------+---------------------+------------------------------------------+
+   | "addr%_"      | CONTRACT %_ t       | None                                     |
+   +---------------+---------------------+------------------------------------------+
+
+Implicit accounts are considered to have a single ``default``
+entrypoint of type ``Unit``.
+
 JSON syntax
 -----------
 
@@ -2490,422 +2791,134 @@ The simplest contract is the contract for which the ``parameter`` and
     storage unit;
     parameter unit;
 
-Reservoir contract
-~~~~~~~~~~~~~~~~~~
 
-We want to create a contract that stores tez until a timestamp ``T`` or
-a maximum amount ``N`` is reached. Whenever ``N`` is reached before
-``T``, all tokens are reversed to an account ``B`` (and the contract is
-automatically deleted). Any call to the contract's code performed after
-``T`` will otherwise transfer the tokens to another account ``A``.
+Example contract with entrypoints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We want to build this contract in a reusable manner, so we do not
-hard-code the parameters. Instead, we assume that the global data of the
-contract are ``(Pair (Pair T N) (Pair A B))``.
-
-Hence, the global data of the contract has the following type
+The following contract maintains a number in its storage. It has two
+entrypoints ``add`` and ``sub`` to modify it, and the default
+entrypoint, of type ``unit`` will reset it to ``0``.
 
 ::
 
-    'g =
-      pair
-        (pair timestamp mutez)
-        (pair (contract unit) (contract unit))
+   { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
+     storage int ;
+     code { AMOUNT ; PUSH mutez 0 ; ASSERT_CMPEQ ; UNPAIR ;
+            IF_LEFT
+              { IF_LEFT { ADD } { SWAP ; SUB } }
+              { DROP ; DROP ; PUSH int 0 } ;
+            NIL operation ; PAIR } }
 
-Following the contract calling convention, the code is a lambda of type
+Multisig contract
+~~~~~~~~~~~~~~~~~
 
-::
+The multisig is a typical access control contract. The ownership of
+the multisig contract is shared between ``N`` participants represented
+by their public keys in the contract's storage. Any action on the
+multisig contract needs to be signed by ``K`` participants where the
+threshold ``K`` is also stored in the storage.
 
-    lambda
-      (pair unit 'g)
-      (pair (list operation) 'g)
+To avoid replay of the signatures sent to the contract, the signed
+data include not only a description of the action to perform but also
+the address of the multisig contract and a counter that gets
+incremented at each successful call to the contract.
 
-written as
+The multisig commands of `Tezos command line client
+<https://tezos.gitlab.io/mainnet/api/cli-commands.html>`__ use this
+smart contract. Moreover, `functional correctness of this contract has
+been verified
+<https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts_coq/multisig.v>`__
+using the Coq proof assistant.
 
-::
-
-    lambda
-      (pair
-         unit
-         (pair
-           (pair timestamp mutez)
-           (pair (contract unit) (contract unit))))
-      (pair
-         (list operation)
-         (pair
-            (pair timestamp mutez)
-            (pair (contract unit) (contract unit))))
-
-The complete source ``reservoir.tz`` is:
-
-::
-
-    parameter unit ;
-    storage
-      (pair
-         (pair (timestamp %T) (mutez %N)) # T N
-         (pair (contract %A unit) (contract %B unit))) ; # A B
-    code
-      { CDR ; DUP ; CAAR %T; # T
-        NOW ; COMPARE ; LE ;
-        IF { DUP ; CADR %N; # N
-             BALANCE ;
-             COMPARE ; LE ;
-             IF { NIL operation ; PAIR }
-                { DUP ; CDDR %B; # B
-                  BALANCE ; UNIT ;
-                  TRANSFER_TOKENS ;
-                  NIL operation ; SWAP ; CONS ;
-                  PAIR } }
-           { DUP ; CDAR %A; # A
-             BALANCE ;
-             UNIT ;
-             TRANSFER_TOKENS ;
-             NIL operation ; SWAP ; CONS ;
-             PAIR } }
-
-Reservoir contract (variant with broker and status)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We basically want the same contract as the previous one, but instead of
-leaving it empty, we want to keep it alive, storing a flag ``S`` so that we
-can tell afterwards if the tokens have been transferred to ``A`` or
-``B``. We also want a broker ``X`` to get some fee ``P`` in any case.
-
-We thus add variables ``P`` and ``S`` and ``X`` to the global data of
-the contract, now
-``(Pair (S, Pair (T, Pair (Pair P N) (Pair X (Pair A B)))))``. ``P`` is
-the fee for broker ``A``, ``S`` is the state, as a string ``"open"``,
-``"timeout"`` or ``"success"``.
-
-At the beginning of the transaction:
 
 ::
 
-     S is accessible via a CDAR
-     T               via a CDDAR
-     P               via a CDDDAAR
-     N               via a CDDDADR
-     X               via a CDDDDAR
-     A               via a CDDDDDAR
-     B               via a CDDDDDDR
+   parameter (pair
+                (pair :payload
+                   (nat %counter) # counter, used to prevent replay attacks
+                   (or :action    # payload to sign, represents the requested action
+                      (pair :transfer    # transfer tokens
+                         (mutez %amount) # amount to transfer
+                         (contract %dest unit)) # destination to transfer to
+                      (or
+                         (option %delegate key_hash) # change the delegate to this address
+                         (pair %change_keys          # change the keys controlling the multisig
+                            (nat %threshold)         # new threshold
+                            (list %keys key)))))     # new list of keys
+                (list %sigs (option signature)));    # signatures
 
-The complete source ``scrutable_reservoir.tz`` is:
+   storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
 
-::
+   code
+     {
+       UNPAIR ; SWAP ; DUP ; DIP { SWAP } ;
+       DIP
+         {
+           UNPAIR ;
+           # pair the payload with the current contract address, to ensure signatures
+           # can't be replayed accross different contracts if a key is reused.
+           DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
+           PACK ; # form the binary payload that we expect to be signed
+           DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP
+         } ;
 
-    parameter unit ;
-    storage
-      (pair
-         string # S
-         (pair
-            timestamp # T
-            (pair
-               (pair mutez mutez) # P N
-               (pair
-                  (contract unit) # X
-                  (pair (contract unit) (contract unit)))))) ; # A B
-    code
-      { DUP ; CDAR ; # S
-        PUSH string "open" ;
-        COMPARE ; NEQ ;
-        IF { FAIL } # on "success", "timeout" or a bad init value
-           { DUP ; CDDAR ; # T
-             NOW ;
-             COMPARE ; LT ;
-             IF { # Before timeout
-                  # We compute (P + N) mutez
-                  PUSH mutez 0 ;
-                  DIP { DUP ; CDDDAAR } ; ADD ; # P
-                  DIP { DUP ; CDDDADR } ; ADD ; # N
-                  # We compare to the cumulated amount
-                  BALANCE ;
-                  COMPARE; LT ;
-                  IF { # Not enough cash, we just accept the transaction
-                       # and leave the global untouched
-                       CDR ; NIL operation ; PAIR }
-                     { # Enough cash, successful ending
-                       # We update the global
-                       CDDR ; PUSH string "success" ; PAIR ;
-                       # We transfer the fee to the broker
-                       DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS ;
-                       # We transfer the rest to A
-                       DIP { DUP ; CDDADR ; # N
-                             DIP { DUP ; CDDDDAR } ; # A
-                             UNIT ; TRANSFER_TOKENS } ;
-                       NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
-                       PAIR } }
-                { # After timeout, we refund
-                  # We update the global
-                  CDDR ; PUSH string "timeout" ; PAIR ;
-                  # We try to transfer the fee to the broker
-                  BALANCE ; # available
-                  DIP { DUP ; CDDAAR } ; # P
-                  COMPARE ; LT ; # available < P
-                  IF { BALANCE ; # available
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS }
-                     { DUP ; CDDAAR ; # P
-                       DIP { DUP ; CDDDAR } ; # X
-                       UNIT ; TRANSFER_TOKENS } ;
-                  # We transfer the rest to B
-                  DIP { BALANCE ; # available
-                        DIP { DUP ; CDDDDDR } ; # B
-                        UNIT ; TRANSFER_TOKENS } ;
-                  NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
-                  PAIR } } }
+       # Check that the counters match
+       UNPAIR @stored_counter; DIP { SWAP };
+       ASSERT_CMPEQ ;
 
-Forward contract
-~~~~~~~~~~~~~~~~
+       # Compute the number of valid signatures
+       DIP { SWAP } ; UNPAIR @threshold @keys;
+       DIP
+         {
+           # Running count of valid signatures
+           PUSH @valid nat 0; SWAP ;
+           ITER
+             {
+               DIP { SWAP } ; SWAP ;
+               IF_CONS
+                 {
+                   IF_SOME
+                     { SWAP ;
+                       DIP
+                         {
+                           SWAP ; DIIP { DIP { DUP } ; SWAP } ;
+                           # Checks signatures, fails if invalid
+                           CHECK_SIGNATURE ; ASSERT ;
+                           PUSH nat 1 ; ADD @valid } }
+                     { SWAP ; DROP }
+                 }
+                 {
+                   # There were fewer signatures in the list
+                   # than keys. Not all signatures must be present, but
+                   # they should be marked as absent using the option type.
+                   FAIL
+                 } ;
+               SWAP
+             }
+         } ;
+       # Assert that the threshold is less than or equal to the
+       # number of valid signatures.
+       ASSERT_CMPLE ;
+       DROP ; DROP ;
 
-We want to write a forward contract on dried peas. The contract takes as
-global data the tons of peas ``Q``, the expected delivery date ``T``,
-the contract agreement date ``Z``, a strike ``K``, a collateral ``C``
-per ton of dried peas, and the accounts of the buyer ``B``, the seller
-``S`` and the warehouse ``W``.
+       # Increment counter and place in storage
+       DIP { UNPAIR ; PUSH nat 1 ; ADD @new_counter ; PAIR} ;
 
-These parameters as grouped in the global storage as follows:
+       # We have now handled the signature verification part,
+       # produce the operation requested by the signers.
+       NIL operation ; SWAP ;
+       IF_LEFT
+         { # Transfer tokens
+           UNPAIR ; UNIT ; TRANSFER_TOKENS ; CONS }
+         { IF_LEFT {
+                     # Change delegate
+                     SET_DELEGATE ; CONS }
+                   {
+                     # Change set of signatures
+                     DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;
+       PAIR }
 
-::
 
-    Pair
-      (Pair (Pair Q (Pair T Z)))
-      (Pair
-         (Pair K C)
-         (Pair (Pair B S) W))
-
-of type
-
-::
-
-    pair
-      (pair nat (pair timestamp timestamp))
-      (pair
-         (pair mutez mutez)
-         (pair (pair account account) account))
-
-The 24 hours after timestamp ``Z`` are for the buyer and seller to store
-their collateral ``(Q * C)``. For this, the contract takes a string as
-parameter, matching ``"buyer"`` or ``"seller"`` indicating the party for
-which the tokens are transferred. At the end of this day, each of them
-can send a transaction to send its tokens back. For this, we need to
-store who already paid and how much, as a ``(pair mutez mutez)`` where the
-left component is the buyer and the right one the seller.
-
-After the first day, nothing can happen until ``T``.
-
-During the 24 hours after ``T``, the buyer must pay ``(Q * K)`` to the
-contract, minus the amount already sent.
-
-After this day, if the buyer didn't pay enough then any transaction will
-send all the tokens to the seller.
-
-Otherwise, the seller must deliver at least ``Q`` tons of dried peas to
-the warehouse, in the next 24 hours. When the amount is equal to or
-exceeds ``Q``, all the tokens are transferred to the seller.
-For storing the quantity of peas already
-delivered, we add a counter of type ``nat`` in the global storage. For
-knowing this quantity, we accept messages from W with a partial amount
-of delivered peas as argument.
-
-After this day, any transaction will send all the tokens to the buyer
-(not enough peas have been delivered in time).
-
-Hence, the global storage is a pair, with the counters on the left, and
-the constant parameters on the right, initially as follows.
-
-::
-
-    Pair
-      (Pair 0 (Pair 0_00 0_00))
-      (Pair
-         (Pair (Pair Q (Pair T Z)))
-         (Pair
-            (Pair K C)
-            (Pair (Pair B S) W)))
-
-of type
-
-::
-
-    pair
-      (pair nat (pair mutez mutez))
-      (pair
-         (pair nat (pair timestamp timestamp))
-         (pair
-            (pair mutez mutez)
-            (pair (pair account account) account)))
-
-The parameter of the transaction will be either a transfer from the
-buyer or the seller or a delivery notification from the warehouse of
-type ``(or string nat)``.
-
-At the beginning of the transaction:
-
-::
-
-    Q is accessible via a CDDAAR
-    T               via a CDDADAR
-    Z               via a CDDADDR
-    K               via a CDDDAAR
-    C               via a CDDDADR
-    B               via a CDDDDAAR
-    S               via a CDDDDADR
-    W               via a CDDDDDR
-    the delivery counter via a CDAAR
-    the amount versed by the seller via a CDADDR
-    the argument via a CAR
-
-The complete source ``forward.tz`` is:
-
-::
-
-    parameter
-      (or string nat) ;
-    storage
-      (pair
-         (pair nat (pair mutez mutez)) # counter from_buyer from_seller
-         (pair
-            (pair nat (pair timestamp timestamp)) # Q T Z
-            (pair
-               (pair mutez mutez) # K C
-               (pair
-                  (pair (contract unit) (contract unit)) # B S
-                  (contract unit))))) ; # W
-    code
-      { DUP ; CDDADDR ; # Z
-        PUSH int 86400 ; SWAP ; ADD ; # one day in second
-        NOW ; COMPARE ; LT ;
-        IF { # Before Z + 24
-             DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
-             IF_LEFT
-               { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
-                 IF { DROP ;
-                      DUP ; CDADAR ; # amount already versed by the buyer
-                      DIP { AMOUNT } ; ADD ; # transaction
-                      #  then we rebuild the globals
-                      DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                      PUSH nat 0 ; PAIR ; # delivery counter at 0
-                      DIP { CDDR } ; PAIR ; # parameters
-                      # and return Unit
-                      NIL operation ; PAIR }
-                    { PUSH string "seller" ; COMPARE ; EQ ;
-                      IF { DUP ; CDADDR ; # amount already versed by the seller
-                           DIP { AMOUNT } ; ADD ; # transaction
-                           #  then we rebuild the globals
-                           DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
-                           PUSH nat 0 ; PAIR ; # delivery counter at 0
-                           DIP { CDDR } ; PAIR ; # parameters
-                           # and return Unit
-                           NIL operation ; PAIR }
-                         { FAIL } } } # (Left _)
-               { FAIL } } # (Right _)
-           { # After Z + 24
-             # if balance is emptied, just fail
-             BALANCE ; PUSH mutez 0 ; IFCMPEQ { FAIL } {} ;
-             # test if the required amount is reached
-             DUP ; CDDAAR ; # Q
-             DIP { DUP ; CDDDADR } ; MUL ; # C
-             PUSH nat 2 ; MUL ;
-             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C)
-             IF { # refund the parties
-                  CDR ; DUP ; CADAR ; # amount versed by the buyer
-                  DIP { DUP ; CDDDAAR } ; # B
-                  UNIT ; TRANSFER_TOKENS ;
-                  NIL operation ; SWAP ; CONS ; SWAP ;
-                  DUP ; CADDR ; # amount versed by the seller
-                  DIP { DUP ; CDDDADR } ; # S
-                  UNIT ; TRANSFER_TOKENS ; SWAP ;
-                  DIP { CONS } ;
-                  DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
-                  BALANCE ; SUB ; # bonus to the warehouse
-                  DIP { DUP ; CDDDDR } ; # W
-                  UNIT ; TRANSFER_TOKENS ;
-                  DIP { SWAP } ; CONS ;
-                  # leave the storage as-is, as the balance is now 0
-                  PAIR }
-                { # otherwise continue
-                  DUP ; CDDADAR ; # T
-                  NOW ; COMPARE ; LT ;
-                  IF { FAIL } # Between Z + 24 and T
-                     { # after T
-                       DUP ; CDDADAR ; # T
-                       PUSH int 86400 ; ADD ; # one day in second
-                       NOW ; COMPARE ; LT ;
-                       IF { # Between T and T + 24
-                            # we only accept transactions from the buyer
-                            DUP ; CAR ; # we must receive (Left "buyer")
-                            IF_LEFT
-                              { PUSH string "buyer" ; COMPARE ; EQ ;
-                                IF { DUP ; CDADAR ; # amount already versed by the buyer
-                                     DIP { AMOUNT } ; ADD ; # transaction
-                                     # The amount must not exceed Q * K
-                                     DUP ;
-                                     DIIP { DUP ; CDDAAR ; # Q
-                                            DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
-                                     DIP { COMPARE ; GT ; # new amount > Q * K
-                                           IF { FAIL } { } } ; # abort or continue
-                                     #  then we rebuild the globals
-                                     DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                                     PUSH nat 0 ; PAIR ; # delivery counter at 0
-                                     DIP { CDDR } ; PAIR ; # parameters
-                                     # and return Unit
-                                     NIL operation ; PAIR }
-                                   { FAIL } } # (Left _)
-                              { FAIL } } # (Right _)
-                          { # After T + 24
-                            # test if the required payment is reached
-                            DUP ; CDDAAR ; # Q
-                            DIP { DUP ; CDDDAAR } ; MUL ; # K
-                            DIP { DUP ; CDADAR } ; # amount already versed by the buyer
-                            COMPARE ; NEQ ;
-                            IF { # not reached, pay the seller
-                                 BALANCE ;
-                                 DIP { DUP ; CDDDDADR } ; # S
-                                 DIIP { CDR } ;
-                                 UNIT ; TRANSFER_TOKENS ;
-                                 NIL operation ; SWAP ; CONS ; PAIR }
-                               { # otherwise continue
-                                 DUP ; CDDADAR ; # T
-                                 PUSH int 86400 ; ADD ;
-                                 PUSH int 86400 ; ADD ; # two days in second
-                                 NOW ; COMPARE ; LT ;
-                                 IF { # Between T + 24 and T + 48
-                                      # We accept only delivery notifications, from W
-                                      DUP ; CDDDDDR ; ADDRESS ; # W
-                                      SENDER ;
-                                      COMPARE ; NEQ ;
-                                      IF { FAIL } {} ; # fail if not the warehouse
-                                      DUP ; CAR ; # we must receive (Right amount)
-                                      IF_LEFT
-                                        { FAIL } # (Left _)
-                                        { # We increment the counter
-                                          DIP { DUP ; CDAAR } ; ADD ;
-                                          # And rebuild the globals in advance
-                                          DIP { DUP ; CDADR } ; PAIR ;
-                                          DIP { CDDR } ; PAIR ;
-                                          UNIT ; PAIR ;
-                                          # We test if enough have been delivered
-                                          DUP ; CDAAR ;
-                                          DIP { DUP ; CDDAAR } ;
-                                          COMPARE ; LT ; # counter < Q
-                                          IF { CDR ; NIL operation } # wait for more
-                                             { # Transfer all the money to the seller
-                                               BALANCE ;
-                                               DIP { DUP ; CDDDDADR } ; # S
-                                               DIIP { CDR } ;
-                                               UNIT ; TRANSFER_TOKENS ;
-                                               NIL operation ; SWAP ; CONS } } ;
-                                      PAIR }
-                                    { # after T + 48, transfer everything to the buyer
-                                      BALANCE ;
-                                      DIP { DUP ; CDDDDAAR } ; # B
-                                      DIIP { CDR } ;
-                                      UNIT ; TRANSFER_TOKENS ;
-                                      NIL operation ; SWAP ; CONS ;
-                                      PAIR} } } } } } }
 
 Full grammar
 ------------
@@ -2956,6 +2969,7 @@ Full grammar
       | SIZE
       | EMPTY_SET <comparable type>
       | EMPTY_MAP <comparable type> <type>
+      | EMPTY_BIG_MAP <comparable type> <type>
       | MAP { <instruction> ... }
       | ITER { <instruction> ... }
       | MEM
@@ -3012,6 +3026,7 @@ Full grammar
       | SOURCE
       | SENDER
       | ADDRESS
+      | CHAIN_ID
     <type> ::=
       | <comparable type>
       | key
@@ -3021,14 +3036,17 @@ Full grammar
       | list <type>
       | set <comparable type>
       | operation
-      | address
       | contract <type>
       | pair <type> <type>
       | or <type> <type>
       | lambda <type> <type>
       | map <comparable type> <type>
       | big_map <comparable type> <type>
+      | chain_id
     <comparable type> ::=
+      | <simple comparable type>
+      | pair <simple comparable type> <comparable type>
+    <simple comparable type> ::=
       | int
       | nat
       | string
@@ -3037,6 +3055,8 @@ Full grammar
       | bool
       | key_hash
       | timestamp
+      | address
+
 
 Reference implementation
 ------------------------

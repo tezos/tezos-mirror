@@ -146,6 +146,7 @@ module Gas : sig
   type error += Gas_limit_too_high (* `Permanent *)
 
   val free : cost
+  val atomic_step_cost : int -> cost
   val step_cost : int -> cost
   val alloc_cost : int -> cost
   val alloc_bytes_cost : int -> cost
@@ -212,6 +213,7 @@ module Script : sig
     | I_BALANCE
     | I_CAR
     | I_CDR
+    | I_CHAIN_ID
     | I_CHECK_SIGNATURE
     | I_COMPARE
     | I_CONCAT
@@ -223,6 +225,7 @@ module Script : sig
     | I_DROP
     | I_DUP
     | I_EDIV
+    | I_EMPTY_BIG_MAP
     | I_EMPTY_MAP
     | I_EMPTY_SET
     | I_EQ
@@ -278,6 +281,8 @@ module Script : sig
     | I_ISNAT
     | I_CAST
     | I_RENAME
+    | I_DIG
+    | I_DUG
     | T_bool
     | T_contract
     | T_int
@@ -300,6 +305,8 @@ module Script : sig
     | T_unit
     | T_operation
     | T_address
+    | T_chain_id
+
 
   type location = Micheline.canonical_location
 
@@ -339,6 +346,27 @@ module Script : sig
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
   val force_decode : context -> lazy_expr -> (expr * context) tzresult Lwt.t
   val force_bytes : context -> lazy_expr -> (MBytes.t * context) tzresult Lwt.t
+
+  val unit_parameter : lazy_expr
+
+  module Legacy_support : sig
+    val manager_script_code: lazy_expr
+    val add_do:
+      manager_pkh: Signature.Public_key_hash.t ->
+      script_code: lazy_expr ->
+      script_storage: lazy_expr ->
+      (lazy_expr * lazy_expr) tzresult Lwt.t
+    val add_set_delegate:
+      manager_pkh: Signature.Public_key_hash.t ->
+      script_code: lazy_expr ->
+      script_storage: lazy_expr ->
+      (lazy_expr * lazy_expr) tzresult Lwt.t
+    val has_default_entrypoint: lazy_expr -> bool
+    val add_root_entrypoint:
+      script_code: lazy_expr ->
+      lazy_expr tzresult Lwt.t
+  end
+
 end
 
 module Constants : sig
@@ -380,12 +408,13 @@ module Constants : sig
     endorsement_security_deposit: Tez.t ;
     block_reward: Tez.t ;
     endorsement_reward: Tez.t ;
-    endorsement_reward_priority_bonus: Tez.t ;
-    endorsement_bonus_intercept: int ;
-    endorsement_bonus_slope: int ;
     cost_per_byte: Tez.t ;
     hard_storage_limit_per_operation: Z.t ;
-    minimum_endorsements_per_priority: int list ;
+    test_chain_duration: int64;
+    quorum_min: int32 ;
+    quorum_max: int32 ;
+    min_proposal_quorum : int32 ;
+    initial_endorsers: int ;
     delay_per_missing_endorsement : Period.t ;
   }
   val parametric_encoding: parametric Data_encoding.t
@@ -397,7 +426,7 @@ module Constants : sig
   val blocks_per_voting_period: context -> int32
   val time_between_blocks: context -> Period.t list
   val endorsers_per_block: context -> int
-  val minimum_endorsements_per_priority: context -> int list
+  val initial_endorsers: context -> int
   val delay_per_missing_endorsement: context -> Period.t
   val hard_gas_limit_per_operation: context -> Z.t
   val hard_gas_limit_per_block: context -> Z.t
@@ -412,6 +441,10 @@ module Constants : sig
   val origination_size: context -> int
   val block_security_deposit: context -> Tez.t
   val endorsement_security_deposit: context -> Tez.t
+  val test_chain_duration: context -> int64
+  val quorum_min: context -> int32
+  val quorum_max: context -> int32
+  val min_proposal_quorum: context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {
@@ -539,6 +572,17 @@ module Seed : sig
 
 end
 
+module Big_map: sig
+  type id = Z.t
+  val fresh : context -> (context * id) tzresult Lwt.t
+  val fresh_temporary : context -> context * id
+  val mem : context -> id -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
+  val get_opt : context -> id -> Script_expr_hash.t -> (context * Script.expr option) tzresult Lwt.t
+  val rpc_arg : id RPC_arg.t
+  val cleanup_temporary : context -> context Lwt.t
+  val exists : context -> id -> (context * (Script.expr * Script.expr) option) tzresult Lwt.t
+end
+
 module Contract : sig
 
   include BASIC_DATA
@@ -559,27 +603,22 @@ module Contract : sig
 
   val list: context -> contract list Lwt.t
 
-  val get_manager:
-    context -> contract -> public_key_hash tzresult Lwt.t
-
   val get_manager_key:
-    context -> contract -> public_key tzresult Lwt.t
+    context -> public_key_hash -> public_key tzresult Lwt.t
   val is_manager_key_revealed:
-    context -> contract -> bool tzresult Lwt.t
+    context -> public_key_hash -> bool tzresult Lwt.t
 
   val reveal_manager_key:
-    context -> contract -> public_key -> context tzresult Lwt.t
+    context -> public_key_hash -> public_key -> context tzresult Lwt.t
 
-  val is_delegatable:
-    context -> contract -> bool tzresult Lwt.t
-  val is_spendable:
-    context -> contract -> bool tzresult Lwt.t
+  val get_script_code:
+    context -> contract -> (context * Script.lazy_expr option) tzresult Lwt.t
   val get_script:
     context -> contract -> (context * Script.t option) tzresult Lwt.t
   val get_storage:
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter: context -> contract -> Z.t tzresult Lwt.t
+  val get_counter: context -> public_key_hash -> Z.t tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
 
@@ -588,28 +627,33 @@ module Contract : sig
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult Lwt.t
   val originated_from_current_nonce: since: context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff_item = {
-    diff_key : Script_repr.expr;
-    diff_key_hash : Script_expr_hash.t;
-    diff_value : Script_repr.expr option;
-  }
+  type big_map_diff_item =
+  | Update of {
+      big_map : Big_map.id ;
+      diff_key : Script.expr;
+      diff_key_hash : Script_expr_hash.t;
+      diff_value : Script.expr option;
+    }
+  | Clear of Big_map.id
+  | Copy of Big_map.id * Big_map.id
+  | Alloc of {
+      big_map : Big_map.id;
+      key_type : Script.expr;
+      value_type : Script.expr;
+    }
   type big_map_diff = big_map_diff_item list
   val big_map_diff_encoding : big_map_diff Data_encoding.t
 
   val originate:
     context -> contract ->
     balance: Tez.t ->
-    manager: public_key_hash ->
-    ?script: (Script.t * big_map_diff option) ->
+    script: (Script.t * big_map_diff option) ->
     delegate: public_key_hash option ->
-    spendable: bool ->
-    delegatable: bool -> context tzresult Lwt.t
+    context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
 
   val spend:
-    context -> contract -> Tez.t -> context tzresult Lwt.t
-  val spend_from_script:
     context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val credit:
@@ -623,17 +667,10 @@ module Contract : sig
   val used_storage_space: context -> t -> Z.t tzresult Lwt.t
 
   val increment_counter:
-    context -> contract -> context tzresult Lwt.t
+    context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment:
-    context -> contract -> Z.t -> unit tzresult Lwt.t
-
-  module Big_map : sig
-    val mem:
-      context -> contract -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
-    val get_opt:
-      context -> contract -> Script_expr_hash.t -> (context * Script_repr.expr option) tzresult Lwt.t
-  end
+    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
   (**/**)
   (* Only for testing *)
@@ -664,9 +701,6 @@ module Delegate : sig
   val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set:
-    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
-
-  val set_from_script:
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
   val fold:
@@ -721,7 +755,7 @@ module Delegate : sig
 
   val delegated_contracts:
     context -> Signature.Public_key_hash.t ->
-    Contract_hash.t list Lwt.t
+    Contract_repr.t list Lwt.t
 
   val delegated_balance:
     context -> Signature.Public_key_hash.t ->
@@ -783,7 +817,9 @@ module Vote : sig
     context -> Voting_period.kind -> context tzresult Lwt.t
 
   val get_current_quorum: context -> int32 tzresult Lwt.t
-  val set_current_quorum: context -> int32 -> context tzresult Lwt.t
+
+  val get_participation_ema: context -> int32 tzresult Lwt.t
+  val set_participation_ema: context -> int32 -> context tzresult Lwt.t
 
   val get_current_proposal:
     context -> proposal tzresult Lwt.t
@@ -901,7 +937,7 @@ and _ contents =
       ballot: Vote.ballot ;
     } -> Kind.ballot contents
   | Manager_operation : {
-      source: Contract.contract ;
+      source: Signature.Public_key_hash.t ;
       fee: Tez.tez ;
       counter: counter ;
       operation: 'kind manager_operation ;
@@ -913,15 +949,13 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   | Transaction : {
       amount: Tez.tez ;
-      parameters: Script.lazy_expr option ;
+      parameters: Script.lazy_expr ;
+      entrypoint: string ;
       destination: Contract.contract ;
     } -> Kind.transaction manager_operation
   | Origination : {
-      manager: Signature.Public_key_hash.t ;
       delegate: Signature.Public_key_hash.t option ;
-      script: Script.t option ;
-      spendable: bool ;
-      delegatable: bool ;
+      script: Script.t ;
       credit: Tez.tez ;
       preorigination: Contract.t option ;
     } -> Kind.origination manager_operation
@@ -1120,14 +1154,15 @@ end
 
 module Global : sig
 
-  val get_last_block_priority: context -> int tzresult Lwt.t
-  val set_last_block_priority: context -> int -> context tzresult Lwt.t
+  val get_block_priority: context -> int tzresult Lwt.t
+  val set_block_priority: context -> int -> context tzresult Lwt.t
 
 end
 
 val prepare_first_block:
   Context.t ->
-  typecheck:(context -> Script.t -> context tzresult Lwt.t) ->
+  typecheck:(context -> Script.t ->
+             ((Script.t * Contract.big_map_diff option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->

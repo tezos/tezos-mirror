@@ -4,10 +4,12 @@
  (libraries tezos-base
             tezos-protocol-alpha
             tezos-protocol-environment
+            tezos-shell-context
             tezos-shell-services
             tezos-client-base
             tezos-client-alpha
             tezos-client-commands
+            tezos-stdlib-unix
             tezos-storage
             tezos-rpc-http
             tezos-rpc)
@@ -16,10 +18,13 @@
                      delegate_commands
                      delegate_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_context
                    -open Tezos_storage
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))
@@ -38,6 +43,7 @@
  (library_flags (:standard -linkall))
  (modules delegate_commands)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
@@ -62,6 +68,7 @@
  (library_flags (:standard -linkall))
  (modules delegate_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_alpha
@@ -71,6 +78,6 @@
                    -open Tezos_rpc)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

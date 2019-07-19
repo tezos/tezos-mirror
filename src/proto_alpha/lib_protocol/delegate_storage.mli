@@ -49,10 +49,6 @@ type frozen_balance = {
   rewards : Tez_repr.t ;
 }
 
-(** Is the contract eligible to delegation ? *)
-val is_delegatable:
-  Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
-
 (** Allow to register a delegate when creating an account. *)
 val init:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t ->
@@ -67,26 +63,19 @@ val get:
   Raw_context.t -> Contract_repr.t ->
   Signature.Public_key_hash.t option tzresult Lwt.t
 
-val registered: Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
+val registered: Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
 (** Updating the delegate of a contract.
 
-    When calling this function on an "implicit contract" this function
-    fails, unless when the registered delegate is the contract manager.
-    In the that case, the manager is now registered as a delegate. One
-    cannot unregister a delegate for now. The associate contract is
-    now 'undeletable'. *)
+    When calling this function on an "implicit contract" and setting
+    the delegate to the contract manager registers it as a delegate. One
+    cannot unregister a delegate for now. The associate contract is now
+    'undeletable'. *)
 val set:
   Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
-(** Same as {!set} ignoring the [delegatable] flag. *)
-val set_from_script:
-  Raw_context.t -> Contract_repr.t -> Signature.Public_key_hash.t option ->
-  Raw_context.t tzresult Lwt.t
-
 type error +=
-  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | No_deletion of Signature.Public_key_hash.t (* `Permanent *)
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
@@ -169,10 +158,10 @@ val staking_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
 
-(** Returns the list of contract that delegated towards a given delegate *)
+(** Returns the list of contracts (implicit or originated) that delegated towards a given delegate *)
 val delegated_contracts:
   Raw_context.t -> Signature.Public_key_hash.t ->
-  Contract_hash.t list Lwt.t
+  Contract_repr.t list Lwt.t
 
 val delegated_balance:
   Raw_context.t -> Signature.Public_key_hash.t ->

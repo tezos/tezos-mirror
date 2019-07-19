@@ -31,7 +31,7 @@ let encoding = Data_encoding.string_enum
       ("rolling", Rolling) ;
     ]
 
-let equal = function
+let equal hm1 hm2 = match (hm1, hm2) with
   | (Archive, Archive)
   | (Full, Full)
   | (Rolling, Rolling) -> true
@@ -42,5 +42,4 @@ let pp ppf = function
   | Full -> Format.fprintf ppf "full"
   | Rolling -> Format.fprintf ppf "rolling"
 
-let tag =
-  Tag.def "history_mode" pp
+let tag = Tag.def "history_mode" pp

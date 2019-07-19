@@ -43,11 +43,11 @@ module Seq_validator = struct
   type t = validation_context
 
   let init context_index =
-    lwt_log_notice "Intialized" >>= fun () ->
+    lwt_log_notice "Initialized" >>= fun () ->
     Lwt.return { context_index }
 
   let close _ =
-    lwt_log_notice "Shutting down ..." >>= fun () ->
+    lwt_log_notice "Shutting down..." >>= fun () ->
     Lwt.return_unit
 
   let apply_block

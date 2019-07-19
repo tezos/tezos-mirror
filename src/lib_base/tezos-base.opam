@@ -6,6 +6,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-stdlib"
@@ -15,10 +16,9 @@ depends: [
   "tezos-event-logging"
   "tezos-micheline"
   "tezos-rpc"
-  "calendar"
+  "ptime" { >= "0.8.4" }
   "ezjsonm" { >= "0.5.0" }
   "ipaddr" { >= "3.0.0" }
-  "mtime" { >= "1.0.0" }
   "re" { >= "1.7.2" }
 ]
 build: [

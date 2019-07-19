@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Helpers_Nonce = Nonce
-open Proto_alpha
+open Protocol
 open Parameters_repr
 open Constants_repr
 open Alpha_context
@@ -47,7 +47,7 @@ let default_args = {
   params = { bootstrap_accounts = [] ;
              commitments = [] ;
              bootstrap_contracts = [] ;
-             constants = default ;
+             constants = Default_parameters.constants_mainnet ;
              security_deposit_ramp_up_cycles = None ;
              no_reward_cycles = None ;
            }
@@ -141,10 +141,12 @@ type gen_state = { mutable possible_transfers : (Account.t * Account.t) list ;
                    mutable nonce_to_reveal : (Cycle.t * Raw_level.t * Nonce.t) list ;
                  }
 
-let generate_random_endorsement ctxt n =
-  let slot = n in
-  Context.get_endorser ctxt slot >>=? fun delegate ->
-  Op.endorsement ~delegate ctxt [ slot ]
+let get_n_endorsements ctxt n =
+  Context.get_endorsers ctxt >>=? fun endorsing_rights ->
+  let endorsing_rights = List.sub endorsing_rights n in
+  map_s (fun { Delegate_services.Endorsing_rights.delegate ; level ; slots ; _ } ->
+      Op.endorsement ~delegate:(delegate,List.hd slots) ~level ctxt ()
+    ) endorsing_rights
 
 let generate_and_add_random_endorsements inc =
   let pred inc = Incremental.predecessor inc in
@@ -154,8 +156,7 @@ let generate_and_add_random_endorsements inc =
   in
   if_debug begin fun () ->
     Format.printf "[DEBUG] Generating up to %d endorsements...\n%!" nb_endorsements end;
-
-  map_s (generate_random_endorsement (B (pred inc))) (0-- (nb_endorsements -1)) >>=? fun endorsements ->
+  get_n_endorsements (B (pred inc)) (nb_endorsements -1) >>=? fun endorsements ->
 
   let compare op1 op2 =
     Operation_hash.compare (Operation.hash op1) (Operation.hash op2)
@@ -281,12 +282,12 @@ let init () =
   (* Right now, we split half of 80.000 rolls between generated accounts *)
   (* TODO : ensure we don't overflow with the underlying commitments *)
   Tez_repr.(
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     args.params.Parameters_repr.constants.Constants_repr.tokens_per_roll
     *? 80_000L >>=? fun total_amount ->
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     total_amount /? 2L >>=? fun amount ->
-    Lwt.return @@ Alpha_environment.wrap_error @@
+    Lwt.return @@ Environment.wrap_error @@
     amount /? (Int64.of_int args.accounts) ) >>=? fun initial_amount ->
 
   (* Ensure a deterministic run *)
@@ -320,11 +321,22 @@ let init () =
   let gen_state = { possible_transfers ; remaining_transfers = [] ;
                     nonce_to_reveal = [] ; remaining_activations } in
 
-  Block.genesis_with_parameters constants
-    ~commitments
-    ~security_deposit_ramp_up_cycles
-    ~no_reward_cycles initial_accounts
-  >>=? fun genesis ->
+
+  let bootstrap_accounts =
+    List.map (fun (Account.{ pk ; pkh ; _ }, amount) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount)
+      ) initial_accounts
+  in
+  let parameters =
+    { Parameters_repr.bootstrap_accounts ;
+      bootstrap_contracts = [] ;
+      commitments ;
+      constants ;
+      security_deposit_ramp_up_cycles ;
+      no_reward_cycles ;
+    } in
+
+  Block.genesis_with_parameters parameters >>=? fun genesis ->
 
   if_debug_s begin fun () ->
     iter_s (let open Account in fun ({ pkh ; _ } as acc, _) ->
@@ -344,6 +356,12 @@ let init () =
          Constants_repr.parametric_encoding parameters.Parameters_repr.constants)
   end;
 
+  let print_block block =
+    let open Block in
+    Format.printf "@[%6i %s@]\n%!"
+      (Int32.to_int (block.header.shell.level))
+      (Block_hash.to_b58check (block.hash)) in
+
   Format.printf "@[<v 2>Starting generation with :@ \
                  @[length    = %d@]@ \
                  @[seed      = %d@]@ \
@@ -352,7 +370,7 @@ let init () =
   let rec loop gen_state blk = function
     | 0 ->  return (gen_state, blk)
     | n -> begin
-        Block.print_block blk;
+        print_block blk ;
         step gen_state blk >>=? fun blk' ->
         loop gen_state blk' (n-1)
       end

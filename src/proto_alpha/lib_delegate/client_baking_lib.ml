@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 let bake_block
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Protocol_client_context.full)
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
@@ -56,12 +56,17 @@ let bake_block
       Some seed_nonce, Some seed_nonce_hash
     else
       None, None in
+  let timestamp =
+    if minimal_timestamp then
+      None
+    else
+      Some Time.System.(to_protocol (Systime_os.now ())) in
   Client_baking_forge.forge_block cctxt
     ?force
     ?minimal_fees
     ?minimal_nanotez_per_gas_unit
     ?minimal_nanotez_per_byte
-    ?timestamp:(if minimal_timestamp then None else Some (Time.now ()))
+    ?timestamp
     ?seed_nonce_hash
     ?mempool
     ?context_path
@@ -109,7 +114,7 @@ let do_reveal cctxt ~chain ~block nonces =
     cctxt ~chain ~block nonces >>=? fun () ->
   return_unit
 
-let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
+let reveal_block_nonces (cctxt : #Protocol_client_context.full) ~chain ~block block_hashes =
   cctxt#with_lock begin fun () ->
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->
     Client_baking_nonces.load cctxt nonces_location
@@ -140,7 +145,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full) ~chain ~block block_hashes =
   let nonces = List.map snd nonces in
   do_reveal cctxt ~chain ~block nonces
 
-let reveal_nonces (cctxt : #Proto_alpha.full) ~chain ~block () =
+let reveal_nonces (cctxt : #Protocol_client_context.full) ~chain ~block () =
   let open Client_baking_nonces in
   cctxt#with_lock begin fun () ->
     Client_baking_files.resolve_location cctxt ~chain `Nonce >>=? fun nonces_location ->

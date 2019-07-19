@@ -23,22 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
+open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_storage (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_big_map_value (rpc : #Proto_alpha.rpc_context) ~chain ~block contract key =
-  Alpha_services.Contract.big_map_get_opt rpc (chain, block) contract key
+let get_big_map_value (rpc : #rpc_context) ~chain ~block id key =
+  Alpha_services.Contract.big_map_get_opt rpc (chain, block) id key
 
-let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_script (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let parse_expression arg =
@@ -46,10 +47,10 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let transfer (cctxt : #Proto_alpha.full)
+let transfer (cctxt : #full)
     ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ~destination ?arg
+    ?branch ~source ~src_pk ~src_sk ~destination ?(entrypoint = "default") ?arg
     ~amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter
     () =
@@ -59,8 +60,8 @@ let transfer (cctxt : #Proto_alpha.full)
         return_some arg
     | None -> return_none
   end >>=? fun parameters ->
-  let parameters = Option.map ~f:Script.lazy_expr parameters in
-  let contents = Transaction { amount ; parameters ; destination } in
+  let parameters = Option.unopt_map ~f:Script.lazy_expr ~default:Script.unit_parameter parameters in
+  let contents = Transaction { amount ; parameters ; destination ; entrypoint } in
   Injection.inject_manager_operation
     cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
@@ -86,7 +87,7 @@ let reveal cctxt
     cctxt (chain, block) source >>=? fun pcounter ->
   let counter = Z.succ pcounter in
   Alpha_services.Contract.manager_key
-    cctxt (chain, block) source >>=? fun (_, key) ->
+    cctxt (chain, block) source >>=? fun key ->
   match key with
   | Some _ ->
       failwith "The manager key was previously revealed."
@@ -107,50 +108,6 @@ let reveal cctxt
           return (oph, op, result)
     end
 
-let originate
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee
-    ?gas_limit ?storage_limit
-    ~fee_parameter
-    contents =
-  Injection.inject_manager_operation
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ?fee ?gas_limit ?storage_limit
-    ~src_pk ~src_sk
-    ~fee_parameter
-    contents >>=? fun (_oph, _op, result as res) ->
-  Lwt.return
-    (Injection.originated_contracts (Single_result result)) >>=? function
-  | [ contract ] -> return (res, contract)
-  | contracts ->
-      failwith
-        "The origination introduced %d contracts instead of one."
-        (List.length contracts)
-
-let originate_account
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ~manager_pkh
-    ?(delegatable = false) ?delegate ~balance ?fee
-    ~fee_parameter
-    () =
-  let origination =
-    Origination { manager = manager_pkh ;
-                  delegate ;
-                  script = None ;
-                  spendable = true ;
-                  delegatable ;
-                  credit = balance ;
-                  preorigination = None } in
-  originate
-    cctxt ~chain ~block ?confirmations
-    ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee
-    ~fee_parameter
-    origination
-
 let delegate_contract cctxt
     ~chain ~block ?branch ?confirmations
     ?dry_run ?verbose_signing
@@ -168,9 +125,7 @@ let delegate_contract cctxt
     operation >>=? fun res ->
   return res
 
-let list_contract_labels
-    (cctxt : #Proto_alpha.full)
-    ~chain ~block =
+let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   map_s (fun h ->
       begin match Contract.is_implicit h with
@@ -195,16 +150,8 @@ let list_contract_labels
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Proto_alpha.full) name =
+let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
-
-let get_manager
-    (cctxt : #Proto_alpha.full)
-    ~chain ~block source =
-  Client_proto_contracts.get_manager
-    cctxt ~chain ~block source >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-  return (src_name, src_pkh, src_pk, src_sk)
 
 let set_delegate
     cctxt ~chain ~block ?confirmations
@@ -229,15 +176,9 @@ let register_as_delegate
   delegate_contract
     cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ~source:(Contract.implicit_contract source) ~src_pk ~src_sk:manager_sk ?fee
+    ~source ~src_pk ~src_sk:manager_sk ?fee
     ~fee_parameter
     (Some source)
-
-let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
-  get_manager
-    wallet ~chain ~block
-    source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-  return (src_pk, src_sk)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
@@ -245,7 +186,7 @@ let save_contract ~force cctxt alias_name contract =
   return_unit
 
 let originate_contract
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block ?confirmations
     ?dry_run
     ?verbose_signing
@@ -254,10 +195,7 @@ let originate_contract
     ?gas_limit
     ?storage_limit
     ~delegate
-    ?(delegatable=true)
-    ?(spendable=false)
     ~initial_storage
-    ~manager
     ~balance
     ~source
     ~src_pk
@@ -265,23 +203,31 @@ let originate_contract
     ~code
     ~fee_parameter
     () =
+  (* With the change of making implicit accounts delegatable, the following
+     3 arguments are being defaulted before they can be safely removed. *)
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage ; _ } ->
   let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
   let origination =
-    Origination { manager ;
-                  delegate ;
-                  script = Some { code ; storage } ;
-                  spendable ;
-                  delegatable ;
+    Origination { delegate ;
+                  script = { code ; storage } ;
                   credit = balance ;
                   preorigination = None } in
-  originate cctxt ~chain ~block ?confirmations
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
-    ?branch ~source ~src_pk ~src_sk ?fee ?gas_limit ?storage_limit
+    ?branch ~source ?fee ?gas_limit ?storage_limit
+    ~src_pk ~src_sk
     ~fee_parameter
-    origination
+    origination >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? function
+  | [ contract ] -> return (res, contract)
+  | contracts ->
+      failwith
+        "The origination introduced %d contracts instead of one."
+        (List.length contracts)
 
 type activation_key =
   { pkh : Ed25519.Public_key_hash.t ;
@@ -382,7 +328,7 @@ let inject_activate_operation
       return (oph, op, result)
 
 let activate_account
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block ?confirmations
     ?dry_run
     ?(encrypted = false) ?force
@@ -408,7 +354,7 @@ let activate_account
     name key.pkh key.activation_code
 
 let activate_existing_account
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block ?confirmations
     ?dry_run
     alias activation_code =
@@ -436,7 +382,7 @@ type ballots_info = {
 }
 
 let get_ballots_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -454,7 +400,7 @@ let get_ballots_info
            ballots }
 
 let get_period_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -471,14 +417,14 @@ let get_period_info
            current_proposal }
 
 let get_proposals
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Voting.proposals cctxt cb
 
 let submit_proposals
     ?dry_run ?verbose_signing
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain ~block ?confirmations ~src_sk source proposals =
   (* We need the next level, not the current *)
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
@@ -489,7 +435,7 @@ let submit_proposals
     ?dry_run ~src_sk contents ?verbose_signing
 
 let submit_ballot
-    ?dry_run ?verbose_signing (cctxt : #Proto_alpha.full)
+    ?dry_run ?verbose_signing (cctxt : #full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
@@ -512,7 +458,7 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
   | _ -> Pervasives.failwith "Unexpected result."
 
 let get_operation_from_block
-    (cctxt : #Client_context.full)
+    (cctxt : #full)
     ~chain
     predecessors
     operation_hash =
@@ -526,11 +472,11 @@ let get_operation_from_block
   | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt
+      Protocol_client_context.Alpha_block_services.Operations.operation cctxt
         ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #full)
     ~chain
     ?(predecessors = 10)
     operation_hash =

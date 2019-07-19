@@ -44,6 +44,11 @@ type error += Missing_field of prim
 type error += Duplicate_field of Script.location * prim
 type error += Unexpected_big_map of Script.location
 type error += Unexpected_operation of Script.location
+type error += Unexpected_contract of Script.location
+type error += No_such_entrypoint of string
+type error += Duplicate_entrypoint of string
+type error += Unreachable_entrypoint of prim list
+type error += Entrypoint_name_too_long of string
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
@@ -67,7 +72,9 @@ type error += Type_too_large : Script.location * int * int -> error
 
 (* Value typing errors *)
 type error += Invalid_constant : Script.location * Script.expr * Script.expr -> error
+type error += Invalid_syntactic_constant : Script.location * Script.expr * string -> error
 type error += Invalid_contract of Script.location * Contract.t
+type error += Invalid_big_map of Script.location * Big_map.id
 type error += Comparable_type_expected : Script.location * Script.expr -> error
 type error += Inconsistent_types : Script.expr * Script.expr -> error
 type error += Unordered_map_keys of Script.location * Script.expr
@@ -82,3 +89,6 @@ type error += Ill_typed_contract : Script.expr * type_map -> error
 
 (* Gas related errors *)
 type error += Cannot_serialize_error
+
+(* Deprecation errors *)
+type error += Deprecated_instruction of prim

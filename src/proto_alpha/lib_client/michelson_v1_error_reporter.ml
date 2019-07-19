@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Tezos_micheline
 open Script_tc_errors
@@ -70,14 +70,17 @@ let rec print_enumeration ppf = function
 
 let collect_error_locations errs =
   let rec collect acc = function
-    | Alpha_environment.Ecoproto_error
+    | Environment.Ecoproto_error
         (Ill_formed_type (_, _, _)
+        | No_such_entrypoint _
+        | Duplicate_entrypoint _
+        | Unreachable_entrypoint _
         | Runtime_contract_error (_, _)
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
         | Ill_typed_data (_, _, _)
         | Ill_typed_contract (_, _)) :: _
     | [] -> acc
-    | Alpha_environment.Ecoproto_error
+    | Environment.Ecoproto_error
         (Invalid_arity (loc, _, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
@@ -97,6 +100,7 @@ let collect_error_locations errs =
         | Unmatched_branches (loc, _, _)
         | Self_in_lambda loc
         | Invalid_constant (loc, _, _)
+        | Invalid_syntactic_constant (loc, _, _)
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
@@ -132,7 +136,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         (List.mapi (fun i l -> (i + 1, l)) lines) in
     match errs with
     | [] -> ()
-    | Alpha_environment.Ecoproto_error (Michelson_v1_primitives.Invalid_primitive_name (expr, loc)) :: rest ->
+    | Environment.Ecoproto_error (Michelson_v1_primitives.Invalid_primitive_name (expr, loc)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed ->
@@ -151,7 +155,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Format.fprintf ppf "Invalid primitive." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Alpha_environment.Ecoproto_error (Ill_typed_data (name, expr, ty)) :: rest ->
+    | Environment.Ecoproto_error (Ill_typed_data (name, expr, ty)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -168,7 +172,20 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_ty ty ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Alpha_environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
+    | Environment.Ecoproto_error (No_such_entrypoint entrypoint) :: rest ->
+        Format.fprintf ppf "Contract has no entrypoint named %s" entrypoint ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Duplicate_entrypoint entrypoint) :: rest ->
+        Format.fprintf ppf "Contract has two entrypoints named %s" entrypoint ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Unreachable_entrypoint path) :: rest ->
+        let path = String.concat "/" (List.map Michelson_v1_primitives.string_of_prim path) in
+        Format.fprintf ppf "Entrypoint at path %s is not reachable" path ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -183,7 +200,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             "Ill formed type." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Alpha_environment.Ecoproto_error (Ill_typed_contract (expr, type_map)) :: rest ->
+    | Environment.Ecoproto_error (Ill_typed_contract (expr, type_map)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when not details && expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -197,44 +214,54 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Format.fprintf ppf "Ill typed contract.";
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Alpha_environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize :: rest ->
+    | Environment.Ecoproto_error Apply.Gas_quota_exceeded_init_deserialize :: rest ->
         Format.fprintf ppf
           "@[<v 0>Not enough gas to deserialize the operation.@,\
            Injecting such a transaction could have you banned from mempools.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Cannot_serialize_error :: rest ->
+    | Environment.Ecoproto_error Cannot_serialize_error :: rest ->
         Format.fprintf ppf
           "Error too big to serialize within the provided gas bounds." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Cannot_serialize_storage :: rest ->
+    | Environment.Ecoproto_error (Deprecated_instruction prim) :: rest ->
+        Format.fprintf ppf "@[<v 0>Use of deprecated instruction: %s@]"
+          (Michelson_v1_primitives.string_of_prim prim) ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error Cannot_serialize_storage :: rest ->
         Format.fprintf ppf
           "Cannot serialize the resulting storage value within the provided gas bounds." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
+    | Environment.Ecoproto_error (Missing_field prim) :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
           (Michelson_v1_primitives.string_of_prim prim) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error (Duplicate_field (loc, prim)) :: rest ->
+    | Environment.Ecoproto_error (Duplicate_field (loc, prim)) :: rest ->
         Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
           print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
-        Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
+    | Environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
+        Format.fprintf ppf "%abig_map type not allowed inside another big_map"
           print_loc loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
+    | Environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
         Format.fprintf ppf "%aoperation type forbidden in parameter, storage and constants"
           print_loc loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
+    | Environment.Ecoproto_error (Unexpected_contract loc) :: rest ->
+        Format.fprintf ppf "%acontract type forbidden in storage and constants"
+          print_loc loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -246,38 +273,38 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Alpha_environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
+    | Environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
         Format.fprintf ppf
           "@[<v 2>Internal operation replay attempt:@,%a@]"
           Operation_result.pp_internal_operation op ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
+    | Environment.Ecoproto_error Gas.Gas_limit_too_high :: rest ->
         Format.fprintf ppf
           "Gas limit for the operation is out of the protocol hard bounds." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
+    | Environment.Ecoproto_error Gas.Block_quota_exceeded :: rest ->
         Format.fprintf ppf
           "Gas limit for the block exceeded during typechecking or execution." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Gas.Operation_quota_exceeded :: rest ->
+    | Environment.Ecoproto_error Gas.Operation_quota_exceeded :: rest ->
         Format.fprintf ppf
           "@[<v 0>Gas limit exceeded during typechecking or execution.@,Try again with a higher gas limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Alpha_environment.Ecoproto_error Fees.Operation_quota_exceeded :: rest ->
+    | Environment.Ecoproto_error Fees.Operation_quota_exceeded :: rest ->
         Format.fprintf ppf
           "@[<v 0>Storage limit exceeded during typechecking or execution.@,Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | [ Alpha_environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c) ] ->
+    | [ Environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c) ] ->
         Format.fprintf ppf
           "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
            The `-arg' flag should not be used when transferring to an account.@]"
           Contract.pp c
-    | Alpha_environment.Ecoproto_error err :: rest ->
+    | Environment.Ecoproto_error err :: rest ->
         begin match err with
           | Script_interpreter.Bad_contract_parameter c ->
               Format.fprintf ppf
@@ -436,6 +463,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 print_loc loc
                 print_expr got
                 print_ty exp
+          | Invalid_syntactic_constant (loc, got, exp) ->
+              Format.fprintf ppf
+                "@[<hov 0>@[<hov 2>%avalue@ %a@]@ \
+                 @[<hov 2>is invalid, expected@ %s@]@]"
+                print_loc loc
+                print_expr got
+                exp
           | Invalid_contract (loc, contract) ->
               Format.fprintf ppf
                 "%ainvalid contract %a."
@@ -471,7 +505,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                        Format.fprintf ppf "@,@[<v 2>trace@,%a@]"
                          print_execution_trace trace)
                 trace
-          | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
+          | err -> Format.fprintf ppf "%a" Environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest

@@ -6,41 +6,6 @@ set -o pipefail
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 
-parameters_file=$test_dir/protocol_parameters.json
-
-if ! [ -f "$parameters_file" ]; then
-	cat > "$parameters_file" <<EOF
-{ "bootstrap_accounts":
-  [
-      [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav", "4000000000000" ],
-      [ "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9", "4000000000000" ],
-      [ "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV", "4000000000000" ],
-      [ "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU", "4000000000000" ],
-      [ "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n", "4000000000000" ]
-  ],
-  "commitments": [
-    [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
-    [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
-    [ "btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348" ],
-    [ "btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031" ],
-    [ "btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550" ],
-    [ "btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555" ],
-    [ "btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443" ],
-    [ "btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525" ],
-    [ "btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693" ],
-    [ "btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478" ]
-  ],
-  "time_between_blocks" : [ "1", "0" ],
-  "blocks_per_cycle" : 128,
-  "blocks_per_roll_snapshot" : 32,
-  "blocks_per_voting_period" : 256,
-  "preserved_cycles" : 1,
-  "proof_of_work_threshold": "-1",
-  "minimum_endorsements_per_priority": []
-}
-EOF
-fi
-
 start_node 1
 activate_alpha
 
@@ -163,7 +128,7 @@ assert_storage $contract_macros_dir/compare_bytes.tz '{}' '(Pair 0x34 0x33)' '{ 
 
 # Test goldenbook
 
-init_with_transfer $contract_macros_dir/guestbook.tz $key1\
+init_with_transfer $contract_macros_dir/guestbook.tz \
                    '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" None }' \
                    100 bootstrap1
 assert_fails $client transfer 0 from bootstrap2 to guestbook -arg '"Pas moi"' --burn-cap 10
@@ -173,7 +138,7 @@ assert_fails $client transfer 0 from bootstrap3 to guestbook -arg '"Pas moi non 
 assert_fails $client transfer 0 from bootstrap1 to guestbook -arg '"Recoucou ?"' --burn-cap 10
 
 # Test for big maps
-init_with_transfer $contract_macros_dir/big_map_mem.tz $key1\
+init_with_transfer $contract_macros_dir/big_map_mem.tz \
                    '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
                    100 bootstrap1
 bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)' --burn-cap 10
@@ -191,7 +156,7 @@ assert_fails $client typecheck data '3' against type \
 $client typecheck data '3' against type \
         '(int :aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
 
-init_with_transfer $contract_macros_dir/big_map_get_add.tz $key1\
+init_with_transfer $contract_macros_dir/big_map_get_add.tz \
                    '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \
                    100 bootstrap1
 

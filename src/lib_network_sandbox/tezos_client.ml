@@ -1,7 +1,9 @@
 open Internal_pervasives
 
-type t = {id: string; port: int; exec: [`Client] Tezos_executable.t}
+type t = {id: string; port: int; exec: Tezos_executable.t}
 type client = t
+
+let no_node_client ~exec = {id= "C-null"; port= 0; exec}
 
 let of_node ~exec n =
   let id = sprintf "C-%s" n.Tezos_node.id in
@@ -22,7 +24,7 @@ let bootstrapped_script t ~state =
   let cmd =
     loop_until_true ~attempts:5 ~sleep:1
       ~on_failed_attempt:(fun _ ->
-          eprintf (str "Bootstrap attempt failed\\n") [] )
+        eprintf (str "Bootstrap attempt failed\\n") [] )
       (succeeds (client_command t ~state ["bootstrapped"]))
   in
   seq
@@ -54,14 +56,14 @@ let activate_protocol_script t ~state protocol =
           ~how:
             [ ( "activate"
               , client_command t ~state @@ opt "block" "genesis"
-                                           @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"
-                                             ; "fitness"
-                                             ; sprintf "%d" protocol.Tezos_protocol.expected_pow
-                                             ; "and"; "key"
-                                             ; Tezos_protocol.dictator_name protocol
-                                             ; "and"; "parameters"
-                                             ; Tezos_protocol.protocol_parameters_path ~config:state
-                                                 protocol ] ) ] ) ]
+                @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"
+                  ; "fitness"
+                  ; sprintf "%d" protocol.Tezos_protocol.expected_pow
+                  ; "and"; "key"
+                  ; Tezos_protocol.dictator_name protocol
+                  ; "and"; "parameters"
+                  ; Tezos_protocol.protocol_parameters_path ~config:state
+                      protocol ] ) ] ) ]
 
 let import_secret_key t ~state name key =
   Running_processes.run_genspio state
@@ -75,8 +77,8 @@ let register_as_delegate t ~state keyname =
     Genspio.EDSL.(
       if_seq
         ( succeeds
-          @@ client_command t ~state
-            ["register"; "key"; keyname; "as"; "delegate"] )
+        @@ client_command t ~state
+             ["register"; "key"; keyname; "as"; "delegate"] )
         ~t:[say "SUCCESS: Registering %s as delegate" [str keyname]]
         ~e:[say "FAILURE: Registering %s as delegate" [str keyname]])
   >>= fun _ -> return ()
@@ -103,13 +105,18 @@ end
 open Command_error
 open Console
 
-let successful_client_cmd state ~client args =
+let client_cmd state ~client args =
   Running_processes.run_cmdf state "sh -c %s"
     ( client_command client ~state args
-      |> Genspio.Compile.to_one_liner |> Filename.quote )
+    |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
-  >>= function
+  >>= fun success -> return (success, res)
+
+let successful_client_cmd state ~client args =
+  client_cmd state ~client args
+  >>= fun (success, res) ->
+  match success with
   | true -> return res
   | false ->
       failf ~args "Client-command failure: %s" (String.concat ~sep:" " args)
@@ -127,18 +134,18 @@ let rpc state ~client meth ~path =
     let json = Jqo.of_string output in
     return json
   with e -> (
-      try
-        Ezjsonm.from_string (sprintf "[ %s ]" output)
-        |> function `A [one] -> return one | _ -> raise e
-      with e ->
-        say state
-          EF.(
-            list
-              [ desc (shout "Output:") (markdown_verbatim output)
-              ; desc (shout "Error:")
-                  (markdown_verbatim (String.concat ~sep:"\n" res#err)) ])
-        >>= fun () ->
-        failf ~args "RPC failure cannot parse json: %s" Exn.(to_string e) )
+    try
+      Ezjsonm.from_string (sprintf "[ %s ]" output)
+      |> function `A [one] -> return one | _ -> raise e
+    with e ->
+      say state
+        EF.(
+          list
+            [ desc (shout "Output:") (markdown_verbatim output)
+            ; desc (shout "Error:")
+                (markdown_verbatim (String.concat ~sep:"\n" res#err)) ])
+      >>= fun () ->
+      failf ~args "RPC failure cannot parse json: %s" Exn.(to_string e) )
 
 let find_applied_in_mempool state ~client ~f =
   successful_client_cmd state ~client
@@ -162,7 +169,7 @@ let mempool_has_operation state ~client ~kind =
   find_applied_in_mempool state ~client ~f:(fun o ->
       Jqo.field o ~k:"contents"
       |> Jqo.list_exists ~f:(fun op -> Jqo.field op ~k:"kind" = `String kind)
-    )
+  )
   >>= fun found_or_not -> return (found_or_not <> None)
 
 let block_has_operation state ~client ~level ~kind =
@@ -176,7 +183,7 @@ let block_has_operation state ~client ~level ~kind =
           Jqo.list_exists olist ~f:(fun o ->
               Jqo.field o ~k:"contents"
               |> Jqo.list_exists ~f:(fun op ->
-                  Jqo.field op ~k:"kind" = `String kind ) ) )
+                     Jqo.field op ~k:"kind" = `String kind ) ) )
     in
     say state
       EF.(
@@ -200,6 +207,120 @@ let get_block_header state ~client block =
   in
   rpc state ~client `Get ~path
 
+let list_known_addresses state ~client =
+  successful_client_cmd state ~client ["list"; "known"; "addresses"]
+  >>= fun res ->
+  let re =
+    Re.(
+      compile
+        (seq
+           [ group (rep1 (alt [alnum; char '_']))
+           ; str ": "
+           ; group (rep1 alnum)
+           ; alt [space; eol; eos] ]))
+  in
+  return
+    (List.filter_map res#out
+       ~f:
+         Re.(
+           fun line ->
+             match exec_opt re line with
+             | None -> None
+             | Some matches -> Some (Group.get matches 1, Group.get matches 2)))
+
+module Ledger = struct
+  type hwm = {main: int; test: int; chain: Tezos_crypto.Chain_id.t option}
+
+  let set_hwm state ~client ~uri ~level =
+    successful_client_cmd state ~client
+      [ "set"; "ledger"; "high"; "watermark"; "for"; uri; "to"
+      ; string_of_int level ]
+    >>= fun _ -> return ()
+
+  let get_hwm state ~client ~uri =
+    successful_client_cmd state ~client
+      [ "get"; "ledger"; "high"; "watermark"; "for"; uri
+      ; "--no-legacy-instructions" ]
+    (* TODO: Use --for-script when available *)
+    >>= fun res ->
+    (* e.g. The high water mark values for married-bison-ill-burmese/P-256 are
+            0 for the main-chain (NetXH12Aer3be93) and
+            0 for the test-chain. *)
+    let re =
+      Re.(
+        let num = rep1 digit in
+        compile
+          (seq
+             [ group num
+             ; str " for the main-chain ("
+             ; group (rep1 alnum)
+             ; str ") and "; group num; str " for the test-chain." ]))
+    in
+    let matches = Re.exec re (String.concat ~sep:" " res#out) in
+    try
+      return
+        { main= int_of_string (Re.Group.get matches 1)
+        ; chain=
+            (let v = Re.Group.get matches 2 in
+             if v = "'Unspecified'" then None
+             else Some (Tezos_crypto.Chain_id.of_b58check_exn v))
+        ; test= int_of_string (Re.Group.get matches 3) }
+    with e ->
+      failf
+        "Couldn't understand result of 'get high watermark for %S': error %S: \
+         from %S"
+        uri (Exn.to_string e)
+        (String.concat ~sep:"\n" res#out)
+
+  let show_ledger state ~client ~uri =
+    successful_client_cmd state ~client ["show"; "ledger"; uri]
+    (* TODO: Use --for-script when available *)
+    >>= fun res ->
+    list_known_addresses state ~client
+    >>= fun known_addresses ->
+    let pk = Re.(rep1 alnum) in
+    let addr_re = Re.(compile (seq [str "* Public Key Hash: "; group pk])) in
+    let pubkey_re = Re.(compile (seq [str "* Public Key: "; group pk])) in
+    let out = String.concat ~sep:" " res#out in
+    try
+      let pubkey = Re.(Group.get (exec pubkey_re out) 1) in
+      let pubkey_hash = Re.(Group.get (exec addr_re out) 1) in
+      let name =
+        match
+          List.find known_addresses ~f:(fun (_, pkh) -> pkh = pubkey_hash)
+        with
+        | None -> ""
+        | Some (alias, _) -> alias
+      in
+      return
+        (Tezos_protocol.Account.key_pair name ~pubkey ~pubkey_hash
+           ~private_key:uri)
+    with e ->
+      failf "Couldn't understand result of 'show ledger %S': error %S: from %S"
+        uri (Exn.to_string e)
+        (String.concat ~sep:"\n" res#out)
+
+  let deauthorize_baking state ~client ~uri =
+    successful_client_cmd state ~client
+      ["deauthorize"; "ledger"; "baking"; "for"; uri]
+    >>= fun _ -> return ()
+
+  let get_authorized_key state ~client ~uri =
+    successful_client_cmd state ~client
+      ["get"; "ledger"; "authorized"; "path"; "for"; uri]
+    >>= fun res ->
+    let re_uri =
+      Re.(compile (seq [str "Authorized baking URI: "; group (rep1 any); eol]))
+    in
+    let re_none = Re.(compile (str "No baking key authorized")) in
+    let out = String.concat ~sep:" " res#out in
+    return
+      Re.(
+        match exec_opt re_none out with
+        | Some _ -> None
+        | None -> Some (Group.get (exec re_uri out) 1))
+end
+
 module Keyed = struct
   type t = {client: client; key_name: string; secret_key: string}
 
@@ -209,9 +330,13 @@ module Keyed = struct
     successful_client_cmd state ~client
       ["import"; "secret"; "key"; key_name; secret_key; "--force"]
 
-  let bake state baker msg =
+  let bake ?chain state baker msg =
+    let chain_arg =
+      Option.value_map chain ~default:[] ~f:(fun c -> ["--chain"; c])
+    in
     successful_client_cmd state ~client:baker.client
-      ["bake"; "for"; baker.key_name; "--force"; "--minimal-timestamp"]
+      ( chain_arg
+      @ ["bake"; "for"; baker.key_name; "--force"; "--minimal-timestamp"] )
     >>= fun res ->
     Log_recorder.Operations.bake state ~client:baker.client.id ~output:res#out
       msg ;
@@ -232,6 +357,11 @@ module Keyed = struct
         desc
           (af "Successful bake (%s: %s):" baker.client.id msg)
           (ocaml_string_list res#out))
+
+  let generate_nonce state {client; key_name; _} data =
+    successful_client_cmd state ~client
+      ["generate"; "nonce"; "hash"; "for"; key_name; "from"; data]
+    >>= fun res -> return (List.hd_exn res#out)
 
   let forge_and_inject state {client; key_name; _} ~json =
     rpc state ~client ~path:"/chains/main/blocks/head/helpers/forge/operations"

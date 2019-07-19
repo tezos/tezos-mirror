@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 val endorsement:
@@ -41,6 +41,7 @@ val transaction:
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
+  ?entrypoint:string ->
   Context.t ->
   Contract.t ->
   Contract.t ->
@@ -58,12 +59,9 @@ val revelation:
 val origination:
   ?counter: Z.t ->
   ?delegate:public_key_hash ->
-  ?script:Script.t ->
-  ?spendable:bool ->
-  ?delegatable:bool ->
+  script:Script.t ->
   ?preorigination: Contract.contract option ->
   ?public_key:public_key ->
-  ?manager:public_key_hash ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
   ?gas_limit:Z.t ->
@@ -111,3 +109,6 @@ val proposals : Context.t -> Contract.t -> Protocol_hash.t list ->
 val ballot : Context.t ->
   Contract.t -> Protocol_hash.t -> Vote.ballot ->
   Operation.packed tzresult Lwt.t
+
+val dummy_script : Script.t
+val dummy_script_cost : Test_tez.Tez.t

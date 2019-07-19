@@ -20,6 +20,7 @@ contract_op_dir="contracts/opcodes"
 contract_macros_dir="contracts/macros"
 contract_scenarios_dir="contracts/mini_scenarios"
 contract_attic_dir="contracts/attic"
+contract_deprecated_dir="contracts/deprecated"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client
@@ -143,15 +144,26 @@ bake_after () {
 init_with_transfer () {
     local FILE="$1"
     local NAME=$(contract_name_of_file "${FILE}")
-    local KEY="$2"
-    local INITIAL_STORAGE="$3"
-    local TRANSFER_AMT="$4"
-    local TRANSFER_SRC=${5-bootstrap1}
+    local INITIAL_STORAGE="$2"
+    local TRANSFER_AMT="$3"
+    local TRANSFER_SRC=${4-bootstrap1}
     echo "Originating [$NAME]"
     $client originate contract ${NAME} \
-            for ${KEY} transferring "${TRANSFER_AMT}" \
+            transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
     bake
+}
+
+assert_fails_init_with_transfer () {
+    local FILE="$1"
+    local NAME=$(contract_name_of_file "${FILE}")
+    local INITIAL_STORAGE="$2"
+    local TRANSFER_AMT="$3"
+    local TRANSFER_SRC=${4-bootstrap1}
+    echo "Originating [$NAME]"
+    assert_fails $client originate contract ${NAME} \
+                 transferring "${TRANSFER_AMT}" \
+                 from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}" --burn-cap 10
 }
 
 # Takes a grep regexp and fails with an error message if command does not include
@@ -166,6 +178,16 @@ assert_in_output () {
     else
         echo "[Assertion succeeded]"
     fi
+}
+
+get_NOW () {
+    local PRED_TS=`$client rpc get /chains/main/blocks/head~1/header | \
+                   jq .timetamp | \
+                   tr -d '"'`
+    local TBB=`$client rpc get /chains/main/blocks/head/context/constants | \
+               jq '.time_between_blocks | .[0]' | \
+               tr -d '"'`
+	echo "$(TZ='AAA' date -d "${PRED_TS} + ${TBB} seconds" +%FT%TZ)"
 }
 
 get_contract_addr () {
@@ -246,7 +268,7 @@ assert_protocol() {
     proto=$1
     printf "\n\nAsserting protocol propagation\n"
     for client in "${client_instances[@]}"; do
-        ( $client -p PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV \
+        ( $client -p ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im \
                   rpc get /chains/main/blocks/head/metadata | assert_in_output "\"next_protocol\": \"$proto\"" ) \
               || exit 2
     done

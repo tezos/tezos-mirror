@@ -50,11 +50,11 @@ module type Single_data_storage = sig
   val get_option: context -> value option tzresult Lwt.t
 
   (** Allocates the storage bucket and initializes it ; returns a
-      {!Storage_error Missing_key} if the bucket exists *)
+      {!Storage_error Existing_key} if the bucket exists *)
   val init: context -> value -> Raw_context.t tzresult Lwt.t
 
   (** Updates the content of the bucket ; returns a {!Storage_Error
-      Existing_key} if the value does not exists *)
+      Missing_key} if the value does not exists *)
   val set: context -> value -> Raw_context.t tzresult Lwt.t
 
   (** Allocates the data and initializes it with a value ; just
@@ -118,16 +118,18 @@ module type Single_carbonated_data_storage = sig
   (** Allocates the data and initializes it with a value ; just
       updates it if the bucket exists.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
-      Returns the difference from the old (maybe 0) to the new size. *)
-  val init_set: context -> value -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the difference from the old (maybe 0) to the new size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val init_set: context -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
       valus is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists.
       Consumes the same gas cost as either {!remove} or {!init_set}.
-      Returns the difference from the old (maybe 0) to the new size. *)
-  val set_option: context -> value option -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the difference from the old (maybe 0) to the new size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val set_option: context -> value option -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** Delete the storage bucket ; returns a {!Storage_error
       Missing_key} if the bucket does not exists.
@@ -138,8 +140,9 @@ module type Single_carbonated_data_storage = sig
   (** Removes the storage bucket and its contents ; does nothing if
       the bucket does not exists.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
-      Returns the freed size. *)
-  val remove: context -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the freed size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val remove: context -> (Raw_context.t * int * bool) tzresult Lwt.t
 
 end
 
@@ -245,8 +248,9 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       with a value ; just updates it if the bucket exists.
       Consumes serialization cost.
       Consumes [Gas_repr.write_bytes_cost <size of the new value>].
-      Returns the difference from the old (maybe 0) to the new size. *)
-  val init_set: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the difference from the old (maybe 0) to the new size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val init_set: context -> key -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
@@ -254,8 +258,9 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       nothing if the bucket does not exists.
       Consumes serialization cost.
       Consumes the same gas cost as either {!remove} or {!init_set}.
-      Returns the difference from the old (maybe 0) to the new size. *)
-  val set_option: context -> key -> value option -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the difference from the old (maybe 0) to the new size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val set_option: context -> key -> value option -> (Raw_context.t * int * bool) tzresult Lwt.t
 
   (** Delete a storage bucket and its contents ; returns a
       {!Storage_error Missing_key} if the bucket does not exists.
@@ -266,8 +271,9 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
   (** Removes a storage bucket and its contents ; does nothing if the
       bucket does not exists.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
-      Returns the freed size. *)
-  val remove: context -> key -> (Raw_context.t * int) tzresult Lwt.t
+      Returns the freed size, and a boolean
+      indicating if a value was already associated to this key. *)
+  val remove: context -> key -> (Raw_context.t * int * bool) tzresult Lwt.t
 
 end
 
@@ -358,6 +364,22 @@ module type VALUE = sig
   val encoding: t Data_encoding.t
 end
 
+module type REGISTER = sig val ghost : bool end
+
+module type Non_iterable_indexed_carbonated_data_storage_with_free = sig
+  include Non_iterable_indexed_carbonated_data_storage
+
+  (** Only used for 005 migration to avoid gas cost.
+      Allocates a storage bucket at the given key and initializes it ;
+      returns a {!Storage_error Existing_key} if the bucket exists. *)
+  val init_free: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+  (** Only used for 005 migration to avoid gas cost.
+      Updates the content of a bucket ; returns A {!Storage_Error
+      Missing_key} if the value does not exists. *)
+  val set_free: context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+end
+
 module type Indexed_raw_context = sig
 
   type t
@@ -373,7 +395,12 @@ module type Indexed_raw_context = sig
 
   val resolve: context -> string list -> key list Lwt.t
 
-  module Make_set (N : NAME)
+  val remove_rec: context -> key -> context Lwt.t
+
+  val copy: context -> from:key -> to_:key -> context tzresult Lwt.t
+
+  module Make_set (R : REGISTER) (N : NAME)
+
     : Data_set_storage with type t = t
                         and type elt = key
 
@@ -383,7 +410,7 @@ module type Indexed_raw_context = sig
                             and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : VALUE)
-    : Non_iterable_indexed_carbonated_data_storage with type t = t
+    : Non_iterable_indexed_carbonated_data_storage_with_free with type t = t
                                                     and type key = key
                                                     and type value = V.t
 

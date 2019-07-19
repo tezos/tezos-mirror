@@ -56,7 +56,7 @@ let lolblock ?(operations = []) header =
       [Operation_list_hash.compute operations] in
   let block_header =
     { Block_header.shell =
-        { timestamp = Time.of_seconds (Random.int64 1500L) ;
+        { timestamp = Time.Protocol.of_seconds (Random.int64 1500L) ;
           level = 0l ; (* dummy *)
           proto_level = 0 ; (* dummy *)
           validation_passes = Random.int 32 ;

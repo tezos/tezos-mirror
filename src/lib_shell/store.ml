@@ -68,7 +68,7 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["genesis" ; "time"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Genesis_protocol =
     Store_helpers.Make_single_store
@@ -86,7 +86,7 @@ module Chain = struct
     Store_helpers.Make_single_store
       (Indexed_store.Store)
       (struct let name = ["expiration"] end)
-      (Store_helpers.Make_value(Time))
+      (Store_helpers.Make_value(Time.Protocol))
 
   module Allow_forked_chain =
     Indexed_store.Make_set (struct let name = ["allow_forked_chain"] end)
@@ -95,15 +95,17 @@ module Chain = struct
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore
          (Indexed_store.Store)
-         (struct let name = ["protocol" ; "level"] end))
+         (struct let name = ["protocol"] end))
       (Store_helpers.Integer_index)
 
-  module Protocol_hash =
+  module Protocol_info =
     Protocol_index.Make_map
-      (struct let name = ["hash"] end)
+      (struct let name = ["info"] end)
       (Store_helpers.Make_value(struct
-         type t = Protocol_hash.t
-         let encoding = Protocol_hash.encoding
+         type t = Protocol_hash.t * Int32.t
+         let encoding =
+           let open Data_encoding in
+           tup2 Protocol_hash.encoding int32
        end))
 end
 
@@ -134,10 +136,6 @@ module Block = struct
          (Chain.Indexed_store.Store)
          (struct let name = ["blocks"] end))
       (Block_hash)
-
-
-  let fold = Indexed_store.fold_indexes
-  let iter t f = fold t ~init:() ~f:(fun k () -> f k)
 
   type contents = {
     header : Block_header.t ;
@@ -180,21 +178,19 @@ module Block = struct
     header : Block_header.t ;
   }
 
-  module Pruned_contents = struct
-    include
-      Store_helpers.Make_single_store
-        (Indexed_store.Store)
-        (struct let name = ["pruned_contents"] end)
-        (Store_helpers.Make_value(struct
-           type t = pruned_contents
-           let encoding =
-             let open Data_encoding in
-             conv
-               (fun { header } -> header)
-               (fun header -> { header })
-               (obj1 (req "header" Block_header.encoding))
-         end))
-  end
+  module Pruned_contents =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["pruned_contents"] end)
+      (Store_helpers.Make_value(struct
+         type t = pruned_contents
+         let encoding =
+           let open Data_encoding in
+           conv
+             (fun { header } -> header)
+             (fun header -> { header })
+             (obj1 (req "header" Block_header.encoding))
+       end))
 
   module Operations_index =
     Store_helpers.Make_indexed_substore
@@ -315,17 +311,6 @@ module Chain_data = struct
            tup2 int32 Block_hash.encoding
        end))
 
-  module Checkpoint_0_0_1 =
-    Store_helpers.Make_single_store
-      (Chain.Indexed_store.Store)
-      (struct let name = ["checkpoint"] end)
-      (Store_helpers.Make_value(struct
-         type t = Int32.t * Block_hash.t
-         let encoding =
-           let open Data_encoding in
-           tup2 int32 Block_hash.encoding
-       end))
-
   module Caboose =
     Store_helpers.Make_single_store
       (Chain.Indexed_store.Store)
@@ -375,8 +360,8 @@ module Protocol = struct
 
 end
 
-let init ?mapsize dir =
-  Raw_store.init ?mapsize dir >>=? fun s ->
+let init ?readonly ?mapsize dir =
+  Raw_store.init ?readonly ?mapsize dir >>=? fun s ->
   Block.register s ;
   Protocol.register s ;
   return s
@@ -384,5 +369,4 @@ let init ?mapsize dir =
 let close = Raw_store.close
 
 let open_with_atomic_rw = Raw_store.open_with_atomic_rw
-
 let with_atomic_rw = Raw_store.with_atomic_rw

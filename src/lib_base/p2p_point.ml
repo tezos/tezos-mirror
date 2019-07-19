@@ -92,17 +92,23 @@ module Id = struct
                   invalid_arg "Utils.parse_addr_port: IPv6 addresses must be bracketed"
     end
 
-  let of_string_exn str =
+  let of_string_exn ?default_port str =
     let addr, port = parse_addr_port str in
-    let port = int_of_string port in
+    let port =
+      if port = "" then
+        Option.unopt_exn
+          (Invalid_argument "P2p_point.of_string_exn: no port")
+          default_port
+      else
+        int_of_string port in
     if port < 0 && port > 1 lsl 16 - 1 then
       invalid_arg "port must be between 0 and 65535" ;
     match Ipaddr.of_string_exn addr with
     | V4 addr -> Ipaddr.v6_of_v4 addr, port
     | V6 addr -> addr, port
 
-  let of_string str =
-    try Ok (of_string_exn str) with
+  let of_string ?default_port str =
+    try Ok (of_string_exn ?default_port str) with
     | Invalid_argument s -> Error s
     | Failure s -> Error s
     | _ -> Error "P2p_point.of_string"
@@ -233,14 +239,14 @@ module Info = struct
 
   type t = {
     trusted : bool ;
-    greylisted_until : Time.t ;
+    greylisted_until : Time.System.t ;
     state : State.t ;
-    last_failed_connection : Time.t option ;
-    last_rejected_connection : (P2p_peer_id.t * Time.t) option ;
-    last_established_connection : (P2p_peer_id.t * Time.t) option ;
-    last_disconnection : (P2p_peer_id.t * Time.t) option ;
-    last_seen : (P2p_peer_id.t * Time.t) option ;
-    last_miss : Time.t option ;
+    last_failed_connection : Time.System.t option ;
+    last_rejected_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_established_connection : (P2p_peer_id.t * Time.System.t) option ;
+    last_disconnection : (P2p_peer_id.t * Time.System.t) option ;
+    last_seen : (P2p_peer_id.t * Time.System.t) option ;
+    last_miss : Time.System.t option ;
   }
 
   let encoding =
@@ -266,15 +272,15 @@ module Info = struct
           last_seen ; last_miss })
       (obj10
          (req "trusted" bool)
-         (dft "greylisted_until" Time.encoding Time.epoch)
+         (dft "greylisted_until" Time.System.encoding Time.System.epoch)
          (req "state" State.encoding)
          (opt "p2p_peer_id" P2p_peer_id.encoding)
-         (opt "last_failed_connection" Time.encoding)
-         (opt "last_rejected_connection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_established_connection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_disconnection" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_seen" (tup2 P2p_peer_id.encoding Time.encoding))
-         (opt "last_miss" Time.encoding))
+         (opt "last_failed_connection" Time.System.encoding)
+         (opt "last_rejected_connection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_established_connection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_disconnection" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
+         (opt "last_miss" Time.System.encoding))
 
 end
 
@@ -339,17 +345,7 @@ module Pool_event = struct
         (fun p2p_peer_id -> External_disconnection p2p_peer_id) ;
     ]
 
-  type t = {
-    kind : kind ;
-    timestamp : Time.t ;
-  }
+  type t = kind Time.System.stamped
+  let encoding = Time.System.stamped_encoding kind_encoding
 
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun { kind ; timestamp ; } -> (kind, timestamp))
-      (fun (kind, timestamp) -> { kind ; timestamp ; })
-      (obj2
-         (req "kind" kind_encoding)
-         (req "timestamp" Time.encoding))
 end
