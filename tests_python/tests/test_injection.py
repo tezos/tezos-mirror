@@ -9,7 +9,7 @@ def clients(sandbox):
     """Launches 2 nodes in sandbox mode (genesis, doesn't activate alpha)."""
     num_nodes = 2
     for i in range(num_nodes):
-        sandbox.add_node(i, params=['--connections', '30'])
+        sandbox.add_node(i, params=['--connections', '30', '--bootstrap-threshold', '0'])
     yield sandbox.all_clients()
 
 
