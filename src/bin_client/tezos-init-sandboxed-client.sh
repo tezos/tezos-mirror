@@ -106,7 +106,7 @@ activate_alpha() {
 
     ${client} \
         -block genesis \
-        activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+        activate protocol Ps1XDxoWkSB4ZyBjtWRkxXz2VgP7tj4PMvV1wo2w6qmraKBzkXV \
         with fitness 1 \
         and key activator \
 	and parameters "${parameters_file}" \
@@ -194,7 +194,7 @@ main () {
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol Ps1XDxoWkSB4ZyBjtWRkxXz2VgP7tj4PMvV1wo2w6qmraKBzkXV with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
@@ -210,7 +210,7 @@ tezos node launched with \`launch-sandboxed-node $1\`. For instance:
   tezos-client rpc get /chains/main/blocks/head/metadata
 
 Note: if the current protocol version, as reported by the previous
-command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
+command, is "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV", you
 may have to activate in your "sandboxed network" the same economic
 protocol as used by the alphanet by running:
 

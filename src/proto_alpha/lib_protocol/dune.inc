@@ -38,7 +38,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_alpha.Environment
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"
+let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps1XDxoWkSB4ZyBjtWRkxXz2VgP7tj4PMvV1wo2w6qmraKBzkXV\"
 let name = Environment.Name.name
 include Tezos_raw_protocol_alpha
 include Tezos_raw_protocol_alpha.Main
