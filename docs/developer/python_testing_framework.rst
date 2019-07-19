@@ -271,7 +271,7 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
         def test_wait_sync_proto(self, sandbox):
             clients = sandbox.all_clients()
             for client in clients:
-                proto = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                proto = "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU"
                 assert utils.check_protocol(client, proto)
 
         def test_transfer(self, sandbox, session):

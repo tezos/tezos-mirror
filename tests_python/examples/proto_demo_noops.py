@@ -4,7 +4,7 @@ from launchers.sandbox import Sandbox
 
 
 PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+PROTO_GENESIS = 'PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV'
 PARAMS = ['-p', PROTO_GENESIS]
 
 
