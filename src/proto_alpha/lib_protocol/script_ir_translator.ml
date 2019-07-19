@@ -1577,7 +1577,7 @@ let rec parse_data
     | Mutez_t _, Int (_, v) ->
         Lwt.return (
           Gas.consume ctxt Typecheck_costs.tez >>? fun ctxt ->
-          Gas.consume ctxt Michelson_v1_gas.Cost_of.z_to_int64
+          Gas.consume ctxt Michelson_v1_gas.Cost_of.Legacy.z_to_int64
         ) >>=? fun ctxt ->
         begin try
             match Tez.of_mutez (Z.to_int64 v) with
@@ -1827,7 +1827,7 @@ let rec parse_data
                    else return_unit
                | None -> return_unit
              end >>=? fun () ->
-             Lwt.return (Gas.consume ctxt (Michelson_v1_gas.Cost_of.set_update v false set)) >>=? fun ctxt ->
+             Lwt.return (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.set_update v false set)) >>=? fun ctxt ->
              return (Some v, set_update v true set, ctxt))
           (None, empty_set t, ctxt) vs >>|? fun (_, set, ctxt) ->
         (set, ctxt)
@@ -3695,7 +3695,7 @@ let pack_data ctxt typ data =
 let hash_data ctxt typ data =
   pack_data ctxt typ data >>=? fun (bytes, ctxt) ->
   Lwt.return @@ Gas.consume ctxt
-    (Michelson_v1_gas.Cost_of.hash bytes Script_expr_hash.size) >>=? fun ctxt ->
+    (Michelson_v1_gas.Cost_of.Legacy.hash bytes Script_expr_hash.size) >>=? fun ctxt ->
   return (Script_expr_hash.(hash_bytes [ bytes ]), ctxt)
 
 (* ---------------- Big map -------------------------------------------------*)
@@ -3726,7 +3726,7 @@ let big_map_update key value ({ diff ; _ } as map) =
   { map with diff = map_set key value diff }
 
 let diff_of_big_map ctxt mode (Ex_bm { key_type ; value_type ; diff }) =
-  Lwt.return (Gas.consume ctxt (Michelson_v1_gas.Cost_of.map_to_list diff)) >>=? fun ctxt ->
+  Lwt.return (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list diff)) >>=? fun ctxt ->
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   fold_left_s
     (fun (acc, ctxt) (key, value) ->

@@ -157,7 +157,7 @@ let unparse_stack ctxt (stack, stack_ty) =
           return ((data, annot) :: rest) in
   unparse_stack (stack, stack_ty)
 
-module Interp_costs = Michelson_v1_gas.Cost_of
+module Interp_costs = Michelson_v1_gas.Cost_of.Interpreter
 
 let rec interp_stack_prefix_preserving_operation : type fbef bef faft aft result .
   (fbef stack -> (faft stack * result) tzresult Lwt.t)
