@@ -444,10 +444,15 @@ let apply_manager_operation_content :
             Script.force_decode ctxt parameters >>=? fun (parameter, ctxt) -> (* see [note] *)
             let cost_parameter = Script.deserialized_cost parameter in
             Lwt.return (Gas.consume ctxt cost_parameter) >>=? fun ctxt ->
+            let step_constants =
+              let open Script_interpreter in
+              { source ;
+                payer ;
+                self = destination ;
+                amount ;
+                chain_id } in
             Script_interpreter.execute
-              ctxt mode
-              ~source ~payer ~chain_id ~self:(destination, script)
-              ~amount ~parameter ~entrypoint
+              ctxt mode step_constants ~script ~parameter ~entrypoint
             >>=? fun { ctxt ; storage ; big_map_diff ; operations } ->
             Contract.update_script_storage
               ctxt destination storage big_map_diff >>=? fun ctxt ->

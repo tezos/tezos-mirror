@@ -42,26 +42,38 @@ type execution_result =
     big_map_diff : Contract.big_map_diff option ;
     operations : packed_internal_operation list }
 
+type step_constants =
+  { source : Contract.t ;
+    payer : Contract.t ;
+    self : Contract.t ;
+    amount : Tez.t ;
+    chain_id : Chain_id.t }
+
+type 'tys stack =
+  | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
+  | Empty : Script_typed_ir.end_of_stack stack
+
+val step:
+  ?log: execution_trace ref ->
+  context -> step_constants ->
+  ('bef, 'aft) Script_typed_ir.descr ->
+  'bef stack ->
+  ('aft stack * context) tzresult Lwt.t
+
 val execute:
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->
-  source: Contract.t ->
-  payer: Contract.t ->
-  chain_id: Chain_id.t ->
-  self: (Contract.t * Script.t) ->
+  step_constants ->
+  script: Script.t ->
   entrypoint: string ->
   parameter: Script.expr ->
-  amount: Tez.t ->
   execution_result tzresult Lwt.t
 
 val trace:
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->
-  source: Contract.t ->
-  payer: Contract.t ->
-  chain_id: Chain_id.t ->
-  self: (Contract.t * Script.t) ->
+  step_constants ->
+  script: Script.t ->
   entrypoint: string ->
   parameter: Script.expr ->
-  amount: Tez.t ->
   (execution_result * execution_trace) tzresult Lwt.t

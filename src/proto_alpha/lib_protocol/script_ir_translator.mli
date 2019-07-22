@@ -32,6 +32,17 @@ type ex_comparable_ty = Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> e
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
+type tc_context =
+  | Lambda : tc_context
+  | Dip : 'a Script_typed_ir.stack_ty * tc_context -> tc_context
+  | Toplevel : { storage_type : 'sto Script_typed_ir.ty ;
+                 param_type : 'param Script_typed_ir.ty ;
+                 root_name : string option ;
+                 legacy_create_contract_literal : bool } -> tc_context
+type 'bef judgement =
+  | Typed : ('bef, 'aft) Script_typed_ir.descr -> 'bef judgement
+  | Failed :
+      { descr : 'aft. 'aft Script_typed_ir.stack_ty -> ('bef, 'aft) Script_typed_ir.descr } -> 'bef judgement
 
 type unparsing_mode = Optimized | Readable
 
@@ -86,6 +97,11 @@ val parse_data :
 val unparse_data :
   context -> unparsing_mode -> 'a Script_typed_ir.ty -> 'a ->
   (Script.node * context) tzresult Lwt.t
+
+val parse_instr :
+  ?type_logger: type_logger ->
+  tc_context -> context -> legacy: bool ->
+  Script.node -> 'bef Script_typed_ir.stack_ty -> ('bef judgement * context) tzresult Lwt.t
 
 val parse_ty :
   context -> legacy: bool ->

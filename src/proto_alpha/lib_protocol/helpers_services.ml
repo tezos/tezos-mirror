@@ -211,14 +211,19 @@ module Scripts = struct
         | Some gas -> gas
         | None -> Constants.hard_gas_limit_per_operation ctxt in
       let ctxt = Gas.set_limit ctxt gas in
+      let step_constants =
+        let open Script_interpreter in
+        { source ;
+          payer ;
+          self = dummy_contract ;
+          amount ;
+          chain_id } in
       Script_interpreter.execute
         ctxt Readable
-        ~source
-        ~payer
-        ~chain_id
-        ~self:(dummy_contract, { storage ; code })
+        step_constants
+        ~script:{ storage ; code }
         ~entrypoint
-        ~amount ~parameter
+        ~parameter
       >>=? fun { Script_interpreter.storage ; operations ; big_map_diff ; _ } ->
       return (storage, operations, big_map_diff)
     end ;
@@ -236,14 +241,19 @@ module Scripts = struct
         | Some gas -> gas
         | None -> Constants.hard_gas_limit_per_operation ctxt in
       let ctxt = Gas.set_limit ctxt gas in
+      let step_constants =
+        let open Script_interpreter in
+        { source ;
+          payer ;
+          self = dummy_contract ;
+          amount ;
+          chain_id } in
       Script_interpreter.trace
         ctxt Readable
-        ~source
-        ~payer
-        ~chain_id
-        ~self:(dummy_contract, { storage ; code })
+        step_constants
+        ~script:{ storage ; code }
         ~entrypoint
-        ~amount ~parameter
+        ~parameter
       >>=? fun ({ Script_interpreter.storage ; operations ; big_map_diff ; _ }, trace) ->
       return (storage, operations, trace, big_map_diff)
     end ;
