@@ -1912,7 +1912,7 @@ Main program structure
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The toplevel of a smart contract file must be an un-delimited sequence
-of four primitive applications (in no particular order) that provide its
+of three primitive applications (in no particular order) that provide its
 ``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
