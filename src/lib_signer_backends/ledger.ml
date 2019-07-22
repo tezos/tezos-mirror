@@ -364,7 +364,7 @@ module Ledger_uri = struct
 
   type t = [ `Ledger of Ledger_id.t | `Ledger_account of Ledger_account.t ]
 
-  let int32_of_path_element_exn ?(allow_weak = true) x =
+  let int32_of_path_element_exn ~allow_weak x =
     let failf ppf = Printf.ksprintf Pervasives.failwith ppf in
     let len = String.length x in
     match String.get x (len - 1) with
@@ -381,12 +381,17 @@ module Ledger_uri = struct
           | None -> failf "Path is not a non-hardened integer: %S" x
         end
     | _ ->
-        failf "Non-hardened paths are not allowed (%S)" x
+        failf "Non-hardened paths are not allowed for this derivation scheme (%S)" x
 
   let parse_animals animals =
     match String.split '-' animals with
     | [c; t; h; d] -> Some { Ledger_names.c ; t ; h ; d }
     | _ -> None
+
+  let derivation_supports_weak_paths = function
+    | Ledgerwallet_tezos.Ed25519 -> false
+    | Ledgerwallet_tezos.Secp256k1 -> true
+    | Ledgerwallet_tezos.Secp256r1 -> true
 
   let parse ?allow_weak uri : t tzresult Lwt.t =
     let host = Uri.host uri in
@@ -406,9 +411,12 @@ module Ledger_uri = struct
             match Ledgerwallet_tezos.curve_of_string s with
             | Some curve -> curve, tl
             | None -> Ledger_id.curve, s :: tl in
+          let actually_allow_weak = match allow_weak with
+            | None -> derivation_supports_weak_paths curve
+            | Some x -> x in
           begin
             try return (List.map
-                          (int32_of_path_element_exn ?allow_weak)
+                          (int32_of_path_element_exn ~allow_weak:actually_allow_weak)
                           more_path)
             with Failure s ->
               failwith "Failed to parse Curve/BIP32 path from %s (%s): %s"
