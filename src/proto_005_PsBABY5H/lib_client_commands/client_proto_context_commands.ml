@@ -456,38 +456,50 @@ let commands version () =
                  minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
                  force_low_fee, fee_cap, burn_cap, entrypoint)
         amount (_, source) (_, destination) cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can be the source of a transfer"
-        | Some source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter = {
-              Injection.minimal_fees ;
-              minimal_nanotez_per_byte ;
-              minimal_nanotez_per_gas_unit ;
-              force_low_fee ;
-              fee_cap ;
-              burn_cap ;
-            } in
-            transfer cctxt
-              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-              ~dry_run ~verbose_signing
-              ~fee_parameter
-              ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
-            report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
-            | None -> return_unit
-            | Some (_res, _contracts) ->
-                return_unit
+        let fee_parameter = {
+          Injection.minimal_fees ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
+          force_low_fee ;
+          fee_cap ;
+          burn_cap ;
+        } in
+        begin match Contract.is_implicit source with
+          | None ->
+              let contract = source in
+              Managed_contract.get_contract_manager cctxt source  >>=? fun source ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Managed_contract.transfer cctxt
+                ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+                ~dry_run ~verbose_signing
+                ~fee_parameter ?fee
+                ~contract ~source ~src_pk ~src_sk ~destination
+                ?entrypoint
+                ?arg ~amount ?gas_limit ?storage_limit ?counter ()
+          | Some source ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              transfer cctxt
+                ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+                ~dry_run ~verbose_signing
+                ~fee_parameter
+                ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint
+                ?arg ~amount ?gas_limit ?storage_limit ?counter () end >>=
+        report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
+        | None -> return_unit
+        | Some (_res, _contracts) ->
+            return_unit
       end;
 
     command ~group ~desc: "Call a smart contract (same as 'transfer 0')."
-      (args14 fee_arg dry_run_switch verbose_signing_switch
+      (args15 fee_arg dry_run_switch verbose_signing_switch
          gas_limit_arg storage_limit_arg counter_arg arg_arg no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
+         burn_cap_arg
+         entrypoint_arg)
       (prefixes [ "call" ]
        @@ prefix "from"
        @@ ContractAlias.destination_param
@@ -499,30 +511,41 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, gas_limit, storage_limit,
                  counter, arg, no_print_source, minimal_fees,
                  minimal_nanotez_per_byte, minimal_nanotez_per_gas_unit,
-                 force_low_fee, fee_cap, burn_cap)
+                 force_low_fee, fee_cap, burn_cap,entrypoint)
         (_, source) (_, destination) cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can be the source of a transfer"
-        | Some source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter = {
-              Injection.minimal_fees ;
-              minimal_nanotez_per_byte ;
-              minimal_nanotez_per_gas_unit ;
-              force_low_fee ;
-              fee_cap ;
-              burn_cap ;
-            } in
-            let amount = Tez.zero in
-            transfer cctxt
-              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
-              ~dry_run ~verbose_signing
-              ~fee_parameter
-              ~source ?fee ~src_pk ~src_sk ~destination ?arg ~amount ?gas_limit ?storage_limit ?counter () >>=
-            report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
-            | None -> return_unit
-            | Some (_res, _contracts) ->
-                return_unit
+        let fee_parameter = {
+          Injection.minimal_fees ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
+          force_low_fee ;
+          fee_cap ;
+          burn_cap ;
+        } in
+        let amount = Tez.zero in
+        begin match Contract.is_implicit source with
+          | None ->
+              let contract = source in
+              Managed_contract.get_contract_manager cctxt source  >>=? fun source ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Managed_contract.transfer cctxt
+                ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+                ~dry_run ~verbose_signing
+                ~fee_parameter ?fee
+                ~contract ~source ~src_pk ~src_sk ~destination
+                ?entrypoint
+                ?arg ~amount ?gas_limit ?storage_limit ?counter ()
+          | Some source ->
+              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              transfer cctxt
+                ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+                ~dry_run ~verbose_signing
+                ~fee_parameter
+                ~source ?fee ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount
+                ?gas_limit ?storage_limit ?counter () end >>=
+        report_michelson_errors ~no_print_source ~msg:"transfer simulation failed" cctxt >>= function
+        | None -> return_unit
+        | Some (_res, _contracts) ->
+            return_unit
       end;
 
     command ~group ~desc: "Reveal the public key of the contract manager."

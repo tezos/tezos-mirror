@@ -54,3 +54,32 @@ val set_delegate : #Protocol_client_context.full ->
     the provided delegate.
     `~source` has to be the registered manager of the contract.
 *)
+
+
+val transfer : #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?branch:int ->
+  source:public_key_hash ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  contract:Contract.t ->
+  destination:Contract.t ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  amount:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:counter ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
+(** Perform a transfer on behalf of a managed contract .
+    For a contract with a `do`entrypoint, it builds the lamba that
+    does the requested operation.
+    `~source` has to be the registered manager of the contract.
+*)

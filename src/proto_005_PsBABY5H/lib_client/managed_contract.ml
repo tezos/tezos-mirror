@@ -106,14 +106,12 @@ let set_delegate
                       Signature.Public_key_hash.pp delegate
                 | None -> "Unit"
               in
-              Lwt.return @@ Micheline_parser.no_parsing_error @@
-              Michelson_v1_parser.parse_expression delegate_data >>=? fun exp ->
-              let e = Michelson_v1_parser.(exp.expanded) in
               let entrypoint =
                 match delegate with
                   Some _ -> "set_delegate"
                 | None -> "remove_delegate" in
-              return (Script.lazy_expr e,entrypoint)
+              parse delegate_data >>=? fun param ->
+              return (param,entrypoint)
           | None ->
               cctxt#error
                 "Cannot find a %%do or %%set_delegate entrypoint in contract@."
@@ -132,3 +130,75 @@ let set_delegate
     ~fee_parameter
     operation >>=? fun  res ->
   return res
+
+let d_unit =
+  Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+let t_unit =
+  Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
+
+let transfer
+    (cctxt :#full)
+    ~chain ~block ?confirmations
+    ?dry_run ?verbose_signing
+    ?branch ~source ~src_pk ~src_sk ~contract ~destination ?(entrypoint = "default") ?arg
+    ~amount ?fee ?gas_limit ?storage_limit ?counter
+    ~fee_parameter
+    () :
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
+  =
+  begin match Alpha_context.Contract.is_implicit destination with
+      None ->
+        Michelson_v1_entrypoints.contract_entrypoint_type
+          cctxt ~chain ~block ~contract:destination ~entrypoint >>=? begin function
+            None -> cctxt#error "Contract %a has no entrypoint named %s"
+                      Contract.pp destination
+                      entrypoint
+
+          | Some parameter_type -> return parameter_type
+        end
+    |  Some _ when entrypoint = "default" -> return t_unit  (* if contract is implicit, parameter type is unit *)
+    |   _ -> cctxt#error "Implicit accounts have no entrypoints. \
+                          (targeted entrypoint %%%s on contract %a)"
+               entrypoint
+               Contract.pp destination
+  end >>=? fun parameter_type -> begin
+    match arg with
+    | Some arg ->  Lwt.return @@ Micheline_parser.no_parsing_error @@
+        Michelson_v1_parser.parse_expression arg >>=? fun  { expanded = arg ; _ } ->
+        return_some arg
+    | None -> return_none
+  end >>=? fun parameters ->
+  let parameters = Option.unopt
+      ~default:d_unit
+      parameters in
+  let lambda =
+    Format.asprintf
+      "{ DROP ; NIL operation ;\
+       PUSH address \"%a\"; CONTRACT %s %a; ASSERT_SOME;\
+       PUSH mutez %a ;\
+       PUSH %a %a;\
+       TRANSFER_TOKENS ; CONS }"
+      Contract.pp destination
+      (match entrypoint with "default" -> "" | s -> "%"^s)
+      Michelson_v1_printer.print_expr parameter_type
+      Tez.pp amount
+      Michelson_v1_printer.print_expr parameter_type
+      Michelson_v1_printer.print_expr parameters
+  in
+  parse lambda >>=? fun parameters ->
+  let entrypoint = "do" in
+  let operation =
+    Transaction {amount = Tez.zero ; parameters;
+                 entrypoint;destination=contract}
+  in
+  Injection.inject_manager_operation
+    cctxt ~chain ~block ?confirmations
+    ?dry_run ?verbose_signing
+    ?branch ~source ?fee
+    ?gas_limit ?storage_limit ?counter
+    ~src_pk ~src_sk
+    ~fee_parameter
+    operation >>=? fun (_oph, _op, result as res) ->
+  Lwt.return
+    (Injection.originated_contracts (Single_result result)) >>=? fun contracts ->
+  return (res, contracts)
