@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -108,4 +109,55 @@ val print_typecheck_result :
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult ->
   #Client_context.printer ->
+  unit tzresult Lwt.t
+
+val entrypoint_type :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Michelson_v1_parser.parsed ->
+  entrypoint:string ->
+  Script.expr option tzresult Lwt.t
+
+val print_entrypoint_type:
+  #Client_context.printer ->
+  emacs:bool ->
+  ?script_name:string ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  entrypoint:string ->
+  Script_repr.expr option tzresult ->
+  unit tzresult Lwt.t
+
+val list_entrypoints :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Michelson_v1_parser.parsed ->
+  (string * Script.expr) list tzresult Lwt.t
+
+val print_entrypoints_list:
+  #Client_context.printer ->
+  emacs:bool ->
+  ?script_name:string ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  (string * Script.expr) list tzresult ->
+  unit tzresult Lwt.t
+
+
+val list_unreachables :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Michelson_v1_parser.parsed ->
+  Michelson_v1_primitives.prim list list tzresult Lwt.t
+
+val print_unreachables:
+  #Client_context.printer ->
+  emacs:bool ->
+  ?script_name:string ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  Michelson_v1_primitives.prim list list tzresult ->
   unit tzresult Lwt.t

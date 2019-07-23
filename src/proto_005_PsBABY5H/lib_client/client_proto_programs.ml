@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -167,3 +168,50 @@ let print_typecheck_result
              ~show_source:print_source_on_error
              ~parsed:program) errs >>= fun () ->
         cctxt#error "ill-typed script"
+
+let entrypoint_type
+    cctxt
+    ~(chain : Chain_services.chain)
+    ~block
+    (program : Michelson_v1_parser.parsed)
+    ~entrypoint =
+  Michelson_v1_entrypoints.script_entrypoint_type cctxt ~chain ~block program.expanded ~entrypoint
+
+
+let print_entrypoint_type (cctxt : #Client_context.printer)
+    ~emacs ?script_name ~show_source ~parsed ~entrypoint ty =
+  Michelson_v1_entrypoints.print_entrypoint_type cctxt  ~entrypoint
+    ~emacs ?script_name
+    ~on_errors:(print_errors cctxt ~show_source ~parsed)
+    ty
+
+
+let list_entrypoints
+    cctxt
+    ~(chain : Chain_services.chain)
+    ~block
+    (program : Michelson_v1_parser.parsed) =
+  Michelson_v1_entrypoints.list_entrypoints cctxt ~chain ~block program.expanded
+
+
+let print_entrypoints_list (cctxt : #Client_context.printer)
+    ~emacs ?script_name ~show_source ~parsed ty =
+  Michelson_v1_entrypoints.print_entrypoints_list cctxt
+    ~emacs ?script_name
+    ~on_errors:(print_errors cctxt ~show_source ~parsed)
+    ty
+
+let list_unreachables
+    cctxt
+    ~(chain : Chain_services.chain)
+    ~block
+    (program : Michelson_v1_parser.parsed) =
+  Michelson_v1_entrypoints.list_unreachables cctxt ~chain ~block program.expanded
+
+
+let print_unreachables (cctxt : #Client_context.printer)
+    ~emacs ?script_name ~show_source ~parsed ty =
+  Michelson_v1_entrypoints.print_unreachables cctxt
+    ~emacs ?script_name
+    ~on_errors:(print_errors cctxt ~show_source ~parsed)
+    ty

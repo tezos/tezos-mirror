@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -141,7 +142,7 @@ let commands version () =
 
     command ~group ~desc: "Get the storage of a contract."
       no_options
-      (prefixes [ "get" ; "script" ; "storage" ; "for" ]
+      (prefixes [ "get" ; "contract" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
@@ -193,9 +194,9 @@ let commands version () =
         return_unit
       end ;
 
-    command ~group ~desc: "Get the storage of a contract."
+    command ~group ~desc: "Get the code of a contract."
       no_options
-      (prefixes [ "get" ; "script" ; "code" ; "for" ]
+      (prefixes [ "get" ; "contract" ; "code" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
@@ -211,6 +212,45 @@ let commands version () =
                 let { Michelson_v1_parser.source ; _ } =
                   Michelson_v1_printer.unparse_toplevel code in
                 cctxt#answer "%a" Format.pp_print_text source >>= return
+      end ;
+
+    command ~group ~desc: "Get the type of an entrypoint  of a contract."
+      no_options
+      (prefixes [ "get" ; "contract" ;  "entrypoint" ; "type" ; "of" ]
+       @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+       @@ prefixes [ "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () entrypoint ( _ , contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.contract_entrypoint_type cctxt
+          ~chain:cctxt#chain ~block:cctxt#block ~contract ~entrypoint >>=
+        Michelson_v1_entrypoints.print_entrypoint_type cctxt
+          ~emacs:false ~contract ~entrypoint
+      end ;
+
+    command ~group ~desc: "Get the entrypoint list of a contract."
+      no_options
+      (prefixes [ "get" ; "contract" ; "entrypoints" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.list_contract_entrypoints cctxt
+          ~chain:cctxt#chain ~block:cctxt#block ~contract >>=
+        Michelson_v1_entrypoints.print_entrypoints_list cctxt
+          ~emacs:false ~contract
+      end ;
+
+
+    command ~group ~desc: "Get the list of unreachable paths\
+                           in a contract's parameter type."
+      no_options
+      (prefixes [ "get" ; "contract" ; "unreachable" ; "paths" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.list_contract_unreachables cctxt
+          ~chain:cctxt#chain ~block:cctxt#block ~contract >>=
+        Michelson_v1_entrypoints.print_unreachables cctxt ~emacs:false ~contract
       end ;
 
     command ~group ~desc: "Get the delegate of a contract."

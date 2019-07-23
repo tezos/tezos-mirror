@@ -166,6 +166,7 @@ let commands () =
            run cctxt ~chain:cctxt#chain ~block:cctxt#block
              ~amount ~program ~storage ~input ?source ?payer ?gas ?entrypoint () >>= fun res ->
            print_run_result cctxt ~show_source ~parsed:program res)) ;
+
     command ~group ~desc: "Ask the node to typecheck a script."
       (args4 show_types_switch emacs_mode_switch no_print_source_flag custom_gas_flag)
       (prefixes [ "typecheck" ; "script" ]
@@ -330,4 +331,100 @@ let commands () =
               return_unit
       ) ;
 
+    command ~group ~desc: "Ask the type of an entrypoint of a script."
+      (args2 emacs_mode_switch no_print_source_flag)
+      (prefixes [ "get" ; "script" ;  "entrypoint"; "type" ; "of"   ]
+       @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+       @@ prefixes [ "for" ]
+       @@ Program.source_param
+       @@ stop)
+      (fun (emacs_mode, no_print_source) entrypoint program cctxt ->
+         match program with
+         | program, [] ->
+             entrypoint_type
+               cctxt ~chain:cctxt#chain ~block:cctxt#block program ~entrypoint >>= fun entrypoint_type ->
+             print_entrypoint_type
+               ~emacs:emacs_mode
+               ~show_source:(not no_print_source)
+               ~parsed:program
+               ~entrypoint
+               cctxt
+               entrypoint_type
+         | res_with_errors when emacs_mode ->
+             cctxt#message
+               "(@[<v 0>(entrypoint . ())@ (errors . %a)@])"
+               Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
+             return_unit
+         | (parsed, errors) ->
+             cctxt#message "%a"
+               (fun ppf () ->
+                  Michelson_v1_error_reporter.report_errors
+                    ~details:(not no_print_source) ~parsed
+                    ~show_source:(not no_print_source)
+                    ppf errors) () >>= fun () ->
+             cctxt#error "syntax error in program"
+      ) ;
+
+    command ~group ~desc: "Ask the node to list the entrypoints of a script."
+      (args2 emacs_mode_switch no_print_source_flag)
+      (prefixes [ "get" ; "script" ; "entrypoints" ; "for" ]
+       @@ Program.source_param
+       @@ stop)
+      (fun (emacs_mode, no_print_source) program cctxt ->
+         match program with
+         | program, [] ->
+             list_entrypoints
+               cctxt ~chain:cctxt#chain ~block:cctxt#block program >>= fun entrypoints ->
+             print_entrypoints_list
+               ~emacs:emacs_mode
+               ~show_source:(not no_print_source)
+               ~parsed:program
+               cctxt
+               entrypoints
+         | res_with_errors when emacs_mode ->
+             cctxt#message
+               "(@[<v 0>(entrypoints . ())@ (errors . %a)@])"
+               Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
+             return_unit
+         | (parsed, errors) ->
+             cctxt#message "%a"
+               (fun ppf () ->
+                  Michelson_v1_error_reporter.report_errors
+                    ~details:(not no_print_source) ~parsed
+                    ~show_source:(not no_print_source)
+                    ppf errors) () >>= fun () ->
+             cctxt#error "syntax error in program"
+      ) ;
+
+    command ~group ~desc: "Ask the node to list the unreachable paths\
+                           in a script's parameter type."
+      (args2 emacs_mode_switch no_print_source_flag)
+      (prefixes [ "get" ; "script" ; "unreachable" ; "paths" ; "for" ]
+       @@ Program.source_param
+       @@ stop)
+      (fun (emacs_mode, no_print_source) program cctxt ->
+         match program with
+         | program, [] ->
+             list_unreachables
+               cctxt ~chain:cctxt#chain ~block:cctxt#block program >>= fun entrypoints ->
+             print_unreachables
+               ~emacs:emacs_mode
+               ~show_source:(not no_print_source)
+               ~parsed:program
+               cctxt
+               entrypoints
+         | res_with_errors when emacs_mode ->
+             cctxt#message
+               "(@[<v 0>(entrypoints . ())@ (errors . %a)@])"
+               Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
+             return_unit
+         | (parsed, errors) ->
+             cctxt#message "%a"
+               (fun ppf () ->
+                  Michelson_v1_error_reporter.report_errors
+                    ~details:(not no_print_source) ~parsed
+                    ~show_source:(not no_print_source)
+                    ppf errors) () >>= fun () ->
+             cctxt#error "syntax error in program"
+      ) ;
   ]
