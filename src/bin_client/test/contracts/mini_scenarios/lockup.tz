@@ -1,5 +1,5 @@
 parameter unit;
-storage (pair timestamp (pair mutez (contract unit)));
+storage (pair timestamp (pair mutez address));
 code { CDR;                      # Ignore the parameter
        DUP;                      # Duplicate the storage
        CAR;                      # Get the timestamp
@@ -12,6 +12,7 @@ code { CDR;                      # Ignore the parameter
        DUP;                      # Duplicate the transfer information
        CAR;                      # Get the amount of the transfer on top of the stack
        DIP{CDR};                 # Put the contract underneath it
+       DIP { CONTRACT unit ; ASSERT_SOME } ;
        UNIT;                     # Put the contract's argument type on top of the stack
        TRANSFER_TOKENS;          # Emit the transfer
        NIL operation; SWAP; CONS;# Make a singleton list of internal operations

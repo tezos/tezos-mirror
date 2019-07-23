@@ -1,0 +1,31 @@
+storage
+  (or (pair (big_map string string) (big_map string string)) unit) ;
+parameter
+  (or (unit %swap)
+      (or (or %reset (pair (big_map string string) (big_map string string)) unit)
+          (or (pair %import (list (pair string string)) (list (pair string string)))
+              (or (list %add (pair string string))
+                  (list %rem string))))) ;
+code { UNPAIR ;
+       IF_LEFT
+         { DROP ; ASSERT_LEFT ; UNPAIR ; SWAP ; PAIR ; LEFT unit }
+         { IF_LEFT
+             { SWAP ; DROP }
+             { IF_LEFT
+                 { DIP { ASSERT_RIGHT ; DROP } ;
+                   UNPAIR ;
+                   DIP { EMPTY_BIG_MAP string string } ;
+                   ITER { UNPAIR ; DIP { SOME } ; UPDATE } ;
+                   SWAP ;
+                   DIP { EMPTY_BIG_MAP string string } ;
+                   ITER { UNPAIR ; DIP { SOME } ; UPDATE } ;
+                   SWAP ;
+                   PAIR ; LEFT unit }
+                 { IF_LEFT
+                     { DIP { ASSERT_LEFT ; UNPAIR } ;
+                       ITER { UNPAIR ; DIP { SOME } ; UPDATE } ;
+                       PAIR ; LEFT unit }
+                     { DIP { ASSERT_LEFT ; UNPAIR } ;
+                       ITER { DIP { NONE string } ; UPDATE } ;
+                       PAIR ; LEFT unit } }} } ;
+       NIL operation ; PAIR }
