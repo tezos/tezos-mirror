@@ -262,8 +262,7 @@ let commands version () =
         Client_proto_contracts.get_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
-        | None ->
-            cctxt#message "none" >>= fun () ->
+        | None -> cctxt#message "none" >>= fun () ->
             return_unit
         | Some delegate ->
             Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
@@ -301,7 +300,19 @@ let commands version () =
           burn_cap ;
         } in
         match Contract.is_implicit contract with
-        | None -> failwith "only implicit accounts can be delegated"
+        | None ->
+            Managed_contract.get_contract_manager cctxt contract  >>=? fun source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Managed_contract.set_delegate cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~source ~src_pk ~src_sk contract (Some delegate) >>= fun errors ->
+            report_michelson_errors ~no_print_source:true
+              ~msg:"Setting delegate through entrypoints failed." cctxt errors >>= fun _ ->
+            return_unit
+
         | Some mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate cctxt
@@ -328,23 +339,33 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
         (_, contract) (cctxt : Protocol_client_context.full) ->
+        let fee_parameter = {
+          Injection.minimal_fees ;
+          minimal_nanotez_per_byte ;
+          minimal_nanotez_per_gas_unit ;
+          force_low_fee ;
+          fee_cap ;
+          burn_cap ;
+        } in
         match Contract.is_implicit contract with
-        | None -> failwith "only implicit accounts can be delegated"
+        | None -> Managed_contract.get_contract_manager cctxt contract  >>=? fun source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Managed_contract.set_delegate cctxt
+              ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
+              ~dry_run ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~source ~src_pk ~src_sk contract None >>= fun errors ->
+            report_michelson_errors ~no_print_source:true
+              ~msg:"Withdrawing delegate through entrypoints failed." cctxt errors >>= fun _ ->
+            return_unit
         | Some mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
-            let fee_parameter = {
-              Injection.minimal_fees ;
-              minimal_nanotez_per_byte ;
-              minimal_nanotez_per_gas_unit ;
-              force_low_fee ;
-              fee_cap ;
-              burn_cap ;
-            } in
             set_delegate cctxt
               ~chain:cctxt#chain ~block:cctxt#block ?confirmations:cctxt#confirmations
               ~dry_run ~verbose_signing
               ~fee_parameter
-              mgr None ?fee ~src_pk ~manager_sk >>=? fun _ ->
+              mgr None ?fee ~src_pk ~manager_sk >>= fun _ ->
             return_unit
       end ;
 
