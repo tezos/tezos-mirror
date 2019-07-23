@@ -75,6 +75,14 @@ val script_opt:
 val storage:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr shell_tzresult Lwt.t
 
+val entrypoint_type:
+  'a #RPC_context.simple -> 'a -> Contract.t -> string -> Script.expr shell_tzresult Lwt.t
+
+val list_entrypoints:
+  'a #RPC_context.simple -> 'a -> Contract.t ->
+  (Michelson_v1_primitives.prim list list *
+   (string * Script.expr) list) shell_tzresult Lwt.t
+
 val storage_opt:
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr option shell_tzresult Lwt.t
 

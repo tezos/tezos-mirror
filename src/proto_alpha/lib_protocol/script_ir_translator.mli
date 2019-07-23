@@ -133,6 +133,16 @@ val parse_contract_for_script :
 val find_entrypoint :
   't Script_typed_ir.ty -> root_name: string option -> string -> ((Script.node -> Script.node) * ex_ty) tzresult
 
+module Entrypoints_map : S.MAP with type key = string
+
+val list_entrypoints :
+  't Script_typed_ir.ty ->
+  context ->
+  root_name: string option ->
+  (Michelson_v1_primitives.prim list list *
+   (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t)
+    tzresult
+
 val pack_data : context -> 'a Script_typed_ir.ty -> 'a -> (MBytes.t * context) tzresult Lwt.t
 val hash_data : context -> 'a Script_typed_ir.ty -> 'a -> (Script_expr_hash.t * context) tzresult Lwt.t
 

@@ -3156,6 +3156,44 @@ let typecheck_data
       (parse_data ?type_logger ctxt ~legacy exp_ty (root data)) >>=? fun (_, ctxt) ->
     return ctxt
 
+module Entrypoints_map = Map.Make (String)
+
+let list_entrypoints  (type full) (full : full ty) ctxt ~root_name =
+  let merge path annot (type t) (ty : t ty) reachable ((unreachables, all) as acc) =
+    match annot with
+    | None | Some (`Field_annot "") ->
+        ok @@
+        if reachable then acc else
+          begin match ty with
+            | Union_t _ -> acc
+            | _ ->  ( (List.rev path)::unreachables, all )
+          end
+    | Some (`Field_annot name) ->
+        if Compare.Int.(String.length name > 31) then ok ((List.rev path)::unreachables, all)
+        else if Entrypoints_map.mem name all then ok ((List.rev path)::unreachables, all)
+        else unparse_ty_no_lwt ctxt ty >>? fun (unparsed_ty , _) ->
+          ok (unreachables, Entrypoints_map.add name ((List.rev path),unparsed_ty)  all)
+  in
+  let rec fold_tree
+    : type t. t ty ->
+      prim list ->
+      bool ->
+      prim list list * (prim list * Script.node)  Entrypoints_map.t ->
+      (prim list list * (prim list * Script.node) Entrypoints_map.t) tzresult
+    = fun t path reachable acc ->
+      match t with
+      | Union_t ((tl, al), (tr, ar), _, _) ->
+          merge (D_Left :: path) al tl reachable acc >>? fun acc ->
+          merge (D_Right :: path) ar tr reachable acc  >>? fun acc ->
+          fold_tree tl (D_Left :: path) (match al with Some _ -> true | None -> reachable) acc >>? fun acc ->
+          fold_tree tr (D_Right :: path) (match ar with Some _ -> true | None -> reachable) acc
+      | _ -> ok acc in
+  unparse_ty_no_lwt ctxt full >>? fun (unparsed_full , _) ->
+  let init, reachable = match root_name with
+    | None | Some "" -> Entrypoints_map.empty, false
+    | Some name ->  Entrypoints_map.singleton name ([],unparsed_full), true in
+  fold_tree full [] reachable ([], init)
+
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
 let rec unparse_data

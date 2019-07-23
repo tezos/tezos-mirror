@@ -127,6 +127,27 @@ module S = struct
       ~output: Script.expr_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
+  let entrypoint_type =
+    RPC_service.get_service
+      ~description: "Return the type of the given entrypoint of the contract"
+      ~query: RPC_query.empty
+      ~output: Script.expr_encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "entrypoints" /: RPC_arg.string)
+
+
+  let list_entrypoints =
+    RPC_service.get_service
+      ~description: "Return the list of entrypoints of the contract"
+      ~query: RPC_query.empty
+      ~output: (obj2
+                  (dft "unreachable"
+                     (Data_encoding.list
+                        (obj1 (req "path" (Data_encoding.list Michelson_v1_primitives.prim_encoding))))
+                     [])
+                  (req "entrypoints"
+                     (assoc Script.expr_encoding)))
+      RPC_path.(custom_root /: Contract.rpc_arg / "entrypoints")
+
   let big_map_get =
     RPC_service.post_service
       ~description: "Access the value associated with a key in the big map storage  of the contract."
@@ -197,6 +218,52 @@ let register () =
           unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
           Script.force_decode ctxt script.storage >>=? fun (storage, _ctxt) ->
           return_some storage) ;
+  register2 S.entrypoint_type
+    (fun ctxt v entrypoint () () -> Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+      match expr with
+      | None -> raise Not_found
+      | Some expr ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let legacy = true in
+          let open Script_ir_translator in
+          Script.force_decode ctxt expr >>=? fun (expr, _) ->
+          Lwt.return
+            begin
+              parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+              parse_ty ctxt ~legacy
+                ~allow_big_map:true ~allow_operation:false
+                ~allow_contract:true arg_type >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.find_entrypoint ~root_name arg_type
+                entrypoint
+            end >>= function
+            Ok (_f , Ex_ty ty)->
+              unparse_ty ctxt ty >>=? fun (ty_node, _) ->
+              return (Micheline.strip_locations ty_node)
+          | Error _ -> raise Not_found) ;
+  register1 S.list_entrypoints
+    (fun ctxt v () () -> Contract.get_script_code ctxt v >>=? fun (_, expr) ->
+      match expr with
+      | None -> raise Not_found
+      | Some expr ->
+          let ctxt = Gas.set_unlimited ctxt in
+          let legacy = true in
+          let open Script_ir_translator in
+          Script.force_decode ctxt expr >>=? fun (expr, _) ->
+          Lwt.return
+            begin
+              parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+              parse_ty ctxt ~legacy
+                ~allow_big_map:true ~allow_operation:false
+                ~allow_contract:true arg_type >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+            end >>=? fun (unreachable_entrypoint,map) ->
+          return
+            (unreachable_entrypoint,
+             Entrypoints_map.fold
+               begin fun entry (_,ty) acc ->
+                 (entry , Micheline.strip_locations ty) ::acc end
+               map [])
+    ) ;
   register1 S.big_map_get (fun ctxt contract () (key, key_type) ->
       let open Script_ir_translator in
       let ctxt = Gas.set_unlimited ctxt in
@@ -265,6 +332,12 @@ let script_opt ctxt block contract =
 
 let storage ctxt block contract =
   RPC_context.make_call1 S.storage ctxt block contract () ()
+
+let entrypoint_type ctxt block contract entrypoint =
+  RPC_context.make_call2 S.entrypoint_type ctxt block contract entrypoint () ()
+
+let list_entrypoints ctxt block contract =
+  RPC_context.make_call1 S.list_entrypoints ctxt block contract () ()
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()

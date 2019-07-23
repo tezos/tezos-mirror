@@ -152,6 +152,33 @@ module Scripts = struct
         ~output: Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
+    let entrypoint_type =
+      RPC_service.post_service
+        ~description: "Return the type of the given entrypoint"
+        ~query: RPC_query.empty
+        ~input: (obj2
+                   (req "script" Script.expr_encoding)
+                   (dft "entrypoint" string "default"))
+        ~output: (obj1
+                    (req "entrypoint_type" (option Script.expr_encoding)))
+        RPC_path.(path / "entrypoint")
+
+
+    let list_entrypoints =
+      RPC_service.post_service
+        ~description: "Return the list of entrypoints of the given script"
+        ~query: RPC_query.empty
+        ~input: (obj1
+                   (req "script" Script.expr_encoding))
+        ~output: (obj2
+                    (dft "unreachable"
+                       (Data_encoding.list
+                          (obj1 (req "path" (Data_encoding.list Michelson_v1_primitives.prim_encoding))))
+                       [])
+                    (req "entrypoints"
+                       (assoc Script.expr_encoding)))
+        RPC_path.(path / "entrypoints")
+
   end
 
   let register () =
@@ -324,7 +351,43 @@ module Scripts = struct
             ctxt Chain_id.zero Optimized shell.branch baker operation
             operation.protocol_data.contents >>=? fun (_ctxt, result) ->
           return result
-
+    end;
+    register0 S.entrypoint_type begin fun ctxt () (expr, entrypoint) ->
+      let ctxt = Gas.set_unlimited ctxt in
+      let legacy = false in
+      let open Script_ir_translator in
+      Lwt.return
+        begin
+          parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+          parse_ty ctxt ~legacy
+            ~allow_big_map:true ~allow_operation:false
+            ~allow_contract:true arg_type >>? fun (Ex_ty arg_type, _) ->
+          Script_ir_translator.find_entrypoint ~root_name arg_type
+            entrypoint
+        end >>= function
+        Ok (_f , Ex_ty ty)->
+          unparse_ty ctxt ty >>=? fun (ty_node, _) ->
+          return_some (Micheline.strip_locations ty_node)
+      | Error _ -> return_none
+    end ;
+    register0 S.list_entrypoints begin fun ctxt () expr ->
+      let ctxt = Gas.set_unlimited ctxt in
+      let legacy = false in
+      let open Script_ir_translator in
+      Lwt.return
+        begin
+          parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+          parse_ty ctxt ~legacy
+            ~allow_big_map:true ~allow_operation:false
+            ~allow_contract:true arg_type >>? fun (Ex_ty arg_type, _) ->
+          Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+        end >>=? fun (unreachable_entrypoint,map) ->
+      return
+        (unreachable_entrypoint,
+         Entrypoints_map.fold
+           begin fun entry (_,ty) acc ->
+             (entry , Micheline.strip_locations ty) ::acc end
+           map [])
     end
 
   let run_code ctxt block code (storage, input, amount, source, payer, gas, entrypoint) =
@@ -346,6 +409,13 @@ module Scripts = struct
 
   let run_operation ctxt block =
     RPC_context.make_call0 S.run_operation ctxt block ()
+
+  let entrypoint_type ctxt block =
+    RPC_context.make_call0 S.entrypoint_type ctxt block ()
+
+  let list_entrypoints ctxt block =
+    RPC_context.make_call0 S.list_entrypoints ctxt block ()
+
 
 end
 

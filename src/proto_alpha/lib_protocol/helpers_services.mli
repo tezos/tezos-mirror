@@ -72,6 +72,16 @@ module Scripts : sig
     'a -> packed_operation ->
     (packed_protocol_data * Apply_results.packed_operation_metadata) shell_tzresult Lwt.t
 
+  val entrypoint_type:
+    'a #RPC_context.simple ->
+    'a -> Script.expr * string -> Script.expr option shell_tzresult Lwt.t
+
+  val list_entrypoints:
+    'a #RPC_context.simple ->
+    'a -> Script.expr ->
+    (Michelson_v1_primitives.prim list list *
+     (string * Script.expr) list) shell_tzresult Lwt.t
+
 end
 
 module Forge : sig
