@@ -33,23 +33,15 @@ class TestFork:
         """Client 0 bakes block A at level 2, not communicated to 1 and 2"""
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
-    def test_endorse_node_0(self, sandbox, session):
-        """bootstrap1 builds an endorsement for block A"""
-        client = sandbox.client(0)
-        client.endorse('bootstrap1')
-        mempool = client.get_mempool()
-        endorsement = mempool['applied'][0]
-        session['endorsement1'] = endorsement
-
     def test_bake_node_0_again(self, sandbox):
-        """Client 0 bakes block A' at level 3, not communicated to 1 and 2"""
+        """Client 0 bakes block A' at level 3 & 4, not communicated to 1 and 2"""
+        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_first_branch(self, sandbox, session):
         head = sandbox.client(0).get_head()
-        assert head['header']['level'] == 3
+        assert head['header']['level'] == 4
         session['hash1'] = head['hash']
-        assert len(head['operations'][0]) == 1
 
     def test_terminate_node_0(self, sandbox):
         sandbox.node(0).terminate()
