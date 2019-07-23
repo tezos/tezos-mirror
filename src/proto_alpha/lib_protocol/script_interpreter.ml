@@ -807,11 +807,17 @@ let rec interp
             unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
             let storage = Micheline.strip_locations storage in
             Contract.fresh_contract_from_current_nonce ctxt >>=? fun (ctxt, contract) ->
+            let code = Script.lazy_expr code in
+            begin
+              if Legacy_support.has_default_entrypoint code then
+                Legacy_support.add_root_entrypoint code
+              else return code
+            end >>=? fun code ->
             let operation =
               Origination
                 { credit ; manager ; delegate ; preorigination = Some contract ;
                   delegatable ; spendable ;
-                  script = Some { code = Script.lazy_expr code ;
+                  script = Some { code ;
                                   storage = Script.lazy_expr storage } } in
             Lwt.return (fresh_internal_nonce ctxt) >>=? fun (ctxt, nonce) ->
             logged_return
