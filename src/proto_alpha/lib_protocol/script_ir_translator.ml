@@ -3160,9 +3160,16 @@ and parse_instr
           (Item_t (Bytes_t None, rest, annot))
     | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
       stack ->
-        parse_var_annot loc annot ~default:default_steps_annot >>=? fun annot ->
-        typed ctxt loc Steps_to_quota
-          (Item_t (Nat_t None, stack, annot))
+        if legacy
+        then begin
+          (* For existing contracts, this instruction is still allowed *)
+          parse_var_annot loc annot ~default:default_steps_annot >>=? fun annot ->
+          typed ctxt loc Steps_to_quota
+            (Item_t (Nat_t None, stack, annot))
+        end
+        else
+          (* For new contracts this instruction is not allowed anymore *)
+          fail (Deprecated_instruction I_STEPS_TO_QUOTA)
     | Prim (loc, I_SOURCE, [], annot),
       stack ->
         parse_var_annot loc annot ~default:default_source_annot >>=? fun annot ->
