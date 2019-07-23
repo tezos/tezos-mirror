@@ -131,7 +131,7 @@ let too_early_double_endorsement_evidence () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (delegate, _) ->
+  >>=? fun (delegate, _slots) ->
   Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) ()
@@ -222,11 +222,11 @@ let wrong_delegate () =
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (endorser_a, _) ->
+  >>=? fun (endorser_a, _a_slots) ->
   Op.endorsement ~delegate:endorser_a (B blk_a) ()
   >>=? fun endorsement_a ->
   Context.get_endorser (B blk_b)
-  >>=? fun (endorser_b, _) ->
+  >>=? fun (endorser_b, _b_slots) ->
   let delegate =
     if Signature.Public_key_hash.equal pkh1 endorser_b then pkh2 else pkh1
   in

@@ -54,6 +54,8 @@ val get_next_baker :
   t ->
   (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
+val get_endorsing_power : block -> int tzresult Lwt.t
+
 module Forge : sig
   val contents :
     ?proof_of_work_nonce:MBytes.t ->
@@ -68,6 +70,7 @@ module Forge : sig
       The header can then be modified and applied with [apply]. *)
   val forge_header :
     ?policy:baker_policy ->
+    ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
     t ->
     header tzresult Lwt.t
@@ -90,6 +93,8 @@ end
 val genesis :
   ?with_commitments:bool ->
   ?endorsers_per_block:int ->
+  ?initial_endorsers:int ->
+  ?min_proposal_quorum:int32 ->
   (Account.t * Tez_repr.tez) list ->
   block tzresult Lwt.t
 
@@ -113,6 +118,7 @@ val apply :
 *)
 val bake :
   ?policy:baker_policy ->
+  ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
   t ->

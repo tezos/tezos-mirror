@@ -289,10 +289,17 @@ let test_assert_right () =
 
 let test_diip () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
-  let dip = Prim (zero_loc, "DIP", [code], []) in
+  assert_expands
+    (Prim (zero_loc, "DIP", [code], []))
+    (Prim (zero_loc, "DIP", [code], []))
+  >>? fun () ->
+  assert_expands
+    (Prim (zero_loc, "DIIIIIIIIP", [code], []))
+    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 8); code], []))
+  >>? fun () ->
   assert_expands
     (Prim (zero_loc, "DIIP", [code], []))
-    (Seq (zero_loc, [Prim (zero_loc, "DIP", [Seq (zero_loc, [dip])], [])]))
+    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], []))
 
 (* pair *)
 
@@ -776,7 +783,7 @@ let test_unexpand_duup () =
                [] );
            Prim (zero_loc, "SWAP", [], []);
          ] ))
-    (Prim (zero_loc, "DUUP", [], []))
+    (Prim (zero_loc, "DUP", [Int (zero_loc, Z.of_int 2)], []))
 
 let test_unexpand_caddadr () =
   let car = Prim (zero_loc, "CAR", [], []) in
@@ -922,10 +929,9 @@ let test_unexpand_map_car () =
 
 let test_unexpand_diip () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
-  let dip = Prim (zero_loc, "DIP", [code], []) in
   assert_unexpansion
     (Prim (zero_loc, "DIIP", [code], []))
-    (Seq (zero_loc, [Prim (zero_loc, "DIP", [Seq (zero_loc, [dip])], [])]))
+    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], []))
 
 let test_unexpand_map_cdr () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
@@ -1044,7 +1050,9 @@ let test_unexpand_diip_duup1 () =
   let cst str = Prim (zero_loc, str, [], []) in
   let app str code = Prim (zero_loc, str, [code], []) in
   let dip = app "DIP" in
-  let diip = app "DIIP" in
+  let diip code =
+    Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], [])
+  in
   let dup = cst "DUP" in
   let swap = cst "SWAP" in
   let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
@@ -1059,9 +1067,11 @@ let test_unexpand_diip_duup2 () =
   let cst str = Prim (zero_loc, str, [], []) in
   let app str code = Prim (zero_loc, str, [code], []) in
   let dip = app "DIP" in
-  let diip = app "DIIP" in
+  let diip code =
+    Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], [])
+  in
   let dup = cst "DUP" in
-  let duup = cst "DUUP" in
+  let duup = Prim (zero_loc, "DUP", [Int (zero_loc, Z.of_int 2)], []) in
   let swap = cst "SWAP" in
   let dip_dup_swap = Seq (zero_loc, [dip (single dup); swap]) in
   assert_unexpansion

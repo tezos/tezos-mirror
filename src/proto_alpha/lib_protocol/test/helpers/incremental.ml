@@ -59,7 +59,13 @@ let rpc_ctxt =
 let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ?(policy = Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
-  >>=? fun (delegate, priority, real_timestamp) ->
+  >>=? fun (delegate, priority, _timestamp) ->
+  Alpha_services.Delegate.Minimal_valid_time.get
+    Block.rpc_ctxt
+    predecessor
+    priority
+    0
+  >>=? fun real_timestamp ->
   Account.find delegate
   >>=? fun delegate ->
   let timestamp = Option.unopt ~default:real_timestamp timestamp in

@@ -25,7 +25,7 @@
 
 open Protocol
 
-let known_ok_tez_litterals =
+let known_ok_tez_literals =
   [
     (0L, "0");
     (10L, "0.00001");
@@ -50,7 +50,7 @@ let known_ok_tez_litterals =
     (999_999_999_999_999_999L, "999999999999.999999");
   ]
 
-let known_bad_tez_litterals =
+let known_bad_tez_literals =
   [
     "10000.";
     "100,.";
@@ -84,7 +84,7 @@ let is_none ?(msg = "") x = if x <> None then fail "None" "Some _" msg
 
 let is_some ?(msg = "") x = if x = None then fail "Some _" "None" msg
 
-let test_known_tez_litterals () =
+let test_known_tez_literals () =
   List.iter
     (fun (v, s) ->
       let vv = Tez_repr.of_mutez v in
@@ -112,15 +112,15 @@ let test_known_tez_litterals () =
       equal ~prn:Tez_repr.to_string vv vs ;
       equal ~prn:Tez_repr.to_string vv vs' ;
       equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
-    known_ok_tez_litterals ;
+    known_ok_tez_literals ;
   List.iter
     (fun s ->
       let vs = Tez_repr.of_string s in
       is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
-    known_bad_tez_litterals ;
+    known_bad_tez_literals ;
   return_unit
 
-let test_random_tez_litterals () =
+let test_random_tez_literals () =
   for _ = 0 to 100_000 do
     let v = Random.int64 12L in
     let vv = Tez_repr.of_mutez v in
@@ -150,8 +150,8 @@ let test_random_tez_litterals () =
 
 let tests =
   [
-    ("tez-litterals", fun _ -> test_known_tez_litterals ());
-    ("rnd-tez-litterals", fun _ -> test_random_tez_litterals ());
+    ("tez-literals", fun _ -> test_known_tez_literals ());
+    ("rnd-tez-literals", fun _ -> test_random_tez_literals ());
   ]
 
 let wrap (n, f) =

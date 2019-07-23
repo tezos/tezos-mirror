@@ -117,6 +117,23 @@ let dispatch_policy = function
 
 let get_next_baker ?(policy = By_priority 0) = dispatch_policy policy
 
+let get_endorsing_power b =
+  fold_left_s
+    (fun acc (op : Operation.packed) ->
+      let (Operation_data data) = op.protocol_data in
+      match data.contents with
+      | Single (Endorsement _) ->
+          Alpha_services.Delegate.Endorsing_power.get
+            rpc_ctxt
+            b
+            op
+            Chain_id.zero
+          >>=? fun endorsement_power -> return (acc + endorsement_power)
+      | _ ->
+          return acc)
+    0
+    b.operations
+
 module Forge = struct
   type header = {
     baker : public_key_hash;
@@ -167,9 +184,13 @@ module Forge = struct
     in
     Block_header.{shell; protocol_data = {contents; signature}} |> return
 
-  let forge_header ?(policy = By_priority 0) ?(operations = []) pred =
+  let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = []) pred
+      =
     dispatch_policy policy pred
-    >>=? fun (pkh, priority, timestamp) ->
+    >>=? fun (pkh, priority, _timestamp) ->
+    Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
+    >>=? fun expected_timestamp ->
+    let timestamp = Option.unopt ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
     ( match Fitness_repr.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
@@ -292,8 +313,8 @@ let genesis_with_parameters parameters =
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
-let genesis ?with_commitments ?endorsers_per_block
-    (initial_accounts : (Account.t * Tez_repr.t) list) =
+let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
+    ?min_proposal_quorum (initial_accounts : (Account.t * Tez_repr.t) list) =
   if initial_accounts = [] then
     Pervasives.failwith "Must have one account with a roll to bake" ;
   let open Tezos_protocol_alpha_parameters in
@@ -301,7 +322,20 @@ let genesis ?with_commitments ?endorsers_per_block
   let endorsers_per_block =
     Option.unopt ~default:constants.endorsers_per_block endorsers_per_block
   in
-  let constants = {constants with endorsers_per_block} in
+  let initial_endorsers =
+    Option.unopt ~default:constants.initial_endorsers initial_endorsers
+  in
+  let min_proposal_quorum =
+    Option.unopt ~default:constants.min_proposal_quorum min_proposal_quorum
+  in
+  let constants =
+    {
+      constants with
+      endorsers_per_block;
+      initial_endorsers;
+      min_proposal_quorum;
+    }
+  in
   (* Check there is at least one roll *)
   ( try
       let open Test_utils in
@@ -367,7 +401,7 @@ let apply header ?(operations = []) pred =
   let hash = Block_header.hash header in
   {hash; header; operations; context}
 
-let bake ?policy ?operation ?operations pred =
+let bake ?policy ?timestamp ?operation ?operations pred =
   let operations =
     match (operation, operations) with
     | (Some op, Some ops) ->
@@ -379,7 +413,7 @@ let bake ?policy ?operation ?operations pred =
     | (None, None) ->
         None
   in
-  Forge.forge_header ?policy ?operations pred
+  Forge.forge_header ?timestamp ?policy ?operations pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header -> apply header ?operations pred
 

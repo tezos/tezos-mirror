@@ -79,24 +79,24 @@ let multiple_origination_and_delegation () =
   Context.init 2
   >>=? fun (blk, contracts) ->
   let c1 = List.nth contracts 0 in
+  let c2 = List.nth contracts 1 in
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  Context.Contract.pkh c1
+  Context.Contract.pkh c2
   >>=? fun delegate_pkh ->
-  let new_accounts = List.map (fun _ -> Account.new_account ()) (1 -- n) in
-  mapi_s
-    (fun i {Account.pk; _} ->
+  (* Deploy n smart contracts with dummy scripts from c1 *)
+  map_s
+    (fun i ->
       Op.origination
         ~delegate:delegate_pkh
         ~counter:(Z.of_int i)
         ~fee:Tez.zero
-        ~public_key:pk
-        ~spendable:true
+        ~script:Op.dummy_script
         ~credit:(Tez.of_int 10)
         (B blk)
         c1)
-    new_accounts
+    (1 -- n)
   >>=? fun originations ->
   (* These computed originated contracts are not the ones really created *)
   (* We will extract them from the tickets *)
@@ -143,8 +143,11 @@ let multiple_origination_and_delegation () =
   >>?= fun origination_burn ->
   Tez.(origination_burn *? Int64.of_int n)
   >>?= fun origination_total_cost ->
-  Tez.(Tez.of_int (10 * n) +? origination_total_cost)
-  >>?= fun total_cost ->
+  Lwt.return
+    ( Tez.( *? ) Op.dummy_script_cost 10L
+    >>? Tez.( +? ) (Tez.of_int (10 * n))
+    >>? Tez.( +? ) origination_total_cost )
+  >>=? fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
   iter_s
