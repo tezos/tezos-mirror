@@ -13,6 +13,6 @@
     base
     genspio
     ezjsonm
-    tezos-signer-backends
+    tezos-signer-backends.unix
     tezos-client-alpha))
 

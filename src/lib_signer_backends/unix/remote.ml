@@ -27,9 +27,7 @@ open Client_keys
 
 let scheme = "remote"
 
-module RPC_client = RPC_client_unix
-
-module Make(S : sig
+module Make(RPC_client : RPC_client.S)(S : sig
     val default : Uri.t
     val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
     val logger: RPC_client.logger
@@ -52,8 +50,8 @@ module Make(S : sig
     \ - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
   module Socket = Socket.Make(S)
-  module Http = Http.Make(S)
-  module Https = Https.Make(S)
+  module Http = Http.Make(RPC_client)(S)
+  module Https = Https.Make(RPC_client)(S)
 
   let get_remote () =
     match Uri.scheme S.default with

@@ -1,20 +1,18 @@
 (library
- (name tezos_signer_backends)
- (public_name tezos-signer-backends)
- (libraries tezos-base
-            tezos-stdlib
-            tezos-client-base
-            tezos-rpc-http-client
-            tezos-signer-services
-            tezos-shell-services
-            pbkdf
-            bip39)
+ (name tezos_signer_backends_unix)
+ (public_name tezos-signer-backends.unix)
+ (libraries tezos-signer-backends
+            tezos-stdlib-unix
+            tezos-rpc-http-client-unix
+            ledgerwallet-tezos)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib
+                   -open Tezos_stdlib_unix
                    -open Tezos_client_base
                    -open Tezos_rpc_http
                    -open Tezos_rpc_http_client
+                   -open Tezos_rpc_http_client_unix
                    -open Tezos_signer_services
+                   -open Tezos_signer_backends
                    -open Tezos_shell_services)))
 
 (alias

@@ -12,7 +12,7 @@
             tezos-client-base-unix
             tezos-client-alpha-commands.registration
             tezos-baking-alpha-commands.registration
-            tezos-signer-backends)
+            tezos-signer-backends.unix)
   (flags (:standard -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http_client
                     -open Tezos_stdlib_unix
