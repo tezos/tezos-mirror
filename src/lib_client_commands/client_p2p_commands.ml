@@ -40,6 +40,13 @@ let addr_parameter =
     (parameter (fun _ x ->
          return (P2p_point.Id.of_string_exn ~default_port:9732 x)))
 
+let p2p_peer_id_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (P2p_peer.Id.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   [ command
@@ -157,7 +164,7 @@ let commands () =
       ~desc:"Kick a peer."
       no_options
       ( prefixes ["kick"; "peer"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Connections.kick cctxt peer
@@ -229,7 +236,7 @@ let commands () =
       ~desc:"Check if a peer ID is banned."
       no_options
       ( prefixes ["is"; "peer"; "banned"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Peers.banned cctxt peer
@@ -245,7 +252,7 @@ let commands () =
          the blacklist if was previously in it."
       no_options
       ( prefixes ["ban"; "peer"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Peers.ban cctxt peer
@@ -257,7 +264,7 @@ let commands () =
       ~desc:"Removes a peer ID from the blacklist."
       no_options
       ( prefixes ["unban"; "peer"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Peers.unban cctxt peer
@@ -271,7 +278,7 @@ let commands () =
          blacklist if it was previously in it."
       no_options
       ( prefixes ["trust"; "peer"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Peers.trust cctxt peer
@@ -283,7 +290,7 @@ let commands () =
       ~desc:"Remove a peer ID from the whitelist."
       no_options
       ( prefixes ["untrust"; "peer"]
-      @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
+      @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
         P2p_services.Peers.untrust cctxt peer

@@ -107,12 +107,6 @@ module type ENCODER = sig
   val encoding : t Data_encoding.t
 
   val rpc_arg : t RPC_arg.t
-
-  val param :
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'arg) Clic.params ->
-    (t -> 'a, 'arg) Clic.params
 end
 
 module type PVSS = sig

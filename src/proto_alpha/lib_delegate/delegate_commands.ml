@@ -70,6 +70,13 @@ let may_lock_pidfile = function
       trace (failure "Failed to create the pidfile: %s" pidfile)
       @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
 
+let block_param t =
+  Clic.param
+    ~name:""
+    ~desc:""
+    (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
+    t
+
 let delegate_commands () =
   let open Clic in
   [ command
@@ -119,7 +126,7 @@ let delegate_commands () =
       ~group
       ~desc:"Forge and inject a seed-nonce revelation operation."
       no_options
-      (prefixes ["reveal"; "nonce"; "for"] @@ seq_of_param Block_hash.param)
+      (prefixes ["reveal"; "nonce"; "for"] @@ seq_of_param block_param)
       (fun () block_hashes cctxt ->
         reveal_block_nonces
           cctxt

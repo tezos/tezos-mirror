@@ -155,6 +155,8 @@ struct
              (Data_encoding.Json.wrap_error H.of_b58check_exn)
              string )
 
+  let of_b58check = H.of_b58check
+
   let rpc_arg =
     RPC_arg.make
       ~name:H.name
@@ -171,13 +173,6 @@ struct
             Ok v)
       ~construct:H.to_b58check
       ()
-
-  let param ?(name = H.name) ?(desc = H.title) t =
-    Clic.param
-      ~name
-      ~desc
-      (Clic.parameter (fun _ str -> Lwt.return (H.of_b58check str)))
-      t
 end
 
 module MakeIterator (H : sig

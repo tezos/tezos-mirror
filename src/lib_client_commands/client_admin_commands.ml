@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let block_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   let group =
@@ -37,7 +44,7 @@ let commands () =
       no_options
       ( prefixes ["unmark"; "invalid"]
       @@ seq_of_param
-           (Block_hash.param
+           (block_param
               ~name:"block"
               ~desc:"blocks to remove from invalid list") )
       (fun () blocks (cctxt : #Client_context.full) ->
