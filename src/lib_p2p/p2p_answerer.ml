@@ -24,76 +24,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.answerer"
-end)
+(** An [Answerer.t] is a set of callback functions, parameterized by
+    [conn_info] record. The [conn_info] records contains values useful
+    for the callback functions to perfom their task, and known after
+    the connection is set up.
+
+    The callback functions are called when the node receives `P2p_messages.t`
+    messages. The parameters are the values carried by the message, and
+    a [request_info] record that contains values pertaining to the connection
+    that may change during the life of the connection. *)
+
+type 'msg conn_info = {
+  peer_id : P2p_peer.Id.t;
+  is_private : bool;
+  write_swap_ack : P2p_addr.t * int -> P2p_peer.Id.t -> bool tzresult;
+  messages : (int * 'msg) Lwt_pipe.t;
+}
+
+type request_info = {
+  last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option;
+}
 
 type 'msg callback = {
-  bootstrap : unit -> P2p_point.Id.t list Lwt.t;
-  advertise : P2p_point.Id.t list -> unit Lwt.t;
-  message : int -> 'msg -> unit Lwt.t;
-  swap_request : P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
-  swap_ack : P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
+  bootstrap : request_info -> P2p_point.Id.t list Lwt.t;
+  advertise : request_info -> P2p_point.Id.t list -> unit Lwt.t;
+  message : request_info -> int -> 'msg -> unit Lwt.t;
+  swap_request : request_info -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
+  swap_ack : request_info -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
 }
 
-type ('msg, 'meta) t = {
-  canceler : Lwt_canceler.t;
-  conn : ('msg P2p_message.t, 'meta) P2p_socket.t;
-  callback : 'msg callback;
-  mutable worker : unit Lwt.t;
-}
-
-let rec worker_loop st =
-  Lwt_unix.yield ()
-  >>= fun () ->
-  protect ~canceler:st.canceler (fun () -> P2p_socket.read st.conn)
-  >>= function
-  | Ok (_, Bootstrap) -> (
-      (* st.callback.bootstrap will return an empty list if the node
-         is in private mode *)
-      st.callback.bootstrap ()
-      >>= function
-      | [] ->
-          worker_loop st
-      | points -> (
-        match P2p_socket.write_now st.conn (Advertise points) with
-        | Ok _sent ->
-            (* if not sent then ?? TODO count dropped message ?? *)
-            worker_loop st
-        | Error _ ->
-            Lwt_canceler.cancel st.canceler ) )
-  | Ok (_, Advertise points) ->
-      (* st.callback.advertise will ignore the points if the node is
-         in private mode *)
-      st.callback.advertise points >>= fun () -> worker_loop st
-  | Ok (_, Swap_request (point, peer)) ->
-      st.callback.swap_request point peer >>= fun () -> worker_loop st
-  | Ok (_, Swap_ack (point, peer)) ->
-      st.callback.swap_ack point peer >>= fun () -> worker_loop st
-  | Ok (size, Message msg) ->
-      st.callback.message size msg >>= fun () -> worker_loop st
-  | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
-      Lwt_canceler.cancel st.canceler
-  | Error (P2p_errors.Decoding_error :: _) ->
-      (* TODO: Penalize peer... *)
-      Lwt_canceler.cancel st.canceler
-  | Error (Canceled :: _) ->
-      Lwt.return_unit
-  | Error err ->
-      lwt_log_error
-        "@[Answerer unexpected error:@ %a@]"
-        Error_monad.pp_print_error
-        err
-      >>= fun () -> Lwt_canceler.cancel st.canceler
-
-let run conn canceler callback =
-  let st = {canceler; conn; callback; worker = Lwt.return_unit} in
-  st.worker <-
-    Lwt_utils.worker
-      "answerer"
-      ~on_event:Internal_event.Lwt_worker_event.on_event
-      ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
-  st
-
-let shutdown st = Lwt_canceler.cancel st.canceler >>= fun () -> st.worker
+type 'msg t = 'msg conn_info -> 'msg callback

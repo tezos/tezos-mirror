@@ -30,7 +30,7 @@ end)
 
 type message = Ping
 
-let msg_config : message P2p_pool.message_config =
+let msg_config : message P2p_connect_handler.message_config =
   {
     encoding =
       [ P2p_message.Encoding
@@ -84,16 +84,16 @@ let detach_node f points n =
   let ((addr, port), points) = List.select n points in
   let proof_of_work_target = Crypto_box.make_target 0. in
   let identity = P2p_identity.generate proof_of_work_target in
+  let private_mode = true in
   let nb_points = List.length points in
-  let config =
-    P2p_pool.
+  let connect_handler_cfg =
+    P2p_connect_handler.
       {
         identity;
         proof_of_work_target;
-        trusted_points = points;
-        peers_file = "/dev/null";
-        private_mode = true;
         listening_port = Some port;
+        private_mode;
+        greylisting_config = P2p_point_state.Info.default_greylisting_config;
         min_connections = nb_points;
         max_connections = nb_points;
         max_incoming_connections = nb_points;
@@ -102,44 +102,57 @@ let detach_node f points n =
         incoming_app_message_queue_size = None;
         incoming_message_queue_size = None;
         outgoing_message_queue_size = None;
-        known_peer_ids_history_size = 100;
-        known_points_history_size = 100;
-        max_known_points = None;
-        max_known_peer_ids = None;
-        swap_linger = Time.System.Span.of_seconds_exn 0.;
         binary_chunks_size = None;
-        greylisting_config = P2p_point_state.Info.default_greylisting_config;
       }
   in
+  let pool_config =
+    P2p_pool.
+      {
+        identity;
+        trusted_points = points;
+        peers_file = "/dev/null";
+        private_mode;
+        max_known_points = None;
+        max_known_peer_ids = None;
+      }
+  in
+  (* swap_linger = Time.System.Span.of_seconds_exn 0. ; *)
   Process.detach
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
     (fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       let events = P2p_events.create () in
       let log _ = () in
-      P2p_pool.create
-        config
-        peer_meta_config
-        conn_meta_config
-        msg_config
-        sched
-        ~log
-        events
+      P2p_pool.create pool_config peer_meta_config ~log events
       >>= fun pool ->
-      P2p_welcome.create ~backlog:10 pool ~addr port
+      let answerer = lazy (P2p_protocol.create_private ()) in
+      let connect_handler =
+        P2p_connect_handler.create
+          connect_handler_cfg
+          pool
+          msg_config
+          conn_meta_config
+          sched
+          events
+          ~log
+          ~answerer
+      in
+      P2p_welcome.create ~backlog:10 connect_handler ~addr port
       >>= fun welcome ->
       P2p_welcome.activate welcome ;
       lwt_log_info "Node ready (port: %d)" port
       >>= fun () ->
       sync channel
       >>=? fun () ->
-      f channel pool points
+      f channel connect_handler pool points
       >>=? fun () ->
       lwt_log_info "Shutting down..."
       >>= fun () ->
       P2p_welcome.shutdown welcome
       >>= fun () ->
       P2p_pool.destroy pool
+      >>= fun () ->
+      P2p_connect_handler.destroy connect_handler
       >>= fun () ->
       P2p_io_scheduler.shutdown sched
       >>= fun () -> lwt_log_info "Bye." >>= fun () -> return_unit)
@@ -154,10 +167,10 @@ let detach_nodes run_node points =
 type error += Connect | Write | Read
 
 module Simple = struct
-  let rec connect ~timeout pool point =
+  let rec connect ~timeout connect_handler pool point =
     lwt_log_info "Connect to %a" P2p_point.Id.pp point
     >>= fun () ->
-    P2p_pool.connect pool point ~timeout
+    P2p_connect_handler.connect connect_handler point ~timeout
     >>= function
     | Error (P2p_errors.Connected :: _) -> (
       match P2p_pool.Connection.find_by_point pool point with
@@ -196,25 +209,30 @@ module Simple = struct
           head_err
         >>= fun () ->
         Lwt_unix.sleep (0.5 +. Random.float 2.)
-        >>= fun () -> connect ~timeout pool point
+        >>= fun () -> connect ~timeout connect_handler pool point
     | (Ok _ | Error _) as res ->
         Lwt.return res
 
-  let connect_all ~timeout pool points = map_p (connect ~timeout pool) points
+  let connect_all ~timeout connect_handler pool points =
+    map_p (connect ~timeout connect_handler pool) points
 
   let write_all conns msg =
-    iter_p (fun conn -> trace Write @@ P2p_pool.write_sync conn msg) conns
+    iter_p (fun conn -> trace Write @@ P2p_conn.write_sync conn msg) conns
 
   let read_all conns =
     iter_p
       (fun conn ->
-        trace Read @@ P2p_pool.read conn >>=? fun Ping -> return_unit)
+        trace Read @@ P2p_conn.read conn >>=? fun Ping -> return_unit)
       conns
 
-  let close_all conns = Lwt_list.iter_p P2p_pool.disconnect conns
+  let close_all conns = Lwt_list.iter_p P2p_conn.disconnect conns
 
-  let node channel pool points =
-    connect_all ~timeout:(Time.System.Span.of_seconds_exn 2.) pool points
+  let node channel connect_handler pool points =
+    connect_all
+      ~timeout:(Time.System.Span.of_seconds_exn 2.)
+      connect_handler
+      pool
+      points
     >>=? fun conns ->
     lwt_log_info "Bootstrap OK"
     >>= fun () ->
@@ -241,35 +259,42 @@ module Simple = struct
 end
 
 module Random_connections = struct
-  let rec connect_random pool total rem point n =
+  let rec connect_random connect_handler pool total rem point n =
     Lwt_unix.sleep (0.2 +. Random.float 1.0)
     >>= fun () ->
     trace Connect
-    @@ Simple.connect ~timeout:(Time.System.Span.of_seconds_exn 2.) pool point
+    @@ Simple.connect
+         ~timeout:(Time.System.Span.of_seconds_exn 2.)
+         connect_handler
+         pool
+         point
     >>=? fun conn ->
-    trace Write @@ P2p_pool.write conn Ping
+    trace Write @@ P2p_conn.write conn Ping
     >>= fun _ ->
-    trace Read @@ P2p_pool.read conn
+    trace Read @@ P2p_conn.read conn
     >>=? fun Ping ->
     Lwt_unix.sleep (0.2 +. Random.float 1.0)
     >>= fun () ->
-    P2p_pool.disconnect conn
+    P2p_conn.disconnect conn
     >>= fun () ->
     ( decr rem ;
       if !rem mod total = 0 then lwt_log_info "Remaining: %d." (!rem / total)
       else Lwt.return_unit )
     >>= fun () ->
-    if n > 1 then connect_random pool total rem point (pred n) else return_unit
+    if n > 1 then connect_random connect_handler pool total rem point (pred n)
+    else return_unit
 
-  let connect_random_all pool points n =
+  let connect_random_all connect_handler pool points n =
     let total = List.length points in
     let rem = ref (n * total) in
-    iter_p (fun point -> connect_random pool total rem point n) points
+    iter_p
+      (fun point -> connect_random connect_handler pool total rem point n)
+      points
 
-  let node repeat _channel pool points =
+  let node repeat _channel connect_handler pool points =
     lwt_log_info "Begin random connections."
     >>= fun () ->
-    connect_random_all pool points repeat
+    connect_random_all connect_handler pool points repeat
     >>=? fun () ->
     lwt_log_info "Random connections OK." >>= fun () -> return_unit
 
@@ -289,12 +314,13 @@ module Garbled = struct
   let write_bad_all conns =
     let bad_msg = Bytes.of_string (String.make 16 '\000') in
     iter_p
-      (fun conn -> trace Write @@ P2p_pool.raw_write_sync conn bad_msg)
+      (fun conn -> trace Write @@ P2p_conn.raw_write_sync conn bad_msg)
       conns
 
-  let node ch pool points =
+  let node ch connect_handler pool points =
     Simple.connect_all
       ~timeout:(Time.System.Span.of_seconds_exn 2.)
+      connect_handler
       pool
       points
     >>=? fun conns ->

@@ -70,14 +70,14 @@ let info_of_peer_info pool i =
     | None ->
         P2p_stat.empty
     | Some conn ->
-        P2p_pool.Connection.stat conn
+        P2p_conn.stat conn
   in
   let meta_opt =
     match conn_opt with
     | None ->
         None
     | Some conn ->
-        Some (P2p_pool.Connection.remote_metadata conn)
+        Some (P2p_conn.remote_metadata conn)
   in
   P2p_peer_state.Info.
     {
@@ -118,11 +118,11 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.register0 dir P2p_services.S.stat (fun () () ->
-        match P2p.pool net with
+        match P2p.connect_handler net with
         | None ->
             return P2p_stat.empty
-        | Some pool ->
-            return (P2p_pool.pool_stat pool))
+        | Some connect_handler ->
+            return (P2p_connect_handler.stat connect_handler))
   in
   let dir =
     RPC_directory.gen_register0 dir P2p_services.S.events (fun () () ->
@@ -133,11 +133,14 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.register1 dir P2p_services.S.connect (fun point q () ->
-        match P2p.pool net with
+        match P2p.connect_handler net with
         | None ->
             failwith "The P2P layer is disabled."
-        | Some pool ->
-            P2p_pool.connect ~timeout:q#timeout pool point
+        | Some connect_handler ->
+            P2p_connect_handler.connect
+              ~timeout:q#timeout
+              connect_handler
+              point
             >>=? fun _conn -> return_unit)
   in
   (* Network : Connection *)
@@ -149,7 +152,7 @@ let build_rpc_directory net =
         return
         @@ Option.apply (P2p.pool net) ~f:(fun pool ->
                Option.map
-                 ~f:P2p_pool.Connection.info
+                 ~f:P2p_conn.info
                  (P2p_pool.Connection.find_by_peer_id pool peer_id)))
   in
   let dir =
@@ -165,7 +168,7 @@ let build_rpc_directory net =
           | None ->
               Lwt.return_unit
           | Some conn ->
-              P2p_pool.disconnect ~wait:q#wait conn ))
+              P2p_conn.disconnect ~wait:q#wait conn ))
   in
   let dir =
     RPC_directory.register0 dir P2p_services.Connections.S.list (fun () () ->
@@ -175,7 +178,7 @@ let build_rpc_directory net =
         | Some pool ->
             return
             @@ P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc ->
-                   P2p_pool.Connection.info c :: acc))
+                   P2p_conn.info c :: acc))
   in
   (* Network : Peer_id *)
   let dir =

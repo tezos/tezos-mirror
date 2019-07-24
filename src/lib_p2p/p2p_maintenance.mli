@@ -73,6 +73,7 @@ val create :
   ?discovery:P2p_discovery.t ->
   config ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
   P2p_events.t ->
   ('msg, 'meta, 'meta_conn) t
 

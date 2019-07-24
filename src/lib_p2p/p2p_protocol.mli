@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,23 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines an answering worker that replies to [P2p_message.t]
-    using callbacks. *)
+(** This module defines constructor for the private and default
+    [P2p_answerer.t]. Both pass messages `[Message msg]` to the upper-layer.
+    The private answerer ignore all other messages. *)
 
-type 'msg callback = {
-  bootstrap : unit -> P2p_point.Id.t list Lwt.t;
-  advertise : P2p_point.Id.t list -> unit Lwt.t;
-  message : int -> 'msg -> unit Lwt.t;
-  swap_request : P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
-  swap_ack : P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;
+(** The [config] type contains "global" values and configuration option used
+    by the default answerer, known when setting up the connection handler
+    in [P2p] *)
+type ('msg, 'peer, 'conn) config = {
+  swap_linger : Time.System.Span.t;
+      (** Peer swapping does not occur more than once during a timespan of
+      [spap_linger] seconds. *)
+  pool : ('msg, 'peer, 'conn) P2p_pool.t;
+  log : P2p_connection.P2p_event.t -> unit;
+  connect : P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t;
 }
 
-type ('msg, 'meta) t
+val create_default : ('msg, 'peer, 'conn) config -> 'msg P2p_answerer.t
 
-val shutdown : ('msg, 'meta) t -> unit Lwt.t
-
-val run :
-  ('msg P2p_message.t, 'meta) P2p_socket.t ->
-  Lwt_canceler.t ->
-  'msg callback ->
-  ('msg, 'meta) t
+val create_private : unit -> 'msg P2p_answerer.t

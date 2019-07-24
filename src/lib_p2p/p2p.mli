@@ -195,6 +195,10 @@ val pool :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option
 
+val connect_handler :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t option
+
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
 val faked_network :

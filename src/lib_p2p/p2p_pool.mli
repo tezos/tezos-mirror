@@ -24,35 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Pool of connections. This module manages the connection pool that
-    the peer-to-peer layer needs to maintain in order to function
-    correctly.
-
-    A pool and its connections are parametrized by the type of
-    messages exchanged over the connection and the type of
-    meta-information associated with a peer. The type
-    [('msg, 'peer_meta,'conn_meta)
-    connection] is a wrapper on top of [P2p_socket.t] that adds
-    meta-informations, data-structures describing the detailed state of
-    the peer and the connection, as well as a new message queue
-    (referred to "app  message queue") that will only contain the
-    messages from the internal [P2p_socket.t] that needs to be examined
-    by the higher layers. Some messages are directly processed by an
-    internal worker and thus never propagated above. *)
+(** This module maintains tables of points, peers, and connections
+    needed by the P2P layer. *)
 
 (** {1 Pool management} *)
-
-type ('msg, 'peer_meta, 'conn_meta) t
 
 (** The type of a pool of connections, parametrized by, resp., the type
     of messages and the meta-informations associated to an identity and
     a connection. *)
-type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
+type ('msg, 'peer, 'conn) t
 
 type config = {
   identity : P2p_identity.t;  (** Our identity. *)
-  proof_of_work_target : Crypto_box.target;
-      (** The proof of work target we require from peers. *)
   trusted_points : P2p_point.Id.t list;
       (** List of hard-coded known peers to bootstrap the network from. *)
   peers_file : string;
@@ -63,39 +46,6 @@ type config = {
       to/from peers whose addresses are in [trusted_peers], and inform
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
-  greylisting_config : P2p_point_state.Info.greylisting_config;
-      (** The greylisting configuration. *)
-  listening_port : P2p_addr.port option;
-      (** If provided, it will be passed to [P2p_connection.authenticate]
-      when we authenticate against a new peer. *)
-  min_connections : int;
-      (** Strict minimum number of connections
-      (triggers [LogEvent.too_few_connections]). *)
-  max_connections : int;
-      (** Max number of connections. If it's reached, [connect] and
-      [accept] will fail, i.e. not add more connections
-      (also triggers [LogEvent.too_many_connections]). *)
-  max_incoming_connections : int;
-      (** Max not-yet-authenticated incoming connections.
-      Above this number, [accept] will start dropping incoming
-      connections. *)
-  connection_timeout : Time.System.Span.t;
-      (** Maximum time allowed to the establishment of a connection. *)
-  authentication_timeout : Time.System.Span.t;
-      (** Delay granted to a peer to perform authentication, in seconds. *)
-  incoming_app_message_queue_size : int option;
-      (** Size of the message queue for user messages (messages returned
-      by this module's [read] function. *)
-  incoming_message_queue_size : int option;
-      (** Size of the incoming message queue internal of a peer's Reader
-      (See [P2p_connection.accept]). *)
-  outgoing_message_queue_size : int option;
-      (** Size of the outgoing message queue internal to a peer's Writer
-      (See [P2p_connection.accept]). *)
-  known_peer_ids_history_size : int;
-      (** Size of the known peer_ids log buffer (default: 50) *)
-  known_points_history_size : int;
-      (** Size of the known points log buffer (default: 50) *)
   max_known_points : (int * int) option;
       (** Parameters for the garbage collection of known points. If
       None, no garbage collection is performed. Otherwise, the first
@@ -105,300 +55,224 @@ type config = {
       connections indicated by the second integer. *)
   max_known_peer_ids : (int * int) option;
       (** Like [max_known_points], but for known peer_ids. *)
-  swap_linger : Time.System.Span.t;
-      (** Peer swapping does not occur more than once during a timespan of
-      [spap_linger] seconds. *)
-  binary_chunks_size : int option;
-      (** Size (in bytes) of binary blocks that are sent to other
-      peers. Default value is 64 kB. *)
 }
 
-type 'peer_meta peer_meta_config = {
-  peer_meta_encoding : 'peer_meta Data_encoding.t;
-  peer_meta_initial : unit -> 'peer_meta;
-  score : 'peer_meta -> float;
+type 'peer peer_meta_config = {
+  peer_meta_encoding : 'peer Data_encoding.t;
+  peer_meta_initial : unit -> 'peer;
+  score : 'peer -> float;
 }
 
-type 'msg message_config = {
-  encoding : 'msg P2p_message.encoding list;
-  chain_name : Distributed_db_version.name;
-  distributed_db_versions : Distributed_db_version.t list;
-}
-
-(** [create config meta_cfg msg_cfg io_sched] is a freshly minted
-    pool. *)
 val create :
-  ?p2p_versions:P2p_version.t list ->
   config ->
-  'peer_meta peer_meta_config ->
-  'conn_meta P2p_socket.metadata_config ->
-  'msg message_config ->
-  P2p_io_scheduler.t ->
-  log:(P2p_connection.P2p_event.t -> unit) ->
+  'peer peer_meta_config ->
   P2p_events.t ->
-  ('msg, 'peer_meta, 'conn_meta) pool Lwt.t
+  log:(P2p_connection.P2p_event.t -> unit) ->
+  ('msg, 'peer, 'conn) t Lwt.t
 
 (** [destroy pool] returns when member connections are either
     disconnected or canceled. *)
-val destroy : ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-
-(** [active_connections pool] is the number of connections inside
-    [pool]. *)
-val active_connections : ('msg, 'peer_meta, 'conn_meta) pool -> int
-
-(** [pool_stat pool] is a snapshot of current bandwidth usage for the
-    entire [pool]. *)
-val pool_stat : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_stat.t
+val destroy : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 (** [config pool] is the [config] argument passed to [pool] at
     creation. *)
-val config : _ pool -> config
-
-(** [send_swap_request pool] given two connected peers pi and pj (pi
-    <> pj), suggest swap with pi for the peer pj. This behavior is
-    disabled in private mode *)
-val send_swap_request : ('msg, 'peer_meta, 'conn_meta) pool -> unit
-
-(** [score pool peer_meta] returns the score of a peer in the pool
-    whose peer_meta is provided *)
-val score : ('msg, 'peer_meta, 'conn_meta) pool -> 'peer_meta -> float
+val config : _ t -> config
 
 (** {1 Connections management} *)
 
-(** Type of a connection to a peer, parametrized by the type of
-    messages exchanged as well as meta-information associated to a
-    peer and a connection. It mostly wraps [P2p_connection.connection],
-    adding meta-information and data-structures describing a more
-    fine-grained logical state of the connection. *)
-type ('msg, 'peer_meta, 'conn_meta) connection
+(** [active_connections pool] is the number of connections inside
+    [pool]. *)
+val active_connections : ('msg, 'peer, 'conn) t -> int
 
-(** [connect ?timeout pool point] tries to add a connection to [point]
-    in [pool] in less than [timeout] seconds. *)
-val connect :
-  ?timeout:Time.System.Span.t ->
-  ('msg, 'peer_meta, 'conn_meta) pool ->
-  P2p_point.Id.t ->
-  ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t
+val register_point :
+  ?trusted:bool ->
+  ('msg, 'peer, 'conn) t ->
+  P2p_addr.t * int ->
+  ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
 
-(** [accept pool fd point] instructs [pool] to start the process of
-    accepting a connection from [fd]. Used by [P2p_welcome]. *)
-val accept :
-  ('msg, 'peer_meta, 'conn_meta) pool -> P2p_fd.t -> P2p_point.Id.t -> unit
-
-(** [register_new_point pool source_peer_id point] tries to register [point]
+(** [register_new_point pool point] tries to register [point]
     in pool's internal peer table. *)
 val register_new_point :
   ?trusted:bool ->
-  ('a, 'b, 'c) pool ->
-  P2p_peer.Table.key ->
+  ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t ->
-  unit
+  ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t option
 
-(** [disconnect conn] cleanly closes [conn] and returns after [conn]'s
-    internal worker has returned. *)
-val disconnect :
-  ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t
+val register_peer :
+  ('msg, 'peer, 'conn) t ->
+  P2p_peer.Id.t ->
+  (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
 
 module Connection : sig
-  val info :
-    ('msg, 'peer_meta, 'conn_meta) connection ->
-    'conn_meta P2p_connection.Info.t
-
-  val local_metadata : ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta
-
-  val remote_metadata : ('msg, 'peer_meta, 'conn_meta) connection -> 'conn_meta
-
-  (** [stat conn] is a snapshot of current bandwidth usage for
-      [conn]. *)
-  val stat : ('msg, 'peer_meta, 'conn_meta) connection -> P2p_stat.t
-
   val fold :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> 'a -> 'a) ->
     'a
 
   val list :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
-    (P2p_peer.Id.t * ('msg, 'peer_meta, 'conn_meta) connection) list
+    ('msg, 'peer, 'conn) t ->
+    (P2p_peer.Id.t * ('msg, 'peer, 'conn) P2p_conn.t) list
 
   val find_by_point :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     P2p_point.Id.t ->
-    ('msg, 'peer_meta, 'conn_meta) connection option
+    ('msg, 'peer, 'conn) P2p_conn.t option
 
   val find_by_peer_id :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     P2p_peer.Id.t ->
-    ('msg, 'peer_meta, 'conn_meta) connection option
+    ('msg, 'peer, 'conn) P2p_conn.t option
 
-  (** [private_node conn] returns 'true' if the node associated to this
-      connection is in private mode *)
-  val private_node : ('msg, 'peer_meta, 'conn_meta) connection -> bool
-
-  (** [trusted_node conn] returns 'true' if the node associated to this
-      connection is trusted *)
-  val trusted_node : ('msg, 'peer_meta, 'conn_meta) connection -> bool
+  val random_lowid :
+    ?different_than:('msg, 'peer, 'conn) P2p_conn.t ->
+    no_private:bool ->
+    ('msg, 'peer, 'conn) t ->
+    ((P2p_addr.t * int) * P2p_peer.Id.t * ('msg, 'peer, 'conn) P2p_conn.t)
+    option
 end
-
-(** [on_new_connection pool f] installs [f] as a hook for new connections in [pool].   *)
-val on_new_connection :
-  ('msg, 'peer_meta, 'conn_meta) pool ->
-  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
-  unit
-
-(** {1 I/O on connections} *)
-
-(** [read conn] returns a message popped from [conn]'s app message
-    queue, or fails with [Connection_closed]. *)
-val read : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg tzresult Lwt.t
-
-(** [is_readable conn] returns when there is at least one message
-    ready to be read. *)
-val is_readable :
-  ('msg, 'peer_meta, 'conn_meta) connection -> unit tzresult Lwt.t
-
-(** [write conn msg] is [P2p_connection.write conn' msg] where [conn']
-    is the internal [P2p_connection.t] inside [conn]. *)
-val write :
-  ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t
-
-(** [write_sync conn msg] is [P2p_connection.write_sync conn' msg]
-    where [conn'] is the internal [P2p_connection.t] inside [conn]. *)
-val write_sync :
-  ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t
-
-(**/**)
-
-val raw_write_sync :
-  ('msg, 'peer_meta, 'conn_meta) connection -> Bytes.t -> unit tzresult Lwt.t
-
-(**/**)
-
-(** [write_now conn msg] is [P2p_connection.write_now conn' msg] where
-    [conn'] is the internal [P2p_connection.t] inside [conn]. *)
-val write_now :
-  ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> bool tzresult
-
-(** {2 Broadcast functions} *)
-
-(** [write_all pool msg] is [write_now conn msg] for all member
-    connections to [pool] in [Running] state. *)
-val write_all : ('msg, 'peer_meta, 'conn_meta) pool -> 'msg -> unit
-
-(** [broadcast_bootstrap_msg pool] is [P2P_connection.write_now conn Bootstrap]
-    for all member connections to [pool] in [Running] state.
-    This behavior is deactivated if the node is in private mode  *)
-val broadcast_bootstrap_msg : ('msg, 'peer_meta, 'conn_meta) pool -> unit
-
-(** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)
-val greylist_addr : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_addr.t -> unit
-
-(** [greylist_peer pool peer] adds [peer] to [pool]'s peer greylist
-    and [peer]'s address to [pool]'s IP greylist. *)
-val greylist_peer :
-  ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
-
-(** [gc_greylist ~older_than pool] *)
-val gc_greylist :
-  older_than:Time.System.t -> ('msg, 'peer_meta, 'conn_meta) pool -> unit
-
-(** [acl_clear pool] clears ACL tables. *)
-val acl_clear : ('msg, 'peer_meta, 'conn_meta) pool -> unit
 
 (** {1 Functions on [Peer_id]} *)
 
 module Peers : sig
-  type ('msg, 'peer_meta, 'conn_meta) info =
-    ( ('msg, 'peer_meta, 'conn_meta) connection,
-      'peer_meta,
-      'conn_meta )
-    P2p_peer_state.Info.t
+  type ('msg, 'peer, 'conn) info =
+    (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
 
   val info :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
-    P2p_peer.Id.t ->
-    ('msg, 'peer_meta, 'conn_meta) info option
+    ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> ('msg, 'peer, 'conn) info option
 
-  val get_peer_metadata :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> 'peer_meta
+  val get_peer_metadata : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> 'peer
 
   val set_peer_metadata :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> 'peer_meta -> unit
+    ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> 'peer -> unit
 
-  val get_score : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> float
+  val get_score : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> float
 
-  val get_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> bool
-
-  val set_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
-
-  val unset_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val get_trusted : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> bool
 
   val fold_known :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) info -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t -> ('msg, 'peer, 'conn) info -> 'a -> 'a) ->
     'a
 
   val fold_connected :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) info -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t -> ('msg, 'peer, 'conn) info -> 'a -> 'a) ->
     'a
 
-  val ban : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val add_connected :
+    ('msg, 'peer, 'conn) t ->
+    P2p_peer.Id.t ->
+    (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t ->
+    unit
 
-  val unban : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val remove_connected : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
 
-  val trust : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
 
-  val untrust : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> unit
+  val unban : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
 
-  val banned : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_peer.Id.t -> bool
+  val trust : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+
+  val untrust : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+
+  val banned : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> bool
 end
 
 (** {1 Functions on [Points]} *)
 
 module Points : sig
-  type ('msg, 'peer_meta, 'conn_meta) info =
-    ('msg, 'peer_meta, 'conn_meta) connection P2p_point_state.Info.t
+  type ('msg, 'peer, 'conn) info =
+    ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
 
   val info :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     P2p_point.Id.t ->
-    ('msg, 'peer_meta, 'conn_meta) info option
+    ('msg, 'peer, 'conn) info option
 
-  val get_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> bool
-
-  val set_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
-
-  val unset_trusted :
-    ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
+  val get_trusted : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> bool
 
   val fold_known :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) info -> 'a -> 'a) ->
+    f:(P2p_point.Id.t ->
+      ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t ->
+      'a ->
+      'a) ->
     'a
 
   val fold_connected :
-    ('msg, 'peer_meta, 'conn_meta) pool ->
+    ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) info -> 'a -> 'a) ->
+    f:(P2p_point.Id.t -> ('msg, 'peer, 'conn) info -> 'a -> 'a) ->
     'a
 
-  val ban : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
+  val add_connected :
+    ('msg, 'peer, 'conn) t ->
+    P2p_point.Id.t ->
+    ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t ->
+    unit
 
-  val unban : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
+  val remove_connected :
+    ('msg, 'peer, 'conn) t -> 'd P2p_point_state.Info.t -> unit
 
-  val trust : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
+  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
-  val untrust : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> unit
+  val unban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
-  val banned : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> bool
+  val trust : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+  val untrust : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+  val banned : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> bool
 end
+
+(** {1 Misc functions} *)
+
+(** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)
+val greylist_addr : ('msg, 'peer, 'conn) t -> P2p_addr.t -> unit
+
+(** [greylist_peer pool peer] adds [peer] to [pool]'s peer greylist
+    and [peer]'s address to [pool]'s IP greylist. *)
+val greylist_peer : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
+
+(** [gc_greylist ~older_than pool] *)
+val gc_greylist : older_than:Time.System.t -> ('msg, 'peer, 'conn) t -> unit
+
+(** [acl_clear pool] clears ACL tables. *)
+val acl_clear : ('msg, 'peer, 'conn) t -> unit
+
+val list_known_points :
+  ignore_private:bool -> ('msg, 'peer, 'coon) t -> P2p_point.Id.t list Lwt.t
+
+val connected_peer_ids :
+  ('msg, 'peer, 'conn) t ->
+  (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t
+  P2p_peer.Table.t
+
+(** [score pool peer_meta] returns the score of a peer in the pool
+    whose peer_meta is provided *)
+val score : ('msg, 'peer, 'conn) t -> 'peer -> float
+
+val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+(** {1 Functions on [Swap requests]} *)
+
+val latest_accepted_swap : ('msg, 'peer, 'conn) t -> Ptime.t
+
+val latest_successful_swap : ('msg, 'peer, 'conn) t -> Ptime.t
+
+(** [send_swap_request pool] given two connected peers pi and pj (pi
+    <> pj), suggest swap with pi for the peer pj. This behaviour is
+    disabled in private mode *)
+val send_swap_request : ('msg, 'peer, 'conn) t -> unit
+
+val swap :
+  ('msg, 'peer, 'conn) t ->
+  P2p_peer.Id.t ->
+  connect:(P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t) ->
+  P2p_peer.Id.t ->
+  P2p_point.Id.t ->
+  unit Lwt.t

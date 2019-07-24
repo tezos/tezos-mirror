@@ -30,6 +30,17 @@ end)
 
 let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
 
+let broadcast_bootstrap_msg pool =
+  P2p_peer.Table.iter
+    (fun _peer_id peer_info ->
+      match P2p_peer_state.get peer_info with
+      | Running {data = conn; _} ->
+          if not (P2p_conn.private_node conn) then
+            ignore (P2p_conn.write_bootstrap conn)
+      | _ ->
+          ())
+    (P2p_pool.connected_peer_ids pool)
+
 type bounds = {
   min_threshold : int;
   min_target : int;
@@ -51,6 +62,7 @@ type ('msg, 'meta, 'meta_conn) t = {
   config : config;
   bounds : bounds;
   pool : ('msg, 'meta, 'meta_conn) P2p_pool.t;
+  connect_handler : ('msg, 'meta, 'meta_conn) P2p_connect_handler.t;
   discovery : P2p_discovery.t option;
   just_maintained : unit Lwt_condition.t;
   please_maintain : unit Lwt_condition.t;
@@ -83,7 +95,8 @@ let classify pool private_mode start_time seen_points point pi =
     connections *)
 let establish t contactable =
   let try_to_connect acc point =
-    protect ~canceler:t.canceler (fun () -> P2p_pool.connect t.pool point)
+    protect ~canceler:t.canceler (fun () ->
+        P2p_connect_handler.connect t.connect_handler point)
     >>= function Ok _ -> acc >|= succ | Error _ -> acc
   in
   List.fold_left try_to_connect (Lwt.return 0) contactable
@@ -173,7 +186,7 @@ let try_to_contact t min_to_contact max_to_contact =
 (** not enough contacts, ask the pals of our pals,
     discover the local network and then wait *)
 let ask_for_more_contacts t =
-  P2p_pool.broadcast_bootstrap_msg t.pool ;
+  broadcast_bootstrap_msg t.pool ;
   Option.iter ~f:P2p_discovery.wakeup t.discovery ;
   protect ~canceler:t.canceler (fun () ->
       Lwt.pick
@@ -187,11 +200,13 @@ let ask_for_more_contacts t =
 (** Selects [n] random connections. Ignore connections to
     nodes who are both private and trusted. *)
 let random_connections pool n =
-  let open P2p_pool.Connection in
+  let open P2p_conn in
   let f _ conn acc =
     if private_node conn && trusted_node conn then acc else conn :: acc
   in
-  let candidates = fold pool ~init:[] ~f |> TzList.shuffle in
+  let candidates =
+    P2p_pool.Connection.fold pool ~init:[] ~f |> TzList.shuffle
+  in
   TzList.rev_sub candidates n
 
 (** GC peers from the greylist that has been greylisted for more than
@@ -238,7 +253,7 @@ and too_many_connections t n_connected =
   lwt_log_notice "Too many connections, will kill %d" n
   >>= fun () ->
   let connections = random_connections t.pool n in
-  Lwt_list.iter_p P2p_pool.disconnect connections >>= fun () -> do_maintain t
+  Lwt_list.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
 
 let rec worker_loop t =
   (let n_connected = P2p_pool.active_connections t.pool in
@@ -278,7 +293,7 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max;
   }
 
-let create ?discovery config pool events =
+let create ?discovery config pool connect_handler events =
   let bounds =
     bounds
       ~min:config.min_connections
@@ -291,6 +306,7 @@ let create ?discovery config pool events =
     bounds;
     discovery;
     pool;
+    connect_handler;
     just_maintained = Lwt_condition.create ();
     please_maintain = Lwt_condition.create ();
     maintain_worker = Lwt.return_unit;
