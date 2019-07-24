@@ -75,7 +75,7 @@ module Info : sig
   val encoding : 'meta Data_encoding.t -> 'meta t Data_encoding.t
 end
 
-module Pool_event : sig
+module P2p_event : sig
   type t =
     | Too_few_connections
     | Too_many_connections

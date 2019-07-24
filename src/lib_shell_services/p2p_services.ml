@@ -88,7 +88,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Stream of all network events"
       ~query:RPC_query.empty
-      ~output:P2p_connection.Pool_event.encoding
+      ~output:P2p_connection.P2p_event.encoding
       RPC_path.(root / "network" / "log")
 
   let connect =

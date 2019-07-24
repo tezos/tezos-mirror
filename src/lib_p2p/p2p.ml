@@ -113,7 +113,7 @@ let create_scheduler limits =
     ()
 
 let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg
-    io_sched =
+    io_sched log =
   let pool_cfg =
     {
       P2p_pool.identity = config.identity;
@@ -140,7 +140,7 @@ let create_connection_pool config limits meta_cfg conn_meta_cfg msg_cfg
     }
   in
   let pool =
-    P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched
+    P2p_pool.create pool_cfg meta_cfg conn_meta_cfg msg_cfg io_sched ~log
   in
   pool
 
@@ -160,7 +160,7 @@ let may_create_discovery_worker _limits config pool =
   | (_, _, _) ->
       None
 
-let create_maintenance_worker limits pool config =
+let create_maintenance_worker limits pool config events =
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
@@ -172,7 +172,7 @@ let create_maintenance_worker limits pool config =
     }
   in
   let discovery = may_create_discovery_worker limits config pool in
-  P2p_maintenance.create ?discovery maintenance_config pool
+  P2p_maintenance.create ?discovery maintenance_config pool events
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -197,10 +197,15 @@ module Real = struct
     pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
     maintenance : ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t;
     welcome : P2p_welcome.t option;
+    watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
+    events : P2p_events.t;
   }
 
   let create ~config ~limits meta_cfg conn_meta_cfg msg_cfg =
     let io_sched = create_scheduler limits in
+    let watcher = Lwt_watcher.create_input () in
+    let log event = Lwt_watcher.notify watcher event in
+    let events = P2p_events.create () in
     create_connection_pool
       config
       limits
@@ -208,11 +213,14 @@ module Real = struct
       conn_meta_cfg
       msg_cfg
       io_sched
+      log
+      events
     >>= fun pool ->
-    let maintenance = create_maintenance_worker limits pool config in
+    let maintenance = create_maintenance_worker limits pool config events in
     may_create_welcome_worker config limits pool
     >>= fun welcome ->
-    return {config; limits; io_sched; pool; maintenance; welcome}
+    return
+      {config; limits; io_sched; pool; maintenance; welcome; watcher; events}
 
   let peer_id {config; _} = config.identity.peer_id
 
@@ -291,7 +299,7 @@ module Real = struct
           :: acc)
     in
     Lwt.pick
-      ( ( P2p_pool.Pool_event.wait_new_connection net.pool
+      ( ( P2p_events.wait_new_connection net.events
         >>= fun () -> Lwt.return_none )
       :: pipes )
     >>= function
@@ -425,6 +433,7 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
     (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
     unit;
   activate : unit -> unit;
+  watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
@@ -507,6 +516,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       iter_connections = Real.iter_connections net;
       on_new_connection = Real.on_new_connection net;
       activate = Real.activate net;
+      watcher = net.Real.watcher;
     }
 
 let activate t =
@@ -547,6 +557,7 @@ let faked_network (msg_cfg : 'msg message_config) peer_cfg faked_metadata =
     broadcast = ignore;
     pool = None;
     activate = (fun _ -> ());
+    watcher = Lwt_watcher.create_input ();
   }
 
 let peer_id net = net.peer_id
@@ -598,3 +609,5 @@ let greylist_addr net addr =
 
 let greylist_peer net peer_id =
   Option.iter net.pool ~f:(fun pool -> P2p_pool.greylist_peer pool peer_id)
+
+let watcher net = Lwt_watcher.create_stream net.watcher

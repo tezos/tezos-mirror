@@ -55,6 +55,7 @@ type ('msg, 'meta, 'meta_conn) t = {
   just_maintained : unit Lwt_condition.t;
   please_maintain : unit Lwt_condition.t;
   mutable maintain_worker : unit Lwt.t;
+  events : P2p_events.t;
 }
 
 let classify pool private_mode start_time seen_points point pi =
@@ -176,8 +177,8 @@ let ask_for_more_contacts t =
   Option.iter ~f:P2p_discovery.wakeup t.discovery ;
   protect ~canceler:t.canceler (fun () ->
       Lwt.pick
-        [ P2p_pool.Pool_event.wait_new_peer t.pool;
-          P2p_pool.Pool_event.wait_new_point t.pool;
+        [ P2p_events.wait_new_peer t.events;
+          P2p_events.wait_new_point t.events;
           (* TODO exponential back-off, or wait for the existence
          of a non grey-listed peer? *)
           Lwt_unix.sleep time_between_looking_for_peers ]
@@ -251,13 +252,12 @@ let rec worker_loop t =
      >>=? fun () ->
      protect ~canceler:t.canceler (fun () ->
          Lwt.pick
-           [ (* default: every two minutes *)
-             Systime_os.sleep t.config.maintenance_idle_time;
+           [ Systime_os.sleep t.config.maintenance_idle_time;
              Lwt_condition.wait t.please_maintain;
              (* when asked *)
-             P2p_pool.Pool_event.wait_too_few_connections t.pool;
+             P2p_events.wait_too_few_connections t.events;
              (* limits *)
-             P2p_pool.Pool_event.wait_too_many_connections t.pool ]
+             P2p_events.wait_too_many_connections t.events ]
          >>= fun () -> return_unit))
   >>= function
   | Ok () ->
@@ -278,7 +278,7 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max;
   }
 
-let create ?discovery config pool =
+let create ?discovery config pool events =
   let bounds =
     bounds
       ~min:config.min_connections
@@ -294,6 +294,7 @@ let create ?discovery config pool =
     just_maintained = Lwt_condition.create ();
     please_maintain = Lwt_condition.create ();
     maintain_worker = Lwt.return_unit;
+    events;
   }
 
 let activate t =

@@ -326,3 +326,7 @@ val on_new_connection :
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
 
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
+
+val watcher :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  P2p_connection.P2p_event.t Lwt_stream.t * Lwt_watcher.stopper

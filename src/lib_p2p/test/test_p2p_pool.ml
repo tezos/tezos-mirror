@@ -115,7 +115,16 @@ let detach_node f points n =
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
     (fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      P2p_pool.create config peer_meta_config conn_meta_config msg_config sched
+      let events = P2p_events.create () in
+      let log _ = () in
+      P2p_pool.create
+        config
+        peer_meta_config
+        conn_meta_config
+        msg_config
+        sched
+        ~log
+        events
       >>= fun pool ->
       P2p_welcome.create ~backlog:10 pool ~addr port
       >>= fun welcome ->

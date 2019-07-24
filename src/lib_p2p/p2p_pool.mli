@@ -134,6 +134,8 @@ val create :
   'conn_meta P2p_socket.metadata_config ->
   'msg message_config ->
   P2p_io_scheduler.t ->
+  log:(P2p_connection.P2p_event.t -> unit) ->
+  P2p_events.t ->
   ('msg, 'peer_meta, 'conn_meta) pool Lwt.t
 
 (** [destroy pool] returns when member connections are either
@@ -160,32 +162,6 @@ val send_swap_request : ('msg, 'peer_meta, 'conn_meta) pool -> unit
 (** [score pool peer_meta] returns the score of a peer in the pool
     whose peer_meta is provided *)
 val score : ('msg, 'peer_meta, 'conn_meta) pool -> 'peer_meta -> float
-
-(** {2 Pool events} *)
-
-module Pool_event : sig
-  (** [wait_too_few_connections pool] is determined when the number of
-      connections drops below the desired level. *)
-  val wait_too_few_connections :
-    ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-
-  (** [wait_too_many_connections pool] is determined when the number of
-      connections exceeds the desired level. *)
-  val wait_too_many_connections :
-    ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-
-  (** [wait_new_peer pool] is determined when a new peer
-      (i.e. authentication successful) gets added to the pool. *)
-  val wait_new_peer : ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-
-  (** [wait_new_point pool] is determined when a new point gets registered
-      to the pool. *)
-  val wait_new_point : ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-
-  (** [wait_new_connection pool] is determined when a new connection is
-      successfully established in the pool. *)
-  val wait_new_connection : ('msg, 'peer_meta, 'conn_meta) pool -> unit Lwt.t
-end
 
 (** {1 Connections management} *)
 
@@ -426,9 +402,3 @@ module Points : sig
 
   val banned : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_point.Id.t -> bool
 end
-
-(** [watch pool] is a [stream, close] a [stream] of events and a
-    [close] function for this stream. *)
-val watch :
-  ('msg, 'peer_meta, 'conn_meta) pool ->
-  P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper

@@ -126,13 +126,7 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.gen_register0 dir P2p_services.S.events (fun () () ->
-        let (stream, stopper) =
-          match P2p.pool net with
-          | None ->
-              Lwt_watcher.create_fake_stream ()
-          | Some pool ->
-              P2p_pool.watch pool
-        in
+        let (stream, stopper) = P2p.watcher net in
         let shutdown () = Lwt_watcher.shutdown stopper in
         let next () = Lwt_stream.get stream in
         RPC_answer.return_stream {next; shutdown})

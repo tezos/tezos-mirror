@@ -67,12 +67,13 @@ type config = {
 (** Type of a maintenance worker. *)
 type ('msg, 'meta, 'meta_conn) t
 
-(** [starts ?discovery config pool] returns a maintenance worker, with
+(** [create ?discovery config pool events] returns a maintenance worker, with
     the [discovery] worker if present, for [pool]. *)
 val create :
   ?discovery:P2p_discovery.t ->
   config ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  P2p_events.t ->
   ('msg, 'meta, 'meta_conn) t
 
 (** [activate t] starts the worker that will maintain connections *)
