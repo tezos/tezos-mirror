@@ -73,8 +73,6 @@ val of_p256 : P256.t -> t
 
 type algo = Ed25519 | Secp256k1 | P256
 
-val algo_param : unit -> (algo, 'a) Clic.parameter
-
 val generate_key :
   ?algo:algo ->
   ?seed:MBytes.t ->

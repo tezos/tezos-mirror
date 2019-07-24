@@ -98,6 +98,13 @@ let test_delay_arg =
          | Some t ->
              return t))
 
+let proto_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (Protocol_hash.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   let args = args1 timestamp_arg in
@@ -105,9 +112,7 @@ let commands () =
       ~desc:"Activate a protocol"
       args
       ( prefixes ["activate"; "protocol"]
-      @@ Protocol_hash.param
-           ~name:"version"
-           ~desc:"Protocol version (b58check)"
+      @@ proto_param ~name:"version" ~desc:"Protocol version (b58check)"
       @@ prefixes ["with"; "fitness"]
       @@ param
            ~name:"fitness"
@@ -148,9 +153,7 @@ let commands () =
       ~desc:"Fork a test protocol"
       (args2 timestamp_arg test_delay_arg)
       ( prefixes ["fork"; "test"; "protocol"]
-      @@ Protocol_hash.param
-           ~name:"version"
-           ~desc:"Protocol version (b58check)"
+      @@ proto_param ~name:"version" ~desc:"Protocol version (b58check)"
       @@ prefixes ["with"; "key"]
       @@ Client_keys.Secret_key.source_param
            ~name:"password"
