@@ -4,8 +4,11 @@ Proof-of-stake in Tezos
 =======================
 
 This document provides an in-depth description of the Tezos
-proof-of-stake algorithm as implemented in
-PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt
+proof-of-stake algorithm as implemented in the current `zeronet` and
+described in these blog posts
+https://blog.nomadic-labs.com/analysis-of-emmy.html and
+https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html.
+
 
 Blocks
 ------
@@ -35,7 +38,7 @@ The shell header contains
 -  ``context`` Hash of the state of the context after application of
    this block.
 
-Protocol header (for tezos.alpha):
+Protocol header (for Tezos.alpha):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  ``signature``: a digital signature of the shell and protocol headers
@@ -76,14 +79,14 @@ of delegation.
 Delegates
 ~~~~~~~~~
 
-In tezos.alpha, tokens are controlled through a private key called the
+In Tezos.alpha, tokens are controlled through a private key called the
 *manager key*. Tezos.alpha accounts let the manager specify a public
 delegate key. This key may be controlled by the manager themselves, or
 by another party. The responsibility of the delegate is to take part in
 the proof-of-stake consensus algorithm and in the governance of Tezos.
 
 The manager can generally change the delegate at any time, though
-contract can be marked to specify an immutable delegate. Though
+contracts can be marked to specify an immutable delegate. Though
 delegation can be changed dynamically, the change only becomes effective
 after a few cycles.
 
@@ -122,23 +125,24 @@ This does not affect voting rights for protocol changes.
 Rolls
 ~~~~~
 
-In theory, it would be possible to give each token a serial number, and
-track the specific tokens assigned to specific delegates. However, it
-would be too demanding of nodes to track assignment at such a granular
-level. Instead we introduce the concept of rolls. A roll represents a
-set of coins delegated to a given key. When tokens are moved, or a
-delegate for a contract is changed, the rolls change delegate according
-to the following algorithm.
+In theory, it would be possible to give each token a serial number,
+and track the specific tokens assigned to specific delegates. However,
+it would be too demanding of nodes to track assignment at such a
+granular level. Instead we introduce the concept of rolls. A *roll*
+represents a set of coins delegated to a given key. A rolls hold
+``TOKENS_PER_ROLL`` = 8,000 tokens. When tokens are moved, or a
+delegate for a contract is changed, the rolls change delegate
+according to the following algorithm.
 
 Each delegate has a stack of roll ids plus some "change" which is always
-an amount smaller than ``TOKENS_PER_ROLLS``. When tokens are moved from
+an amount smaller than ``TOKENS_PER_ROLL``. When tokens are moved from
 one delegate to the other, first, the change is used. If it is not
 enough, rolls need to be "broken" which means that they move from the
 delegate stack to a global, unallocated, roll stack. This is done until
 the amount is covered, and some change possibly remains.
 
 Then, the other delegate is credited. First the amount is added to the
-"change". If it becomes greater than ``TOKENS_PER_ROLLS``, then rolls
+"change". If it becomes greater than ``TOKENS_PER_ROLL``, then rolls
 are unstacked from the global unallocated roll stack onto the delegate
 stack. If the global stack is empty, a fresh roll is created.
 
@@ -150,11 +154,6 @@ The advantage of tracking tokens in this way is that a delegate creating
 a malicious fork cannot easily change the specific rolls assigned to
 them, even if they control the underlying tokens and shuffle them
 around.
-
-Rolls hold ``TOKENS_PER_ROLLS`` = 10,000 tokens and thus there should be
-about 80,000 rolls in the Tezos foundation's planned genesis block,
-though the number of rolls will increase with inflation and / or
-participation in the delegation.
 
 Roll snapshots
 ~~~~~~~~~~~~~~
@@ -170,7 +169,7 @@ and resell them right after.
 Cycles
 ------
 
-Blocks in the Tezos.Alpha Blockchain are grouped into *cycles* of
+Blocks in the Tezos.Alpha blockchain are grouped into *cycles* of
 ``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
 ``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
 least* 2 days, 20 hours, and 16 minutes. In the following description,
@@ -179,7 +178,7 @@ beginning of the chain. Cycle ``(n-1)`` is the cycle that took place
 before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
 the one after, etc.
 
-At any point, the tezos shell will not implicitly accept a branch whose
+At any point, the Tezos shell will not implicitly accept a branch whose
 fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
 past (that is *at least* 14 days, 5 hours, and 20 minutes).
 
@@ -188,7 +187,7 @@ Security deposits
 
 The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 XTZ
 per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 XTZ per
-endorsement.
+endorsement (explained below).
 
 Each delegate key has an associated security deposit account.
 When a delegate bakes or endorses a block the security deposit is
@@ -204,54 +203,60 @@ all tokens should be held as security deposits. It also means that a
 delegate should own over 8.25% of the amount of token delegated to them
 in order to not miss out on creating any block.
 
-Baking rights
-~~~~~~~~~~~~~
+Baking and endorsing
+~~~~~~~~~~~~~~~~~~~~
 
-Baking in tezos.alpha is the action of signing and publishing a block.
+*Baking* in Tezos.alpha is the action of signing and publishing a block.
 In Bitcoin, the right to publish a block is associated with solving a
-proof-of-work puzzle. In tezos.alpha, the right to publish a block in
+proof-of-work puzzle. In Tezos.alpha, the right to publish a block in
 cycle ``n`` is assigned to a randomly selected roll in a randomly
 selected roll snapshot from cycle ``n-PRESERVED_CYCLES-2``.
 
-We admit, for the time being, that the protocol generates a random seed
-for each cycle. From this random seed, we can seed a CSPRNG which is
-used to draw baking rights for a cycle.
+We admit, for the time being, that the protocol generates a random
+seed for each cycle. From this random seed, we can seed a
+cryptographically secure pseudo-random number generator which is used
+to draw baking rights for a cycle.
 
-To each position, in the cycle, is associated a priority list of
-delegates.
-This is drawn randomly, with replacement, from the set of active rolls
-so it is possible that the same public key appears multiple times in
+To each level is associated a priority list of delegates.
+This list is obtained by randomly selecting an active roll for each position in the list, and then taking the owner of the selected roll.
+As the draw is independent for each list position, it is possible that the same public key appears multiple times in
 this list.
-The first baker in the list is the first one who can bake a block at
-that level.
-If a delegate is for some reason unable to bake, the next delegate in
-the list can step up and bake the block.
-
-The delegate with the highest priority can bake a block with a timestamp
-greater than ``timestamp_of_previous_block`` plus
-``TIME_BETWEEN_BLOCKS`` = one minute. The one with the kth highest
-priority, ``k * TIME_BETWEEN_BLOCKS`` = k minutes.
-
-Baking a block gives a block reward of ``BLOCK_REWARD`` = 16 XTZ plus
-all fees paid by transactions inside the block.
-
-Endorsements
-~~~~~~~~~~~~
+The elements of the list that contain a certain delegate also called the *baking slots* of that delegate, and the indexes of these slots are called *priorities*.
 
 To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` = 32
-*endorsers*. Endorsers are drawn from the set of delegates, by randomly
-selecting 32 rolls with replacement.
+*endorsers*. Endorsers are drawn similarly as bakers, by randomly
+selecting 32 active rolls with replacement.
 
 Each endorser verifies the last block that was baked, say at level
 ``n``, and emits an endorsement operation. The endorsement operations
-are then baked in block ``n+1`` and will contribute to the `fitness`
-of block ``n``. Once block ``n+1`` is baked, no other endorsement for
-block ``n`` will be considered valid.
+are then baked in block ``n+1``. Once block ``n+1`` is baked, no other
+endorsement for block ``n`` will be considered valid.
 
-Endorsers receive a reward (at the same time as block creators do). The
-reward is ``ENDORSEMENT_REWARD`` = 2 / ``BLOCK_PRIORITY`` where block
-priority starts at 1. So the endorsement reward is only half if the
-block of priority 2 for a given slot is being endorsed.
+A block is valid only if its timestamp has a minimal delay with respect to the previous block’s timestamp. The minimal delay is given by the following expression:
+```
+TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p + DELAY_PER_MISSING_ENDORSEMENT * MAX (0, INITIAL_ENDORSERS - e),
+```
+where ``TIME_BETWEEN_BLOCKS[0]`` = 60 seconds,
+``TIME_BETWEEN_BLOCKS[0]`` = 40 seconds,
+``DELAY_PER_MISSING_ENDORSEMENT`` = 8 seconds, ``INITIAL_ENDORSERS`` =
+24, ``p`` is the block's priority at which the block was baked, and
+``e`` is the number of endorsements the block contains.) That is, the
+higher the priority and the fewer endorsements a block carries the
+longer it takes before it can be considered valid. However, if the
+block contains more than `INITIAL_ENDORSERS` then there is no time
+penalty.
+
+Baking a block gives a block reward of ``BLOCK_REWARD / (1 + p) *
+(0.8 + 0.2 * e / ENDORSERS_PER_BLOCK)`` plus all fees paid by
+transactions inside the block, where ``BLOCK_REWARD`` = 16 XTZ, ``p``
+is the priority at which the block was baked, and ``e`` is the number
+of endorsements the block contains.
+
+Endorsers also receive a reward (at the same time as block creators
+do). The reward is ``ENDORSEMENT_REWARD / (1 + p)``, where
+``ENDORSEMENT_REWARD`` = 2 XTZ and ``p`` is the priority of the block
+containing the endorsement. So the endorsement reward is only half if
+it is contained in a block of priority 1.
 
 It is possible that the same endorser be selected ``k`` times for the
 same block, in this case ``k`` deposits are required and ``k`` rewards
@@ -262,12 +267,11 @@ Fitness
 ~~~~~~~
 
 To each block we associate a measure of `fitness` which determines the
-quality of the chain leading to that block.
-This measure in Bitcoin is simply the length of the chain, in Tezos we
-add also the number of endorsements to each block.
-Given a block at level ``n`` with fitness ``f``, when we receive a new
-head that contains ``e`` endorsements for block ``n``, the fitness of
-the new head is ``f+1+e``.
+quality of the chain leading to that block. This measure is simply the
+length of the chain (as in Bitcoin). More precisely, the fitness of a
+block is 1 plus the fitness of the previous block. The shell changes
+the head of the chain to the valid block has the highest fitness.
+
 
 Inflation
 ~~~~~~~~~
@@ -309,7 +313,7 @@ Accusations
 
 If two endorsements are made for the same slot or two blocks at the same
 height by a delegate, the evidence can be collected by an accuser and included
-in a block for a period of PRESERVED_CYCLES, including the current cycle.
+in a block for a period of `PRESERVED_CYCLES`, including the current cycle.
 
 This accusation forfeits the entirety of the safety deposit and future reward up
 to that point in the cycle. Half is burned, half goes to the accuser in the form
