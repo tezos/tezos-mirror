@@ -65,20 +65,26 @@ let binary_pretty_printer (Record { encoding ; pp ; _ }) =
         let json = Json.construct encoding data in
         Format.fprintf fmt "%a" Json.pp json
 
-let lookup_inner_description ({ encoding ; _ } : 'a Encoding.t) =
+let rec lookup_inner_description ({ encoding ; _ } : 'a Encoding.t) =
   match encoding with
+  | Splitted { encoding ; _ }
+  | Dynamic_size { encoding ; _ }
+  | Check_size { encoding ; _ }
+  | Describe { description = None ; encoding ; _ }
+    -> lookup_inner_description encoding
   | Describe { description ; _ } -> description
   | _ -> None
 
 let register ~id ?description ?pp encoding =
-  let description =
-    match description with
-    | Some description -> Some description
-    | None -> lookup_inner_description encoding in
-  let record = Record { encoding ; description ; pp } in
   table :=
     EncodingTable.update id (function
-        | None -> Some record
+        | None ->
+            let description =
+              match description with
+              | Some description -> Some description
+              | None -> lookup_inner_description encoding in
+            let record = Record { encoding ; description ; pp } in
+            Some record
         | Some _ ->
             Format.kasprintf
               Pervasives.invalid_arg
