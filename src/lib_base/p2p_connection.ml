@@ -58,6 +58,10 @@ module Id = struct
 
   let encoding =
     let open Data_encoding in
+    def "p2p_connection.id"
+      ~description:"The identifier for a p2p connection. It includes an \
+                    address and a port number."
+    @@
     (obj2
        (req "addr" P2p_addr.encoding)
        (opt "port" uint16))
@@ -221,6 +225,11 @@ module Pool_event = struct
       conv (fun x -> (), x) (fun ((), x) -> x)
         (merge_objs
            (obj1 (req "event" (constant name))) obj) in
+    def "p2p_connection.pool_event"
+      ~description:"An event that may happen during maintenance of and other \
+                    operations on the p2p connection pool. Typically, it \
+                    includes connection errors, peer swaps, etc."
+    @@
     union ~tag_size:`Uint8 [
       case (Tag 0)
         ~title:"Too_few_connections"

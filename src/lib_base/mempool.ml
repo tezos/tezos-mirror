@@ -31,6 +31,10 @@ type mempool = t
 
 let encoding =
   let open Data_encoding in
+  def "mempool"
+    ~description:"A batch of operation. This format is used to gossip \
+                  operations between peers."
+  @@
   conv
     (fun { known_valid ; pending } -> (known_valid, pending))
     (fun (known_valid, pending) -> { known_valid ; pending })

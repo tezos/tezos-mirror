@@ -38,7 +38,11 @@ type t =
 
 let encoding =
   let open Data_encoding in
-  def "test_chain_status" @@
+  def "test_chain_status"
+    ~description:"The status of the test chain: not_running (there is no test \
+                  chain at the moment), forking (the test chain is being \
+                  setup), running (the test chain is running)."
+  @@
   union [
     case (Tag 0) ~title:"Not_running"
       (obj1 (req "status" (constant "not_running")))

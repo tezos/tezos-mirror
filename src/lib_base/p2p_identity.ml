@@ -32,6 +32,10 @@ type t = {
 
 let encoding =
   let open Data_encoding in
+  def "p2p_identity"
+    ~description:"The identity of a peer. This includes cryptographic keys as \
+                  well as a proof-of-work."
+  @@
   conv
     (fun { peer_id ; public_key ; secret_key ; proof_of_work_stamp } ->
        (Some peer_id, public_key, secret_key, proof_of_work_stamp))
