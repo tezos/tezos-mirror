@@ -315,7 +315,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     | Environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
         Format.fprintf
           ppf
-          "%abig_map type only allowed on the left of the toplevel storage pair"
+          "%abig_map type not allowed inside another big_map"
           print_loc
           loc ;
         if rest <> [] then Format.fprintf ppf "@," ;

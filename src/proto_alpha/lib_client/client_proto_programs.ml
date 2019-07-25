@@ -54,27 +54,6 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
     errs
   >>= fun () -> cctxt#error "error running script" >>= fun () -> return_unit
 
-let print_big_map_diff ppf = function
-  | None ->
-      ()
-  | Some diff ->
-      Format.fprintf
-        ppf
-        "@[<v 2>map diff:@,%a@]@,"
-        (Format.pp_print_list
-           ~pp_sep:Format.pp_print_space
-           (fun ppf Contract.{diff_key; diff_value; _} ->
-             Format.fprintf
-               ppf
-               "%s %a%a"
-               (match diff_value with None -> "-" | Some _ -> "+")
-               print_expr
-               diff_key
-               (fun ppf -> function None -> () | Some x ->
-                     Format.fprintf ppf "-> %a" print_expr x)
-               diff_value))
-        diff
-
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
   | Ok (storage, operations, maybe_diff) ->
@@ -83,12 +62,13 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@,\
          @[<v 2>emitted operations@,\
          %a@]@,\
-         @[%a@]@]@."
+         @[<v 2>big_map diff%a@]@]@."
         print_expr
         storage
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
-        print_big_map_diff
+        (fun ppf -> function None -> () | Some diff ->
+              print_big_map_diff ppf diff)
         maybe_diff
       >>= fun () -> return_unit
   | Error errs ->
@@ -102,13 +82,15 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@,\
          @[<v 2>emitted operations@,\
          %a@]@,\
-         %a@[<v 2>@[<v 2>trace@,\
+         @[<v 2>big_map diff@,\
+         %a@[<v 2>trace@,\
          %a@]@]@."
         print_expr
         storage
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
-        print_big_map_diff
+        (fun ppf -> function None -> () | Some diff ->
+              print_big_map_diff ppf diff)
         maybe_big_map_diff
         print_execution_trace
         trace

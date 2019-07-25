@@ -159,7 +159,7 @@ let commands version () =
       ~group
       ~desc:
         "Get the value associated to a key in the big map storage of a \
-         contract."
+         contract (deprecated)."
       no_options
       ( prefixes ["get"; "big"; "map"; "value"; "for"]
       @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
@@ -169,7 +169,7 @@ let commands version () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
-        get_big_map_value
+        get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
@@ -181,6 +181,32 @@ let commands version () =
         | Some value ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value
             >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get a value in a big map."
+      no_options
+      ( prefixes ["get"; "element"]
+      @@ Clic.param
+           ~name:"key"
+           ~desc:"the key to look for"
+           (Clic.parameter (fun _ s ->
+                return (Script_expr_hash.of_b58check_exn s)))
+      @@ prefixes ["of"; "big"; "map"]
+      @@ Clic.param
+           ~name:"big_map"
+           ~desc:"identifier of the big_map"
+           int_parameter
+      @@ stop )
+      (fun () key id (cctxt : Protocol_client_context.full) ->
+        get_big_map_value
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          (Z.of_int id)
+          key
+        >>=? fun value ->
+        cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value
+        >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Get the storage of a contract."

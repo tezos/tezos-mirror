@@ -39,13 +39,21 @@ val get_storage :
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
-val get_big_map_value :
+val get_contract_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.expr * Script.expr ->
   Script.expr option tzresult Lwt.t
+
+val get_big_map_value :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Z.t ->
+  Script_expr_hash.t ->
+  Script.expr tzresult Lwt.t
 
 val get_script :
   #Protocol_client_context.rpc_context ->
