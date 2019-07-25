@@ -7,9 +7,9 @@ if [ $? -ne 0 ]; then
   echo "ocp-indent is required but could not be found. Aborting."
   exit 1
 fi
-type sed > /dev/null 2>&-
+type perl > /dev/null 2>&-
 if [ $? -ne 0 ]; then
-  echo "sed is required but could not be found. Aborting."
+  echo "perl is required but could not be found. Aborting."
   exit 1
 fi
 type diff > /dev/null 2>&-
@@ -52,9 +52,9 @@ for f in $files ; do
   # copy file to temporary directory
   cp $f $tmp_dir/$ff
   # lint temporary file in place (remove tabs, indent, remove trailing spaces)
-  sed -i.prev 's/\t/  /' $tmp_dir/$ff && rm $tmp_dir/$ff.prev
+  perl -i -pe 's/\t/  /' "$tmp_dir/$ff"
   ocp-indent --config match_clause=4 --inplace $tmp_dir/$ff
-  sed -i.prev 's/ \+$//' $tmp_dir/$ff && rm $tmp_dir/$ff.prev
+  perl -i -pe 's/ +$//' "$tmp_dir/$ff"
   # compare original and linted file, act if need be
   diff -U 3 $f $tmp_dir/$ff
   if [ $? -ne 0 ]; then
