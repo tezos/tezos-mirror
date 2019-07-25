@@ -32,7 +32,7 @@ let group =
 
 let id_parameter =
   parameter (fun (cctxt : #Client_context.printer) id ->
-      match Data_encoding.Registration.find_opt id with
+      match Data_encoding.Registration.find id with
       | Some record -> return record
       | None -> cctxt#error "Unkown encoding id: %s" id)
 
@@ -59,7 +59,7 @@ let commands () = [
     (fixed [ "list" ; "encodings" ])
     begin fun () (cctxt : #Client_context.printer) ->
       let bindings =
-        Data_encoding.Registration.list_registered_encodings ()
+        Data_encoding.Registration.list ()
         |> List.map (fun (id, elem) -> (id, Data_encoding.Registration.description elem)) in
       cctxt#message
         "@[<v 2>Encoding listing:@ %a@]@."

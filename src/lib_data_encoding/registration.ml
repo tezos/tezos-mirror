@@ -25,14 +25,14 @@
 
 type id = string
 
-type registered_encoding =
-    Record : {
+type t =
+  | Record : {
       encoding : 'a Encoding.t ;
       description : string option ;
       pp : (Format.formatter -> 'a -> unit) option ;
       json_schema : Json.schema ;
       binary_schema : Binary_schema.t ;
-    } -> registered_encoding
+    } -> t
 
 module EncodingTable = Map.Make(String)
 
@@ -93,10 +93,10 @@ let register ~id ?description ?pp encoding =
             Some x)
       !table
 
-let find_opt id =
+let find id =
   EncodingTable.find_opt id !table
 
-let list_registered_encodings () =
+let list () =
   EncodingTable.bindings !table
 
 let bytes_of_json record json =

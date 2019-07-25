@@ -545,19 +545,25 @@ end
 include module type of Encoding with type 'a t = 'a Encoding.t
 
 module Registration : sig
-  (* FIXME add documentation *)
 
   type id = string
 
-  type registered_encoding
+  (** A encoding that has been {!register}ed. It can be retreived using either
+      {!list} or {!find}. *)
+  type t
 
-  val binary_schema : registered_encoding -> Binary_schema.t
-  val json_schema : registered_encoding -> Json.schema
-  val description : registered_encoding -> string option
+  (** Descriptions and schemas of registered encodings. *)
+  val binary_schema : t -> Binary_schema.t
+  val json_schema : t -> Json.schema
+  val description : t -> string option
 
-  val json_pretty_printer: registered_encoding -> (Format.formatter -> Json.t -> unit)
-  val binary_pretty_printer: registered_encoding -> (Format.formatter -> MBytes.t -> unit)
+  (** Printers for the encodings. *)
+  val json_pretty_printer: t -> (Format.formatter -> Json.t -> unit)
+  val binary_pretty_printer: t -> (Format.formatter -> MBytes.t -> unit)
 
+  (** [register ~id encoding] registers the [encoding] with the [id]. It can
+      later be found using {!find} and providing the matching [id]. It will
+      also appear in the results of {!list}. *)
   val register :
     id:id ->
     ?description:string ->
@@ -565,11 +571,18 @@ module Registration : sig
     'a Encoding.t ->
     unit
 
-  val find_opt : id -> registered_encoding option
-  val list_registered_encodings : unit -> (id * registered_encoding) list
+  (** [find id] is [Some r] if [register id e] has been called, in which
+      case [r] matches [e]. Otherwise, it is [None]. *)
+  val find : id -> t option
 
-  val bytes_of_json : registered_encoding -> Json.t -> MBytes.t option
-  val json_of_bytes : registered_encoding -> MBytes.t -> Json.t option
+  (** [list ()] is a list of pairs [(id, r)] where [r] is
+      a registered encoding for the [id]. *)
+  val list : unit -> (id * t) list
+
+  (** Conversion functions from/to json to/from bytes. *)
+  val bytes_of_json : t -> Json.t -> MBytes.t option
+  val json_of_bytes : t -> MBytes.t -> Json.t option
+
 end
 
 module With_version: sig
