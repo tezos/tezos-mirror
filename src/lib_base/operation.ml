@@ -29,6 +29,9 @@ type shell_header = {
 
 let shell_header_encoding =
   let open Data_encoding in
+  def "operation.shell_header"
+    ~description:"An operation's shell header."
+  @@
   conv
     (fun { branch } -> branch)
     (fun branch -> { branch })
@@ -49,6 +52,11 @@ include Compare.Make(struct
 
 let encoding =
   let open Data_encoding in
+  def "operation"
+    ~description:"An operation. The shell_header part indicates a block an \
+                  operation is meant to apply on top of. The proto part is \
+                  protocol-specific and appears as a binary blob."
+  @@
   conv
     (fun { shell ; proto } -> (shell, proto))
     (fun (shell, proto) -> { shell ; proto })

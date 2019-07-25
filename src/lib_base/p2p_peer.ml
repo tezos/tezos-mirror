@@ -67,6 +67,12 @@ module State = struct
 
   let encoding =
     let open Data_encoding in
+    def "p2p_peer.state"
+      ~description:"The state a peer connection can be in: accepted (when the \
+                    connection is being established), running (when the \
+                    connection is already established), disconnected \
+                    (otherwise)."
+    @@
     string_enum [
       "accepted", Accepted ;
       "running", Running ;
@@ -177,6 +183,10 @@ module Pool_event = struct
 
   let encoding =
     let open Data_encoding in
+    def "p2p_peer.pool_event"
+      ~description:"An event that may happen during maintenance of and other \
+                    operations on the connection to a specific peer."
+    @@
     conv
       (fun { kind ; timestamp ; point = (addr, port) } ->
          (kind, timestamp, addr, port))

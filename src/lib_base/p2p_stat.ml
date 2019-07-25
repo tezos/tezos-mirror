@@ -68,6 +68,9 @@ let pp ppf stat =
 
 let encoding =
   let open Data_encoding in
+  def "p2p_stat"
+    ~description:"Statistics about the p2p network."
+  @@
   conv
     (fun { total_sent ; total_recv ; current_inflow ; current_outflow } ->
        (total_sent, total_recv, current_inflow, current_outflow))

@@ -54,14 +54,14 @@ let pp_short ppf (hd, h_lst) =
 
 let encoding =
   let open Data_encoding in
-  (* TODO add a [description] *)
+  def "block_locator" ~description:"A sparse block locator à la Bitcoin"
+  @@
   (obj2
      (req "current_head" (dynamic_size Block_header.encoding))
      (req "history" (Variable.list Block_hash.encoding)))
 
 let bounded_encoding ?max_header_size ?max_length () =
   let open Data_encoding in
-  (* TODO add a [description] *)
   (obj2
      (req "current_head"
         (dynamic_size

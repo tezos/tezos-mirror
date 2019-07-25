@@ -116,7 +116,11 @@ module Id = struct
   let to_string saddr = Format.asprintf "%a" pp saddr
 
   let encoding =
-    Data_encoding.conv to_string of_string_exn Data_encoding.string
+    let open Data_encoding in
+    def "p2p_point.id"
+      ~description:"Identifier for a peer point"
+    @@
+    conv to_string of_string_exn string
 
   let rpc_arg =
     RPC_arg.make
@@ -192,6 +196,12 @@ module State = struct
       conv (fun x -> (), x) (fun ((), x) -> x)
         (merge_objs
            (obj1 (req "event_kind" (constant name))) obj) in
+    def "p2p_point.state"
+      ~description:"The state a connection to a peer point can be in: \
+                    requested (connection open from here), accepted \
+                    (handshake), running (connection already established), \
+                    disconnected (no connection)."
+    @@
     union ~tag_size:`Uint8 [
       case (Tag 0)
         ~title:"Requested"
@@ -251,6 +261,10 @@ module Info = struct
 
   let encoding =
     let open Data_encoding in
+    def "p2p_point.info"
+      ~description:"Information about a peer point. Includes flags, state, and \
+                    records about past events."
+    @@
     conv
       (fun { trusted ; greylisted_until ; state ;
              last_failed_connection ; last_rejected_connection ;
@@ -346,7 +360,13 @@ module Pool_event = struct
     ]
 
   type t = kind Time.System.stamped
-  let encoding = Time.System.stamped_encoding kind_encoding
+  let encoding =
+    Data_encoding.def "p2p_point.pool_event"
+      ~description:"Events happening during maintenance of and operations on a \
+                    peer point pool (such as connections, disconnections, \
+                    connection requests)."
+    @@
+    Time.System.stamped_encoding kind_encoding
 
 end
 

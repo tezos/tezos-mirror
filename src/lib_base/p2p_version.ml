@@ -27,7 +27,11 @@
 type t = int
 
 let pp = Format.pp_print_int
-let encoding = Data_encoding.uint16
+let encoding =
+  let open Data_encoding in
+  def "p2p_version"
+    ~description:"A version number for the p2p layer."
+    uint16
 
 let zero = 0
 

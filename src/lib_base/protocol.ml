@@ -62,6 +62,10 @@ let env_version_encoding =
 
 let encoding =
   let open Data_encoding in
+  def "protocol"
+    ~description:"The environment a protocol relies on and the components a \
+                  protocol is made of."
+  @@
   conv
     (fun { expected_env ; components } -> (expected_env, components))
     (fun (expected_env, components) -> { expected_env ; components })
@@ -116,6 +120,9 @@ module Meta = struct
 
   let encoding =
     let open Data_encoding in
+    def "protocol.meta"
+    (* FIXME: add ~description argument *)
+    @@
     conv
       (fun { hash ; expected_env_version ; modules } ->
          (hash, expected_env_version, modules))

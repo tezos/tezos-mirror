@@ -27,6 +27,9 @@ type t = Ipaddr.V6.t
 
 let encoding =
   let open Data_encoding in
+  def "p2p_address"
+    ~description:"An address for locating peers."
+  @@
   splitted
     ~json:begin
       conv
@@ -65,6 +68,6 @@ let to_string saddr = Format.asprintf "%a" pp saddr
 
 let () =
   Data_encoding.Registration.register
-    ~id:"p2p_addr"
+    ~id:"p2p_address"
     ~pp:pp
     encoding

@@ -39,6 +39,10 @@ let pp ppf { chain_name ; distributed_db_version ; p2p_version } =
 
 let encoding =
   let open Data_encoding in
+  def "network_version"
+    ~description:"A version number for the network protocol (includes \
+                  distributed DB version and p2p version)"
+  @@
   conv
     (fun { chain_name ; distributed_db_version ; p2p_version } ->
        (chain_name, distributed_db_version, p2p_version))
