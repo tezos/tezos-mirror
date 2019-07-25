@@ -88,9 +88,10 @@ let register ~id ?description ?pp encoding =
   table :=
     EncodingTable.update id (function
         | None -> Some record
-        | Some x ->
-            Format.eprintf "Encoding %s previously registered@." id ;
-            Some x)
+        | Some _ ->
+            Format.kasprintf
+              Pervasives.invalid_arg
+              "Encoding %s previously registered" id)
       !table
 
 let find id =
