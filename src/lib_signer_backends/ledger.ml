@@ -90,7 +90,7 @@ let () =
     ~title: "Ledger error"
     ~description: "Error when communication to a Ledger Nano S device"
     ~pp:(fun ppf e ->
-        Format.fprintf ppf "Ledger %a" Ledgerwallet.Transport.pp_error e)
+        Format.fprintf ppf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e)
     error_encoding
     (function LedgerError e -> Some e | _ -> None)
     (fun e -> LedgerError e)
