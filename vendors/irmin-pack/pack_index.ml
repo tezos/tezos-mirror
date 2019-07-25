@@ -10,26 +10,38 @@
    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. *)
 
-module type S = Index.S with type value = int64 * int * char
+module type S = sig
+  include Index.S with type value = int64 * int * char
+
+  type full_key
+
+  val key : full_key -> key
+end
 
 module Make (K : Irmin.Hash.S) = struct
   module Key = struct
-    type t = K.t
+    type t = string
 
-    let pp = Irmin.Type.pp K.t
+    let pp = Fmt.fmt "%S"
 
-    let hash = K.short_hash
+    let hash = Hashtbl.hash
 
-    let hash_size = 63
+    let hash_size = Sys.int_size - 1
 
-    let equal = Irmin.Type.equal K.t
+    let equal x y = String.equal x y
 
-    let encode = Irmin.Type.to_bin_string K.t
+    let encode x = x
 
-    let decode s off = snd (Irmin.Type.decode_bin K.t s off)
+    let encoded_size = K.hash_size / 2
 
-    let encoded_size = K.hash_size
+    let decode s off = String.sub s off encoded_size
   end
+
+  type full_key = K.t
+
+  let key s =
+    let s = Irmin.Type.to_bin_string K.t s in
+    String.sub s 0 Key.encoded_size
 
   module Val = struct
     type t = int64 * int * char

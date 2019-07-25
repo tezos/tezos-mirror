@@ -24,7 +24,7 @@ module type ELT = sig
   val magic : t -> char
 
   val encode_bin :
-    dict:(string -> int) ->
+    dict:(string -> int option) ->
     offset:(hash -> int64 option) ->
     t ->
     hash ->
@@ -38,11 +38,14 @@ end
 module type S = sig
   include Irmin.CONTENT_ADDRESSABLE_STORE
 
+  type index
+
   val v :
     ?fresh:bool ->
     ?shared:bool ->
     ?readonly:bool ->
     ?lru_size:int ->
+    index:index ->
     string ->
     [ `Read ] t Lwt.t
 
@@ -60,15 +63,19 @@ end
 module type MAKER = sig
   type key
 
+  type index
+
   (** Save multiple kind of values in the same pack file. Values will
       be distinguished using [V.magic], so they have to all be
       different. *)
   module Make (V : ELT with type hash := key) :
-    S with type key = key and type value = V.t
+    S with type key = key and type value = V.t and type index = index
 end
 
-module File (Index : Pack_index.S) (K : Irmin.Hash.S with type t = Index.key) :
-  MAKER with type key = K.t
+module File
+    (Index : Pack_index.S)
+    (K : Irmin.Hash.S with type t = Index.full_key) :
+  MAKER with type key = K.t and type index = Index.t
 
 type stats = {
   pack_cache_misses : float;

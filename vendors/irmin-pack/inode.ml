@@ -24,11 +24,14 @@ module Log = (val Logs.src_log src : Logs.LOG)
 module type S = sig
   include Irmin.CONTENT_ADDRESSABLE_STORE
 
+  type index
+
   val v :
     ?fresh:bool ->
     ?shared:bool ->
     ?readonly:bool ->
     ?lru_size:int ->
+    index:index ->
     string ->
     [ `Read ] t Lwt.t
 
@@ -36,11 +39,7 @@ module type S = sig
 
   module Key : Irmin.Hash.S with type t = key
 
-  module Val :
-    Irmin.Private.Node.S
-    with type t = value
-     and type hash = key
-     and type t = value
+  module Val : Irmin.Private.Node.S with type t = value and type hash = key
 end
 
 module type CONFIG = sig
@@ -51,10 +50,12 @@ end
 
 module Make
     (Conf : CONFIG)
-    (Pack : Pack.MAKER)
-    (H : Irmin.Hash.S with type t = Pack.key)
+    (H : Irmin.Hash.S)
+    (Pack : Pack.MAKER with type key = H.t)
     (Node : Irmin.Private.Node.S with type hash = H.t) =
 struct
+  type index = Pack.index
+
   module Node = struct
     include Node
     module H = Irmin.Hash.Typed (H) (Node)
@@ -614,10 +615,8 @@ struct
       let encode_bin ~dict ~offset (t : t) k =
         let step s : Compress.name =
           let str = Irmin.Type.to_bin_string T.step_t s in
-          if String.length str <= 4 then Direct s
-          else
-            let s = dict str in
-            Indirect s
+          if String.length str <= 3 then Direct s
+          else match dict str with Some i -> Indirect i | None -> Direct s
         in
         let hash h : Compress.address =
           match offset h with

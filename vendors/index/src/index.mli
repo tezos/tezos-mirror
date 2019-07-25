@@ -92,15 +92,15 @@ module type S = sig
   val clear : t -> unit
   (** [clear t] clears [t] so that there are no more bindings in it. *)
 
-  val find : t -> key -> value option
-  (** [find t k] is the last binding of [k] in [t], if any. *)
+  val find_all : t -> key -> value list
+  (** [find t k] are all the bindings of [k] in [t]. The order is not
+      specified *)
 
   val mem : t -> key -> bool
-  (** [mem t k] is [true] iff [k] is binded in [t]. *)
+  (** [mem t k] is [true] iff [k] is bound in [t]. *)
 
-  val replace : t -> key -> value -> unit
-  (** [replace t k v] binds [k] to [v] in [t], replacing the existing binding
-      if any. *)
+  val add : t -> key -> value -> unit
+  (** [add t k v] binds [k] to [v] in [t]. *)
 
   val iter : (key -> value -> unit) -> t -> unit
   (** Iterates over the index bindings. Order is not specified.
