@@ -28,14 +28,14 @@
 
 type id = string
 
-type registered_encoding
+type t
 
-val binary_schema : registered_encoding -> Binary_schema.t
-val json_schema : registered_encoding -> Json.schema
-val description : registered_encoding -> string option
+val binary_schema : t -> Binary_schema.t
+val json_schema : t -> Json.schema
+val description : t -> string option
 
-val json_pretty_printer: registered_encoding -> (Format.formatter -> Json.t -> unit)
-val binary_pretty_printer: registered_encoding -> (Format.formatter -> MBytes.t -> unit)
+val json_pretty_printer: t -> (Format.formatter -> Json.t -> unit)
+val binary_pretty_printer: t -> (Format.formatter -> MBytes.t -> unit)
 
 val register :
   id:id ->
@@ -44,8 +44,8 @@ val register :
   'a Encoding.t ->
   unit
 
-val find_opt : id -> registered_encoding option
-val list_registered_encodings : unit -> (id * registered_encoding) list
+val find : id -> t option
+val list : unit -> (id * t) list
 
-val bytes_of_json : registered_encoding -> Json.t -> MBytes.t option
-val json_of_bytes : registered_encoding -> MBytes.t -> Json.t option
+val bytes_of_json : t -> Json.t -> MBytes.t option
+val json_of_bytes : t -> MBytes.t -> Json.t option
