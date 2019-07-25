@@ -30,46 +30,40 @@ type t =
       encoding : 'a Encoding.t ;
       description : string option ;
       pp : (Format.formatter -> 'a -> unit) option ;
-      json_schema : Json.schema ;
-      binary_schema : Binary_schema.t ;
     } -> t
 
 module EncodingTable = Map.Make(String)
 
 let table = ref EncodingTable.empty
 
-let description = function
-  | Record { description ; _ } ->
-      description
+let description (Record { description ; _ }) = description
 
-let json_schema = function
-  | Record { json_schema ; _ } ->
-      json_schema
+let json_schema (Record { encoding ; _ }) =
+  let json_schema = Json.schema encoding in
+  json_schema
 
-let binary_schema = function
-  | Record { binary_schema ; _ } ->
-      binary_schema
+let binary_schema (Record { encoding ; _ }) =
+  let binary_schema = Binary_description.describe encoding in
+  binary_schema
 
-let json_pretty_printer = function
-  | Record { encoding ; pp ; _ } ->
-      fun fmt json ->
-        match pp with
-        | Some pp ->
-            let json = Json.destruct encoding json in
-            Format.fprintf fmt "%a" pp json
-        | None ->
-            Format.fprintf fmt "%a" Json.pp json
+let json_pretty_printer (Record { encoding ; pp ; _ }) =
+  fun fmt json ->
+    match pp with
+    | Some pp ->
+        let json = Json.destruct encoding json in
+        Format.fprintf fmt "%a" pp json
+    | None ->
+        Format.fprintf fmt "%a" Json.pp json
 
-let binary_pretty_printer = function
-  | Record { encoding ; pp ; _ } ->
-      fun fmt bytes ->
-        let data = Binary_reader.of_bytes_exn encoding bytes in
-        match pp with
-        | Some pp ->
-            Format.fprintf fmt "%a" pp data
-        | None ->
-            let json = Json.construct encoding data in
-            Format.fprintf fmt "%a" Json.pp json
+let binary_pretty_printer (Record { encoding ; pp ; _ }) =
+  fun fmt bytes ->
+    let data = Binary_reader.of_bytes_exn encoding bytes in
+    match pp with
+    | Some pp ->
+        Format.fprintf fmt "%a" pp data
+    | None ->
+        let json = Json.construct encoding data in
+        Format.fprintf fmt "%a" Json.pp json
 
 let lookup_inner_description ({ encoding ; _ } : 'a Encoding.t) =
   match encoding with
@@ -77,14 +71,11 @@ let lookup_inner_description ({ encoding ; _ } : 'a Encoding.t) =
   | _ -> None
 
 let register ~id ?description ?pp encoding =
-  let binary_schema = Binary_description.describe encoding in
-  let json_schema = Json.schema encoding in
   let description =
     match description with
     | Some description -> Some description
     | None -> lookup_inner_description encoding in
-  let record = Record { encoding ; description ; pp ;
-                        binary_schema ; json_schema } in
+  let record = Record { encoding ; description ; pp } in
   table :=
     EncodingTable.update id (function
         | None -> Some record
@@ -100,15 +91,11 @@ let find id =
 let list () =
   EncodingTable.bindings !table
 
-let bytes_of_json record json =
-  match record with
-  | Record { encoding ; _ } ->
-      let data = Json.destruct encoding json in
-      Binary_writer.to_bytes encoding data
+let bytes_of_json (Record { encoding ; _ }) json =
+  let data = Json.destruct encoding json in
+  Binary_writer.to_bytes encoding data
 
-let json_of_bytes record bytes =
-  match record with
-  | Record { encoding ; _ } ->
-      Option.map
-        ~f:(fun data -> Json.construct encoding data)
-        (Binary_reader.of_bytes encoding bytes)
+let json_of_bytes (Record { encoding ; _ }) bytes =
+  Option.map
+    ~f:(Json.construct encoding)
+    (Binary_reader.of_bytes encoding bytes)
