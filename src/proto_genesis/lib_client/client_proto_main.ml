@@ -26,10 +26,6 @@
 open Protocol
 open Protocol_client_context
 
-let protocol =
-  Protocol_hash.of_b58check_exn
-    "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-
 let bake cctxt ?timestamp block command sk =
   let timestamp =
     match timestamp with
@@ -202,4 +198,4 @@ let commands () =
         cctxt#answer "Injected %a" Block_hash.pp_short hash
         >>= fun () -> return_unit) ]
 
-let () = Client_commands.register protocol @@ fun _network -> commands ()
+let () = Client_commands.register Protocol.hash @@ fun _network -> commands ()
