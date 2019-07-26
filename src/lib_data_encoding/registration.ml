@@ -65,31 +65,28 @@ let binary_pretty_printer (Record { encoding ; pp ; _ }) =
         let json = Json.construct encoding data in
         Format.fprintf fmt "%a" Json.pp json
 
-let rec lookup_inner_description ({ encoding ; _ } : 'a Encoding.t) =
+let rec lookup_id_descr ({ encoding ; _ } : 'a Encoding.t) =
   match encoding with
   | Splitted { encoding ; _ }
   | Dynamic_size { encoding ; _ }
-  | Check_size { encoding ; _ }
-  | Describe { description = None ; encoding ; _ }
-    -> lookup_inner_description encoding
-  | Describe { description ; _ } -> description
+  | Check_size { encoding ; _ } -> lookup_id_descr encoding
+  | Describe { id ; description ; _ } -> Some (id, description)
   | _ -> None
 
-let register ~id ?description ?pp encoding =
-  table :=
-    EncodingTable.update id (function
-        | None ->
-            let description =
-              match description with
-              | Some description -> Some description
-              | None -> lookup_inner_description encoding in
-            let record = Record { encoding ; description ; pp } in
-            Some record
-        | Some _ ->
-            Format.kasprintf
-              Pervasives.invalid_arg
-              "Encoding %s previously registered" id)
-      !table
+let register ?pp encoding =
+  match lookup_id_descr encoding with
+  | None -> invalid_arg "Data_encoding.Registration.register: non def(in)ed encoding"
+  | Some (id, description) ->
+      table :=
+        EncodingTable.update id (function
+            | None ->
+                let record = Record { encoding ; description ; pp } in
+                Some record
+            | Some _ ->
+                Format.kasprintf
+                  Pervasives.invalid_arg
+                  "Encoding %s previously registered" id)
+          !table
 
 let find id =
   EncodingTable.find_opt id !table

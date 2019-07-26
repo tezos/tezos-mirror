@@ -38,8 +38,6 @@ val json_pretty_printer: t -> (Format.formatter -> Json.t -> unit)
 val binary_pretty_printer: t -> (Format.formatter -> MBytes.t -> unit)
 
 val register :
-  id:id ->
-  ?description:string ->
   ?pp:(Format.formatter -> 'a -> unit) ->
   'a Encoding.t ->
   unit

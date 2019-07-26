@@ -565,8 +565,6 @@ module Registration : sig
       later be found using {!find} and providing the matching [id]. It will
       also appear in the results of {!list}. *)
   val register :
-    id:id ->
-    ?description:string ->
     ?pp:(Format.formatter -> 'a -> unit) ->
     'a Encoding.t ->
     unit
