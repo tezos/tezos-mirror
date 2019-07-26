@@ -80,7 +80,10 @@ module Sign = struct
     type t = Signature.t
 
     let encoding =
-      Data_encoding.(obj1 (req "signature" Signature.encoding))
+      let open Data_encoding in
+      def "signer_messages.sign.response"
+      @@
+      obj1 (req "signature" Signature.encoding)
 
   end
 
@@ -95,7 +98,10 @@ module Deterministic_nonce = struct
     type t = MBytes.t
 
     let encoding =
-      Data_encoding.(obj1 (req "deterministic_nonce" bytes))
+      let open Data_encoding in
+      def "signer_messages.deterministic_nonce.response"
+      @@
+      obj1 (req "deterministic_nonce" bytes)
 
   end
 
@@ -110,7 +116,10 @@ module Deterministic_nonce_hash = struct
     type t = MBytes.t
 
     let encoding =
-      Data_encoding.(obj1 (req "deterministic_nonce_hash" bytes))
+      let open Data_encoding in
+      def "signer_messages.deterministic_nonce_hash.response"
+      @@
+      obj1 (req "deterministic_nonce_hash" bytes)
 
   end
 
@@ -123,7 +132,10 @@ module Supports_deterministic_nonces = struct
     type t = Signature.Public_key_hash.t
 
     let encoding =
-      Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+      let open Data_encoding in
+      def "signer_messages.supports_deterministic_nonces.request"
+      @@
+      obj1 (req "pkh" Signature.Public_key_hash.encoding)
 
   end
 
@@ -131,7 +143,11 @@ module Supports_deterministic_nonces = struct
 
     type t = bool
 
-    let encoding = Data_encoding.(obj1 (req "bool" bool))
+    let encoding =
+      let open Data_encoding in
+      def "signer_messages.supports_deterministic_nonces.response"
+      @@
+      obj1 (req "bool" bool)
   end
 
 end
@@ -145,7 +161,10 @@ module Public_key = struct
     type t = Signature.Public_key_hash.t
 
     let encoding =
-      Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+      let open Data_encoding in
+      def "signer_messages.public_key.request"
+      @@
+      obj1 (req "pkh" Signature.Public_key_hash.encoding)
 
   end
 
@@ -154,7 +173,10 @@ module Public_key = struct
     type t = Signature.Public_key.t
 
     let encoding =
-      Data_encoding.(obj1 (req "pubkey" Signature.Public_key.encoding))
+      let open Data_encoding in
+      def "signer_messages.public_key.response"
+      @@
+      obj1 (req "pubkey" Signature.Public_key.encoding)
 
   end
 
@@ -198,6 +220,8 @@ module Request = struct
 
   let encoding =
     let open Data_encoding in
+    def "signer_messages.request"
+    @@
     union [
       case (Tag 0)
         ~title:"Sign"
