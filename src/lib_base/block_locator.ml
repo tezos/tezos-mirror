@@ -236,7 +236,4 @@ let unknown_prefix ~is_known locator =
       loop history []
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"block_locator"
-    ~pp:pp_short
-    encoding
+  Data_encoding.Registration.register ~pp:pp_short encoding

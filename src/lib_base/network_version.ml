@@ -99,7 +99,4 @@ let select
            p2p_version }
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"network_version"
-    ~pp:pp
-    encoding
+  Data_encoding.Registration.register ~pp:pp encoding

@@ -152,10 +152,5 @@ let get_voted_protocol_overrides proto_hash =
   List.assoc_opt proto_hash voted_protocol_overrides
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"block_header.shell_header"
-    shell_header_encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"block_header"
-    encoding
+  Data_encoding.Registration.register shell_header_encoding ;
+  Data_encoding.Registration.register encoding

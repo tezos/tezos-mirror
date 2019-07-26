@@ -141,11 +141,5 @@ module Meta = struct
 end
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"protocol"
-    ~pp:pp_ocaml
-    encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"protocol.meta"
-    Meta.encoding
+  Data_encoding.Registration.register ~pp:pp_ocaml encoding ;
+  Data_encoding.Registration.register Meta.encoding

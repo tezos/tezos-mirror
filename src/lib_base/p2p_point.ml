@@ -371,20 +371,7 @@ module Pool_event = struct
 end
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"p2p_point.id"
-    ~pp:Id.pp
-    Id.encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"p2p_point.state"
-    ~pp:State.pp_digram
-    State.encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"p2p_point.info"
-    Info.encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"p2p_point.pool_event"
-    Pool_event.encoding
+  Data_encoding.Registration.register ~pp:Id.pp Id.encoding ;
+  Data_encoding.Registration.register ~pp:State.pp_digram State.encoding ;
+  Data_encoding.Registration.register Info.encoding ;
+  Data_encoding.Registration.register Pool_event.encoding

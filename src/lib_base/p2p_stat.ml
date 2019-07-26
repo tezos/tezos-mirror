@@ -83,7 +83,4 @@ let encoding =
        (req "current_outflow" int31))
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"p2p_stat"
-    ~pp:pp
-    encoding
+  Data_encoding.Registration.register ~pp:pp encoding
