@@ -273,14 +273,6 @@ module System = struct
 end
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"time.protocol"
-    ~pp:Protocol.pp_hum
-    Protocol.encoding ;
-  Data_encoding.Registration.register
-    ~id:"time.system"
-    ~pp:System.pp_hum
-    System.encoding ;
-  Data_encoding.Registration.register
-    ~id:"time.system.span"
-    System.Span.encoding
+  Data_encoding.Registration.register ~pp:Protocol.pp_hum Protocol.encoding ;
+  Data_encoding.Registration.register ~pp:System.pp_hum System.encoding ;
+  Data_encoding.Registration.register System.Span.encoding

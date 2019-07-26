@@ -52,11 +52,5 @@ let encoding =
 let zero = 0
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"distributed_db_version.name"
-    ~pp:pp_name
-    name_encoding ;
-  Data_encoding.Registration.register
-    ~id:"distributed_db_version"
-    ~pp:pp
-    encoding
+  Data_encoding.Registration.register ~pp:pp_name name_encoding ;
+  Data_encoding.Registration.register ~pp:pp encoding

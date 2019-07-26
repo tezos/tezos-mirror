@@ -94,7 +94,4 @@ let pp ppf = function
         Time.System.pp_hum (Time.System.of_protocol_exn expiration)
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"test_chain_status"
-    ~pp:pp
-    encoding
+  Data_encoding.Registration.register ~pp:pp encoding

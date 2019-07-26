@@ -60,6 +60,4 @@ let generate_with_bound ?max target =
 let generate target = generate_with_bound target
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"p2p_identity"
-    encoding
+  Data_encoding.Registration.register encoding

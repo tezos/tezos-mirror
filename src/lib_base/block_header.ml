@@ -140,10 +140,5 @@ let get_forced_protocol_upgrade =
   fun ~level -> LevelMap.find_opt level table
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"block_header.shell_header"
-    shell_header_encoding ;
-
-  Data_encoding.Registration.register
-    ~id:"block_header"
-    encoding
+  Data_encoding.Registration.register shell_header_encoding ;
+  Data_encoding.Registration.register encoding

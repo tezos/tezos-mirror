@@ -56,6 +56,4 @@ let empty = {
 }
 
 let () =
-  Data_encoding.Registration.register
-    ~id:"mempool"
-    encoding
+  Data_encoding.Registration.register encoding
