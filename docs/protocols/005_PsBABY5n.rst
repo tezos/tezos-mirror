@@ -212,8 +212,89 @@ Changes to RPCs
 Coming soon...
 
 
-Changes to operations
----------------------
+Changes to the binary format of operations
+------------------------------------------
+
+This section describes the changes in binary format for operations.
+It is possible for readers to compile this list by themselves by
+calling ``describe unsigned operation`` on the tezos client with both
+protocols Athens and Babylon, and then use a diffing tool.
+
+The ``source`` field of manager operations is now a public key hash
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Babylon, only tz1, tz2 and tz3 accounts can be the source of
+manager operations (transaction, origination, delegation,
+reveal). These operations currently contain a source contract, that is
+a byte ``0`` followed by a public key hash for a tz1, tz2 or tz3, or a
+byte ``1`` followed by a contract hash for a KT1. This first byte
+disappears since the KT1 case is now impossible.
+
+Transactions now have an entrypoint
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Athens, the transaction operation ends in either a byte ``0``,
+equivalent to sending ``Unit``, and sufficient for transaction to tz1,
+tz2 or tz3 accounts, or a byte ``1``, followed by the smart contract
+parameter (four bytes of size followed by the serialized Michelson
+data).
+
+In Babylon, the transaction operation ends in either a byte ``0``,
+equivalent to sending ``Unit`` to entrypoint ``%default``, and
+sufficient for transaction to tz1, tz2 or tz3 accounts, or a byte
+``1``, followed by the entrypoint, and then the smart contract
+parameter (four bytes of size followed by the serialized Michelson
+data).
+
+The entrypoint format is as follows:
+
+ - one byte ``0`` for entrypoint ``%default``
+ - one byte ``1`` for entrypoint ``%root``
+ - one byte ``2`` for entrypoint ``%do``
+ - one byte ``3`` for entrypoint ``%set_delegate``
+ - one byte ``4`` for entrypoint ``%remove_delegate``
+ - one byte ``255`` for a named entrypoint, then one byte of entrypoint
+   name size (limited to 31), and the name itself
+
+Bytes ``5`` to ``254`` are unused and may be used in future update to
+optimize in size frequent calls to common entrypoints.
+
+Some fields are dropped in originations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Babylon, smart contracts do not have a manager anymore, and must have a script.
+
+The following field thus disappear:
+
+ - the manager public key (21 bytes),
+ - the spendable flag (1 byte),
+ - the delegatable flag (1 byte),
+ - the presence flag before the script field (1 byte).
+
+The tags of all manager operations are shifted by ``100``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because of the incompatibilities above, all manager operations see
+their tags changed. The transaction format incompatibility between
+Athens and Babylon is made explicit by this change.
+
+  - the reveal operation tag goes from ``7`` to ``107``,
+  - the transaction operation tag goes from ``8`` to ``108``,
+  - the origination operation tag goes from ``9`` to ``109``,
+  - the delegation operation tag goes from ``10`` to ``110``.
+
+Developers who inject transactions in the chain must adapt to this new
+tagging policy. The recommended procedure is to make a dynamic test,
+and to produce a transaction in a format compatible with the
+``next_protocol`` announced by the head of the chain.
+
+Transactions that are emitted in the last moments of Athens and that
+do not get included in a block because of network latency will not
+survive the migration to Babylon. They will have to be emitted again
+in the new format.
+
+How to handle the migration from scriptless KT1s to ``manager.tz``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Coming soon...
 
@@ -281,28 +362,6 @@ Emmy+
 
     Developers of analytics tools or explorers may also want to use these
     new RPCs.
-
-- Endorser: handle the new slot in endorsement operations
-
-::
-
-    This is not a patch for the protocol.
-    It does not affect the hash, but is needed for the endorser to work.
-
-- Proto: endorsement operation now bears the first slot they endorse
-
-::
-
-    Contains a BREAKING CHANGE (see end of message).
-
-    Previously, this slot was inferred by checking the signature against
-    the list of possible endorsers. This is now more explicit, easier and
-    faster to compute.
-
-    This changes both the JSON and binary representation for endorsement
-    operations. This may impact authors of custom endorsers and remote
-    signers, as well as anyone who consumes the JSON representation of
-    endorsements.
 
 - Proto: add a minimum number of endorsements requirement, a.k.a Emmy+
 
