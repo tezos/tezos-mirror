@@ -2452,10 +2452,10 @@ Micheline expressions are encoded in JSON like this:
    ``[ expr, ... ]``
 
 - A primitive application is an object with two fields ``"prim"`` for
-   the primitive name and ``"args"`` for the arguments (that must
-   contain an array). A third optional field ``"annots"`` contains a
-   list of annotations, including their leading ``@``, ``%`` or ``%``
-   sign.
+  the primitive name and ``"args"`` for the arguments (that must
+  contain an array). A third optional field ``"annots"`` contains a
+  list of annotations, including their leading ``@``, ``%`` or ``:``
+  sign.
 
    ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim": "nat", "args": [] } ], "annots": [":t"] }``
 
