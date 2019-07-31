@@ -246,7 +246,7 @@ let finalize_block { mode ; ctxt ; op_count } =
       let fitness = Alpha_context.Fitness.current ctxt in
       let commit_message =
         Format.asprintf
-          "lvl %ld, fit %Ld, prio %d, %d ops"
+          "lvl %ld, fit 1:%Ld, prio %d, %d ops"
           raw_level fitness priority op_count in
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
       return (ctxt, receipt)

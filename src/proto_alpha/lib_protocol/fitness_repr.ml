@@ -57,5 +57,10 @@ let to_int64 = function
     when Compare.String.
            (MBytes.to_string version = Constants_repr.version_number) ->
       int64_of_bytes fitness
+  | [ version ;
+      _fitness (* ignored since higher version takes priority *) ]
+    when Compare.String.
+           (MBytes.to_string version = Constants_repr.version_number_004) ->
+      ok 0L
   | [] -> ok 0L
   | _ -> error Invalid_fitness

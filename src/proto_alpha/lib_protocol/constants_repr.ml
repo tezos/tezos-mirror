@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let version_number = "\000"
+let version_number_004 = "\000"
+let version_number = "\001"
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 let max_revelations_per_block = 32
