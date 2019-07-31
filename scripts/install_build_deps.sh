@@ -1,5 +1,7 @@
 #! /bin/sh
 
+set -e
+
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
