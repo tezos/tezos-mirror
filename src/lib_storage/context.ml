@@ -32,6 +32,35 @@ exception TODO of string
 
 let todo fmt = Fmt.kstrf (fun s -> raise (TODO s)) fmt
 
+let reporter () =
+  let report src level ~over k msgf =
+    let k _ = over () ; k () in
+    let with_stamp h _tags k fmt =
+      let dt = Mtime.Span.to_us (Mtime_clock.elapsed ()) in
+      Fmt.kpf
+        k
+        Fmt.stderr
+        ("%+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
+        dt
+        Fmt.(styled `Magenta string)
+        (Logs.Src.name src)
+        Logs_fmt.pp_header
+        (level, h)
+    in
+    msgf @@ fun ?header ?tags fmt -> with_stamp header tags k fmt
+  in
+  {Logs.report}
+
+let () =
+  match Unix.getenv "TEZOS_STORAGE" with
+  | "v" | "verbose" | "vv" ->
+      Logs.set_level (Some Logs.Debug) ;
+      Logs.set_reporter (reporter ())
+  | _ ->
+      ()
+  | exception Not_found ->
+      ()
+
 module Hash : sig
   include Irmin.Hash.S
 
