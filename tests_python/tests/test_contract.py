@@ -89,8 +89,8 @@ class TestManager:
         client.bake('bootstrap5', BAKE_ARGS)
         client.withdraw_delegate('delegatable_target', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        assert client.get_delegate('manager', []) == "none"
-        assert client.get_delegate('delegatable_target', []) == "none"
+        assert client.get_delegate('manager', []) is None
+        assert client.get_delegate('delegatable_target', []) is None
 
     def test_transfer_to_manager(self, client):
         balance = client.get_mutez_balance('manager')

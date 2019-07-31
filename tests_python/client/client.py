@@ -114,22 +114,28 @@ class Client:
         print(format_command(cmd))
 
         stdout = ""
+        stderr = ""
         new_env = os.environ.copy()
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
         # in python3.7, cleaner to use capture_output=true, text=True
         with subprocess.Popen(cmd,
                               stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
                               bufsize=1,
                               universal_newlines=True,
                               env=new_env) as process:
             for line in process.stdout:
                 print(line, end='')
                 stdout += line
+            for line in process.stderr:
+                print(line, end='')
+                stderr += line
 
         if check and process.returncode:
             raise subprocess.CalledProcessError(process.returncode,
-                                                process.args)
+                                                process.args,
+                                                stderr)
 
         return stdout
 
@@ -158,6 +164,10 @@ class Client:
             params = params + ['with', json.dumps(data)]
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
+
+    def remember(self, alias: str, contract: str) -> str:
+        assert os.path.isfile(contract), f'{contract} is not a file'
+        return self.run(['remember', 'script', alias, f'file:{contract}'])
 
     def typecheck(self, contract: str) -> str:
         assert os.path.isfile(contract), f'{contract} is not a file'
@@ -267,6 +277,12 @@ class Client:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignatureResult(self.run(cmd)).sig
 
+    def activate_account(self,
+                         manager: str,
+                         contract: str):
+        cmd = ['activate', 'account', manager, 'with', contract]
+        return self.run(cmd)
+
     def transfer(self,
                  amount: float,
                  account1: str,
@@ -298,7 +314,9 @@ class Client:
             args = []
         cmd += args
         res = self.run(cmd)
-        return client_output.GetDelegateResult(res).delegate
+        if res[:-1] == 'none':
+            return None
+        return client_output.GetDelegateResult(res).address
 
     def withdraw_delegate(
             self,
@@ -321,6 +339,9 @@ class Client:
     def get_mutez_balance(self, account) -> float:
         res = self.run(['get', 'balance', 'for', account])
         return int(client_output.extract_balance(res)*1000000)
+
+    def register_delegate(self, delegate: str) -> str:
+        return self.run(['register', 'key', delegate, 'as', 'delegate'])
 
     def get_receipt(self,
                     operation: str,
@@ -394,7 +415,7 @@ class Client:
                            branch: str = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
-        cmd += ['--check-previous', '2']
+        cmd += ['--check-previous', '5']
         if branch is not None:
             cmd += ['--branch', branch]
         if args is None:

@@ -179,14 +179,15 @@ class SetDelegateResult:
 
 
 class GetDelegateResult:
-    """Result of a 'get delegate' query."""
+    """Result of a 'get delegate' command."""
 
     def __init__(self, client_output: str):
-        pattern = r"(\w*)"
+        pattern = r"(\w+)( \(known as (\w+)\))*"
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
-        self.delegate = match.groups()[0]
+        self.address = match.groups()[0]
+        self.alias = match.groups()[2]
 
 
 def extract_rpc_answer(client_output: str) -> dict:

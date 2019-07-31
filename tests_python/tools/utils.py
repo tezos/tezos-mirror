@@ -1,8 +1,7 @@
 """ Utility functions to check time-dependent assertions in the tests.
-
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import List  # pylint: disable=unused-import
+from typing import List, Callable  # pylint: disable=unused-import
 import json
 import time
 import re
