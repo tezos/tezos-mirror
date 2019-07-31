@@ -237,7 +237,7 @@ module Encoding = struct
               builtin_case 2 "do" ;
               builtin_case 3 "set_delegate" ;
               builtin_case 4 "remove_delegate" ;
-              Data_encoding.case (Tag 255) ~title:"named" string (fun s -> Some s) (fun s -> s) ]
+              Data_encoding.case (Tag 255) ~title:"named" (Bounded.string 31) (fun s -> Some s) (fun s -> s) ]
 
     let transaction_case =
       MCase {
