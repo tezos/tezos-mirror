@@ -160,6 +160,9 @@ let headers_fetch_worker_loop pipeline =
           let chain_state = Distributed_db.chain_state pipeline.chain_db in
           State.Chain.save_point chain_state >>= Lwt.return_some
     end >>= begin fun save_point ->
+      (* In Full and Rolling mode, we do not want to receive blocks
+         that are past our save point's level, otherwise we would
+         start validating them again. *)
       let steps = match save_point with
         | None ->
             Block_locator.to_steps seed pipeline.locator
