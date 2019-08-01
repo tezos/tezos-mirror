@@ -189,6 +189,11 @@ integration:basic.sh:
   script:
     - dune build @src/bin_client/runtest_basic.sh
 
+integration:multisig.sh:
+  <<: *integration_definition
+  script:
+    - dune build @src/bin_client/runtest_multisig.sh
+
 integration:contracts.sh:
   <<: *integration_definition
   script:
