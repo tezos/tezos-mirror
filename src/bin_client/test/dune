@@ -3,25 +3,6 @@
        protocol_parameters.json))
 
 (alias
- (name runtest_basic.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       king_commitment.json
-       queen_commitment.json
-       test_lib.inc.sh
-       (glob_files contracts/opcodes/*)
-       (glob_files contracts/mini_scenarios/*))
-  (locks /tcp-port/18731
-         /tcp-port/19731)
-  (action
-   (run bash %{dep:test_basic.sh}
-             %{bin:tezos-sandboxed-node.sh}
-             %{bin:tezos-node}
-             %{bin:tezos-init-sandboxed-client.sh}
-             %{bin:tezos-client}
-             %{bin:tezos-admin-client})))
-
-(alias
  (name runtest_multisig.sh)
  (deps sandbox.json
        protocol_parameters.json
