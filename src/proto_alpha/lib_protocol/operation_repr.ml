@@ -545,10 +545,10 @@ module Encoding = struct
            (rebuild op (mcase.inj contents)))
     }
 
-  let reveal_case = make_manager_case 7 Manager_operations.reveal_case
-  let transaction_case = make_manager_case 8 Manager_operations.transaction_case
-  let origination_case = make_manager_case 9 Manager_operations.origination_case
-  let delegation_case = make_manager_case 10 Manager_operations.delegation_case
+  let reveal_case = make_manager_case 107 Manager_operations.reveal_case
+  let transaction_case = make_manager_case 108 Manager_operations.transaction_case
+  let origination_case = make_manager_case 109 Manager_operations.origination_case
+  let delegation_case = make_manager_case 110 Manager_operations.delegation_case
 
   let contents_encoding =
     let make (Case { tag ; name ; encoding ; select ; proj ; inj }) =
