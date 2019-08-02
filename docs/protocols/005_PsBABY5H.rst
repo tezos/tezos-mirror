@@ -1,10 +1,10 @@
 .. _005_proposal:
 
-Protocol 005_PsBABY5n - **Proposal**
+Protocol 005_PsBABY5H - **Proposal**
 ====================================
 
 This page contains all the relevant information for protocol Babylon
-005 PsBABY5n.
+005 PsBABY5H.
 Each of the main changes is briefly described with links to relevant
 external documentation and merge requests.
 There are two sections dedicated to all the changes to RPCs and
@@ -308,7 +308,7 @@ In order to regenerate a protocol with the same hash as Babylon you
 can run from this branch::
 
   $ ./scripts/snapshot_alpha.sh babylon_005 from athens_004
-  $ ls src/proto_005_PsBABY5n
+  $ ls src/proto_005_PsBABY5H
 
 
 Emmy+
