@@ -73,6 +73,30 @@ let commands () = [
       return_unit
     end ;
 
+  command ~group
+    ~desc:"Dump a json description of all registered encodings."
+    (args1 @@ switch
+       ~doc:"Output json descriptions without extraneous whitespace characters"
+       ~long:"compact" ())
+    (fixed [ "dump" ; "encodings" ])
+    begin fun minify (cctxt : #Client_context.printer) ->
+      cctxt#message "%s"
+        (Json.to_string ~minify
+           (`A
+              (Registration.list ()
+               |> List.map (fun (id, enc) ->
+                   `O [("id", `String id);
+                       ("json",
+                        Json.construct Json.schema_encoding
+                          (Registration.json_schema enc));
+                       ("binary",
+                        Json.construct Binary_schema.encoding
+                          (Registration.binary_schema enc));
+                      ]))))
+      >>= fun () ->
+      return_unit
+    end ;
+
   (* JSON -> Binary *)
   command ~group
     ~desc:"Encode the given JSON data into binary using the \
