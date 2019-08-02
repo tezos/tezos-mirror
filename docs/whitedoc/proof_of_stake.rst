@@ -10,6 +10,27 @@ https://blog.nomadic-labs.com/analysis-of-emmy.html and
 https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html.
 
 
+Brief Overview
+--------------
+A blockchain is a linked list of **blocks**. In Tezos, blocks to be added to the blockchain are agreed upon through a proof-of-stake consensus mechanism. Proof-of-stake means that participants in the consensus algorithm are chosen in function of their stake.  In Tezos, a participant needs to have a minimum stake of 10,000 XTZ (which is called a **roll**). If one does not have enough stake to participate on its own or does not want to set up the needed infrastructure, (s)he can use **delegation**. Therefore, in Tezos, participants in the consensus algorithm are called **delegates**. There are two roles a delegate can have: that of a **baker**, that is a delegate that creates blocks, or that of an **endorser**, that is a delegate that contributes in agreeing on a block by **endorsing** that block.
+
+**Baking rights** and **endorsing rights** are determined at the beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi strategy starting from a **random seed** computed from information already found on blockchain.
+
+To incentivize participation in the consensus algorithm, delegates are **rewarded** for their baking and endorsing. As a counter-measure against double-baking or double-endorsement a **security deposit** is frozen from the delegate's account. The deposit is either released after a number of cycles or burnt in case of proven bad behaviour.
+
+The remainder of this document contains the detailed description of the notions which are in bold in the text above.
+
+Further External Resources
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The original design of the proof-of-stake mechanism in Tezos can be found in the `whitepaper <https://tezos.com/static/white_paper-2dc8c02267a8fb86bd67a108199441bf.pdf>`_.
+Here are a few more resources that present Tezos' proof-of-stake mechanism:
+
+-  `Proof of Stake <https://learn.tqgroup.io/files/proofofstake.html#consensus>`_
+-  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
+-  `All you ever wanted to ask about Tezos — Illustrated <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
+
+
 Blocks
 ------
 
