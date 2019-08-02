@@ -37,6 +37,9 @@ type config = {
   maintenance_idle_time: Time.System.Span.t ;
   greylist_timeout: Time.System.Span.t ;
   private_mode: bool ;
+  min_connections : int ;
+  max_connections : int ;
+  expected_connections : int ;
 }
 
 type 'meta pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> 'meta pool
@@ -228,16 +231,36 @@ let rec worker_loop st =
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let create ?discovery config bounds pool = {
-  canceler = Lwt_canceler.create () ;
-  config ;
-  bounds ;
-  discovery ;
-  pool = Pool pool ;
-  just_maintained = Lwt_condition.create () ;
-  please_maintain = Lwt_condition.create () ;
-  maintain_worker = Lwt.return_unit ;
-}
+
+let bounds ~min ~expected ~max =
+  assert (min <= expected) ;
+  assert (expected <= max) ;
+  let step_min =
+    (expected - min) / 3
+  and step_max =
+    (max - expected) / 3 in
+  { min_threshold = min + step_min ;
+    min_target = min + 2 * step_min ;
+    max_target = max - 2 * step_max ;
+    max_threshold = max - step_max ;
+  }
+
+let create ?discovery config pool =
+  let bounds =
+    bounds
+      ~min:config.min_connections
+      ~expected:config.expected_connections
+      ~max:config.max_connections in
+  {
+    canceler = Lwt_canceler.create () ;
+    config ;
+    bounds ;
+    discovery ;
+    pool = Pool pool ;
+    just_maintained = Lwt_condition.create () ;
+    please_maintain = Lwt_condition.create () ;
+    maintain_worker = Lwt.return_unit ;
+  }
 
 let activate st =
   st.maintain_worker <-

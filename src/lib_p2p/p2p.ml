@@ -159,33 +159,18 @@ let may_create_discovery_worker _limits config pool =
   | (_, _, _) ->
       None
 
-let bounds ~min ~expected ~max =
-  assert (min <= expected) ;
-  assert (expected <= max) ;
-  let step_min =
-    (expected - min) / 3
-  and step_max =
-    (max - expected) / 3 in
-  { P2p_maintenance.min_threshold = min + step_min ;
-    min_target = min + 2 * step_min ;
-    max_target = max - 2 * step_max ;
-    max_threshold = max - step_max ;
-  }
-
 let create_maintenance_worker limits pool config =
-  let bounds =
-    bounds
-      ~min:limits.min_connections
-      ~expected:limits.expected_connections
-      ~max:limits.max_connections in
   let maintenance_config = {
     P2p_maintenance.
     maintenance_idle_time = limits.maintenance_idle_time ;
     greylist_timeout = limits.greylist_timeout ;
     private_mode = config.private_mode ;
+    min_connections = limits.min_connections ;
+    max_connections = limits.max_connections;
+    expected_connections = limits.max_connections;
   } in
   let discovery = may_create_discovery_worker limits config pool in
-  P2p_maintenance.create ?discovery maintenance_config bounds pool
+  P2p_maintenance.create ?discovery maintenance_config pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
