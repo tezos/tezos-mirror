@@ -24,32 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* min <= min_threshold <= min_target <= max_target <= max_threshold <= max *)
-
-(** P2P maintenance worker.
-
-    The P2P layer urges the maintainer to work when the number of
-    connections reaches `max` or is below `min`. Otherwise, the
-    maintener is lazy and only looks up for connections every two
-    minutes (hardcoded constant). The [maintain] function is another
-    way to signal the maintainer that a maintenance step is desired.
-
-    When the maintener detects that the number of connections is over
-    `max_threshold`, it randomly kills connections to reach
-    `max_target`.
-
-    When the maintener detects that the number of connections is below
-    `min_threshold`, it creates enough connection to reach at least
-    `min_target` (and never more than `max_target`). In the process, it
-    might ask its actual peers for new peers.  *)
-
-type bounds = {
-  min_threshold: int ;
-  min_target: int ;
-  max_target: int ;
-  max_threshold: int ;
-}
-
 type config = {
 
   maintenance_idle_time: Time.System.Span.t ;
@@ -64,6 +38,14 @@ type config = {
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
 
+  min_connections : int ;
+  (** Strict minimum number of connections *)
+
+  max_connections : int ;
+  (** Maximum number of connections *)
+
+  expected_connections : int ;
+  (** Targeted number of connections to reach *)
 }
 
 
@@ -72,7 +54,7 @@ type 'meta t
 
 val create:
   ?discovery:P2p_discovery.t ->
-  config -> bounds ->
+  config ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
   'meta t
 (** [run ?discovery config bounds pool] returns a maintenance worker, with
