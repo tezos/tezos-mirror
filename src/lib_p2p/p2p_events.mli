@@ -24,6 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines some condition values for inter modules synchronization.
+
+    Conditions are triggered by [P2p_pool] and [P2p_connect_handler].
+    There are used in particular by the maintenance worker in
+    [P2p_maintenance]. *)
+
 type t = {
   too_few_connections : unit Lwt_condition.t;
   too_many_connections : unit Lwt_condition.t;
@@ -34,22 +40,22 @@ type t = {
 
 val create : unit -> t
 
-(** [wait_too_few_connections t] is determined when the number of
+(** [wait_too_few_connections t] resolves when the number of
     connections drops below the desired level. *)
 val wait_too_few_connections : t -> unit Lwt.t
 
-(** [wait_too_many_connections t] is determined when the number of
+(** [wait_too_many_connections t] resolves when the number of
     connections exceeds the desired level. *)
 val wait_too_many_connections : t -> unit Lwt.t
 
-(** [wait_new_peer t] is determined when a new peer
+(** [wait_new_peer t] resolves when a new peer
     (i.e. authentication successful) gets added to the pool. *)
 val wait_new_peer : t -> unit Lwt.t
 
-(** [wait_new_point t] is determined when a new point gets registered
+(** [wait_new_point t] resolves when a new point gets registered
     to the pool. *)
 val wait_new_point : t -> unit Lwt.t
 
-(** [wait_new_connection t] is determined when a new connection is
+(** [wait_new_connection t] resolves when a new connection is
     successfully established in the pool. *)
 val wait_new_connection : t -> unit Lwt.t

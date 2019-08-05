@@ -42,8 +42,7 @@ type config = {
   peers_file : string;
   private_mode : bool;
   max_known_points : (int * int) option;
-  (* max, gc target *)
-  max_known_peer_ids : (int * int) option; (* max, gc target *)
+  max_known_peer_ids : (int * int) option;
 }
 
 type 'peer peer_meta_config = {
@@ -301,6 +300,8 @@ module Peers = struct
     try P2p_peer_state.Info.set_trusted (register_peer pool peer_id)
     with Not_found -> ()
 
+  (* TODO can this exception occur *)
+
   let unset_trusted pool peer_id =
     try
       P2p_peer_state.Info.unset_trusted
@@ -369,11 +370,11 @@ module Connection = struct
     match candidates with [] -> None | _ -> Some (random_elt candidates)
 
   (** [random_connection ?conn no_private t] returns a random connection from
-      the pool of connections. It ignores connections to private peers if
-      [no_private] is set to true. It also ignores connection [conn].
-
-      The behavior is almost identical to [random_addr], but couldn't be
-      derived from it as some connections may not have a port (TODO why?). *)
+      the pool of connections. It ignores:
+      - connections to private peers if [no_private] is set to [true]
+      - connection [conn]
+      Unlike [random_addr], it may return a connection to a peer who didn't
+      provide a listening port *)
   let random_connection ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:(fun _peer conn acc ->

@@ -412,12 +412,7 @@ let authenticate t ?point_info canceler fd point =
 
 let accept t fd point =
   t.log (Incoming_connection point) ;
-  let max_active_conns =
-    if Random.bool () then
-      (* randomly allow one additional incoming connection *)
-      t.config.max_connections + 1
-    else t.config.max_connections
-  in
+  let max_active_conns = t.config.max_connections + Random.int 2 in
   if
     t.config.max_incoming_connections <= P2p_point.Table.length t.incoming
     || max_active_conns <= P2p_pool.active_connections t.pool

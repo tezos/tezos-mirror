@@ -41,53 +41,50 @@ let private_node_warn fmt =
 
 open P2p_answerer
 
-let message_handler conn _request size msg =
-  Lwt_pipe.push conn.messages (size, msg)
+let message conn _request size msg = Lwt_pipe.push conn.messages (size, msg)
 
-module PrivateAnswerer = struct
+module Private_answerer = struct
+  let advertise conn _request _points =
+    private_node_warn
+      "Received new peers addresses from %a"
+      P2p_peer.Id.pp
+      conn.peer_id
+
+  let bootstrap conn _request =
+    private_node_warn
+      "Receive requests for peers addresses from %a"
+      P2p_peer.Id.pp
+      conn.peer_id
+    >>= fun () -> Lwt.return_nil
+
+  let swap_request conn _request _new_point _peer =
+    private_node_warn
+      "Received swap requests from %a"
+      P2p_peer.Id.pp
+      conn.peer_id
+
+  let swap_ack conn _request _point _peer_id =
+    private_node_warn "Received swap ack from %a" P2p_peer.Id.pp conn.peer_id
+
   let create conn =
     P2p_answerer.
       {
-        message = message_handler conn;
-        advertise =
-          (fun _conn_info _points ->
-            private_node_warn
-              "Received new peers addresses from %a"
-              P2p_peer.Id.pp
-              conn.peer_id
-            >>= fun () -> Lwt.return_unit);
-        bootstrap =
-          (fun _conn_info ->
-            private_node_warn
-              "Receive requests for peers addresses from %a"
-              P2p_peer.Id.pp
-              conn.peer_id
-            >>= fun () -> Lwt.return_nil);
-        swap_request =
-          (fun _conn_info _point _peer_id ->
-            private_node_warn
-              "Received swap requests from %a"
-              P2p_peer.Id.pp
-              conn.peer_id
-            >>= fun () -> Lwt.return_unit);
-        swap_ack =
-          (fun _conn_info _point _peer_id ->
-            private_node_warn
-              "Received swap ack from %a"
-              P2p_peer.Id.pp
-              conn.peer_id
-            >>= fun () -> Lwt.return_unit);
+        message = message conn;
+        advertise = advertise conn;
+        bootstrap = bootstrap conn;
+        swap_request = swap_request conn;
+        swap_ack = swap_ack conn;
       }
 end
 
-module DefaultAnswerer = struct
+module Default_answerer = struct
   open P2p_connection.P2p_event
 
-  let advertise_handler config _conn _request points =
+  let advertise config _conn _request points =
     let f point = P2p_pool.register_new_point config.pool point |> ignore in
     List.iter f points ; Lwt.return_unit
 
-  let bootstrap_handler config conn _request_info =
+  let bootstrap config conn _request_info =
     if conn.is_private then
       private_node_warn
         "Private peer (%a) asked other peers addresses"
@@ -129,7 +126,7 @@ module DefaultAnswerer = struct
               pp_print_error
               err )
 
-  let swap_ack_handler config conn request new_point _peer =
+  let swap_ack config conn request new_point _peer =
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let connect = config.connect in
@@ -148,7 +145,7 @@ module DefaultAnswerer = struct
       | Some _ ->
           Lwt.return_unit )
 
-  let swap_request_handler config conn _request new_point _peer =
+  let swap_request config conn _request new_point _peer =
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let swap_linger = config.swap_linger in
@@ -196,14 +193,14 @@ module DefaultAnswerer = struct
   let create config conn =
     P2p_answerer.
       {
-        message = message_handler conn;
-        advertise = advertise_handler config conn;
-        bootstrap = bootstrap_handler config conn;
-        swap_request = swap_request_handler config conn;
-        swap_ack = swap_ack_handler config conn;
+        message = message conn;
+        advertise = advertise config conn;
+        bootstrap = bootstrap config conn;
+        swap_request = swap_request config conn;
+        swap_ack = swap_ack config conn;
       }
 end
 
-let create_default = DefaultAnswerer.create
+let create_default = Default_answerer.create
 
-let create_private () = PrivateAnswerer.create
+let create_private () = Private_answerer.create

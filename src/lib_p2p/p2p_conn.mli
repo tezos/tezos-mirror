@@ -26,7 +26,7 @@
 
 (** Type of a connection to a peer, parametrized by the type of
     messages exchanged as well as meta-information associated to a
-    peer and a connection. It mostly wraps [P2p_connection.connection],
+    peer and a connection. It wraps a [P2p_socket.t],
     adding meta-information and data-structures describing a more
     fine-grained logical state of the connection. It also set up
     an answering worker that responds to the messages [P2p_message.t] using
@@ -60,8 +60,7 @@ val local_metadata : ('msg, 'peer, 'conn) t -> 'conn
 
 val remote_metadata : ('msg, 'peer, 'conn) t -> 'conn
 
-(** [stat t] is a snapshot of current bandwidth usage for
-    [t]. *)
+(** [stat t] is a snapshot of current bandwidth usage for [t]. *)
 val stat : ('msg, 'peer, 'conn) t -> P2p_stat.t
 
 (** [read t] returns a message popped from [t]'s app message
@@ -80,21 +79,24 @@ val write_swap_ack :
 
 val write_bootstrap : ('msg, 'peer, 'conn) t -> bool tzresult
 
-(** [write t msg] is [P2p_connection.write t' msg] where [t']
-    is the internal [P2p_connection.t] inside [t]. *)
+(** [write t msg] is [P2p_socket.write t' msg] where [t'] is the internal
+    [P2p_socket.t] inside [t]. *)
 val write : ('msg, 'peer, 'conn) t -> 'msg -> unit tzresult Lwt.t
 
-(** [write_sync t msg] is [P2p_connection.write_sync t' msg]
-    where [t'] is the internal [P2p_connection.t] inside [t]. *)
+(** [write_sync t msg] is [P2p_socket.write_sync t' msg] where [t'] is
+    the internal [P2p_socket.t] inside [t]. *)
 val write_sync : ('msg, 'peer, 'conn) t -> 'msg -> unit tzresult Lwt.t
 
-(** [write_now t msg] is [P2p_connection.write_now t' msg] where
-    [t'] is the internal [P2p_connection.t] inside [t]. *)
+(** [write_now t msg] is [P2p_socket.write_now t' msg] where
+    [t'] is the internal [P2p_socket.t] inside [t]. *)
 val write_now : ('msg, 'peer, 'conn) t -> 'msg -> bool tzresult
 
 val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
 
 val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
+
+(* TODO properly document disconnect/close. Check they are properly used
+   and if we really need both. *)
 
 val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
 

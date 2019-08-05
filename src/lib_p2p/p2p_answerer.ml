@@ -37,7 +37,7 @@
 type 'msg conn_info = {
   peer_id : P2p_peer.Id.t;
   is_private : bool;
-  write_swap_ack : P2p_addr.t * int -> P2p_peer.Id.t -> bool tzresult;
+  write_swap_ack : P2p_point.Id.t -> P2p_peer.Id.t -> bool tzresult;
   messages : (int * 'msg) Lwt_pipe.t;
 }
 

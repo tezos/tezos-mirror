@@ -92,9 +92,8 @@ type limits = {
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
   known_peer_ids_history_size : int;
-  (* TODO where is it used *)
+  (* TODO: remove these two fields *)
   known_points_history_size : int;
-  (* TODO where is it used *)
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
   swap_linger : Time.System.Span.t;
@@ -228,23 +227,28 @@ module Real = struct
     let events = P2p_events.create () in
     create_connection_pool config limits meta_cfg log events
     >>= fun pool ->
+    (* There is a mutual recursion between an answerer and connect_handler,
+       for the default answerer. Because of the swap request mechanism, the
+       default answerer needs to initiate new connections using the
+       [P2p_connect_hander.connect] callback. *)
     let rec answerer =
       lazy
-        (let connect =
-           P2p_connect_handler.connect (Lazy.force connect_handler)
-         in
-         let proto_conf =
-           {
-             P2p_protocol.swap_linger = limits.swap_linger;
-             pool;
-             log;
-             connect;
-             latest_accepted_swap = Ptime.epoch;
-             latest_successful_swap = Ptime.epoch;
-           }
-         in
-         if config.private_mode then P2p_protocol.create_private ()
-         else P2p_protocol.create_default proto_conf)
+        ( if config.private_mode then P2p_protocol.create_private ()
+        else
+          let connect =
+            P2p_connect_handler.connect (Lazy.force connect_handler)
+          in
+          let proto_conf =
+            {
+              P2p_protocol.swap_linger = limits.swap_linger;
+              pool;
+              log;
+              connect;
+              latest_accepted_swap = Ptime.epoch;
+              latest_successful_swap = Ptime.epoch;
+            }
+          in
+          P2p_protocol.create_default proto_conf )
     and connect_handler =
       lazy
         (create_connect_handler
@@ -419,6 +423,10 @@ module Real = struct
       (fun _peer_id peer_info ->
         match P2p_peer_state.get peer_info with
         | Running {data = conn; _} ->
+            (* Silently discards Error P2p_errors.Connection_closed in case
+                the pipe is closed. Shouldn't happen because
+                - no race conditions (no Lwt)
+                - the peer state is Running. *)
             ignore (P2p_conn.write_now conn msg : bool tzresult)
         | _ ->
             ())

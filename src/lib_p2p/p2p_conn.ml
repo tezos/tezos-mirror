@@ -150,6 +150,14 @@ let create conn point_info peer_info messages canceler callback
          ~cancel:(fun () -> Lwt_canceler.cancel t.canceler)) ;
   t
 
+let pipe_exn_handler = function
+  | Lwt_pipe.Closed ->
+      fail P2p_errors.Connection_closed
+  | _ ->
+      assert false
+
+(* see [Lwt_pipe.pop] *)
+
 let read t =
   Lwt.catch
     (fun () ->
@@ -161,12 +169,12 @@ let read t =
         P2p_peer.Id.pp
         (P2p_socket.info t.conn).peer_id
       >>= fun () -> return msg)
-    (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
+    pipe_exn_handler
 
 let is_readable t =
   Lwt.catch
     (fun () -> Lwt_pipe.values_available t.messages >>= return)
-    (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
+    pipe_exn_handler
 
 let write t msg = P2p_socket.write t.conn (Message msg)
 
