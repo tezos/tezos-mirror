@@ -62,12 +62,12 @@ let commands () = [
         Data_encoding.Registration.list ()
         |> List.map (fun (id, elem) -> (id, Data_encoding.Registration.description elem)) in
       cctxt#message
-        "@[<v 2>Encoding listing:@ %a@]@."
+        "@[<v>%a@]@."
         (Format.pp_print_list
            ~pp_sep:Format.pp_print_cut
            (fun ppf (id, desc) ->
               let desc = Option.unopt ~default:"No description available." desc in
-              Format.fprintf ppf "@[<v 4><%s>@ @[%a@]@]" id
+              Format.fprintf ppf "@[<v 2>%s:@ @[%a@]@]" id
                 Format.pp_print_text desc))
         bindings >>= fun () ->
       return_unit
