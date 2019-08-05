@@ -198,8 +198,118 @@ Merge requests
 Changes to RPCs
 ---------------
 
-Coming soon...
+This section lists the changes in RPCs to put the spotlight on them.
+To stay readable, it cannot provide detailed recipes to adapt to every
+one of them. Affected users can get the new formats by using the
+command ``tezos-client rpc list <url>`` and ``tezos-client rpc format
+<url>``.
 
+
+Consequence of ``Emmy +``
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/constants`` has
+  two new required fields "delay_per_missing_endorsement" and
+  "initial_endorsers".
+
+- There are three new RPCs ``GET
+  /chains/<chain_id>/blocks/<block_id>/minimal_valid_time``, ``GET
+  /chains/<chain_id>/blocks/<block_id>/required_endorsements`` and
+  ``POST /chains/<chain_id>/blocks/<block_id>/endorsing_power``.
+
+Consequence of ``quorums``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/constants`` has three
+  new required fields "min_proposal_quorum", "quorum_max" and "quorum_min".
+
+Consequences of ``New instructions to facilitate compilation to Michelson``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Inputs and outputs of
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/big_map_get``
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/typecheck_data``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/typecheck_code``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/pack_data``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/forge/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/parse/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/preapply/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/preapply/block``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/run_code``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/run_operation``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/trace_code``
+
+are affected
+
+Consequences of ``Entry-point introduction``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+New RPCs
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/entrypoints``
+
+- ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/entrypoints/<string>``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/entrypoint``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/entrypoints``
+
+Consequences of other ``Michelson`` changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fields "manager" and "spendable" disappear in ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>``
+  as well as the RPCs ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager``,
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/spendable``
+  and ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/delegatable``
+
+- Output format of field "delegate" in ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>``
+  and output of ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/manager_key``
+  are now public key hashes.
+
+- Field "counter" becomes optional in
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>``
+
+- In ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/delegates/<pkh>`` and
+  ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/delegates/<pkh>/delegated_contracts``,
+  field "Contract_hash" is replaced by "contract_id".
+
+Manager operations are incompatible
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As a consequence, the following RPCs formats are intentionally changed to make explicit the modifications
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/forge/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/parse/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/preapply/operations``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/preapply/block``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/run_code``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/run_operation``
+
+- ``POST /chains/<chain_id>/blocks/<block_id>/helpers/scripts/trace_code``
 
 Changes to the binary format of operations
 ------------------------------------------
