@@ -7,7 +7,7 @@ TRANSFER_ARGS = ['--burn-cap', '0.257']
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts'
 ACCOUNT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/'
 
-# TODO finish porting test_basic.sh
+
 @pytest.mark.incremental
 class TestRawContext:
 

@@ -450,3 +450,152 @@ class Client:
         """Remove base dir, only if not provided by user."""
         if self._is_tmp_dir:
             shutil.rmtree(self.base_dir)
+
+    def deploy_msig(self, msig_name: str,
+                    amount: float, src: str,
+                    threshold: int, keys: List[str],
+                    args: List[str] = None
+                    ) -> client_output.OriginationResult:
+        cmd = ['deploy', 'multisig', msig_name,
+               'transferring', str(amount), 'from', src, 'with',
+               'threshold', str(threshold), 'on', 'public', 'keys']
+        cmd += keys
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.OriginationResult(self.run(cmd))
+
+    def msig_sign_transfer(self, msig_name: str,
+                           amount: float, dest: str,
+                           secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'transferring', str(amount), 'to', dest,
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_withdraw(self, msig_name: str,
+                           amount: float, dest: str,
+                           secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'transferring', str(amount), 'to', dest,
+               'using', 'secret', 'key', secret_key]
+        return self.run(cmd)
+
+    def msig_sign_set_delegate(self, msig_name: str,
+                               delegate: str,
+                               secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'setting', 'delegate', 'to', delegate,
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_withdrawing_delegate(self, msig_name: str,
+                                       secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'withdrawing', 'delegate',
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_setting_threshold(self, msig_name: str,
+                                    secret_key: str, threshold: int,
+                                    public_keys: List[str]) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'using', 'secret', 'key', secret_key, 'setting', 'threshold',
+               'to', str(threshold), 'and', 'public', 'keys', 'to']
+        cmd += public_keys
+        res = self.run(cmd)
+        return res[:-1]
+
+    def sign_bytes(self, to_sign: bytes,
+                   key: str) -> client_output.SignBytesResult:
+        cmd = ['sign', 'bytes', str(to_sign), 'for', key]
+        return client_output.SignBytesResult(self.run(cmd))
+
+    def msig_prepare_transfer(self, msig_name: str,
+                              amount: float, dest: str,
+                              args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'transferring', str(amount), 'to', dest]
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_set_delegate(self, msig_name: str,
+                                  delegate: str,
+                                  args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'setting', 'delegate', 'to', delegate]
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_withdrawing_delegate(self, msig_name: str,
+                                          args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'withdrawing', 'delegate']
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_setting_threshold(self, msig_name: str,
+                                       threshold: int,
+                                       public_keys: List[str],
+                                       args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'setting', 'threshold',
+               'to', str(threshold), 'and', 'public', 'keys', 'to']
+        cmd += public_keys
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_transfer(self, msig_name: str,
+                      amount: float, dest: str,
+                      src: str, signatures: List[str],
+                      args: List[str] = None) -> str:
+        cmd = ['from', 'multisig', 'contract', msig_name,
+               'transfer', str(amount), 'to', dest,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_set_delegate(self, msig_name: str,
+                          delegate: str,
+                          src: str, signatures: List[str],
+                          args: List[str] = None) -> str:
+        cmd = ['set', 'delegate', 'of', 'multisig', 'contract', msig_name,
+               'to', delegate,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_withdrawing_delegate(self, msig_name: str,
+                                  src: str, signatures: List[str],
+                                  args: List[str] = None) -> str:
+        cmd = ['withdraw', 'delegate', 'of', 'multisig', 'contract', msig_name,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_run_transaction(self, msig_name: str,
+                             transaction: bytes,
+                             src: str,
+                             signatures: List[str]) -> str:
+        cmd = ['run', 'transaction', str(transaction), 'on',
+               'multisig', 'contract', msig_name,
+               'on', 'behalf', 'of', src, 'with',
+               'signatures'] + signatures
+        return self.run(cmd)
