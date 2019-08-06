@@ -6,25 +6,16 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-rpc-http-server"
-  "tezos-p2p"
-  "tezos-shell"
-  "tezos-protocol-updater"
-  "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-demo-noops"
-  "tezos-embedded-protocol-005-PsBABY5H"
-  "cmdliner"
-  "tls"
-  "cstruct"
+  "tezos-stdlib-unix"
+  "tezos-shell-services"
+  "tezos-protocol-environment"
+  "tezos-protocol-005-PsBABY5H"
+  "tezos-protocol-005-PsBABY5H-parameters"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
-]
-synopsis: "Tezos: `tezos-node` binary"
+synopsis: "Tezos/Protocol: protocol testing framework"

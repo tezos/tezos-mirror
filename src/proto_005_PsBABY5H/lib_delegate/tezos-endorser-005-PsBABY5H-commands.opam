@@ -10,21 +10,15 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-rpc-http-server"
-  "tezos-p2p"
-  "tezos-shell"
-  "tezos-protocol-updater"
-  "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-demo-noops"
-  "tezos-embedded-protocol-005-PsBABY5H"
-  "cmdliner"
-  "tls"
-  "cstruct"
+  "tezos-protocol-environment"
+  "tezos-protocol-005-PsBABY5H"
+  "tezos-shell-services"
+  "tezos-client-base"
+  "tezos-client-commands"
+  "tezos-client-005-PsBABY5H"
+  "tezos-baking-005-PsBABY5H"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
-]
-synopsis: "Tezos: `tezos-node` binary"
+synopsis: "Tezos/Protocol: protocol-specific commands for `tezos-endorser`"

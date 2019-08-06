@@ -1,0 +1,17 @@
+(executable
+ (name main_endorser_005_PsBABY5H)
+ (public_name tezos-endorser-005-PsBABY5H)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-005-PsBABY5H-commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_005_PsBABY5H
+                   -open Tezos_client_005_PsBABY5H
+                   -open Tezos_client_commands
+                   -open Tezos_baking_005_PsBABY5H_commands
+                   -open Tezos_client_base_unix)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

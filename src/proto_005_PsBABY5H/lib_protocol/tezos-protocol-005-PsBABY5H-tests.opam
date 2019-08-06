@@ -10,22 +10,22 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-005-PsBABY5H"
-  "tezos-client-005-PsBABY5H-commands"
-  "tezos-baking-005-PsBABY5H"
-  "tezos-baking-005-PsBABY5H-commands"
-  "tezos-client-base-unix"
-  "tezos-signer-backends"
-  "tezos-node" { with-test }
-  "tezos-protocol-compiler" { with-test }
+  "tezos-protocol-compiler"
+  "alcotest-lwt" { with-test }
+  "tezos-005-PsBABY5H-test-helpers" { with-test }
+  "tezos-stdlib-unix" { with-test }
+  "tezos-protocol-environment" { with-test }
   "tezos-protocol-005-PsBABY5H-parameters" { with-test }
+  "tezos-shell-services" { with-test }
+  "bip39" { with-test }
 ]
 build: [
+  [ "%{tezos-protocol-compiler:lib}%/replace"
+      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+      "dune" "005_PsBABY5H" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos: `tezos-client` binary"
+synopsis: "Tezos/Protocol: tests for economic-protocol definition"
