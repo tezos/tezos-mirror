@@ -231,7 +231,7 @@ the node data directory for performance reasons.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   tezos-baker-alpha run with local node ~/.tezos-node bob
+   tezos-baker-005-PsBABY5H run with local node ~/.tezos-node bob
 
 Endorser
 ~~~~~~~~
@@ -245,7 +245,7 @@ all accounts.
 
 ::
 
-   tezos-endorser-alpha run
+   tezos-endorser-005-PsBABY5H run
 
 Accuser
 ~~~~~~~
@@ -263,7 +263,7 @@ cause the offender to loose its security deposit.
 
 ::
 
-   tezos-accuser-alpha run
+   tezos-accuser-005-PsBABY5H run
 
 Remember that having two bakers or endorsers running connected to the
 same account could lead to double baking/endorsing and the loss of all
