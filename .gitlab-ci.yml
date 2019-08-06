@@ -704,60 +704,60 @@ opam:63:tezos-accuser-alpha:
   variables:
     package: tezos-accuser-alpha
 
-opam:64:tezos-mempool-alpha:
+opam:64:ocplib-json-typed-browser:
+  <<: *opam_definition
+  variables:
+    package: ocplib-json-typed-browser
+
+opam:65:tezos-mempool-alpha:
   <<: *opam_definition
   variables:
     package: tezos-mempool-alpha
 
-opam:65:tezos-tooling:
+opam:66:tezos-tooling:
   <<: *opam_definition
   variables:
     package: tezos-tooling
 
-opam:66:tezos-protocol-alpha-tests:
+opam:67:tezos-protocol-alpha-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-alpha-tests
 
-opam:67:tezos-alpha-test-helpers:
+opam:68:tezos-alpha-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-alpha-test-helpers
 
-opam:68:tezos-endorser-alpha:
+opam:69:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:69:tezos-accuser-alpha-commands:
+opam:70:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:70:tezos-baker-alpha:
+opam:71:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:71:tezos-network-sandbox:
+opam:72:tezos-network-sandbox:
   <<: *opam_definition
   variables:
     package: tezos-network-sandbox
 
-opam:72:tezos-signer:
+opam:73:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:73:tezos-node:
+opam:74:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
-
-opam:74:ocplib-json-typed-browser:
-  <<: *opam_definition
-  variables:
-    package: ocplib-json-typed-browser
 
 
 ##END_OPAM##
