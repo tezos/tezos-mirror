@@ -14,5 +14,5 @@
     genspio
     ezjsonm
     tezos-signer-backends.unix
-    tezos-client-alpha))
+    tezos-client-005-PsBABY5H))
 
