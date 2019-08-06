@@ -184,11 +184,6 @@ unit:micheline:
   tags:
     - gitlab-org
 
-integration:multisig.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_multisig.sh
-
 integration:contracts.sh:
   <<: *integration_definition
   script:
@@ -345,6 +340,12 @@ integration:multinode_snapshot:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_multinode_snapshot.py
+  stage: test
+
+integration:multisig:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multisig.py
   stage: test
 
 integration:proto_demo_noops_manual_bake:
