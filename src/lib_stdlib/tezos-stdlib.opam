@@ -14,7 +14,7 @@ depends: [
   "ocplib-endian"
   "re"
   "lwt"
-  "lwt_log"
+  "lwt_log" { with-test }
   "zarith"
   "mtime"
   "alcotest" { with-test }

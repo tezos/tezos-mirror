@@ -3,6 +3,7 @@
         test_lwt_pipe)
  (libraries tezos-stdlib
             alcotest
+            lwt_log
             lwt.unix)
  (flags (:standard -open Tezos_stdlib)))
 
