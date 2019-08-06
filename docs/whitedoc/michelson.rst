@@ -1073,9 +1073,9 @@ Operations on optional values
 
 ::
 
-    :: option 'a : 'S   ->   'b : 'S
-       iff   bt :: [ 'S -> 'b : 'S]
-             bf :: [ 'a : 'S -> 'b : 'S]
+    :: option 'a : 'A   ->   'B
+       iff   bt :: [ 'A -> 'B]
+             bf :: [ 'a : 'A -> 'B]
 
     > IF_NONE bt bf / (None) : S  =>  bt / S
     > IF_NONE bt bf / (Some a) : S  =>  bf / a : S
@@ -1103,9 +1103,9 @@ Operations on unions
 
 ::
 
-    :: or 'a 'b : 'S   ->   'c : 'S
-       iff   bt :: [ 'a : 'S -> 'c : 'S]
-             bf :: [ 'b : 'S -> 'c : 'S]
+    :: or 'a 'b : 'A   ->   'B
+       iff   bt :: [ 'a : 'A -> 'B]
+             bf :: [ 'b : 'A -> 'B]
 
     > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
     > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
@@ -1114,9 +1114,9 @@ Operations on unions
 
 ::
 
-    :: or 'a 'b : 'S   ->   'c : 'S
-       iff   bt :: [ 'b : 'S -> 'c : 'S]
-             bf :: [ 'a : 'S -> 'c : 'S]
+    :: or 'a 'b : 'A   ->   'B
+       iff   bt :: [ 'b : 'A -> 'B]
+             bf :: [ 'a : 'A -> 'B]
 
     > IF_RIGHT bt bf / (Right b) : S  =>  bt / b : S
     > IF_RIGHT bt bf / (Left a) : S  =>  bf / a : S
@@ -1144,9 +1144,9 @@ Operations on lists
 
 ::
 
-    :: list 'a : 'S   ->   'b : 'S
-       iff   bt :: [ 'a : list 'a : 'S -> 'b : 'S]
-             bf :: [ 'S -> 'b : 'S]
+    :: list 'a : 'A   ->   'B
+       iff   bt :: [ 'a : list 'a : 'A -> 'B]
+             bf :: [ 'A -> 'B]
 
     > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
     > IF_CONS bt bf / {} : S  =>  bf / S
@@ -1730,9 +1730,9 @@ A typing rule can be inferred:
 
 ::
 
-    :: option 'a : 'S   ->   'b : 'S
-       iff   bt :: [ 'a : 'S -> 'b : 'S]
-             bf :: [ 'S -> 'b : 'S]
+    :: option 'a : 'A   ->   'B
+       iff   bt :: [ 'a : 'A -> 'B]
+             bf :: [ 'A -> 'B]
 
     > IF_SOME / (Some a) : S  =>  bt / a : S
     > IF_SOME / (None) : S  =>  bf / S
@@ -1912,7 +1912,7 @@ Main program structure
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The toplevel of a smart contract file must be an un-delimited sequence
-of four primitive applications (in no particular order) that provide its
+of three primitive applications (in no particular order) that provide its
 ``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
@@ -2452,10 +2452,10 @@ Micheline expressions are encoded in JSON like this:
    ``[ expr, ... ]``
 
 - A primitive application is an object with two fields ``"prim"`` for
-   the primitive name and ``"args"`` for the arguments (that must
-   contain an array). A third optional field ``"annots"`` contains a
-   list of annotations, including their leading ``@``, ``%`` or ``%``
-   sign.
+  the primitive name and ``"args"`` for the arguments (that must
+  contain an array). A third optional field ``"annots"`` contains a
+  list of annotations, including their leading ``@``, ``%`` or ``:``
+  sign.
 
    ``{ "prim": "pair", "args": [ { "prim": "nat", "args": [] }, { "prim": "nat", "args": [] } ], "annots": [":t"] }``
 

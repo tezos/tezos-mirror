@@ -264,7 +264,11 @@ let may_validate_new_branch w distant_hash locator =
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
   | Some unknown_prefix ->
-      bootstrap_new_branch w distant_header unknown_prefix
+      let (_, history) = Block_locator.raw unknown_prefix in
+      if history <> [] then
+        bootstrap_new_branch w distant_header unknown_prefix
+      else
+        return_unit
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -294,9 +298,9 @@ let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
   Lwt.return_unit
 
-let on_error w r st errs =
+let on_error w r st err =
   let pv = Worker.state w in
-  match errs with
+  match err with
     ((( Validation_errors.Unknown_ancestor
       | Validation_errors.Invalid_locator _
       | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
@@ -306,12 +310,12 @@ let on_error w r st errs =
         P2p_peer.Id.pp_short pv.peer_id ;
       debug w "%a" Error_monad.pp_print_error errors ;
       Worker.trigger_shutdown w ;
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return_error errs
-  | [Block_validator_errors.System_error _ ] as errs ->
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
+      Lwt.return_error err
+  | (Block_validator_errors.System_error _  :: _) ->
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
       return_unit
-  | [Block_validator_errors.Unavailable_protocol { protocol ; _ } ] -> begin
+  | (Block_validator_errors.Unavailable_protocol { protocol ; _ }  :: _) -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator
         ~peer:pv.peer_id
@@ -328,19 +332,19 @@ let on_error w r st errs =
              (missing protocol %a)."
             P2p_peer.Id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol ;
-          Worker.record_event w (Event.Request (r, st, Some errs)) ;
-          Lwt.return_error errs
+          Worker.record_event w (Event.Request (r, st, Some err)) ;
+          Lwt.return_error err
     end
-  | [ Validation_errors.Too_short_locator _ ] ->
+  | (Validation_errors.Too_short_locator _  :: _) ->
       debug w
         "Terminating the validation worker for peer %a (kick)."
         P2p_peer.Id.pp_short pv.peer_id ;
       Worker.trigger_shutdown w ;
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
       return_unit
   | _ ->
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return_error errs
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
+      Lwt.return_error err
 
 let on_close w =
   let pv = Worker.state w in

@@ -82,8 +82,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     if header.shell.level <= checkpoint.shell.level then
       Chain.mem chain_state hash >>= fun in_chain ->
       fail_unless in_chain
-        (Checkpoint_error (hash, Some pipeline.peer_id)) >>=? fun () ->
-      return_unit
+        (Checkpoint_error (hash, Some pipeline.peer_id))
     else
       return_unit
   else
@@ -138,11 +137,10 @@ let fetch_step pipeline (step : Block_locator.step)  =
   iter_s
     begin fun header ->
       protect ~canceler:pipeline.canceler begin fun () ->
-        Lwt_pipe.push pipeline.fetched_headers header >>= return
+        Lwt_pipe.push pipeline.fetched_headers header >>= fun () -> return_unit
       end
     end
-    headers >>=? fun () ->
-  return_unit
+    headers
 
 let headers_fetch_worker_loop pipeline =
   begin
@@ -160,6 +158,9 @@ let headers_fetch_worker_loop pipeline =
           let chain_state = Distributed_db.chain_state pipeline.chain_db in
           State.Chain.save_point chain_state >>= Lwt.return_some
     end >>= begin fun save_point ->
+      (* In Full and Rolling mode, we do not want to receive blocks
+         that are past our save point's level, otherwise we would
+         start validating them again. *)
       let steps = match save_point with
         | None ->
             Block_locator.to_steps seed pipeline.locator
@@ -180,8 +181,7 @@ let headers_fetch_worker_loop pipeline =
             predecessor_known
             (Too_short_locator (sender_id, pipeline.locator)) >>=? fun () ->
           iter_s (fetch_step pipeline) steps
-    end >>=? fun () ->
-    return_unit
+    end
   end >>= function
   | Ok () ->
       lwt_log_info Tag.DSL.(fun f ->
@@ -190,17 +190,18 @@ let headers_fetch_worker_loop pipeline =
           -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
       Lwt_pipe.close pipeline.fetched_headers ;
       Lwt.return_unit
-  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
+  | Error (Exn Lwt.Canceled :: _)
+  | Error (Canceled :: _)
+  | Error (Exn Lwt_pipe.Closed :: _) ->
       Lwt.return_unit
-  | Error [ Distributed_db.Block_header.Timeout bh ] ->
+  | Error (Distributed_db.Block_header.Timeout bh  :: _) ->
       lwt_log_info Tag.DSL.(fun f ->
           f "request for header %a from peer %a timed out."
           -% t event "header_request_timeout"
           -% a Block_hash.Logging.tag bh
           -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
-  | Error [ Future_block_header { block; block_time; time } ] ->
+      Lwt_canceler.cancel pipeline.canceler
+  | Error (Future_block_header { block; block_time; time }  :: _) ->
       lwt_log_notice Tag.DSL.(fun f ->
           f "Block locator %a from peer %a contains future blocks. \
              local time: %a, block time: %a"
@@ -209,24 +210,21 @@ let headers_fetch_worker_loop pipeline =
           -% a P2p_peer.Id.Logging.tag pipeline.peer_id
           -% a node_time_tag time
           -% a block_time_tag block_time) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
-  | Error ([ Too_short_locator _ ] as err) ->
+      Lwt_canceler.cancel pipeline.canceler
+  | Error (Too_short_locator _  :: _ as err) ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_info Tag.DSL.(fun f ->
           f "Too short locator received"
           -% t event "too_short_locator"
         ) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error Tag.DSL.(fun f ->
           f "@[Unexpected error (headers fetch):@ %a@]"
           -% t event "unexpected_error"
           -% a errs_tag err) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
 
 let rec operations_fetch_worker_loop pipeline =
   begin
@@ -257,31 +255,31 @@ let rec operations_fetch_worker_loop pipeline =
       return operations in
     protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.push pipeline.fetched_blocks
-        (hash, header, operations) >>= return
+        (hash, header, operations) >>= fun () -> return_unit
     end
   end >>= function
   | Ok () ->
       operations_fetch_worker_loop pipeline
-  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
+  | Error (Exn Lwt.Canceled :: _)
+  | Error (Canceled :: _)
+  | Error (Exn Lwt_pipe.Closed :: _) ->
       Lwt_pipe.close pipeline.fetched_blocks ;
       Lwt.return_unit
-  | Error [ Distributed_db.Operations.Timeout (bh, n) ] ->
+  | Error (Distributed_db.Operations.Timeout (bh, n)  :: _) ->
       lwt_log_info Tag.DSL.(fun f ->
           f "request for operations %a:%d from peer %a timed out."
           -% t event "request_operations_timeout"
           -% a Block_hash.Logging.tag bh
           -% s operations_index_tag n
           -% a P2p_peer.Id.Logging.tag pipeline.peer_id) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error Tag.DSL.(fun f ->
           f "@[Unexpected error (operations fetch):@ %a@]"
           -% t event "unexpected_error"
           -% a errs_tag err) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
 
 let rec validation_worker_loop pipeline =
   begin
@@ -310,24 +308,22 @@ let rec validation_worker_loop pipeline =
     return_unit
   end >>= function
   | Ok () -> validation_worker_loop pipeline
-  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
+  | Error ((Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed) :: _) ->
       Lwt.return_unit
-  | Error ([ Block_validator_errors.Invalid_block _
+  | Error (( Block_validator_errors.Invalid_block _
            | Block_validator_errors.Unavailable_protocol _
            | Block_validator_errors.System_error _
-           | Timeout] as err ) ->
+           | Timeout) :: _ as err) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error Tag.DSL.(fun f ->
           f "@[Unexpected error (validator):@ %a@]"
           -% t event "unexpected_error"
           -% a errs_tag err) >>= fun () ->
-      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel pipeline.canceler
 
 let create
     ?(notify_new_block = fun _ -> ())
@@ -384,8 +380,7 @@ let create
 let wait_workers pipeline =
   pipeline.headers_fetch_worker >>= fun () ->
   pipeline.operations_fetch_worker >>= fun () ->
-  pipeline.validation_worker >>= fun () ->
-  Lwt.return_unit
+  pipeline.validation_worker
 
 let wait pipeline =
   wait_workers pipeline >>= fun () ->

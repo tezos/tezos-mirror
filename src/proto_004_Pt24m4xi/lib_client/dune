@@ -4,7 +4,7 @@
  (libraries tezos-base
             tezos-protocol-004-Pt24m4xi
             tezos-shell-services
-            tezos-client-base-unix
+            tezos-client-base
             tezos-rpc
             tezos-signer-backends
             bip39)

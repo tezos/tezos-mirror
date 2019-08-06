@@ -101,7 +101,7 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes ~check_high_watermark
     Lwt.async begin fun () ->
       protect
         ~on_error:(function
-            | [Exn End_of_file] -> return_unit
+            | Exn End_of_file :: _ -> return_unit
             | errs -> Lwt.return_error errs)
         (fun () ->
            handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt cfd)

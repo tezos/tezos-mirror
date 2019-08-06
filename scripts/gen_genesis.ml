@@ -7,7 +7,6 @@
 #require "zarith";;
 #require "re";;
 #require "hacl";;
-#require "calendar";;
 #mod_use "../src/lib_stdlib/tzString.ml";;
 #mod_use "../src/lib_stdlib/option.ml";;
 #mod_use "../src/lib_stdlib/tzList.ml";;
@@ -44,15 +43,28 @@ let () =
 let sed =
   Format.sprintf
     "sed -i.old \
-     -e 's/Time.of_notation_exn \"[^\\\"]*\"/Time.of_notation_exn \"%s\"/' \
+     -e 's/Time.Protocol.of_notation_exn \"[^\\\"]*\"/Time.Protocol.of_notation_exn \"%s\"/' \
      -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
-     ../src/bin_node/node_run_command.ml"
+     ../src/bin_node/genesis_chain.ml"
     date
     genesis
 
 let () =
   Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-                Lwt_unix.unlink "../src/bin_node/node_run_command.ml.old")
+                Lwt_unix.unlink "../src/bin_node/genesis_chain.ml.old")
+
+let sed =
+  Format.sprintf
+    "sed -i.old \
+     -e 's/Time.Protocol.of_notation_exn \"[^\\\"]*\"/Time.Protocol.of_notation_exn \"%s\"/' \
+     -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
+     ../docs/doc_gen/node_helpers.ml"
+    date
+    genesis
+
+let () =
+  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
+                Lwt_unix.unlink "../docs/doc_gen/node_helpers.ml.old")
 
 let sed =
   Format.sprintf

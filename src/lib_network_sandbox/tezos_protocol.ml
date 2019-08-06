@@ -311,62 +311,72 @@ let ensure t ~config =
 let cli_term () =
   let open Cmdliner in
   let open Term in
+  let def = default () in
+  let docs = "PROTOCOL OPTIONS" in
   pure
     (fun remove_default_bas
-    (`Blocks_per_voting_period bpvp)
-    (`Protocol_hash hashopt)
-    (`Time_between_blocks tbb)
+    (`Blocks_per_voting_period blocks_per_voting_period)
+    (`Protocol_hash hash)
+    (`Time_between_blocks time_between_blocks)
+    (`Blocks_per_cycle blocks_per_cycle)
+    (`Preserved_cycles preserved_cycles)
     add_bootstraps
     ->
-      let d = default () in
-      let id =
-        if add_bootstraps = [] && remove_default_bas = false then d.id
-        else "default-and-command-line"
-      in
-      let time_between_blocks =
-        Option.value tbb ~default:d.time_between_blocks
-      in
+      let id = "default-and-command-line" in
       let bootstrap_accounts =
         add_bootstraps
-        @ if remove_default_bas then [] else d.bootstrap_accounts
+        @ if remove_default_bas then [] else def.bootstrap_accounts
       in
-      let blocks_per_voting_period =
-        match bpvp with Some v -> v | None -> d.blocks_per_voting_period
-      in
-      let hash = Option.value hashopt ~default:d.hash in
-      { d with
+      { def with
         id
+      ; blocks_per_cycle
       ; hash
       ; bootstrap_accounts
       ; time_between_blocks
+      ; preserved_cycles
       ; blocks_per_voting_period } )
   $ Arg.(
       value
         (flag
            (info ~doc:"Do not create any of the default bootstrap accounts."
+              ~docs
               ["remove-default-bootstrap-accounts"])))
   $ Arg.(
       pure (fun x -> `Blocks_per_voting_period x)
       $ value
-          (opt (some int) None
-             (info
+          (opt int def.blocks_per_voting_period
+             (info ~docs
                 ["blocks-per-voting-period"]
-                ~doc:"Set the length of voting periods")))
+                ~doc:"Set the length of voting periods.")))
   $ Arg.(
       pure (fun x -> `Protocol_hash x)
       $ value
-          (opt (some string) None
-             (info ["protocol-hash"] ~doc:"Set the (starting) protocol hash.")))
+          (opt string def.hash
+             (info ["protocol-hash"] ~docs
+                ~doc:"Set the (initial) protocol hash.")))
   $ Arg.(
       pure (fun x -> `Time_between_blocks x)
       $ value
-          (opt
-             (some (list ~sep:',' int))
-             None
+          (opt (list ~sep:',' int) def.time_between_blocks
              (info ["time-between-blocks"] ~docv:"COMMA-SEPARATED-SECONDS"
+                ~docs
                 ~doc:
                   "Set the time between blocks bootstrap-parameter, e.g. \
                    `2,3,2`.")))
+  $ Arg.(
+      pure (fun x -> `Blocks_per_cycle x)
+      $ value
+          (opt int def.blocks_per_cycle
+             (info ["blocks-per-cycle"] ~docv:"NUMBER" ~docs
+                ~doc:"Number of blocks per cycle.")))
+  $ Arg.(
+      pure (fun x -> `Preserved_cycles x)
+      $ value
+          (opt int def.preserved_cycles
+             (info ["preserved-cycles"] ~docv:"NUMBER" ~docs
+                ~doc:
+                  "Base constant for baking rights (search for \
+                   `PRESERVED_CYCLES` in the white paper).")))
   $ Arg.(
       pure (fun l ->
           List.map l ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
@@ -376,7 +386,7 @@ let cli_term () =
           (opt_all
              (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
              []
-             (info ["add-bootstrap-account"]
+             (info ["add-bootstrap-account"] ~docs
                 ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
                 ~doc:
                   "Add a custom bootstrap account, e.g. \

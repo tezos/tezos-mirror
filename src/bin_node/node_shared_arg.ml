@@ -146,9 +146,31 @@ module Term = struct
        | None -> `Error s),
     Lwt_log_sink_unix.Output.pp
 
+  let history_mode_converter =
+    let open History_mode in
+    (function
+      | "archive" -> `Ok Archive
+      | "full" -> `Ok Full
+      | "experimental-rolling" -> `Ok Rolling
+      | s -> `Error s),
+    pp
+
   (* misc args *)
 
   let docs = Manpage.misc_section
+
+  let history_mode =
+    let doc = "Set the mode for the chain's data history \
+               storage. Possible values are $(i,archive), $(i,full) \
+               (default), $(i,experimental-rolling). Archive mode \
+               retains all data since the genesis block. Full mode \
+               only maintains block headers and operations allowing \
+               replaying the chain since the genesis if \
+               wanted. (Experimental-)Rolling mode retains only the \
+               most recent data (i.e. from the 5 last cycles) and \
+               deletes the rest." in
+    Arg.(value & opt (some history_mode_converter) None &
+         info ~docs ~doc ~docv:"<mode>" ["history-mode"])
 
   let log_output =
     let doc =
@@ -299,25 +321,6 @@ module Term = struct
        reported during CORS preflighting; may be used multiple times" in
     Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"HEADER" ["cors-header"])
-
-  (* History mode. *)
-
-  let history_mode_converter =
-    let open History_mode in
-    let conv s = match s with
-      | "archive" -> `Ok Archive
-      | "full" -> `Ok Full
-      | "experimental-rolling" -> `Ok Rolling
-      | s -> `Error s in
-    let to_string = Format.asprintf "%a" History_mode.pp in
-    let pp fmt mode = Format.fprintf fmt "%s" (to_string mode) in
-    (conv, pp)
-
-  let history_mode =
-    let doc = "History mode. Possible values: \
-               $(i,archive), $(i,full) (used by default), $(i,experimental-rolling)" in
-    Arg.(value & opt (some history_mode_converter) None &
-         info ~docs ~doc ~docv:"History mode" ["history-mode"])
 
   (* Args. *)
 

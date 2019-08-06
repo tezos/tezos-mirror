@@ -240,6 +240,11 @@ module System = struct
       (fun {stamp; data} -> (stamp, data))
       (fun (stamp, data) -> {stamp; data})
       (tup2 encoding arg_encoding)
+  let pp_stamped pp fmt { data ; stamp } =
+    Format.fprintf fmt
+      "%a(%a)"
+      pp data
+      pp_hum stamp
   let stamp ~time data =
     { data ; stamp = time }
   let recent a1 a2 =

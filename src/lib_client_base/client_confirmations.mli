@@ -47,3 +47,7 @@ val lookup_operation_in_previous_blocks:
   predecessors:int ->
   Operation_list_hash.elt ->
   (Block_hash.t * int * int) option tzresult Lwt.t
+
+(** wait for the node to be bootstrapped *)
+val wait_for_bootstrapped:
+  #Client_context.full -> unit tzresult Lwt.t

@@ -79,12 +79,12 @@ let may_patch_protocol
     (validation_result : Tezos_protocol_environment.validation_result) =
   match Block_header.get_forced_protocol_upgrade ~level with
   | None ->
-      return validation_result
+      Lwt.return validation_result
   | Some hash ->
       let context = Shell_context.unwrap_disk_context validation_result.context in
       Context.set_protocol context hash >>= fun context ->
       let context = Shell_context.wrap_disk_context context in
-      return { validation_result with context }
+      Lwt.return { validation_result with context }
 
 module Make(Proto : Registered_protocol.T) = struct
 
@@ -189,25 +189,31 @@ module Make(Proto : Registered_protocol.T) = struct
       predecessor_context predecessor_block_header
       block_header.shell.timestamp >>=? fun context ->
     parse_operations block_hash operations >>=? fun operations ->
-    (* TODO wrap 'proto_error' into 'block_error' *)
     let context = Shell_context.wrap_disk_context context in
-    Proto.begin_application
-      ~chain_id
-      ~predecessor_context:context
-      ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-      ~predecessor_fitness:predecessor_block_header.shell.fitness
-      block_header >>=? fun state ->
-    fold_left_s
-      (fun (state, acc) ops ->
-         fold_left_s
-           (fun (state, acc) op ->
-              Proto.apply_operation state op >>=? fun (state, op_metadata) ->
-              return (state, op_metadata :: acc))
-           (state, []) ops >>=? fun (state, ops_metadata) ->
-         return (state, List.rev ops_metadata :: acc))
-      (state, []) operations >>=? fun (state, ops_metadata) ->
-    let ops_metadata = List.rev ops_metadata in
-    Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+    begin
+      begin
+        Proto.begin_application
+          ~chain_id
+          ~predecessor_context:context
+          ~predecessor_timestamp:predecessor_block_header.shell.timestamp
+          ~predecessor_fitness:predecessor_block_header.shell.fitness
+          block_header >>=? fun state ->
+        fold_left_s
+          (fun (state, acc) ops ->
+             fold_left_s
+               (fun (state, acc) op ->
+                  Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+                  return (state, op_metadata :: acc))
+               (state, []) ops >>=? fun (state, ops_metadata) ->
+             return (state, List.rev ops_metadata :: acc))
+          (state, []) operations >>=? fun (state, ops_metadata) ->
+        let ops_metadata = List.rev ops_metadata in
+        Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+        return (validation_result, block_data, ops_metadata)
+      end >>= function
+      | Error err -> fail (invalid_block (Economic_protocol_error err))
+      | Ok o -> return o
+    end >>=? fun (validation_result, block_data, ops_metadata) ->
     (* reset_test_chain
      *   validation_result.context
      *   current_block_header
@@ -215,7 +221,7 @@ module Make(Proto : Registered_protocol.T) = struct
     let context = Shell_context.unwrap_disk_context validation_result.context in
     is_testchain_forking context >>= fun forking_testchain ->
     may_patch_protocol
-      ~level:block_header.shell.level validation_result >>=? fun validation_result ->
+      ~level:block_header.shell.level validation_result >>= fun validation_result ->
     let context = Shell_context.unwrap_disk_context validation_result.context in
     Context.get_protocol context >>= fun new_protocol ->
     let expected_proto_level =

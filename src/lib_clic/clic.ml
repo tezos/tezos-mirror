@@ -974,7 +974,13 @@ let insert_in_dispatch_tree :
             TParam { l with stop = Some command }
         | _, _ ->
             Pervasives.failwith
-              "Clic.Command_tree.insert: conflicting commands" in
+              (Format.asprintf
+                 "Clic.Command_tree.insert: conflicting commands \"%a\""
+                 (fun ppf (Command { params ;
+                                     options = Argument { spec ; _ } ; _ }) ->
+                   print_commandline ppf ([], spec, params))
+                 command)
+    in
     insert_tree conv root params
 
 

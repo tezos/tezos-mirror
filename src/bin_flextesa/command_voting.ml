@@ -50,7 +50,8 @@ let transfer state ~client ~src ~dst ~amount =
 
 let register state ~client ~dst =
   Tezos_client.successful_client_cmd state ~client
-    [ "--wait"; "none"; "register"; "key" ; dst ; "as" ; "delegate" ; "--fee"; "0.05" ]
+    [ "--wait"; "none"; "register"; "key"; dst; "as"; "delegate"; "--fee"
+    ; "0.05" ]
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
@@ -63,8 +64,7 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       | `String p when p = period_name -> return (`Done (nth - 1))
       | other ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              register state ~client ~dst
-              >>= fun res -> return () )
+              register state ~client ~dst >>= fun res -> return () )
           >>= fun _ ->
           ksprintf
             (Tezos_client.Keyed.bake state baker)
@@ -611,10 +611,12 @@ let cmd ~pp_error () =
         pure Filename.dirname
         $ required
             (pos 1 (some string) None
-               (info [] ~docv:"LOOSER-PROTOCOL-PATH"
+               (info [] ~docv:"LOSER-PROTOCOL-PATH"
                   ~doc:
                     "The protocol to inject and down-vote, e.g. \
-                     `./src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`.")))
+                     `./src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL` \
+                     (if same as `WINNER-PROTOCOL-PATH` the scenario will \
+                     make them automatically & artificially different).")))
     $ Tezos_executable.cli_term `Node "current"
     $ Tezos_executable.cli_term `Client "current"
     $ Tezos_executable.cli_term `Admin "current"

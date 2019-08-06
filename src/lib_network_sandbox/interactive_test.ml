@@ -397,7 +397,7 @@ module Interactivity = struct
           match (interactive, pause_end, pause_error) with
           | true, _, _ -> `Full
           | false, true, _ -> `At_end
-          | false, false, true -> `At_end
+          | false, false, true -> `On_error
           | false, false, false -> `None )
       $ Arg.(
           value
@@ -486,7 +486,10 @@ module Pauser = struct
           ~force:(Interactivity.pause_on_error state)
           EF.
             [ haf "Last pause before the test will Kill 'Em All and Quit."
-            ; desc (shout "Error:") (af "%a" pp_error error_value) ]
+            ; desc (shout "Error:")
+                (af "%a"
+                   (fun ppf c -> Attached_result.pp ppf c ~pp_error)
+                   result) ]
         >>= fun () ->
         finish () >>= fun () -> fail error_value ~attach:result.attachments )
 end

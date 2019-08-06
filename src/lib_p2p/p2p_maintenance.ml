@@ -177,7 +177,7 @@ and too_few_connections st n_connected =
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
-      ] >>= return
+      ] >>= fun () -> return_unit
     end >>=? fun () ->
     maintain st
   end
@@ -225,7 +225,7 @@ let rec worker_loop st =
     end
   end >>= function
   | Ok () -> worker_loop st
-  | Error [ Canceled ] -> Lwt.return_unit
+  | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
 let create ?discovery config bounds pool = {

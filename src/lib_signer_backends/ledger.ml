@@ -51,7 +51,7 @@ module Bip32_path = struct
 
   let pp_node ppf node =
     match is_hard node with
-    | true -> Fmt.pf ppf "%ld'" (unhard node)
+    | true -> Fmt.pf ppf "%ldh" (unhard node)
     | false -> Fmt.pf ppf "%ld" node
 
   let string_of_node = Fmt.to_to_string pp_node
@@ -74,7 +74,7 @@ end
 
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
-  | Ledger_deterministic_nonce_not_implemented
+  | Ledger_signing_hash_mismatch of string * string
 
 let error_encoding =
   let open Data_encoding in
@@ -90,24 +90,32 @@ let () =
     ~title: "Ledger error"
     ~description: "Error when communication to a Ledger Nano S device"
     ~pp:(fun ppf e ->
-        Format.fprintf ppf "Ledger %a" Ledgerwallet.Transport.pp_error e)
+        Format.fprintf ppf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e)
     error_encoding
     (function LedgerError e -> Some e | _ -> None)
     (fun e -> LedgerError e)
 
 let () =
+  let description ledger_hash computed_hash =
+    let paren fmt hash_opt =
+      match Base.Option.bind ~f:Blake2B.of_string_opt hash_opt with
+      | None -> ()
+      | Some hash -> Format.fprintf fmt " (%a)" Blake2B.pp_short hash in
+    Format.asprintf
+      "The ledger returned a hash%a which doesn't \
+       match the independently computed hash%a."
+      paren ledger_hash paren computed_hash
+  in
   register_error_kind
     `Permanent
-    ~id: "signer.ledger.deterministic_nonce_not_implemented"
-    ~title: "Ledger deterministic_nonce(_hash) not implemented"
-    ~description: "The deterministic_nonce(_hash) functionality \
-                   is not implemented by the ledger"
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Asked the ledger to generate a  deterministic nonce (hash), \
-                            but this functionality is not yet implemented")
-    Data_encoding.unit
-    (function Ledger_deterministic_nonce_not_implemented -> Some () | _ -> None)
-    (fun () -> Ledger_deterministic_nonce_not_implemented)
+    ~id: "signer.ledger.signing-hash-mismatch"
+    ~title: "Ledger signing-hash mismatch"
+    ~description:(description None None)
+    ~pp:(fun ppf (lh, ch) ->
+        Format.pp_print_string ppf (description (Some lh) (Some ch)))
+    Data_encoding.(obj2 (req "ledger-hash" string) (req "computed-hash" string))
+    (function Ledger_signing_hash_mismatch (lh, ch) -> Some (lh, ch) | _ -> None)
+    (fun (lh, ch) -> Ledger_signing_hash_mismatch (lh, ch))
 
 (** Wrappers around Ledger APDUs. *)
 module Ledger_commands = struct
@@ -180,7 +188,7 @@ module Ledger_commands = struct
     end >>|? fun pk ->
     let pk = Cstruct.to_bigarray pk in
     match curve with
-    | Ledgerwallet_tezos.Ed25519 ->
+    | Ed25519 | Bip32_ed25519 ->
         MBytes.set_int8 pk 0 0 ; (* hackish, but works. *)
         Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
     | Secp256k1 ->
@@ -241,7 +249,7 @@ module Ledger_commands = struct
       | Error _ as e -> Lwt.return e
       | Ok (path, curve) -> return (`Path_curve (path, curve))
 
-  let sign ?watermark hid curve path base_msg =
+  let sign ?watermark ~version hid curve path (base_msg : MBytes.t) =
     let msg =
       Option.unopt_map watermark
         ~default:base_msg ~f:(fun watermark ->
@@ -249,16 +257,31 @@ module Ledger_commands = struct
               [Signature.bytes_of_watermark watermark ; base_msg]) in
     let path = Bip32_path.tezos_root @ path in
     wrap_ledger_cmd begin fun pp ->
-      (* if msg_len > 1024 && (major, minor, patch) < (1, 1, 0) then
-       *   Ledgerwallet_tezos.sign ~hash_on_ledger:false
-       *     ~pp ledger curve path
-       *     (Cstruct.of_bigarray (Blake2B.(to_bytes (hash_bytes [ msg ]))))
-       * else *)
-      Ledgerwallet_tezos.sign
-        ~pp hid curve path (Cstruct.of_bigarray msg)
-    end >>=? fun signature ->
+      let { Ledgerwallet_tezos.Version. major ; minor ; patch ; _ } = version in
+      let open Rresult.R.Infix in
+      if (major, minor, patch) <= (2, 0, 0) then
+        Ledgerwallet_tezos.sign
+          ~pp hid curve path (Cstruct.of_bigarray msg) >>= fun s ->
+        Ok (None, s)
+      else
+        Ledgerwallet_tezos.sign_and_hash
+          ~pp hid curve path (Cstruct.of_bigarray msg) >>= fun (h, s) ->
+        Ok (Some h, s)
+    end >>=? fun (hash_opt, signature) ->
+    begin match hash_opt with
+      | None -> return_unit
+      | Some hsh ->
+          let hash_msg = Blake2B.hash_bytes [msg] in
+          let ledger_one = Blake2B.of_bytes_exn (Cstruct.to_bigarray hsh) in
+          if Blake2B.equal hash_msg ledger_one
+          then return_unit
+          else
+            fail (Ledger_signing_hash_mismatch
+                    (Blake2B.to_string ledger_one, Blake2B.to_string hash_msg))
+    end
+    >>=? fun () ->
     match curve with
-    | Ed25519 ->
+    | Ed25519 | Bip32_ed25519 ->
         let signature = Cstruct.to_bigarray signature in
         let signature = Ed25519.of_bytes_exn signature in
         return (Signature.of_ed25519 signature)
@@ -281,7 +304,16 @@ module Ledger_commands = struct
         let buf = Sign.to_bytes secp256k1_ctx signature in
         let signature = P256.of_bytes_exn buf in
         return (Signature.of_p256 signature)
+
+  let get_deterministic_nonce hid curve path (msg : MBytes.t) =
+    let path = Bip32_path.tezos_root @ path in
+    wrap_ledger_cmd begin fun pp ->
+      Ledgerwallet_tezos.get_deterministic_nonce
+        ~pp hid curve path (Cstruct.of_bigarray msg)
+    end >>=? fun nonce ->
+    return (Cstruct.to_bigarray nonce : MBytes.t)
 end
+
 
 (** Identification of a ledger's root key through crouching-tigers
     (not the keys used for an account). *)
@@ -332,12 +364,12 @@ module Ledger_uri = struct
 
   type t = [ `Ledger of Ledger_id.t | `Ledger_account of Ledger_account.t ]
 
-  let int32_of_path_element_exn ?(allow_weak = false) x =
+  let int32_of_path_element_exn ~allow_weak x =
     let failf ppf = Printf.ksprintf Pervasives.failwith ppf in
     let len = String.length x in
     match String.get x (len - 1) with
     | exception _ -> failf "Empty path element"
-    | '\'' ->
+    | '\'' | 'h' ->
         let intpart = String.sub x 0 (len - 1) in
         begin match Int32.of_string_opt intpart with
           | Some i -> Bip32_path.hard i
@@ -349,13 +381,18 @@ module Ledger_uri = struct
           | None -> failf "Path is not a non-hardened integer: %S" x
         end
     | _ ->
-        (* Future derivation schemes will support weak paths, not for now. *)
-        failf "Non-hardened paths are not allowed (%S)" x
+        failf "Non-hardened paths are not allowed for this derivation scheme (%S)" x
 
   let parse_animals animals =
     match String.split '-' animals with
     | [c; t; h; d] -> Some { Ledger_names.c ; t ; h ; d }
     | _ -> None
+
+  let derivation_supports_weak_paths = function
+    | Ledgerwallet_tezos.Ed25519 -> false
+    | Ledgerwallet_tezos.Secp256k1 -> true
+    | Ledgerwallet_tezos.Secp256r1 -> true
+    | Ledgerwallet_tezos.Bip32_ed25519 -> true
 
   let parse ?allow_weak uri : t tzresult Lwt.t =
     let host = Uri.host uri in
@@ -375,9 +412,12 @@ module Ledger_uri = struct
             match Ledgerwallet_tezos.curve_of_string s with
             | Some curve -> curve, tl
             | None -> Ledger_id.curve, s :: tl in
+          let actually_allow_weak = match allow_weak with
+            | None -> derivation_supports_weak_paths curve
+            | Some x -> x in
           begin
             try return (List.map
-                          (int32_of_path_element_exn ?allow_weak)
+                          (int32_of_path_element_exn ~allow_weak:actually_allow_weak)
                           more_path)
             with Failure s ->
               failwith "Failed to parse Curve/BIP32 path from %s (%s): %s"
@@ -469,13 +509,20 @@ module Filter = struct
     | `Version (s, _) -> fprintf ppf "%s" s
 end
 
-(* Those are always valid on Ledger Nano S with latest firmware. *)
+(* Those constants are provided by the vendor (e.g. check the udev
+   rules they provide): *)
 let vendor_id = 0x2c97
-let product_id = 0x0001
+let product_id_nano_s = 0x0001
+let product_id_nano_x = 0x0004
 
 let use_ledger ?(filter : Filter.t = `None) f =
-  let ledgers = Hidapi.enumerate ~vendor_id ~product_id () in
-  log_info "Found %d Ledger(s)" (List.length ledgers) ;
+  let ledgers =
+    Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_s ()
+    @ Hidapi.enumerate ~vendor_id ~product_id:product_id_nano_x ()
+  in
+  debug "Found %d Ledger(s) %s" (List.length ledgers)
+    (String.concat " -- " (List.map Hidapi.(fun l ->
+         Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id) ledgers)) ;
   let process_device device_info f =
     log_info "Processing Ledger at path [%s]" device_info.Hidapi.path ;
     (* HID interfaces get the number 0
@@ -523,11 +570,35 @@ let use_ledger ?(filter : Filter.t = `None) f =
   in
   go ledgers
 
+let min_version_of_derivation_scheme = function
+  | Ledgerwallet_tezos.Ed25519 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Secp256k1 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Secp256r1 -> (1, 3, 0)
+  | Ledgerwallet_tezos.Bip32_ed25519 -> (2, 1, 0)
+
+let is_derivation_scheme_supported version curve =
+  Ledgerwallet_tezos.Version.(
+    let { major ; minor ; patch ; _ } = version in
+    (major, minor, patch) >= min_version_of_derivation_scheme curve)
+
 let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
   use_ledger ?filter
     (fun hidapi (version, git_commit) device_info ledger_id ->
        Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
-           f hidapi (version, git_commit) device_info ledger_id))
+           let go () = f hidapi (version, git_commit) device_info ledger_id in
+           match ledger_uri with
+           | `Ledger_account { curve; _ } ->
+               if is_derivation_scheme_supported version curve
+               then go ()
+               else Ledgerwallet_tezos.(
+                   failwith "To use derivation scheme %a you need %a or later \
+                             but you're using %a."
+                     pp_curve curve
+                     Version.pp (let (a, b, c) = min_version_of_derivation_scheme curve in
+                                 { version with major = a ; minor = b ; patch = c })
+                     Version.pp version)
+           | _ -> go ()
+         ))
   >>=? function
   | Some o -> return o
   | None ->
@@ -615,14 +686,26 @@ module Signer_implementation : Client_keys.SIGNER = struct
     Ledger_uri.parse (sk_uri :> Uri.t) >>=? fun ledger_uri ->
     Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
     use_ledger_or_fail ~ledger_uri
-      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
-         Ledger_commands.sign ?watermark hidapi curve path msg
+      (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+         Ledger_commands.sign ?watermark ~version hidapi curve path msg
          >>=? fun bytes ->
          return_some bytes)
 
-  let deterministic_nonce _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let deterministic_nonce_hash _ _ = fail Ledger_deterministic_nonce_not_implemented
-  let supports_deterministic_nonces _ = return_false
+  let deterministic_nonce (sk_uri : sk_uri) msg =
+    Ledger_uri.parse (sk_uri :> Uri.t) >>=? fun ledger_uri ->
+    Ledger_uri.full_account ledger_uri >>=? fun { curve ; path ; _ } ->
+    use_ledger_or_fail ~ledger_uri
+      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+         Ledger_commands.get_deterministic_nonce hidapi curve path msg
+         >>=? fun bytes ->
+         return_some bytes)
+
+  let deterministic_nonce_hash (sk : sk_uri) msg =
+    deterministic_nonce sk msg
+    >>=? fun nonce ->
+    return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
+
+  let supports_deterministic_nonces _ = return_true
 end
 
 (* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)
@@ -671,12 +754,14 @@ let generic_commands group = Clic.[
                     List.iter (fun curve ->
                         fprintf ppf
                           "  tezos-client import secret key \
-                           ledger_%s \"ledger://%a/%a/0'/0'\""
+                           ledger_%s \"ledger://%a/%a/0h/0h\""
                           (Sys.getenv_opt "USER" |> Option.unopt ~default:"user")
                           Ledger_id.pp ledger_id
                           Ledgerwallet_tezos.pp_curve curve ;
                         pp_print_cut ppf ())
-                      [ Ed25519 ; Secp256k1 ; Secp256r1 ] ;
+                      (List.filter
+                         (is_derivation_scheme_supported version)
+                         [ Bip32_ed25519 ; Ed25519 ; Secp256k1 ; Secp256r1 ]);
                     pp_close_box ppf () ;
                     pp_print_newline ppf () )
               >>= fun () ->
@@ -733,7 +818,7 @@ let generic_commands group = Clic.[
                             MBytes.pp_hex pkh_bytes
                           >>= fun () ->
                           Ledger_commands.sign
-                            ~watermark:Generic_operation
+                            ~version ~watermark:Generic_operation
                             hidapi curve path pkh_bytes >>=? fun signature ->
                           begin match
                               Signature.check ~watermark:Generic_operation

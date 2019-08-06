@@ -58,8 +58,7 @@ let rec worker_loop st =
               (* if not sent then ?? TODO count dropped message ?? *)
               worker_loop st
           | Error _ ->
-              Lwt_canceler.cancel st.canceler >>= fun () ->
-              Lwt.return_unit
+              Lwt_canceler.cancel st.canceler
     end
   | Ok (_, Advertise points) ->
       (* st.callback.advertise will ignore the points if the node is
@@ -75,20 +74,17 @@ let rec worker_loop st =
   | Ok (size, Message msg) ->
       st.callback.message size msg >>= fun () ->
       worker_loop st
-  | Ok (_, Disconnect) | Error [P2p_errors.Connection_closed] ->
-      Lwt_canceler.cancel st.canceler >>= fun () ->
-      Lwt.return_unit
-  | Error [P2p_errors.Decoding_error] ->
+  | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
+      Lwt_canceler.cancel st.canceler
+  | Error (P2p_errors.Decoding_error :: _) ->
       (* TODO: Penalize peer... *)
-      Lwt_canceler.cancel st.canceler >>= fun () ->
-      Lwt.return_unit
-  | Error [ Canceled ] ->
+      Lwt_canceler.cancel st.canceler
+  | Error (Canceled  :: _) ->
       Lwt.return_unit
   | Error err ->
       lwt_log_error "@[Answerer unexpected error:@ %a@]"
         Error_monad.pp_print_error err >>= fun () ->
-      Lwt_canceler.cancel st.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel st.canceler
 
 let run conn canceler callback =
   let st = {

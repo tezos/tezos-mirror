@@ -429,8 +429,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
           Operation_hash.Set.empty
       } ;
     State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
-      ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
-    Lwt.return_unit
+      ~head:(State.Block.hash pv.predecessor) pv.mempool
 
   let fetch_operation w pv ?peer oph =
     debug w
@@ -442,7 +441,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
     | Ok op ->
         Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
-    | Error [ Distributed_db.Operation.Canceled _ ] ->
+    | Error (Distributed_db.Operation.Canceled _  :: _) ->
         debug w
           "operation %a included before being prevalidated"
           Operation_hash.pp_short oph ;

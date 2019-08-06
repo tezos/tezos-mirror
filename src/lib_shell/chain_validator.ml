@@ -221,7 +221,7 @@ let may_switch_test_chain w active_chains spawn_child block =
           Lwt.return (expiration < block_header.shell.timestamp)
     end >>= fun locally_expired ->
     if locally_expired && activated then
-      shutdown_child nv active_chains >>= return
+      shutdown_child nv active_chains >>= fun () -> return_unit
     else if activated
          || locally_expired
          || not (State.Chain.allow_forked_chain nv.parameters.chain_state) then
@@ -246,12 +246,12 @@ let may_switch_test_chain w active_chains spawn_child block =
                   Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
                   Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
                   return chain_state
-              | Error [ Block_validator_errors.Missing_test_protocol missing_protocol ] ->
+              | Error (Block_validator_errors.Missing_test_protocol missing_protocol  :: _) ->
                   Block_validator.fetch_and_compile_protocol
                     nv.parameters.block_validator
                     missing_protocol >>=? fun _ ->
                   cont ()
-              | Error _ as errs -> Lwt.return errs
+              | Error _ as error -> Lwt.return error
             in
             try_init_test_chain @@ fun () ->
             try_init_test_chain @@ fun () ->
@@ -275,7 +275,7 @@ let may_switch_test_chain w active_chains spawn_child block =
   in
   begin
     State.Block.test_chain block >>= function
-    | Not_running, _ -> shutdown_child nv active_chains >>= return
+    | Not_running, _ -> shutdown_child nv active_chains >>= fun () -> return_unit
     | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
     | (Forking { protocol ; expiration ; _ }
       | Running { protocol ; expiration ; _ }), Some forking_block ->
@@ -374,11 +374,9 @@ let on_request (type a) w
                   Prevalidator.shutdown old_prevalidator >>= fun () ->
                   return_unit
             end else begin
-              Prevalidator.flush old_prevalidator block_hash >>=? fun () ->
-              return_unit
+              Prevalidator.flush old_prevalidator block_hash
             end
-          end >>=? fun () ->
-          return_unit
+          end
       | None -> return_unit
     end >>=? fun () ->
     (if start_testchain then
@@ -415,8 +413,7 @@ let on_close w =
        | None -> Lwt.return_unit
      end ::
      Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
-     pvs) >>= fun () ->
-  Lwt.return_unit
+     pvs)
 
 let on_launch start_prevalidator w _ parameters =
   begin if start_prevalidator then
