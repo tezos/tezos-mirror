@@ -173,7 +173,7 @@ let may_create_discovery_worker _limits config pool =
   | (_, _, _) ->
       None
 
-let create_maintenance_worker limits pool connect_handler config events =
+let create_maintenance_worker limits pool connect_handler config events log =
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
@@ -191,6 +191,7 @@ let create_maintenance_worker limits pool connect_handler config events =
     pool
     connect_handler
     events
+    ~log
 
 let may_create_welcome_worker config limits connect_handler =
   match config.listening_port with
@@ -233,7 +234,14 @@ module Real = struct
            P2p_connect_handler.connect (Lazy.force connect_handler)
          in
          let proto_conf =
-           {P2p_protocol.swap_linger = limits.swap_linger; pool; log; connect}
+           {
+             P2p_protocol.swap_linger = limits.swap_linger;
+             pool;
+             log;
+             connect;
+             latest_accepted_swap = Ptime.epoch;
+             latest_successful_swap = Ptime.epoch;
+           }
          in
          if config.private_mode then P2p_protocol.create_private ()
          else P2p_protocol.create_default proto_conf)
@@ -252,7 +260,7 @@ module Real = struct
     in
     let connect_handler = Lazy.force connect_handler in
     let maintenance =
-      create_maintenance_worker limits pool connect_handler config events
+      create_maintenance_worker limits pool connect_handler config events log
     in
     may_create_welcome_worker config limits connect_handler
     >>= fun welcome ->

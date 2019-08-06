@@ -98,12 +98,6 @@ val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
 
 val close : ('msg, 'peer, 'conn) t -> unit Lwt.t
 
-val last_sent_swap_request :
-  ('msg, 'peer, 'conn) t -> (Time.System.t * P2p_peer.Id.t) option
-
-val set_last_sent_swap_request :
-  ('msg, 'peer, 'conn) t -> Time.System.t * P2p_peer.Id.t -> unit
-
 (**/**)
 
 val raw_write_sync : ('msg, 'peer, 'conn) t -> Bytes.t -> unit tzresult Lwt.t

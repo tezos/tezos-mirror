@@ -70,8 +70,6 @@ type ('msg, 'peer, 'conn) t = {
   events : P2p_events.t;
   log : P2p_connection.P2p_event.t -> unit;
   acl : P2p_acl.t;
-  mutable latest_accepted_swap : Time.System.t;
-  mutable latest_successful_swap : Time.System.t;
 }
 
 module Gc_point_set = List.Bounded (struct
@@ -347,24 +345,12 @@ module Connection = struct
   let list pool =
     fold pool ~init:[] ~f:(fun peer_id c acc -> (peer_id, c) :: acc)
 
-  let random ?different_than ~no_private pool =
-    let candidates =
-      fold pool ~init:[] ~f:(fun _peer conn acc ->
-          if no_private && P2p_conn.private_node conn then acc
-          else
-            match different_than with
-            | Some excluded_conn when P2p_conn.equal_sock conn excluded_conn ->
-                acc
-            | Some _ | None ->
-                conn :: acc)
-    in
-    match candidates with
-    | [] ->
-        None
-    | _ :: _ ->
-        Some (List.nth candidates (Random.int @@ List.length candidates))
+  let random_elt l =
+    let n = List.length l in
+    let r = Random.int n in
+    List.nth l r
 
-  let random_lowid ?different_than ~no_private pool =
+  let random_addr ?different_than ~no_private pool =
     let candidates =
       fold pool ~init:[] ~f:(fun _peer conn acc ->
           if no_private && P2p_conn.private_node conn then acc
@@ -378,13 +364,39 @@ module Connection = struct
                 | (_, None) ->
                     acc
                 | (addr, Some port) ->
-                    ((addr, port), ci.peer_id, conn) :: acc ))
+                    ((addr, port), ci.peer_id) :: acc ))
     in
-    match candidates with
-    | [] ->
+    match candidates with [] -> None | _ -> Some (random_elt candidates)
+
+  (** [random_connection ?conn no_private t] returns a random connection from
+      the pool of connections. It ignores connections to private peers if
+      [no_private] is set to true. It also ignores connection [conn].
+
+      The behavior is almost identical to [random_addr], but couldn't be
+      derived from it as some connections may not have a port (TODO why?). *)
+  let random_connection ?different_than ~no_private pool =
+    let candidates =
+      fold pool ~init:[] ~f:(fun _peer conn acc ->
+          if no_private && P2p_conn.private_node conn then acc
+          else
+            match different_than with
+            | Some excluded_conn when P2p_conn.equal_sock conn excluded_conn ->
+                acc
+            | Some _ | None ->
+                conn :: acc)
+    in
+    match candidates with [] -> None | _ -> Some (random_elt candidates)
+
+  let propose_swap_request pool =
+    match random_connection ~no_private:true pool with
+    | Some recipient -> (
+      match random_addr ~different_than:recipient ~no_private:true pool with
+      | None ->
+          None
+      | Some (proposed_point, proposed_peer_id) ->
+          Some (proposed_point, proposed_peer_id, recipient) )
+    | None ->
         None
-    | _ :: _ ->
-        Some (List.nth candidates (Random.int @@ List.length candidates))
 
   let find_by_peer_id pool peer_id =
     Option.apply (Peers.info pool peer_id) ~f:(fun p ->
@@ -436,8 +448,6 @@ let create config peer_meta_config events ~log =
       connected_points = P2p_point.Table.create 53;
       events;
       acl = P2p_acl.create 1023;
-      latest_accepted_swap = Ptime.epoch;
-      latest_successful_swap = Ptime.epoch;
       log;
     }
   in
@@ -581,65 +591,3 @@ let list_known_points ~ignore_private pool =
   |> sample 30 20
   |> List.map P2p_point_state.Info.point
   |> Lwt.return
-
-(* Swap requests *)
-(* TODO this could be extracted to a separate module *)
-
-let latest_accepted_swap t = t.latest_accepted_swap
-
-let latest_successful_swap t = t.latest_successful_swap
-
-let send_swap_request pool =
-  match Connection.random ~no_private:true pool with
-  | Some recipient when not pool.config.private_mode -> (
-      let recipient_peer_id = (P2p_conn.info recipient).peer_id in
-      match
-        Connection.random_lowid ~different_than:recipient ~no_private:true pool
-      with
-      | None ->
-          ()
-      | Some (proposed_point, proposed_peer_id, _proposed_conn) ->
-          pool.log (Swap_request_sent {source = recipient_peer_id}) ;
-          P2p_conn.set_last_sent_swap_request
-            recipient
-            (Systime_os.now (), proposed_peer_id) ;
-          ignore
-            (P2p_conn.write_swap_request
-               recipient
-               proposed_point
-               proposed_peer_id) )
-  | Some _ | None ->
-      ()
-
-let swap t source_peer_id ~connect current_peer_id new_point =
-  t.latest_accepted_swap <- Systime_os.now () ;
-  connect new_point
-  >>= function
-  | Ok _new_conn -> (
-      t.latest_successful_swap <- Systime_os.now () ;
-      t.log (Swap_success {source = source_peer_id}) ;
-      lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point
-      >>= fun () ->
-      match Connection.find_by_peer_id t current_peer_id with
-      | None ->
-          Lwt.return_unit
-      | Some conn ->
-          P2p_conn.disconnect conn >>= fun () -> Lwt.return_unit )
-  | Error err -> (
-      t.latest_accepted_swap <- t.latest_successful_swap ;
-      t.log (Swap_failure {source = source_peer_id}) ;
-      match err with
-      | [Timeout] ->
-          lwt_debug
-            "Swap to %a was interrupted: %a"
-            P2p_point.Id.pp
-            new_point
-            pp_print_error
-            err
-      | _ ->
-          lwt_log_error
-            "Swap to %a failed: %a"
-            P2p_point.Id.pp
-            new_point
-            pp_print_error
-            err )

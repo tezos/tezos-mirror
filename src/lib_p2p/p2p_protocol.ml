@@ -32,6 +32,8 @@ type ('msg, 'peer, 'conn) config = {
   pool : ('msg, 'peer, 'conn) P2p_pool.t;
   log : P2p_connection.P2p_event.t -> unit;
   connect : P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t;
+  mutable latest_accepted_swap : Time.System.t;
+  mutable latest_successful_swap : Time.System.t;
 }
 
 let private_node_warn fmt =
@@ -94,6 +96,39 @@ module DefaultAnswerer = struct
       >>= fun () -> Lwt.return_nil
     else P2p_pool.list_known_points ~ignore_private:true config.pool
 
+  let swap t pool source_peer_id ~connect current_peer_id new_point =
+    t.latest_accepted_swap <- Systime_os.now () ;
+    connect new_point
+    >>= function
+    | Ok _new_conn -> (
+        t.latest_successful_swap <- Systime_os.now () ;
+        t.log (Swap_success {source = source_peer_id}) ;
+        lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point
+        >>= fun () ->
+        match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
+        | None ->
+            Lwt.return_unit
+        | Some conn ->
+            P2p_conn.disconnect conn )
+    | Error err -> (
+        t.latest_accepted_swap <- t.latest_successful_swap ;
+        t.log (Swap_failure {source = source_peer_id}) ;
+        match err with
+        | [Timeout] ->
+            lwt_debug
+              "Swap to %a was interrupted: %a"
+              P2p_point.Id.pp
+              new_point
+              pp_print_error
+              err
+        | _ ->
+            lwt_log_error
+              "Swap to %a failed: %a"
+              P2p_point.Id.pp
+              new_point
+              pp_print_error
+              err )
+
   let swap_ack_handler config conn request new_point _peer =
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
@@ -108,7 +143,7 @@ module DefaultAnswerer = struct
     | Some (_time, proposed_peer_id) -> (
       match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
       | None ->
-          P2p_pool.swap pool source_peer_id ~connect proposed_peer_id new_point
+          swap config pool source_peer_id ~connect proposed_peer_id new_point
           >>= fun () -> Lwt.return_unit
       | Some _ ->
           Lwt.return_unit )
@@ -128,8 +163,8 @@ module DefaultAnswerer = struct
       Ptime.diff
         (Systime_os.now ())
         (Time.System.max
-           (P2p_pool.latest_successful_swap pool)
-           (P2p_pool.latest_accepted_swap pool))
+           config.latest_successful_swap
+           config.latest_accepted_swap)
     in
     let new_point_info = P2p_pool.register_point pool new_point in
     if
@@ -142,19 +177,14 @@ module DefaultAnswerer = struct
         P2p_peer.Id.pp
         source_peer_id )
     else
-      match P2p_pool.Connection.random_lowid pool ~no_private:true with
+      match P2p_pool.Connection.random_addr pool ~no_private:true with
       | None ->
           lwt_log_info "No swap candidate for %a" P2p_peer.Id.pp source_peer_id
-      | Some (proposed_point, proposed_peer_id, _proposed_conn) -> (
+      | Some (proposed_point, proposed_peer_id) -> (
         match conn.write_swap_ack proposed_point proposed_peer_id with
         | Ok true ->
             log (Swap_ack_sent {source = source_peer_id}) ;
-            P2p_pool.swap
-              pool
-              source_peer_id
-              ~connect
-              proposed_peer_id
-              new_point
+            swap config pool source_peer_id ~connect proposed_peer_id new_point
             >>= fun () -> Lwt.return_unit
         | Ok false ->
             log (Swap_request_received {source = source_peer_id}) ;

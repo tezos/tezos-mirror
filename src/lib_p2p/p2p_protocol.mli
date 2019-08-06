@@ -37,6 +37,8 @@ type ('msg, 'peer, 'conn) config = {
   pool : ('msg, 'peer, 'conn) P2p_pool.t;
   log : P2p_connection.P2p_event.t -> unit;
   connect : P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t;
+  mutable latest_accepted_swap : Time.System.t;
+  mutable latest_successful_swap : Time.System.t;
 }
 
 val create_default : ('msg, 'peer, 'conn) config -> 'msg P2p_answerer.t

@@ -124,9 +124,16 @@ module Connection : sig
     P2p_peer.Id.t ->
     ('msg, 'peer, 'conn) P2p_conn.t option
 
-  val random_lowid :
+  (** [random_addr ?conn no_private t] returns a random ((addr, port), peer_id) from
+      the pool of connections. It ignores connections to private peers if
+      [no_private] is set to true. It also ignores connection [conn]. *)
+  val random_addr :
     ?different_than:('msg, 'peer, 'conn) P2p_conn.t ->
     no_private:bool ->
+    ('msg, 'peer, 'conn) t ->
+    ((P2p_addr.t * int) * P2p_peer.Id.t) option
+
+  val propose_swap_request :
     ('msg, 'peer, 'conn) t ->
     ((P2p_addr.t * int) * P2p_peer.Id.t * ('msg, 'peer, 'conn) P2p_conn.t)
     option
@@ -256,23 +263,6 @@ val connected_peer_ids :
     whose peer_meta is provided *)
 val score : ('msg, 'peer, 'conn) t -> 'peer -> float
 
+(** [add_to_id_points t point] adds [point] to the list of points for this
+    peer. [point] is removed from the list of known points. *)
 val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
-
-(** {1 Functions on [Swap requests]} *)
-
-val latest_accepted_swap : ('msg, 'peer, 'conn) t -> Ptime.t
-
-val latest_successful_swap : ('msg, 'peer, 'conn) t -> Ptime.t
-
-(** [send_swap_request pool] given two connected peers pi and pj (pi
-    <> pj), suggest swap with pi for the peer pj. This behaviour is
-    disabled in private mode *)
-val send_swap_request : ('msg, 'peer, 'conn) t -> unit
-
-val swap :
-  ('msg, 'peer, 'conn) t ->
-  P2p_peer.Id.t ->
-  connect:(P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t) ->
-  P2p_peer.Id.t ->
-  P2p_point.Id.t ->
-  unit Lwt.t

@@ -30,17 +30,6 @@ end)
 
 let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
 
-let broadcast_bootstrap_msg pool =
-  P2p_peer.Table.iter
-    (fun _peer_id peer_info ->
-      match P2p_peer_state.get peer_info with
-      | Running {data = conn; _} ->
-          if not (P2p_conn.private_node conn) then
-            ignore (P2p_conn.write_bootstrap conn)
-      | _ ->
-          ())
-    (P2p_pool.connected_peer_ids pool)
-
 type bounds = {
   min_threshold : int;
   min_target : int;
@@ -68,7 +57,29 @@ type ('msg, 'meta, 'meta_conn) t = {
   please_maintain : unit Lwt_condition.t;
   mutable maintain_worker : unit Lwt.t;
   events : P2p_events.t;
+  log : P2p_connection.P2p_event.t -> unit;
 }
+
+let broadcast_bootstrap_msg pool =
+  P2p_peer.Table.iter
+    (fun _peer_id peer_info ->
+      match P2p_peer_state.get peer_info with
+      | Running {data = conn; _} ->
+          if not (P2p_conn.private_node conn) then
+            ignore (P2p_conn.write_bootstrap conn)
+      | _ ->
+          ())
+    (P2p_pool.connected_peer_ids pool)
+
+let send_swap_request t =
+  match P2p_pool.Connection.propose_swap_request t.pool with
+  | None ->
+      ()
+  | Some (proposed_point, proposed_peer_id, recipient) ->
+      let recipient_peer_id = (P2p_conn.info recipient).peer_id in
+      t.log (Swap_request_sent {source = recipient_peer_id}) ;
+      ignore
+        (P2p_conn.write_swap_request recipient proposed_point proposed_peer_id)
 
 let classify pool private_mode start_time seen_points point pi =
   let now = Systime_os.now () in
@@ -262,7 +273,7 @@ let rec worker_loop t =
      || t.bounds.max_threshold < n_connected
    then do_maintain t
    else
-     ( P2p_pool.send_swap_request t.pool ;
+     ( if not t.config.private_mode then send_swap_request t ;
        return_unit )
      >>=? fun () ->
      protect ~canceler:t.canceler (fun () ->
@@ -293,7 +304,7 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max;
   }
 
-let create ?discovery config pool connect_handler events =
+let create ?discovery config pool connect_handler events ~log =
   let bounds =
     bounds
       ~min:config.min_connections
@@ -311,6 +322,7 @@ let create ?discovery config pool connect_handler events =
     please_maintain = Lwt_condition.create ();
     maintain_worker = Lwt.return_unit;
     events;
+    log;
   }
 
 let activate t =

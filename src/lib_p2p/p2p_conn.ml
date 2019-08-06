@@ -177,6 +177,7 @@ let raw_write_sync t buf = P2p_socket.raw_write_sync t.conn buf
 let write_now t msg = P2p_socket.write_now t.conn (Message msg)
 
 let write_swap_request t point peer_id =
+  t.last_sent_swap_request <- Some (Systime_os.now (), peer_id) ;
   P2p_socket.write_now t.conn (Swap_request (point, peer_id))
 
 let write_bootstrap t = P2p_socket.write_now t.conn Bootstrap
@@ -202,7 +203,3 @@ let private_node t = t.private_node
 let peer_id t = t.peer_id
 
 let trusted_node t = t.trusted_node
-
-let last_sent_swap_request t = t.last_sent_swap_request
-
-let set_last_sent_swap_request t s = t.last_sent_swap_request <- Some s
