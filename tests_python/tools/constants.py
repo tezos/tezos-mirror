@@ -27,12 +27,32 @@ COMMITMENTS = [
 PARAMETERS = {
     "bootstrap_accounts": BOOTSTRAP_ACCOUNTS,
     "commitments": COMMITMENTS,
+    "preserved_cycles": 2,
+    "blocks_per_cycle": 8,
+    "blocks_per_commitment": 4,
+    "blocks_per_roll_snapshot": 4,
+    "blocks_per_voting_period": 64,
     "time_between_blocks": ["1", "0"],
-    "blocks_per_cycle": 128,
-    "blocks_per_roll_snapshot": 32,
-    "blocks_per_voting_period": 16,
-    "preserved_cycles": 1,
-    "proof_of_work_threshold": "-1"
+    "endorsers_per_block": 32,
+    "hard_gas_limit_per_operation": "800000",
+    "hard_gas_limit_per_block": "8000000",
+    "proof_of_work_threshold": "-1",
+    "tokens_per_roll": "8000000000",
+    "michelson_maximum_type_size": 1000,
+    "seed_nonce_revelation_tip": "125000",
+    "origination_size": 257,
+    "block_security_deposit": "512000000",
+    "endorsement_security_deposit": "64000000",
+    "block_reward": "16000000",
+    "endorsement_reward": "2000000",
+    "cost_per_byte": "1000",
+    "hard_storage_limit_per_operation": "60000",
+    "test_chain_duration": "1966080",
+    "quorum_min": 3000,
+    "quorum_max": 7000,
+    "min_proposal_quorum": 500,
+    "initial_endorsers": 1,
+    "delay_per_missing_endorsement": "1"
 }
 
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -86,7 +106,7 @@ IDENTITIES_SHORT = {
 
 
 ALPHA = "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU"
-ALPHA_DEAMON = "alpha"  # tezos-baker-alpha
+ALPHA_DEAMON = "005-PsBABY5H"  # tezos-baker-alpha
 
 
 TEZOS_CRT = """
