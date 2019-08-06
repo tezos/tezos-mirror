@@ -89,27 +89,7 @@ type t =
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
   ; preserved_cycles: int
-  ; proof_of_work_threshold: int
-  ; blocks_per_commitment: int
-  ; endorsers_per_block: int
-  ; hard_gas_limit_per_operation: int
-  ; hard_gas_limit_per_block: int
-  ; tokens_per_roll: int
-  ; michelson_maximum_type_size: int
-  ; seed_nonce_revelation_tip: int
-  ; origination_size: int
-  ; block_security_deposit: int
-  ; endorsement_security_deposit: int
-  ; block_reward: int
-  ; endorsement_reward: int
-  ; hard_storage_limit_per_operation: int
-  ; cost_per_byte: int
-  ; test_chain_duration: int
-  ; quorum_min: int
-  ; quorum_max: int
-  ; min_proposal_quorum: int
-  ; initial_endorsers: int
-  ; delay_per_missing_endorsement: int }
+  ; proof_of_work_threshold: int }
 
 val compare : t -> t -> int
 val default : unit -> t
@@ -130,7 +110,7 @@ val ensure_script :
     bootstrap-parameters JSON file. *)
 
 val ensure :
-  t
+     t
   -> config:< paths: Paths.t ; .. >
   -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
 (** Run the script created by [ensure_script], i.e. create the JSON

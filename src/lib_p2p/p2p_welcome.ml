@@ -96,8 +96,7 @@ let rec worker_loop st =
       Lwt.return_unit
   | Error err ->
       lwt_log_error "@[<v 2>Unexpected error in the Welcome worker@ %a@]"
-        pp_print_error err >>= fun () ->
-      Lwt.return_unit
+        pp_print_error err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in

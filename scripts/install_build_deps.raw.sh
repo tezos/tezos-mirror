@@ -12,7 +12,7 @@ export OPAMYES=${OPAMYES:=true}
 ## In another ideal world, this list should be extracted from the pinned
 ## packages and filter only conf-* packages
 
-opam depext conf-gmp conf-libev conf-m4 conf-perl conf-pkg-config conf-which conf-hidapi conf-autoconf
+opam depext conf-gmp conf-libev conf-m4 conf-perl conf-pkg-config conf-which conf-hidapi
 
 ## In an ideal world, `--with-test` should be present only when using
 ## `--dev`. But this would probably break the CI, so we postponed this

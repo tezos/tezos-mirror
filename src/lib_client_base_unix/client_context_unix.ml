@@ -140,6 +140,7 @@ class unix_logger ~base_dir : Client_context.printer =
 
 class unix_ui : Client_context.ui = object
   method sleep f = Lwt_unix.sleep f
+  method now = Tezos_stdlib_unix.Systime_os.now
 end
 
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename ~rpc_config : Client_context.full =

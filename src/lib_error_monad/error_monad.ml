@@ -334,17 +334,17 @@ module Make(Prefix : sig val id : string end) = struct
 
   let return v = Lwt.return_ok v
 
-  let return_unit = Lwt.return_ok ()
+  let return_unit = Lwt.return (Ok ())
 
-  let return_none = Lwt.return_ok None
+  let return_none = Lwt.return (Ok None)
 
   let return_some x = Lwt.return_ok (Some x)
 
-  let return_nil = Lwt.return_ok []
+  let return_nil = Lwt.return (Ok [])
 
-  let return_true = Lwt.return_ok true
+  let return_true = Lwt.return (Ok true)
 
-  let return_false = Lwt.return_ok false
+  let return_false = Lwt.return (Ok false)
 
   let error s = Error [ s ]
 

@@ -9,7 +9,7 @@
             tezos-rpc-http-server
             tezos-rpc-http-client-unix
             tezos-stdlib-unix
-            tezos-signer-backends)
+            tezos-signer-backends.unix)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_client_base
                    -open Tezos_client_base_unix

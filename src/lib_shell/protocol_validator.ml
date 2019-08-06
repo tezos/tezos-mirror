@@ -81,18 +81,15 @@ let rec worker_loop bv =
   end >>= function
   | Ok () ->
       worker_loop bv
-  | Error (Canceled :: _)
-  | Error (Exn Lwt_pipe.Closed :: _) ->
+  | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
       lwt_log_notice Tag.DSL.(fun f ->
-          f "terminating" -% t event "terminating") >>= fun () ->
-      Lwt.return_unit
+          f "terminating" -% t event "terminating")
   | Error err ->
       lwt_log_error Tag.DSL.(fun f ->
           f "@[Unexpected error (worker):@ %a@]"
           -% t event "unexpected_error"
           -% a errs_tag err) >>= fun () ->
-      Lwt_canceler.cancel bv.canceler >>= fun () ->
-      Lwt.return_unit
+      Lwt_canceler.cancel bv.canceler
 
 let create db =
   let canceler = Lwt_canceler.create () in
@@ -178,8 +175,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
         end >>= fun () ->
         return_unit in
   protocol >>=? fun () ->
-  test_protocol >>=? fun () ->
-  return_unit
+  test_protocol
 
 let prefetch_and_compile_protocols pv ?peer ?timeout block =
   try ignore (fetch_and_compile_protocols pv ?peer ?timeout block) with _ -> ()

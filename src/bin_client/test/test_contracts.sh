@@ -44,7 +44,7 @@ tee /tmp/first_explosion.tz <<EOF
         DUP ; PAIR ;
         DUP ; PAIR } }'
 EOF
-assert_fails $client originate contract first_explosion \
+assert_fails $client originate contract first_explosion for bootstrap1 \
              transferring 0 from bootstrap1 \
              running /tmp/first_explosion.tz -G 8000 --burn-cap 10
 
@@ -79,7 +79,7 @@ tee /tmp/bug_262.tz <<EOF
          LAMBDA unit unit {} ; UNIT ; EXEC ;
          NIL operation ; PAIR } }
 EOF
-init_with_transfer /tmp/bug_262.tz 'Unit' 1 bootstrap1
+init_with_transfer /tmp/bug_262.tz $key1 'Unit' 1 bootstrap1
 assert_balance bug_262 "1 ꜩ"
 
 printf "\nEnd of test\n"

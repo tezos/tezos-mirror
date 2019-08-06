@@ -87,7 +87,8 @@ end
 
 (** An “decorated result type” based on polymorphic variants *)
 module Attached_result = struct
-  type content = [`Text of string | `String_value of string]
+  type content =
+    [`Text of string | `String_value of string | `Verbatim of string list]
 
   type ('ok, 'error) t =
     {result: ('ok, 'error) result; attachments: (string * content) list}
@@ -98,6 +99,7 @@ module Attached_result = struct
 
   let pp ppf ?pp_ok ?pp_error {result; attachments} =
     let open Format in
+    pp_open_hovbox ppf 4 ;
     ( match result with
     | Ok o ->
         pp_open_hvbox ppf 2 ;
@@ -115,18 +117,30 @@ module Attached_result = struct
         pp_close_tag ppf () ;
         Option.iter pp_error ~f:(fun pp -> pp ppf e) ;
         pp_close_box ppf () ) ;
-    match attachments with
+    ( match attachments with
     | [] -> ()
     | more ->
-        pp_print_newline ppf () ;
-        pp_open_hovbox ppf 4 ;
+        pp_open_vbox ppf 4 ;
         List.iter more ~f:(fun (k, v) ->
-            pp_print_if_newline ppf () ;
+            pp_print_cut ppf () ;
+            pp_open_hovbox ppf 2 ;
             pp_print_string ppf "* " ;
             fprintf ppf "%s:@ " k ;
-            match v with
+            ( match v with
             | `Text s -> pp_print_text ppf s
-            | `String_value s -> fprintf ppf "%S" s )
+            | `String_value s -> fprintf ppf "%S" s
+            | `Verbatim lines ->
+                pp_open_vbox ppf 0 ;
+                pp_print_cut ppf () ;
+                fprintf ppf "```````````````" ;
+                List.iter lines ~f:(fun s ->
+                    pp_print_cut ppf () ; pp_print_string ppf s ) ;
+                pp_print_cut ppf () ;
+                fprintf ppf "```````````````" ;
+                pp_close_box ppf () ) ;
+            pp_close_box ppf () ) ;
+        pp_close_box ppf () ) ;
+    pp_close_box ppf ()
 end
 
 (** A wrapper around [('ok, 'a Error.t) result Lwt.t]. *)
@@ -172,7 +186,9 @@ module Asynchronous_result = struct
     | {result= Error e; attachments= attach} as res ->
         f ~result:res e
         >>= fun {result; attachments} ->
-        Lwt.return {result; attachments= attachments @ attach}
+        Lwt.return
+          { result
+          ; attachments= List.dedup_and_sort ~compare (attachments @ attach) }
 
   let transform_error o ~f =
     let open Lwt.Infix in
@@ -181,6 +197,13 @@ module Asynchronous_result = struct
     | {result= Ok _; _} as o -> Lwt.return o
     | {result= Error e; attachments} ->
         Lwt.return {result= Error (f e); attachments}
+
+  let enrich : attachment:(string * content) list -> 'a -> ('b, 'c) t =
+   fun ~attachment x ->
+    bind_on_error x ~f:(fun ~result _ ->
+        Lwt.return
+          Attached_result.
+            {result with attachments= result.attachments @ attachment} )
 
   let bind_all :
          ('ok, 'error) t

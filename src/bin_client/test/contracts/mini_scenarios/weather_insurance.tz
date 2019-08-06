@@ -1,7 +1,7 @@
 parameter (pair (signature %signed_weather_data) (nat :rain %actual_level));
 # (pair (under_key over_key) (pair weather_service_key (pair rain_level days_in_future)))
-storage (pair (pair (address %under_key)
-                    (address %over_key))
+storage (pair (pair (contract %under_key unit)
+                    (contract %over_key unit))
               (pair (nat :rain %rain_level) (key %weather_service_key)));
 code { DUP; DUP;
        CAR; MAP_CDR{PACK ; BLAKE2B};
@@ -13,7 +13,6 @@ code { DUP; DUP;
        DIP{CADR %actual_level};   # Get actual rain
        CDDAR %rain_level;         # Get rain threshold
        CMPLT; IF {CAR %under_key} {CDR %over_key};     # Select contract to receive tokens
-       CONTRACT unit ; ASSERT_SOME ;
        BALANCE; UNIT ; TRANSFER_TOKENS @trans.op; # Setup and execute transfer
        NIL operation ; SWAP ; CONS ;
        PAIR };

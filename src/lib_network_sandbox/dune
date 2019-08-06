@@ -13,6 +13,6 @@
     base
     genspio
     ezjsonm
-    tezos-signer-backends
-    tezos-client-alpha))
+    tezos-signer-backends.unix
+    tezos-client-005-PsBABY5H))
 

@@ -76,6 +76,7 @@ end
 
 class type ui = object
   method sleep : float -> unit Lwt.t
+  method now : unit -> Ptime.t
 end
 
 class type full = object

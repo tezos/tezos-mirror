@@ -120,13 +120,11 @@ module Answer = struct
         lwt_log_error
           "@[<v 2>Unexpected error in answer worker@ %a@]"
           pp_print_error err >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
     | Ok () ->
         lwt_log_error
           "@[<v 2>Unexpected exit in answer worker@]" >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port = {
     canceler = Lwt_canceler.create () ;
@@ -192,8 +190,7 @@ module Sender = struct
         Lwt_utils_unix.safe_close socket
       end
       begin fun _exn ->
-        lwt_debug "Error broadcasting a discovery request" >>= fun () ->
-        Lwt.return_unit
+        lwt_debug "Error broadcasting a discovery request"
       end
 
   let rec worker_loop sender_config st =
@@ -229,8 +226,7 @@ module Sender = struct
         lwt_log_error
           "@[<v 2>Unexpected error in sender worker@ %a@]"
           pp_print_error err >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr = {
     canceler = Lwt_canceler.create () ;

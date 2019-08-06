@@ -7,12 +7,12 @@
             tezos-client-base
             tezos-client-commands
             tezos-client-genesis
-            tezos-client-alpha
+            tezos-client-005-PsBABY5H
             tezos-stdlib-unix
             tezos-client-base-unix
-            tezos-client-alpha-commands.registration
-            tezos-baking-alpha-commands.registration
-            tezos-signer-backends)
+            tezos-client-005-PsBABY5H-commands.registration
+            tezos-baking-005-PsBABY5H-commands.registration
+            tezos-signer-backends.unix)
   (flags (:standard -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http_client
                     -open Tezos_stdlib_unix

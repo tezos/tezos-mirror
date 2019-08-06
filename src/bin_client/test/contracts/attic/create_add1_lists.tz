@@ -2,7 +2,10 @@ parameter unit;
 storage address;
 code { DROP; NIL int; # starting storage for contract
        AMOUNT;                   # Push the starting balance
+       PUSH bool False;          # Not spendable
+       DUP;                      # Or delegatable
        NONE key_hash;                 # No delegate
+       PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
        CREATE_CONTRACT          # Create the contract
          { parameter (list int) ;
            storage (list int) ;

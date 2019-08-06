@@ -40,7 +40,7 @@ endif
 	 done
 
 
-PROTOCOLS := genesis alpha demo_noops
+PROTOCOLS := genesis 005_PsBABY5H demo_noops
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 generate_dune: ${DUNE_INCS}

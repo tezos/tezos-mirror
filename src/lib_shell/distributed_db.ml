@@ -570,8 +570,7 @@ module P2p_reader = struct
               f "Received future block %a from peer %a."
               -% t event "received_future_block"
               -% a Block_hash.Logging.tag (Block_header.hash head)
-              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
-          Lwt.return_unit
+              -% a P2p_peer.Id.Logging.tag state.gid)
         end else begin
           chain_db.callback.notify_branch state.gid locator ;
           (* TODO discriminate between received advertisements
@@ -627,8 +626,7 @@ module P2p_reader = struct
               f "Received future block %a from peer %a."
               -% t event "received_future_block"
               -% a Block_hash.Logging.tag head
-              -% a P2p_peer.Id.Logging.tag state.gid) >>= fun () ->
-          Lwt.return_unit
+              -% a P2p_peer.Id.Logging.tag state.gid)
         end else begin
           chain_db.callback.notify_head state.gid header mempool ;
           (* TODO discriminate between received advertisements
@@ -906,9 +904,7 @@ let deactivate chain_db =
        end)
     chain_db.active_connections ;
   Raw_operation.shutdown chain_db.operation_db >>= fun () ->
-  Raw_block_header.shutdown chain_db.block_header_db >>= fun () ->
-  Lwt.return_unit >>= fun () ->
-  Lwt.return_unit
+  Raw_block_header.shutdown chain_db.block_header_db
 
 let get_chain { active_chains ; _ } chain_id =
   Chain_id.Table.find_opt active_chains chain_id
@@ -933,8 +929,7 @@ let shutdown { p2p_readers ; active_chains ; _ } =
        Raw_block_header.shutdown chain_db.block_header_db >>= fun () ->
        acc)
     active_chains
-    Lwt.return_unit >>= fun () ->
-  Lwt.return_unit
+    Lwt.return_unit
 
 let clear_block chain_db hash n =
   Raw_operations.clear_all chain_db.operations_db.table hash n ;

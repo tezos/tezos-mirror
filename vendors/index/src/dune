@@ -1,5 +1,0 @@
-(library
- (public_name index)
- (name index)
- (modules_without_implementation io)
- (libraries bloomf logs fmt))

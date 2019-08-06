@@ -39,6 +39,4 @@ class TestExample:
     # @pytest.mark.timeout(5, method='thread')
     def test_inclusion(self, sandbox, session):
         operation_hash = session['operation_hash']
-        # FIXME retrieve the block hash where the operation was
-        # injected and pass it to `wait_for_inclusion`
         sandbox.client(0).wait_for_inclusion(operation_hash)

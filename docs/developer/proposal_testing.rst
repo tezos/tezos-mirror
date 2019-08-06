@@ -1,7 +1,7 @@
 .. _proposal_testing:
 
-How to test a protocol
-======================
+How to test a protocol proposal
+===============================
 
 In this tutorial we show how to test a newly developed protocol and in
 particular the migration from its predecessor.
@@ -141,47 +141,39 @@ used to go from 001 to 002 and from 002 to 003.
 The same mechanism can be used to trigger an amendment to protocol 005
 at a specific level, say 3 levels after our current context level.
 
-Yes-node, client and baker
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Yes-node and yes-wallet
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Once we start a node from a Mainnet context however, how can the chain
 progress?
 Indeed we don't have the rights to produce blocks and we don't know
 the private keys of existing bakers!
 
-The solution is to patch the current `mainnet` code to make:
-- a testing node that skips signature checks
-- a testing baker that selects the delegate at priority 0 and signs
-blocks for it with a fake signature
-- a testing client that signs operations with a fake signature
+The solution is to patch the current `mainnet` code to make a
+`yes-node` that forges fake signatures.
+This can be achieved with a small patch in `lib_crypto/Signature.ml`
+which replaces signatures with a concatenation of public key and
+message, so that they are still unique for each key and
+message.
 
-All the above can be achieved with surprisingly little code that
-should not impact too much the fidelity of our migration.
+Once we have a yes-node we need to create a yes-wallet, which is a
+special wallet where secret keys actually encode the same bytes as
+their corresponding public keys.
+If we add to the yes-wallet the existing accounts of large bakers in
+Mainnet, e.g. the foundation, we should have enough rights to bake
+blocks at will.
+The script `scripts/yes-wallet.ml` can be used to generate such a
+wallet.
 
-Once we have a yes-node we can use the client baking command to
-produce a block for the baker at priority 0.
-To make the client work, we first need to create a bogus account::
+Then it's a matter of::
 
-  ./tezos-client gen keys alice
-  ./tezos-client bake for alice --minimal-timestamp
+  ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
+  or
+  ./tezos-baker-005-* -d yes-wallet run with local node ~/488274-node foundation1
 
-Testing wallet
-~~~~~~~~~~~~~~
-
-If we need to run more client commands, such as transfers or
-delegations, even if signatures are not checked anymore we still need
-to have a wallet with a couple of accounts.
-We can simply generate a couple of fresh key pairs `alice` and `bob`
-like above so to have the file structure of `tezos-client` and then
-replace the values in `public_key_hashes` and `public_keys`.
-Using a block explorer, we can pick the public_key and public_key_hash
-of any account on mainnet.
-We can leave the value of the secret keys untouched, they are not used
-by the yes-node anyway.
-
-Once we have prepared a wallet, we can keep it for all our testing.
-Note: remember to remove spurious files ``blocks`` or ``wallet_lock``
+Note: remember to remove spurious files such as ``blocks`` or ``wallet_lock``
 from one test to the other.
+
 
 Wrap it up
 ~~~~~~~~~~
@@ -204,19 +196,16 @@ Then::
   $ rm -rf src/proto_00* && ./scripts/snapshot_alpha.sh b_005 from athens_004
   $ git checkout mainnet
 
-  # get the activate script in proto-proposal from the commit
-  # "Scripts: add yes node, client, baker for 004 and 005 to activate"
-  $ git cherry-pick 7f5de3ada
+  # cherry-pick the activate_protocol.sh script in proto-proposal
+  $ git log --oneline proto-proposal | grep yes-node | head -1
+  dddf3e48a Scripts: add yes-node to activate_protocol.sh
+  $ git cherry-pick dddf3e48a
 
-  # activate using 488275 for the user-activated update
+  # activate using 488276 for the user-activated update
   $ ./scripts/activate_protocol.sh src/proto_005_*
   Link in the Node? (no if you want to test injection) (Y/n)
   User-activated update? (Y/n)
-  At what level? (e.g. 3 for sandbox): 488275
-  patching file src/lib_client_base/client_keys.ml
-  patching file src/lib_crypto/signature.ml
-  patching file src/proto_004_Pt24m4xi/lib_delegate/client_baking_forge.ml
-  patching file lib_delegate/client_baking_forge.ml
+  At what level? (e.g. 3 for sandbox): 488276
 
   $ make
 
@@ -227,48 +216,28 @@ Then::
   "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
   "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
 
-  # delegating an implicit account is not allowed in 004
-  $ ./tezos-client -w none -d ~/tezos-client-test set delegate for bob to alice
-  [...]
-  Error:
-    Contract tz1bDXD6nNSrebqmAnnKKwnX1QdePSMCj4MX is not delegatable
+  # baking a regular 004 block should be quick
+  $ time ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
 
-  $ ./tezos-client -d ~/tezos-client-test bake for alice --minimal-timestamp
+  # baking the migration block to 005 takes longer
+  $ time ./tezos-client -d yes-wallet bake for foundation1 --minimal-timestamp
   Jun 30 16:26:37 - 005-PscqRYyw:
   Jun 30 16:26:37 - 005-PscqRYyw: STITCHING!
   Jun 30 16:26:37 - 005-PscqRYyw:
   [...]
 
   # the context resulted from the application of
-  # block 488275 is understood by 005
+  # block 488276 is understood by 005
   $ curl -s localhost:8732/chains/main/blocks/head/metadata | jq '.level.level, .protocol, .next_protocol'
-  488275
+  488276
   "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
   "PscqRYywd243M2eZspXZEJGsRmNchp4ZKfKmoyEZTRHeLQvVGjp"
-
-  # let's try the same delegation again
-  $ ./tezos-client -w none -d ~/tezos-client-test set delegate for bob to alice
-
-  # bake the operation in a block to apply it
-  $ ./tezos-client -d ~/tezos-client-test bake for alice --minimal-timestamp
-
-  # there is now a tz1 in the delegated set of alice
-  $ curl -s localhost:8732/chains/main/blocks/head/context/raw/json/contracts/index/tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5/delegated | jq .
-  [
-  "KT1CSKPf2jeLpMmrgKquN2bCjBTkAcAdRVDy",
-  "KT1LZFMGrdnPjRLsCZ1aEDUAF5myA5Eo4rQe",
-  "KT1Ubd69oZLjfcd4B6CBNb7i4ADsZzsQZZkf",
-  "KT1AZgVih4VrzHKusqCQ4d7jp4vMc4TjHexA",
-  "tz1bDXD6nNSrebqmAnnKKwnX1QdePSMCj4MX",              <------------------------
-  "KT1W148mcjmfvr9J2RvWcGHxsAFApq9mcfgT",
-  "KT1RUT25eGgo9KKWXfLhj1xYjghAY1iZ2don"
-  ]
 
   # kill the node, a little cleanup and we are ready for another test
   $ fg
   ./tezos-node run --connections 0 --data-dir ~/check/tezos-heavy/488274-node --rpc-addr localhost
   ^C
-  $ rm -rf ~/tezos-node-test && cp -r ~/488274-node-orig ~/tezos-node-test && rm -f ~/tezos-client-test/{wallet_lock,blocks}
+  $ rm -rf ~/tezos-node-test && cp -r ~/488274-node-orig ~/tezos-node-test && rm -f yes-wallet/{wallet_lock,blocks}
 
 
 Tips and tricks
@@ -327,19 +296,29 @@ but using a more efficient format.
 
 If we want to inspect the low level representation in bytes, and we
 often need to, we first need to convert the public key hash of the
-account in its disk format::
+account in its disk format.
+We can use `utop` and a couple of functions to do that::
 
   # let's borrow some code from the protocol tests
   $ dune utop src/proto_005_*/lib_protocol/test/
 
-  # parse the b58check address
-  utop# let h = Tezos_004_Pt24m4xi_test_helpers.Proto_alpha.Contract_repr.of_b58check "tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5" |> function Ok h -> h | _ -> assert false ;;
+  # open Tezos_protocol_alpha.Protocol ;;
 
-  # ask the Index to transform the contract to path
-  utop# Tezos_004_Pt24m4xi_test_helpers.Proto_alpha.Contract_repr.Index.to_path h [];;
-  - : string list =
-    ["ff"; "18"; "cc"; "02"; "32"; "fc";
-    "0002ab07ab920a19a555c8b8d93070d5a21dd1ff33fe"]
+  # let b58check_to_path c =
+  Contract_repr.of_b58check c |> fun (Ok c) ->
+  Contract_repr.Index.to_path c [] |>
+  String.concat "/"
+  ;;
+  # b58check_to_path "tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5" ;;
+  ff/18/cc/02/32/fc/0002ab07ab920a19a555c8b8d93070d5a21dd1ff33fe
+
+  # let path_to_b58check p =
+  String.split_on_char '/' p |>
+  Contract_repr.Index.of_path |> fun (Some c) ->
+  Contract_repr.to_b58check c
+  ;;
+  # path_to_b58check "ff/18/cc/02/32/fc/0002ab07ab920a19a555c8b8d93070d5a21dd1ff33fe"  ;;
+  "tz3bvNMQ95vfAYtG8193ymshqjSvmxiCUuR5"
 
 Now we can use the path with the `raw/bytes` RPC::
 

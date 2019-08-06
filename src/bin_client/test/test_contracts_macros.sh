@@ -128,7 +128,7 @@ assert_storage $contract_macros_dir/compare_bytes.tz '{}' '(Pair 0x34 0x33)' '{ 
 
 # Test goldenbook
 
-init_with_transfer $contract_macros_dir/guestbook.tz \
+init_with_transfer $contract_macros_dir/guestbook.tz $key1\
                    '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" None }' \
                    100 bootstrap1
 assert_fails $client transfer 0 from bootstrap2 to guestbook -arg '"Pas moi"' --burn-cap 10
@@ -138,7 +138,7 @@ assert_fails $client transfer 0 from bootstrap3 to guestbook -arg '"Pas moi non 
 assert_fails $client transfer 0 from bootstrap1 to guestbook -arg '"Recoucou ?"' --burn-cap 10
 
 # Test for big maps
-init_with_transfer $contract_macros_dir/big_map_mem.tz \
+init_with_transfer $contract_macros_dir/big_map_mem.tz $key1\
                    '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
                    100 bootstrap1
 bake_after $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)' --burn-cap 10
@@ -156,7 +156,7 @@ assert_fails $client typecheck data '3' against type \
 $client typecheck data '3' against type \
         '(int :aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
 
-init_with_transfer $contract_macros_dir/big_map_get_add.tz \
+init_with_transfer $contract_macros_dir/big_map_get_add.tz $key1\
                    '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \
                    100 bootstrap1
 

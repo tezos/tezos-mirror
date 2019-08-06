@@ -245,27 +245,18 @@ class Client:
 
     def originate(self,
                   contract_name: str,
+                  manager: str,
                   amount: float,
                   sender: str,
                   contract: str,
                   args: List[str] = None) -> client_output.OriginationResult:
-        cmd = ['originate', 'contract', contract_name, 'transferring',
-               str(amount), 'from', sender, 'running', contract]
+        cmd = ['originate', 'contract', contract_name, 'for', manager,
+               'transferring', str(amount), 'from', sender, 'running',
+               contract]
         if args is None:
             args = []
         cmd += args
         return client_output.OriginationResult(self.run(cmd))
-
-    def hash(self, data: str, typ: str) -> client_output.HashResult:
-        cmd = ['hash', 'data', data, 'of', 'type', typ]
-        return client_output.HashResult(self.run(cmd))
-
-    def pack(self, data: str, typ: str) -> str:
-        return self.hash(data, typ).packed
-
-    def sign(self, data: str, identity: str) -> str:
-        cmd = ['sign', 'bytes', data, 'for', identity]
-        return client_output.SignatureResult(self.run(cmd)).sig
 
     def transfer(self,
                  amount: float,
@@ -358,7 +349,7 @@ class Client:
                            branch: str = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
-        cmd += ['--check-previous', '2']
+        cmd += ['--check-previous', '5']
         if branch is not None:
             cmd += ['--branch', branch]
         if args is None:

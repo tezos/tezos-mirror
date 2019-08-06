@@ -9,10 +9,8 @@ code {
              # There's a temptation to use @storage to parametrize
              # a contract but, in general, there's no reason to encumber
              # @storage with immutable values.
-             PUSH @from key_hash "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"; #changeme
-             IMPLICIT_ACCOUNT ;
-             PUSH @to   key_hash "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"; #changeme
-             IMPLICIT_ACCOUNT ;
+             PUSH @from (contract unit) "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"; #changeme
+             PUSH @to   (contract unit) "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"; #changeme
              PUSH @target_hash bytes 0x123456; #changeme
              PUSH @deadline timestamp "2018-08-08 00:00:00Z"; #changeme
            };

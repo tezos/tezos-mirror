@@ -374,18 +374,13 @@ module Reader = struct
     end >>= function
     | Ok (Some stream) ->
         worker_loop st (Some stream)
-    | Ok None ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+    | Ok None -> Lwt_canceler.cancel st.canceler
     | Error (Canceled :: _)
     | Error (Exn Lwt_pipe.Closed :: _) ->
-        lwt_debug "connection closed to %a"
-          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-        Lwt.return_unit
+        lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
 
   let run ?size conn encoding canceler =
     let compute_size = function
@@ -451,15 +446,12 @@ module Writer = struct
     end >>= function
     | Error (Canceled :: _)
     | Error (Exn Lwt_pipe.Closed :: _) ->
-        lwt_debug "connection closed to %a"
-          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-        Lwt.return_unit
+        lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error err ->
         lwt_log_error
           "@[<v 2>error writing to %a@ %a@]"
           P2p_peer.Id.pp st.conn.info.peer_id pp_print_error err >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
     | Ok (buf, wakener) ->
         send_message st buf >>= fun res ->
         match res with
@@ -474,20 +466,17 @@ module Writer = struct
             match err with
             | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
                 lwt_debug "connection closed to %a"
-                  P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-                Lwt.return_unit
+                  P2p_peer.Id.pp st.conn.info.peer_id
             | P2p_errors.Connection_closed :: _ ->
                 lwt_debug "connection closed to %a"
                   P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-                Lwt_canceler.cancel st.canceler >>= fun () ->
-                Lwt.return_unit
+                Lwt_canceler.cancel st.canceler
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
                   P2p_peer.Id.pp st.conn.info.peer_id
                   pp_print_error err >>= fun () ->
-                Lwt_canceler.cancel st.canceler >>= fun () ->
-                Lwt.return_unit
+                Lwt_canceler.cancel st.canceler
 
   let run
       ?size ?binary_chunks_size
@@ -609,7 +598,7 @@ let write { writer ; conn ; _ } msg =
     debug "Sending message to %a: %a"
       P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
-    Lwt_pipe.push writer.messages (buf, None) >>= return
+    Lwt_pipe.push writer.messages (buf, None) >>= fun () -> return_unit
   end
 
 let write_sync { writer ; conn ; _ } msg =
@@ -648,7 +637,7 @@ let is_readable { reader ; _ } =
   not (Lwt_pipe.is_empty reader.messages)
 let wait_readable { reader ; _ } =
   catch_closed_pipe begin fun () ->
-    Lwt_pipe.values_available reader.messages >>= return
+    Lwt_pipe.values_available reader.messages >>= fun () -> return_unit
   end
 let read { reader ; _ } =
   catch_closed_pipe begin fun () ->

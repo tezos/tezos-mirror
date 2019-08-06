@@ -106,7 +106,7 @@ activate_alpha() {
 
     ${client} \
         -block genesis \
-        activate protocol Ps1XDxoWkSB4ZyBjtWRkxXz2VgP7tj4PMvV1wo2w6qmraKBzkXV \
+        activate protocol PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU \
         with fitness 1 \
         and key activator \
 	and parameters "${parameters_file}" \
@@ -194,7 +194,7 @@ main () {
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol Ps1XDxoWkSB4ZyBjtWRkxXz2VgP7tj4PMvV1wo2w6qmraKBzkXV with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
+alias tezos-activate-alpha="$client  -block genesis activate protocol PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU with fitness 1 and key activator and parameters $parameters_file --timestamp $(TZ='AAA+1' date +%FT%TZ)" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;

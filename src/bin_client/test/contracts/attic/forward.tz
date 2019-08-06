@@ -8,8 +8,8 @@ storage
         (pair
            (pair mutez mutez) # K C
            (pair
-              (pair address address) # B S
-              address)))) ; # W
+              (pair (contract unit) (contract unit)) # B S
+              (contract unit))))) ; # W
 code
   { DUP ; CDDADDR ; # Z
     PUSH int 86400 ; SWAP ; ADD ; # one day in second
@@ -49,18 +49,15 @@ code
          IF { # refund the parties
               CDR ; DUP ; CADAR ; # amount versed by the buyer
               DIP { DUP ; CDDDAAR } ; # B
-              DIP { CONTRACT unit ; ASSERT_SOME } ;
               UNIT ; TRANSFER_TOKENS ;
               NIL operation ; SWAP ; CONS ; SWAP ;
               DUP ; CADDR ; # amount versed by the seller
               DIP { DUP ; CDDDADR } ; # S
-              DIP { CONTRACT unit ; ASSERT_SOME } ;
               UNIT ; TRANSFER_TOKENS ; SWAP ;
               DIP { CONS } ;
               DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
               BALANCE ; SUB ; # bonus to the warehouse
               DIP { DUP ; CDDDDR } ; # W
-              DIP { CONTRACT unit ; ASSERT_SOME } ;
               UNIT ; TRANSFER_TOKENS ;
               DIP { SWAP } ; CONS ;
               # leave the storage as-is, as the balance is now 0
@@ -104,7 +101,6 @@ code
                              BALANCE ;
                              DIP { DUP ; CDDDDADR } ; # S
                              DIIP { CDR } ;
-                             DIP { CONTRACT unit ; ASSERT_SOME } ;
                              UNIT ; TRANSFER_TOKENS ;
                              NIL operation ; SWAP ; CONS ; PAIR }
                            { # otherwise continue
@@ -114,7 +110,7 @@ code
                              NOW ; COMPARE ; LT ;
                              IF { # Between T + 24 and T + 48
                                   # We accept only delivery notifications, from W
-                                  DUP ; CDDDDDR ; # W
+                                  DUP ; CDDDDDR ; ADDRESS ; # W
                                   SENDER ;
                                   COMPARE ; NEQ ;
                                   IF { FAIL } {} ; # fail if not the warehouse
@@ -136,7 +132,6 @@ code
                                            BALANCE ;
                                            DIP { DUP ; CDDDDADR } ; # S
                                            DIIP { CDR } ;
-                                           DIP { CONTRACT unit ; ASSERT_SOME } ;
                                            UNIT ; TRANSFER_TOKENS ;
                                            NIL operation ; SWAP ; CONS } } ;
                                   PAIR }
@@ -144,7 +139,6 @@ code
                                   BALANCE ;
                                   DIP { DUP ; CDDDDAAR } ; # B
                                   DIIP { CDR } ;
-                                  DIP { CONTRACT unit ; ASSERT_SOME } ;
                                   UNIT ; TRANSFER_TOKENS ;
                                   NIL operation ; SWAP ; CONS ;
                                   PAIR} } } } } } }

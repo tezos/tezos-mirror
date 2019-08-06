@@ -264,7 +264,11 @@ let may_validate_new_branch w distant_hash locator =
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
   | Some unknown_prefix ->
-      bootstrap_new_branch w distant_header unknown_prefix
+      let (_, history) = Block_locator.raw unknown_prefix in
+      if history <> [] then
+        bootstrap_new_branch w distant_header unknown_prefix
+      else
+        return_unit
 
 let on_no_request w =
   let pv = Worker.state w in

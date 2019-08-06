@@ -62,17 +62,25 @@ bake
 $client remember script noop file:contracts/opcodes/noop.tz
 $client typecheck script file:contracts/opcodes/noop.tz
 bake_after $client originate contract noop \
-        transferring 1,000 from bootstrap1 \
+        for $key1 transferring 1,000 from bootstrap1 \
         running file:contracts/opcodes/noop.tz --burn-cap 0.295
 
 bake_after $client transfer 10 from bootstrap1 to noop --arg "Unit"
 
 
 bake_after $client originate contract hardlimit \
-        transferring 1,000 from bootstrap1 \
+        for $key1 transferring 1,000 from bootstrap1 \
         running file:contracts/mini_scenarios/hardlimit.tz --init "3" --burn-cap 0.341
 bake_after $client transfer 10 from bootstrap1 to hardlimit --arg "Unit"
 bake_after $client transfer 10 from bootstrap1 to hardlimit --arg "Unit"
+
+bake_after $client originate account free_account for $key1 \
+        transferring 1,000 from bootstrap1 --delegatable --burn-cap 0.257
+$client get delegate for free_account
+
+bake_after $client register key $key2 as delegate
+bake_after $client set delegate for free_account to $key2
+$client get delegate for free_account
 
 $client get balance for bootstrap5 | assert "4000000 ꜩ"
 bake_after $client transfer 400,000 from bootstrap5 to bootstrap1 --fee 0 --force-low-fee
@@ -93,7 +101,7 @@ echo
 echo "-- Origination --"
 echo
 
-bake_after $client deploy multisig msig transferring 100 from bootstrap1 with threshold 2 on public keys $key1 $key2 $key3 --burn-cap 100
+bake_after $client deploy multisig msig for bootstrap1 transferring 100 from bootstrap1 with threshold 2 on public keys $key1 $key2 $key3 --burn-cap 100
 
 echo
 echo "-- Transfer --"

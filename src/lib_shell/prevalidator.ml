@@ -388,8 +388,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
           Operation_hash.Set.empty
       } ;
     State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
-      ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
-    Lwt.return_unit
+      ~head:(State.Block.hash pv.predecessor) pv.mempool
 
   let fetch_operation w pv ?peer oph =
     debug w

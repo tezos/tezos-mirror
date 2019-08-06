@@ -288,7 +288,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
   Block_validation.may_patch_protocol
-    ~level block_result >>=? fun { fitness ; context ; message ; _ } ->
+    ~level block_result >>= fun { fitness ; context ; message ; _ } ->
   State.Block.protocol_hash predecessor >>= fun pred_protocol ->
   let context = Shell_context.unwrap_disk_context context in
   Context.get_protocol context >>= fun protocol ->
@@ -321,5 +321,5 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
           let context = Shell_context.unwrap_disk_context context in
           return (context, message)
   end >>=? fun (context, message) ->
-  let context = Context.hash ?message ~time:timestamp context in
+  Context.hash ?message ~time:timestamp context >>= fun context ->
   return ({ shell_header with context }, validation_result_list)

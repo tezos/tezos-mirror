@@ -277,7 +277,7 @@ let read { messages ; conn ; _ } =
 
 let is_readable { messages ; _ } =
   Lwt.catch
-    (fun () -> Lwt_pipe.values_available messages >>= return)
+    (fun () -> Lwt_pipe.values_available messages >>= fun () -> return_unit)
     (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
 let write { conn ; _ } msg =
@@ -884,9 +884,7 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
         (fun _points ->
            private_node_warn
              "Received new peers addresses from %a"
-             P2p_peer.Id.pp peer_id >>= fun () ->
-           Lwt.return_unit
-        ) ;
+             P2p_peer.Id.pp peer_id) ;
       bootstrap =
         (fun () ->
            private_node_warn
@@ -898,16 +896,12 @@ and create_connection pool p2p_conn id_point point_info peer_info negotiated_ver
         (fun _point _peer_id ->
            private_node_warn
              "Received swap requests from %a"
-             P2p_peer.Id.pp peer_id >>= fun () ->
-           Lwt.return_unit
-        ) ;
+             P2p_peer.Id.pp peer_id) ;
       swap_ack =
         (fun _point _peer_id ->
            private_node_warn
              "Received swap ack from %a"
-             P2p_peer.Id.pp peer_id >>= fun () ->
-           Lwt.return_unit
-        ) ;
+             P2p_peer.Id.pp peer_id) ;
     }
 
   and answerer =
@@ -1019,8 +1013,7 @@ and swap_request pool conn new_point _new_peer_id =
                 conn.conn (Swap_ack (proposed_point, proposed_peer_id)) with
         | Ok true ->
             log pool (Swap_ack_sent { source = source_peer_id }) ;
-            swap pool conn proposed_peer_id new_point >>= fun () ->
-            Lwt.return_unit
+            swap pool conn proposed_peer_id new_point
         | Ok false ->
             log pool (Swap_request_received { source = source_peer_id }) ;
             Lwt.return_unit
@@ -1038,11 +1031,8 @@ and swap_ack pool conn new_point _new_peer_id =
   | None -> Lwt.return_unit (* ignore *)
   | Some (_time, proposed_peer_id) ->
       match Connection.find_by_peer_id pool proposed_peer_id with
-      | None ->
-          swap pool conn proposed_peer_id new_point >>= fun () ->
-          Lwt.return_unit
-      | Some _ ->
-          Lwt.return_unit
+      | None -> swap pool conn proposed_peer_id new_point
+      | Some _ -> Lwt.return_unit
 
 and swap pool conn current_peer_id new_point =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
@@ -1054,9 +1044,7 @@ and swap pool conn current_peer_id new_point =
       lwt_log_info "Swap to %a succeeded" P2p_point.Id.pp new_point >>= fun () ->
       match Connection.find_by_peer_id pool current_peer_id with
       | None -> Lwt.return_unit
-      | Some conn ->
-          disconnect conn >>= fun () ->
-          Lwt.return_unit
+      | Some conn -> disconnect conn
     end
   | Error err -> begin
       pool.latest_accepted_swap <- pool.latest_succesfull_swap ;
@@ -1174,7 +1162,7 @@ let destroy ({ config ; peer_meta_config ; _ } as pool) =
         log_error "@[Failed to save peers file:@ %a@]"
           pp_print_error err;
         Lwt.return_unit
-    | Ok ()-> Lwt.return_unit
+    | Ok () -> Lwt.return_unit
   end >>= fun () ->
   P2p_point.Table.fold (fun _point point_info acc ->
       match P2p_point_state.get point_info with

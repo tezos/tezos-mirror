@@ -240,12 +240,13 @@ let fresh_id _state prefix ~seed =
 let run_cmdf state fmt =
   let get_file path =
     Lwt_exception.catch
-      Lwt.Infix.(
+      Lwt.(
         fun () ->
           Lwt_io.open_file ~mode:Lwt_io.input path
           >>= fun inchan ->
           let stream = Lwt_io.read_lines inchan in
-          Lwt_stream.to_list stream)
+          Lwt_stream.to_list stream
+          >>= fun l -> Lwt_io.close inchan >>= fun () -> return l)
       ()
   in
   ksprintf

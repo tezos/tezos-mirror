@@ -129,38 +129,6 @@ class WaitForResult:
         self.block_hash = match.groups()[0]
 
 
-class HashResult:
-    """Result of a 'hash data' command."""
-
-    def __init__(self, client_output: str):
-
-        pattern = r'''Raw packed data: ?(0x[0-9a-f]*)
-Hash: ?(\w*)
-Raw Blake2b hash: ?(\w*)
-Raw Sha256 hash: ?(\w*)
-Raw Sha512 hash: ?(\w*)'''
-        match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.packed = match.groups()[0]
-        self.hash = match.groups()[1]
-        self.blake2b = match.groups()[2]
-        self.sha256 = match.groups()[3]
-        self.sha512 = match.groups()[4]
-
-
-class SignatureResult:
-    """Result of a 'sign bytes' command."""
-
-    def __init__(self, client_output: str):
-
-        pattern = r'Signature: ?(\w*)\n'
-        match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.sig = match.groups()[0]
-
-
 def extract_rpc_answer(client_output: str) -> dict:
     """Convert json client output to a dict representation.
 

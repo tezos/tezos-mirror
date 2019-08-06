@@ -23,7 +23,7 @@ class TestOriginationCall:
         path = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes'
         contract = f'{path}/transfer_tokens.tz'
         args = ['--init', initial_storage, '--burn-cap', '0.400']
-        origination = client.originate('foobar', 1000,
+        origination = client.originate('foobar', 'bootstrap1', 1000,
                                        'bootstrap1', contract, args)
         session['contract'] = origination.contract
         client.bake('bootstrap5', BAKE_ARGS)

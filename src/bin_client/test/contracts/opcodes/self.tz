@@ -1,3 +1,3 @@
 parameter unit ;
-storage address ;
-code { DROP ; SELF ; ADDRESS ; NIL operation ; PAIR }
+storage (contract unit) ;
+code { DROP ; SELF ; NIL operation ; PAIR }
