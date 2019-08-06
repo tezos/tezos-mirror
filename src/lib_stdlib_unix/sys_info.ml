@@ -95,21 +95,22 @@ let linux_statm pid =
       let fname = Format.asprintf ("/proc/%d/statm") pid in
       Lwt_unix.file_exists fname >>= function
       | true ->
-          begin Lwt_io.open_file ~mode:Input fname >>= fun ic ->
-            Lwt_io.read_line ic >>= fun line ->
-            match List.map Int64.of_string @@ String.split ' ' line with
-            | size::resident::shared::text::lib::data::dt::_ ->
-                begin page_size () >>= function
-                  | Error e ->
-                      Lwt.return_error e
-                  | Ok page_size ->
-                      Lwt.return_ok
-                        (Statm { page_size ; size ; resident ;
-                                 shared ; text ;
-                                 lib ; data ; dt ; }) end
-            | _ ->  Lwt.return_error
-                      (error_info "procfs statm"
-                         "Unexpected proc/<pid>/statm format") end
+          begin Lwt_io.with_file ~mode:Input fname
+              ( fun ic ->
+                  Lwt_io.read_line ic >>= fun line ->
+                  match List.map Int64.of_string @@ String.split ' ' line with
+                  | size::resident::shared::text::lib::data::dt::_ ->
+                      begin page_size () >>= function
+                        | Error e ->
+                            Lwt.return_error e
+                        | Ok page_size ->
+                            Lwt.return_ok
+                              (Statm { page_size ; size ; resident ;
+                                       shared ; text ;
+                                       lib ; data ; dt ; }) end
+                  | _ ->  Lwt.return_error
+                            (error_info "procfs statm"
+                               "Unexpected proc/<pid>/statm format")) end
       | false ->
           Lwt.return_error (error_info
                               "procfs statm"
