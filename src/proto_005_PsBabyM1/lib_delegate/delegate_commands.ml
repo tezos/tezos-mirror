@@ -72,8 +72,8 @@ let may_lock_pidfile = function
 
 let block_param t =
   Clic.param
-    ~name:""
-    ~desc:""
+    ~name:"block"
+    ~desc:"block to be injected"
     (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
     t
 
