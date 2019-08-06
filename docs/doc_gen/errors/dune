@@ -5,7 +5,7 @@
  (flags (:standard -open Tezos_base
                    -open Tezos_error_monad
                    -open Tezos_data_encoding
-                   -open Tezos_client_alpha
+                   -open Tezos_client_005_PsBABY5H
                    -safe-string
                    -linkall)))
 

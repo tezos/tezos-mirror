@@ -13,7 +13,7 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-005-PsBABY5H"
   "tezos-shell-services"
-  "tezos-client-base-unix"
+  "tezos-client-base"
   "tezos-signer-backends"
 ]
 build: [

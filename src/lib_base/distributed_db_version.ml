@@ -31,7 +31,7 @@ type name = string
 let pp_name = Format.pp_print_string
 let name_encoding = Data_encoding.string
 
-let chain_name = "TEZOS_ZERONET_2018-11-23T22:24:02Z"
+let chain_name = "TEZOS_ZERONET_2019-08-06T15:18:56Z"
 let sandboxed_chain_name = "SANDBOXED_TEZOS"
 
 type t = int
