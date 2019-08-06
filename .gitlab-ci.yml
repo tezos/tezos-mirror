@@ -342,11 +342,6 @@ integration:proto_demo_noops:
   script:
     - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
 
-integration:fork:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_fork.py
-
 ##END_INTEGRATION_PYTHON##
 
 ############################################################
