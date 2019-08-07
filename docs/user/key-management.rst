@@ -8,9 +8,9 @@ Ledger support
 --------------
 
 It is possible and advised to use a hardware wallet to manage your
-keys, Tezos' client supports the Ledger Nano S provided that you have
-the Tezos app installed.
-The app is developed by Obsidian Systems and they provide a comprehensive
+keys, Tezos' client supports Ledger Nano devices provided that you have
+a Tezos app installed.
+The apps are developed by Obsidian Systems and they provide a comprehensive
 `tutorial on how to install it.
 <https://github.com/obsidiansystems/ledger-app-tezos>`_
 
@@ -61,9 +61,9 @@ time to sign an operation.
 Tezos Baking app
 ~~~~~~~~~~~~~~~~
 
-In Ledger Live, there is also a `Tezos Baking` app which allows a
-delegate to sign non-interactively e.g. there is no need to
-manually sign every block or endorsement.
+In Ledger Live (with Developer Mode enabled), there is also a `Tezos Baking`
+app which allows a delegate to sign non-interactively e.g. there is no need
+to manually sign every block or endorsement.
 The application however is restricted to sign exclusively blocks and
 endorsement operations; it is not possible to sign for example a
 transfer.

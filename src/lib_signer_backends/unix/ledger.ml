@@ -88,7 +88,7 @@ let () =
     `Permanent
     ~id: "signer.ledger"
     ~title: "Ledger error"
-    ~description: "Error when communication to a Ledger Nano S device"
+    ~description: "Error communicating with a Ledger Nano device"
     ~pp:(fun ppf e ->
         Format.fprintf ppf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e)
     error_encoding
@@ -358,7 +358,7 @@ module Ledger_account = struct
   }
 end
 
-(** {!Leder_uri.t} represents a parsed ["ledger://..."] URI which may
+(** {!Ledger_uri.t} represents a parsed ["ledger://..."] URI which may
     refer to a {!Ledger_id.t} or a full blown {!Ledger_account.t}. *)
 module Ledger_uri = struct
 
@@ -636,7 +636,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
   let scheme = "ledger"
 
   let title =
-    "Built-in signer using a Ledger Nano S."
+    "Built-in signer using a Ledger Nano device."
 
   let description =
     Printf.sprintf
@@ -717,7 +717,7 @@ let pp_ledger_chain_id fmt s =
 (** Commands for both ledger applications. *)
 let generic_commands group = Clic.[
     command ~group
-      ~desc: "List supported Ledger Nano S devices connected."
+      ~desc: "List supported Ledger Nano devices connected."
       no_options
       (fixed [ "list" ; "connected" ; "ledgers" ])
       (fun () (cctxt : Client_context.full) ->
@@ -1142,7 +1142,7 @@ let high_water_mark_commands group watermark_spelling =
 let commands =
   let group =
     { Clic.name = "ledger" ;
-      title = "Commands for managing the connected Ledger Nano S devices" } in
+      title = "Commands for managing the connected Ledger Nano devices" } in
   fun () ->
     generic_commands group @
     baking_commands group @

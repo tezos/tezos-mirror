@@ -648,7 +648,7 @@ let cmd ~pp_error () =
             (opt (some string) None
                (info ["with-ledger"] ~docv:"ledger://..."
                   ~doc:
-                    "Do the test with a Ledger Nano S as one of the \
+                    "Do the test with a Ledger Nano device as one of the \
                      bakers/voters.")))
     $ Arg.(
         pure (fun x -> `Serialize_proposals x)
@@ -666,7 +666,7 @@ let cmd ~pp_error () =
            "This command provides a test which uses a network sandbox to \
             perform a full round of protocol vote and upgrade, including \
             voting and baking on the test chain with or without a Ledger Nano \
-            S."; `P "There are two main test behaviors:"
+            device."; `P "There are two main test behaviors:"
        ; `P
            "* $(b,SIMPLE:) The simple one does as much as possible with any \
             dummy protocol candidates and a Tezos code-base which doesn't \
