@@ -255,3 +255,57 @@ def extract_balance(client_output: str) -> float:
 def extract_protocols(client_output: str) -> List[str]:
     """Extract protocol from the output of 'get_protocols' operation."""
     return client_output.split()
+
+
+class PointInfo:
+
+    def __init__(self, peer_id=None, is_connected=None, is_trusted=None):
+        self.peer_id = peer_id
+        self.is_connected = is_connected
+        self.is_trusted = is_trusted
+
+    def __str__(self):
+        return f'{self.peer_id}, {self.is_connected}, {self.is_trusted}'
+
+
+def parse_peer(line):
+    # Expected format
+    #  ⚌  1 idr9R9xzYpSt98b9GspNQj9QZxj8zi ↗ 668 B (133 B/s) ↘ 668 B (133 B/s)
+    return line.split()[2]
+
+
+def parse_point(line):
+    # Expected format
+    #  ⚌  127.0.0.1:19731 idr9R9xzYpSt98b9GspNQj9QZxj8zi ★
+    #  ⚏  127.0.0.1:19764 ★
+    #  ⚏  127.0.0.1:19730
+    #  (last seen: idtbwXjfV38usn36SoL5sMcdYRk5sL 2019-08-07T12:13:13-00:00) ★
+    last_seen_or_id = r"(?:id\w*)|\(last seen: id\w* \S*"
+    pattern = r"(⚏|⚌)  (\S*)\s?(" + last_seen_or_id + ")? (★)?"
+    match = re.search(pattern, line)
+    assert match is not None
+    groups = match.groups()
+    assert len(groups) == 4
+    is_trusted = groups[3] == '★'
+    is_connected = groups[0] == '⚌'
+    point_id = groups[1]
+    peer_id = groups[2]
+    if peer_id and peer_id.startswith('(last seen: '):
+        peer_id = peer_id[12: 42]
+    res = (point_id, peer_id, is_connected, is_trusted)
+    return res
+
+
+class P2pStatResult:
+    """Result of a 'p2p stat' command."""
+
+    def __init__(self, client_output: str):
+        self.peers = []
+        self.points = {}   # maps 'ip:port' to PointInfo
+        lines = client_output.splitlines()
+        j = lines.index('KNOWN PEERS')
+        k = lines.index('KNOWN POINTS')
+        self.peers = [parse_peer(line) for line in lines[j+1:k]]
+        points_list = (parse_point(line) for line in lines[k+1:])
+        for addr, peer_id, is_connected, is_trusted in points_list:
+            self.points[addr] = PointInfo(peer_id, is_connected, is_trusted)

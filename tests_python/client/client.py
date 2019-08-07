@@ -350,8 +350,9 @@ class Client:
     def register_delegate(self, delegate: str) -> str:
         return self.run(['register', 'key', delegate, 'as', 'delegate'])
 
-    def p2p_stat(self) -> str:
-        return self.run(['p2p', 'stat'], admin=True)
+    def p2p_stat(self) -> client_output.P2pStatResult:
+        res = self.run(['p2p', 'stat'], admin=True)
+        return client_output.P2pStatResult(res)
 
     def get_balance(self, account) -> float:
         res = self.run(['get', 'balance', 'for', account])
