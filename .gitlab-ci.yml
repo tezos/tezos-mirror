@@ -447,6 +447,12 @@ integration:multisig:
     - pytest tests_python/tests/test_multisig.py -s --log-dir=tmp
   stage: test
 
+integration:p2p:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_p2p.py -s --log-dir=tmp
+  stage: test
+
 integration:proto_demo_counter:
   <<: *integration_python_definition
   script:
