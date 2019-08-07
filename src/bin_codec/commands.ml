@@ -151,7 +151,7 @@ let commands () = [
     end ;
 
   command ~group
-    ~desc:"Display the JSON encoded data using the provided encodind \
+    ~desc:"Display the JSON encoded data using the provided encoding \
            identifier."
     (no_options)
     (prefix "display"

@@ -67,38 +67,63 @@ let parse_config_args argv =
 
 (* Main (lwt) entry *)
 let main commands =
-  let argv, autocomplete =
-    (* for shell aliases *)
-    let rec move_autocomplete_token_upfront acc = function
-      | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
-          let args = List.rev acc @ args in
-          args, Some (prev_arg, cur_arg, script)
-      | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
-      | [] -> List.rev acc, None in
-    match Array.to_list Sys.argv with
-    | _ :: args -> move_autocomplete_token_upfront [] args
-    | [] -> [], None in
-  Random.self_init () ;
-  ignore Clic.(setup_formatter Format.std_formatter
-                 (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
-  ignore Clic.(setup_formatter Format.err_formatter
-                 (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
-  Internal_event_unix.init () >>= fun () ->
-  parse_config_args argv >>=? fun (base_dir, argv) ->
-  let ctxt = new Client_context_unix.unix_logger ~base_dir in
-  match autocomplete with
-  | Some (prev_arg, cur_arg, script) ->
-      Clic.autocompletion
-        ~script ~cur_arg ~prev_arg ~args:argv ~global_options
-        commands ctxt >>=? fun completions ->
-      List.iter print_endline completions ;
-      return_unit
-  | None ->
-      Clic.dispatch commands ctxt argv
-
-let () =
+  let executable_name = Filename.basename Sys.executable_name in
+  let run () =
+    let argv, autocomplete =
+      (* for shell aliases *)
+      let rec move_autocomplete_token_upfront acc = function
+        | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
+            let args = List.rev acc @ args in
+            args, Some (prev_arg, cur_arg, script)
+        | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
+        | [] -> List.rev acc, None in
+      match Array.to_list Sys.argv with
+      | _ :: args -> move_autocomplete_token_upfront [] args
+      | [] -> [], None in
+    Random.self_init () ;
+    ignore Clic.(setup_formatter Format.std_formatter
+                   (if Unix.isatty Unix.stdout then Ansi else Plain) Short) ;
+    ignore Clic.(setup_formatter Format.err_formatter
+                   (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
+    Internal_event_unix.init () >>= fun () ->
+    parse_config_args argv >>=? fun (base_dir, argv) ->
+    let ctxt = new Client_context_unix.unix_logger ~base_dir in
+    let commands =
+      Clic.add_manual
+        ~executable_name
+        ~global_options
+        (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+        Format.std_formatter
+        commands
+    in
+    match autocomplete with
+    | Some (prev_arg, cur_arg, script) ->
+        Clic.autocompletion
+          ~script ~cur_arg ~prev_arg ~args:argv ~global_options
+          commands ctxt >>=? fun completions ->
+        List.iter print_endline completions ;
+        return_unit
+    | None ->
+        Clic.dispatch commands ctxt argv
+  in
   Pervasives.exit
     (Lwt_main.run
-       (main commands >>= function
+       (run () >>= function
          | Ok () -> Lwt.return 0
-         | Error _ -> Lwt.return 1))
+         | Error [ Clic.Help command ] ->
+             Clic.usage
+               Format.std_formatter
+               ~executable_name
+               ~global_options
+               (match command with None -> [] | Some c -> [ c ]) ;
+             Lwt.return 0
+         | Error errs ->
+             Clic.pp_cli_errors
+               Format.err_formatter
+               ~executable_name
+               ~global_options
+               ~default:Error_monad.pp
+               errs ;
+             Lwt.return 1))
+
+let () = main commands
