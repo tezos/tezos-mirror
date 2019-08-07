@@ -43,10 +43,10 @@ and
 `analysis. <https://blog.nomadic-labs.com/analysis-of-emmy.html>`_
 
 Merge requests
-`1
+`(MR58)
 <https://gitlab.com/nomadic-labs/tezos/merge_requests/58>`_
 and
-`2.
+`(MR72)
 <https://gitlab.com/nomadic-labs/tezos/merge_requests/72>`_
 
 
@@ -62,18 +62,18 @@ More details are provided later in the changelog and in the
 A summary of the main changes:
 
 - smart contracts now support entrypoints
-  `(MR) <https://gitlab.com/nomadic-labs/tezos/merge_requests/59>`_,
+  `(MR59) <https://gitlab.com/nomadic-labs/tezos/merge_requests/59>`_,
 - contracts can now create, store and transmit as many big_maps as
   they want
-  `(MR) <https://gitlab.com/nomadic-labs/tezos/merge_requests/76>`_,
+  `(MR76) <https://gitlab.com/nomadic-labs/tezos/merge_requests/76>`_,
 - comparable types are now closed under products (i.e. the pair
   constructor),
 - a new instruction, ``CHAIN_ID``, allows contracts to differentiate
   between the test chain and the main network
-  `(MR) <https://gitlab.com/nomadic-labs/tezos/merge_requests/65>`_,
+  `(MR65) <https://gitlab.com/nomadic-labs/tezos/merge_requests/65>`_,
 - a gas cost overhaul has been integrated, and ``STEPS_TO_QUOTA`` has been
   disabled until a more robust semantics is found
-  `(MR) <https://gitlab.com/nomadic-labs/tezos/merge_requests/73>`_.
+  `(MR73) <https://gitlab.com/nomadic-labs/tezos/merge_requests/73>`_.
 
 New instructions to facilitate compilation to Michelson
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,11 +82,11 @@ Some new instructions have been added in order to make Michelson a
 better compilation target for high level languages.
 
 The new instructions ``DIG n``, ``DUG n``, ``DIP n { code }``, ``DROP n``
-allow to simplify commonly used patterns `(MR).
+allow to simplify commonly used patterns `(MR81).
 <https://gitlab.com/nomadic-labs/tezos/merge_requests/81>`_
 
 The new instruction ``APPLY`` allows to perform the partial application of
-an argument to a lambda `(MR).
+an argument to a lambda `(MR46).
 <https://gitlab.com/nomadic-labs/tezos/merge_requests/46>`_
 
 Changes for compatibility with the accounts rehaul
@@ -111,10 +111,10 @@ Protocol 005 introduces a quorum of 5% (constant
 vote period, if there is less than 5% of the stake supporting them,
 the protocol goes back to a proposal period.
 
-`Cryptium's blog post.
+`Cryptium's blog post (proposal quorum).
 <https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-v-3e0ddfd98177>`_
 
-`Merge request.
+`(MR71)
 <https://gitlab.com/nomadic-labs/tezos/merge_requests/71>`_
 
 
@@ -135,10 +135,10 @@ maximum to 70%, these values can be changed in future updates.
 Additionally the formula to update the quorum uses an exponential
 moving average of the participation.
 
-`Cryptium's blog post.
+`Cryptium's blog post (quorum caps).
 <https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-ii-607227fc6d65>`_
 
-`Merge Request. <https://gitlab.com/nomadic-labs/tezos/merge_requests/52>`_
+`MR52. <https://gitlab.com/nomadic-labs/tezos/merge_requests/52>`_
 
 
 Make implicit accounts delegatable
@@ -159,14 +159,10 @@ The only solution for now is to move the funds to a newly created tz
 account and delegate from there.
 
 Cryptium's blog posts
-`1
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
-and
-`2
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
+1. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
+2. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
 
-`Merge request.
-<https://gitlab.com/nomadic-labs/tezos/merge_requests/61>`_
+Merge Request : `MR61. <https://gitlab.com/nomadic-labs/tezos/merge_requests/61>`_
 
 
 Replace KT1 accounts with ``manager.tz`` script
@@ -186,11 +182,8 @@ Detailed instructions for migrating such applications will be provided
 in the coming days.
 
 Cryptium's blog posts
-`1
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
-and
-`2
-<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
+1. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-iii-1c824b760da3>`_
+2. `<https://medium.com/cryptium/meanwhile-at-cryptium-labs-1-part-vi-540170f46c51>`_
 
 `manager.tz script
 <https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts/manager.tz>`_
@@ -199,12 +192,8 @@ and
 <https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts_coq/manager.v>`_.
 
 Merge requests
-`1
-<https://gitlab.com/nomadic-labs/tezos/merge_requests/66>`_
-`and 2.
-<https://gitlab.com/nomadic-labs/tezos/merge_requests/74>`_
-
-
+- `(MR66) <https://gitlab.com/nomadic-labs/tezos/merge_requests/66>`_
+- `(MR74) <https://gitlab.com/nomadic-labs/tezos/merge_requests/74>`_
 
 Changes to RPCs
 ---------------

@@ -335,7 +335,7 @@ let remote_signer_arg () =
     ~placeholder:"uri"
     ~doc:"URI of the remote signer"
     (parameter
-       (fun _ x -> Tezos_signer_backends.Remote.parse_base_uri x))
+       (fun _ x -> Tezos_signer_backends_unix.Remote.parse_base_uri x))
 let password_filename_arg () =
   arg
     ~long:"password-filename"
@@ -505,7 +505,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
   let tls = cfg.tls || tls in
   let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
   let node_port = Option.unopt ~default:cfg.node_port node_port in
-  Tezos_signer_backends.Remote.read_base_uri_from_env () >>=? fun remote_signer_env ->
+  Tezos_signer_backends_unix.Remote.read_base_uri_from_env () >>=? fun remote_signer_env ->
   let remote_signer =
     Option.first_some remote_signer
       (Option.first_some remote_signer_env cfg.remote_signer) in
@@ -561,7 +561,7 @@ let other_registrations : (_ -> (module Remote_params) -> _) option  =
   Some (fun parsed_config_file (module Remote_params) ->
       Option.iter parsed_config_file.Cfg_file.remote_signer ~f:(fun signer ->
           Client_keys.register_signer
-            (module Tezos_signer_backends.Remote.Make(struct
+            (module Tezos_signer_backends_unix.Remote.Make(RPC_client_unix)(struct
                  let default = signer
                  include Remote_params
                end))

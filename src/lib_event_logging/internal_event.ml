@@ -561,7 +561,7 @@ module Error_event = struct
         >>= function
         | Ok () -> Lwt.return_unit
         | Error el ->
-            Format.kasprintf (Lwt_log.error)
+            Format.kasprintf (Lwt_log_core.error)
               "Error while emitting error logging event !! %a"
               pp_print_error el
 end
@@ -692,7 +692,7 @@ module Lwt_log_sink = struct
            >>= fun () -> return_unit)
 
     let close _ =
-      Lwt_log.close !Lwt_log.default
+      Lwt_log_core.close !Lwt_log_core.default
       >>= fun () ->
       return_unit
   end

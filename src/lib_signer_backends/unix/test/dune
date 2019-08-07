@@ -1,24 +1,24 @@
 (executables
- (names test_encrypted)
- (libraries tezos-signer-backends
+ (names test_crouching)
+ (libraries tezos-signer-backends.unix
             alcotest-lwt)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_client_base
-                   -open Tezos_signer_backends)))
+                   -open Tezos_signer_backends_unix)))
 
 (alias
  (name buildtest)
- (deps test_encrypted.exe))
+ (deps test_crouching.exe))
 
 (alias
- (name runtest_signer_encrypted)
- (action (run %{exe:test_encrypted.exe})))
+ (name runtest_crouching)
+ (action (run %{exe:test_crouching.exe})))
 
 (alias
  (name runtest)
- (deps (alias runtest_signer_encrypted)))
+ (deps (alias runtest_crouching)))
 
 (alias
  (name runtest_lint)

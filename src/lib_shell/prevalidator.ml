@@ -204,10 +204,13 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
   (** Centralised operation stream for the RPCs *)
   let notify_operation { operation_stream ; _ } result  { Operation.shell ; proto } =
     let protocol_data =
-      Data_encoding.Binary.of_bytes_exn
+      Data_encoding.Binary.of_bytes
         Proto.operation_data_encoding
         proto in
-    Lwt_watcher.notify operation_stream (result, shell, protocol_data)
+    match protocol_data with
+    | Some protocol_data ->
+        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
+    | None -> ()
 
   open Types
 
@@ -454,6 +457,10 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
 
     let module Proto_services = Block_services.Make(Proto)(Proto) in
 
+    (* TODO
+       refused => Operation_hash.Set.t ;
+       kick le peer
+    *)
     dir := RPC_directory.register !dir
         (Proto_services.S.Mempool.get_filter RPC_path.open_root)
         (fun pv () () ->
@@ -477,26 +484,38 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
         (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
         (fun pv () () ->
            let map_op op =
-             let protocol_data =
-               Data_encoding.Binary.of_bytes_exn
+             let protocol_data_opt =
+               Data_encoding.Binary.of_bytes
                  Proto.operation_data_encoding
                  op.Operation.proto in
-             { Proto.shell = op.shell ; protocol_data } in
-           let map_op_error (op, error) = (map_op op, error) in
-           return {
-             Proto_services.Mempool.applied =
-               List.map
-                 (fun (hash, op) -> (hash, map_op op))
-                 (List.rev pv.applied) ;
-             refused =
-               Operation_hash.Map.map map_op_error pv.refusals ;
-             branch_refused =
-               Operation_hash.Map.map map_op_error pv.branch_refusals ;
-             branch_delayed =
-               Operation_hash.Map.map map_op_error pv.branch_delays ;
-             unprocessed =
-               Operation_hash.Map.map map_op pv.pending ;
-           }) ;
+             match protocol_data_opt with
+             | Some protocol_data ->
+                 Some { Proto.shell = op.shell ; protocol_data }
+             | None -> None in
+           let map_op_error oph (op, error) acc = match map_op op with
+             | None -> acc
+             | Some res -> Operation_hash.Map.add oph (res, error) acc  in
+           let applied = List.filter_map (fun (hash, op) ->
+               match map_op op with
+               | Some op -> Some (hash, op)
+               | None -> None
+             ) (List.rev pv.applied) in
+           let filter f map =
+             Operation_hash.Map.fold f map Operation_hash.Map.empty in
+           let refused = filter map_op_error pv.refusals in
+           let branch_refused = filter map_op_error pv.branch_refusals in
+           let branch_delayed = filter map_op_error pv.branch_delays in
+           let unprocessed = Operation_hash.Map.fold
+               (fun oph op acc ->
+                  match map_op op with
+                  | Some op -> Operation_hash.Map.add oph op acc
+                  | None -> acc)
+               pv.pending Operation_hash.Map.empty in
+           return { Proto_services.Mempool.applied ;
+                    refused ;
+                    branch_refused ;
+                    branch_delayed ;
+                    unprocessed }) ;
 
     dir := RPC_directory.register !dir
         (Proto_services.S.Mempool.request_operations RPC_path.open_root)
