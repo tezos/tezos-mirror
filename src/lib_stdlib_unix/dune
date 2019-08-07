@@ -9,7 +9,8 @@
             ptime.clock.os
             mtime
             mtime.clock.os
-            str))
+            str
+            lwt_log))
 
 (alias
  (name runtest_lint)

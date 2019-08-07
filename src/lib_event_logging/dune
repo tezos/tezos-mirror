@@ -8,7 +8,7 @@
  (libraries tezos-stdlib
             tezos-data-encoding
             tezos-error-monad
-            lwt_log))
+            lwt_log.core))
 
 (alias
  (name runtest_lint)
