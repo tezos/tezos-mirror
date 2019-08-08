@@ -32,7 +32,7 @@ module Log =
 module Name = struct
   type t = Chain_id.t
   let encoding = Chain_id.encoding
-  let base = [ "validator.chain" ]
+  let base = [ "validator" ; "chain" ]
   let pp = Chain_id.pp_short
 end
 
@@ -91,7 +91,8 @@ module Types = struct
         P2p_peer.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [] }
 end
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types)
+module Logger = Worker_logger.Make(Event)(Request)
+module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
 open Types
 

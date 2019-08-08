@@ -38,7 +38,7 @@ type validator_kind = Block_validator_process.validator_kind =
 module Name = struct
   type t = unit
   let encoding = Data_encoding.empty
-  let base = [ "validator.block" ]
+  let base = [ "validator" ; "block" ]
   let pp _ () = ()
 end
 
@@ -73,7 +73,8 @@ module Request = struct
       { chain_id ; block = hash ; peer = peer }
 end
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types)
+module Logger = Worker_logger.Make(Event)(Request)
+module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
 type t = Worker.infinite Worker.queue Worker.t
 
