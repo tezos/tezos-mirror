@@ -187,6 +187,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
 
   end
 
+  module Logger = Worker_logger.Make(Event)(Request)
   module Worker: Worker.T
     with type Name.t = Name.t
      and type Event.t = Event.t
@@ -195,7 +196,7 @@ module Make(Proto: Registered_protocol.T)(Arg: ARG): T = struct
      and type Types.state = Types.state
      and type Types.parameters = Types.parameters
     = Worker.Make (Name) (Prevalidator_worker_state.Event)
-      (Prevalidator_worker_state.Request) (Types)
+      (Prevalidator_worker_state.Request) (Types) (Logger)
 
   (** Centralised operation stream for the RPCs *)
   let notify_operation { operation_stream ; _ } result  { Operation.shell ; proto } =

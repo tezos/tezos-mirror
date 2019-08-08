@@ -117,6 +117,26 @@ module type TYPES = sig
 
 end
 
+module type LOGGER = sig
+  module Event : EVENT
+  module Request : REQUEST
+
+  type status =
+      WorkerEvent of Event.t
+    | Request of Request.view
+    | Terminated
+    | Timeout
+    | Crashed of error list
+    | Started of string option
+    | Triggering_shutdown
+    | Duplicate of string
+
+  type t = status Time.System.stamped
+
+  module MakeDefinition (Static : sig val worker_name : string end) :
+    Internal_event.EVENT_DEFINITION with type t = t
+end
+
 (** {2 Worker group maker} *)
 
 (** An error returned when trying to communicate with a worker that
@@ -311,8 +331,9 @@ module type T = sig
 
 end
 
-
-module Make (Name : NAME) (Event : EVENT) (Request : REQUEST) (Types : TYPES)
+module Make (Name : NAME) (Event : EVENT)
+    (Request : REQUEST) (Types : TYPES)
+    (Logger: LOGGER with module Event = Event and module Request = Request)
   : T with module Name = Name
        and module Event = Event
        and module Request = Request

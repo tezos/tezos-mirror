@@ -58,6 +58,26 @@ module type TYPES = sig
   val pp : Format.formatter -> view -> unit
 end
 
+module type LOGGER = sig
+  module Event : EVENT
+  module Request : REQUEST
+
+  type status =
+      WorkerEvent of Event.t
+    | Request of Request.view
+    | Terminated
+    | Timeout
+    | Crashed of error list
+    | Started of string option
+    | Triggering_shutdown
+    | Duplicate of string
+
+  type t = status Time.System.stamped
+
+  module MakeDefinition (Static : sig val worker_name : string end) :
+    Internal_event.EVENT_DEFINITION with type t = t
+end
+
 (** An error returned when trying to communicate with a worker that
     has been closed.*)
 type worker_name = {base: string; name:string}
@@ -264,14 +284,18 @@ module Make
     (Name : NAME)
     (Event : EVENT)
     (Request : REQUEST)
-    (Types : TYPES) = struct
+    (Types : TYPES)
+    (Logger : LOGGER
+     with module Event = Event and
+     module Request = Request) = struct
 
   module Name = Name
   module Event = Event
   module Request = Request
   module Types = Types
+  module Logger = Logger
 
-  let base_name = String.concat "." Name.base
+  let base_name = String.concat "-" Name.base
 
   type message = Message: 'a Request.t * 'a tzresult Lwt.u option -> message
 
@@ -302,12 +326,12 @@ module Make
     mutable (* only for init *) state : Types.state option ;
     buffer : 'kind buffer ;
     event_log : (Internal_event.level * Event.t Ring.t) list ;
-    logger : (module Internal_event.Legacy_logging.LOG) ;
     canceler : Lwt_canceler.t ;
     name : Name.t ;
     id : int ;
     mutable status : Worker_types.worker_status ;
     mutable current_request : (Time.System.t * Time.System.t * Request.view) option ;
+    logEvent : (module Internal_event.EVENT with type t = Logger.t) ;
     table : 'kind table ;
   }
   and 'kind table = {
@@ -473,20 +497,19 @@ module Make
 
   let canceler { canceler ; _ } = canceler
 
+  let lwt_emit w (status : Logger.status) =
+    let (module LogEvent) = w.logEvent in
+    let time = Systime_os.now () in
+    LogEvent.emit  (fun () -> Time.System.stamp ~time status) >>= function
+    | Ok () -> Lwt.return_unit
+    | Error el ->
+        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a"
+          pp_print_error el
+
   let log_event w evt =
-    let (module Logger) = w.logger in
-    let level = Event.level evt in
-    let log =
-      match level with
-      | Debug -> Logger.lwt_debug
-      | Info -> Logger.lwt_log_info
-      | Notice -> Logger.lwt_log_notice
-      | Warning -> Logger.lwt_warn
-      | Error -> Logger.lwt_log_error
-      | Fatal -> Logger.lwt_fatal_error in
-    log "@[<v 0>%a@]" Event.pp evt >>= fun () ->
-    if level >= w.limits.backlog_level then
-      Ring.add (List.assoc level w.event_log) evt ;
+    lwt_emit w (Logger.WorkerEvent evt) >>= fun () ->
+    if Event.level evt >= w.limits.backlog_level then
+      Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
     Lwt.return_unit
 
   let record_event w evt =
@@ -515,7 +538,6 @@ module Make
 
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
-    let (module Logger) = w.logger in
     let do_close errs =
       let t0 = match w.status with
         | Running t0 -> t0
@@ -541,8 +563,7 @@ module Make
             let current_request = Request.view request in
             let treated = Systime_os.now () in
             w.current_request <- Some (pushed, treated, current_request) ;
-            Logger.debug "@[<v 2>Request:@,%a@]"
-              Request.pp current_request ;
+            lwt_emit w (Request current_request) >>= fun () ->
             match u with
             | None ->
                 Handlers.on_request w request >>=? fun res ->
@@ -567,9 +588,7 @@ module Make
       | Error (Exn Lwt.Canceled :: _)
       | Error (Exn Lwt_pipe.Closed :: _)
       | Error (Exn Lwt_dropbox.Closed :: _) ->
-          Logger.lwt_log_notice
-            "@[Worker terminated [%a] @]"
-            Name.pp w.name  >>= fun () ->
+          lwt_emit w Terminated >>= fun () ->
           do_close None
       | Error errs ->
           begin match w.current_request with
@@ -583,15 +602,10 @@ module Make
           | Ok () ->
               loop ()
           | Error (Timeout :: _ as errs) ->
-              Logger.lwt_log_notice
-                "@[Worker terminated with timeout [%a] @]"
-                Name.pp w.name  >>= fun () ->
+              lwt_emit w Terminated >>= fun () ->
               do_close (Some errs)
           | Error errs ->
-              Logger.lwt_log_error
-                "@[<v 0>Worker crashed [%a]:@,%a@]"
-                Name.pp w.name
-                (Format.pp_print_list Error_monad.pp) errs >>= fun () ->
+              lwt_emit w (Crashed errs) >>= fun () ->
               do_close (Some errs) in
     loop ()
 
@@ -629,23 +643,23 @@ module Make
               Debug ; Info ; Notice ; Warning ; Error ; Fatal
             ] in
           List.map (fun l -> l, Ring.create limits.backlog_size) levels in
-        let module Logger =
-          Internal_event.Legacy_logging.Make(struct
-            let name = id_name
-          end) in
+        let module Definition = Logger.MakeDefinition
+            (struct let worker_name = id_name end) in
+        let module LogEvent = Internal_event.Make(Definition) in
         let w = { limits ; parameters ; name ; canceler ;
-                  table ; buffer ; logger = (module Logger) ;
+                  table ; buffer ;
                   state = None ; id ;
                   worker = Lwt.return_unit ;
                   event_log ; timeout ;
                   current_request = None ;
+                  logEvent = (module LogEvent);
                   status = Launching (Systime_os.now ())} in
         Hashtbl.add table.instances name w ;
         begin
           if id_name = base_name then
-            Logger.lwt_log_notice "Worker started"
+            lwt_emit w (Started None)
           else
-            Logger.lwt_log_notice "Worker started for %s" name_s
+            lwt_emit w (Started (Some name_s))
         end >>= fun () ->
         Handlers.on_launch w name parameters >>=? fun state ->
         w.status <- Running (Systime_os.now ()) ;
@@ -659,8 +673,7 @@ module Make
         return w
 
   let shutdown w =
-    let (module Logger) = w.logger in
-    Logger.lwt_debug "Triggering shutdown" >>= fun () ->
+    lwt_emit w Triggering_shutdown >>= fun () ->
     Lwt_canceler.cancel w.canceler >>= fun () ->
     w.worker
 
