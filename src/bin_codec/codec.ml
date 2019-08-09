@@ -108,7 +108,11 @@ let main commands =
   in
   Pervasives.exit
     (Lwt_main.run
-       (run () >>= function
+       ((Lwt.catch run
+           (function
+             | Failure msg -> failwith "%s" msg
+             | exn -> failwith "%s" (Printexc.to_string exn))
+         >>= function
          | Ok () -> Lwt.return 0
          | Error [ Clic.Help command ] ->
              Clic.usage
@@ -124,6 +128,9 @@ let main commands =
                ~global_options
                ~default:Error_monad.pp
                errs ;
-             Lwt.return 1))
+             Lwt.return 1) >>= fun retcode ->
+        Format.pp_print_flush Format.err_formatter () ;
+        Format.pp_print_flush Format.std_formatter () ;
+        Lwt.return retcode))
 
 let () = main commands
