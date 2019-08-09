@@ -109,7 +109,12 @@ let commands () = [
      @@ stop)
     begin fun () registered_encoding json (cctxt : #Client_context.printer) ->
       match Data_encoding.Registration.bytes_of_json registered_encoding json with
-      | None -> cctxt#error "Cannot parse the JSON with the given encoding"
+      | exception exn ->
+          cctxt#error "%a" (fun ppf exn -> Json.print_error ppf exn) exn
+      | None ->
+          cctxt#error
+            "Impossible to the JSON convert to binary.@,\
+             This error should not happen."
       | Some bytes ->
           cctxt#message "%a" MBytes.pp_hex bytes >>= fun () ->
           return_unit
