@@ -24,7 +24,7 @@
             ptime
             ezjsonm
             lwt
-            ipaddr.unix))
+            ipaddr))
 
 (rule
     (targets generated_git_info.ml)
