@@ -181,4 +181,11 @@ let sort = stable_sort
 let unless cond f =
   if cond then Lwt.return_unit else f ()
 
-
+let rec fold_left_s_n ~n f  acc l =
+  if n = 0 then Lwt.return (acc, l) else
+    match l with
+    | [] ->
+        Lwt.return (acc, [])
+    | x :: l ->
+        f acc x >>= fun acc ->
+        (fold_left_s_n [@ocaml.tailcall]) f ~n:(n-1) acc l
