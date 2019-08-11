@@ -34,7 +34,6 @@
 open Data_encoding
 open Helpers
 open Types
-open Utils.Infix
 
 let json ty encoding value () =
   no_exception begin fun () ->
@@ -131,7 +130,10 @@ let test_z_sequence () =
   for i = -100_000_000 downto -100_010_000 do test (Z.of_int i) done
 
 let test_string_enum_boundary () =
-  let entries = List.rev_map (fun x -> string_of_int x, x) (0 -- 254) in
+  let entries =
+    List.rev_map
+      (fun x -> string_of_int x, x)
+      (List.init 255 (fun i -> i)) in
   let run_test cases =
     List.iter (fun (_, num)  ->
         let enc = string_enum cases in
