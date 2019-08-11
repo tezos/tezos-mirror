@@ -25,9 +25,6 @@
 
 module Infix : sig
 
-  (** Compose functions from right to left. *)
-  val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
-
   (** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
   val (--) : int -> int -> int list
 

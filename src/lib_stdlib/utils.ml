@@ -25,12 +25,7 @@
 
 module Infix = struct
 
-  let (<<) g f = fun a -> g (f a)
-
-  let (--) i j =
-    let rec loop acc j =
-      if j < i then acc else loop (j :: acc) (pred j) in
-    loop [] j
+  let (--) i j = List.init (j - i + 1) (fun x -> x + i)
 
 end
 
