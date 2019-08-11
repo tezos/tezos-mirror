@@ -267,7 +267,7 @@ let describe (type x) (encoding : x Encoding.t) =
     (Binary_size.range_to_size ~minimum:0 ~maximum:(Array.length encoding_array),
      List.map
        (fun i -> (i, fst @@ Hashtbl.find tbl encoding_array.(i)))
-       Utils.Infix.(0 -- ((Array.length encoding_array) - 1)))
+       (List.init (Array.length encoding_array) (fun i -> i)))
   and fields :
     type b. string option -> recursives -> references ->
     b Encoding.desc -> Binary_schema.fields * references =
