@@ -99,6 +99,6 @@ let bytes_of_json (Record { encoding ; _ }) json =
   Binary_writer.to_bytes encoding data
 
 let json_of_bytes (Record { encoding ; _ }) bytes =
-  Option.map
-    ~f:(Json.construct encoding)
-    (Binary_reader.of_bytes encoding bytes)
+  match Binary_reader.of_bytes encoding bytes with
+  | Some v -> Some (Json.construct encoding v)
+  | None -> None

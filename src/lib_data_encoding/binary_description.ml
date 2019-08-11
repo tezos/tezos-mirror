@@ -338,7 +338,7 @@ let describe (type x) (encoding : x Encoding.t) =
           ([ Anonymous_field (kind, Ref name) ], references)
       | (Mu { kind ; name ; title ; description ; fix } as encoding) ->
           let kind = (kind :> Kind.t) in
-          let title = Option.unopt ~default:name title in
+          let title = match title with Some title -> title | None -> name in
           if List.mem name recursives
           then ([ Anonymous_field (kind, Ref name) ], references)
           else
@@ -474,7 +474,7 @@ let describe (type x) (encoding : x Encoding.t) =
           let name, references = union ref_name recursives references kind tag_size cases in
           (Ref name, references)
       | Mu { name ; title ; description ; fix ; _ } as encoding ->
-          let title = Option.unopt ~default:name title in
+          let title = match title with Some title -> title | None -> name in
           if List.mem name recursives
           then (Ref name, references)
           else
