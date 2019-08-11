@@ -276,11 +276,11 @@ let rec read_rec
     | String_enum (_, arr) ->
         Atom.string_enum arr resume state k
     | Array (max_length, e) ->
-        let max_length = Option.unopt ~default:max_int max_length in
+        let max_length = match max_length with Some l -> l | None -> max_int in
         read_list Array_too_long max_length e state @@ fun (l, state) ->
         k (Array.of_list l, state)
     | List (max_length, e) ->
-        let max_length = Option.unopt ~default:max_int max_length in
+        let max_length = match max_length with Some l -> l | None -> max_int in
         read_list List_too_long max_length e state k
     | (Obj (Req { encoding = e ; _ })) -> read_rec whole e state k
     | (Obj (Dft { encoding = e ; _ })) -> read_rec whole e state k

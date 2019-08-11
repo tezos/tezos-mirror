@@ -266,8 +266,9 @@ module Printer = struct
               (pp_line '-') s))
       body
 
-  let pp_option_nl ppf =
-    Option.iter ~f:(Format.fprintf ppf "%s@\n@\n")
+  let pp_option_nl ppf = function
+    | Some s -> Format.fprintf ppf "%s@\n@\n" s
+    | None -> ()
 
   let pp_toplevel ppf = function
     | Printer_ast.Table table -> pp_table ppf table
