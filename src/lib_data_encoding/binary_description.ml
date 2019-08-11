@@ -222,11 +222,12 @@ let describe (type x) (encoding : x Encoding.t) =
     type a. string option -> recursives -> references -> Kind.t -> Binary_size.tag_size -> a case list -> string * references=
     fun ref_name recursives references kind size cases ->
       let cases =
-        List.sort (fun (t1, _) (t2, _) -> Compare.Int.compare t1 t2) @@
-        TzList.filter_map
-          (function
-            | Case { tag = Json_only ; _ } -> None
-            | (Case { tag = Tag tag ; _ } as case) -> Some (tag, case))
+        List.sort (fun (t1, _) (t2, _) -> (compare : int -> int -> int) t1 t2) @@
+        List.fold_left
+          (fun acc case -> match case with
+             | Case { tag = Json_only ; _ } -> acc
+             | Case { tag = Tag tag ; _ } -> (tag, case) :: acc)
+          []
           cases in
       let tag_field =
         Binary_schema.Named_field ("Tag", `Fixed (Binary_size.tag_size size), Int (size :> Binary_schema.integer_extended)) in
