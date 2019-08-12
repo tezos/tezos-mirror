@@ -15,9 +15,7 @@ depends: [
   "ocplib-resto-directory"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: library of auto-documented RPCs (service and hierarchy descriptions)"

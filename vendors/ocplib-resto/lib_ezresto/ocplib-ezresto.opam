@@ -9,12 +9,9 @@ dev-repo: "git+https://github.com/OCamlPro/ocplib-resto"
 synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
-]
-
 depends: [
   "ocamlfind" {build}
   "dune" {build}

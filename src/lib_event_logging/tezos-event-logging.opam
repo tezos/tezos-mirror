@@ -15,5 +15,8 @@ depends: [
   "tezos-error-monad"
   "lwt_log"
 ]
-build: [[ "dune" "build" "-p" name "-j" jobs ]]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
 synopsis: "Tezos event logging library"

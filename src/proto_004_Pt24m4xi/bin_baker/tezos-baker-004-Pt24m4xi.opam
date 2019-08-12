@@ -16,6 +16,7 @@ depends: [
   "tezos-client-base-unix"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: baker binary"

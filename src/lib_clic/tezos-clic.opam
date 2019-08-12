@@ -13,9 +13,7 @@ depends: [
   "tezos-error-monad"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: library of auto-documented command-line-parsing combinators"

@@ -19,6 +19,7 @@ depends: [
   "tezos-baking-004-Pt24m4xi"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: protocol-specific commands for `tezos-accuser`"

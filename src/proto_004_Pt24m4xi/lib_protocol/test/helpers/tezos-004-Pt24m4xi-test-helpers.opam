@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-004-Pt24m4xi-parameters"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: protocol testing framework"

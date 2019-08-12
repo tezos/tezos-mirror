@@ -10,7 +10,8 @@ depends: [
   "ocp-indent" { = "1.6.1" }
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: tooling for the project"
 
