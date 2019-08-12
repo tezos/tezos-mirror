@@ -245,9 +245,9 @@ module Ledger_commands = struct
 
   let pkh_of_pk = Signature.Public_key.hash
 
-  let public_key ?(interactive : Client_context.io_wallet option) hid curve
+  let public_key ?(first_import : Client_context.io_wallet option) hid curve
       path =
-    match interactive with
+    match first_import with
     | Some cctxt ->
         get_public_key ~prompt:false hid curve path
         >>=? fun pk ->
@@ -261,8 +261,8 @@ module Ledger_commands = struct
     | None ->
         get_public_key ~prompt:false hid curve path
 
-  let public_key_hash ?interactive hid curve path =
-    public_key ?interactive hid curve path
+  let public_key_hash ?first_import hid curve path =
+    public_key ?first_import hid curve path
     >>=? fun pk -> return (pkh_of_pk pk, pk)
 
   let get_authorized_path hid version =
@@ -741,7 +741,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
 
   let pkh_of_pk = Signature.Public_key.hash
 
-  let public_key ?(interactive : Client_context.io_wallet option)
+  let public_key_maybe_prompt ?(first_import : Client_context.io_wallet option)
       (pk_uri : pk_uri) =
     match Global_cache.get pk_uri with
     | Some (_, pk) ->
@@ -754,7 +754,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
                use_ledger_or_fail
                  ~ledger_uri
                  (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
-                   Ledger_commands.public_key ?interactive hidapi curve path
+                   Ledger_commands.public_key ?first_import hidapi curve path
                    >>=? fun pk ->
                    let pkh = pkh_of_pk pk in
                    Global_cache.record pk_uri ~pkh ~pk ;
@@ -762,13 +762,20 @@ module Signer_implementation : Client_keys.SIGNER = struct
         >>= function
         | Error err -> failwith "%a" pp_print_error err | Ok v -> return v )
 
-  let public_key_hash ?interactive pk_uri =
+  let public_key_hash_maybe_prompt ?first_import pk_uri =
     match Global_cache.get pk_uri with
     | Some (pkh, pk) ->
         return (pkh, Some pk)
     | None ->
-        public_key ?interactive pk_uri
+        public_key_maybe_prompt ?first_import pk_uri
         >>=? fun pk -> return (pkh_of_pk pk, Some pk)
+
+  let public_key = public_key_maybe_prompt ?first_import:None
+
+  let public_key_hash = public_key_hash_maybe_prompt ?first_import:None
+
+  let import_secret_key ~io pk_uri =
+    public_key_hash_maybe_prompt ~first_import:io pk_uri
 
   let sign ?watermark (sk_uri : sk_uri) msg =
     Ledger_uri.parse (sk_uri :> Uri.t)

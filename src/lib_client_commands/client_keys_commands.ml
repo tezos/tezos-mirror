@@ -406,8 +406,8 @@ let commands version : Client_context.full Clic.command list =
                          don't use --force"
                         name))
         >>=? fun () ->
-        Client_keys.public_key_hash
-          ~interactive:(cctxt :> Client_context.io_wallet)
+        Client_keys.import_secret_key
+          ~io:(cctxt :> Client_context.io_wallet)
           pk_uri
         >>=? fun (pkh, public_key) ->
         cctxt#message

@@ -94,15 +94,15 @@ struct
     | _ ->
         assert false
 
-  let public_key ?interactive pk_uri =
+  let public_key pk_uri =
     Remote.public_key
-      ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
 
-  let public_key_hash ?interactive pk_uri =
+  let public_key_hash pk_uri =
     Remote.public_key_hash
-      ?interactive
       (Client_keys.make_pk_uri (key (pk_uri : pk_uri :> Uri.t)))
+
+  let import_secret_key ~io:_ = public_key_hash
 
   let neuterize sk_uri =
     return (Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t))

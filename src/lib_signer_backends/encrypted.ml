@@ -284,6 +284,8 @@ struct
 
   let public_key_hash = Unencrypted.public_key_hash
 
+  let import_secret_key = Unencrypted.import_secret_key
+
   let neuterize sk_uri =
     decrypt C.cctxt sk_uri
     >>=? fun sk ->

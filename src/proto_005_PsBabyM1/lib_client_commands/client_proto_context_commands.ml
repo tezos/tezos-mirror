@@ -1143,9 +1143,7 @@ let commands version () =
              (cctxt : Protocol_client_context.full) ->
           Client_keys.neuterize src_sk
           >>=? fun src_pk ->
-          Client_keys.public_key_hash
-            ~interactive:(cctxt :> Client_context.io_wallet)
-            src_pk
+          Client_keys.public_key_hash src_pk
           >>=? fun (src_pkh, _) ->
           get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
           >>=? fun info ->
@@ -1316,9 +1314,7 @@ let commands version () =
              (cctxt : Protocol_client_context.full) ->
           Client_keys.neuterize src_sk
           >>=? fun src_pk ->
-          Client_keys.public_key_hash
-            ~interactive:(cctxt :> Client_context.io_wallet)
-            src_pk
+          Client_keys.public_key_hash src_pk
           >>=? fun (src_pkh, _) ->
           get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
           >>=? fun info ->

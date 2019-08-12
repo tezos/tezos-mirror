@@ -110,7 +110,7 @@ struct
       Lwt.return (Signature.Public_key_hash.of_b58check pkh)
       >>=? fun pkh -> return (base, pkh)
 
-    let public_key ?interactive:_ uri =
+    let public_key uri =
       parse (uri : pk_uri :> Uri.t)
       >>=? fun (base, pkh) ->
       RPC_client.call_service
@@ -126,9 +126,11 @@ struct
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash ?interactive uri =
-      public_key ?interactive uri
+    let public_key_hash uri =
+      public_key uri
       >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+
+    let import_secret_key ~io:_ = public_key_hash
 
     let get_signature base pkh msg =
       RPC_client.call_service
