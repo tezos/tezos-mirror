@@ -155,15 +155,17 @@ struct
           >>=? fun key ->
           return (Lwt_utils_unix.Socket.Unix (Uri.path uri), key)
 
-    let public_key ?interactive:_ uri =
+    let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
 
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash ?interactive:_ uri =
+    let public_key_hash uri =
       public_key uri
       >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+
+    let import_secret_key ~io:_ = public_key_hash
 
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t)
@@ -210,15 +212,17 @@ struct
                 (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM]),
               pkh )
 
-    let public_key ?interactive:_ uri =
+    let public_key uri =
       parse (uri : pk_uri :> Uri.t) >>=? fun (path, pkh) -> public_key path pkh
 
     let neuterize uri =
       return (Client_keys.make_pk_uri (uri : sk_uri :> Uri.t))
 
-    let public_key_hash ?interactive uri =
-      public_key ?interactive uri
+    let public_key_hash uri =
+      public_key uri
       >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+
+    let import_secret_key ~io:_ = public_key_hash
 
     let sign ?watermark uri msg =
       parse (uri : sk_uri :> Uri.t)
