@@ -97,8 +97,8 @@ test-lint:
 	@dune build @runtest_lint
 	make -C tests_python lint_all
 
-fix-lint:
-	@src/tooling/lint.sh fix
+fmt:
+	@src/tooling/lint.sh format
 
 build-deps:
 	@./scripts/install_build_deps.sh
