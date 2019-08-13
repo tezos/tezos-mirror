@@ -14,6 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+let stable_hash = 256
+
+let need_to_upgrade reason =
+  "storage error: " ^ reason ^ ", please update your Tezos node to the latest version"
+
+let err_invalid_order () = failwith (need_to_upgrade "invalid order")
+let err_too_many_children () = failwith (need_to_upgrade "too many children")
+
 module Option = struct
   let of_result = function
     | Ok v -> Some v
@@ -276,6 +284,7 @@ module Irmin_value_store
               let lenx = String.length xs in
               let leny = String.length ys in
               let i = ref 0 in
+              let r =
               try
                 while !i < lenx && !i < leny do
                   match
@@ -297,6 +306,13 @@ module Irmin_value_store
                 | i -> i
               with Result i ->
                 i
+              in
+              let s = String.compare xs ys in
+              if (r = 0 && s = 0) ||
+                 (r < 0 && s < 0) ||
+                 (r > 0 && s > 0)
+              then r
+              else err_invalid_order ()
 
         let order a b = match compare a b with
           | 0 -> EQ
@@ -423,6 +439,7 @@ module Irmin_value_store
         find_bind db key ~f:(fun v -> of_cstruct (cstruct_of_ba_copy v))
 
       let add db v =
+        if List.length v > stable_hash then err_too_many_children ();
         let v = Irmin.Type.encode_cstruct (Irmin.Type.list Val.entry_t) v in
         let k = H.digest Irmin.Type.cstruct v in
         let k_lmdb = lmdb_of_key k in
