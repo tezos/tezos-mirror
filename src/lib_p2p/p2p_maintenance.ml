@@ -206,15 +206,6 @@ and too_many_connections st n_connected =
 let rec worker_loop st =
   let Pool pool = st.pool in
   begin
-    protect ~canceler:st.canceler begin fun () ->
-      Lwt.pick [
-        Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
-        Lwt_condition.wait st.please_maintain ; (* when asked *)
-        P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
-        P2p_pool.Pool_event.wait_too_many_connections pool ;
-      ] >>= fun () ->
-      return_unit
-    end >>=? fun () ->
     let n_connected = P2p_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
     || st.bounds.max_threshold < n_connected then
@@ -222,7 +213,16 @@ let rec worker_loop st =
     else begin
       P2p_pool.send_swap_request pool ;
       return_unit
-    end
+    end >>=? fun () ->
+      protect ~canceler:st.canceler begin fun () ->
+        Lwt.pick [
+          Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
+          Lwt_condition.wait st.please_maintain ; (* when asked *)
+          P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
+          P2p_pool.Pool_event.wait_too_many_connections pool ;
+        ] >>= fun () ->
+        return_unit
+      end
   end >>= function
   | Ok () -> worker_loop st
   | Error (Canceled :: _) -> Lwt.return_unit

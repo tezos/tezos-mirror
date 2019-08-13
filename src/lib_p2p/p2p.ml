@@ -240,7 +240,6 @@ module Real = struct
       | Some w -> P2p_welcome.activate w
     end ;
     P2p_maintenance.activate t.maintenance ;
-    Lwt.async (fun () -> P2p_maintenance.maintain t.maintenance) ;
     ()
 
   let roll _net () = Lwt.return_unit (* TODO implement *)
