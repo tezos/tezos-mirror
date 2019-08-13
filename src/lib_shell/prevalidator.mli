@@ -55,6 +55,7 @@ type limits = {
   max_refused_operations : int ;
   operation_timeout : Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 
 (** Creates/tear-down a new prevalidator context. *)
