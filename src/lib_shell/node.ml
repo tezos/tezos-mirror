@@ -123,7 +123,6 @@ let init_p2p ?(sandboxed = false) p2p_params =
         peer_metadata_cfg
         conn_metadata_cfg
         message_cfg >>=? fun p2p ->
-      Lwt.async (fun () -> P2p.maintain p2p) ;
       Initialization_event.lwt_emit `P2p_maintain_started >>= fun () ->
       return p2p
 
