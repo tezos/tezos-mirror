@@ -27,6 +27,7 @@ module Request = struct
   type 'a t =
     | Flush : Block_hash.t -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
+    | Leftover : unit t
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
@@ -91,6 +92,8 @@ module Request = struct
                Operation_hash.pp oph)
           (Operation_hash.Set.elements pending) ;
         Format.fprintf ppf "@]"
+    | Leftover ->
+        Format.fprintf ppf "process next batch of operation"
     | Inject op ->
         Format.fprintf ppf "injecting operation %a"
           Operation_hash.pp (Operation.hash op)
@@ -112,6 +115,7 @@ module Event = struct
     | Debug _ -> Internal_event.Debug
     | Request (View (Flush _), _, _) -> Internal_event.Notice
     | Request (View (Notify _), _, _) -> Internal_event.Debug
+    | Request (View (Leftover), _, _) -> Internal_event.Debug
     | Request (View (Inject _), _, _) -> Internal_event.Notice
     | Request (View (Arrived _), _, _) -> Internal_event.Debug
     | Request (View Advertise, _, _) -> Internal_event.Debug

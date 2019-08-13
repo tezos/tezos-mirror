@@ -48,6 +48,7 @@ and prevalidator_limits = {
   max_refused_operations: int ;
   operation_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 and block_validator_limits = {
   protocol_timeout: Time.System.Span.t ;

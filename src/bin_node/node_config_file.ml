@@ -411,16 +411,22 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun { Node.operation_timeout ; max_refused_operations ; worker_limits } ->
-       ((operation_timeout, max_refused_operations), worker_limits))
-    (fun ((operation_timeout, max_refused_operations), worker_limits) ->
-       { operation_timeout ; max_refused_operations ; worker_limits})
+    (fun { Node.operation_timeout ; max_refused_operations ;
+           operations_batch_size ; worker_limits ; } ->
+      ((operation_timeout, max_refused_operations,
+        operations_batch_size), worker_limits))
+    (fun ((operation_timeout, max_refused_operations,
+           operations_batch_size), worker_limits) ->
+      { operation_timeout ; max_refused_operations ;
+        operations_batch_size ; worker_limits ; })
     (merge_objs
-       (obj2
+       (obj3
           (dft "operations_request_timeout" timeout_encoding
              default_shell.prevalidator_limits.operation_timeout)
           (dft "max_refused_operations" uint16
-             default_shell.prevalidator_limits.max_refused_operations))
+             default_shell.prevalidator_limits.max_refused_operations)
+          (dft "operations_batch_size" int31
+             default_shell.prevalidator_limits.operations_batch_size))
        (worker_limits_encoding
           default_shell.prevalidator_limits.worker_limits.backlog_size
           default_shell.prevalidator_limits.worker_limits.backlog_level

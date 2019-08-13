@@ -148,6 +148,7 @@ and prevalidator_limits = Prevalidator.limits = {
   max_refused_operations: int ;
   operation_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 
 and block_validator_limits = Block_validator.limits = {
@@ -173,7 +174,8 @@ let default_prevalidator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-  }
+  } ;
+  operations_batch_size = 50 ;
 }
 let default_peer_validator_limits = {
   block_header_timeout = Time.System.Span.of_seconds_exn 60. ;
