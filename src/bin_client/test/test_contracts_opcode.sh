@@ -361,7 +361,7 @@ assert_storage_contains split_bytes '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }
 
 # Test hash consistency between Michelson and the CLI
 hash_result=`$client hash data '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' \
-                     of type '(pair mutez (pair timestamp int))' | grep Blake2b | sed 's/.*: *//'`
+                     of type '(pair mutez (pair timestamp int))' | grep 'Raw Script-expression-ID-Hash' | sed 's/.*: *//'`
 
 assert_storage $contract_op_dir/hash_consistency_checker.tz '0x00' \
               '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"

@@ -247,14 +247,16 @@ let commands () =
              let hash = Script_expr_hash.hash_bytes [ bytes ] in
              cctxt#message
                "Raw packed data: 0x%a@,\
-                Hash: %a@,\
-                Raw Blake2b hash: 0x%a@,\
+                Script-expression-ID-Hash: %a@,\
+                Raw Script-expression-ID-Hash: 0x%a@,\
+                Ledger Blake2b hash: %s@,\
                 Raw Sha256 hash: 0x%a@,\
                 Raw Sha512 hash: 0x%a@,\
                 Gas remaining: %a"
                MBytes.pp_hex bytes
                Script_expr_hash.pp hash
                MBytes.pp_hex (Script_expr_hash.to_bytes hash)
+               (Base58.raw_encode Blake2B.(hash_bytes [bytes] |> to_string))
                MBytes.pp_hex (Environment.Raw_hashes.sha256 bytes)
                MBytes.pp_hex (Environment.Raw_hashes.sha512 bytes)
                Alpha_context.Gas.pp remaining_gas >>= fun () ->
