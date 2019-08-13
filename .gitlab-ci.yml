@@ -773,15 +773,15 @@ opam:73:tezos-accuser-alpha-commands:
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:74:tezos-baker-alpha:
+opam:74:tezos-validator:
+  <<: *opam_definition
+  variables:
+    package: tezos-validator
+
+opam:75:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
-
-opam:75:tezos-fork-validator:
-  <<: *opam_definition
-  variables:
-    package: tezos-fork-validator
 
 opam:76:tezos-signer:
   <<: *opam_definition

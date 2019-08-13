@@ -1,24 +1,45 @@
-(executable
- (name main_fork_validator)
- (public_name tezos-fork-validator)
+(library
+ (name tezos_validator)
+ (public_name tezos-validator)
  (libraries tezos-base
- 	    tezos-storage
+            tezos-storage
             tezos-stdlib-unix
             tezos-shell
             tezos-shell-services
-	    tezos-validation
-	    tezos-protocol-updater
-)
+            tezos-validation
+            tezos-protocol-updater
+            tezos-shell-context
+            tezos-embedded-protocol-genesis
+            tezos-embedded-protocol-demo-noops
+            tezos-embedded-protocol-alpha)
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string
                    -open Tezos_base__TzPervasives
-		   -open Tezos_storage
+                   -open Tezos_storage
                    -open Tezos_stdlib_unix
                    -open Tezos_shell
-		   -open Tezos_shell_services
-		   -open Tezos_validation
-		   -open Tezos_protocol_updater
-                   -linkall)))
+                   -open Tezos_shell_services
+                   -open Tezos_validation
+                   -open Tezos_protocol_updater
+                   -linkall))
+ (modules Validator))
+
+(executable
+ (name main_validator)
+ (public_name tezos-validator)
+ (libraries tezos_validator)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_storage
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell
+                   -open Tezos_shell_services
+                   -open Tezos_validation
+                   -open Tezos_protocol_updater
+                   -open Tezos_validator
+                   -linkall))
+ (modules Main_validator))
 
 (alias
  (name runtest_indent)

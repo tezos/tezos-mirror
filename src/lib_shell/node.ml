@@ -291,7 +291,7 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let create ?(sandboxed = false) ?multiprocess
+let create ?(sandboxed = false) ~multiprocess
     { genesis;
       store_root;
       context_root;
@@ -318,12 +318,14 @@ let create ?(sandboxed = false) ?multiprocess
   store_known_protocols state
   >>= fun () ->
   let multiprocess =
-    match multiprocess with
-    | Some process_path ->
-        Block_validator.External
-          (context_index, store_root, context_root, protocol_root, process_path)
-    | None ->
-        Block_validator.Internal context_index
+    if multiprocess then
+      Block_validator.External
+        ( context_index,
+          store_root,
+          context_root,
+          protocol_root,
+          Sys.executable_name )
+    else Block_validator.Internal context_index
   in
   Validator.create
     state

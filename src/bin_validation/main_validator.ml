@@ -23,25 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {context_root : string; protocol_root : string}
-
-type request = {
-  chain_id : Chain_id.t;
-  block_header : Block_header.t;
-  predecessor_block_header : Block_header.t;
-  operations : Operation.t list list;
-  max_operations_ttl : int;
-}
-
-val magic : MBytes.t
-
-val parameters_encoding : parameters Data_encoding.t
-
-val request_encoding : request Data_encoding.t
-
-val send : Lwt_io.output_channel -> 'a Data_encoding.t -> 'a -> unit Lwt.t
-
-val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
-
-val recv_result :
-  Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
+let () =
+  Pervasives.exit (Lwt_main.run @@ Validator.main ())

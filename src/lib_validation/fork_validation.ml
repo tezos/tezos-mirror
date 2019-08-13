@@ -23,10 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type fork_parameter = {
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
+type parameters = {context_root : string; protocol_root : string}
+
+type request = {
   chain_id : Chain_id.t;
   block_header : Block_header.t;
   predecessor_block_header : Block_header.t;
@@ -34,61 +33,72 @@ type fork_parameter = {
   max_operations_ttl : int;
 }
 
-let fork_parameters_encoding =
+let magic = MBytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
+
+let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun { store_root;
-           context_root;
-           protocol_root;
-           chain_id;
+    (fun {context_root; protocol_root} -> (context_root, protocol_root))
+    (fun (context_root, protocol_root) -> {context_root; protocol_root})
+    (obj2 (req "context_root" string) (req "protocol_root" string))
+
+let request_encoding =
+  let open Data_encoding in
+  conv
+    (fun { chain_id;
            block_header;
            predecessor_block_header;
-           operations;
-           max_operations_ttl } ->
-      ( store_root,
-        context_root,
-        protocol_root,
-        chain_id,
+           max_operations_ttl;
+           operations } ->
+      ( chain_id,
         block_header,
         predecessor_block_header,
-        operations,
-        max_operations_ttl ))
-    (fun ( store_root,
-           context_root,
-           protocol_root,
-           chain_id,
+        max_operations_ttl,
+        operations ))
+    (fun ( chain_id,
            block_header,
            predecessor_block_header,
-           operations,
-           max_operations_ttl ) ->
+           max_operations_ttl,
+           operations ) ->
       {
-        store_root;
-        context_root;
-        protocol_root;
         chain_id;
         block_header;
         predecessor_block_header;
-        operations;
         max_operations_ttl;
+        operations;
       })
-    (obj8
-       (req "store_root" (dynamic_size string))
-       (req "context_root" (dynamic_size string))
-       (req "protocol_root" (dynamic_size string))
-       (req "chain_id" (dynamic_size Chain_id.encoding))
+    (obj5
+       (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
-       (req "operations" (list @@ list @@ dynamic_size Operation.encoding))
-       (req "max_operations_ttl" (dynamic_size int31)))
+       (req "max_operations_ttl" int31)
+       (req "operations" (list (list (dynamic_size Operation.encoding)))))
 
 let data_size msg = String.length msg
 
-let send pin msg =
+let send pin encoding data =
+  let msg = Data_encoding.Binary.to_bytes_exn encoding data in
+  let msg = MBytes.to_string msg in
   Lwt_io.write_int pin (data_size msg) >>= fun () -> Lwt_io.write pin msg
 
-let recv pout =
+let recv_result pout encoding =
   Lwt_io.read_int pout
   >>= fun count ->
   let buf = Bytes.create count in
   Lwt_io.read_into_exactly pout buf 0 count
-  >>= fun () -> Lwt.return @@ Bytes.to_string buf
+  >>= fun () ->
+  Lwt.return
+    (Data_encoding.Binary.of_bytes_exn
+       (Error_monad.result_encoding encoding)
+       (MBytes.of_string (Bytes.to_string buf)))
+
+let recv pout encoding =
+  Lwt_io.read_int pout
+  >>= fun count ->
+  let buf = Bytes.create count in
+  Lwt_io.read_into_exactly pout buf 0 count
+  >>= fun () ->
+  Lwt.return
+    (Data_encoding.Binary.of_bytes_exn
+       encoding
+       (MBytes.of_string (Bytes.to_string buf)))

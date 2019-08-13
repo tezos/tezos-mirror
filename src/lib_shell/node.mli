@@ -73,7 +73,7 @@ val default_chain_validator_limits : chain_validator_limits
 
 val create :
   ?sandboxed:bool ->
-  ?multiprocess:string ->
+  multiprocess:bool ->
   config ->
   peer_validator_limits ->
   block_validator_limits ->
