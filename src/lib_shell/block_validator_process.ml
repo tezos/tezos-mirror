@@ -75,6 +75,7 @@ module Fork_validator = struct
     context_root : string;
     protocol_root : string;
     process_path : string;
+    mutable validator_process : Lwt_process.process_full option;
   }
 
   type t = validation_context
@@ -83,10 +84,14 @@ module Fork_validator = struct
     lwt_log_notice (fun f -> f "Initialized")
     >>= fun () ->
     Lwt.return
-      {context_index; store_root; context_root; protocol_root; process_path}
-
-  let close _vp =
-    lwt_log_notice (fun f -> f "Shutting down ...") >>= fun () -> Lwt.return ()
+      {
+        context_index;
+        store_root;
+        context_root;
+        protocol_root;
+        process_path;
+        validator_process = None;
+      }
 
   let check_process_status =
     let open Unix in
@@ -109,18 +114,48 @@ module Fork_validator = struct
           Tag.DSL.(
             fun f -> f "The process was stopped by signal %a" -% a int_tag i)
 
-  let apply_block validator_process chain_state ~max_operations_ttl
+  let close vp =
+    lwt_log_notice (fun f -> f "Shutting down ...")
+    >>= fun () ->
+    match vp.validator_process with
+    | Some process ->
+        process#close
+        >>= fun status ->
+        check_process_status status
+        >>= fun () ->
+        vp.validator_process <- None ;
+        Lwt.return_unit
+    | None ->
+        Lwt.return_unit
+
+  let apply_block vp chain_state ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t) ~block_header operations =
     let chain_id = State.Chain.id chain_state in
-    let genesis = State.Chain.genesis chain_state in
-    let genesis_encoded =
-      Data_encoding.Json.construct State.Chain.genesis_encoding genesis
-    in
-    let process =
-      Lwt_process.open_process_full
-        ( validator_process.process_path,
-          [|""; Data_encoding.Json.to_string genesis_encoded|] )
-    in
+    ( match vp.validator_process with
+    | Some process ->
+        Lwt.return process
+    | None ->
+        let process =
+          Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
+        in
+        let parameters =
+          {
+            Fork_validation.context_root = vp.context_root;
+            protocol_root = vp.protocol_root;
+          }
+        in
+        vp.validator_process <- Some process ;
+        Fork_validation.send
+          process#stdin
+          Data_encoding.Variable.bytes
+          Fork_validation.magic
+        >>= fun () ->
+        Fork_validation.send
+          process#stdin
+          Fork_validation.parameters_encoding
+          parameters
+        >>= fun () -> Lwt.return process )
+    >>= fun process ->
     lwt_log_notice
       Tag.DSL.(
         fun f ->
@@ -129,32 +164,30 @@ module Fork_validator = struct
     >>= fun () ->
     Lwt.catch
       (fun () ->
-        let to_send =
-          Data_encoding.Binary.to_bytes_exn
-            Fork_validation.fork_parameters_encoding
-            {
-              store_root = validator_process.store_root;
-              context_root = validator_process.context_root;
-              protocol_root = validator_process.protocol_root;
-              chain_id;
-              block_header;
-              predecessor_block_header;
-              operations;
-              max_operations_ttl;
-            }
+        let request =
+          {
+            Fork_validation.chain_id;
+            block_header;
+            predecessor_block_header;
+            operations;
+            max_operations_ttl;
+          }
         in
-        Fork_validation.send process#stdin (MBytes.to_string to_send)
+        Fork_validation.send
+          process#stdin
+          Fork_validation.request_encoding
+          request
         >>= fun () ->
-        Fork_validation.recv process#stdout
-        >>= fun data ->
-        process#status
-        >>= fun status ->
-        check_process_status status
-        >>= fun () ->
-        Lwt.return
-        @@ Data_encoding.Binary.of_bytes_exn
-             (Error_monad.result_encoding Block_validation.result_encoding)
-             (MBytes.of_string data))
+        Fork_validation.recv_result
+          process#stdout
+          Block_validation.result_encoding
+        >>=? fun res ->
+        match process#state with
+        | Running ->
+            return res
+        | Exited status ->
+            vp.validator_process <- None ;
+            check_process_status status >>= fun () -> return res)
       (function
         | errors ->
             process#status

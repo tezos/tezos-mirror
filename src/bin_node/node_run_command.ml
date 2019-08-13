@@ -67,7 +67,7 @@ let () =
 
 let ( // ) = Filename.concat
 
-let init_node ?sandbox ?checkpoint ?multiprocess (config : Node_config_file.t)
+let init_node ?sandbox ?checkpoint ~multiprocess (config : Node_config_file.t)
     =
   ( match sandbox with
   | None ->
@@ -163,7 +163,7 @@ let init_node ?sandbox ?checkpoint ?multiprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
-    ?multiprocess
+    ~multiprocess
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -232,7 +232,7 @@ let init_rpc (rpc_config : Node_config_file.rpc) node =
     rpc_config.listen_addrs
     []
 
-let run ?verbosity ?sandbox ?checkpoint ?multiprocess
+let run ?verbosity ?sandbox ?checkpoint ~multiprocess
     (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir
   >>=? fun () ->
@@ -256,7 +256,7 @@ let run ?verbosity ?sandbox ?checkpoint ?multiprocess
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..."
   >>= fun () ->
-  init_node ?sandbox ?checkpoint ?multiprocess config
+  init_node ?sandbox ?checkpoint ~multiprocess config
   >>= (function
         | Ok node ->
             return node
@@ -326,17 +326,11 @@ let process sandbox verbosity checkpoint multiprocess args =
             "Failed to parse the provided checkpoint (Base58Check-encoded)." )
     )
     >>=? fun checkpoint ->
-    ( match multiprocess with
-    | Some path ->
-        return_some path
-    | None ->
-        return_none )
-    >>=? fun multiprocess ->
     Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
     >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint ?multiprocess config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint ~multiprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
                 Lwt_list.fold_right_s
@@ -413,13 +407,8 @@ module Term = struct
        validation requests."
     in
     Arg.(
-      value
-      & opt (some string) None
-      & info
-          ~docs:Node_shared_arg.Manpage.misc_section
-          ~doc
-          ~docv:"EXECUTABLE"
-          ["multiprocess"])
+      value & flag
+      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["multiprocess"])
 
   let term =
     Cmdliner.Term.(

@@ -893,20 +893,20 @@ opam:097:tezos-endorser-005-PsBabyM1:
   variables:
     package: tezos-endorser-005-PsBabyM1
 
-opam:098:tezos-baker-004-Pt24m4xi:
+opam:098:tezos-validator:
+  <<: *opam_definition
+  variables:
+    package: tezos-validator
+
+opam:099:tezos-baker-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-baker-004-Pt24m4xi
 
-opam:099:tezos-endorser-004-Pt24m4xi-commands:
+opam:100:tezos-endorser-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-004-Pt24m4xi-commands
-
-opam:100:tezos-fork-validator:
-  <<: *opam_definition
-  variables:
-    package: tezos-fork-validator
 
 opam:101:tezos-signer:
   <<: *opam_definition
