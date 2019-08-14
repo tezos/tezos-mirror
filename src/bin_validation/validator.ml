@@ -65,28 +65,67 @@ let run stdin stdout =
     (inconsistent_handshake "bad magic") >>=? fun () ->
   Fork_validation.recv stdin Fork_validation.parameters_encoding
   >>= fun { context_root ; protocol_root } ->
-  Context.init context_root >>= fun context_index ->
+  let genesis_block = ref Block_hash.zero in
+  let genesis_time = ref Time.Protocol.epoch in
+  let genesis_protocol = ref Protocol_hash.zero in
+  let patch_context ctxt =
+    let module Proto = (val Registered_protocol.get_exn !genesis_protocol) in
+    let ctxt = Shell_context.wrap_disk_context ctxt in
+    Proto.init ctxt {
+      level = 0l ;
+      proto_level = 0 ;
+      predecessor = !genesis_block ;
+      timestamp = !genesis_time ;
+      validation_passes = 0 ;
+      operations_hash = Operation_list_list_hash.empty ;
+      fitness = [] ;
+      context = Context_hash.zero ;
+    } >>= function
+    | Error _ -> assert false (* FIXME error *)
+    | Ok { context ; _ } ->
+        let context = Shell_context.unwrap_disk_context context in
+        Lwt.return context in
+  Context.init ~patch_context context_root >>= fun context_index ->
   let rec loop () =
-    begin
-      Fork_validation.recv stdin Fork_validation.request_encoding
-      >>= fun { Fork_validation.chain_id ;
-                block_header ; predecessor_block_header ; operations ;
-                max_operations_ttl } ->
-      get_context context_index
-        predecessor_block_header.shell.context >>=? fun predecessor_context ->
-      Context.get_protocol predecessor_context >>= fun protocol_hash ->
-      load_protocol protocol_hash protocol_root >>=? fun () ->
-      Block_validation.apply
-        chain_id
-        ~max_operations_ttl
-        ~predecessor_block_header
-        ~predecessor_context
-        ~block_header
-        operations
-    end >>= fun result ->
-    Fork_validation.send stdout
-      (Error_monad.result_encoding Block_validation.result_encoding)
-      result >>= fun () ->
+    Fork_validation.recv stdin Fork_validation.request_encoding
+    >>= begin function
+      | Fork_validation.Validate
+          { chain_id ;
+            block_header ; predecessor_block_header ; operations ;
+            max_operations_ttl } ->
+          Error_monad.protect begin fun () ->
+            get_context context_index
+              predecessor_block_header.shell.context >>=? fun predecessor_context ->
+            Context.get_protocol predecessor_context >>= fun protocol_hash ->
+            load_protocol protocol_hash protocol_root >>=? fun () ->
+            Block_validation.apply
+              chain_id
+              ~max_operations_ttl
+              ~predecessor_block_header
+              ~predecessor_context
+              ~block_header
+              operations
+          end >>= fun result ->
+          Fork_validation.send stdout
+            (Error_monad.result_encoding Block_validation.result_encoding)
+            result
+      | Fork_validation.Commit_genesis
+          { chain_id ; time ; genesis_hash ; protocol } ->
+          genesis_time := time ;
+          genesis_block := genesis_hash ;
+          genesis_protocol := protocol ;
+          Error_monad.protect begin fun () ->
+            Context.commit_genesis context_index ~chain_id ~time ~protocol >>= fun commit ->
+            return commit
+          end >>= fun commit ->
+          Fork_validation.send stdout
+            (Error_monad.result_encoding Context_hash.encoding)
+            commit
+      | Fork_validation.Init ->
+          Fork_validation.send stdout
+            (Error_monad.result_encoding Data_encoding.empty)
+            (Ok ())
+    end >>= fun () ->
     loop () in
   loop ()
 

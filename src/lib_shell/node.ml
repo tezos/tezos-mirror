@@ -310,29 +310,44 @@ let create ?(sandboxed = false) ~multiprocess
   in
   init_p2p ~sandboxed p2p_params
   >>=? fun p2p ->
-  State.init ~store_root ~context_root ?history_mode ?patch_context genesis
-  >>=? fun (state, mainchain_state, context_index, history_mode) ->
+  (let open Block_validator_process in
+  if multiprocess then
+    init
+      (External
+         {context_root; protocol_root; process_path = Sys.executable_name})
+    >>=? fun validator_process ->
+    let commit_genesis =
+      Block_validator_process.commit_genesis
+        validator_process
+        ~genesis_hash:genesis.block
+    in
+    State.init
+      ~store_root
+      ~context_root
+      ?history_mode
+      ?patch_context
+      ~commit_genesis
+      genesis
+    >>=? fun (state, mainchain_state, _context_index, history_mode) ->
+    return (validator_process, state, mainchain_state, history_mode)
+  else
+    State.init ~store_root ~context_root ?history_mode ?patch_context genesis
+    >>=? fun (state, mainchain_state, context_index, history_mode) ->
+    init (Internal context_index)
+    >>=? fun validator_process ->
+    return (validator_process, state, mainchain_state, history_mode))
+  >>=? fun (validator_process, state, mainchain_state, history_mode) ->
   may_update_checkpoint mainchain_state checkpoint history_mode
   >>=? fun () ->
   let distributed_db = Distributed_db.create state p2p in
   store_known_protocols state
   >>= fun () ->
-  let multiprocess =
-    if multiprocess then
-      Block_validator.External
-        ( context_index,
-          store_root,
-          context_root,
-          protocol_root,
-          Sys.executable_name )
-    else Block_validator.Internal context_index
-  in
   Validator.create
     state
     distributed_db
     peer_validator_limits
     block_validator_limits
-    multiprocess
+    validator_process
     prevalidator_limits
     chain_validator_limits
     ~start_testchain

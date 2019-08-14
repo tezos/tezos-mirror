@@ -26,11 +26,15 @@
 
 type validator_kind =
   | Internal of Context.index
-  | External of Context.index * string * string * string * string
+  | External of {
+      context_root : string;
+      protocol_root : string;
+      process_path : string;
+    }
 
 type t
 
-val init : validator_kind -> t Lwt.t
+val init : validator_kind -> t tzresult Lwt.t
 
 val close : t -> unit Lwt.t
 
@@ -40,3 +44,11 @@ val apply_block :
   Block_header.t ->
   Operation.t list list ->
   Block_validation.result tzresult Lwt.t
+
+val commit_genesis :
+  t ->
+  genesis_hash:Block_hash.t ->
+  chain_id:Chain_id.t ->
+  time:Time.Protocol.t ->
+  protocol:Protocol_hash.t ->
+  Context_hash.t tzresult Lwt.t

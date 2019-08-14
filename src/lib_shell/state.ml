@@ -165,18 +165,13 @@ end
 let read_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state -> f state.chain_data_store state.data)
 
-let update_chain_data {chain_id; context_index; chain_data; _} f =
+let update_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state ->
       f state.chain_data_store state.data
       >>= fun (data, res) ->
       Lwt_utils.may data ~f:(fun data ->
           state.data <- data ;
-          Shared.use context_index (fun context_index ->
-              Context.set_head
-                context_index
-                chain_id
-                data.current_head.header.shell.context)
-          >>= fun () -> Lwt.return_unit)
+          Lwt.return_unit)
       >>= fun () -> Lwt.return res)
 
 (** The number of predecessors stored per block.
@@ -655,19 +650,18 @@ module Chain = struct
     Chain_id.Table.add data.chains chain_id chain ;
     Lwt.return chain
 
-  let create state ?allow_forked_chain genesis chain_id =
+  let create state ?allow_forked_chain ~commit_genesis genesis chain_id =
     Shared.use state.global_data (fun data ->
         let chain_store = Store.Chain.get data.global_store chain_id in
         let block_store = Store.Block.get chain_store in
         if Chain_id.Table.mem data.chains chain_id then
           Pervasives.failwith "State.Chain.create"
         else
-          Context.commit_genesis
-            data.context_index
+          commit_genesis
             ~chain_id
             ~time:genesis.time
             ~protocol:genesis.protocol
-          >>= fun commit ->
+          >>=? fun commit ->
           Locked_block.store_genesis block_store genesis commit
           >>= fun genesis_header ->
           locked_create
@@ -683,7 +677,7 @@ module Chain = struct
           Store.Forking_block_hash.remove
             data.global_store
             (Context.compute_testchain_chain_id genesis.block)
-          >>= fun () -> Lwt.return chain)
+          >>= fun () -> return chain)
 
   let locked_read global_state data chain_id =
     let chain_store = Store.Chain.get data.global_store chain_id in
@@ -1697,13 +1691,18 @@ module Current_mempool = struct
         Lwt.return (Block.header data.current_head, data.current_mempool))
 end
 
-let may_create_chain state chain_id genesis =
+let may_create_chain ~commit_genesis state chain_id genesis =
   Chain.get state chain_id
   >>= function
   | Ok chain ->
-      Lwt.return chain
+      return chain
   | Error _ ->
-      Chain.create ~allow_forked_chain:true state genesis chain_id
+      Chain.create
+        ~commit_genesis
+        ~allow_forked_chain:true
+        state
+        genesis
+        chain_id
 
 let read global_store context_index main_chain =
   let global_data =
@@ -1751,18 +1750,37 @@ let () =
     (fun (previous_mode, next_mode) ->
       Incorrect_history_mode_switch {previous_mode; next_mode})
 
-let init ?patch_context ?(store_mapsize = 40_960_000_000L)
+let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
     ?(context_mapsize = 409_600_000_000L) ~store_root ~context_root
     ?history_mode genesis =
   Store.init ~mapsize:store_mapsize store_root
   >>=? fun global_store ->
-  Context.init ~mapsize:context_mapsize ?patch_context context_root
-  >>= fun context_index ->
+  ( match commit_genesis with
+  | Some commit_genesis ->
+      Context.init
+        ~readonly:true
+        ~mapsize:context_mapsize
+        ?patch_context
+        context_root
+      >>= fun context_index -> Lwt.return (context_index, commit_genesis)
+  | None ->
+      Context.init
+        ~readonly:false
+        ~mapsize:context_mapsize
+        ?patch_context
+        context_root
+      >>= fun context_index ->
+      let commit_genesis ~chain_id ~time ~protocol =
+        Context.commit_genesis context_index ~chain_id ~time ~protocol
+        >>= fun res -> return res
+      in
+      Lwt.return (context_index, commit_genesis) )
+  >>= fun (context_index, commit_genesis) ->
   let chain_id = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index chain_id
   >>=? fun state ->
-  may_create_chain state chain_id genesis
-  >>= fun main_chain_state ->
+  may_create_chain ~commit_genesis state chain_id genesis
+  >>=? fun main_chain_state ->
   Store.Configuration.History_mode.read_opt global_store
   >>= (function
         | None ->
