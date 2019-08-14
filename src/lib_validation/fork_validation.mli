@@ -25,13 +25,21 @@
 
 type parameters = {context_root : string; protocol_root : string}
 
-type request = {
-  chain_id : Chain_id.t;
-  block_header : Block_header.t;
-  predecessor_block_header : Block_header.t;
-  operations : Operation.t list list;
-  max_operations_ttl : int;
-}
+type request =
+  | Init
+  | Validate of {
+      chain_id : Chain_id.t;
+      block_header : Block_header.t;
+      predecessor_block_header : Block_header.t;
+      operations : Operation.t list list;
+      max_operations_ttl : int;
+    }
+  | Commit_genesis of {
+      chain_id : Chain_id.t;
+      genesis_hash : Block_hash.t;
+      time : Time.Protocol.t;
+      protocol : Protocol_hash.t;
+    }
 
 val magic : MBytes.t
 

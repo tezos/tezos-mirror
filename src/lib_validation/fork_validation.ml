@@ -25,13 +25,21 @@
 
 type parameters = {context_root : string; protocol_root : string}
 
-type request = {
-  chain_id : Chain_id.t;
-  block_header : Block_header.t;
-  predecessor_block_header : Block_header.t;
-  operations : Operation.t list list;
-  max_operations_ttl : int;
-}
+type request =
+  | Init
+  | Validate of {
+      chain_id : Chain_id.t;
+      block_header : Block_header.t;
+      predecessor_block_header : Block_header.t;
+      operations : Operation.t list list;
+      max_operations_ttl : int;
+    }
+  | Commit_genesis of {
+      chain_id : Chain_id.t;
+      genesis_hash : Block_hash.t;
+      time : Time.Protocol.t;
+      protocol : Protocol_hash.t;
+    }
 
 let magic = MBytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
@@ -44,35 +52,65 @@ let parameters_encoding =
 
 let request_encoding =
   let open Data_encoding in
-  conv
-    (fun { chain_id;
-           block_header;
-           predecessor_block_header;
-           max_operations_ttl;
-           operations } ->
-      ( chain_id,
-        block_header,
-        predecessor_block_header,
-        max_operations_ttl,
-        operations ))
-    (fun ( chain_id,
-           block_header,
-           predecessor_block_header,
-           max_operations_ttl,
-           operations ) ->
-      {
-        chain_id;
-        block_header;
-        predecessor_block_header;
-        max_operations_ttl;
-        operations;
-      })
-    (obj5
-       (req "chain_id" Chain_id.encoding)
-       (req "block_header" (dynamic_size Block_header.encoding))
-       (req "pred_header" (dynamic_size Block_header.encoding))
-       (req "max_operations_ttl" int31)
-       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+  union
+    [ case
+        (Tag 0)
+        ~title:"init"
+        empty
+        (function Init -> Some () | Commit_genesis _ | Validate _ -> None)
+        (fun () -> Init);
+      case
+        (Tag 1)
+        ~title:"validate"
+        (obj5
+           (req "chain_id" Chain_id.encoding)
+           (req "block_header" (dynamic_size Block_header.encoding))
+           (req "pred_header" (dynamic_size Block_header.encoding))
+           (req "max_operations_ttl" int31)
+           (req "operations" (list (list (dynamic_size Operation.encoding)))))
+        (function
+          | Validate
+              { chain_id;
+                block_header;
+                predecessor_block_header;
+                max_operations_ttl;
+                operations } ->
+              Some
+                ( chain_id,
+                  block_header,
+                  predecessor_block_header,
+                  max_operations_ttl,
+                  operations )
+          | Init | Commit_genesis _ ->
+              None)
+        (fun ( chain_id,
+               block_header,
+               predecessor_block_header,
+               max_operations_ttl,
+               operations ) ->
+          Validate
+            {
+              chain_id;
+              block_header;
+              predecessor_block_header;
+              max_operations_ttl;
+              operations;
+            });
+      case
+        (Tag 2)
+        ~title:"commit_genesis"
+        (obj4
+           (req "chain_id" Chain_id.encoding)
+           (req "time" Time.Protocol.encoding)
+           (req "genesis_hash" Block_hash.encoding)
+           (req "protocol" Protocol_hash.encoding))
+        (function
+          | Commit_genesis {chain_id; time; genesis_hash; protocol} ->
+              Some (chain_id, time, genesis_hash, protocol)
+          | Init | Validate _ ->
+              None)
+        (fun (chain_id, time, genesis_hash, protocol) ->
+          Commit_genesis {chain_id; time; genesis_hash; protocol}) ]
 
 let data_size msg = String.length msg
 

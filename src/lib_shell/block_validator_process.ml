@@ -70,8 +70,6 @@ module Fork_validator = struct
   end)
 
   type validation_context = {
-    context_index : Context.index;
-    store_root : string;
     context_root : string;
     protocol_root : string;
     process_path : string;
@@ -80,18 +78,11 @@ module Fork_validator = struct
 
   type t = validation_context
 
-  let init context_index store_root context_root protocol_root process_path =
+  let init ~context_root ~protocol_root ~process_path =
     lwt_log_notice (fun f -> f "Initialized")
     >>= fun () ->
     Lwt.return
-      {
-        context_index;
-        store_root;
-        context_root;
-        protocol_root;
-        process_path;
-        validator_process = None;
-      }
+      {context_root; protocol_root; process_path; validator_process = None}
 
   let check_process_status =
     let open Unix in
@@ -128,9 +119,7 @@ module Fork_validator = struct
     | None ->
         Lwt.return_unit
 
-  let apply_block vp chain_state ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t) ~block_header operations =
-    let chain_id = State.Chain.id chain_state in
+  let send_request vp request result_encoding =
     ( match vp.validator_process with
     | Some process ->
         Lwt.return process
@@ -138,6 +127,12 @@ module Fork_validator = struct
         let process =
           Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
         in
+        lwt_log_notice
+          Tag.DSL.(
+            fun f ->
+              f "Block validation started on pid %a"
+              -% a (Tag.def "int" Format.pp_print_int) process#pid)
+        >>= fun () ->
         let parameters =
           {
             Fork_validation.context_root = vp.context_root;
@@ -156,31 +151,14 @@ module Fork_validator = struct
           parameters
         >>= fun () -> Lwt.return process )
     >>= fun process ->
-    lwt_log_notice
-      Tag.DSL.(
-        fun f ->
-          f "Block validation started on pid %a"
-          -% a (Tag.def "int" Format.pp_print_int) process#pid)
-    >>= fun () ->
     Lwt.catch
       (fun () ->
-        let request =
-          {
-            Fork_validation.chain_id;
-            block_header;
-            predecessor_block_header;
-            operations;
-            max_operations_ttl;
-          }
-        in
         Fork_validation.send
           process#stdin
           Fork_validation.request_encoding
           request
         >>= fun () ->
-        Fork_validation.recv_result
-          process#stdout
-          Block_validation.result_encoding
+        Fork_validation.recv_result process#stdout result_encoding
         >>=? fun res ->
         match process#state with
         | Running ->
@@ -198,21 +176,22 @@ end
 
 type validator_kind =
   | Internal of Context.index
-  | External of Context.index * string * string * string * string
+  | External of {
+      context_root : string;
+      protocol_root : string;
+      process_path : string;
+    }
 
 type t = Sequential of Seq_validator.t | Fork of Fork_validator.t
 
 let init = function
   | Internal index ->
-      Seq_validator.init index >>= fun v -> Lwt.return (Sequential v)
-  | External (index, store_root, context_root, protocol_root, process_path) ->
-      Fork_validator.init
-        index
-        store_root
-        context_root
-        protocol_root
-        process_path
-      >>= fun v -> Lwt.return (Fork v)
+      Seq_validator.init index >>= fun v -> return (Sequential v)
+  | External {context_root; protocol_root; process_path} ->
+      Fork_validator.init ~context_root ~protocol_root ~process_path
+      >>= fun v ->
+      Fork_validator.send_request v Fork_validation.Init Data_encoding.empty
+      >>=? fun () -> return (Fork v)
 
 let close = function
   | Sequential vp ->
@@ -248,10 +227,26 @@ let apply_block bvp ~predecessor block_header operations =
         ~block_header
         operations
   | Fork vp ->
-      Fork_validator.apply_block
-        vp
-        ~max_operations_ttl
-        chain_state
-        ~predecessor_block_header
-        ~block_header
-        operations
+      let chain_id = State.Chain.id chain_state in
+      let request =
+        Fork_validation.Validate
+          {
+            chain_id;
+            block_header;
+            predecessor_block_header;
+            operations;
+            max_operations_ttl;
+          }
+      in
+      Fork_validator.send_request vp request Block_validation.result_encoding
+
+let commit_genesis bvp ~genesis_hash ~chain_id ~time ~protocol =
+  match bvp with
+  | Sequential {context_index} ->
+      Context.commit_genesis context_index ~chain_id ~time ~protocol
+      >>= fun res -> return res
+  | Fork vp ->
+      let request =
+        Fork_validation.Commit_genesis {genesis_hash; chain_id; time; protocol}
+      in
+      Fork_validator.send_request vp request Context_hash.encoding

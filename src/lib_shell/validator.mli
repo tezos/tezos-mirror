@@ -33,7 +33,7 @@ val create :
   Distributed_db.t ->
   Peer_validator.limits ->
   Block_validator.limits ->
-  Block_validator.validator_kind ->
+  Block_validator_process.t ->
   Prevalidator.limits ->
   Chain_validator.limits ->
   start_testchain:bool ->

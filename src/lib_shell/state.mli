@@ -60,9 +60,13 @@ module Chain : sig
   val create :
     global_state ->
     ?allow_forked_chain:bool ->
+    commit_genesis:(chain_id:Chain_id.t ->
+                   time:Time.Protocol.t ->
+                   protocol:Protocol_hash.t ->
+                   Context_hash.t tzresult Lwt.t) ->
     genesis ->
     Chain_id.t ->
-    chain_state Lwt.t
+    chain_state tzresult Lwt.t
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get : global_state -> Chain_id.t -> chain_state tzresult Lwt.t
@@ -402,6 +406,10 @@ val history_mode : global_state -> History_mode.t Lwt.t
     the databases. *)
 val init :
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?commit_genesis:(chain_id:Chain_id.t ->
+                  time:Time.Protocol.t ->
+                  protocol:Protocol_hash.t ->
+                  Context_hash.t tzresult Lwt.t) ->
   ?store_mapsize:int64 ->
   ?context_mapsize:int64 ->
   store_root:string ->
