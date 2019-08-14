@@ -1143,7 +1143,11 @@ let create
       List.iter
         (fun peer_info ->
            let peer_id = P2p_peer_state.Info.peer_id peer_info in
-           P2p_peer.Table.add pool.known_peer_ids peer_id peer_info)
+           P2p_peer.Table.add pool.known_peer_ids peer_id peer_info ;
+           match P2p_peer_state.Info.last_seen peer_info with
+           | None | Some ((_, None (* no reachable port stored*)), _) -> ()
+           | Some ((addr, Some port), _) ->
+               register_point pool peer_id (addr, port) |> ignore)
         peer_ids ;
       Lwt.return pool
   | Error err ->
