@@ -125,6 +125,9 @@ let run stdin stdout =
           Fork_validation.send stdout
             (Error_monad.result_encoding Data_encoding.empty)
             (Ok ())
+      | Fork_validation.Terminate ->
+          Lwt_io.flush_all () >>= fun () ->
+          exit 0
     end >>= fun () ->
     loop () in
   loop ()

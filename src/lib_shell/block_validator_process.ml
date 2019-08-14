@@ -110,9 +110,17 @@ module Fork_validator = struct
     >>= fun () ->
     match vp.validator_process with
     | Some process ->
-        process#close
-        >>= fun status ->
-        check_process_status status
+        Fork_validation.send
+          process#stdin
+          Fork_validation.request_encoding
+          Fork_validation.Terminate
+        >>= fun () ->
+        process#status
+        >>= (function
+              | Unix.WEXITED 0 ->
+                  Lwt.return_unit
+              | _ ->
+                  process#terminate ; Lwt.return_unit)
         >>= fun () ->
         vp.validator_process <- None ;
         Lwt.return_unit

@@ -40,6 +40,7 @@ type request =
       time : Time.Protocol.t;
       protocol : Protocol_hash.t;
     }
+  | Terminate
 
 val magic : MBytes.t
 
