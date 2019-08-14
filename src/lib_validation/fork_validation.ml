@@ -117,7 +117,8 @@ let data_size msg = String.length msg
 let send pin encoding data =
   let msg = Data_encoding.Binary.to_bytes_exn encoding data in
   let msg = MBytes.to_string msg in
-  Lwt_io.write_int pin (data_size msg) >>= fun () -> Lwt_io.write pin msg
+  Lwt_io.write_int pin (data_size msg)
+  >>= fun () -> Lwt_io.write pin msg >>= fun () -> Lwt_io.flush pin
 
 let recv_result pout encoding =
   Lwt_io.read_int pout
