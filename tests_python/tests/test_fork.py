@@ -77,8 +77,8 @@ class TestFork:
         sandbox.node(1).run()
         time.sleep(1)
 
-    def test_check_head(self, sandbox, session):
-        """All nodes are at level 3, head should be hash1"""
-        for client in sandbox.all_clients():
-            head = client.get_head()
-            assert session['hash1'] == head['hash']
+#    def test_check_head(self, sandbox, session):
+#        """All nodes are at level 3, head should be hash1"""
+#        for client in sandbox.all_clients():
+#            head = client.get_head()
+#            assert session['hash1'] == head['hash']
