@@ -724,29 +724,21 @@ let rec step :
   | (Empty_map (t, _), rest) ->
       logged_return (Item (empty_map t, rest), ctxt)
   | (Map_map body, Item (map, rest)) ->
-      let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-      let rec loop rest ctxt l acc =
-        match l with
-        | [] ->
-            return (Item (acc, rest), ctxt)
-        | ((k, _) as hd) :: tl ->
-            step logger ctxt step_constants body (Item (hd, rest))
-            >>=? fun (Item (hd, rest), ctxt) ->
-            loop rest ctxt tl (map_update k (Some hd) acc)
-      in
-      loop rest ctxt l (empty_map (map_key_ty map))
-      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
+      map_fold_m
+        (fun ((k, _) as item) (rest, ctxt, acc) ->
+          step logger ctxt step_constants body (Item (item, rest))
+          >>=? fun (Item (item, rest), ctxt) ->
+          return (rest, ctxt, map_update k (Some item) acc))
+        map
+        (rest, ctxt, empty_map (map_key_ty map))
+      >>=? fun (rest, ctxt, res) -> logged_return (Item (res, rest), ctxt)
   | (Map_iter body, Item (map, init)) ->
-      let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-      let rec loop ctxt l stack =
-        match l with
-        | [] ->
-            return (stack, ctxt)
-        | hd :: tl ->
-            step logger ctxt step_constants body (Item (hd, stack))
-            >>=? fun (stack, ctxt) -> loop ctxt tl stack
-      in
-      loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
+      map_fold_m
+        (fun item (stack, ctxt) ->
+          step logger ctxt step_constants body (Item (item, stack)))
+        map
+        (init, ctxt)
+      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Map_mem, Item (v, Item (map, rest))) ->
       logged_return (Item (map_mem v map, rest), ctxt)
   | (Map_get, Item (v, Item (map, rest))) ->

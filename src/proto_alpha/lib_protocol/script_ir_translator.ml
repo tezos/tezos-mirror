@@ -785,6 +785,21 @@ let map_fold :
     (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
  fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
 
+let map_fold_m :
+    type key value acc.
+    (key * value -> acc -> acc tzresult Lwt.t) ->
+    (key, value) map ->
+    acc ->
+    acc tzresult Lwt.t =
+ fun f map init ->
+  fold_m
+    (fun step ->
+      (* uncurry 'step' *)
+      map_fold (fun key value -> step (key, value)))
+    f
+    map
+    init
+
 let map_size : type key value. (key, value) map -> Script_int.n Script_int.num
     =
  fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))

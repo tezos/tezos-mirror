@@ -112,6 +112,12 @@ val map_fold :
   'acc ->
   'acc
 
+val map_fold_m :
+  ('key * 'value -> 'acc -> 'acc tzresult Lwt.t) ->
+  ('key, 'value) Script_typed_ir.map ->
+  'acc ->
+  'acc tzresult Lwt.t
+
 val map_update :
   'a ->
   'b option ->
