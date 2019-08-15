@@ -27,6 +27,7 @@ module Request : sig
   type 'a t =
     | Flush : Block_hash.t -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
+    | Leftover : unit t
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t

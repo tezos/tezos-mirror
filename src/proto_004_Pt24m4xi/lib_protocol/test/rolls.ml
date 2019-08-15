@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_tez
 open Test_utils
@@ -32,7 +32,7 @@ let account_pair = function
   | [a1; a2] -> (a1, a2)
   | _ -> assert false
 
-let wrap e = Lwt.return (Alpha_environment.wrap_error e)
+let wrap e = Lwt.return (Environment.wrap_error e)
 let traverse_rolls ctxt head =
   let rec loop acc roll =
     Storage.Roll.Successor.get_option ctxt roll >>= wrap >>=? function
@@ -47,7 +47,7 @@ let get_rolls ctxt delegate =
 
 let check_rolls b (account:Account.t) =
   Context.get_constants (B b) >>=? fun constants ->
-  Context.Delegate.info (B b) account.pkh >>=? fun { staking_balance } ->
+  Context.Delegate.info (B b) account.pkh >>=? fun { staking_balance ; _ } ->
   let token_per_roll = constants.parametric.tokens_per_roll in
   let expected_rolls = Int64.div (Tez.to_mutez staking_balance) (Tez.to_mutez token_per_roll) in
   Raw_context.prepare b.context
@@ -92,7 +92,7 @@ let simple_staking_rights_after_baking () =
   check_rolls b m2
 
 let frozen_deposit (info:Context.Delegate.info) =
-  Cycle.Map.fold (fun _ { Delegate.deposit } acc ->
+  Cycle.Map.fold (fun _ { Delegate.deposit ; _ } acc ->
       Test_tez.Tez.(deposit + acc))
     info.frozen_balance_by_cycle Tez.zero
 
@@ -104,7 +104,7 @@ let check_activate_staking_balance ~loc ~deactivated b (a, (m:Account.t)) =
   Assert.equal_tez ~loc Test_tez.Tez.(balance + deposit) info.staking_balance
 
 let run_until_deactivation () =
-  Context.init ~preserved_cycles:2 2 >>=? fun (b,accounts) ->
+  Context.init 2 >>=? fun (b,accounts) ->
   let (a1, a2) = account_pair accounts in
 
   Context.Contract.balance (B b) a1 >>=? fun balance_start ->
@@ -155,7 +155,7 @@ let deactivation_then_empty_then_self_delegation () =
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
   Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->
@@ -176,7 +176,7 @@ let deactivation_then_empty_then_self_delegation_then_recredit () =
   (* empty the contract *)
   let sink_account = Account.new_account () in
   let sink_contract = Contract.implicit_contract sink_account.pkh in
-  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Context.get_constants (B b) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount = match Tez.(balance -? origination_burn) with Ok r -> r | Error _ -> assert false in
   Op.transaction (B b) deactivated_contract sink_contract amount >>=? fun empty_contract ->

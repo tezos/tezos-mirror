@@ -1,17 +1,18 @@
 (library
  (name tezos_004_Pt24m4xi_test_helpers)
+ (public_name tezos-004-Pt24m4xi-test-helpers)
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
             tezos-protocol-004-Pt24m4xi
-            alcotest-lwt)
- (flags (:standard -w -9-32 -safe-string
-                   -open Tezos_base__TzPervasives
+            tezos-protocol-004-Pt24m4xi-parameters)
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
+                   -open Tezos_protocol_004_Pt24m4xi
                    -open Tezos_shell_services)))
 
 (alias
- (name runtest_indent)
- (deps (glob_files *.ml*))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

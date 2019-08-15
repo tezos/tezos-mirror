@@ -55,6 +55,7 @@ type limits = {
   max_refused_operations : int ;
   operation_timeout : Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 
 (** Creates/tear-down a new prevalidator context. *)
@@ -107,5 +108,9 @@ val status: t -> Worker_types.worker_status
 val pending_requests : t -> (Time.System.t * Prevalidator_worker_state.Request.view) list
 val current_request : t -> (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view) option
 val last_events : t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
+
+val information : t -> Worker_types.worker_information
+
+val pipeline_length : t -> int
 
 val rpc_directory : t option RPC_directory.t

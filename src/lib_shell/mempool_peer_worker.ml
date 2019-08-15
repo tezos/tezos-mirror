@@ -220,8 +220,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
 
       else
         (* There are some pending operations, we need to wait on them *)
-        select pipeline >>= fun () ->
-        Lwt.return_unit
+        select pipeline
 
     let process_batch mempool_worker pool_size input =
       let pipeline = create pool_size input in
@@ -249,7 +248,7 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
         let _: string = Format.flush_str_formatter () in
         Format.fprintf Format.str_formatter "%a" Protocol_hash.pp Proto.hash;
         Format.flush_str_formatter () in
-      [ "node"; "mempool"; "peer_worker"; proto_hash ]
+      [ "node" ; "mempool" ; "peer_worker" ; proto_hash ]
     let pp = P2p_peer.Id.pp
   end
 
@@ -335,7 +334,8 @@ module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
     let pp _ _ = ()
   end
 
-  module Worker = Worker.Make (Name) (Event) (Request) (Types)
+  module Logger = Worker_logger.Make(Event)(Request)
+  module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
   type t = Worker.bounded Worker.queue Worker.t
   let table =
     let open Worker in

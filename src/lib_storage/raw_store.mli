@@ -27,7 +27,7 @@ open Store_sigs
 
 include STORE
 
-val init: ?mapsize:int64 -> string -> t tzresult Lwt.t
+val init: ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
 val close: t -> unit
 
 val with_atomic_rw:

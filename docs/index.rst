@@ -136,8 +136,10 @@ in the :ref:`introduction <howtoget>`.
    developer/michelson_anti_patterns
    developer/entering_alpha
    developer/protocol_environment
+   developer/proposal_testing
    developer/profiling
    developer/flextesa
+   developer/python_testing_framework
    developer/contributing
 
 .. toctree::
@@ -146,6 +148,7 @@ in the :ref:`introduction <howtoget>`.
 
    protocols/003_PsddFKi3
    protocols/004_Pt24m4xi
+   protocols/005_PsBABY5H
 
 .. toctree::
    :maxdepth: 2

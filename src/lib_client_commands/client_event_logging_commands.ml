@@ -46,7 +46,7 @@ let date_parameter option_name build =
         if day > 31 then  problem "The month cannot be more than '31'" ;
         let t =
           let tm =
-            Unix.{ 
+            Unix.{
               tm_sec = 0 ;
               tm_min = 0 ;
               tm_hour = 0 ;

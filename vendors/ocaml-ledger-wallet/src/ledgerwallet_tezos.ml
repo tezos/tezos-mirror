@@ -68,6 +68,8 @@ type ins =
   | Query_all_high_watermarks
   | Deauthorize_baking
   | Get_authorized_path_and_curve
+  | Make_deterministic_nonce
+  | Sign_with_hash
 
 let int_of_ins = function
   | Version -> 0x00
@@ -84,25 +86,31 @@ let int_of_ins = function
   | Query_all_high_watermarks -> 0x0B
   | Deauthorize_baking -> 0x0C
   | Get_authorized_path_and_curve -> 0x0D
+  | Make_deterministic_nonce -> 0x0E
+  | Sign_with_hash -> 0x0F
 
 type curve =
   | Ed25519
   | Secp256k1
   | Secp256r1
+  | Bip32_ed25519
 
 let pp_curve ppf = function
   | Ed25519 -> Format.pp_print_string ppf "ed25519"
   | Secp256k1 -> Format.pp_print_string ppf "secp256k1"
   | Secp256r1 -> Format.pp_print_string ppf "P-256"
+  | Bip32_ed25519 -> Format.pp_print_string ppf "bip25519"
 
 let pp_curve_short ppf = function
   | Ed25519 -> Format.pp_print_string ppf "ed"
   | Secp256k1 -> Format.pp_print_string ppf "secp"
   | Secp256r1 -> Format.pp_print_string ppf "p2"
+  | Bip32_ed25519 -> Format.pp_print_string ppf "bip25519"
 
 let curve_of_string str =
   match String.lowercase_ascii str with
   | "ed" | "ed25519" -> Some Ed25519
+  | "bip25519" | "bip32-ed25519" -> Some Bip32_ed25519
   | "secp256k1" -> Some Secp256k1
   | "p256" | "p-256" | "secp256r1" -> Some Secp256r1
   | _ -> None
@@ -111,19 +119,24 @@ let int_of_curve = function
   | Ed25519 -> 0x00
   | Secp256k1 -> 0x01
   | Secp256r1 -> 0x02
+  | Bip32_ed25519 -> 0x03
 
 let curve_of_int = function
   | 0x00 -> Some Ed25519
   | 0x01 -> Some Secp256k1
   | 0x02 -> Some Secp256r1
+  | 0x03 -> Some Bip32_ed25519
   | _ -> None
 
 type Transport.Status.t +=
-    Tezos_invalid_curve_code of int
+  | Tezos_invalid_curve_code of int
+  | Payload_too_big of int
 
 let () = Transport.Status.register_string_f begin function
     | Tezos_invalid_curve_code curve_code ->
         Some ("Unrecognized curve code: " ^ string_of_int curve_code)
+    | Payload_too_big size ->
+        Some (Printf.sprintf "Payload too big: %d bytes" size)
     | _ -> None
   end
 
@@ -259,6 +272,44 @@ let sign ?pp ?buf ?(hash_on_ledger=true) h curve path payload =
   let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data:data_init cmd in
   let _addr = Transport.apdu ~msg ?pp ?buf h apdu in
   Transport.write_payload ~mark_last:true ?pp ?buf ~msg ~cmd h ~p1:0x01 payload
+
+let get_deterministic_nonce ?pp ?buf h curve path payload =
+  let nb_derivations = List.length path in
+  if nb_derivations > 10 then
+    invalid_arg "get_deterministic_nonce: max 10 derivations" ;
+  let path_data =
+    let lc = 1 + (4 * nb_derivations) in
+    let data = Cstruct.create lc in
+    Cstruct.set_uint8 data 0 nb_derivations ;
+    let _ = write_path (Cstruct.shift data 1) path in
+    data in
+  let data = Cstruct.append path_data payload in
+  let cmd = wrap_ins Make_deterministic_nonce in
+  let lc = Cstruct.len data in
+  if lc >= Apdu.max_data_length then
+    Transport.app_error ~msg:"get_deterministic_nonce"
+    @@ R.error (Payload_too_big (Cstruct.len payload))
+  else
+    let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data cmd in
+    let msg = "make-deterministic-nonce" in
+    Transport.apdu ~msg ?pp ?buf h apdu
+
+let sign_and_hash ?pp ?buf h curve path payload =
+  let nb_derivations = List.length path in
+  if nb_derivations > 10 then invalid_arg "get_public_key: max 10 derivations" ;
+  let lc = 1 + 4 * nb_derivations in
+  let data_init = Cstruct.create lc in
+  Cstruct.set_uint8 data_init 0 nb_derivations ;
+  let data = Cstruct.shift data_init 1 in
+  let _data = write_path data path in
+  let cmd = wrap_ins Sign_with_hash in
+  let msg = "sign-with-hash" in
+  let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data:data_init cmd in
+  let _addr = Transport.apdu ~msg ?pp ?buf h apdu in
+  Transport.write_payload ~mark_last:true ?pp ?buf ~msg ~cmd h ~p1:0x01 payload
+  >>= fun bytes ->
+  let hash, signature = Cstruct.split bytes 32 in
+  R.return (hash, signature)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

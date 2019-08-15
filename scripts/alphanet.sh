@@ -66,6 +66,7 @@ services:
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
+    restart: on-failure
 
 EOF
 
@@ -80,6 +81,7 @@ if [ -n "$local_snapshot_path" ]; then
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
       - $local_snapshot_path:/snapshot
+    restart: on-failure
 
 EOF
 
@@ -798,10 +800,6 @@ case "$command" in
 
     ## Node
 
-    upgrade)
-        upgrade_node_storage
-        ;;
-
     node)
         subcommand="$1"
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
@@ -815,6 +813,9 @@ case "$command" in
             log)
                 log_node
                 ;;
+	        upgrade)
+		        upgrade_node_storage
+		        ;;
             stop)
                 stop_node
                 ;;

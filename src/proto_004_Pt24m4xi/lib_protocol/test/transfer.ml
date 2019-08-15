@@ -22,7 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Proto_alpha
+
+open Protocol
 open Alpha_context
 open Test_utils
 open Test_tez
@@ -53,7 +54,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee=Tez.zero) ?exp
   Context.Contract.balance (I b) dst >>=? fun bal_dst ->
   Op.transaction (I b) ~fee src dst amount >>=? fun op ->
   Incremental.add_operation ?expect_failure b op >>=? fun b ->
-  Context.get_constants (I b) >>=? fun { parametric = { origination_size ; cost_per_byte } } ->
+  Context.get_constants (I b) >>=? fun { parametric = { origination_size ; cost_per_byte ; _ } ; _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size) >>?= fun origination_burn ->
   let amount_fee_maybe_burn =
     if with_burn then
@@ -150,7 +151,7 @@ let block_with_a_single_transfer_with_fee () =
 let transfer_zero_tez () =
   single_transfer ~expect_failure:(
     function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _ ->
         return_unit
     | _ ->
         failwith "Empty transaction should fail")
@@ -450,7 +451,7 @@ let balance_too_low fee () =
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
   Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
         return_unit
     | _ ->
         failwith "balance too low should fail"
@@ -491,7 +492,7 @@ let balance_too_low_two_transfers fee () =
   Op.transaction ~fee (I i) contract_1 contract_3
     two_third_of_balance >>=? fun operation ->
   let expect_failure = function
-    | Alpha_environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
         return_unit
     | _ ->
         failwith "balance too low should fail"
@@ -574,7 +575,7 @@ let random_transfer () =
   let source = random_contract contracts in
   let dest = random_contract contracts in
   Context.Contract.pkh source >>=? fun source_pkh ->
-  (* given that source may not have a sufficient balance for the transfer + to bake, 
+  (* given that source may not have a sufficient balance for the transfer + to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [source_pkh]) >>=? fun b ->
   Context.Contract.balance (I b) source >>=? fun amount ->

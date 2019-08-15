@@ -68,12 +68,10 @@ let cli_term () =
           value & opt (enum answers) `G & info ["color"] ~doc)))
 
 let do_output t =
-  Lwt_exception.catch
-    Lwt.(
-      fun () ->
-        Lwt_io.write t.channel (Buffer.contents t.buffer)
-        >>= fun () -> Buffer.clear t.buffer ; return_unit)
-    ()
+  Lwt.(
+    fun () ->
+      Lwt_io.write t.channel (Buffer.contents t.buffer)
+      >>= fun () -> Buffer.clear t.buffer ; return_unit)
 
 let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     (_, _) Asynchronous_result.t =
@@ -95,7 +93,7 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     pp_print_newline ppf () ;
     pp_close_box ppf () ;
     pp_print_flush ppf ()) ;
-  do_output o#console
+  Lwt_exception.catch (do_output o#console) ()
 
 let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
   let date =
@@ -111,7 +109,7 @@ let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
     fprintf fmt "%a" Easy_format.Pretty.to_formatter msg ;
     pp_print_newline fmt () ;
     pp_print_flush fmt ()) ;
-  do_output o#console
+  Lwt_exception.catch (do_output o#console) ()
 
 module Prompt = struct
   type item =
@@ -153,12 +151,14 @@ module Prompt = struct
               List.mem m.commands c ~equal:String.equal )
         with
         | Some {action; _} -> (
-            Asynchronous_result.bind_on_error (action more) ~f:(fun err ->
+            Asynchronous_result.bind_on_error (action more)
+              ~f:(fun ~result _ ->
                 say state
                   EF.(
                     desc (shout "Error in action:")
-                      (custom (fun fmt ->
-                           Error.pp fmt err ~error:(fun fmt -> function
+                      (custom (fun ppf ->
+                           Attached_result.pp ppf result (* Error.pp ppf err *)
+                             ~pp_error:(fun fmt -> function
                              | `Lwt_exn _ as e -> Lwt_exception.pp fmt e
                              | `Command_line s ->
                                  Format.fprintf fmt "Wrong command line: %s" s

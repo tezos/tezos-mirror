@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 
 type t = {
   pkh : Signature.Public_key_hash.t ;
@@ -34,8 +34,8 @@ type account = t
 
 let known_accounts = Signature.Public_key_hash.Table.create 17
 
-let new_account () =
-  let (pkh, pk, sk) = Signature.generate_key () in
+let new_account ?seed () =
+  let (pkh, pk, sk) = Signature.generate_key ?seed () in
   let account = { pkh ; pk ; sk } in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
   account
@@ -76,3 +76,17 @@ let generate_accounts ?(initial_balances = []) n : (t * Tez_repr.t) list =
       Signature.Public_key_hash.Table.add known_accounts pkh account ;
       account, amount i)
     (0--(n-1))
+
+let commitment_secret =
+  Blinded_public_key_hash.activation_code_of_hex
+    "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"
+
+let new_commitment ?seed () =
+  let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
+  let unactivated_account = { pkh; pk; sk } in
+  let open Commitment_repr in
+  let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
+  let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
+  Lwt.return @@ Environment.wrap_error @@
+  Tez_repr.(one *? 4_000L) >>=? fun amount ->
+  return @@ (unactivated_account, { blinded_public_key_hash = bpkh ; amount })

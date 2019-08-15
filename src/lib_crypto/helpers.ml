@@ -196,6 +196,10 @@ module MakeIterator(H : sig
         Data_encoding.(list (tup2 H.encoding arg_encoding))
   end
 
+  module Error_table = struct
+    include Error_table.Make(Table)
+  end
+
   module WeakRingTable = struct
     include WeakRingTable.Make(struct
         type t = H.t

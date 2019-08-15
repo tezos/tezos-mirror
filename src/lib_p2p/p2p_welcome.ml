@@ -48,12 +48,55 @@ let rec worker_loop st =
             (Ipaddr_unix.V6.of_inet_addr_exn addr, port) in
       P2p_pool.accept pool fd point ;
       worker_loop st
-  | Error [ Canceled ] ->
+
+  (* Unix errors related to the failure to create one connection,
+     No reason to abort just now, but we want to stress out that we
+     have a problem preventing us from accepting new connections. *)
+  | Error (((Exn (Unix.Unix_error ((
+      EMFILE              (* Too many open files by the process *)
+    | ENFILE              (* Too many open files in the system *)
+    | ENETDOWN            (* Network is down *)
+    ), _ , _))
+    ) :: _) as err) ->
+      lwt_log_error "@[<v 2>Incoming connection failed with %a in the
+      Welcome worker. Resuming in 5s.@]"
+        pp_print_error err >>= fun () ->
+      (* These are temporary system errors, giving some time for the system to
+         recover *)
+      Lwt_unix.sleep 5. >>= fun () ->
+      worker_loop st
+  | Error (((Exn (Unix.Unix_error ((
+      EAGAIN              (* Resource temporarily unavailable; try again *)
+    | EWOULDBLOCK         (* Operation would block *)
+    | ENOPROTOOPT         (* Protocol not available *)
+    | EOPNOTSUPP          (* Operation not supported on socket *)
+    | ENETUNREACH         (* Network is unreachable *)
+    | ECONNABORTED        (* Software caused connection abort *)
+    | ECONNRESET          (* Connection reset by peer *)
+    | ETIMEDOUT           (* Connection timed out *)
+    | EHOSTDOWN           (* Host is down *)
+    | EHOSTUNREACH        (* No route to host *)
+    (* Ugly hack to catch EPROTO and ENONET, Protocol error, which are not
+       defined in the Unix module (which is 20 years late on the POSIX
+       standard). A better solution is to use the package ocaml-unix-errno or
+       redo the work *)
+    | EUNKNOWNERR (71|64)
+    (* On Linux EPROTO is 71, ENONET is 64
+       On BSD systems, accept cannot raise EPROTO.
+       71 is EREMOTE   for openBSD, NetBSD, Darwin, which is irrelevant here
+       64 is EHOSTDOWN for openBSD, NetBSD, Darwin, which is already caught
+    *)
+    ), _ , _))
+    ) :: _) as err) ->
+      (* These are socket-specific errors, ignoring. *)
+      lwt_log_error "@[<v 2>Incoming connection failed with %a in the Welcome worker@]"
+        pp_print_error err >>= fun () ->
+      worker_loop st
+  | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
       lwt_log_error "@[<v 2>Unexpected error in the Welcome worker@ %a@]"
-        pp_print_error err >>= fun () ->
-      Lwt.return_unit
+        pp_print_error err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in

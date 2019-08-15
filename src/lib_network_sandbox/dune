@@ -1,7 +1,9 @@
 (library
  (name tezos_network_sandbox)
  (public_name tezos-network-sandbox)
- (flags (:standard -safe-string))
+ (flags (:standard -safe-string
+                   -open Tezos_protocol_004_Pt24m4xi
+                   -open Tezos_client_004_Pt24m4xi))
  (libraries
     lwt.unix
     cmdliner
@@ -11,6 +13,6 @@
     base
     genspio
     ezjsonm
-    tezos-signer-backends
+    tezos-signer-backends.unix
     tezos-client-004-Pt24m4xi))
 

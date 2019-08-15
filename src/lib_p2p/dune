@@ -2,13 +2,11 @@
  (name tezos_p2p)
  (public_name tezos-p2p)
  (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-shell-services)
+            tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services)))
+                   -open Tezos_stdlib_unix)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -54,11 +54,12 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  disable_testchain : bool ;
+  enable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 and rpc = {
-  listen_addr : string option ;
+  listen_addrs : string list ;
   cors_origins : string list ;
   cors_headers : string list ;
   tls : tls option ;
@@ -111,11 +112,12 @@ let default_p2p = {
   private_mode = false ;
   limits = default_p2p_limits ;
   disable_mempool = false ;
-  disable_testchain = false ;
+  enable_testchain = false ;
+  greylisting_config = P2p_point_state.Info.default_greylisting_config
 }
 
 let default_rpc = {
-  listen_addr = None ;
+  listen_addrs = [] ;
   cors_origins = [] ;
   cors_headers = [] ;
   tls = None ;
@@ -262,17 +264,17 @@ let p2p =
   conv
     (fun { expected_pow ; bootstrap_peers ;
            listen_addr ; discovery_addr ; private_mode ;
-           limits ; disable_mempool ; disable_testchain } ->
+           limits ; disable_mempool ; enable_testchain ; greylisting_config } ->
       (expected_pow, bootstrap_peers,
        listen_addr, discovery_addr, private_mode, limits,
-       disable_mempool, disable_testchain))
+       disable_mempool, enable_testchain, greylisting_config))
     (fun (expected_pow, bootstrap_peers,
           listen_addr, discovery_addr, private_mode, limits,
-          disable_mempool, disable_testchain) ->
+          disable_mempool, enable_testchain, greylisting_config) ->
       { expected_pow ; bootstrap_peers ;
         listen_addr ; discovery_addr ; private_mode ; limits ;
-        disable_mempool ; disable_testchain })
-    (obj8
+        disable_mempool ; enable_testchain ; greylisting_config })
+    (obj9
        (dft "expected-proof-of-work"
           ~description: "Floating point number between 0 and 256 that represents a \
                          difficulty, 24 signifies for example that at least 24 leading \
@@ -312,34 +314,51 @@ let p2p =
                          It can be used to decrease the memory and \
                          computation footprints of the node."
           bool false)
-       (dft "disable_testchain"
-          ~description: "If set to [true], the node will not spawn a testchain during \
-                         the protocol's testing voting period. \
-                         Default value is [false]. It may be used used to decrease the \
-                         node storage usage and computation by droping the validation \
-                         of the test network blocks."
+       (dft "enable_testchain"
+          ~description: "If set to [true], the node will spawn a \
+                         testchain during the protocol's testing \
+                         voting period. Default value is [false]. It \
+                         is disabled to decrease the node storage \
+                         usage and computation by droping the \
+                         validation of the test network blocks."
           bool false)
+       (let open P2p_point_state.Info in
+        dft "greylisting_config"
+          ~description: "The greylisting policy."
+          greylisting_config_encoding default_greylisting_config)
     )
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { cors_origins ; cors_headers ; listen_addr ; tls } ->
+    (fun { cors_origins ; cors_headers ; listen_addrs ; tls } ->
        let cert, key =
          match tls with
          | None -> None, None
          | Some { cert ; key } -> Some cert, Some key in
-       (listen_addr, cors_origins, cors_headers, cert, key ))
-    (fun (listen_addr, cors_origins, cors_headers, cert, key ) ->
+       (Some listen_addrs, None, cors_origins, cors_headers, cert, key ))
+    (fun (listen_addrs, legacy_listen_addr, cors_origins, cors_headers, cert, key ) ->
        let tls =
          match cert, key with
          | None, _ | _, None -> None
          | Some cert, Some key -> Some { cert ; key } in
-       { listen_addr ; cors_origins ; cors_headers ; tls })
-    (obj5
-       (opt "listen-addr"
-          ~description: "Host to listen to. If the port is not specified, \
+       let listen_addrs =
+         match listen_addrs, legacy_listen_addr with
+         | Some addrs, None -> addrs
+         | None, Some addr -> [addr]
+         | None, None -> default_rpc.listen_addrs
+         | Some _, Some _ ->
+             Pervasives.failwith
+               "Config file: Use only \"listen-addrs\" and not (legacy) \"listen-addr\"."
+       in
+       { listen_addrs ; cors_origins ; cors_headers ; tls })
+    (obj6
+       (opt "listen-addrs"
+          ~description: "Hosts to listen to. If the port is not specified, \
                          the default port 8732 will be assumed."
+          (list string))
+       (opt "listen-addr"
+          ~description: "Legacy value: Host to listen to"
           string)
        (dft "cors-origin"
           ~description: "Cross Origin Resource Sharing parameters, see \
@@ -392,16 +411,22 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun { Node.operation_timeout ; max_refused_operations ; worker_limits } ->
-       ((operation_timeout, max_refused_operations), worker_limits))
-    (fun ((operation_timeout, max_refused_operations), worker_limits) ->
-       { operation_timeout ; max_refused_operations ; worker_limits})
+    (fun { Node.operation_timeout ; max_refused_operations ;
+           operations_batch_size ; worker_limits ; } ->
+      ((operation_timeout, max_refused_operations,
+        operations_batch_size), worker_limits))
+    (fun ((operation_timeout, max_refused_operations,
+           operations_batch_size), worker_limits) ->
+      { operation_timeout ; max_refused_operations ;
+        operations_batch_size ; worker_limits ; })
     (merge_objs
-       (obj2
+       (obj3
           (dft "operations_request_timeout" timeout_encoding
              default_shell.prevalidator_limits.operation_timeout)
           (dft "max_refused_operations" uint16
-             default_shell.prevalidator_limits.max_refused_operations))
+             default_shell.prevalidator_limits.max_refused_operations)
+          (dft "operations_batch_size" int31
+             default_shell.prevalidator_limits.operations_batch_size))
        (worker_limits_encoding
           default_shell.prevalidator_limits.worker_limits.backlog_size
           default_shell.prevalidator_limits.worker_limits.backlog_level
@@ -526,17 +551,18 @@ let update
     ?bootstrap_peers
     ?listen_addr
     ?discovery_addr
-    ?rpc_listen_addr
+    ?(rpc_listen_addrs = [])
     ?(private_mode = false)
     ?(disable_mempool = false)
-    ?(disable_testchain = false)
+    ?(enable_testchain = false)
     ?(cors_origins = [])
     ?(cors_headers = [])
     ?rpc_tls
     ?log_output
     ?bootstrap_threshold
     ?history_mode
-    cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
+    cfg =
+  let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
     Option.map peer_table_size ~f:(fun i -> i, i / 4 * 3) in
@@ -584,11 +610,12 @@ let update
     private_mode = cfg.p2p.private_mode || private_mode ;
     limits ;
     disable_mempool = cfg.p2p.disable_mempool || disable_mempool ;
-    disable_testchain = cfg.p2p.disable_testchain || disable_testchain ;
+    enable_testchain = cfg.p2p.enable_testchain || enable_testchain ;
+    greylisting_config = cfg.p2p.greylisting_config ;
   }
   and rpc : rpc = {
-    listen_addr =
-      Option.first_some rpc_listen_addr cfg.rpc.listen_addr ;
+    listen_addrs =
+      unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs ;
     cors_origins =
       unopt_list ~default:cfg.rpc.cors_origins cors_origins ;
     cors_headers =
@@ -672,7 +699,7 @@ let resolve_bootstrap_addrs peers =
     ~default_port:default_p2p_port
     peers
 
-let check_listening_addr config =
+let check_listening_addrs config =
   match config.p2p.listen_addr with
   | None -> Lwt.return_unit
   | Some addr ->
@@ -709,22 +736,22 @@ let check_discovery_addr config =
       end
 
 let check_rpc_listening_addr config =
-  match config.rpc.listen_addr with
-  | None -> Lwt.return_unit
-  | Some addr ->
-      Lwt.catch begin fun () ->
-        resolve_rpc_listening_addrs addr >>= function
-        | [] ->
-            Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-            Lwt.return_unit
-        | _ :: _ ->
-            Lwt.return_unit
-      end begin function
-        | (Invalid_argument msg) ->
-            Format.eprintf "Warning: failed to parse %S:\   %s\n@." addr msg ;
-            Lwt.return_unit
-        | exn -> Lwt.fail exn
-      end
+  Lwt_list.iter_p
+    (fun addr ->
+       Lwt.catch begin fun () ->
+         resolve_rpc_listening_addrs addr >>= function
+         | [] ->
+             Format.eprintf "Warning: failed to resolve %S\n@." addr ;
+             Lwt.return_unit
+         | _ :: _ ->
+             Lwt.return_unit
+       end begin function
+         | (Invalid_argument msg) ->
+             Format.eprintf "Warning: failed to parse %S:\   %s\n@." addr msg ;
+             Lwt.return_unit
+         | exn -> Lwt.fail exn
+       end)
+    config.rpc.listen_addrs
 
 let check_bootstrap_peer addr =
   Lwt.catch begin fun () ->
@@ -789,7 +816,7 @@ let check_connections config =
 
 
 let check config =
-  check_listening_addr config >>= fun () ->
+  check_listening_addrs config >>= fun () ->
   check_rpc_listening_addr config >>= fun () ->
   check_discovery_addr config >>= fun () ->
   check_bootstrap_peers config >>= fun () ->

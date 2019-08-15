@@ -38,7 +38,7 @@ type validator_kind = Block_validator_process.validator_kind =
 module Name = struct
   type t = unit
   let encoding = Data_encoding.empty
-  let base = [ "validator.block" ]
+  let base = [ "validator" ; "block" ]
   let pp _ () = ()
 end
 
@@ -73,7 +73,8 @@ module Request = struct
       { chain_id ; block = hash ; peer = peer }
 end
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types)
+module Logger = Worker_logger.Make(Event)(Request)
+module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
 type t = Worker.infinite Worker.queue Worker.t
 
@@ -121,25 +122,25 @@ let on_request
                 debug w "validating block %a" Block_hash.pp_short hash ;
                 State.Block.read
                   chain_state header.shell.predecessor >>=? fun pred ->
-                (* TODO also protect with [Worker.canceler w]. *)
-                protect ?canceler begin fun () ->
-                  begin Block_validator_process.apply_block
-                      bv.validation_process
-                      ~predecessor:pred
-                      header operations >>= function
-                    | Ok x -> return x
-                    | Error [ Missing_test_protocol protocol ] ->
-                        Protocol_validator.fetch_and_compile_protocol
-                          bv.protocol_validator
-                          ?peer ~timeout:bv.limits.protocol_timeout
-                          protocol >>=? fun _ ->
-                        Block_validator_process.apply_block
-                          bv.validation_process
-                          ~predecessor:pred
-                          header operations
-                    | Error _ as x -> Lwt.return x
-                  end >>=? fun { validation_result ; block_metadata ;
-                                 ops_metadata ; context_hash ; forking_testchain } ->
+                Worker.protect w begin fun () ->
+                  protect ?canceler begin fun () ->
+                    begin Block_validator_process.apply_block
+                        bv.validation_process
+                        ~predecessor:pred
+                        header operations >>= function
+                      | Ok x -> return x
+                      | Error (Missing_test_protocol protocol  :: _) ->
+                          Protocol_validator.fetch_and_compile_protocol
+                            bv.protocol_validator
+                            ?peer ~timeout:bv.limits.protocol_timeout
+                            protocol >>=? fun _ ->
+                          Block_validator_process.apply_block
+                            bv.validation_process
+                            ~predecessor:pred
+                            header operations
+                      | Error _ as x -> Lwt.return x
+                    end end >>=? fun { validation_result ; block_metadata ;
+                                       ops_metadata ; context_hash ; forking_testchain } ->
                   let validation_store =
                     ({ context_hash ;
                        message = validation_result.message ;
@@ -162,16 +163,21 @@ let on_request
                     block ;
                   notify_new_block block ;
                   return (Ok (Some block))
-              | Error [Canceled | Unavailable_protocol _ | Missing_test_protocol _ | System_error _ ] as err ->
-                  (* FIXME: Canceled can escape. Canceled is not registered. BOOM! *)
-                  return err
-              | Error errors ->
-                  Worker.protect w begin fun () ->
-                    Distributed_db.commit_invalid_block
-                      chain_db hash header errors
-                  end >>=? fun commited ->
-                  assert commited ;
-                  return (Error errors)
+              | Error err as error ->
+                  if List.exists (function Invalid_block _ -> true | _ -> false) err
+                  then begin
+                    Worker.protect w begin fun () ->
+                      Distributed_db.commit_invalid_block
+                        chain_db hash header err
+                    end >>=? fun commited ->
+                    assert commited ;
+                    return error
+                  end else begin
+                    debug w "Error during %a block validation: %a"
+                      Block_hash.pp_short hash
+                      Error_monad.pp_print_error err ;
+                    return error
+                  end
 
 let on_launch _ _ (limits, start_testchain, db, validation_kind) =
   let protocol_validator = Protocol_validator.create db in
@@ -267,8 +273,12 @@ let status = Worker.status
 
 let running_worker () =
   match Worker.list table with
-  | (_, single) :: _ -> single
+  | [(_, single)] -> single
   | [] -> raise Not_found
+  | _ :: _ :: _ ->
+      (* NOTE: names of workers must be unique, [Name.t = unit] which has only
+         one inhabitant. *)
+      assert false
 
 let pending_requests t = Worker.Queue.pending_requests t
 

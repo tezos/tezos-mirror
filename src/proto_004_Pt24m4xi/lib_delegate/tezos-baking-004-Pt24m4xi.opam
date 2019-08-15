@@ -6,20 +6,17 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-protocol-004-Pt24m4xi"
   "tezos-protocol-environment"
+  "tezos-protocol-004-Pt24m4xi"
+  "tezos-shell-context"
   "tezos-shell-services"
   "tezos-client-base"
-  "tezos-client-003-PsddFKi3"
-  "tezos-client-004-Pt24m4xi"
   "tezos-client-commands"
-  "tezos-node" { with-test }
-  "tezos-client-genesis" { with-test }
-  "tezos-client-base-unix" { with-test }
-  "alcotest-lwt" { with-test }
+  "tezos-client-004-Pt24m4xi"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
@@ -27,4 +24,4 @@ build: [
 run-test: [
   [ "dune" "runtest" "-p" name "-j" jobs ]
 ]
-synopsis: "Tezos/Protocol: 004_Pt24m4xi (base library for `tezos-baker/endorser/accuser`)"
+synopsis: "Tezos/Protocol: base library for `tezos-baker/endorser/accuser`"

@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+
 include Internal_event.Legacy_logging.Make_semantic(struct
-    let name =  Proto_alpha.Name.name ^ ".client.nonce_revelation"
+    let name = Protocol.name ^ ".baking.nonce_revelation"
   end)
 
-open Proto_alpha
-
 let inject_seed_nonce_revelation
-    (cctxt: #Proto_alpha.full)
+    (cctxt: #Alpha_client_context.full)
     ~chain ~block ?async nonces =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with

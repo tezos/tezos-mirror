@@ -33,11 +33,13 @@ class unix_prompter :
 class unix_logger :
   base_dir:string ->
   Client_context.printer
+class unix_ui :
+  Client_context.ui
 class unix_full :
   base_dir:string ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   confirmations:int option ->
   password_filename: string option ->
-  rpc_config:RPC_client.config ->
+  rpc_config:RPC_client_unix.config ->
   Client_context.full

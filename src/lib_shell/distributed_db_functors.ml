@@ -79,6 +79,7 @@ module type MEMORY_TABLE = sig
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val length : 'a t -> int
 end
 
 module type SCHEDULER_EVENTS = sig
@@ -90,6 +91,7 @@ module type SCHEDULER_EVENTS = sig
   val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
   val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
   val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
+  val memory_table_length : t -> int
 end
 
 module type PRECHECK = sig
@@ -120,6 +122,7 @@ module Make_table
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val memory_table_length : t -> int
 
 end = struct
 
@@ -309,7 +312,7 @@ end = struct
     | Some (Pending { wakener = w ; _ }) ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (Error [Canceled k])
+        Lwt.wakeup_later w (error (Canceled k))
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
@@ -324,6 +327,8 @@ end = struct
     | None -> false
     | Some (Found _) -> false
     | Some (Pending _) -> true
+
+  let memory_table_length s = Memory_table.length s.memory
 
 end
 
@@ -351,6 +356,7 @@ module Make_request_scheduler
   val create: Request.param -> t
   val shutdown: t -> unit Lwt.t
   include SCHEDULER_EVENTS with type t := t and type key := Hash.t
+  val memory_table_length : t -> int
 
 end = struct
 
@@ -466,8 +472,7 @@ end = struct
               f "registering request %a from %a -> replaced"
               -% t event "registering_request_replaced"
               -% a Hash.Logging.tag key
-              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
-          Lwt.return_unit
+              -% a P2p_peer.Id.Logging.tag_opt peer)
         with Not_found ->
           let peers =
             match peer with
@@ -482,8 +487,7 @@ end = struct
               f "registering request %a from %a -> added"
               -% t event "registering_request_added"
               -% a Hash.Logging.tag key
-              -% a P2p_peer.Id.Logging.tag_opt peer) >>= fun () ->
-          Lwt.return_unit
+              -% a P2p_peer.Id.Logging.tag_opt peer)
       end
     | Notify (peer, key) ->
         Table.remove state.pending key ;
@@ -491,39 +495,34 @@ end = struct
             f "received %a from %a"
             -% t event "received"
             -% a Hash.Logging.tag key
-            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
-        Lwt.return_unit
+            -% a P2p_peer.Id.Logging.tag peer)
     | Notify_cancelation key ->
         Table.remove state.pending key ;
         lwt_debug Tag.DSL.(fun f ->
             f "canceled %a"
             -% t event "canceled"
-            -% a Hash.Logging.tag key) >>= fun () ->
-        Lwt.return_unit
+            -% a Hash.Logging.tag key)
     | Notify_invalid (peer, key) ->
+        (* TODO *)
         lwt_debug Tag.DSL.(fun f ->
             f "received invalid %a from %a"
             -% t event "received_invalid"
             -% a Hash.Logging.tag key
-            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
-        (* TODO *)
-        Lwt.return_unit
+            -% a P2p_peer.Id.Logging.tag peer)
     | Notify_unrequested (peer, key) ->
+        (* TODO *)
         lwt_debug Tag.DSL.(fun f ->
             f "received unrequested %a from %a"
             -% t event "received_unrequested"
             -% a Hash.Logging.tag key
-            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
-        (* TODO *)
-        Lwt.return_unit
+            -% a P2p_peer.Id.Logging.tag peer)
     | Notify_duplicate (peer, key) ->
+        (* TODO *)
         lwt_debug Tag.DSL.(fun f ->
             f "received duplicate %a from %a"
             -% t event "received_duplicate"
             -% a Hash.Logging.tag key
-            -% a P2p_peer.Id.Logging.tag peer) >>= fun () ->
-        (* TODO *)
-        Lwt.return_unit
+            -% a P2p_peer.Id.Logging.tag peer)
 
   let worker_loop state =
     let shutdown = Lwt_canceler.cancelation state.canceler in
@@ -533,8 +532,7 @@ end = struct
         [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
       if Lwt.state shutdown <> Lwt.Sleep then
         lwt_debug Tag.DSL.(fun f ->
-            f "terminating" -% t event "terminating") >>= fun () ->
-        Lwt.return_unit
+            f "terminating" -% t event "terminating")
       else if Lwt.state state.events <> Lwt.Sleep then
         let now = Systime_os.now () in
         state.events >>= fun events ->
@@ -614,5 +612,7 @@ end = struct
   let shutdown s =
     Lwt_canceler.cancel s.canceler >>= fun () ->
     s.worker
+
+  let memory_table_length s = Table.length s.pending
 
 end

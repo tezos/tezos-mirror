@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type error += Contract_has_no_script of Contract.t
@@ -341,7 +341,7 @@ let check_multisig_script script : unit tzresult Lwt.t =
 
 (* Returns [Ok ()] if [~contract] is an originated contract whose code
    is [multisig_script] *)
-let check_multisig_contract (cctxt : #Proto_alpha.full) ~chain ~block contract =
+let check_multisig_contract (cctxt : #Alpha_client_context.full) ~chain ~block contract =
   Client_proto_context.get_script cctxt ~chain ~block contract >>=? fun script_opt ->
   (match script_opt with
    | Some script -> return script.code
@@ -447,7 +447,7 @@ type multisig_contract_information =
     keys : key_list;
   }
 
-let multisig_get_information (cctxt : #Proto_alpha.full) ~chain ~block contract =
+let multisig_get_information (cctxt : #Alpha_client_context.full) ~chain ~block contract =
   let open Client_proto_context in
   let open Tezos_micheline.Micheline in
   get_storage cctxt ~chain ~block contract >>=? fun storage_opt ->
@@ -531,7 +531,7 @@ let check_threshold ~threshold ~keys () =
     return_unit
 
 let originate_multisig
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch
@@ -574,7 +574,7 @@ let check_action ~action () =
       check_threshold ~threshold ~keys ()
   | _ -> return_unit
 
-let prepare_multisig_transaction (cctxt : #Proto_alpha.full)
+let prepare_multisig_transaction (cctxt : #Alpha_client_context.full)
     ~chain ~block ~multisig_contract ~action () =
   let contract = multisig_contract in
   check_multisig_contract cctxt ~chain ~block contract >>=? fun () ->
@@ -612,7 +612,7 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   if (signature_count >= threshold_int) then return opt_sigs else
     fail (Not_enough_signatures (threshold_int, signature_count))
 
-let call_multisig (cctxt : #Proto_alpha.full)
+let call_multisig (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~multisig_contract ~action ~signatures
@@ -656,7 +656,7 @@ let action_of_bytes ~multisig_contract ~stored_counter bytes =
   else
     fail (Bytes_deserialisation_error bytes)
 
-let call_multisig_on_bytes (cctxt : #Proto_alpha.full)
+let call_multisig_on_bytes (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?branch ~source ~src_pk ~src_sk ~multisig_contract ~bytes ~signatures

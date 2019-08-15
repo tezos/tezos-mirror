@@ -25,6 +25,7 @@ type curve =
   | Ed25519
   | Secp256k1
   | Secp256r1
+  | Bip32_ed25519
 
 val curve_of_string : string -> curve option
 val pp_curve : Format.formatter -> curve -> unit
@@ -124,6 +125,25 @@ val sign :
   ?hash_on_ledger:bool ->
   Hidapi.t -> curve -> int32 list ->
   Cstruct.t -> (Cstruct.t, Transport.error) result
+(** [sign ?pp ?buf ?hash_on_ledger h curve path payload] is the
+    signature of [payload] (or its hash if [hash_on_ledger] is [true],
+    the default), signed on [ledger] with key from curve [curve] at
+    [path]. *)
+
+val get_deterministic_nonce :
+  ?pp:Format.formatter ->
+  ?buf:Cstruct.t ->
+  Hidapi.t -> curve -> int32 list ->
+  Cstruct.t -> (Cstruct.t, Transport.error) result
+(** [get_deterministic_nonce ?pp ?buf h curve path payload] asks the ledger
+    for a deterministic nonce from a some given bytes (using HMAC).
+*)
+
+val sign_and_hash :
+  ?pp:Format.formatter ->
+  ?buf:Cstruct.t ->
+  Hidapi.t -> curve -> int32 list ->
+  Cstruct.t -> (Cstruct.t * Cstruct.t, Transport.error) result
 (** [sign ?pp ?buf ?hash_on_ledger h curve path payload] is the
     signature of [payload] (or its hash if [hash_on_ledger] is [true],
     the default), signed on [ledger] with key from curve [curve] at

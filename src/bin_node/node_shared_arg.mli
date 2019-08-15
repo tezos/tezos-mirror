@@ -39,10 +39,10 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   discovery_addr: string option ;
-  rpc_listen_addr: string option ;
+  rpc_listen_addrs: string list ;
   private_mode: bool ;
   disable_mempool: bool ;
-  disable_testchain: bool ;
+  enable_testchain: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;

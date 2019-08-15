@@ -62,7 +62,7 @@ module Prompt : sig
     -> item
 
   val default_commands : unit -> item list
-  (** The default commands are !{help} and {!quit}. *)
+  (** The default commands are {!help} and {!quit}. *)
 
   val command :
        ?with_defaults:bool

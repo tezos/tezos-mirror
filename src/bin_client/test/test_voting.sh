@@ -10,16 +10,11 @@ source $test_dir/test_lib.inc.sh "$@"
 
 # Prepare a config with a shorter blocks_per_voting_period
 tempdir=`mktemp -d`
-sed -e 's/"blocks_per_voting_period" : [0-9]*/"blocks_per_voting_period" : 4/' $parameters_file > $tempdir/parameters.json
+sed -e 's/"blocks_per_voting_period": [0-9]*/"blocks_per_voting_period" : 4/' $parameters_file > $tempdir/parameters.json
 parameters_file=$tempdir/parameters.json
 echo params=${parameters_file}
 
-# Start a node
-start_node 1
-activate_alpha
-
-echo Alpha activated
-
+#useful RPCs
 function get_ballot_list() {
     $client rpc get /chains/main/blocks/head/votes/ballot_list
 }
@@ -43,13 +38,19 @@ function get_proposals() {
 }
 function get_period_position() {
     #TODO why offset 1?
-    $client rpc get /chains/main/blocks/head/helpers/current_level?offset=1 | jq .voting_period_position
+    $client rpc get /chains/main/blocks/head/helpers/current_level | jq .voting_period_position
 }
+
+# Start a node
+start_node 1
+activate_alpha
+
+echo Alpha activated
 
 $client show voting period
 
 echo 'Checking the current period = proposal with non empty listings'
-[ `get_period_position` = '1' ] \
+[ `get_period_position` = '0' ] \
     || { echo "strange voting_period_position" ; exit 1 ; }
 [ "`get_listings`" != '[]' ] \
     || { echo "strange listings" ; exit 1 ; }
@@ -88,6 +89,13 @@ $client submit proposals for bootstrap1 ${proto[0]}
 $client submit proposals for bootstrap2 ${proto[0]} ${proto[1]}
 $client submit proposals for bootstrap3 ${proto[1]}
 $client submit proposals for bootstrap4 ${proto[2]}
+
+bake
+
+$client show voting period
+
+[ "`get_proposals`" != '[]' ] \
+    || { echo "strange proposals" ; exit 1 ; }
 
 bake # pos=2
 

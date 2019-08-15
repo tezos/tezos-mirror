@@ -124,12 +124,12 @@ module Scheduler(IO : IO) = struct
           false, (Queue.pop st.readys_low)
       in
       match msg with
-      | Error [ Canceled ] ->
+      | Error (Canceled  :: _) ->
           worker_loop st
-      | Error ([P2p_errors.Connection_closed |
-                Exn ( Lwt_pipe.Closed |
-                      Unix.Unix_error ((EBADF | ETIMEDOUT), _, _) )]
-               as err) ->
+      | Error (P2p_errors.Connection_closed :: _ as err)
+      | Error (Exn Lwt_pipe.Closed :: _ as err)
+      | Error (Exn (Unix.Unix_error ((EBADF | ETIMEDOUT), _, _)) :: _ as err)
+        ->
           lwt_debug "Connection closed (pop: %d, %s)"
             conn.id IO.name >>= fun () ->
           cancel conn err >>= fun () ->
@@ -144,11 +144,11 @@ module Scheduler(IO : IO) = struct
           conn.current_push <- begin
             IO.push conn.out_param msg >>= function
             | Ok ()
-            | Error [ Canceled ] ->
+            | Error (Canceled  :: _) ->
                 return_unit
-            | Error ([P2p_errors.Connection_closed |
-                      Exn (Unix.Unix_error (EBADF, _, _) |
-                           Lwt_pipe.Closed)] as err) ->
+            | Error (P2p_errors.Connection_closed :: _ as err)
+            | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
+            | Error (Exn Lwt_pipe.Closed :: _ as err) ->
                 lwt_debug "Connection closed (push: %d, %s)"
                   conn.id IO.name >>= fun () ->
                 cancel conn err >>= fun () ->
@@ -224,8 +224,7 @@ module Scheduler(IO : IO) = struct
     lwt_debug "--> scheduler(%s).shutdown" IO.name >>= fun () ->
     Lwt_canceler.cancel st.canceler >>= fun () ->
     st.worker >>= fun () ->
-    lwt_debug "<-- scheduler(%s).shutdown" IO.name >>= fun () ->
-    Lwt.return_unit
+    lwt_debug "<-- scheduler(%s).shutdown" IO.name
 
 
 end
@@ -250,7 +249,7 @@ module ReadScheduler = Scheduler(struct
     type out_param = MBytes.t tzresult Lwt_pipe.t
     let push p msg =
       Lwt.catch
-        (fun () -> Lwt_pipe.push p (Ok msg) >>= return)
+        (fun () -> Lwt_pipe.push p (Ok msg) >>= fun () -> return_unit)
         (fun exn -> fail (Exn exn))
     let close p err =
       Lwt.catch
@@ -274,10 +273,8 @@ module WriteScheduler = Scheduler(struct
           | Unix.Unix_error(Unix.ECONNRESET, _, _)
           | Unix.Unix_error(Unix.EPIPE, _, _)
           | Lwt.Canceled
-          | End_of_file ->
-              fail P2p_errors.Connection_closed
-          | exn ->
-              Lwt.return (error_exn exn))
+          | End_of_file -> fail P2p_errors.Connection_closed
+          | exn -> Lwt.return (error_exn exn))
     let close _p _err = Lwt.return_unit
   end)
 
@@ -398,7 +395,7 @@ let register st conn =
 let write ?canceler { write_queue ; _ } msg =
   trace P2p_errors.Connection_closed @@
   protect ?canceler begin fun () ->
-    Lwt_pipe.push write_queue msg >>= return
+    Lwt_pipe.push write_queue msg >>= fun () -> return_unit
   end
 let write_now { write_queue ; _ } msg = Lwt_pipe.push_now write_queue msg
 
@@ -418,7 +415,7 @@ let read_from conn ?pos ?len buf msg =
           Some (MBytes.sub msg read_len (msg_len - read_len)) ;
       Ok read_len
   | Error _ ->
-      Error [P2p_errors.Connection_closed]
+      error P2p_errors.Connection_closed
 
 let read_now conn ?pos ?len buf =
   match conn.partial_read with
@@ -430,7 +427,7 @@ let read_now conn ?pos ?len buf =
         Option.map
           ~f:(read_from conn ?pos ?len buf)
           (Lwt_pipe.pop_now conn.read_queue)
-      with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
+      with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed)
 
 let read ?canceler conn ?pos ?len buf =
   match conn.partial_read with
@@ -508,7 +505,6 @@ let shutdown ?timeout st =
     st.connected
     Lwt.return_unit >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler >>= fun () ->
-  lwt_log_info "<-- shutdown" >>= fun () ->
-  Lwt.return_unit
+  lwt_log_info "<-- shutdown"
 
 let id conn = P2p_fd.id conn.conn

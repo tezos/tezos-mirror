@@ -13,6 +13,7 @@
  (library_flags (:standard -linkall))
  (modules (:standard \ alpha_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_004_Pt24m4xi
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
@@ -36,6 +37,7 @@
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_004_Pt24m4xi
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_client_004_Pt24m4xi
@@ -44,6 +46,6 @@
                    -open Tezos_rpc)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -65,8 +65,6 @@ let try_with f =
 
 let some x = Some x
 
-let pp ?(default="") data_pp ppf opt =
-  unopt_map
-    ~f:(fun i -> data_pp ppf i)
-    ~default:(Format.pp_print_string ppf default)
-    opt
+let pp ?(default = "None") pp fmt = function
+  | Some value -> pp fmt value
+  | None -> Format.pp_print_text fmt default

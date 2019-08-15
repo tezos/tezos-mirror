@@ -54,7 +54,7 @@ type 'meta t = {
 
 (** Select [expected] points among the disconnected known points.
     It ignores points which are greylisted, or for which a connection
-    failed after [start_time] and the pointes that are banned. It
+    failed after [start_time] and the points that are banned. It
     first selects points with the oldest last tentative.
     Non-trusted points are also ignored if option --private-mode is set. *)
 let connectable st start_time expected seen_points =
@@ -177,7 +177,7 @@ and too_few_connections st n_connected =
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
-      ] >>= return
+      ] >>= fun () -> return_unit
     end >>=? fun () ->
     maintain st
   end
@@ -206,15 +206,6 @@ and too_many_connections st n_connected =
 let rec worker_loop st =
   let Pool pool = st.pool in
   begin
-    protect ~canceler:st.canceler begin fun () ->
-      Lwt.pick [
-        Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
-        Lwt_condition.wait st.please_maintain ; (* when asked *)
-        P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
-        P2p_pool.Pool_event.wait_too_many_connections pool ;
-      ] >>= fun () ->
-      return_unit
-    end >>=? fun () ->
     let n_connected = P2p_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
     || st.bounds.max_threshold < n_connected then
@@ -222,10 +213,19 @@ let rec worker_loop st =
     else begin
       P2p_pool.send_swap_request pool ;
       return_unit
-    end
+    end >>=? fun () ->
+      protect ~canceler:st.canceler begin fun () ->
+        Lwt.pick [
+          Systime_os.sleep st.config.maintenance_idle_time ; (* default: every two minutes *)
+          Lwt_condition.wait st.please_maintain ; (* when asked *)
+          P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
+          P2p_pool.Pool_event.wait_too_many_connections pool ;
+        ] >>= fun () ->
+        return_unit
+      end
   end >>= function
   | Ok () -> worker_loop st
-  | Error [ Canceled ] -> Lwt.return_unit
+  | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
 let create ?discovery config bounds pool = {

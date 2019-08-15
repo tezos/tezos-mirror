@@ -44,10 +44,10 @@ type t = {
   no_bootstrap_peers: bool ;
   listen_addr: string option ;
   discovery_addr: string option ;
-  rpc_listen_addr: string option ;
+  rpc_listen_addrs: string list ;
   private_mode: bool ;
   disable_mempool: bool ;
-  disable_testchain: bool ;
+  enable_testchain: bool ;
   cors_origins: string list ;
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
@@ -61,8 +61,8 @@ let wrap
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
     listen_addr discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
-    disable_mempool disable_testchain
-    expected_pow rpc_listen_addr rpc_tls
+    disable_mempool enable_testchain
+    expected_pow rpc_listen_addrs rpc_tls
     cors_origins cors_headers log_output history_mode =
 
   let actual_data_dir =
@@ -106,10 +106,10 @@ let wrap
     no_bootstrap_peers ;
     listen_addr ;
     discovery_addr ;
-    rpc_listen_addr ;
+    rpc_listen_addrs ;
     private_mode ;
     disable_mempool ;
-    disable_testchain ;
+    enable_testchain ;
     cors_origins ;
     cors_headers ;
     rpc_tls ;
@@ -146,9 +146,31 @@ module Term = struct
        | None -> `Error s),
     Lwt_log_sink_unix.Output.pp
 
+  let history_mode_converter =
+    let open History_mode in
+    (function
+      | "archive" -> `Ok Archive
+      | "full" -> `Ok Full
+      | "experimental-rolling" -> `Ok Rolling
+      | s -> `Error s),
+    pp
+
   (* misc args *)
 
   let docs = Manpage.misc_section
+
+  let history_mode =
+    let doc = "Set the mode for the chain's data history \
+               storage. Possible values are $(i,archive), $(i,full) \
+               (default), $(i,experimental-rolling). Archive mode \
+               retains all data since the genesis block. Full mode \
+               only maintains block headers and operations allowing \
+               replaying the chain since the genesis if \
+               wanted. (Experimental-)Rolling mode retains only the \
+               most recent data (i.e. from the 5 last cycles) and \
+               deletes the rest." in
+    Arg.(value & opt (some history_mode_converter) None &
+         info ~docs ~doc ~docv:"<mode>" ["history-mode"])
 
   let log_output =
     let doc =
@@ -260,23 +282,22 @@ module Term = struct
        of the node." in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
 
-  let disable_testchain =
+  let enable_testchain =
     let doc =
-      "If set to [true], the node will not spawn a testchain during \
-       the protocol's testing voting period. \
-       Default value is [false]. It may be used used to decrease the \
-       node storage usage and computation by droping the validation \
-       of the test network blocks." in
-    Arg.(value & flag & info ~docs ~doc ["disable-testchain"])
+      "If set, the node will spawn a testchain during the protocol's \
+       testing voting period. It will increase the node storage usage \
+       and computation by additionally validating the test network \
+       blocks." in
+    Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
 
   (* rpc args *)
   let docs = Manpage.rpc_section
 
-  let rpc_listen_addr =
+  let rpc_listen_addrs =
     let doc =
       "The TCP socket address at which this RPC server \
        instance can be reached." in
-    Arg.(value & opt (some string) None &
+    Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let rpc_tls =
@@ -300,25 +321,6 @@ module Term = struct
     Arg.(value & opt_all string [] &
          info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
-  (* History mode. *)
-
-  let history_mode_converter =
-    let open History_mode in
-    let conv s = match s with
-      | "archive" -> `Ok Archive
-      | "full" -> `Ok Full
-      | "experimental-rolling" -> `Ok Rolling
-      | s -> `Error s in
-    let to_string = Format.asprintf "%a" History_mode.pp in
-    let pp fmt mode = Format.fprintf fmt "%s" (to_string mode) in
-    (conv, pp)
-
-  let history_mode =
-    let doc = "History mode. Possible values: \
-               $(i,archive), $(i,full) (used by default), $(i,experimental-rolling)" in
-    Arg.(value & opt (some history_mode_converter) None &
-         info ~docs ~doc ~docv:"History mode" ["history-mode"])
-
   (* Args. *)
 
   let args =
@@ -328,8 +330,8 @@ module Term = struct
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
     $ listen_addr $ discovery_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
-    $ private_mode $ disable_mempool $ disable_testchain
-    $ expected_pow $ rpc_listen_addr $ rpc_tls
+    $ private_mode $ disable_mempool $ enable_testchain
+    $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
     $ history_mode
@@ -358,8 +360,8 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         peers ; no_bootstrap_peers ;
         listen_addr ; private_mode ;
         discovery_addr ;
-        disable_mempool ; disable_testchain ;
-        rpc_listen_addr ; rpc_tls ;
+        disable_mempool ; enable_testchain ;
+        rpc_listen_addrs ; rpc_tls ;
         cors_origins ; cors_headers ;
         log_output ;
         bootstrap_threshold ;
@@ -377,6 +379,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
-    ~bootstrap_peers ?listen_addr ?discovery_addr ?rpc_listen_addr ~private_mode
-    ~disable_mempool ~disable_testchain ~cors_origins ~cors_headers ?rpc_tls
+    ~bootstrap_peers ?listen_addr ?discovery_addr ~rpc_listen_addrs ~private_mode
+    ~disable_mempool ~enable_testchain ~cors_origins ~cors_headers ?rpc_tls
     ?log_output ?bootstrap_threshold ?history_mode cfg

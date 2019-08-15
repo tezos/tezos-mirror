@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 let sign ?(watermark = Signature.Generic_operation)
@@ -70,16 +70,16 @@ let combine_operations
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
   let { Tezos_base.Operation.branch } = (List.hd packed_operations).shell in
   assert (List.for_all
-            (fun { shell = { Tezos_base.Operation.branch = b } } -> Block_hash.(branch = b))
+            (fun { shell = { Tezos_base.Operation.branch = b ; _} ; _} -> Block_hash.(branch = b))
             packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
     List.map (function
-        | ({ Alpha_context.protocol_data = Operation_data { contents } } ) ->
+        | ({ Alpha_context.protocol_data = Operation_data { contents ; _ } ; _ } ) ->
             match Contents_list contents with
             | Contents_list (Single o) -> Contents o
             | Contents_list (Cons
-                               ((Manager_operation { operation = Reveal _ })
+                               ((Manager_operation { operation = Reveal _ ; _ })
                                , (Single o))) -> Contents o
             | _ -> (* TODO : decent error *) assert false
       ) packed_operations in
@@ -124,13 +124,18 @@ let combine_operations
 let manager_operation
     ?counter
     ?(fee = Tez.zero)
-    ?(gas_limit = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(storage_limit = Constants_repr.default.hard_storage_limit_per_operation)
+    ?(gas_limit)
+    ?(storage_limit)
     ?public_key ~source ctxt operation =
   begin match counter with
     | Some counter -> return counter
     | None ->  Context.Contract.counter ctxt source end
   >>=? fun counter ->
+  Context.get_constants ctxt >>=? fun c ->
+  let gas_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation gas_limit in
+  let storage_limit = Option.unopt
+      ~default:c.parametric.hard_storage_limit_per_operation storage_limit in
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.unopt ~default:account.pk public_key in
   let counter = Z.succ counter in

@@ -71,7 +71,8 @@ module Topology = struct
     | Net_in_the_middle {left; right; middle} ->
         continue middle @ continue left @ continue right
 
-  let build ?protocol ?(base_port = 15_001) ~exec network =
+  let build ?(external_peer_ports = []) ?protocol ?(base_port = 15_001) ~exec
+      network =
     let all_ports = ref [] in
     let next_port = ref (base_port + (base_port mod 2)) in
     let rpc name =
@@ -87,13 +88,16 @@ module Topology = struct
     let node peers id =
       let rpc_port = rpc id in
       let p2p_port = p2p id in
-      let expected_connections = List.length peers in
+      let expected_connections =
+        List.length peers + List.length external_peer_ports
+      in
       let peers =
         List.filter_map peers ~f:(fun p ->
             if p <> id then Some (p2p p) else None )
       in
       Tezos_node.make ?protocol ~exec id ~expected_connections ~rpc_port
-        ~p2p_port peers
+        ~p2p_port
+        (external_peer_ports @ peers)
     in
     let dbgp prefx names =
       Printf.eprintf "%s:\n  %s\n%!" prefx
@@ -237,10 +241,10 @@ module Network = struct
         Tezos_client.bootstrapped client ~state )
 end
 
-let network_with_protocol ?base_port ?(size = 5) ?protocol state ~node_exec
-    ~client_exec =
+let network_with_protocol ?external_peer_ports ?base_port ?(size = 5) ?protocol
+    state ~node_exec ~client_exec =
   let nodes =
-    Topology.build ?base_port ?protocol ~exec:node_exec
+    Topology.build ?base_port ?protocol ~exec:node_exec ?external_peer_ports
       (Topology.mesh "N" size)
   in
   let protocols =
@@ -253,15 +257,15 @@ let network_with_protocol ?base_port ?(size = 5) ?protocol state ~node_exec
   >>= fun () -> return (nodes, protocol)
 
 module Queries = struct
-  let all_levels state ~nodes =
+  let all_levels ?(chain = "main") state ~nodes =
     List.fold nodes ~init:(return [])
       ~f:(fun prevm {Tezos_node.id; rpc_port; _} ->
         prevm
         >>= fun prev ->
         Running_processes.run_cmdf state
-          "curl http://localhost:%d/chains/main/blocks/head/metadata | jq \
+          "curl http://localhost:%d/chains/%s/blocks/head/metadata | jq \
            .level.level"
-          rpc_port
+          rpc_port chain
         >>= fun lvl ->
         Console.display_errors_of_command state lvl ~should_output:true
         >>= function
@@ -281,7 +285,7 @@ module Queries = struct
     in
     return sorted
 
-  let wait_for_all_levels_to_be state ~attempts ~seconds nodes level =
+  let wait_for_all_levels_to_be ?chain state ~attempts ~seconds nodes level =
     let check_level =
       match level with
       | `Equal_to l -> ( = ) l
@@ -307,12 +311,13 @@ module Queries = struct
     in
     Console.say state
       EF.(
-        wf "Checking for all levels to be %s (nodes: %s)" level_string
+        wf "Checking for all levels to be %s (nodes: %s%s)" level_string
           (String.concat ~sep:", "
-             (List.map nodes ~f:(fun n -> n.Tezos_node.id))))
+             (List.map nodes ~f:(fun n -> n.Tezos_node.id)))
+          (Option.value_map chain ~default:"" ~f:(sprintf ", chain: %s")))
     >>= fun () ->
     Helpers.wait_for state ~attempts ~seconds (fun _nth ->
-        all_levels state ~nodes
+        all_levels state ~nodes ?chain
         >>= fun results ->
         let not_readys =
           List.filter_map results ~f:(function

@@ -32,7 +32,7 @@ module Name = struct
   type t = Chain_id.t * P2p_peer.Id.t
   let encoding =
     Data_encoding.tup2 Chain_id.encoding P2p_peer.Id.encoding
-  let base = [ "validator.peer" ]
+  let base = [ "validator" ; "peer" ]
   let pp ppf (chain, peer) =
     Format.fprintf ppf "%a:%a"
       Chain_id.pp_short chain P2p_peer.Id.pp_short peer
@@ -79,19 +79,26 @@ module Types = struct
     peer_id: P2p_peer.Id.t ;
     parameters : parameters ;
     mutable bootstrapped: bool ;
+    mutable pipeline : Bootstrap_pipeline.t option ;
     mutable last_validated_head: Block_header.t ;
     mutable last_advertised_head: Block_header.t ;
   }
 
+  let pipeline_length = function
+    | None -> Bootstrap_pipeline.length_zero
+    | Some p -> Bootstrap_pipeline.length p
+
   let view (state : state) _ : view =
-    let { bootstrapped ; last_validated_head ; last_advertised_head ; _ } = state in
-    { bootstrapped ;
+    let { bootstrapped ; pipeline ;
+          last_validated_head ; last_advertised_head ; _ } = state in
+    { bootstrapped ; pipeline_length = pipeline_length pipeline ;
       last_validated_head = Block_header.hash last_validated_head ;
       last_advertised_head = Block_header.hash last_advertised_head }
 
 end
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types)
+module Logger = Worker_logger.Make(Event)(Request)
+module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
 open Types
 
@@ -123,15 +130,18 @@ let bootstrap_new_branch w _head unknown_prefix =
       ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
       pv.parameters.block_validator
       pv.peer_id pv.parameters.chain_db unknown_prefix in
+  pv.pipeline <- Some pipeline ;
   Worker.protect w
     ~on_error:begin fun error ->
       (* if the peer_validator is killed, let's cancel the pipeline *)
+      pv.pipeline <- None ;
       Bootstrap_pipeline.cancel pipeline >>= fun () ->
       Lwt.return_error error
     end
     begin fun () ->
       Bootstrap_pipeline.wait pipeline
     end >>=? fun () ->
+  pv.pipeline <- None ;
   set_bootstrapped pv ;
   debug w
     "done validating new branch from peer %a."
@@ -255,7 +265,11 @@ let may_validate_new_branch w distant_hash locator =
         P2p_peer.Id.pp_short pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
   | Some unknown_prefix ->
-      bootstrap_new_branch w distant_header unknown_prefix
+      let (_, history) = Block_locator.raw unknown_prefix in
+      if history <> [] then
+        bootstrap_new_branch w distant_header unknown_prefix
+      else
+        return_unit
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -285,9 +299,9 @@ let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
   Lwt.return_unit
 
-let on_error w r st errs =
+let on_error w r st err =
   let pv = Worker.state w in
-  match errs with
+  match err with
     ((( Validation_errors.Unknown_ancestor
       | Validation_errors.Invalid_locator _
       | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
@@ -297,12 +311,12 @@ let on_error w r st errs =
         P2p_peer.Id.pp_short pv.peer_id ;
       debug w "%a" Error_monad.pp_print_error errors ;
       Worker.trigger_shutdown w ;
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return_error errs
-  | [Block_validator_errors.System_error _ ] as errs ->
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
+      Lwt.return_error err
+  | (Block_validator_errors.System_error _  :: _) ->
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
       return_unit
-  | [Block_validator_errors.Unavailable_protocol { protocol ; _ } ] -> begin
+  | (Block_validator_errors.Unavailable_protocol { protocol ; _ }  :: _) -> begin
       Block_validator.fetch_and_compile_protocol
         pv.parameters.block_validator
         ~peer:pv.peer_id
@@ -319,19 +333,19 @@ let on_error w r st errs =
              (missing protocol %a)."
             P2p_peer.Id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol ;
-          Worker.record_event w (Event.Request (r, st, Some errs)) ;
-          Lwt.return_error errs
+          Worker.record_event w (Event.Request (r, st, Some err)) ;
+          Lwt.return_error err
     end
-  | [ Validation_errors.Too_short_locator _ ] ->
+  | (Validation_errors.Too_short_locator _  :: _) ->
       debug w
         "Terminating the validation worker for peer %a (kick)."
         P2p_peer.Id.pp_short pv.peer_id ;
       Worker.trigger_shutdown w ;
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
       return_unit
   | _ ->
-      Worker.record_event w (Event.Request (r, st, Some errs)) ;
-      Lwt.return_error errs
+      Worker.record_event w (Event.Request (r, st, Some err)) ;
+      Lwt.return_error err
 
 let on_close w =
   let pv = Worker.state w in
@@ -347,6 +361,7 @@ let on_launch _ name parameters =
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;
     bootstrapped = false ;
+    pipeline = None ;
     last_validated_head = State.Block.header genesis ;
     last_advertised_head = State.Block.header genesis ;
   }
@@ -432,9 +447,14 @@ let current_head w =
   pv.last_validated_head
 
 let status = Worker.status
+let information = Worker.information
 
 let running_workers () = Worker.list table
 
 let current_request t = Worker.current_request t
 
 let last_events = Worker.last_events
+
+let pipeline_length w =
+  let state = Worker.state w in
+  Types.pipeline_length state.pipeline

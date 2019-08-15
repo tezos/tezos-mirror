@@ -23,22 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
+open Alpha_client_context
 open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_big_map_value (rpc : #Proto_alpha.rpc_context) ~chain ~block contract key =
+let get_big_map_value (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract key =
   Alpha_services.Contract.big_map_get_opt rpc (chain, block) contract key
 
-let get_script (rpc : #Proto_alpha.rpc_context) ~chain ~block contract =
+let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let parse_expression arg =
@@ -46,7 +47,7 @@ let parse_expression arg =
     (Micheline_parser.no_parsing_error
        (Michelson_v1_parser.parse_expression arg))
 
-let transfer (cctxt : #Proto_alpha.full)
+let transfer (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run ?verbose_signing
     ?branch ~source ~src_pk ~src_sk ~destination ?arg
@@ -169,7 +170,7 @@ let delegate_contract cctxt
   return res
 
 let list_contract_labels
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   map_s (fun h ->
@@ -195,11 +196,11 @@ let list_contract_labels
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Proto_alpha.full) name =
+let message_added_contract (cctxt : #Alpha_client_context.full) name =
   cctxt#message "Contract memorized as %s." name
 
 let get_manager
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block source =
   Client_proto_contracts.get_manager
     cctxt ~chain ~block source >>=? fun src_pkh ->
@@ -233,7 +234,7 @@ let register_as_delegate
     ~fee_parameter
     (Some source)
 
-let source_to_keys (wallet : #Proto_alpha.full) ~chain ~block source =
+let source_to_keys (wallet : #Alpha_client_context.full) ~chain ~block source =
   get_manager
     wallet ~chain ~block
     source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
@@ -245,7 +246,7 @@ let save_contract ~force cctxt alias_name contract =
   return_unit
 
 let originate_contract
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?verbose_signing
@@ -382,7 +383,7 @@ let inject_activate_operation
       return (oph, op, result)
 
 let activate_account
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     ?(encrypted = false) ?force
@@ -408,7 +409,7 @@ let activate_account
     name key.pkh key.activation_code
 
 let activate_existing_account
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations
     ?dry_run
     alias activation_code =
@@ -436,7 +437,7 @@ type ballots_info = {
 }
 
 let get_ballots_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -454,7 +455,7 @@ let get_ballots_info
            ballots }
 
 let get_period_info
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
@@ -471,14 +472,14 @@ let get_period_info
            current_proposal }
 
 let get_proposals
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Voting.proposals cctxt cb
 
 let submit_proposals
     ?dry_run ?verbose_signing
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations ~src_sk source proposals =
   (* We need the next level, not the current *)
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block) >>=? fun (level : Level.t) ->
@@ -489,7 +490,7 @@ let submit_proposals
     ?dry_run ~src_sk contents ?verbose_signing
 
 let submit_ballot
-    ?dry_run ?verbose_signing (cctxt : #Proto_alpha.full)
+    ?dry_run ?verbose_signing (cctxt : #Alpha_client_context.full)
     ~chain ~block ?confirmations ~src_sk source proposal ballot =
   (* The user must provide the proposal explicitly to make himself sure
      for what he is voting. *)
@@ -526,11 +527,11 @@ let get_operation_from_block
   | Some (block, i, j) ->
       cctxt#message "Operation found in block: %a (pass: %d, offset: %d)"
         Block_hash.pp block i j >>= fun () ->
-      Proto_alpha.Alpha_block_services.Operations.operation cctxt
+      Alpha_client_context.Alpha_block_services.Operations.operation cctxt
         ~chain ~block:(`Hash (block, 0)) i j >>=? fun op' -> return_some op'
 
 let display_receipt_for_operation
-    (cctxt : #Proto_alpha.full)
+    (cctxt : #Alpha_client_context.full)
     ~chain
     ?(predecessors = 10)
     operation_hash =

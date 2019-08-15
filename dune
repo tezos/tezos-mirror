@@ -6,7 +6,7 @@
 
 (alias
  (name runtest)
- (deps (alias_rec runtest_indent)))
+ (deps (alias_rec runtest_lint)))
 
 (alias
  (name runtest)

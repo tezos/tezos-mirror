@@ -39,7 +39,7 @@ val iter: f:('a -> unit) -> 'a option -> unit
 (** [x] if input is [Some x], default if it's [None] **)
 val unopt: default:'a -> 'a option -> 'a
 
-(** [unopt_map f d x] is [y] if [x] is [Some y], [d] if [x] is [None] **)
+(** [unopt_map f d x] is [f y] if [x] is [Some y], [d] if [x] is [None] **)
 val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
 (** [unopt_exn exn x] is [y] if [x] is [Some y], or raises [exn] if [x] is [None] *)
@@ -57,6 +57,11 @@ val try_with : (unit -> 'a) -> 'a option
 (** Make an option of a value *)
 val some : 'a -> 'a option
 
-(** [pp ~default data_pp ppf x] pretty-print value [x] using [data_pp]
-    or [default] ([""] by default) string if there is no value. *)
-val pp: ?default:string ->(Format.formatter -> 'a -> unit) -> Format.formatter -> 'a option -> unit
+(** [pp ~default pp fmt x] pretty-print value [x] using [pp]
+    or [default] (["None"] by default) string if there is no value. *)
+val pp:
+  ?default:string ->
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter ->
+  'a option ->
+  unit

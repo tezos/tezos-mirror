@@ -152,6 +152,10 @@ module type INDEXES = sig
     val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
   end
 
+  module Error_table : sig
+    include Error_table.S with type key = t
+  end
+
   module WeakRingTable : sig
     include WeakRingTable.S with type key = t
     val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t

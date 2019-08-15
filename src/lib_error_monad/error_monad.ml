@@ -334,17 +334,17 @@ module Make(Prefix : sig val id : string end) = struct
 
   let return v = Lwt.return_ok v
 
-  let return_unit = Lwt.return_ok ()
+  let return_unit = Lwt.return (Ok ())
 
-  let return_none = Lwt.return_ok None
+  let return_none = Lwt.return (Ok None)
 
   let return_some x = Lwt.return_ok (Some x)
 
-  let return_nil = Lwt.return_ok []
+  let return_nil = Lwt.return (Ok [])
 
-  let return_true = Lwt.return_ok true
+  let return_true = Lwt.return (Ok true)
 
-  let return_false = Lwt.return_ok false
+  let return_false = Lwt.return (Ok false)
 
   let error s = Error [ s ]
 
@@ -680,13 +680,14 @@ end
 
 include Make(struct let id = "" end)
 
+type error += Exn of exn
+
 let generic_error fmt =
-  Format.kasprintf (fun s -> error (Unclassified s)) fmt
+  Format.kasprintf (fun s -> error (Exn (Failure  s))) fmt
 
 let failwith fmt =
-  Format.kasprintf (fun s -> fail (Unclassified s)) fmt
+  Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
-type error += Exn of exn
 let error s = Error [ s ]
 let error_exn s = Error [ Exn s ]
 let trace_exn exn f = trace (Exn exn) f
@@ -714,6 +715,16 @@ let () =
     (fun msg -> Exn (Failure msg))
 
 type error += Canceled
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"canceled"
+    ~title:"Canceled"
+    ~description:"A promise was unexpectedly canceled"
+    Data_encoding.unit
+    (function Canceled -> Some () | _ -> None)
+    (fun () -> Canceled)
 
 let protect ?on_error ?canceler t =
   let cancelation =

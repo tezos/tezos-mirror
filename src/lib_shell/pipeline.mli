@@ -29,25 +29,57 @@
 (** Steps are the building blocks of pipeline. A step is essentially a function
     from a given type to another. *)
 type ('a, 'b) step
+
+(** [sync f] is the function [f] as a synchronous step. Data that is transformed
+    by a synchronous function is never buffered. Instead it is transformed as it
+    arrives. *)
 val sync: ('a -> 'b) -> ('a, 'b) step
+
+(** [async_s f] is the function [f] as an asynchronous serial step. There is
+    only ever at most one unresolved promise created by this function. If data
+    arrives at this step and the function as already been called, the data is
+    buffered until the promise created by the call resolves. *)
 val async_s: ('a -> 'b Lwt.t) -> ('a, 'b) step
+
+(** [async_p f] is the function [f] as an asynchronous parallel step. Multiple
+    unresolved promise for this step can be unresolved at the same time. Data
+    might still be buffered if the global limit on unresolved promises is
+    reached. *)
 val async_p: ('a -> 'b Lwt.t) -> ('a, 'b) step
 
-(** Error management *)
+(** Error management: these steps are helpers for managing errors through the
+    [result] type. *)
+
+(** [all_ok] is [sync (fun x -> Ok x)] and it is meant to inject all of the
+    available data into the [result] type. *)
 val all_ok:
   ('a, ('a, 'b) result) step
+
+(** [map_in_err f s] is a step with the same synchronicity as [s]. On [Ok] data
+    it acts the same as [s], but [Error] data is modified by [f] before being
+    handled normally by [s]. *)
 val map_in_err:
   ('erra -> 'errb) ->
   (('a, 'errb) result, 'b) step ->
   (('a, 'erra) result, 'b) step
+
+(** [map_out_err f s] is a step with the same synchronicity as [s]. On [Ok] data
+    it acts the same as [s], but [Error] data is modified by [f] after being
+    handled normally by [s]. *)
 val map_out_err:
   ('erra -> 'errb) ->
   ('a, ('b, 'erra) result) step ->
   ('a, ('b, 'errb) result) step
+
+(** [with_err s] is a step with the same synchronicity as [s]. It acts as [s] on
+    [Ok] data and it is a no-op on [Error] data. *)
 val with_err:
   ('a, ('b, 'err) result) step ->
   (('a, 'err) result, ('b, 'err) result) step
 
+(** [recover f] is [sync (function | Ok v -> v | Error e -> f e)]: it maps the
+    [Error] data onto the same type as the [Ok] data and exits the [result]
+    type. *)
 val recover:
   ('err -> 'a) ->
   (('a, 'err) result, 'a) step
@@ -67,7 +99,7 @@ val nil: ('x, 'x) pipe
 val cons: ('a, 'b) step -> ('b, 'c) pipe -> ('a, 'c) pipe
 
 
-(** Core funcitonality:
+(** Core functionality:
     [run ?pool pipe input] runs all the elements of [input] through the steps of
     [pipeline]. All the while it maintains the following invariants:
     - There are never more than [pool] unresolved high-level promises at any one

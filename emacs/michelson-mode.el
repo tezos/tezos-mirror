@@ -1,5 +1,6 @@
 ;; Major mode for editing Michelson smart contracts.
 
+(require 'cl)
 (require 'cl-lib)
 (require 'deferred)
 (require 'font-lock)
@@ -163,6 +164,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
       (kbd "TAB") 'indent-for-tab-command)
     (define-key michelson-mode-map
       (kbd "<f1>") 'michelson-type-at-point)
+    (define-key michelson-mode-map
+      (kbd "C-c C-x") 'michelson-goto-next-error)
     michelson-mode-map))
 
 (defun michelson-font-lock-syntactic-face-function (s)
@@ -614,6 +617,25 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
   (interactive)
   (michelson-get-info (buffer-name))
   (michelson-show-program-info))
+
+
+(defun michelson-goto-next-error ()
+  "goto the first error found after the cursor, wrapping at the end of
+buffer."
+  (interactive)
+  (let ((errors (cache-errors michelson-cached-buffer-info)))
+    (if errors
+        (let ((next (find-if
+                     (lambda (err) (> (car err) (point)) errors nil)
+                     errors
+                     )))
+          (if next
+              (goto-char next)
+            (goto-char (caar errors)))
+          )
+      (message "no error"))
+    )
+  )
 
 (defun michelson-make-suggest (instr pred)
   "Suggest `INSTR' if `PRED' is not nil."

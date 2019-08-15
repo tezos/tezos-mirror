@@ -404,7 +404,7 @@ module Reader = struct
       match msg with
       | None ->
           protect ~canceler:st.canceler begin fun () ->
-            Lwt_pipe.push st.messages (Error [P2p_errors.Decoding_error]) >>= fun () ->
+            Lwt_pipe.push st.messages (error P2p_errors.Decoding_error) >>= fun () ->
             return_none
           end
       | Some (msg, size, stream) ->
@@ -415,17 +415,13 @@ module Reader = struct
     end >>= function
     | Ok (Some stream) ->
         worker_loop st (Some stream)
-    | Ok None ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
-    | Error [Canceled | Exn Lwt_pipe.Closed] ->
-        lwt_debug "connection closed to %a"
-          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-        Lwt.return_unit
+    | Ok None -> Lwt_canceler.cancel st.canceler
+    | Error (Canceled :: _)
+    | Error (Exn Lwt_pipe.Closed :: _) ->
+        lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
 
   let run ?size conn encoding canceler =
     let compute_size = function
@@ -489,16 +485,14 @@ module Writer = struct
     protect ~canceler:st.canceler begin fun () ->
       Lwt_pipe.pop st.messages >>= return
     end >>= function
-    | Error [Canceled | Exn Lwt_pipe.Closed] ->
-        lwt_debug "connection closed to %a"
-          P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-        Lwt.return_unit
+    | Error (Canceled :: _)
+    | Error (Exn Lwt_pipe.Closed :: _) ->
+        lwt_debug "connection closed to %a" P2p_peer.Id.pp st.conn.info.peer_id
     | Error err ->
         lwt_log_error
           "@[<v 2>error writing to %a@ %a@]"
           P2p_peer.Id.pp st.conn.info.peer_id pp_print_error err >>= fun () ->
-        Lwt_canceler.cancel st.canceler >>= fun () ->
-        Lwt.return_unit
+        Lwt_canceler.cancel st.canceler
     | Ok (buf, wakener) ->
         send_message st buf >>= fun res ->
         match res with
@@ -509,24 +503,21 @@ module Writer = struct
             Option.iter wakener
               ~f:(fun u ->
                   Lwt.wakeup_later u
-                    (Error [P2p_errors.Connection_closed])) ;
+                    (error P2p_errors.Connection_closed)) ;
             match err with
-            | [ Canceled | Exn Lwt_pipe.Closed ] ->
+            | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
                 lwt_debug "connection closed to %a"
-                  P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-                Lwt.return_unit
+                  P2p_peer.Id.pp st.conn.info.peer_id
             | P2p_errors.Connection_closed :: _ ->
                 lwt_debug "connection closed to %a"
                   P2p_peer.Id.pp st.conn.info.peer_id >>= fun () ->
-                Lwt_canceler.cancel st.canceler >>= fun () ->
-                Lwt.return_unit
+                Lwt_canceler.cancel st.canceler
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
                   P2p_peer.Id.pp st.conn.info.peer_id
                   pp_print_error err >>= fun () ->
-                Lwt_canceler.cancel st.canceler >>= fun () ->
-                Lwt.return_unit
+                Lwt_canceler.cancel st.canceler
 
   let run
       ?size ?binary_chunks_size
@@ -564,7 +555,7 @@ module Writer = struct
       while not (Lwt_pipe.is_empty st.messages) do
         let _, w = Lwt_pipe.pop_now_exn st.messages in
         Option.iter w
-          ~f:(fun u -> Lwt.wakeup_later u (Error [Exn Lwt_pipe.Closed]))
+          ~f:(fun u -> Lwt.wakeup_later u (error (Exn Lwt_pipe.Closed)))
       done ;
       Lwt.return_unit
     end ;
@@ -635,7 +626,7 @@ let catch_closed_pipe f =
     | Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
     | exn -> fail (Exn exn)
   end >>= function
-  | Error [Exn Lwt_pipe.Closed] ->
+  | Error (Exn Lwt_pipe.Closed :: _) ->
       fail P2p_errors.Connection_closed
   | Error _ | Ok _ as v -> Lwt.return v
 
@@ -648,7 +639,7 @@ let write { writer ; conn ; _ } msg =
     debug "Sending message to %a: %a"
       P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
-    Lwt_pipe.push writer.messages (buf, None) >>= return
+    Lwt_pipe.push writer.messages (buf, None) >>= fun () -> return_unit
   end
 
 let write_sync { writer ; conn ; _ } msg =
@@ -666,7 +657,7 @@ let write_now { writer ; conn ; _ } msg =
     P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
   Writer.encode_message writer msg >>? fun buf ->
   try Ok (Lwt_pipe.push_now writer.messages (buf, None))
-  with Lwt_pipe.Closed -> Error [P2p_errors.Connection_closed]
+  with Lwt_pipe.Closed -> error P2p_errors.Connection_closed
 
 let rec split_bytes size bytes =
   if MBytes.length bytes <= size then
@@ -687,7 +678,7 @@ let is_readable { reader ; _ } =
   not (Lwt_pipe.is_empty reader.messages)
 let wait_readable { reader ; _ } =
   catch_closed_pipe begin fun () ->
-    Lwt_pipe.values_available reader.messages >>= return
+    Lwt_pipe.values_available reader.messages >>= fun () -> return_unit
   end
 let read { reader ; _ } =
   catch_closed_pipe begin fun () ->
@@ -695,7 +686,7 @@ let read { reader ; _ } =
   end
 let read_now { reader ; _ } =
   try Lwt_pipe.pop_now reader.messages
-  with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
+  with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed)
 
 let stat { conn = { fd ; _ } ; _ } = P2p_io_scheduler.stat fd
 

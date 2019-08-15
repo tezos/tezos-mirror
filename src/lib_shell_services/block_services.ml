@@ -745,14 +745,14 @@ module Make(Proto : PROTO)(Next_proto : PROTO) = struct
                 method branch_refused = branch_refused
                 method branch_delayed = branch_delayed
               end)
-        |+ flag ~descr:"Include applied operations (set by default)"
-          "applied" (fun t -> t#applied)
-        |+ flag ~descr:"Include refused operations"
-          "refused" (fun t -> t#refused)
-        |+ flag ~descr:"Include branch refused operations"
-          "branch_refused" (fun t -> t#branch_refused)
-        |+ flag ~descr:"Include branch delayed operations (set by default)"
-          "branch_delayed" (fun t -> t#branch_delayed)
+        |+ field ~descr:"Include applied operations (set by default)"
+          "applied" RPC_arg.bool true (fun t -> t#applied)
+        |+ field ~descr:"Include refused operations"
+          "refused" RPC_arg.bool false (fun t -> t#refused)
+        |+ field ~descr:"Include branch refused operations"
+          "branch_refused" RPC_arg.bool false (fun t -> t#branch_refused)
+        |+ field ~descr:"Include branch delayed operations (set by default)"
+          "branch_delayed" RPC_arg.bool true (fun t -> t#branch_delayed)
         |> seal
 
       let monitor_operations path =

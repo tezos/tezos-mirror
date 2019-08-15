@@ -103,7 +103,7 @@
         dune_protocol.template))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  ;; we would like (deps ((glob_files *.ml \ embedded_cmis.ml)))
  ;; meanwhile, we hardcode the module list
  (deps "embedded_cmis.mli"
@@ -120,4 +120,4 @@
        "registerer.ml"
        "registerer.mli"
        )
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

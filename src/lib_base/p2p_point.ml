@@ -92,17 +92,23 @@ module Id = struct
                   invalid_arg "Utils.parse_addr_port: IPv6 addresses must be bracketed"
     end
 
-  let of_string_exn str =
+  let of_string_exn ?default_port str =
     let addr, port = parse_addr_port str in
-    let port = int_of_string port in
+    let port =
+      if port = "" then
+        Option.unopt_exn
+          (Invalid_argument "P2p_point.of_string_exn: no port")
+          default_port
+      else
+        int_of_string port in
     if port < 0 && port > 1 lsl 16 - 1 then
       invalid_arg "port must be between 0 and 65535" ;
     match Ipaddr.of_string_exn addr with
     | V4 addr -> Ipaddr.v6_of_v4 addr, port
     | V6 addr -> addr, port
 
-  let of_string str =
-    try Ok (of_string_exn str) with
+  let of_string ?default_port str =
+    try Ok (of_string_exn ?default_port str) with
     | Invalid_argument s -> Error s
     | Failure s -> Error s
     | _ -> Error "P2p_point.of_string"

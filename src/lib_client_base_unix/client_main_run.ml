@@ -65,7 +65,7 @@ sig
     other_commands:Tezos_client_base.Client_context.full Clic.command list ->
     require_auth:bool ->
     Tezos_client_base.Client_context.full Clic.command list
-  val logger : RPC_client.logger option
+  val logger : RPC_client_unix.logger option
 end
 
 
@@ -101,7 +101,7 @@ let main
           ~confirmations:None
           ~password_filename:None
           ~base_dir:C.default_base_dir
-          ~rpc_config:RPC_client.default_config)
+          ~rpc_config:RPC_client_unix.default_config)
         original_args
       >>=? fun (parsed, remaining) ->
       let parsed_config_file = parsed.Client_config.parsed_config_file
@@ -114,11 +114,11 @@ let main
           | Some p -> p.Client_config.Cfg_file.base_dir
       and require_auth = parsed.Client_config.require_auth in
       let rpc_config =
-        let rpc_config : RPC_client.config = match parsed_config_file with
-          | None -> RPC_client.default_config
+        let rpc_config : RPC_client_unix.config = match parsed_config_file with
+          | None -> RPC_client_unix.default_config
           | Some parsed_config_file ->
               {
-                RPC_client.default_config with
+                RPC_client_unix.default_config with
                 host = parsed_config_file.Client_config.Cfg_file.node_addr ;
                 port = parsed_config_file.Client_config.Cfg_file.node_port ;
                 tls = parsed_config_file.Client_config.Cfg_file.tls ;
@@ -127,10 +127,10 @@ let main
         | Some parsed_args ->
             if parsed_args.Client_config.print_timings then
               { rpc_config with
-                logger = RPC_client.timings_logger Format.err_formatter }
+                logger = RPC_client_unix.timings_logger Format.err_formatter }
             else if parsed_args.Client_config.log_requests then
               { rpc_config with
-                logger = RPC_client.full_logger Format.err_formatter }
+                logger = RPC_client_unix.full_logger Format.err_formatter }
             else rpc_config
         | None ->
             rpc_config
@@ -171,16 +171,16 @@ let main
              module C *)
           match C.logger with Some logger -> logger | None -> rpc_config.logger
       end in
-      let module Http = Tezos_signer_backends.Http.Make(Remote_params) in
-      let module Https = Tezos_signer_backends.Https.Make(Remote_params) in
-      let module Socket = Tezos_signer_backends.Socket.Make(Remote_params) in
+      let module Http = Tezos_signer_backends.Http.Make(RPC_client_unix)(Remote_params) in
+      let module Https = Tezos_signer_backends.Https.Make(RPC_client_unix)(Remote_params) in
+      let module Socket = Tezos_signer_backends_unix.Socket.Make(Remote_params) in
       Client_keys.register_signer
         (module Tezos_signer_backends.Encrypted.Make(struct
              let cctxt = (client_config :> Client_context.prompter)
            end)) ;
       Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
       Client_keys.register_signer
-        (module Tezos_signer_backends.Ledger.Signer_implementation) ;
+        (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
       Client_keys.register_signer (module Socket.Unix) ;
       Client_keys.register_signer (module Socket.Tcp) ;
       Client_keys.register_signer (module Http) ;
@@ -197,7 +197,7 @@ let main
       begin
         (match parsed_args with
          | Some parsed_args ->
-             select_commands (client_config :> RPC_client.http_ctxt) parsed_args
+             select_commands (client_config :> RPC_client_unix.http_ctxt) parsed_args
          | None -> return_nil)
         >>=? fun other_commands ->
         let commands =
@@ -268,7 +268,7 @@ let main
 let run
     (module M:M)
     ~(select_commands :
-        (RPC_client.http_ctxt ->
+        (RPC_client_unix.http_ctxt ->
          Client_config.cli_args ->
          Client_context.full Clic.command list tzresult Lwt.t))
   =

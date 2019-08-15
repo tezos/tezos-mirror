@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type t = {
   predecessor: Block.t ;
-  state: M.validation_state ;
+  state: validation_state ;
   rev_operations: Operation.packed list ;
   rev_tickets: operation_receipt list ;
   header: Block_header.t ;
@@ -44,22 +44,22 @@ let level st = st.header.shell.level
 let rpc_context st =
   let result = Alpha_context.finalize st.state.ctxt in
   {
-    Alpha_environment.Updater.block_hash = Block_hash.zero ;
+    Environment.Updater.block_hash = Block_hash.zero ;
     block_header = { st.header.shell with fitness = result.fitness } ;
     context = result.context ;
   }
 
 let rpc_ctxt =
-  new Alpha_environment.proto_rpc_context_of_directory
-    rpc_context Proto_alpha.rpc_services
+  new Environment.proto_rpc_context_of_directory
+    rpc_context rpc_services
 
-let begin_construction ?(priority=0) ?timestamp
+let begin_construction ?(priority=0) ?timestamp ?seed_nonce_hash
     ?(policy=Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy
     predecessor >>=? fun (delegate, priority, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
   let timestamp = Option.unopt ~default:real_timestamp timestamp in
-  let contents = Block.Forge.contents ~priority () in
+  let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {
     Block_header.contents ;
     signature = Signature.zero ;
@@ -80,7 +80,7 @@ let begin_construction ?(priority=0) ?timestamp
       signature = Signature.zero ;
     } ;
   } in
-  M.begin_construction
+  begin_construction
     ~chain_id: Chain_id.zero
     ~predecessor_context: predecessor.context
     ~predecessor_timestamp: predecessor.header.shell.timestamp
@@ -89,7 +89,9 @@ let begin_construction ?(priority=0) ?timestamp
     ~predecessor:predecessor.hash
     ~timestamp
     ~protocol_data
-    () >>=? fun state ->
+    () >>= fun state ->
+  Lwt.return (Environment.wrap_error state)
+  >>=? fun state ->
   return {
     predecessor ;
     state ;
@@ -107,7 +109,7 @@ let detect_script_failure :
     let detect_script_failure_single
         (type kind)
         (Manager_operation_result { operation_result ;
-                                    internal_operation_results }
+                                    internal_operation_results ; _ }
          : kind Kind.manager Apply_results.contents_result) =
       let detect_script_failure (type kind) (result : kind manager_operation_result) =
         match result with
@@ -117,9 +119,9 @@ let detect_script_failure :
             (* there must be another error for this to happen *)
             Ok ()
         | Backtracked (_, Some errs) ->
-            Alpha_environment.wrap_error (Error errs)
+            Environment.wrap_error (Error errs)
         | Failed (_, errs) ->
-            Alpha_environment.wrap_error (Error errs) in
+            Environment.wrap_error (Error errs) in
       List.fold_left
         (fun acc (Internal_operation_result (_, r)) ->
            acc >>? fun () ->
@@ -138,7 +140,9 @@ let detect_script_failure :
 
 let add_operation ?expect_failure st op =
   let open Apply_results in
-  M.apply_operation st.state op >>=? function
+  apply_operation st.state op >>= fun x ->
+  Lwt.return (Environment.wrap_error x)
+  >>=? function
   | state, (Operation_metadata result as metadata) ->
       Lwt.return @@ detect_script_failure result >>= fun result ->
       begin match expect_failure with
@@ -158,7 +162,9 @@ let add_operation ?expect_failure st op =
                        rev_tickets = metadata :: st.rev_tickets }
 
 let finalize_block st =
-  M.finalize_block st.state >>=? fun (result, _) ->
+  finalize_block st.state >>= fun x ->
+  Lwt.return (Environment.wrap_error x)
+  >>=? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute [

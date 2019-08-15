@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
 open Alpha_context
 
@@ -32,19 +32,19 @@ type t = {
   hash : Block_hash.t ;
   header : Block_header.t ;
   operations : Operation.packed list ;
-  context : Tezos_protocol_environment_memory.Context.t ;
+  context : Tezos_protocol_environment.Context.t ;
 }
 type block = t
 
 let rpc_context block = {
-  Alpha_environment.Updater.block_hash = block.hash ;
+  Environment.Updater.block_hash = block.hash ;
   block_header = block.header.shell ;
   context = block.context ;
 }
 
 let rpc_ctxt =
-  new Alpha_environment.proto_rpc_context_of_directory
-    rpc_context Proto_alpha.rpc_services
+  new Environment.proto_rpc_context_of_directory
+    rpc_context rpc_services
 
 (******** Policies ***********)
 
@@ -62,7 +62,7 @@ let get_next_baker_by_priority priority block =
     ~all:true
     ~max_priority:(priority+1) block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp} = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p } -> p = priority)  bakers in
+        timestamp; _ } = List.find (fun { Alpha_services.Delegate.Baking_rights.priority = p ; _ } -> p = priority)  bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
@@ -70,16 +70,16 @@ let get_next_baker_by_account pkh block =
     ~delegates:[pkh]
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } = List.hd bakers in
+        timestamp ; priority ; _ } = List.hd bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt
     ~max_priority:256 block >>=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh ;
-        timestamp ; priority } =
+        timestamp ; priority ; _ } =
     List.find
-      (fun { Alpha_services.Delegate.Baking_rights.delegate } ->
+      (fun { Alpha_services.Delegate.Baking_rights.delegate ; _ } ->
          not (List.mem delegate excludes))
       bakers in
   return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
@@ -153,8 +153,8 @@ module Forge = struct
     end >>=? fun fitness ->
     begin
       Alpha_services.Helpers.current_level ~offset:1l (rpc_ctxt) pred >>|? function
-      | { expected_commitment = true } -> Some (fst (Proto_Nonce.generate ()))
-      | { expected_commitment = false } -> None
+      | { expected_commitment = true ; _ } -> Some (fst (Proto_Nonce.generate ()))
+      | { expected_commitment = false ; _ } -> None
     end >>=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash = Operation_list_list_hash.compute
@@ -194,79 +194,95 @@ let check_constants_consistency constants =
   return
 
 let initial_context
+    ?(with_commitments = false)
     constants
     header
-    commitments
     initial_accounts
-    security_deposit_ramp_up_cycles
-    no_reward_cycles
   =
+  let open Tezos_protocol_004_Pt24m4xi_parameters in
   let bootstrap_accounts =
     List.map (fun (Account.{ pk ; pkh ; _ }, amount) ->
-        Parameters_repr.{ public_key_hash = pkh ; public_key = Some pk ; amount }
+        Default_parameters.make_bootstrap_account (pkh, pk, amount)
       ) initial_accounts
   in
-  let json =
-    Data_encoding.Json.construct
-      Parameters_repr.encoding
-      Parameters_repr.{
-        bootstrap_accounts ;
-        bootstrap_contracts = [] ;
-        commitments ;
-        constants ;
-        security_deposit_ramp_up_cycles ;
-        no_reward_cycles ;
-      }
-  in
+
+  let parameters =
+    Default_parameters.parameters_of_constants
+      ~bootstrap_accounts
+      ~with_commitments
+      constants in
+  let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Tezos_protocol_environment_memory.Context.(
-    set empty ["version"] (MBytes.of_string "genesis")
-  ) >>= fun ctxt ->
-  Tezos_protocol_environment_memory.Context.(
+  Tezos_protocol_environment.Context.(
+    let empty = Memory_context.empty in
+    set empty ["version"] (MBytes.of_string "genesis") >>= fun ctxt ->
     set ctxt protocol_param_key proto_params
   ) >>= fun ctxt ->
   Main.init ctxt header
-  >|= Alpha_environment.wrap_error >>=? fun { context; _ } ->
+  >|= Environment.wrap_error >>=? fun { context; _ } ->
   return context
 
+let genesis_with_parameters parameters =
+  let hash =
+    Block_hash.of_b58check_exn "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
+  in
+  let shell = Forge.make_shell
+      ~level:0l
+      ~predecessor:hash
+      ~timestamp:Time.Protocol.epoch
+      ~fitness: (Fitness_repr.from_int64 0L)
+      ~operations_hash: Operation_list_list_hash.zero in
+  let contents = Forge.make_contents
+      ~priority:0
+      ~seed_nonce_hash:None () in
+  let open Tezos_protocol_004_Pt24m4xi_parameters in
+  let json = Default_parameters.json_of_parameters parameters in
+  let proto_params =
+    Data_encoding.Binary.to_bytes_exn Data_encoding.json json
+  in
+  Tezos_protocol_environment.Context.(
+    let empty = Memory_context.empty in
+    set empty ["version"] (MBytes.of_string "genesis") >>= fun ctxt ->
+    set ctxt protocol_param_key proto_params
+  ) >>= fun ctxt ->
+  Main.init ctxt shell
+  >|= Environment.wrap_error >>=? fun { context; _ } ->
+  let block = { hash ;
+                header = { shell ;
+                           protocol_data = {
+                             contents = contents ;
+                             signature = Signature.zero ;
+                           } } ;
+                operations = [] ;
+                context ;
+              } in
+  return block
+
+(* if no parameter file is passed we check in the current directory
+   where the test is run *)
 let genesis
-    ?(preserved_cycles = Constants_repr.default.preserved_cycles)
-    ?(blocks_per_cycle = Constants_repr.default.blocks_per_cycle)
-    ?(blocks_per_commitment = Constants_repr.default.blocks_per_commitment)
-    ?(blocks_per_roll_snapshot = Constants_repr.default.blocks_per_roll_snapshot)
-    ?(blocks_per_voting_period = Constants_repr.default.blocks_per_voting_period)
-    ?(time_between_blocks = Constants_repr.default.time_between_blocks)
-    ?(endorsers_per_block = Constants_repr.default.endorsers_per_block)
-    ?(hard_gas_limit_per_operation = Constants_repr.default.hard_gas_limit_per_operation)
-    ?(hard_gas_limit_per_block = Constants_repr.default.hard_gas_limit_per_block)
-    ?(proof_of_work_threshold = Int64.(neg one))
-    ?(tokens_per_roll = Constants_repr.default.tokens_per_roll)
-    ?(michelson_maximum_type_size = Constants_repr.default.michelson_maximum_type_size)
-    ?(seed_nonce_revelation_tip = Constants_repr.default.seed_nonce_revelation_tip)
-    ?(origination_size = Constants_repr.default.origination_size)
-    ?(block_security_deposit = Constants_repr.default.block_security_deposit)
-    ?(endorsement_security_deposit = Constants_repr.default.endorsement_security_deposit)
-    ?(block_reward = Constants_repr.default.block_reward)
-    ?(endorsement_reward = Constants_repr.default.endorsement_reward)
-    ?(cost_per_byte = Constants_repr.default.cost_per_byte)
-    ?(hard_storage_limit_per_operation = Constants_repr.default.hard_storage_limit_per_operation)
-    ?(commitments = [])
-    ?(security_deposit_ramp_up_cycles = None)
-    ?(no_reward_cycles = None)
+    ?with_commitments
+    ?endorsers_per_block
     (initial_accounts : (Account.t * Tez_repr.t) list)
   =
   if initial_accounts = [] then
     Pervasives.failwith "Must have one account with a roll to bake";
 
+  let open Tezos_protocol_004_Pt24m4xi_parameters in
+  let constants = Default_parameters.constants_test in
+  let endorsers_per_block =
+    Option.unopt ~default:constants.endorsers_per_block endorsers_per_block in
+  let constants = { constants with endorsers_per_block } in
+
   (* Check there is at least one roll *)
   begin try
       let open Test_utils in
       fold_left_s (fun acc (_, amount) ->
-          Alpha_environment.wrap_error @@
+          Environment.wrap_error @@
           Tez_repr.(+?) acc amount >>?= fun acc ->
-          if acc >= tokens_per_roll then
+          if acc >= constants.tokens_per_roll then
             raise Exit
           else return acc
         ) Tez_repr.zero initial_accounts >>=? fun _ ->
@@ -274,29 +290,6 @@ let genesis
     with Exit -> return_unit
   end >>=? fun () ->
 
-  let constants : Constants_repr.parametric = {
-    preserved_cycles ;
-    blocks_per_cycle ;
-    blocks_per_commitment ;
-    blocks_per_roll_snapshot ;
-    blocks_per_voting_period ;
-    time_between_blocks ;
-    endorsers_per_block ;
-    hard_gas_limit_per_operation ;
-    hard_gas_limit_per_block ;
-    proof_of_work_threshold ;
-    tokens_per_roll ;
-    michelson_maximum_type_size ;
-    seed_nonce_revelation_tip ;
-    origination_size ;
-    block_security_deposit ;
-    endorsement_security_deposit ;
-    block_reward ;
-    endorsement_reward ;
-    cost_per_byte ;
-    hard_storage_limit_per_operation ;
-    test_chain_duration = Constants_repr.default.test_chain_duration;
-  } in
   check_constants_consistency constants >>=? fun () ->
 
   let hash =
@@ -312,12 +305,10 @@ let genesis
       ~priority:0
       ~seed_nonce_hash:None () in
   initial_context
+    ?with_commitments
     constants
     shell
-    commitments
     initial_accounts
-    security_deposit_ramp_up_cycles
-    no_reward_cycles
   >>=? fun context ->
   let block =
     { hash ;
@@ -338,8 +329,8 @@ let genesis
 
 let apply header ?(operations = []) pred =
   begin
-    let open Alpha_environment.Error_monad in
-    Proto_alpha.Main.begin_application
+    let open Environment.Error_monad in
+    Main.begin_application
       ~chain_id: Chain_id.zero
       ~predecessor_context: pred.context
       ~predecessor_fitness: pred.header.shell.fitness
@@ -347,12 +338,12 @@ let apply header ?(operations = []) pred =
       header >>=? fun vstate ->
     fold_left_s
       (fun vstate op ->
-         Proto_alpha.apply_operation vstate op >>=? fun (state, _result) ->
+         apply_operation vstate op >>=? fun (state, _result) ->
          return state)
       vstate operations >>=? fun vstate ->
-    Proto_alpha.Main.finalize_block vstate >>=? fun (validation, _result) ->
+    Main.finalize_block vstate >>=? fun (validation, _result) ->
     return validation.context
-  end >|= Alpha_environment.wrap_error >>|? fun context ->
+  end >|= Environment.wrap_error >>|? fun context ->
   let hash = Block_header.hash header in
   { hash ; header ; operations ; context }
 
@@ -379,7 +370,7 @@ let bake_n ?policy n b =
     (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let current_level = b.header.shell.level in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
@@ -390,7 +381,7 @@ let bake_until_n_cycle_end ?policy n b =
     (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let bake_until_cycle ?policy cycle (b:t) =
-  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle } } ->
+  get_constants b >>=? fun Constants.{ parametric = { blocks_per_cycle ; _ } ; _ } ->
   let rec loop (b:t) =
     let current_cycle =
       let current_level = b.header.shell.level in

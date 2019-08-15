@@ -30,7 +30,7 @@
     endorser. This reward depends on the priority of the endorsed
     block. *)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Test_utils
 open Test_tez
@@ -42,7 +42,8 @@ open Test_tez
 let get_expected_reward ?(priority=0) ~nb_baking ~nb_endorsement ctxt =
   Context.get_constants ctxt >>=? fun Constants.
     { parametric = { endorsement_reward ; block_reward ; _ } ; _  } ->
-  let open Alpha_environment in let open Tez in
+  let open Environment in
+  let open Tez in
   endorsement_reward /? Int64.(succ (of_int priority)) >>?= fun endorsement_reward ->
 
   endorsement_reward *? (Int64.of_int nb_endorsement) >>?= fun endorsement_reward ->
@@ -53,7 +54,8 @@ let get_expected_deposit ctxt ~nb_baking ~nb_endorsement =
   Context.get_constants ctxt >>=? fun Constants.
     { parametric = { endorsement_security_deposit ;
                      block_security_deposit ; _ } ; _  } ->
-  let open Alpha_environment in let open Tez in
+  let open Environment in
+  let open Tez in
   endorsement_security_deposit *? (Int64.of_int nb_endorsement) >>?= fun endorsement_deposit ->
   block_security_deposit *? (Int64.of_int nb_baking) >>?= fun baking_deposit ->
   endorsement_deposit +? baking_deposit >>?= fun deposit -> return deposit
@@ -97,7 +99,7 @@ let max_endorsement () =
 
   Context.get_endorsers (B b) >>=? fun endorsers ->
   Assert.equal_int ~loc:__LOC__
-    (List.length (List.concat (List.map (fun { Alpha_services.Delegate.Endorsing_rights.slots } -> slots) endorsers))) endorsers_per_block >>=? fun () ->
+    (List.length (List.concat (List.map (fun { Alpha_services.Delegate.Endorsing_rights.slots ; _ } -> slots) endorsers))) endorsers_per_block >>=? fun () ->
 
   fold_left_s (fun (delegates, ops, balances) (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
       let delegate = endorser.delegate in

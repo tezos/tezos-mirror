@@ -52,11 +52,14 @@ module Info : sig
     factor: float ;
     initial_delay: Time.System.Span.t ;
     disconnection_delay: Time.System.Span.t ;
+    increase_cap: Time.System.Span.t ;
   }
+
+  val default_greylisting_config : greylisting_config
+  val greylisting_config_encoding : greylisting_config Data_encoding.encoding
 
   val create :
     ?trusted:bool ->
-    ?greylisting_config:greylisting_config ->
     P2p_addr.t -> P2p_addr.port -> 'conn point_info
   (** [create ~trusted addr port] is a freshly minted point_info. If
       [trusted] is true, this point is considered trusted and will
@@ -136,5 +139,6 @@ val set_running :
 val set_private : 'conn Info.t -> bool -> unit
 
 val set_disconnected :
-  ?timestamp:Time.System.t -> ?requested:bool -> 'conn Info.t -> unit
+  ?timestamp:Time.System.t -> ?requested:bool ->
+  Info.greylisting_config -> 'conn Info.t -> unit
 

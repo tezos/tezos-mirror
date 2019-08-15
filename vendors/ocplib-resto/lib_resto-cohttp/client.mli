@@ -10,7 +10,7 @@
 
 (** Typed RPC services: client implementation. *)
 
-module Make (Encoding : Resto.ENCODING) : sig
+module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
 
   module Service : (module type of (struct include Resto.MakeService(Encoding) end))
 
@@ -54,7 +54,6 @@ module Make (Encoding : Resto.ENCODING) : sig
 
   val generic_call:
     [< Resto.meth ] ->
-    ?logger:logger ->
     ?headers:(string * string) list ->
     ?accept:Media_type.Make(Encoding).t list ->
     ?body:Cohttp_lwt.Body.t ->

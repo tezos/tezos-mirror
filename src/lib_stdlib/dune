@@ -8,14 +8,10 @@
             re
             zarith
             lwt
-            lwt_log)
+            )
  (flags (:standard -safe-string)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{dep:test-ocp-indent.sh} %{deps})))
-
-(install
- (section libexec)
- (files (test-ocp-indent.sh as test-ocp-indent.sh)))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

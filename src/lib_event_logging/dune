@@ -8,9 +8,9 @@
  (libraries tezos-stdlib
             tezos-data-encoding
             tezos-error-monad
-            lwt))
+            lwt_log.core))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

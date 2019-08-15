@@ -44,3 +44,7 @@ val sort: ('a -> 'a -> int Lwt.t) -> 'a list -> 'a list Lwt.t
 
 val unless: bool -> (unit -> unit Lwt.t) -> unit Lwt.t
 
+(** Evaluates fold_left_s on a batch of [n] elements and returns a pair
+    containing the result of the first batch and the unprocessed elements *)
+val fold_left_s_n:
+  n:int -> ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> ('a * 'b list) Lwt.t

@@ -47,8 +47,7 @@ module Seq_validator = struct
     Lwt.return { context_index }
 
   let close _ =
-    lwt_log_notice "Shutting down..." >>= fun () ->
-    Lwt.return_unit
+    lwt_log_notice "Shutting down..."
 
   let apply_block
       validator_process

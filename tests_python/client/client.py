@@ -329,8 +329,9 @@ class Client:
     def get_proposals(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/proposals')
 
-    def get_protocol(self) -> str:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/metadata')
+    def get_protocol(self, params: List[str] = None) -> str:
+        rpc_res = self.rpc('get', '/chains/main/blocks/head/metadata',
+                           params=params)
         return rpc_res['protocol']
 
     def get_period_position(self) -> str:
@@ -338,8 +339,9 @@ class Client:
             'get', '/chains/main/blocks/head/helpers/current_level?offset=1')
         return rpc_res['voting_period_position']
 
-    def get_level(self) -> int:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/header/shell')
+    def get_level(self, params: List[str] = None) -> int:
+        rpc_res = self.rpc('get', '/chains/main/blocks/head/header/shell',
+                           params=params)
         return int(rpc_res['level'])
 
     def wait_for_inclusion(self,
@@ -347,6 +349,7 @@ class Client:
                            branch: str = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
+        cmd += ['--check-previous', '5']
         if branch is not None:
             cmd += ['--branch', branch]
             cmd += ['--check-previous', '5']

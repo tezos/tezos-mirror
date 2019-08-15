@@ -30,6 +30,7 @@ type limits = {
   max_refused_operations : int ;
   operation_timeout : Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 
 type name_t = (Chain_id.t * Protocol_hash.t)
@@ -191,6 +192,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
 
   end
 
+  module Logger = Worker_logger.Make(Event)(Request)
   module Worker: Worker.T
     with type Name.t = Name.t
      and type Event.t = Event.t
@@ -199,15 +201,18 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
      and type Types.state = Types.state
      and type Types.parameters = Types.parameters
     = Worker.Make (Name) (Prevalidator_worker_state.Event)
-      (Prevalidator_worker_state.Request) (Types)
+      (Prevalidator_worker_state.Request) (Types) (Logger)
 
   (** Centralised operation stream for the RPCs *)
   let notify_operation { operation_stream ; _ } result  { Operation.shell ; proto } =
     let protocol_data =
-      Data_encoding.Binary.of_bytes_exn
+      Data_encoding.Binary.of_bytes
         Proto.operation_data_encoding
         proto in
-    Lwt_watcher.notify operation_stream (result, shell, protocol_data)
+    match protocol_data with
+    | Some protocol_data ->
+        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
+    | None -> ()
 
   open Types
 
@@ -341,69 +346,73 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
           | n ->
               debug w "processing %d operations" n ;
               let operations = List.map snd (Operation_hash.Map.bindings pv.pending) in
-              Lwt_list.fold_left_s (fun (acc_validation_state, acc_mempool) op ->
-                  let refused hash raw errors =
-                    notify_operation pv `Refused raw ;
-                    let new_mempool = Mempool.{ acc_mempool with pending = Operation_hash.Set.add hash acc_mempool.pending } in
-                    Option.iter (Ring.add_and_return_erased pv.refused hash)
-                      ~f:(fun e -> pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
-                    pv.refusals <- Operation_hash.Map.add hash (raw, errors) pv.refusals ;
-                    Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
-                    Lwt.return (acc_validation_state, new_mempool) in
-                  match Prevalidation.parse op with
-                  | Error errors ->
-                      refused (Operation.hash op) op errors
-                  | Ok op ->
-                      Prevalidation.apply_operation state op >>= function
-                      | Applied (new_acc_validation_state, receipt) ->
-                          post_filter w pv
-                            ~validation_state_before: (Prevalidation.validation_state acc_validation_state)
-                            ~validation_state_after: (Prevalidation.validation_state new_acc_validation_state)
-                            op.protocol_data receipt >>= fun accept ->
-                          if accept
-                          && (pv.applied_count <= 2000 (* this test is a quick fix while we wait for the new mempool *)
-                              || is_endorsement op)
-                          then begin
-                            notify_operation pv `Applied op.raw ;
-                            let new_mempool = Mempool.{ acc_mempool with known_valid = op.hash :: acc_mempool.known_valid } in
-                            pv.applied <- (op.hash, op.raw) :: pv.applied ;
-                            pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
-                            Lwt.return (new_acc_validation_state, new_mempool)
-                          end else
-                            Lwt.return (acc_validation_state, acc_mempool)
-                      | Branch_delayed errors ->
-                          notify_operation pv `Branch_delayed op.raw ;
-                          let new_mempool =
-                            if Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then
-                              Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending }
-                            else
-                              acc_mempool in
-                          Option.iter (Ring.add_and_return_erased pv.branch_delayed op.hash)
-                            ~f:(fun e ->
-                                pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
-                                pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
-                          pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
-                          pv.branch_delays <- Operation_hash.Map.add op.hash (op.raw, errors) pv.branch_delays ;
-                          Lwt.return (acc_validation_state, new_mempool)
-                      | Branch_refused errors ->
-                          notify_operation pv `Branch_refused op.raw ;
-                          let new_mempool =
-                            if Proto.acceptable_passes { shell = op.raw.shell ; protocol_data = op.protocol_data } = [0] then
-                              Mempool.{ acc_mempool with pending = Operation_hash.Set.add op.hash acc_mempool.pending }
-                            else
-                              acc_mempool in
-                          Option.iter (Ring.add_and_return_erased pv.branch_refused op.hash)
-                            ~f:(fun e ->
-                                pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
-                                pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
-                          pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
-                          pv.branch_refusals <- Operation_hash.Map.add op.hash (op.raw, errors) pv.branch_refusals ;
-                          Lwt.return (acc_validation_state, new_mempool)
-                      | Refused errors ->
-                          refused op.hash op.raw errors
-                      | Duplicate | Outdated -> Lwt.return (acc_validation_state, acc_mempool))
+              Lwt_utils.fold_left_s_n ~n:pv.limits.operations_batch_size
+                (fun (acc_validation_state, acc_mempool) op ->
+                   let refused hash raw errors =
+                     notify_operation pv `Refused raw ;
+                     let new_mempool = Mempool.{ acc_mempool with pending = Operation_hash.Set.add hash acc_mempool.pending } in
+                     Option.iter (Ring.add_and_return_erased pv.refused hash)
+                       ~f:(fun e -> pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
+                     pv.refusals <- Operation_hash.Map.add hash (raw, errors) pv.refusals ;
+                     Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
+                     Lwt.return (acc_validation_state, new_mempool) in
+                   match Prevalidation.parse op with
+                   | Error errors ->
+                       refused (Operation.hash op) op errors
+                   | Ok op ->
+                       Prevalidation.apply_operation state op >>= function
+                       | Applied (new_acc_validation_state, receipt) ->
+                           post_filter w pv
+                             ~validation_state_before: (Prevalidation.validation_state acc_validation_state)
+                             ~validation_state_after: (Prevalidation.validation_state new_acc_validation_state)
+                             op.protocol_data receipt >>= fun accept ->
+                           if accept && pv.applied_count <= 2000
+                           (* this test is a quick fix while we wait for the new mempool *)
+                           || is_endorsement op then begin
+                             notify_operation pv `Applied op.raw ;
+                             let new_mempool =
+                               Mempool.{ acc_mempool with known_valid = op.hash :: acc_mempool.known_valid } in
+                             pv.applied <- (op.hash, op.raw) :: pv.applied ;
+                             pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
+                             Lwt.return (new_acc_validation_state, new_mempool)
+                           end else
+                             Lwt.return (acc_validation_state, acc_mempool)
+                       | Branch_delayed errors ->
+                           notify_operation pv `Branch_delayed op.raw ;
+                           let new_mempool =
+                             if is_endorsement op then
+                               Mempool.{ acc_mempool with
+                                         pending = Operation_hash.Set.add op.hash acc_mempool.pending }
+                             else acc_mempool in
+                           Option.iter (Ring.add_and_return_erased pv.branch_delayed op.hash)
+                             ~f:(fun e ->
+                                 pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
+                                 pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
+                           pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
+                           pv.branch_delays <- Operation_hash.Map.add op.hash (op.raw, errors) pv.branch_delays ;
+                           Lwt.return (acc_validation_state, new_mempool)
+                       | Branch_refused errors ->
+                           notify_operation pv `Branch_refused op.raw ;
+                           let new_mempool =
+                             if is_endorsement op then
+                               Mempool.{ acc_mempool with
+                                         pending = Operation_hash.Set.add op.hash acc_mempool.pending }
+                             else acc_mempool in
+                           Option.iter (Ring.add_and_return_erased pv.branch_refused op.hash)
+                             ~f:(fun e ->
+                                 pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
+                                 pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
+                           pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool ;
+                           pv.branch_refusals <- Operation_hash.Map.add op.hash (op.raw, errors) pv.branch_refusals ;
+                           Lwt.return (acc_validation_state, new_mempool)
+                       | Refused errors ->
+                           refused op.hash op.raw errors
+                       | Duplicate | Outdated -> Lwt.return (acc_validation_state, acc_mempool))
                 (state, Mempool.empty)
-                operations >>= fun (state, advertised_mempool) ->
+                operations >>= fun ((state, advertised_mempool), remaining_op) ->
+              begin if remaining_op != [] then
+                  Worker.Queue.push_request w Request.Leftover
+                else Lwt.return_unit end >>= fun () ->
               pv.validation_state <- Ok state ;
               pv.pending <- Operation_hash.Map.empty ;
               advertise w pv
@@ -430,7 +439,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
       } ;
     State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
       ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
-    Lwt.return_unit
+    Lwt_main.yield ()
 
   let fetch_operation w pv ?peer oph =
     debug w
@@ -442,7 +451,7 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
     | Ok op ->
         Worker.Queue.push_request_now w (Arrived (oph, op)) ;
         Lwt.return_unit
-    | Error [ Distributed_db.Operation.Canceled _ ] ->
+    | Error (Distributed_db.Operation.Canceled _  :: _) ->
         debug w
           "operation %a included before being prevalidated"
           Operation_hash.pp_short oph ;
@@ -455,6 +464,10 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
 
     let module Proto_services = Block_services.Make(Proto)(Proto) in
 
+    (* TODO
+       refused => Operation_hash.Set.t ;
+       kick le peer
+    *)
     dir := RPC_directory.register !dir
         (Proto_services.S.Mempool.get_filter RPC_path.open_root)
         (fun pv () () ->
@@ -478,26 +491,38 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
         (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
         (fun pv () () ->
            let map_op op =
-             let protocol_data =
-               Data_encoding.Binary.of_bytes_exn
+             let protocol_data_opt =
+               Data_encoding.Binary.of_bytes
                  Proto.operation_data_encoding
                  op.Operation.proto in
-             { Proto.shell = op.shell ; protocol_data } in
-           let map_op_error (op, error) = (map_op op, error) in
-           return {
-             Proto_services.Mempool.applied =
-               List.map
-                 (fun (hash, op) -> (hash, map_op op))
-                 (List.rev pv.applied) ;
-             refused =
-               Operation_hash.Map.map map_op_error pv.refusals ;
-             branch_refused =
-               Operation_hash.Map.map map_op_error pv.branch_refusals ;
-             branch_delayed =
-               Operation_hash.Map.map map_op_error pv.branch_delays ;
-             unprocessed =
-               Operation_hash.Map.map map_op pv.pending ;
-           }) ;
+             match protocol_data_opt with
+             | Some protocol_data ->
+                 Some { Proto.shell = op.shell ; protocol_data }
+             | None -> None in
+           let map_op_error oph (op, error) acc = match map_op op with
+             | None -> acc
+             | Some res -> Operation_hash.Map.add oph (res, error) acc  in
+           let applied = List.filter_map (fun (hash, op) ->
+               match map_op op with
+               | Some op -> Some (hash, op)
+               | None -> None
+             ) (List.rev pv.applied) in
+           let filter f map =
+             Operation_hash.Map.fold f map Operation_hash.Map.empty in
+           let refused = filter map_op_error pv.refusals in
+           let branch_refused = filter map_op_error pv.branch_refusals in
+           let branch_delayed = filter map_op_error pv.branch_delays in
+           let unprocessed = Operation_hash.Map.fold
+               (fun oph op acc ->
+                  match map_op op with
+                  | Some op -> Operation_hash.Map.add oph op acc
+                  | None -> acc)
+               pv.pending Operation_hash.Map.empty in
+           return { Proto_services.Mempool.applied ;
+                    refused ;
+                    branch_refused ;
+                    branch_delayed ;
+                    unprocessed }) ;
 
     dir := RPC_directory.register !dir
         (Proto_services.S.Mempool.request_operations RPC_path.open_root)
@@ -670,6 +695,9 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
               return (() : r)
           | Request.Notify (peer, mempool) ->
               on_notify w pv peer mempool ;
+              return_unit
+          | Request.Leftover ->
+              (* unprocessed ops are handled just below *)
               return_unit
           | Request.Inject op ->
               on_inject w pv op
@@ -886,6 +914,16 @@ let protocol_hash (t:t) =
 let parameters (t:t) =
   let module Prevalidator: T = (val t) in
   Prevalidator.parameters
+
+let information (t:t) =
+  let module Prevalidator: T = (val t) in
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.information w
+
+let pipeline_length (t:t) =
+  let module Prevalidator: T = (val t) in
+  let w = Lazy.force Prevalidator.worker in
+  Prevalidator.Worker.Queue.pending_requests_length w
 
 let empty_rpc_directory : unit RPC_directory.t =
   RPC_directory.register

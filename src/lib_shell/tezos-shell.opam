@@ -6,17 +6,17 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
-  "tezos-rpc-http"
   "tezos-p2p"
   "tezos-shell-services"
   "tezos-protocol-updater"
   "tezos-validation"
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
-  "tezos-embedded-protocol-demo" { with-test }
+  "tezos-embedded-protocol-demo-noops" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

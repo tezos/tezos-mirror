@@ -1,5 +1,23 @@
 (library
  (name resto_cohttp)
  (public_name ocplib-resto-cohttp)
- (libraries ocplib-resto-directory cohttp-lwt-unix)
+ (libraries ocplib-resto-directory cohttp-lwt)
+ (modules utils media_type cors)
  (flags (:standard -safe-string)))
+
+(library
+ (name resto_cohttp_server)
+ (public_name ocplib-resto-cohttp-server)
+ (libraries ocplib-resto-directory ocplib-resto-cohttp cohttp-lwt-unix)
+ (modules server)
+ (flags (:standard -safe-string
+        -open Resto_cohttp)))
+
+(library
+ (name resto_cohttp_client)
+ (public_name ocplib-resto-cohttp-client)
+ (libraries ocplib-resto-directory ocplib-resto-cohttp)
+ (modules client)
+ (flags (:standard -safe-string
+        -open Resto_cohttp))
+)

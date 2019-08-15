@@ -25,7 +25,7 @@
 
 module Make(N : sig val scheme : string end) : sig
 
-  module Make(P : sig
+  module Make(RPC_client : RPC_client.S)(P : sig
       val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
       val logger: RPC_client.logger
     end)

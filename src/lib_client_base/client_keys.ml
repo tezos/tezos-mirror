@@ -67,10 +67,16 @@ let uri_encoding =
   Data_encoding.(conv Uri.to_string Uri.of_string string)
 
 type pk_uri = Uri.t
-let make_pk_uri x = x
+let make_pk_uri (x : Uri.t) : pk_uri =
+  match Uri.scheme x with
+  | None -> Pervasives.failwith "PK_URI needs a scheme"
+  | Some _ -> x
 
 type sk_uri = Uri.t
-let make_sk_uri x = x
+let make_sk_uri (x : Uri.t) : sk_uri =
+  match Uri.scheme x with
+  | None -> Pervasives.failwith "SK_URI needs a scheme"
+  | Some _ -> x
 
 let pk_uri_parameter () = Clic.parameter (fun _ s ->
     try return (make_pk_uri @@ Uri.of_string s)
@@ -180,43 +186,48 @@ let () =
     (function Signature_mismatch sk -> Some sk | _ -> None)
     (fun sk -> Signature_mismatch sk)
 
+let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a) : 'a =
+  match Uri.scheme uri with
+  | None -> assert false
+  | Some scheme ->
+      find_signer_for_key ~scheme >>=? fun signer ->
+      f signer
+
 let neuterize sk_uri =
-  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.neuterize sk_uri
+  with_scheme_signer sk_uri begin fun (module Signer: SIGNER) ->
+    Signer.neuterize sk_uri
+  end
 
 let public_key ?interactive pk_uri =
-  let scheme = Option.unopt ~default:"" (Uri.scheme pk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.public_key ?interactive pk_uri
+  with_scheme_signer pk_uri begin fun (module Signer: SIGNER) ->
+    Signer.public_key ?interactive pk_uri
+  end
 
 let public_key_hash ?interactive pk_uri =
-  public_key ?interactive pk_uri >>=? fun pk ->
-  return (Signature.Public_key.hash pk, Some pk)
+  with_scheme_signer pk_uri begin fun (module Signer: SIGNER) ->
+    Signer.public_key_hash ?interactive pk_uri
+  end
 
 let sign cctxt ?watermark sk_uri buf =
-  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.sign ?watermark sk_uri buf >>=? fun signature ->
-  Signer.neuterize sk_uri >>=? fun pk_uri ->
-  Secret_key.rev_find cctxt sk_uri >>=? begin function
-    | None ->
-        public_key pk_uri
-    | Some name ->
-        Public_key.find cctxt name >>=? function
-        | (_, None) ->
-            public_key pk_uri >>=? fun pk ->
-            Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
-            return pk
-        | (_, Some pubkey) -> return pubkey
-  end >>=? fun pubkey ->
-  fail_unless
-    (Signature.check ?watermark pubkey signature buf)
-    (Signature_mismatch sk_uri) >>=? fun () ->
-  return signature
+  with_scheme_signer sk_uri begin fun (module Signer: SIGNER) ->
+    Signer.sign ?watermark sk_uri buf >>=? fun signature ->
+    Signer.neuterize sk_uri >>=? fun pk_uri ->
+    Secret_key.rev_find cctxt sk_uri >>=? begin function
+      | None ->
+          public_key pk_uri
+      | Some name ->
+          Public_key.find cctxt name >>=? function
+          | (_, None) ->
+              public_key pk_uri >>=? fun pk ->
+              Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+              return pk
+          | (_, Some pubkey) -> return pubkey
+    end >>=? fun pubkey ->
+    fail_unless
+      (Signature.check ?watermark pubkey signature buf)
+      (Signature_mismatch sk_uri) >>=? fun () ->
+    return signature
+  end
 
 let append cctxt ?watermark loc buf =
   sign cctxt ?watermark loc buf >>|? fun signature ->
@@ -227,22 +238,22 @@ let check ?watermark pk_uri signature buf =
   return (Signature.check ?watermark pk signature buf)
 
 let deterministic_nonce sk_uri data =
-  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.deterministic_nonce sk_uri data
+  with_scheme_signer sk_uri
+    begin fun (module Signer: SIGNER) ->
+      Signer.deterministic_nonce sk_uri data
+    end
 
 let deterministic_nonce_hash sk_uri data =
-  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.deterministic_nonce_hash sk_uri data
+  with_scheme_signer sk_uri
+    begin fun (module Signer: SIGNER) ->
+      Signer.deterministic_nonce_hash sk_uri data
+    end
 
 let supports_deterministic_nonces sk_uri =
-  let scheme = Option.unopt ~default:"" (Uri.scheme sk_uri) in
-  find_signer_for_key ~scheme >>=? fun signer ->
-  let module Signer = (val signer : SIGNER) in
-  Signer.supports_deterministic_nonces sk_uri
+  with_scheme_signer sk_uri
+    begin fun (module Signer: SIGNER) ->
+      Signer.supports_deterministic_nonces sk_uri
+    end
 
 let register_key cctxt ?(force=false) (public_key_hash, pk_uri, sk_uri) ?public_key name =
   Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->

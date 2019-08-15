@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -239,6 +240,11 @@ module System = struct
       (fun {stamp; data} -> (stamp, data))
       (fun (stamp, data) -> {stamp; data})
       (tup2 encoding arg_encoding)
+  let pp_stamped pp fmt { data ; stamp } =
+    Format.fprintf fmt
+      "%a(%a)"
+      pp data
+      pp_hum stamp
   let stamp ~time data =
     { data ; stamp = time }
   let recent a1 a2 =

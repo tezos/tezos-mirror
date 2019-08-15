@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 open Tezos_micheline
 open Client_proto_context
@@ -103,7 +103,7 @@ let commands version () =
       (args1
          (switch ~doc:"output time in seconds" ~short:'s' ~long:"seconds" ()))
       (fixed [ "get" ; "timestamp" ])
-      begin fun seconds (cctxt : Proto_alpha.full) ->
+      begin fun seconds (cctxt : Alpha_client_context.full) ->
         Shell_services.Blocks.Header.shell_header
           cctxt ~chain:cctxt#chain ~block:cctxt#block () >>=? fun { timestamp = v ; _ } ->
         begin
@@ -117,7 +117,7 @@ let commands version () =
     command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         list_contract_labels cctxt
           ~chain:cctxt#chain ~block:cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
@@ -131,7 +131,7 @@ let commands version () =
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_balance cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun amount ->
@@ -144,7 +144,7 @@ let commands version () =
       (prefixes [ "get" ; "script" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_storage cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -166,7 +166,7 @@ let commands version () =
        @@ prefix "in"
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () key key_type (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () key key_type (_, contract) (cctxt : Alpha_client_context.full) ->
         get_big_map_value cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract (key.expanded, key_type.expanded) >>=? function
@@ -182,7 +182,7 @@ let commands version () =
       (prefixes [ "get" ; "script" ; "code" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_script cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -190,7 +190,7 @@ let commands version () =
             cctxt#error "This is not a smart contract."
         | Some { code ; storage = _ } ->
             match Script_repr.force_decode code with
-            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Alpha_environment.Error_monad.pp) errs
+            | Error errs -> cctxt#error "%a" (Format.pp_print_list ~pp_sep:Format.pp_print_newline Environment.Error_monad.pp) errs
             | Ok (code, _) ->
                 let { Michelson_v1_parser.source ; _ } =
                   Michelson_v1_printer.unparse_toplevel code in
@@ -202,7 +202,7 @@ let commands version () =
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_manager cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun manager ->
@@ -218,7 +218,7 @@ let commands version () =
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
+      begin fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_delegate cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? function
@@ -251,7 +251,7 @@ let commands version () =
       begin fun
         (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
          minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
+        (_, contract) (_, delegate) (cctxt : Alpha_client_context.full) ->
         let fee_parameter = {
           Injection.minimal_fees ;
           minimal_nanotez_per_byte ;
@@ -286,7 +286,7 @@ let commands version () =
        @@ stop)
       begin fun (fee, dry_run, verbose_signing, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        (_, contract) (cctxt : Proto_alpha.full) ->
+        (_, contract) (cctxt : Alpha_client_context.full) ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
           contract >>=? fun (src_pk, manager_sk) ->
@@ -331,7 +331,7 @@ let commands version () =
       begin fun (fee, dry_run, verbose_signing, delegate, delegatable, force,
                  minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        new_contract manager_pkh balance (_, source) (cctxt : Proto_alpha.full) ->
+        new_contract manager_pkh balance (_, source) (cctxt : Alpha_client_context.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt
           ~chain:cctxt#chain ~block:cctxt#block
@@ -390,7 +390,7 @@ let commands version () =
                  delegate, force, delegatable, spendable, initial_storage,
                  no_print_source, minimal_fees, minimal_nanotez_per_byte,
                  minimal_nanotez_per_gas_unit, force_low_fee, fee_cap, burn_cap)
-        alias_name manager balance (_, source) program (cctxt : Proto_alpha.full) ->
+        alias_name manager balance (_, source) program (cctxt : Alpha_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code ; _ } ->
         source_to_keys cctxt
@@ -531,8 +531,7 @@ let commands version () =
           ?fee ~manager_sk:src_sk src_pk
         >>= function
         | Ok _ -> return_unit
-        | Error (Alpha_environment.Ecoproto_error
-                   Proto_alpha.Proto.Delegate_storage.Active_delegate  :: []) ->
+        | Error (Environment.Ecoproto_error Delegate_storage.Active_delegate  :: []) ->
             cctxt#message "Delegate already activated." >>= fun () ->
             return_unit
         | Error el -> Lwt.return (Error el)
@@ -620,7 +619,7 @@ let commands version () =
                | Some hash -> return hash))
        @@ prefixes [ "to" ; "be" ; "included" ]
        @@ stop)
-      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Proto_alpha.full) ->
+      begin fun (confirmations, predecessors, branch) operation_hash (ctxt : Alpha_client_context.full) ->
         Client_confirmations.wait_for_operation_inclusion ctxt
           ~chain:ctxt#chain ~confirmations ~predecessors ?branch operation_hash >>=? fun _ ->
         return_unit
@@ -644,7 +643,7 @@ let commands version () =
                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                | Some hash -> return hash))
        @@ stop)
-      begin fun predecessors operation_hash (ctxt : Proto_alpha.full) ->
+      begin fun predecessors operation_hash (ctxt : Alpha_client_context.full) ->
         display_receipt_for_operation ctxt
           ~chain:ctxt#chain ~predecessors operation_hash >>=? fun _ ->
         return_unit
@@ -653,7 +652,7 @@ let commands version () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "block" ; "header" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -664,7 +663,7 @@ let commands version () =
     command ~group:binary_description ~desc:"Describe unsigned block header"
       no_options
       (fixed [ "describe" ; "unsigned" ; "operation" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         cctxt#message "%a"
           Data_encoding.Binary_schema.pp
           (Data_encoding.Binary.describe
@@ -694,7 +693,7 @@ let commands version () =
                   | None -> Error_monad.failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))))
       begin fun (dry_run, verbose_signing, force)
-        (_name, source) proposals (cctxt : Proto_alpha.full) ->
+        (_name, source) proposals (cctxt : Alpha_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Proposal -> return_unit
@@ -735,7 +734,7 @@ let commands version () =
           end ;
           List.iter (fun (p : Protocol_hash.t) ->
               if (List.mem p known_protos) ||
-                 (Alpha_environment.Protocol_hash.Map.mem p known_proposals)
+                 (Environment.Protocol_hash.Map.mem p known_proposals)
               then ()
               else
                 error "Protocol %a is not a known proposal." Protocol_hash.pp p
@@ -760,7 +759,7 @@ let commands version () =
                       pp_open_hovbox ppf 2 ;
                       pp_print_string ppf "* ";
                       pp_print_text ppf msg ;
-                      pp_close_box ppf () ; 
+                      pp_close_box ppf () ;
                       pp_print_cut ppf ())
                     !errors ;
                   pp_close_box ppf ())
@@ -826,7 +825,7 @@ let commands version () =
                | "pass" -> return Vote.Pass
                | s -> failwith "Invalid ballot: '%s'" s))
        @@ stop)
-      begin fun dry_run (_name, source) proposal ballot (cctxt : Proto_alpha.full) ->
+      begin fun dry_run (_name, source) proposal ballot (cctxt : Alpha_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         begin match info.current_period_kind with
           | Testing_vote | Promotion_vote -> return_unit
@@ -843,18 +842,18 @@ let commands version () =
     command ~group ~desc: "Summarize the current voting period"
       no_options
       (fixed [ "show" ; "voting" ; "period" ])
-      begin fun () (cctxt : Proto_alpha.full) ->
+      begin fun () (cctxt : Alpha_client_context.full) ->
         get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun info ->
         cctxt#message "Current period: %a\n\
                        Blocks remaining until end of period: %ld"
           Data_encoding.Json.pp
           (Data_encoding.Json.construct
-             Proto_alpha.Alpha_context.Voting_period.kind_encoding
+             Alpha_context.Voting_period.kind_encoding
              info.current_period_kind)
           info.remaining >>= fun () ->
         Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt >>=? fun props ->
-        let ranks = Alpha_environment.Protocol_hash.Map.bindings props |>
+        let ranks = Environment.Protocol_hash.Map.bindings props |>
                     List.sort (fun (_,v1) (_,v2) -> Int32.(compare v2 v1)) in
         let print_proposal = function
           | None -> assert false (* not called during proposal phase *)

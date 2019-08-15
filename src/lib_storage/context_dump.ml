@@ -130,8 +130,8 @@ module type S = sig
      (block_header -> (pruned_block option * protocol_data option) tzresult Lwt.t)) ->
     fd:Lwt_unix.file_descr -> unit tzresult Lwt.t
 
-  val restore_contexts_fd : index -> Raw_store.t -> fd:Lwt_unix.file_descr ->
-    (pruned_block -> Block_hash.t -> unit tzresult Lwt.t) ->
+  val restore_contexts_fd : index -> fd:Lwt_unix.file_descr ->
+    ((Block_hash.t * pruned_block) list -> unit tzresult Lwt.t) ->
     (block_header option ->
      Block_hash.t -> pruned_block -> unit tzresult Lwt.t) ->
     (block_header * block_data * History_mode.t *
@@ -503,7 +503,7 @@ module Make (I:Dump_interface) = struct
                   if visited hash then Lwt.return_unit
                   else
                     begin
-                      Tezos_stdlib.Utils.display_progress
+                      Tezos_stdlib_unix.Utils.display_progress
                         ~refresh_rate:(!cpt, 1_000)
                         "Context: %dK elements, %dMiB written%!"
                         (!cpt / 1_000) (!written / 1_048_576) ;
@@ -539,12 +539,12 @@ module Make (I:Dump_interface) = struct
       | Some ctxt ->
           let tree = I.context_tree ctxt in
           fold_tree_path ctxt tree >>= fun () ->
-          Tezos_stdlib.Utils.display_progress_end ();
+          Tezos_stdlib_unix.Utils.display_progress_end ();
           I.context_parents ctxt >>= fun parents ->
           set_root buf bh (I.context_info ctxt) parents block_data;
           (* Dump pruned blocks *)
           let dump_pruned cpt pruned =
-            Tezos_stdlib.Utils.display_progress
+            Tezos_stdlib_unix.Utils.display_progress
               ~refresh_rate:(cpt, 1_000)
               "History: %dK block, %dMiB written"
               (cpt / 1_000) (!written / 1_048_576) ;
@@ -571,7 +571,7 @@ module Make (I:Dump_interface) = struct
               set_loot buf proto;
               maybe_flush () ;
             ) protocol_datas >>= fun () ->
-          Tezos_stdlib.Utils.display_progress_end ();
+          Tezos_stdlib_unix.Utils.display_progress_end ();
           return_unit >>=? fun () ->
           set_end buf;
           flush () >>= fun () ->
@@ -585,7 +585,7 @@ module Make (I:Dump_interface) = struct
 
   (* Restoring *)
 
-  let restore_contexts_fd index store ~fd k_store_pruned_block block_validation =
+  let restore_contexts_fd index ~fd k_store_pruned_blocks block_validation =
 
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
@@ -604,7 +604,7 @@ module Make (I:Dump_interface) = struct
 
     let restore history_mode =
       let rec first_pass ctxt cpt =
-        Tezos_stdlib.Utils.display_progress
+        Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Context: %dK elements, %dMiB read"
           (cpt / 1_000) (!read / 1_048_576) ;
@@ -624,7 +624,7 @@ module Make (I:Dump_interface) = struct
         | _ -> fail Inconsistent_snapshot_data in
 
       let rec second_pass pred_header (rev_block_hashes, protocol_datas) todo cpt =
-        Tezos_stdlib.Utils.display_progress
+        Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Store: %dK elements, %dMiB read"
           (cpt / 1_000) (!read / 1_048_576) ;
@@ -634,11 +634,7 @@ module Make (I:Dump_interface) = struct
             let hash = Block_header.hash header in
             block_validation pred_header hash pruned_block >>=? fun () ->
             begin if (cpt + 1) mod 5_000 = 0 then
-                Raw_store.with_atomic_rw store begin fun () ->
-                  Error_monad.iter_s begin fun (hash, pruned_block) ->
-                    k_store_pruned_block pruned_block hash
-                  end ((hash, pruned_block) :: todo)
-                end >>=? fun () ->
+                k_store_pruned_blocks ((hash, pruned_block) :: todo) >>=? fun () ->
                 second_pass (Some header)
                   (hash :: rev_block_hashes, protocol_datas) [] (cpt + 1)
               else
@@ -646,18 +642,15 @@ module Make (I:Dump_interface) = struct
                   (hash :: rev_block_hashes, protocol_datas) ((hash, pruned_block) :: todo) (cpt + 1)
             end
         | Loot protocol_data ->
-            Raw_store.with_atomic_rw store begin fun () ->
-              Error_monad.iter_s (fun (hash, pruned_block) ->
-                  k_store_pruned_block pruned_block hash) todo
-            end >>=? fun () ->
+            k_store_pruned_blocks todo >>=? fun () ->
             second_pass pred_header (rev_block_hashes, protocol_data :: protocol_datas) todo (cpt + 1)
         | End ->
             return (pred_header, rev_block_hashes, List.rev protocol_datas)
         | _ -> fail Inconsistent_snapshot_data in
       first_pass (I.make_context index) 0 >>=? fun (block_header, block_data) ->
-      Tezos_stdlib.Utils.display_progress_end () ;
+      Tezos_stdlib_unix.Utils.display_progress_end () ;
       second_pass None ([], []) [] 0 >>=? fun (oldest_header_opt, rev_block_hashes, protocol_datas) ->
-      Tezos_stdlib.Utils.display_progress_end () ;
+      Tezos_stdlib_unix.Utils.display_progress_end () ;
       return (block_header,
               block_data,
               history_mode,

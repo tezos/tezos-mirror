@@ -133,6 +133,7 @@ module type MEMORY_TABLE = sig
   val replace: 'a t -> key -> 'a -> unit
   val remove: 'a t -> key -> unit
   val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val length : 'a t -> int
 end
 
 module type SCHEDULER_EVENTS = sig
@@ -144,6 +145,7 @@ module type SCHEDULER_EVENTS = sig
   val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
   val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
   val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
+  val memory_table_length : t -> int
 end
 
 module type PRECHECK = sig
@@ -174,6 +176,7 @@ module Make_table
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val memory_table_length : t -> int
 
 end
 

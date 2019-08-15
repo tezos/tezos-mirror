@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
 open Alpha_context
+
+module Proto = Registerer.Registered
 
 type nanotez = Z.t
 let nanotez_enc =
@@ -74,8 +77,6 @@ let default_config =
     allow_script_failure = true ;
   }
 
-module Proto = Tezos_embedded_protocol_004_Pt24m4xi.Registerer.Registered
-
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
   let l = to_list (Contents_list contents) in
@@ -114,7 +115,7 @@ let pre_filter_manager
              (Z.add minimal_fees_for_gas_in_nanotez minimal_fees_for_size_in_nanotez))
         >= 0
 
-let pre_filter config (Operation_data { contents } as op : Operation.packed_protocol_data) =
+let pre_filter config (Operation_data { contents ; _ } as op : Operation.packed_protocol_data) =
   let bytes =
     Data_encoding.Binary.fixed_length_exn
       Tezos_base.Operation.shell_header_encoding +
@@ -137,7 +138,7 @@ open Apply_results
 let rec post_filter_manager
   : type t. Alpha_context.t -> t Kind.manager contents_result_list -> config -> bool Lwt.t
   = fun ctxt op config -> match op with
-    | Single_result (Manager_operation_result { operation_result }) ->
+    | Single_result (Manager_operation_result { operation_result ; _ }) ->
         begin match operation_result with
           | Applied _ -> Lwt.return_true
           | Skipped _ | Failed _ | Backtracked _ ->
@@ -150,7 +151,7 @@ let rec post_filter_manager
 
 let post_filter config
     ~validation_state_before:_
-    ~validation_state_after: ({ Main.ctxt } : Proto.validation_state)
+    ~validation_state_after: ({ ctxt ; _ } : validation_state)
     (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)

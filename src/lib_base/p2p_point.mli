@@ -34,8 +34,8 @@ module Id : sig
   val pp_opt : Format.formatter -> t option -> unit
   val pp_list : Format.formatter -> t list -> unit
 
-  val of_string_exn : string -> t
-  val of_string : string -> (t, string) result
+  val of_string_exn : ?default_port:int -> string -> t
+  val of_string : ?default_port:int -> string -> (t, string) result
   val to_string : t -> string
   val encoding : t Data_encoding.t
   val is_local : t -> bool

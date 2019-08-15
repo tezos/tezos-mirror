@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Proto_alpha
+open Protocol
 open Alpha_context
 
 type multisig_action =
@@ -40,7 +40,7 @@ type multisig_prepared_action =
   }
 
 val originate_multisig:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->
@@ -63,7 +63,7 @@ val originate_multisig:
   unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val prepare_multisig_transaction:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   multisig_contract: Contract.t ->
@@ -71,7 +71,7 @@ val prepare_multisig_transaction:
   unit -> multisig_prepared_action tzresult Lwt.t
 
 val call_multisig:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->
@@ -93,7 +93,7 @@ val call_multisig:
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
 
 val call_multisig_on_bytes:
-  #Proto_alpha.full ->
+  #Alpha_client_context.full ->
   chain: Shell_services.chain ->
   block: Shell_services.block ->
   ?confirmations:int ->
@@ -113,4 +113,3 @@ val call_multisig_on_bytes:
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
-

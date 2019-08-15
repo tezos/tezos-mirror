@@ -33,7 +33,8 @@ let addr_parameter =
   let open Clic in
   param ~name:"address"
     ~desc:"<IPv4>:PORT or <IPV6>:PORT address (PORT defaults to 9732)."
-    (parameter (fun _ x -> return (P2p_point.Id.of_string_exn x)))
+    (parameter
+       (fun _ x -> return (P2p_point.Id.of_string_exn ~default_port:9732 x)))
 
 let commands () =
   let open Clic in
@@ -99,9 +100,18 @@ let commands () =
        @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
          let timeout = Time.System.Span.of_seconds_exn 10. in
-         P2p_services.connect cctxt ~timeout (address, port) >>=? fun () ->
-         cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= fun () ->
-         return_unit
+         P2p_services.connect cctxt ~timeout (address, port) >>= function
+         | Ok () ->
+             cctxt#message "Connection to %a:%d established." P2p_addr.pp address port >>= fun () ->
+             return_unit
+         | Error (Tezos_p2p.P2p_errors.Pending_connection :: _) ->
+             cctxt#warning "Already connecting to peer %a" P2p_addr.pp address >>= fun () ->
+             return_unit
+         | Error (Tezos_p2p.P2p_errors.Connected :: _) ->
+             cctxt#warning "Already connected to peer %a" P2p_addr.pp address >>= fun () ->
+             return_unit
+         | Error _ as e ->
+             Lwt.return e
       ) ;
 
     command ~group ~desc: "Kick a peer."

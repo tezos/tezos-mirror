@@ -152,7 +152,7 @@ type t =
 let encoding =
   let open Data_encoding in
   let case ?max_length ~tag ~title encoding unwrap wrap =
-    P2p.Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length } in
+    P2p_message.Encoding { tag ; title ; encoding ; wrap ; unwrap ; max_length } in
   [
     case ~tag:0x10
       ~title:"Get_current_branch"
@@ -306,7 +306,7 @@ let cfg : _ P2p.message_config = {
   ] ;
 }
 
-let raw_encoding = P2p.Raw.encoding encoding
+let raw_encoding = P2p_message.encoding encoding
 
 let pp_json ppf msg =
   Data_encoding.Json.pp ppf

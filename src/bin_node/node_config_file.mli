@@ -43,11 +43,12 @@ and p2p = {
   private_mode : bool ;
   limits : P2p.limits ;
   disable_mempool : bool ;
-  disable_testchain : bool ;
+  enable_testchain : bool ;
+  greylisting_config : P2p_point_state.Info.greylisting_config ;
 }
 
 and rpc = {
-  listen_addr : string option ;
+  listen_addrs : string list ;
   cors_origins : string list ;
   cors_headers : string list ;
   tls : tls option ;
@@ -85,10 +86,10 @@ val update:
   ?bootstrap_peers:string list ->
   ?listen_addr:string ->
   ?discovery_addr:string ->
-  ?rpc_listen_addr:string ->
+  ?rpc_listen_addrs:string list ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
-  ?disable_testchain:bool ->
+  ?enable_testchain:bool ->
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->

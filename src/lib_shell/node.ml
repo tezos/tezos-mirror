@@ -123,7 +123,6 @@ let init_p2p ?(sandboxed = false) p2p_params =
         peer_metadata_cfg
         conn_metadata_cfg
         message_cfg >>=? fun p2p ->
-      Lwt.async (fun () -> P2p.maintain p2p) ;
       Initialization_event.lwt_emit `P2p_maintain_started >>= fun () ->
       return p2p
 
@@ -149,6 +148,7 @@ and prevalidator_limits = Prevalidator.limits = {
   max_refused_operations: int ;
   operation_timeout: Time.System.Span.t ;
   worker_limits : Worker_types.limits ;
+  operations_batch_size : int ;
 }
 
 and block_validator_limits = Block_validator.limits = {
@@ -174,7 +174,8 @@ let default_prevalidator_limits = {
   worker_limits = {
     backlog_size = 1000 ;
     backlog_level = Internal_event.Info ;
-  }
+  } ;
+  operations_batch_size = 50 ;
 }
 let default_peer_validator_limits = {
   block_header_timeout = Time.System.Span.of_seconds_exn 60. ;
@@ -293,11 +294,23 @@ let create
     ?max_child_ttl ~start_prevalidator
     mainchain_state >>=? fun mainchain_validator ->
   let shutdown () =
+    let open Local_logging in
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the p2p layer..."
+        -% t event "shutdown") >>= fun () ->
     P2p.shutdown p2p >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the distributed database..."
+        -% t event "shutdown") >>= fun () ->
     Distributed_db.shutdown distributed_db >>= fun () ->
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Shutting down the validator..."
+        -% t event "shutdown") >>= fun () ->
     Validator.shutdown validator >>= fun () ->
-    State.close state >>= fun () ->
-    Lwt.return_unit
+    lwt_log_info Tag.DSL.(fun f ->
+        f "Closing down the state..."
+        -% t event "shutdown") >>= fun () ->
+    State.close state
   in
   return {
     state ;
@@ -322,7 +335,7 @@ let build_rpc_directory node =
            node.validator node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
   merge (Chain_directory.build_rpc_directory node.validator) ;
-  merge (P2p.build_rpc_directory node.p2p) ;
+  merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.state) ;
 
   merge (Stat_directory.rpc_directory ()) ;

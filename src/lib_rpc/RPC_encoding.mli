@@ -28,3 +28,4 @@ type schema = Data_encoding.json_schema * Data_encoding.Binary_schema.t
 include Resto.ENCODING with type 'a t = 'a Data_encoding.t
                         and type schema := schema
 
+val uri_encoding: Uri.t Data_encoding.t

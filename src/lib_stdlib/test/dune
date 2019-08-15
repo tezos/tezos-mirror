@@ -3,6 +3,7 @@
         test_lwt_pipe)
  (libraries tezos-stdlib
             alcotest
+            lwt_log
             lwt.unix)
  (flags (:standard -open Tezos_stdlib)))
 
@@ -25,6 +26,6 @@
        (alias runtest_lwt_pipe)))
 
 (alias
- (name runtest_indent)
+ (name runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -158,7 +158,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
         let _: string = Format.flush_str_formatter () in
         Format.fprintf Format.str_formatter "%a" Protocol_hash.pp Proto.hash;
         Format.flush_str_formatter () in
-      [ "node"; "mempool"; "worker"; proto_hash ]
+      [ "node" ; "mempool" ; "worker" ; proto_hash ]
     let pp = Chain_id.pp_short
   end
 
@@ -400,7 +400,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
 
   end
 
-  module Worker = Worker.Make (Name) (Event) (Request) (Types)
+  module Logger = Worker_logger.Make(Event)(Request)
+  module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
   open Types
 
@@ -434,6 +435,7 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data
     end >>=? fun protocol_data ->
+    let predecessor_context = Shell_context.wrap_disk_context predecessor_context in
     Proto.begin_construction
       ~chain_id: (State.Block.chain_id predecessor)
       ~predecessor_context
@@ -612,8 +614,8 @@ module Make(Static: STATIC)(Proto: Registered_protocol.T)
          let state = Worker.state w in
          let filter_result = function
            | Applied _ -> params#applied
-           | Refused _ -> params#branch_refused
-           | Branch_refused _ -> params#refused
+           | Refused _ -> params#refused
+           | Branch_refused _ -> params#branch_refused
            | Branch_delayed _ -> params#branch_delayed
            | _ -> false in
 

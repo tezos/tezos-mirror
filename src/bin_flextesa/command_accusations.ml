@@ -4,8 +4,8 @@ open Console
 
 let default_attempts = 35
 
-let little_mesh_with_bakers ?base_port ?kiln state ~starting_level ~node_exec
-    ~client_exec ~bakers () =
+let little_mesh_with_bakers ?base_port ?generate_kiln_config state
+    ~starting_level ~node_exec ~client_exec ~bakers () =
   Helpers.clear_root state
   >>= fun () ->
   Interactive_test.Pauser.generic state
@@ -59,29 +59,28 @@ let little_mesh_with_bakers ?base_port ?kiln state ~starting_level ~node_exec
     Interactive_test.Commands.
       [ arbitrary_command_on_clients state
           ~clients:[client_0; client_1; client_2] ] ;
-  Asynchronous_result.map_option kiln ~f:(fun k ->
+  Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
       Tezos_client.rpc state ~client:client_0 `Get
         ~path:"/chains/main/chain_id"
       >>= fun chain_id_json ->
       let network_id =
         match chain_id_json with `String s -> s | _ -> assert false
       in
-      Kiln.start state ~network_id k
-        ~bakers:
-          ( List.map baker_list ~f:(fun (account, _) ->
-                Tezos_protocol.Account.(name account, pubkey_hash account) )
-            @ List.map [baker_0; baker_1; baker_2] ~f:(fun bak ->
-                  ( bak.key_name
-                  , Tezos_protocol.Key.Of_name.pubkey_hash bak.key_name ) )
-          |> List.dedup_and_sort ~compare:(fun (_, a) (_, b) ->
-                 String.compare a b ) )
-        ~node_uris:
+      Kiln.Configuration_directory.generate state kiln_config
+        ~peers:
+          (List.map all_nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
+        ~sandbox_json:(Tezos_protocol.sandbox_path ~config:state protocol)
+        ~nodes:
           (List.map all_nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port ))
-      >>= fun (pg, kiln) ->
-      Interactive_test.Pauser.generic state EF.[af "Started Kiln with its DB."]
-  )
-  >>= fun (_ : unit option) ->
+        ~bakers:
+          (List.map protocol.Tezos_protocol.bootstrap_accounts
+             ~f:(fun (account, _) ->
+               Tezos_protocol.Account.(name account, pubkey_hash account) ))
+        ~network_string:network_id ~node_exec ~client_exec
+      >>= fun () ->
+      return EF.(wf "Kiln was configured at `%s`" kiln_config.path) )
+  >>= fun kiln_info_opt ->
   let bake msg baker = Tezos_client.Keyed.bake state baker msg in
   List.fold
     (List.init (starting_level - 1) ~f:(fun n -> n))
@@ -123,10 +122,10 @@ let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec
             (`Not_done
               (sprintf "Waiting for %S to show up in the mempool" kind)) )
 
-let simple_double_baking ~starting_level ?kiln ~state ~base_port node_exec
-    client_exec () =
+let simple_double_baking ~starting_level ?generate_kiln_config ~state
+    ~base_port node_exec client_exec () =
   little_mesh_with_bakers ~bakers:1 state ~node_exec ~client_exec () ~base_port
-    ~starting_level ?kiln
+    ~starting_level ?generate_kiln_config
   >>= fun (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2) ->
   let kill_nth nth = List.nth_exn all_nodes nth |> Helpers.kill_node state in
   let restart_nth nth =
@@ -236,10 +235,10 @@ let find_endorsement_in_mempool state ~client =
       | None -> return (`Not_done (sprintf "No endorsement so far"))
       | Some e -> return (`Done e) )
 
-let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
-    client_exec () =
+let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
+    ~base_port node_exec client_exec () =
   little_mesh_with_bakers ~bakers:2 state ~node_exec ~client_exec ()
-    ~starting_level ~base_port ?kiln
+    ~starting_level ~base_port ?generate_kiln_config
   >>= fun (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2) ->
   (* 2 bakers ⇒ baker_0 and baker_2 are for the same key on ≠ nodes *)
   assert (
@@ -286,8 +285,6 @@ let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
   >>= fun () ->
   Helpers.restart_node state node_1 ~client_exec
   >>= fun () ->
-  (* Tezos_client.Keyed.bake state baker_0 "baker-0 baking lonelily"
-   * >>= fun () -> *)
   Test_scenario.Queries.wait_for_all_levels_to_be state
     ~attempts:default_attempts ~seconds:8. [node_1; node_2]
     (`Equal_to (starting_level + 1))
@@ -364,8 +361,7 @@ let simple_double_endorsement ~starting_level ?kiln ~state ~base_port node_exec
                  last_level)) )
   >>= fun () -> say state EF.(af "Test done.")
 
-let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
-    =
+let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
   Helpers.clear_root state
   >>= fun () ->
   let block_interval = 2 in
@@ -407,9 +403,6 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
     let bak =
       Tezos_client.Keyed.make client ~key_name
         ~secret_key:(Tezos_protocol.Account.private_key (fst baker_0_account))
-      (* ~secret_key:
-         *   (Tezos_protocol.Key.Of_name.private_key
-         *      (fst baker_0 |> Tezos_protocol.name_to_string)) *)
     in
     Tezos_client.Keyed.initialize state bak >>= fun _ -> return (client, bak)
   in
@@ -419,25 +412,6 @@ let with_accusers ?kiln ~state ~base_port node_exec accuser_exec client_exec ()
   >>= fun (client_1, baker_1) ->
   baker 2
   >>= fun (client_2, baker_2) ->
-  Asynchronous_result.map_option kiln ~f:(fun k ->
-      Tezos_client.rpc state ~client:client_0 `Get
-        ~path:"/chains/main/chain_id"
-      >>= fun chain_id_json ->
-      let network_id =
-        match chain_id_json with `String s -> s | _ -> assert false
-      in
-      Kiln.start state ~network_id k
-        ~bakers:
-          [ Tezos_protocol.Account.(
-              let acc = fst baker_0_account in
-              (name acc, pubkey_hash acc)) ]
-        ~node_uris:
-          (List.map all_nodes ~f:(fun {Tezos_node.rpc_port; _} ->
-               sprintf "http://localhost:%d" rpc_port ))
-      >>= fun (pg, kiln) ->
-      Interactive_test.Pauser.generic state EF.[af "Started Kiln with its DB."]
-  )
-  >>= fun (_ : unit option) ->
   Interactive_test.Pauser.add_commands state
     Interactive_test.Commands.(
       all_defaults state ~nodes:all_nodes
@@ -627,18 +601,30 @@ let cmd ~pp_error () =
         bnod
         bcli
         accex
-        kiln
+        generate_kiln_config
         state
         ->
-          let actual_test =
+          let checks () =
+            let acc = if test = `With_accusers then [accex] else [] in
+            Helpers.System_dependencies.precheck state `Or_fail
+              ~executables:(acc @ [bnod; bcli])
+          in
+          let actual_test () =
             match test with
-            | `With_accusers -> with_accusers ~state bnod accex bcli ~base_port
+            | `With_accusers ->
+                checks ()
+                >>= fun () ->
+                with_accusers ~state bnod accex bcli ~base_port ()
             | `Simple_double_baking ->
-                simple_double_baking ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
+                checks ()
+                >>= fun () ->
+                simple_double_baking ~state bnod bcli ~base_port
+                  ?generate_kiln_config ~starting_level ()
             | `Simple_double_endorsing ->
-                simple_double_endorsement ~state bnod bcli ~base_port ?kiln
-                  ~starting_level
+                checks ()
+                >>= fun () ->
+                simple_double_endorsement ~state bnod bcli ~base_port
+                  ?generate_kiln_config ~starting_level ()
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test)
       )
@@ -662,7 +648,7 @@ let cmd ~pp_error () =
     $ Tezos_executable.cli_term `Node "tezos"
     $ Tezos_executable.cli_term `Client "tezos"
     $ Tezos_executable.cli_term `Accuser "tezos"
-    $ Kiln.cli_term ()
+    $ Kiln.Configuration_directory.cli_term ()
     $ Test_command_line.cli_state ~name:"accusing" () )
     (let doc = "Sandbox networks which record double-bakings." in
      let man : Manpage.block list =
