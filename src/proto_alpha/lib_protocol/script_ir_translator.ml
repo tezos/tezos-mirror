@@ -598,6 +598,35 @@ let list_cons :
   let open Script_typed_ir in
   {length = 1 + l.length; elements = elt :: l.elements}
 
+(* Creates a single use delimited continuation that
+   allows functions to abort computation half way through *)
+let with_return f =
+  (* a localized exception that is tied to
+     the particular [with_return] call *)
+  let exception Return of error list in
+  (* Invariant: [ret] must only be called once *)
+  let ret a = raise_notrace (Return a) in
+  match f ~ret with
+  | lwt_res ->
+      lwt_res >|= ok
+  | exception Return a ->
+      Lwt.return (Error a)
+
+(* Generic terminating fold for sets and maps.
+   Allows for the fold that is sent in to terminate
+   early when the error lwt monad gives back an error.
+   Useful for say [set_iter], [map_map], and [map_iter] as this allows
+   us to fold over the set/map without having to waste computation and gas
+   turning the set/map into a list which is then recursed on. *)
+let fold_m fold step items init =
+  with_return (fun ~ret ->
+      let terminating_step item acc =
+        acc
+        >>= fun acc ->
+        step item acc >|= function Ok t -> t | Error err -> ret err
+      in
+      fold terminating_step items (Lwt.return init))
+
 let wrap_compare compare a b =
   let res = compare a b in
   if Compare.Int.(res = 0) then 0 else if Compare.Int.(res > 0) then 1 else -1
@@ -674,6 +703,14 @@ let set_mem : type elt. elt -> elt set -> bool =
 
 let set_fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
  fun f (module Box) -> Box.OPS.fold f Box.boxed
+
+let set_fold_m :
+    type elt acc.
+    (elt -> acc -> acc tzresult Lwt.t) ->
+    elt Script_typed_ir.set ->
+    acc ->
+    acc tzresult Lwt.t =
+ fun f set init -> fold_m set_fold f set init
 
 let set_size : type elt. elt set -> Script_int.n Script_int.num =
  fun (module Box) -> Script_int.(abs (of_int Box.size))

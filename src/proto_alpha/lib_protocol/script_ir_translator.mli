@@ -91,6 +91,12 @@ val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
 val set_fold :
   ('elt -> 'acc -> 'acc) -> 'elt Script_typed_ir.set -> 'acc -> 'acc
 
+val set_fold_m :
+  ('elt -> 'acc -> 'acc tzresult Lwt.t) ->
+  'elt Script_typed_ir.set ->
+  'acc ->
+  'acc tzresult Lwt.t
+
 val set_update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
 
 val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool

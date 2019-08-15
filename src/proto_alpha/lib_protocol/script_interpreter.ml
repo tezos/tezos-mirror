@@ -708,16 +708,12 @@ let rec step :
   | (Empty_set t, rest) ->
       logged_return (Item (empty_set t, rest), ctxt)
   | (Set_iter body, Item (set, init)) ->
-      let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
-      let rec loop ctxt l stack =
-        match l with
-        | [] ->
-            return (stack, ctxt)
-        | hd :: tl ->
-            step logger ctxt step_constants body (Item (hd, stack))
-            >>=? fun (stack, ctxt) -> loop ctxt tl stack
-      in
-      loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
+      set_fold_m
+        (fun item (stack, ctxt) ->
+          step logger ctxt step_constants body (Item (item, stack)))
+        set
+        (init, ctxt)
+      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Set_mem, Item (v, Item (set, rest))) ->
       logged_return (Item (set_mem v set, rest), ctxt)
   | (Set_update, Item (v, Item (presence, Item (set, rest)))) ->
