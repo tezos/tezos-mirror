@@ -161,12 +161,14 @@ module Fork_validator = struct
     >>= fun process ->
     Lwt.catch
       (fun () ->
-        Fork_validation.send
-          process#stdin
-          Fork_validation.request_encoding
-          request
-        >>= fun () ->
-        Fork_validation.recv_result process#stdout result_encoding
+        (* Make sure that the promise is not canceled between a send and recv *)
+        Lwt.protected
+          ( Fork_validation.send
+              process#stdin
+              Fork_validation.request_encoding
+              request
+          >>= fun () ->
+          Fork_validation.recv_result process#stdout result_encoding )
         >>=? fun res ->
         match process#state with
         | Running ->
