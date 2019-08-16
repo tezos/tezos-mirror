@@ -1,5 +1,5 @@
-(** Wrapper around the main ["tezos-client"] application. *)
 open Internal_pervasives
+(** Wrapper around the main ["tezos-client"] application. *)
 
 type t = {id : string; port : int; exec : Tezos_executable.t}
 

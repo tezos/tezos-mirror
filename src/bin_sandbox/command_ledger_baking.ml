@@ -1,4 +1,4 @@
-open Tezos_network_sandbox
+open Flextesa
 open Internal_pervasives
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt

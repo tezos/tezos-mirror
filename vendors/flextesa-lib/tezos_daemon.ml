@@ -42,8 +42,7 @@ let to_script (t : t) ~state =
              (arg_to_string t.args)
              t.node.Tezos_node.rpc_port
              (Option.value_map t.name_tag ~default:"" ~f:(sprintf "-%s")) )
-      args
-  in
+      args in
   match t.args with
   | Baker key ->
       let node_path = Tezos_node.data_dir ~config:state t.node in

@@ -1,6 +1,6 @@
 (executables
   (names main)
-  (libraries tezos-network-sandbox)
+  (libraries flextesa)
   (flags (:standard -w -9-27-30-32-40@8 -safe-string)))
 
 (alias

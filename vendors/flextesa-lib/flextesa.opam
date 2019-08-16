@@ -1,6 +1,6 @@
 opam-version: "2.0"
 version: "dev"
-maintainer: "contact@tezos.com"
+maintainer: "seb@mondet.org"
 authors: [ "Tezos devteam" ]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
@@ -13,13 +13,11 @@ depends: [
   "genspio" { = "0.0.2" }
   "dum"
   "tezos-stdlib-unix"
-  "tezos-signer-backends"
-  "tezos-client-005-PsBabyM1"
-  "tezos-protocol-005-PsBabyM1"
   "lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: library to manage network sandboxes"
+synopsis:
+    "Flexible Tezos Sandboxes: library to run various Tezos network-sandboxes"
