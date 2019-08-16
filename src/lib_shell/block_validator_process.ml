@@ -74,6 +74,7 @@ module Fork_validator = struct
     protocol_root : string;
     process_path : string;
     mutable validator_process : Lwt_process.process_full option;
+    lock : Lwt_mutex.t;
   }
 
   type t = validation_context
@@ -82,7 +83,13 @@ module Fork_validator = struct
     lwt_log_notice (fun f -> f "Initialized")
     >>= fun () ->
     Lwt.return
-      {context_root; protocol_root; process_path; validator_process = None}
+      {
+        context_root;
+        protocol_root;
+        process_path;
+        validator_process = None;
+        lock = Lwt_mutex.create ();
+      }
 
   let check_process_status =
     let open Unix in
@@ -175,12 +182,13 @@ module Fork_validator = struct
       (fun () ->
         (* Make sure that the promise is not canceled between a send and recv *)
         Lwt.protected
-          ( Fork_validation.send
-              process#stdin
-              Fork_validation.request_encoding
-              request
-          >>= fun () ->
-          Fork_validation.recv_result process#stdout result_encoding )
+          (Lwt_mutex.with_lock vp.lock (fun () ->
+               Fork_validation.send
+                 process#stdin
+                 Fork_validation.request_encoding
+                 request
+               >>= fun () ->
+               Fork_validation.recv_result process#stdout result_encoding))
         >>=? fun res ->
         match process#state with
         | Running ->
