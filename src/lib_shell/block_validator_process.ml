@@ -128,36 +128,48 @@ module Fork_validator = struct
         Lwt.return_unit
 
   let send_request vp request result_encoding =
+    let start_process () =
+      let process =
+        Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
+      in
+      lwt_log_notice
+        Tag.DSL.(
+          fun f ->
+            f "Block validation started on pid %a"
+            -% a (Tag.def "int" Format.pp_print_int) process#pid)
+      >>= fun () ->
+      let parameters =
+        {
+          Fork_validation.context_root = vp.context_root;
+          protocol_root = vp.protocol_root;
+        }
+      in
+      vp.validator_process <- Some process ;
+      Fork_validation.send
+        process#stdin
+        Data_encoding.Variable.bytes
+        Fork_validation.magic
+      >>= fun () ->
+      Fork_validation.send
+        process#stdin
+        Fork_validation.parameters_encoding
+        parameters
+      >>= fun () -> Lwt.return process
+    in
     ( match vp.validator_process with
-    | Some process ->
-        Lwt.return process
+    | Some process -> (
+      match process#state with
+      | Running ->
+          Lwt.return process
+      | Exited status ->
+          vp.validator_process <- None ;
+          check_process_status status
+          >>= fun () ->
+          vp.validator_process <- None ;
+          lwt_log_notice (fun f -> f "restarting validation process...")
+          >>= fun () -> start_process () )
     | None ->
-        let process =
-          Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
-        in
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "Block validation started on pid %a"
-              -% a (Tag.def "int" Format.pp_print_int) process#pid)
-        >>= fun () ->
-        let parameters =
-          {
-            Fork_validation.context_root = vp.context_root;
-            protocol_root = vp.protocol_root;
-          }
-        in
-        vp.validator_process <- Some process ;
-        Fork_validation.send
-          process#stdin
-          Data_encoding.Variable.bytes
-          Fork_validation.magic
-        >>= fun () ->
-        Fork_validation.send
-          process#stdin
-          Fork_validation.parameters_encoding
-          parameters
-        >>= fun () -> Lwt.return process )
+        start_process () )
     >>= fun process ->
     Lwt.catch
       (fun () ->
@@ -181,7 +193,9 @@ module Fork_validator = struct
             process#status
             >>= fun status ->
             check_process_status status
-            >>= fun () -> Lwt.return (error_exn errors))
+            >>= fun () ->
+            vp.validator_process <- None ;
+            Lwt.return (error_exn errors))
 end
 
 type validator_kind =
