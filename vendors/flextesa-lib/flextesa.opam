@@ -14,6 +14,7 @@ depends: [
   "dum"
   "tezos-stdlib-unix"
   "lwt"
+  "fmt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
