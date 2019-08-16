@@ -24,6 +24,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** P2P maintenance worker.
+
+    This worker enforces the connection bounds defined on the command-line
+    or/and the configuration file.
+
+    The maintenance process is launched:
+    . If not launched within [maintenance_idle_time] seconds
+    . When any of the following future  is resolved
+        [P2p_pool.Pool_event.wait_too_few_connections]
+        [P2p_pool.Pool_event.wait_too_many_connections]
+        [P2p_pool.Pool_event.wait_too_few_trusted_connections]
+    . When [maintain] is called
+
+    If the number of connections is above the limit, the maintainer
+    kill existing connections.
+
+    If below the limit, it tries to connect to points available from [P2p_pool].
+    If not enough connections can be obtained, it requires new points from
+    [P2p_pool] using [P2p_pool.broadcast msg], and wakes up the
+    [P2p_discovery] worker. It then waits for new peers or points by waiting
+    on futures
+      [P2p_pool.Pool_event.wait_new_peer]
+      [P2p_pool.Pool_event.wait_new_point pool]
+    This is reiterated indefinitely every [require_new_points_time] seconds. *)
+
 type config = {
 
   maintenance_idle_time: Time.System.Span.t ;
@@ -48,27 +73,25 @@ type config = {
   (** Targeted number of connections to reach *)
 }
 
-
-type 'meta t
+type ('msg, 'meta, 'meta_conn) t
 (** Type of a maintenance worker. *)
 
 val create:
   ?discovery:P2p_discovery.t ->
   config ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
-  'meta t
-(** [run ?discovery config bounds pool] returns a maintenance worker, with
-    the [discovery] worker if present, for [pool] with connection targets
-    specified in [bounds]. *)
+  ('msg, 'meta, 'meta_conn) t
+(** [starts ?discovery config pool] returns a maintenance worker, with
+    the [discovery] worker if present, for [pool]. *)
 
-val activate: 'meta t -> unit
-(** [activate t] start the worker that will maintain connections *)
+val activate: ('msg, 'meta, 'meta_conn) t -> unit
+(** [activate t] starts the worker that will maintain connections *)
 
-val maintain: 'meta t -> unit Lwt.t
+val maintain: ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 (** [maintain t] gives a hint to maintenance worker [t] that
     maintenance is needed and returns whenever [t] has done a
     maintenance cycle. *)
 
-val shutdown: 'meta t -> unit Lwt.t
+val shutdown: ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 (** [shutdown t] is a thread that returns whenever [t] has
     successfully shut down. *)
