@@ -83,8 +83,8 @@ doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
 build-sandbox:
-	@dune build src/bin_flextesa/main.exe
-	@cp _build/default/src/bin_flextesa/main.exe tezos-sandbox
+	@dune build src/bin_sandbox/main.exe
+	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 build-test: build-sandbox
 	@dune build @buildtest

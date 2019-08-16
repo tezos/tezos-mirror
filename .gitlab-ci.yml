@@ -230,7 +230,7 @@ integration:proto:sandbox:
 integration:sandboxes:voting:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_flextesa/runtest_sandbox_voting_demo_noops
+    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_sandbox/runtest_sandbox_voting_demo_noops
   artifacts:
     paths:
     - flextesa-voting-demo-noops
@@ -241,7 +241,7 @@ integration:sandboxes:voting:
 integration:sandboxes:acc-baking:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_baking
+    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_baking
   artifacts:
     paths:
     - flextesa-acc-sdb
@@ -251,7 +251,7 @@ integration:sandboxes:acc-baking:
 integration:sandboxes:acc-endorsement:
   <<: *integration_definition
   script:
-    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_flextesa/runtest_sandbox_accusations_simple_double_endorsing
+    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_endorsing
   artifacts:
     paths:
     - flextesa-acc-sde
