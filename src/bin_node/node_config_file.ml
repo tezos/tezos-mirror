@@ -38,6 +38,153 @@ let default_p2p_port = 9732
 
 let default_discovery_port = 10732
 
+type chain_name = Distributed_db_version.name
+
+type blockchain_network = {
+  genesis : State.Chain.genesis;
+  chain_name : chain_name;
+  old_chain_name : chain_name option;
+  incompatible_chain_name : chain_name option;
+  sandboxed_chain_name : chain_name;
+}
+
+let make_blockchain_network ~chain_name ?old_chain_name
+    ?incompatible_chain_name ~sandboxed_chain_name genesis =
+  let of_string = Distributed_db_version.of_string in
+  {
+    genesis;
+    chain_name = of_string chain_name;
+    old_chain_name = Option.map old_chain_name ~f:of_string;
+    incompatible_chain_name = Option.map incompatible_chain_name ~f:of_string;
+    sandboxed_chain_name = of_string sandboxed_chain_name;
+  }
+
+let blockchain_network_mainnet =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+      }
+    ~chain_name:"TEZOS_MAINNET"
+    ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
+    ~incompatible_chain_name:"INCOMPATIBLE"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
+
+let blockchain_network_alphanet =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H";
+      }
+    ~chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
+    ~old_chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
+    ~incompatible_chain_name:"INCOMPATIBLE"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
+
+let blockchain_network_zeronet =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+      }
+    ~chain_name:"TEZOS_ZERONET_2019-08-06T15:18:56Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+
+let blockchain_network_default =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+      }
+    ~chain_name:"TEZOS"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+
+let blockchain_network_encoding : blockchain_network Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun { genesis;
+           chain_name;
+           old_chain_name;
+           incompatible_chain_name;
+           sandboxed_chain_name } ->
+      ( genesis,
+        chain_name,
+        old_chain_name,
+        incompatible_chain_name,
+        sandboxed_chain_name ))
+    (fun ( genesis,
+           chain_name,
+           old_chain_name,
+           incompatible_chain_name,
+           sandboxed_chain_name ) ->
+      {
+        genesis;
+        chain_name;
+        old_chain_name;
+        incompatible_chain_name;
+        sandboxed_chain_name;
+      })
+    (let chain = Distributed_db_version.name_encoding in
+     obj5
+       (req "genesis" State.Chain.genesis_encoding)
+       (req "chain_name" chain)
+       (opt "old_chain_name" chain)
+       (opt "incompatible_chain_name" chain)
+       (req "sandboxed_chain_name" chain))
+
+let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [ case
+        (Tag 0)
+        ~title:"Custom"
+        blockchain_network_encoding
+        (fun x -> Some x)
+        (fun x -> x);
+      case
+        (Tag 1)
+        ~title:"Zeronet"
+        (constant "Zeronet")
+        (fun _ -> None)
+        (fun () -> blockchain_network_zeronet);
+      case
+        (Tag 2)
+        ~title:"Alphanet"
+        (constant "Alphanet")
+        (fun _ -> None)
+        (fun () -> blockchain_network_alphanet);
+      case
+        (Tag 3)
+        ~title:"Mainnet"
+        (constant "Mainnet")
+        (fun _ -> None)
+        (fun () -> blockchain_network_mainnet) ]
+
 type t = {
   data_dir : string;
   p2p : p2p;
@@ -45,6 +192,7 @@ type t = {
   log : Lwt_log_sink_unix.cfg;
   internal_events : Internal_event_unix.Configuration.t;
   shell : shell;
+  blockchain_network : blockchain_network;
 }
 
 and p2p = {
@@ -137,6 +285,7 @@ let default_config =
     log = Lwt_log_sink_unix.default_cfg;
     internal_events = Internal_event_unix.Configuration.default;
     shell = default_shell;
+    blockchain_network = blockchain_network_default;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -684,11 +833,11 @@ let shell =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc; p2p; log; internal_events; shell} ->
-      (data_dir, rpc, p2p, log, internal_events, shell))
-    (fun (data_dir, rpc, p2p, log, internal_events, shell) ->
-      {data_dir; rpc; p2p; log; internal_events; shell})
-    (obj6
+    (fun {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network} ->
+      (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network))
+    (fun (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network) ->
+      {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network})
+    (obj7
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
@@ -715,7 +864,13 @@ let encoding =
           "shell"
           ~description:"Configuration of network parameters"
           shell
-          default_shell))
+          default_shell)
+       (dft
+          "network"
+          ~description:
+            "Configuration of which network/blockchain to connect to"
+          sugared_blockchain_network_encoding
+          blockchain_network_default))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -844,8 +999,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }
   in
-  let internal_events = cfg.internal_events in
-  return {data_dir; p2p; rpc; log; internal_events; shell}
+  return {cfg with data_dir; p2p; rpc; log; shell}
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in

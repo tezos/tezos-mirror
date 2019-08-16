@@ -28,6 +28,8 @@
 
 type name = string
 
+let of_string x = x
+
 let pp_name = Format.pp_print_string
 
 let name_encoding =

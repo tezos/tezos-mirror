@@ -49,8 +49,11 @@ module Term = struct
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
-      Node_shared_arg.read_data_dir args
-      >>=? fun data_dir ->
+      Node_shared_arg.read_and_patch_config_file
+        ~ignore_bootstrap_peers: true
+        args
+      >>=? fun config ->
+      let data_dir = config.data_dir in
       Node_data_version.ensure_data_dir data_dir
       >>=? fun () ->
       Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
@@ -61,7 +64,7 @@ module Term = struct
       let store_root = Node_data_version.store_dir data_dir in
       Store.init ~mapsize:40_960_000_000L store_root
       >>=? fun store ->
-      let genesis = Genesis_chain.genesis in
+      let genesis = config.blockchain_network.genesis in
       State.init ~context_root ~store_root genesis
       >>=? fun (state, chain_state, context_index, history_mode) ->
       let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in

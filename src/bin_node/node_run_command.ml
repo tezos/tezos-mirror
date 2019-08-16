@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Node_logging
-open Genesis_chain
 
 type error += Non_private_sandbox of P2p_addr.t
 
@@ -152,7 +151,10 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           return_some ("sandbox_parameter", json))
     sandbox
   >>=? fun sandbox_param ->
-  let patch_context = Some (Patch_context.patch_context sandbox_param) in
+  let genesis = config.blockchain_network.genesis in
+  let patch_context =
+    Some (Patch_context.patch_context genesis sandbox_param)
+  in
   let node_config : Node.config =
     {
       genesis;

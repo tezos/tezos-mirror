@@ -62,9 +62,10 @@ module Term = struct
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
-      Node_shared_arg.read_data_dir args
-      >>=? fun data_dir ->
-      let genesis = Genesis_chain.genesis in
+      Node_shared_arg.read_and_patch_config_file args
+      >>=? fun node_config ->
+      let data_dir = node_config.data_dir in
+      let genesis = node_config.blockchain_network.genesis in
       match subcommand with
       | Export ->
           Node_data_version.ensure_data_dir data_dir
@@ -101,7 +102,9 @@ module Term = struct
                   return_some ("sandbox_parameter", json))
             sandbox_file
           >>=? fun sandbox_parameters ->
-          let patch_context = Patch_context.patch_context sandbox_parameters in
+          let patch_context =
+            Patch_context.patch_context genesis sandbox_parameters
+          in
           Snapshots.import
             ~reconstruct
             ~patch_context

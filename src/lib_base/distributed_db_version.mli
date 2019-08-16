@@ -28,6 +28,8 @@
 
 type name = private string
 
+val of_string : string -> name
+
 val pp_name : Format.formatter -> name -> unit
 
 val name_encoding : name Data_encoding.t

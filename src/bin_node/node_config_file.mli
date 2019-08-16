@@ -26,6 +26,24 @@
 
 [@@@ocaml.warning "-30"]
 
+type chain_name = Distributed_db_version.name
+
+type blockchain_network = {
+  genesis : State.Chain.genesis;
+  chain_name : chain_name;
+  old_chain_name : chain_name option;
+  incompatible_chain_name : chain_name option;
+  sandboxed_chain_name : chain_name;
+}
+
+val blockchain_network_mainnet : blockchain_network
+
+val blockchain_network_alphanet : blockchain_network
+
+val blockchain_network_zeronet : blockchain_network
+
+val blockchain_network_default : blockchain_network
+
 type t = {
   data_dir : string;
   p2p : p2p;
@@ -33,6 +51,7 @@ type t = {
   log : Lwt_log_sink_unix.cfg;
   internal_events : Internal_event_unix.Configuration.t;
   shell : shell;
+  blockchain_network : blockchain_network;
 }
 
 and p2p = {
