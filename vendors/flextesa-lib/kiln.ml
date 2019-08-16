@@ -1,7 +1,7 @@
 open Internal_pervasives
 
 module Configuration_directory = struct
-  type t = {path : string; clean : bool; p2p_port : int}
+  type t = {path: string; clean: bool; p2p_port: int}
 
   let generate state ?(protocol_execs = []) t ~peers ~sandbox_json ~nodes
       ~bakers ~network_string ~node_exec ~client_exec =
@@ -9,55 +9,40 @@ module Configuration_directory = struct
      should be fixed soon. *)
     let {path; clean; p2p_port} = t in
     ( if clean then
-      Running_processes.run_cmdf
-        state
-        "rm -fr %s ; mkdir -p %s ; chmod -R 777 %s"
-        path
-        path
-        path
+      Running_processes.run_cmdf state
+        "rm -fr %s ; mkdir -p %s ; chmod -R 777 %s" path path path
       >>= fun _ -> return ()
     else return () )
     >>= fun _ ->
-    System.write_file
-      state
-      ~perm:0o777
-      (path // "loggers")
+    System.write_file state ~perm:0o777 (path // "loggers")
       ~content:
         Ezjsonm.(
           `A
             [ dict
-                [ ("logger", dict [("Stderr", dict [])]);
-                  ( "filters",
-                    dict [("SQL", string "Error"); ("", string "Info")] ) ] ]
+                [ ("logger", dict [("Stderr", dict [])])
+                ; ( "filters"
+                  , dict [("SQL", string "Error"); ("", string "Info")] ) ] ]
           |> to_string)
     (* {json|[{ "logger":{"Stderr":{}} , "filters": { "SQL":"Error" , "":"Info"}}]|json} *)
     >>= fun () ->
     let node_config = path // "node-config.json" in
-    System.write_file
-      state
-      ~perm:0o777
-      node_config
+    System.write_file state ~perm:0o777 node_config
       ~content:
         Ezjsonm.(
           dict
-            [ ("data-dir", string (path // "node-data-dir-unused"));
-              ("rpc", dict [("listen-addr", string "127.0.0.1")]);
-              ("p2p", dict [("expected-proof-of-work", int 1)]) ]
+            [ ("data-dir", string (path // "node-data-dir-unused"))
+            ; ("rpc", dict [("listen-addr", string "127.0.0.1")])
+            ; ("p2p", dict [("expected-proof-of-work", int 1)]) ]
           |> to_string)
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
+    System.write_file state ~perm:0o777
       (path // "kiln-node-net-port")
       ~content:(sprintf "%d" p2p_port)
     >>= fun () ->
     let pwd = Sys.getenv "PWD" in
     let absolutize path =
-      if Filename.is_relative path then pwd // path else path
-    in
-    System.write_file
-      state
-      ~perm:0o777
+      if Filename.is_relative path then pwd // path else path in
+    System.write_file state ~perm:0o777
       (path // "kiln-node-custom-args")
       ~content:
         (sprintf
@@ -69,47 +54,32 @@ module Configuration_directory = struct
            (List.length peers - 1)
            sandbox_json)
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
-      (path // "nodes")
+    System.write_file state ~perm:0o777 (path // "nodes")
       ~content:(String.concat ~sep:"," nodes)
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
-      (path // "bakers")
+    System.write_file state ~perm:0o777 (path // "bakers")
       ~content:
         ( List.map bakers ~f:(fun (n, addr) -> sprintf "%s@%s" addr n)
         |> String.concat ~sep:"," )
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
-      (path // "network")
+    System.write_file state ~perm:0o777 (path // "network")
       ~content:network_string
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
+    System.write_file state ~perm:0o777
       (path // "enable-obsidian-node")
       ~content:(sprintf "%b" false)
     >>= fun () ->
-    System.write_file
-      state
-      ~perm:0o777
-      (path // "binary-paths")
+    System.write_file state ~perm:0o777 (path // "binary-paths")
       ~content:
         Ezjsonm.(
           let absolutize exec =
             let path = Tezos_executable.get exec in
-            absolutize path
-          in
+            absolutize path in
           dict
-            [ ("node-path", string (absolutize node_exec));
-              ("client-path", string (absolutize client_exec));
-              ( "baker-endorser-paths",
-                list
+            [ ("node-path", string (absolutize node_exec))
+            ; ("client-path", string (absolutize client_exec))
+            ; ( "baker-endorser-paths"
+              , list
                   (fun (p, bak, endo) ->
                     strings [p; absolutize bak; absolutize endo])
                   protocol_execs ) ]

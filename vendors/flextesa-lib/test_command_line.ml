@@ -41,8 +41,7 @@ let cli_state ?default_interactivity ?(disable_interactivity = false) ~name ()
       method pauser = pauser
 
       method operations_log = ops
-    end
-  in
+    end in
   let open Cmdliner in
   Term.(
     pure state $ Console.cli_term ()
