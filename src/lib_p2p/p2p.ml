@@ -192,7 +192,7 @@ module Real = struct
     limits: limits ;
     io_sched: P2p_io_scheduler.t ;
     pool: ('msg, 'peer_meta, 'conn_meta) P2p_pool.t ;
-    maintenance: 'peer_meta P2p_maintenance.t ;
+    maintenance: ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t ;
     welcome: P2p_welcome.t option ;
   }
 
