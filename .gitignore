@@ -1,6 +1,5 @@
-
 *~
 _build
-
+dune-project
 .merlin
 *.install

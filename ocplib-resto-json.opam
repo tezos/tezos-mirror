@@ -8,11 +8,14 @@ bug-reports: "https://github.com/OCamlPro/ocplib-resto/issues"
 dev-repo: "git+https://github.com/OCamlPro/ocplib-resto"
 synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 
-build: [[ "dune" "build" "-p" name "-j" jobs "@install" ]]
-run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+]
+
 depends: [
   "ocamlfind" {build}
   "dune" {build}
-  "ocplib-resto-directory" {= "dev" }
-  "cohttp-lwt" { >= "1.0.0" }
+  "ocplib-resto" {= "dev" }
+  "ocplib-json-typed" {= "0.7.1" }
+  "ocplib-json-typed-bson" {= "0.7.1" }
 ]
