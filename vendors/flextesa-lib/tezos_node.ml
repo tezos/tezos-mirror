@@ -69,8 +69,12 @@ let node_command t ~config cmd options =
 
 let run_command t ~config =
   let peers = List.concat_map t.peers ~f:(optf "peer" "127.0.0.1:%d") in
-  node_command t ~config ["run"]
-    ( flag "private-mode" @ flag "no-bootstrap-peers" @ peers
+  node_command
+    t
+    ~config
+    ["run"]
+    ( flag "private-mode" @ flag "no-bootstrap-peers" @ flag "singleprocess"
+    @ peers
     @ optf "bootstrap-threshold" "0"
     @ optf "connections" "%d" t.expected_connections
     @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )

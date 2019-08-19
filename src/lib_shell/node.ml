@@ -291,7 +291,7 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let create ?(sandboxed = false) ~multiprocess
+let create ?(sandboxed = false) ~singleprocess
     { genesis;
       store_root;
       context_root;
@@ -311,7 +311,13 @@ let create ?(sandboxed = false) ~multiprocess
   init_p2p ~sandboxed p2p_params
   >>=? fun p2p ->
   (let open Block_validator_process in
-  if multiprocess then
+  if singleprocess then
+    State.init ~store_root ~context_root ?history_mode ?patch_context genesis
+    >>=? fun (state, mainchain_state, context_index, history_mode) ->
+    init (Internal context_index)
+    >>=? fun validator_process ->
+    return (validator_process, state, mainchain_state, history_mode)
+  else
     init
       (External
          {context_root; protocol_root; process_path = Sys.executable_name})
@@ -329,12 +335,6 @@ let create ?(sandboxed = false) ~multiprocess
       ~commit_genesis
       genesis
     >>=? fun (state, mainchain_state, _context_index, history_mode) ->
-    return (validator_process, state, mainchain_state, history_mode)
-  else
-    State.init ~store_root ~context_root ?history_mode ?patch_context genesis
-    >>=? fun (state, mainchain_state, context_index, history_mode) ->
-    init (Internal context_index)
-    >>=? fun validator_process ->
     return (validator_process, state, mainchain_state, history_mode))
   >>=? fun (validator_process, state, mainchain_state, history_mode) ->
   may_update_checkpoint mainchain_state checkpoint history_mode

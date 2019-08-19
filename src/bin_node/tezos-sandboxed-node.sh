@@ -179,7 +179,7 @@ EOF
     fi
 
     [ -f "${node_dir}/identity.json" ] || $node identity generate "$expected_pow" --data-dir "$node_dir"
-    $node run --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
+    $node run --singleprocess --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
     node_pids+=("$!")
 
 }
