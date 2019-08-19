@@ -171,7 +171,7 @@ let delegate_contract cctxt
 
 let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
-  map_s (fun h ->
+  rev_map_s (fun h ->
       begin match Contract.is_implicit h with
         | Some m -> begin
             Public_key_hash.rev_find cctxt m >>=? function
@@ -192,7 +192,7 @@ let list_contract_labels cctxt ~chain ~block =
         | None -> "" in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
-    contracts
+    contracts >>|? List.rev
 
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
