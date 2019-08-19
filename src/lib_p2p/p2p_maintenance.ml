@@ -55,7 +55,28 @@ type ('msg, 'meta,  'meta_conn) t = {
   mutable maintain_worker: unit Lwt.t ;
 }
 
-(** try to establish as many connection as possible from [contactable] *)
+let classify pool private_mode start_time seen_points point pi =
+  let now = Systime_os.now () in
+  if
+    P2p_point.Set.mem point seen_points ||
+    P2p_pool.Points.banned pool point ||
+    (private_mode && not (P2p_point_state.Info.trusted pi))
+  then
+    `Ignore
+  else begin
+    match P2p_point_state.get pi with
+    | Disconnected -> begin
+        match P2p_point_state.Info.last_miss pi with
+        | Some last when Time.System.(start_time < last)
+                      || P2p_point_state.Info.greylisted ~now pi -> `Seen
+        | last -> `Candidate last
+      end
+    | _ -> `Seen
+  end
+
+(** [establish t contactable] tries to establish as many connection as possible
+    with points in [contactable]. It returns the number of established
+    connections *)
 let establish t contactable =
   let try_to_connect acc point =
     protect ~canceler:t.canceler begin fun () ->
@@ -66,16 +87,10 @@ let establish t contactable =
   in
   List.fold_left try_to_connect (Lwt.return 0) contactable
 
-(** Select [expected] points among the disconnected known points.
-    It ignores points:
-    - greylisted,
-    - banned,
-    - for which a connection failed after [start_time],
-    - Non-trusted points if option --private-mode is set.
-
-    It first selects points with the oldest last tentative. *)
+(* [connectable t start_time expected seen_points] selects at most
+   [expected] connections candidates from the known points, not in [seen]
+   points. *)
 let connectable t start_time expected seen_points =
-  let now = Systime_os.now () in
   let module Bounded_point_info =
     List.Bounded(struct
       type t = (Time.System.t option * P2p_point.Id.t)
@@ -87,49 +102,58 @@ let connectable t start_time expected seen_points =
         | Some t1, Some t2 -> Time.System.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  let seen_points =
-    P2p_pool.Points.fold_known t.pool ~init:seen_points
-      ~f:begin fun point pi seen_points ->
-        if P2p_point.Set.mem point seen_points ||
-           P2p_pool.Points.banned t.pool point ||
-           (t.config.private_mode && not (P2p_point_state.Info.trusted pi))
-        then
-          seen_points
-        else begin
-          (match P2p_point_state.get pi with
-           | Disconnected -> begin
-               match P2p_point_state.Info.last_miss pi with
-               | Some last when Time.System.(start_time < last)
-                             || P2p_point_state.Info.greylisted ~now pi -> ()
-               | last -> Bounded_point_info.insert (last, point) acc
-             end
-           | _ -> ()) ;
-          P2p_point.Set.add point seen_points
-        end
-      end
+  let f point pi seen_points =
+    match classify t.pool t.config.private_mode start_time seen_points point pi
+    with
+    | `Ignore -> seen_points (* Ignored points can be retried again *)
+    | `Candidate last ->
+        Bounded_point_info.insert (last, point) acc ;
+        P2p_point.Set.add point seen_points
+    | `Seen -> P2p_point.Set.add point seen_points
   in
+  let seen_points = P2p_pool.Points.fold_known t.pool ~init:seen_points ~f in
   List.map snd (Bounded_point_info.get acc), seen_points
 
+(* [try_to_contact_loop t start_time ~seen_points] is the main loop
+    for contacting points. [start_time] is set when calling the function
+    and remains constant in the loop. [seen_points] simply accumulates the
+    points already seen, to avoid trying to contact them again.
+
+    It repeats two operations until the number of connections is reached:
+      - get [max_to_contact] points
+      - connect to many of them as possible
+
+   TODO why not the simpler implementation. Sort all candidates points,
+        and try to connect to [n] of them. *)
 let rec try_to_contact_loop t start_time ~seen_points
     min_to_contact max_to_contact =
   if min_to_contact <= 0 then
     Lwt.return_true
   else
-    let contactable, seen_points =
+    let candidates, seen_points =
       connectable t start_time max_to_contact seen_points in
-    if contactable = [] then
+    if candidates = [] then
       Lwt_unix.yield () >>= fun () ->
       Lwt.return_false
     else
-      establish t contactable >>= fun established ->
+      establish t candidates >>= fun established ->
       try_to_contact_loop t start_time ~seen_points
         (min_to_contact - established) (max_to_contact - established)
 
-(** Try to create connections to new peers. It tries to create at
-    least [min_to_contact] connections, and will never creates more
-    than [max_to_contact].
+(** [try_to_contact t min_to_contact max_to_contact] tries to create
+    between [min_to_contact] and [max_to_contact] new connections.
 
-    If it fails after trying once all disconnected peers, it returns [false]. *)
+    It goes through all know points, and ignores points which are
+    - greylisted,
+    - banned,
+    - for which a connection failed after the time this function is called
+    - Non-trusted points if option --private-mode is set.
+
+    It tries to favor points for which the last failed missed connection is old.
+
+    Note that this function works as a sequence of lwt tasks that tries
+    to incrementally reach the number of connections. The set of
+    known points maybe be concurrently updated. *)
 let try_to_contact t min_to_contact max_to_contact =
   let start_time = Systime_os.now () in
   let seen_points = P2p_point.Set.empty in
