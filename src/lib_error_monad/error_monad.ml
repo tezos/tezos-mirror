@@ -386,6 +386,15 @@ module Make(Prefix : sig val id : string end) = struct
     in
     mapi_s f 0 l
 
+  let rec rev_map_append_s acc f = function
+    | [] -> return acc
+    | hd :: tl ->
+        f hd >>=? fun v ->
+        rev_map_append_s (v :: acc) f tl
+
+  let rev_map_s f l =
+    rev_map_append_s [] f l
+
   let rec map_p f l =
     match l with
     | [] ->
