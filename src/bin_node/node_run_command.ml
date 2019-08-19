@@ -67,7 +67,7 @@ let () =
 
 let ( // ) = Filename.concat
 
-let init_node ?sandbox ?checkpoint ~multiprocess (config : Node_config_file.t)
+let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
     =
   ( match sandbox with
   | None ->
@@ -163,7 +163,7 @@ let init_node ?sandbox ?checkpoint ~multiprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
-    ~multiprocess
+    ~singleprocess
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -232,7 +232,7 @@ let init_rpc (rpc_config : Node_config_file.rpc) node =
     rpc_config.listen_addrs
     []
 
-let run ?verbosity ?sandbox ?checkpoint ~multiprocess
+let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir
   >>=? fun () ->
@@ -256,7 +256,7 @@ let run ?verbosity ?sandbox ?checkpoint ~multiprocess
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..."
   >>= fun () ->
-  init_node ?sandbox ?checkpoint ~multiprocess config
+  init_node ?sandbox ?checkpoint ~singleprocess config
   >>= (function
         | Ok node ->
             return node
@@ -295,7 +295,7 @@ let run ?verbosity ?sandbox ?checkpoint ~multiprocess
   >>= fun () ->
   Internal_event_unix.close () >>= fun () -> Lwt.return unit_or_error
 
-let process sandbox verbosity checkpoint multiprocess args =
+let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -330,7 +330,7 @@ let process sandbox verbosity checkpoint multiprocess args =
     >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint ~multiprocess config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
                 Lwt_list.fold_right_s
@@ -398,22 +398,21 @@ module Term = struct
           ~docv:"<level>,<block_hash>"
           ["checkpoint"])
 
-  let multiprocess =
+  let singleprocess =
     let open Cmdliner in
     let doc =
-      "When enabled, it activates block validation using the provided \
-       external process. The validation procedure is then delegated to that \
-       executable. It allows the node to spawn a new processes for each block \
-       validation requests."
+      "When enabled, it deactivates block validation using an external \
+       process. Thus, the validation procedure is done in the same process as \
+       the node and might not be responding when doing extensive I/Os."
     in
     Arg.(
       value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["multiprocess"])
+      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
 
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ sandbox $ verbosity $ checkpoint $ multiprocess
+        ( const process $ sandbox $ verbosity $ checkpoint $ singleprocess
         $ Node_shared_arg.Term.args ))
 end
 

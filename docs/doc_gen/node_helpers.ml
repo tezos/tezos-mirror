@@ -50,7 +50,7 @@ let with_node f =
       }
     in
     Node.create
-      ~multiprocess:false
+      ~singleprocess:true
       node_config
       Node.default_peer_validator_limits
       Node.default_block_validator_limits
