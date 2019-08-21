@@ -15,6 +15,7 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base-unix"
   "tezos-signer-backends"
+  "alcotest-lwt" { with-test }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
