@@ -24,30 +24,82 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell Net - Low level API for the Gossip network
+(** Tezos P2p layer - Dynamic overlay network of authentified peers.
 
-    This is the entry point of the peer-to-peer layer.
+    The P2P layer implements several mechanisms, notably:
+    - It maintains pools of known points (p2p servers), peers (authentified
+      p2p servers), connections,
+    - it implements an "administrative" protocol for maintaining the network
+      topology,
+    - it regulates bandwith usage between connections,
+    - it implements an authentification / session agreement protocol,
+    - it can ban or greylist peers or IP addresses who don't behave well,
+    - it offers the ability to the upper-layer to send, broadcast, or
+      receive messages.
 
-    It is used by the Shell as the API to communicate with other
-    nodes.
-*)
+    The protocol sends/receives messages to maintain the network topology,
+    and also "generic" application messages that can be sent and received
+    by the upper-layer. See [P2p_message].
 
+    The protocol may operate in *private* mode, in which only user-provided
+     points (a.k.a *trusted) are used. In particular, points
+    advertisements and swap requests messages are ignored.
+
+    The module [P2p_pool] maintains pools of points, peers and
+    connections.
+
+    Several workers are used:
+    - [P2p_maintenance] tries to regulate the number of connections
+    - [P2p_welcome] waits for incoming connections
+    - [P2p_discovery] looks for points on the local network via UDP messages
+    - A protocol worker implements the messaging protocol
+
+    Points can be trusted. This is relevant in private mode
+    (see above), but generally peers shoudn't advertise trusted points.
+
+    Addresses and peers can be *banned* (a.k.a. black listed). In
+    which case, connections to and from them should be ignored.
+
+    Addresses or peers can be *greylisted*. As for banning, greylisting
+    can be enforced via the API, but also dynamically when the peer isn't
+    able to authenticate. Eventually greylisted peers are whitelisted again. *)
+
+(** Most types of the P2p layer are parameterized by three types ['peer_meta],
+    ['conn_meta], [`msg]. The concrete types, and function operating on them,
+    are defined by the calling layer. *)
+
+(** Metadata for a peer. Typically contains information used to compute the
+    score of a peer. This is used to classify peers when choosing "good"
+    neighbors. *)
 type 'peer_meta peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t;
+  (** Encoding of the peer meta data. *)
+
   peer_meta_initial : unit -> 'peer_meta;
+  (** Initial value for this peer meta-data *)
+
   score : 'peer_meta -> float ;
+  (** Score of a peer. *)
 }
 
+(* Metadata for a connection. *)
 type 'conn_meta conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t;
   conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
   private_node : 'conn_meta -> bool ;
 }
 
+(* Configuration for the application protocol. ['msg] represents
+   the type of the application level protocol *)
 type 'msg message_config = {
   encoding : 'msg P2p_message.encoding list ;
+  (** Encoding of the messages. *)
+
   chain_name : Distributed_db_version.name ;
+  (** Identifier for this P2p protocol when establishing session. *)
+
   distributed_db_versions : Distributed_db_version.t list ;
+  (** List of versions supported by this P2p protocol. *)
 }
 
 (** Network configuration *)
@@ -90,12 +142,14 @@ type config = {
 
   disable_mempool : bool ;
   (** If [true], all non-empty mempools will be ignored. *)
+  (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
 
   trust_discovered_peers : bool ;
   (** If [true], peers discovered on the local network will be trusted. *)
 
   disable_testchain : bool ;
   (** If [true], testchain related messages will be ignored. *)
+  (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
 
   greylisting_config : P2p_point_state.Info.greylisting_config ;
   (** The greylisting configuration. *)
