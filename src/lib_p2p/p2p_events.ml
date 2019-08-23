@@ -50,3 +50,15 @@ let wait_new_peer t = Lwt_condition.wait t.new_peer
 let wait_new_point t = Lwt_condition.wait t.new_point
 
 let wait_new_connection t = Lwt_condition.wait t.new_connection
+
+let broadcast_new_point t = Lwt_condition.broadcast t.new_point ()
+
+let broadcast_new_connection t = Lwt_condition.broadcast t.new_connection ()
+
+let broadcast_new_peer t = Lwt_condition.broadcast t.new_peer ()
+
+let broadcast_too_few_connections t =
+  Lwt_condition.broadcast t.too_few_connections ()
+
+let broadcast_too_many_connections t =
+  Lwt_condition.broadcast t.too_many_connections ()

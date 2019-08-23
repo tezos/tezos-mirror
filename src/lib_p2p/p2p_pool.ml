@@ -113,7 +113,7 @@ let register_point ?trusted pool ((addr, port) as point) =
           if P2p_point.Table.length pool.known_points >= max then
             gc_points pool) ;
       P2p_point.Table.add pool.known_points point point_info ;
-      Lwt_condition.broadcast pool.events.new_point () ;
+      P2p_events.broadcast_new_point pool.events ;
       pool.log (New_point point) ;
       point_info
   | Some point_info ->
@@ -175,7 +175,7 @@ let gc_peer_ids
 let register_peer pool peer_id =
   match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
   | None ->
-      Lwt_condition.broadcast pool.events.new_peer () ;
+      P2p_events.broadcast_new_peer pool.events ;
       let peer =
         P2p_peer_state.Info.create
           peer_id

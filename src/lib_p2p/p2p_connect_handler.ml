@@ -118,7 +118,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   t.log (Connection_established (id_point, peer_id)) ;
   P2p_peer_state.set_running peer_info id_point conn conn_meta ;
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
-  Lwt_condition.broadcast t.events.new_connection () ;
+  P2p_events.broadcast_new_connection t.events ;
   Lwt_canceler.on_cancel canceler (fun () ->
       lwt_debug
         "Disconnect: %a (%a)"
@@ -136,13 +136,13 @@ let create_connection t p2p_conn id_point point_info peer_info
           P2p_pool.Points.remove_connected t.pool point_info) ;
       P2p_pool.Peers.remove_connected t.pool peer_id ;
       if t.config.max_connections <= P2p_pool.active_connections t.pool then (
-        Lwt_condition.broadcast t.events.too_many_connections () ;
+        P2p_events.broadcast_too_many_connections t.events ;
         t.log Too_many_connections ) ;
       Lwt_pipe.close messages ;
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   if P2p_pool.active_connections t.pool < t.config.min_connections then (
-    Lwt_condition.broadcast t.events.too_few_connections () ;
+    P2p_events.broadcast_too_few_connections t.events ;
     t.log Too_few_connections ) ;
   conn
 

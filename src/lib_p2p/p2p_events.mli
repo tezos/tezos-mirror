@@ -30,13 +30,7 @@
     There are used in particular by the maintenance worker in
     [P2p_maintenance]. *)
 
-type t = {
-  too_few_connections : unit Lwt_condition.t;
-  too_many_connections : unit Lwt_condition.t;
-  new_peer : unit Lwt_condition.t;
-  new_point : unit Lwt_condition.t;
-  new_connection : unit Lwt_condition.t;
-}
+type t
 
 val create : unit -> t
 
@@ -59,3 +53,13 @@ val wait_new_point : t -> unit Lwt.t
 (** [wait_new_connection t] resolves when a new connection is
     successfully established in the pool. *)
 val wait_new_connection : t -> unit Lwt.t
+
+val broadcast_new_point : t -> unit
+
+val broadcast_new_connection : t -> unit
+
+val broadcast_new_peer : t -> unit
+
+val broadcast_too_few_connections : t -> unit
+
+val broadcast_too_many_connections : t -> unit
