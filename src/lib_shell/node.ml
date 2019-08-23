@@ -111,27 +111,24 @@ let connection_metadata_cfg cfg : _ P2p_params.conn_meta_config =
     conn_meta_value = (fun () -> cfg);
   }
 
-let init_connection_metadata opt =
+let init_connection_metadata opt disable_mempool =
   let open Connection_metadata in
   match opt with
   | None ->
       {disable_mempool = false; private_node = false}
   | Some c ->
-      {
-        disable_mempool = c.P2p.disable_mempool;
-        private_node = c.P2p.private_mode;
-      }
+      {disable_mempool; private_node = c.P2p.private_mode}
 
-let init_p2p chain_name p2p_params =
+let init_p2p chain_name p2p_params disable_mempool =
   let message_cfg = Distributed_db_message.cfg chain_name in
   match p2p_params with
   | None ->
-      let c_meta = init_connection_metadata None in
+      let c_meta = init_connection_metadata None disable_mempool in
       Initialization_event.lwt_emit `P2p_layer_disabled
       >>= fun () ->
       return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
-      let c_meta = init_connection_metadata (Some config) in
+      let c_meta = init_connection_metadata (Some config) disable_mempool in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
       Initialization_event.lwt_emit `Bootstrapping
       >>= fun () ->
@@ -157,6 +154,8 @@ type config = {
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
   checkpoint : Block_header.t option;
+  disable_mempool : bool;
+  disable_testchain : bool;
 }
 
 and peer_validator_limits = Peer_validator.limits = {
@@ -325,16 +324,21 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       protocol_root;
       patch_context;
       p2p = p2p_params;
+      disable_mempool;
+      disable_testchain;
       checkpoint } peer_validator_limits block_validator_limits
     prevalidator_limits chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
-    | Some (config, _limits) ->
-        (not config.P2p.disable_mempool, not config.P2p.disable_testchain)
+    | Some _ ->
+        (not disable_mempool, not disable_testchain)
     | None ->
         (true, true)
   in
-  init_p2p (if sandboxed then sandboxed_chain_name else chain_name) p2p_params
+  init_p2p
+    (if sandboxed then sandboxed_chain_name else chain_name)
+    p2p_params
+    disable_mempool
   >>=? fun p2p ->
   (let open Block_validator_process in
   if singleprocess then

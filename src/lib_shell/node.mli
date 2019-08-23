@@ -39,6 +39,10 @@ type config = {
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
   checkpoint : Block_header.t option;
+  disable_mempool : bool;
+      (** If [true], all non-empty mempools will be ignored. *)
+  disable_testchain : bool;
+      (** If [true], testchain related messages will be ignored. *)
 }
 
 and peer_validator_limits = {

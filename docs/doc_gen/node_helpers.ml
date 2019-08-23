@@ -51,6 +51,8 @@ let with_node f =
         protocol_root = dir / "protocol";
         p2p = None;
         checkpoint = None;
+        disable_mempool = true;
+        disable_testchain = true;
       }
     in
     Node.create

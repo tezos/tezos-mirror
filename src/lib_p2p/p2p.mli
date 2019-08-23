@@ -99,14 +99,8 @@ type config = {
   identity : P2p_identity.t;  (** Cryptographic identity of the peer. *)
   proof_of_work_target : Crypto_box.target;
       (** Expected level of proof of work of peers' identity. *)
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)
-  disable_testchain : bool;
-      (** If [true], testchain related messages will be ignored. *)
-  (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
   greylisting_config : P2p_point_state.Info.greylisting_config;
       (** The greylisting configuration. *)
 }

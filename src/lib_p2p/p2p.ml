@@ -38,9 +38,7 @@ type config = {
   private_mode : bool;
   identity : P2p_identity.t;
   proof_of_work_target : Crypto_box.target;
-  disable_mempool : bool;
   trust_discovered_peers : bool;
-  disable_testchain : bool;
   greylisting_config : P2p_point_state.Info.greylisting_config;
 }
 
