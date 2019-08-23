@@ -24,15 +24,159 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "shell.snapshots"
-end)
+type status =
+  | Export_unspecified_hash of Block_hash.t
+  | Export_info of History_mode.t * Block_hash.t * Int32.t
+  | Export_success of string
+  | Set_history_mode of History_mode.t
+  | Import_info of string
+  | Import_unspecified_hash
+  | Import_loading
+  | Set_head of Block_hash.t
+  | Import_success of string
 
-let ( // ) = Filename.concat
+let status_pp ppf = function
+  | Export_unspecified_hash h ->
+      Format.fprintf
+        ppf
+        "There is no block hash specified with the `--block` option. Using %a \
+         (last checkpoint)"
+        Block_hash.pp
+        h
+  | Export_info (hm, h, l) ->
+      Format.fprintf
+        ppf
+        "Exporting a snapshot in %a mode, targeting block hash %a at level %a"
+        History_mode.pp
+        hm
+        Block_hash.pp
+        h
+        Format.pp_print_int
+        (Int32.to_int l)
+  | Export_success filename ->
+      Format.fprintf ppf "@[Successful export: %s@]" filename
+  | Set_history_mode hm ->
+      Format.fprintf ppf "Setting history-mode to %a" History_mode.pp hm
+  | Import_info filename ->
+      Format.fprintf ppf "Importing data from snapshot file %s" filename
+  | Import_unspecified_hash ->
+      Format.fprintf
+        ppf
+        "You may consider using the --block <block_hash> argument to verify \
+         that the block imported is the one you expect"
+  | Import_loading ->
+      Format.fprintf
+        ppf
+        "Retrieving and validating data. This can take a while, please bear \
+         with us"
+  | Set_head h ->
+      Format.fprintf ppf "Setting current head to block %a" Block_hash.pp h
+  | Import_success filename ->
+      Format.fprintf ppf "@[Successful import from file %s@]" filename
 
-let context_dir data_dir = data_dir // "context"
+type t = status Time.System.stamped
 
-let store_dir data_dir = data_dir // "store"
+module Definition = struct
+  let name = "snapshot"
+
+  type nonrec t = t
+
+  let encoding =
+    let open Data_encoding in
+    Time.System.stamped_encoding
+    @@ union
+         [ case
+             (Tag 0)
+             ~title:"Export_unspecified_hash"
+             Block_hash.encoding
+             (function Export_unspecified_hash h -> Some h | _ -> None)
+             (fun h -> Export_unspecified_hash h);
+           case
+             (Tag 1)
+             ~title:"Export_info"
+             (obj3
+                (req "history_mode" History_mode.encoding)
+                (req "block_hash" Block_hash.encoding)
+                (req "level" int32))
+             (function Export_info (hm, h, l) -> Some (hm, h, l) | _ -> None)
+             (fun (hm, h, l) -> Export_info (hm, h, l));
+           case
+             (Tag 2)
+             ~title:"Export_success"
+             string
+             (function Export_success s -> Some s | _ -> None)
+             (fun s -> Export_success s);
+           case
+             (Tag 3)
+             ~title:"Set_history_mode"
+             History_mode.encoding
+             (function Set_history_mode hm -> Some hm | _ -> None)
+             (fun hm -> Set_history_mode hm);
+           case
+             (Tag 4)
+             ~title:"Import_info"
+             string
+             (function Import_info s -> Some s | _ -> None)
+             (fun s -> Import_info s);
+           case
+             (Tag 5)
+             ~title:"Import_unspecified_hash"
+             empty
+             (function Import_unspecified_hash -> Some () | _ -> None)
+             (fun () -> Import_unspecified_hash);
+           case
+             (Tag 6)
+             ~title:"Import_loading"
+             empty
+             (function Import_loading -> Some () | _ -> None)
+             (fun () -> Import_loading);
+           case
+             (Tag 7)
+             ~title:"Set_head"
+             Block_hash.encoding
+             (function Set_head h -> Some h | _ -> None)
+             (fun h -> Set_head h);
+           case
+             (Tag 8)
+             ~title:"Import_success"
+             string
+             (function Import_success s -> Some s | _ -> None)
+             (fun s -> Import_success s) ]
+
+  let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+
+  let doc = "Snapshots status."
+
+  let level (status : t) =
+    match status.data with
+    | Export_unspecified_hash _
+    | Export_info _
+    | Export_success _
+    | Set_history_mode _
+    | Import_info _
+    | Import_unspecified_hash
+    | Import_loading
+    | Set_head _
+    | Import_success _ ->
+        Internal_event.Notice
+end
+
+module Event_snapshot = Internal_event.Make (Definition)
+
+let lwt_emit (status : status) =
+  let time = Systime_os.now () in
+  Event_snapshot.emit
+    ~section:(Internal_event.Section.make_sanitized [Definition.name])
+    (fun () -> Time.System.stamp ~time status)
+  >>= function
+  | Ok () ->
+      Lwt.return_unit
+  | Error el ->
+      Format.kasprintf
+        Lwt.fail_with
+        "Snapshot_event.emit: %a"
+        pp_print_error
+        el
 
 type error += Wrong_snapshot_export of History_mode.t * History_mode.t
 
@@ -176,6 +320,12 @@ let () =
           None)
     (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph'))
 
+let ( // ) = Filename.concat
+
+let context_dir data_dir = data_dir // "context"
+
+let store_dir data_dir = data_dir // "store"
+
 let compute_export_limit block_store chain_data_store block_header
     export_rolling =
   let block_hash = Block_header.hash block_header in
@@ -230,10 +380,6 @@ let pruned_block_iterator index block_store limit header =
       >>= fun proto_data -> return (Some pruned_block, Some proto_data)
     else return (Some pruned_block, None)
 
-let filename_tag = Tag.def "filename" Format.pp_print_string
-
-let block_level_tag = Tag.def "block_level" Format.pp_print_int
-
 let export ?(export_rolling = false) ~context_index ~store ~genesis filename
     block =
   let chain_id = Chain_id.of_block_hash genesis in
@@ -259,13 +405,7 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
         fail (Wrong_block_export (genesis, `Too_few_predecessors))
       else
         let last_checkpoint_hash = Block_header.hash last_checkpoint in
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f
-                "There is no block hash specified with the `--block` option. \
-                 Using %a (last checkpoint)"
-              -% a Block_hash.Logging.tag last_checkpoint_hash)
+        lwt_emit (Export_unspecified_hash last_checkpoint_hash)
         >>= fun () -> return last_checkpoint_hash )
   >>=? fun checkpoint_block_hash ->
   State.Block.Header.read_opt (block_store, checkpoint_block_hash)
@@ -276,15 +416,9 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             let export_mode =
               if export_rolling then History_mode.Rolling else Full
             in
-            lwt_log_notice
-              Tag.DSL.(
-                fun f ->
-                  f
-                    "Exporting a snapshot in mode %a, targeting block hash %a \
-                     at level %a"
-                  -% a History_mode.tag export_mode
-                  -% a Block_hash.Logging.tag checkpoint_block_hash
-                  -% a block_level_tag (Int32.to_int block_header.shell.level))
+            lwt_emit
+              (Export_info
+                 (export_mode, checkpoint_block_hash, block_header.shell.level))
             >>= fun () ->
             (* Get block precessor's block header *)
             Store.Block.Predecessors.read
@@ -314,13 +448,8 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             let block_data = {Context.Block_data.block_header; operations} in
             return (pred_block_header, block_data, export_mode, iterator))
   >>=? fun data_to_dump ->
-  lwt_log_notice (fun f -> f "Now loading data")
-  >>= fun () ->
   Context.dump_contexts context_index data_to_dump ~filename
-  >>=? fun () ->
-  lwt_log_notice
-    Tag.DSL.(fun f -> f "@[Successful export: %a@]" -% a filename_tag filename)
-  >>= fun () -> return_unit
+  >>=? fun () -> lwt_emit (Export_success filename) >>= fun () -> return_unit
 
 let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
@@ -372,10 +501,7 @@ let check_context_hash_consistency block_validation_result block_header =
 let set_history_mode store history_mode =
   match history_mode with
   | History_mode.Full | History_mode.Rolling ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Setting history-mode to %a" -% a History_mode.tag history_mode)
+      lwt_emit (Set_history_mode history_mode)
       >>= fun () ->
       Store.Configuration.History_mode.store store history_mode
       >>= fun () -> return_unit
@@ -540,24 +666,15 @@ let block_validation succ_header_opt header_hash
   >>=? fun () -> return_unit
 
 let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "Importing data from snapshot file %a" -% a filename_tag filename)
+  lwt_emit (Import_info filename)
   >>= fun () ->
   ( match block with
   | None ->
-      lwt_log_notice (fun f ->
-          f
-            "You may consider using the --block <block_hash> argument to \
-             verify that the block imported is the one you expect")
+      lwt_emit Import_unspecified_hash
   | Some _ ->
       Lwt.return_unit )
   >>= fun () ->
-  lwt_log_notice (fun f ->
-      f
-        "Retrieving and validating data. This can take a while, please bear \
-         with us")
+  lwt_emit Import_loading
   >>= fun () ->
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
@@ -677,11 +794,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
       | None ->
           return_unit )
       >>=? fun () ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Setting current head to block %a"
-            -% a Block_hash.Logging.tag (Block_header.hash block_header))
+      lwt_emit (Set_head (Block_header.hash block_header))
       >>= fun () ->
       let pred_context_hash = predecessor_block_header.shell.context in
       checkout_exn context_index pred_context_hash
@@ -735,12 +848,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
       State.close state >>= fun () -> return_unit)
     (function
       | Ok () ->
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f "@[Successful import from file %a@]"
-                -% a filename_tag filename)
-          >>= fun () -> return_unit
+          lwt_emit (Import_success filename) >>= fun () -> return_unit
       | Error errors ->
           dir_cleaner data_dir >>= fun () -> Lwt.return (Error errors))
     (fun exn -> dir_cleaner data_dir >>= fun () -> Lwt.fail exn)
