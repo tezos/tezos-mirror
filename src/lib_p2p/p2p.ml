@@ -113,7 +113,7 @@ let create_scheduler limits =
     ?write_queue_size:limits.write_queue_size
     ()
 
-let create_connection_pool config limits meta_cfg log events =
+let create_connection_pool config limits meta_cfg log triggers =
   let pool_cfg =
     {
       P2p_pool.identity = config.identity;
@@ -124,10 +124,10 @@ let create_connection_pool config limits meta_cfg log events =
       max_known_peer_ids = limits.max_known_peer_ids;
     }
   in
-  P2p_pool.create pool_cfg meta_cfg ~log events
+  P2p_pool.create pool_cfg meta_cfg ~log triggers
 
 let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
-    events log answerer =
+    triggers log answerer =
   let connect_handler_cfg =
     {
       P2p_connect_handler.identity = config.identity;
@@ -152,7 +152,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     msg_cfg
     conn_meta_cfg
     io_sched
-    events
+    triggers
     ~log
     ~answerer
 
@@ -172,7 +172,7 @@ let may_create_discovery_worker _limits config pool =
   | (_, _, _) ->
       None
 
-let create_maintenance_worker limits pool connect_handler config events log =
+let create_maintenance_worker limits pool connect_handler config triggers log =
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
@@ -189,7 +189,7 @@ let create_maintenance_worker limits pool connect_handler config events log =
     maintenance_config
     pool
     connect_handler
-    events
+    triggers
     ~log
 
 let may_create_welcome_worker config limits connect_handler =
@@ -217,15 +217,15 @@ module Real = struct
     maintenance : ('msg, 'peer_meta, 'conn_meta) P2p_maintenance.t;
     welcome : P2p_welcome.t option;
     watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
-    events : P2p_events.t;
+    triggers : P2p_trigger.t;
   }
 
   let create ~config ~limits meta_cfg msg_cfg conn_meta_cfg =
     let io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
     let log event = Lwt_watcher.notify watcher event in
-    let events = P2p_events.create () in
-    create_connection_pool config limits meta_cfg log events
+    let triggers = P2p_trigger.create () in
+    create_connection_pool config limits meta_cfg log triggers
     >>= fun pool ->
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
@@ -258,13 +258,13 @@ module Real = struct
            msg_cfg
            conn_meta_cfg
            io_sched
-           events
+           triggers
            log
            answerer)
     in
     let connect_handler = Lazy.force connect_handler in
     let maintenance =
-      create_maintenance_worker limits pool connect_handler config events log
+      create_maintenance_worker limits pool connect_handler config triggers log
     in
     may_create_welcome_worker config limits connect_handler
     >>= fun welcome ->
@@ -278,7 +278,7 @@ module Real = struct
         maintenance;
         welcome;
         watcher;
-        events;
+        triggers;
       }
 
   let peer_id {config; _} = config.identity.peer_id
@@ -361,7 +361,7 @@ module Real = struct
           :: acc)
     in
     Lwt.pick
-      ( ( P2p_events.wait_new_connection net.events
+      ( ( P2p_trigger.wait_new_connection net.triggers
         >>= fun () -> Lwt.return_none )
       :: pipes )
     >>= function

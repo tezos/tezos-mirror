@@ -32,7 +32,7 @@
 
     Pool functions can trigger two types of events. They can *log*
     [P2p_connection.P2p_event.t] (for the upper layer), and they can
-    trigger condition variables defined in [P2p_events.t], for inter-modules
+    trigger condition variables defined in [P2p_trigger.t], for inter-modules
     synchronization. *)
 
 (** {1 Pool management} *)
@@ -74,7 +74,7 @@ type 'peer peer_meta_config = {
 val create :
   config ->
   'peer peer_meta_config ->
-  P2p_events.t ->
+  P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->
   ('msg, 'peer, 'conn) t Lwt.t
 

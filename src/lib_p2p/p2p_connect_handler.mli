@@ -34,7 +34,7 @@
 
     Functions of this module can trigger two types of events. They can *log*
     [P2p_connection.P2p_event.t], and they can trigger condition variables
-    defined in [P2p_events.t]. *)
+    defined in [P2p_trigger.t]. *)
 
 type ('msg, 'peer, 'conn) t
 
@@ -87,9 +87,9 @@ type 'msg message_config = {
 }
 
 (** [create ?p2p_version config pool message_config socket_meta_config
-     scheduler events log answerer] returns a connection handler.
+     scheduler triggers log answerer] returns a connection handler.
 
-     [config] is a record of configuration parameters. [events] is a record
+     [config] is a record of configuration parameters. [triggers] is a record
      of condition variable used to signal some events to other modules.
      [log] is a callback to signal events to the upper layer. [answerer] is
      a parameterized callback that defines how the p2p layer will reply to
@@ -101,7 +101,7 @@ val create :
   'msg message_config ->
   'conn P2p_socket.metadata_config ->
   P2p_io_scheduler.t ->
-  P2p_events.t ->
+  P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->
   answerer:'msg P2p_answerer.t Lazy.t ->
   ('msg, 'peer, 'conn) t

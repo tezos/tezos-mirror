@@ -66,7 +66,7 @@ type ('msg, 'peer, 'conn) t = {
     ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t P2p_point.Table.t;
   connected_points :
     ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t P2p_point.Table.t;
-  events : P2p_events.t;
+  triggers : P2p_trigger.t;
   log : P2p_connection.P2p_event.t -> unit;
   acl : P2p_acl.t;
 }
@@ -113,7 +113,7 @@ let register_point ?trusted pool ((addr, port) as point) =
           if P2p_point.Table.length pool.known_points >= max then
             gc_points pool) ;
       P2p_point.Table.add pool.known_points point point_info ;
-      P2p_events.broadcast_new_point pool.events ;
+      P2p_trigger.broadcast_new_point pool.triggers ;
       pool.log (New_point point) ;
       point_info
   | Some point_info ->
@@ -175,7 +175,7 @@ let gc_peer_ids
 let register_peer pool peer_id =
   match P2p_peer.Table.find_opt pool.known_peer_ids peer_id with
   | None ->
-      P2p_events.broadcast_new_peer pool.events ;
+      P2p_trigger.broadcast_new_peer pool.triggers ;
       let peer =
         P2p_peer_state.Info.create
           peer_id
@@ -437,7 +437,7 @@ let score {peer_meta_config = {score; _}; _} meta = score meta
 
 let active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
-let create config peer_meta_config events ~log =
+let create config peer_meta_config triggers ~log =
   let pool =
     {
       config;
@@ -447,7 +447,7 @@ let create config peer_meta_config events ~log =
       connected_peer_ids = P2p_peer.Table.create 53;
       known_points = P2p_point.Table.create 53;
       connected_points = P2p_point.Table.create 53;
-      events;
+      triggers;
       acl = P2p_acl.create 1023;
       log;
     }

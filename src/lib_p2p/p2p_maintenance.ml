@@ -56,7 +56,7 @@ type ('msg, 'meta, 'meta_conn) t = {
   just_maintained : unit Lwt_condition.t;
   please_maintain : unit Lwt_condition.t;
   mutable maintain_worker : unit Lwt.t;
-  events : P2p_events.t;
+  triggers : P2p_trigger.t;
   log : P2p_connection.P2p_event.t -> unit;
 }
 
@@ -201,8 +201,8 @@ let ask_for_more_contacts t =
   Option.iter ~f:P2p_discovery.wakeup t.discovery ;
   protect ~canceler:t.canceler (fun () ->
       Lwt.pick
-        [ P2p_events.wait_new_peer t.events;
-          P2p_events.wait_new_point t.events;
+        [ P2p_trigger.wait_new_peer t.triggers;
+          P2p_trigger.wait_new_point t.triggers;
           (* TODO exponential back-off, or wait for the existence
          of a non grey-listed peer? *)
           Lwt_unix.sleep time_between_looking_for_peers ]
@@ -281,9 +281,9 @@ let rec worker_loop t =
            [ Systime_os.sleep t.config.maintenance_idle_time;
              Lwt_condition.wait t.please_maintain;
              (* when asked *)
-             P2p_events.wait_too_few_connections t.events;
+             P2p_trigger.wait_too_few_connections t.triggers;
              (* limits *)
-             P2p_events.wait_too_many_connections t.events ]
+             P2p_trigger.wait_too_many_connections t.triggers ]
          >>= fun () -> return_unit))
   >>= function
   | Ok () ->
@@ -304,7 +304,7 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max;
   }
 
-let create ?discovery config pool connect_handler events ~log =
+let create ?discovery config pool connect_handler triggers ~log =
   let bounds =
     bounds
       ~min:config.min_connections
@@ -321,7 +321,7 @@ let create ?discovery config pool connect_handler events ~log =
     just_maintained = Lwt_condition.create ();
     please_maintain = Lwt_condition.create ();
     maintain_worker = Lwt.return_unit;
-    events;
+    triggers;
     log;
   }
 

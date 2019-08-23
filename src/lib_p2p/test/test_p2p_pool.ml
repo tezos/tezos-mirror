@@ -121,9 +121,9 @@ let detach_node f points n =
     ~prefix:(Format.asprintf "%a: " P2p_peer.Id.pp_short identity.peer_id)
     (fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      let events = P2p_events.create () in
+      let triggers = P2p_trigger.create () in
       let log _ = () in
-      P2p_pool.create pool_config peer_meta_config ~log events
+      P2p_pool.create pool_config peer_meta_config ~log triggers
       >>= fun pool ->
       let answerer = lazy (P2p_protocol.create_private ()) in
       let connect_handler =
@@ -133,7 +133,7 @@ let detach_node f points n =
           msg_config
           conn_meta_config
           sched
-          events
+          triggers
           ~log
           ~answerer
       in
