@@ -9,6 +9,7 @@
                    -open Tezos_client_004_Pt24m4xi
                    -open Tezos_client_commands
                    -open Tezos_baking_004_Pt24m4xi_commands
+                   -open Tezos_stdlib_unix
                    -open Tezos_client_base_unix)))
 
 (alias
