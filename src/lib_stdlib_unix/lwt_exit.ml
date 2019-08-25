@@ -109,7 +109,7 @@ let signals_to_exit_on = ref []
 let exit_on ?log signal =
   if List.mem signal !signals_to_exit_on then
     Format.kasprintf
-      failwith
+      Pervasives.failwith
       "Killable.exit_on: already registered signal %d"
       signal
   else (

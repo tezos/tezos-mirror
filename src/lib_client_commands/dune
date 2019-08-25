@@ -3,6 +3,7 @@
  (public_name tezos-client-commands)
  (libraries tezos-base
             tezos-client-base
+            tezos-clic.unix
             tezos-rpc
             tezos-p2p
             tezos-shell-services
@@ -12,6 +13,7 @@
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc
+                   -open Tezos_clic_unix
                    -open Tezos_client_base
                    -open Tezos_shell_services
                    -open Tezos_data_encoding)))
