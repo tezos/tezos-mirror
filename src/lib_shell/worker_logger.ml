@@ -27,7 +27,7 @@ open Worker
 
 module Make
     (Event : EVENT)
-    (Request : REQUEST)  = struct
+    (Request : REQUEST) = struct
 
   module Event = Event
   module Request = Request
@@ -130,8 +130,7 @@ module Make
       let v0_encoding =  status_encoding in
       With_version.(encoding ~name (first_version v0_encoding))
     let pp ppf (status: t)  =
-      Format.fprintf ppf "%s : %a"
-        name
+      Format.fprintf ppf "%a"
         (Time.System.pp_stamped (pp Static.worker_name)) status
     let doc = "Worker status."
     let level (status : t)  =
