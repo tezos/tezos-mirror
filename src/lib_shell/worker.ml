@@ -500,7 +500,8 @@ module Make
   let lwt_emit w (status : Logger.status) =
     let (module LogEvent) = w.logEvent in
     let time = Systime_os.now () in
-    LogEvent.emit  (fun () -> Time.System.stamp ~time status) >>= function
+    LogEvent.emit ~section:(Internal_event.Section.make_sanitized Name.base)
+      (fun () -> Time.System.stamp ~time status) >>= function
     | Ok () -> Lwt.return_unit
     | Error el ->
         Format.kasprintf Lwt.fail_with "Worker_event.emit: %a"
