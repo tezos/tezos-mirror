@@ -12,6 +12,7 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
+  "lwt" { < "4.3" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

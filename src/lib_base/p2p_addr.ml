@@ -30,7 +30,7 @@ let encoding =
   def "p2p_address" ~description:"An address for locating peers."
   @@ splitted
        ~json:(conv Ipaddr.V6.to_string Ipaddr.V6.of_string_exn string)
-       ~binary:(conv Ipaddr.V6.to_bytes Ipaddr.V6.of_bytes_exn string)
+       ~binary:(conv Ipaddr.V6.to_octets Ipaddr.V6.of_octets_exn string)
 
 type port = int
 
