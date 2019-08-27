@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "tezos-base"
   "tezos-protocol-environment"
   "tezos-storage"

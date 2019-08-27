@@ -10,7 +10,7 @@ depends: [
   ## ocaml should be in sync with `script/version.sh`
   "ocaml" { = "4.07.1" }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "base-unix"
   "tezos-base"
   "tezos-protocol-environment"
