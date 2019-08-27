@@ -148,17 +148,14 @@ module Event = struct
     | Debug msg -> Format.fprintf ppf "%s" msg
     | Request (view, { pushed ; treated ; completed }, None)  ->
         Format.fprintf ppf
-          "@[<v 0>%a@,\
-           Pushed: %a, Treated: %a, Completed: %a@]"
+          "@[<v 0>%a@, %a@]"
           Request.pp view
-          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
+          Worker_types.pp_status {pushed ; treated ; completed }
     | Request (view, { pushed ; treated ; completed }, Some errors)  ->
         Format.fprintf ppf
-          "@[<v 0>%a@,\
-           Pushed: %a, Treated: %a, Failed: %a@,\
-           %a@]"
+          "@[<v 0>%a@, %a, %a@]"
           Request.pp view
-          Time.System.pp_hum pushed Time.System.pp_hum treated Time.System.pp_hum completed
+          Worker_types.pp_status {pushed ; treated ; completed }
           (Format.pp_print_list Error_monad.pp) errors
 end
 

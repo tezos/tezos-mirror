@@ -64,7 +64,7 @@ module type LOGGER = sig
 
   type status =
       WorkerEvent of Event.t
-    | Request of Request.view
+    | Request of (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -564,23 +564,26 @@ module Make
             let current_request = Request.view request in
             let treated = Systime_os.now () in
             w.current_request <- Some (pushed, treated, current_request) ;
-            lwt_emit w (Request current_request) >>= fun () ->
             match u with
             | None ->
                 Handlers.on_request w request >>=? fun res ->
                 let completed = Systime_os.now () in
                 w.current_request <- None ;
+                let status = Worker_types.{ pushed ; treated ; completed } in
                 Handlers.on_completion w
-                  request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
+                  request res status >>= fun () ->
+                lwt_emit w (Request (current_request,status, None)) >>= fun () ->
                 return_unit
             | Some u ->
                 Handlers.on_request w request >>= fun res ->
                 Lwt.wakeup_later u res ;
                 Lwt.return res >>=? fun res ->
                 let completed = Systime_os.now () in
+                let status = Worker_types.{ pushed ; treated ; completed } in
                 w.current_request <- None ;
                 Handlers.on_completion w
-                  request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
+                  request res status >>= fun () ->
+                lwt_emit w (Request (current_request,status, None)) >>= fun () ->
                 return_unit
       end >>= function
       | Ok () ->

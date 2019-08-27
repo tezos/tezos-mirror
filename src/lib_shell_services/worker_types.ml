@@ -146,3 +146,13 @@ let full_status_encoding req_encoding evt_encoding error_encoding =
        (req "pending_requests" requests_encoding)
        (req "backlog" events_encoding)
        (opt "current_request" current_request_encoding))
+
+
+let pp_status ppf { pushed ; treated ; completed } =
+  let completed = (Ptime.diff completed treated)
+  and treated = (Ptime.diff treated pushed) in
+  Format.fprintf ppf
+    "Request pushed on %a, treated in %a, completed in %a "
+    Time.System.pp_hum pushed
+    Ptime.Span.pp treated
+    Ptime.Span.pp completed

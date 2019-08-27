@@ -71,3 +71,6 @@ val full_status_encoding :
   'evt Data_encoding.t ->
   error list Data_encoding.t ->
   ('req, 'evt) full_status Data_encoding.t
+
+val pp_status :
+  Format.formatter -> request_status -> unit

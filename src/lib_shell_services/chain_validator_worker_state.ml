@@ -94,11 +94,8 @@ module Event = struct
         end
           Request.pp req.request
           Fitness.pp req.fitness ;
-        Format.fprintf ppf
-          "Pushed: %a, Treated: %a, Completed: %a@]"
-          Time.System.pp_hum req.request_status.pushed
-          Time.System.pp_hum req.request_status.treated
-          Time.System.pp_hum req.request_status.completed
+        Format.fprintf ppf "%a@]"
+          Worker_types.pp_status req.request_status
     | Could_not_switch_testchain err ->
         Format.fprintf ppf "@[<v 0>Error while switching test chain:@ %a@]"
           (Format.pp_print_list Error_monad.pp) err
