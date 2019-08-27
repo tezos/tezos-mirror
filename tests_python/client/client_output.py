@@ -161,6 +161,32 @@ class SignatureResult:
         self.sig = match.groups()[0]
 
 
+class SetDelegateResult:
+    """Result of a 'set delegate' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Operation hash is '?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.operation_hash = match.groups()[0]
+        pattern = r"--branch ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.branch_hash = match.groups()[0]
+
+class GetDelegateResult:
+    """Result of a 'get delegate' query."""
+
+    def __init__(self, client_output: str):
+        pattern = r"(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.delegate = match.groups()[0]
+
+
 def extract_rpc_answer(client_output: str) -> dict:
     """Convert json client output to a dict representation.
 

@@ -279,6 +279,37 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
+    def set_delegate(self,
+                     account1: str,
+                     account2: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['set', 'delegate', 'for', account1, 'to', account2]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.SetDelegateResult(res)              # TODO : extract_results
+
+    def get_delegate(self,
+                     account1: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['get', 'delegate', 'for', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.GetDelegateResult(res).delegate              # TODO : extract_results
+
+    def withdraw_delegate(self,
+                          account1: str,
+                          args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['withdraw', 'delegate', 'from', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return res
+
     def p2p_stat(self) -> str:
         return self.run(['p2p', 'stat'], admin=True)
 
