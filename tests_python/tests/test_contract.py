@@ -32,6 +32,89 @@ def originate(client,
                                                  [origination.operation_hash])
 
 
+
+@pytest.mark.contract
+class TestManager:
+    def test_manager_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/entrypoints/manager.tz'
+        pubkey = constants.IDENTITIES['bootstrap2']['identity']
+        originate(client, session, path, f'"{pubkey}"', 1000)
+    def test_target_with_entrypoints_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/entrypoints/big_map_entrypoints.tz'
+        originate(client, session, path, 'Pair {} {}', 1000,
+                  contract_name='target')
+    def test_target_without_entrypoints_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/entrypoints/no_entrypoint_target.tz'
+        originate(client, session, path, 'Pair "hello" 42', 1000,
+                  contract_name='target_no_entrypoints')
+    def test_target_without_explicit_default_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/entrypoints/no_default_target.tz'
+        originate(client, session, path, 'Pair "hello" 42', 1000,
+                  contract_name='target_no_default')
+    def test_target_with_root_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/entrypoints/rooted_target.tz'
+        originate(client, session, path, 'Pair "hello" 42', 1000,
+                  contract_name='rooted_target')
+    def test_manager_set_delegate(self, client):
+        client.set_delegate('manager', 'bootstrap2', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+        delegate = constants.IDENTITIES['bootstrap2']['identity']
+        assert client.get_delegate('manager', []) == delegate
+        client.set_delegate('manager', 'bootstrap3', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+        delegate = constants.IDENTITIES['bootstrap3']['identity']
+        assert client.get_delegate('manager', []) == delegate
+    def test_manager_withdraw_delegate(self, client):
+        client.withdraw_delegate('manager', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+        res = client.get_delegate('manager', [])
+        assert res == "none"
+    def test_transfer_to_manager(self, client):
+        client.transfer(10, 'bootstrap2', 'manager', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_simple_transfer_from_manager_to_implicit(self, client):
+        client.transfer(10, 'manager', 'bootstrap2', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_manager(self, client):
+        client.transfer(10, 'manager', 'manager', [])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_default(self, client):
+        client.transfer(10, 'manager', 'bootstrap2', ['--entrypoint', 'default'])
+        client.bake('bootstrap5', BAKE_ARGS)
+        client.transfer(10, 'manager', 'manager', ['--entrypoint', 'default'])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_target_no_entrypoint_specified(self, client):
+        client.transfer(10, 'manager', 'target', ['--burn-cap', '0.356'])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_entrypoint_with_args(self, client):
+        arg = 'Pair "hello" 42'
+        client.transfer(0, 'manager', 'target',
+                        ['--entrypoint', 'add_left',
+                         '--arg', arg,
+                         '--burn-cap', '0.014'
+                        ])
+        client.bake('bootstrap5', BAKE_ARGS)
+        client.transfer(0, 'manager', 'target',
+                        ['--entrypoint', 'mem_left',
+                         '--arg', '"hello"'])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_no_entrypoint_with_args(self, client):
+        arg = 'Left Unit'
+        client.transfer(0, 'manager', 'target_no_entrypoints',
+                        ['--arg', arg])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_no_default_with_args(self, client):
+        arg = 'Left Unit'
+        client.transfer(0, 'manager', 'target_no_default',
+                        ['--arg', arg])
+        client.bake('bootstrap5', BAKE_ARGS)
+    def test_transfer_from_manager_to_rooted_target_with_args(self, client):
+        arg = 'Left Unit'
+        client.transfer(0, 'manager', 'rooted_target',
+                        ['--arg', arg,
+                         '--entrypoint', 'root'])
+        client.bake('bootstrap5', BAKE_ARGS)
+
 def all_contracts():
     directories = ['attic', 'opcodes']
     contracts = []
