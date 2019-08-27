@@ -1,10 +1,10 @@
 (library
- (name tezos_004_Pt24m4xi_bench_helpers)
+ (name tezos_005_PsBABY5H_bench_helpers)
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
-            tezos-protocol-004-Pt24m4xi
+            tezos-protocol-005-PsBABY5H
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix

@@ -606,7 +606,7 @@ let cmd ~pp_error () =
                (info [] ~docv:"WINNER-PROTOCOL-PATH"
                   ~doc:
                     "The protocol to inject and make win the election, e.g. \
-                     `src/proto_004_Pt24m4xi/lib_protocol/src/TEZOS_PROTOCOL`.")))
+                     `src/proto_005_PsBABY5H/lib_protocol/src/TEZOS_PROTOCOL`.")))
     $ Arg.(
         pure Filename.dirname
         $ required

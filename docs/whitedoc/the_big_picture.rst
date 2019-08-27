@@ -225,8 +225,8 @@ Three economic protocols are included in the main Tezos repository.
     the genesis block. It accepts a single block, signed by a activator
     whose public key is hardcoded, that single action is to switch to
     a new protocol chosen by the activator.
-  - :package:`tezos-protocol-004-Pt24m4xi`
-    (:package:`tezos-embedded-protocol-004-Pt24m4xi`) is the first real
+  - :package:`tezos-protocol-005-PsBABY5H`
+    (:package:`tezos-embedded-protocol-005-PsBABY5H`) is the first real
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
     to start reading the protocol's code.
   - :package:`tezos-protocol-demo-noops`
@@ -245,17 +245,17 @@ compatible, and library vs command line interface.
     interacting via the user, making RPC calls, and signing data using
     signer plug-ins. Most of the, including RPC calling functions from
     :package:`tezos-shell-services` and
-    :package:`tezos-protocol-004-Pt24m4xi`, are abstracted over this object
+    :package:`tezos-protocol-005-PsBABY5H`, are abstracted over this object
     type. That way, it is possible to use the same code for different
     platforms or toolkits.
-  - :package:`tezos-client-004-Pt24m4xi` provides some functions to perform
+  - :package:`tezos-client-005-PsBABY5H` provides some functions to perform
     the operations of protocol alpha using the wallet and signers from
     the client context.
   - :package:`tezos-client-commands` plugs the basic context access
     functions from :package:`tezos-client-base` as handlers for the
     commands of the ``tezos-client`` command line wallet.
-  - :package:`tezos-client-004-Pt24m4xi-commands` plugs the functions from
-    :package:`tezos-client-004-Pt24m4xi` as handlers for the alpha specific
+  - :package:`tezos-client-005-PsBABY5H-commands` plugs the functions from
+    :package:`tezos-client-005-PsBABY5H` as handlers for the alpha specific
     commands of the ``tezos-client`` command line wallet.
   - :package:`tezos-client-000-Ps9mPmXa` contains the basic activator
     commands available on the genesis protocol.
@@ -290,8 +290,8 @@ run them.
  - :package-name:`tezos-storage`
    (in directory :src:`src/lib_storage/test/`):
    tests for the versioned key-value context.
- - :package-name:`tezos-protocol-004-Pt24m4xi`
-   (in directory :src:`src/proto_004_Pt24m4xi/lib_protocol/test/`):
+ - :package-name:`tezos-protocol-005-PsBABY5H`
+   (in directory :src:`src/proto_005_PsBABY5H/lib_protocol/test/`):
    tests of the alpha protocol (without launching a node).
  - :package-name:`tezos-crypto`
    (in directory :src:`src/lib_crypto/test/`):
@@ -313,11 +313,11 @@ The Final Executables
     command line wallet, the latter an administration tool for the
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
-  - :package:`tezos-baker-004-Pt24m4xi` provides the ``tezos-baker-004-Pt24m4xi``
+  - :package:`tezos-baker-005-PsBABY5H` provides the ``tezos-baker-005-PsBABY5H``
     binary.
-  - :package:`tezos-endorser-004-Pt24m4xi` provides the ``tezos-endorser-004-Pt24m4xi``
+  - :package:`tezos-endorser-005-PsBABY5H` provides the ``tezos-endorser-005-PsBABY5H``
     binary.
-  - :package:`tezos-accuser-004-Pt24m4xi` provides the ``tezos-accuser-004-Pt24m4xi``
+  - :package:`tezos-accuser-005-PsBABY5H` provides the ``tezos-accuser-005-PsBABY5H``
     binary.
   - :package:`tezos-protocol-compiler` provides the
     ``tezos-protocol-compiler`` binary that is used by the node to

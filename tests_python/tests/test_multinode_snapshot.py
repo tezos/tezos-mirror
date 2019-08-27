@@ -25,6 +25,7 @@ class TestMultiNodeSnapshot:
     def test_bake_group1_level_a(self, sandbox):
         for _ in range(LEVEL_A - 1):
             sandbox.client(GROUP1[0]).bake('bootstrap1', BAKE_ARGS)
+            sandbox.client(GROUP1[0]).endorse('bootstrap2')
 
     def test_group1_level_a(self, sandbox, session):
         for i in GROUP1:
@@ -57,6 +58,7 @@ class TestMultiNodeSnapshot:
     def test_bake_group2_level_b(self, sandbox):
         for _ in range(LEVEL_B - LEVEL_A):
             sandbox.client(GROUP2[0]).bake('bootstrap1', BAKE_ARGS)
+            sandbox.client(GROUP2[0]).endorse('bootstrap2')
 
     def test_all_level_c(self, sandbox):
         for client in sandbox.all_clients():

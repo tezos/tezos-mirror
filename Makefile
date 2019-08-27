@@ -63,12 +63,12 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 doc-html: all
 	@dune build @doc
-	@./tezos-client -protocol Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
+	@./tezos-client -protocol PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
 	@./tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-admin-client.html
 	@./tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-signer.html
-	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-baker-alpha.html
-	@./tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-endorser-alpha.html
-	@./tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-accuser-alpha.html
+	@./tezos-baker-005-PsBABY5H man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-baker-005-PsBABY5H.html
+	@./tezos-endorser-005-PsBABY5H man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-endorser-005-PsBABY5H.html
+	@./tezos-accuser-005-PsBABY5H man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-accuser-005-PsBABY5H.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
@@ -125,6 +125,6 @@ clean:
 		tezos-protocol-compiler \
 	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p))
 	@-${MAKE} -C docs clean
-	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
+	@-rm -f docs/api/tezos-{baker,endorser,accuser}-005-PsBABY5H.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 
 .PHONY: all test build-deps docker-image clean

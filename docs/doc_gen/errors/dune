@@ -1,11 +1,11 @@
 (executable
  (name error_doc)
  (libraries tezos-shell
-            tezos-client-004-Pt24m4xi)
+            tezos-client-005-PsBABY5H)
  (flags (:standard -open Tezos_base
                    -open Tezos_error_monad
                    -open Tezos_data_encoding
-                   -open Tezos_client_004_Pt24m4xi
+                   -open Tezos_client_005_PsBABY5H
                    -safe-string
                    -linkall)))
 

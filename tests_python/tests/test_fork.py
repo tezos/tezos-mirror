@@ -77,8 +77,10 @@ class TestFork:
         sandbox.node(1).run()
         time.sleep(1)
 
-    def test_check_head(self, sandbox, session):
-        """All nodes are at level 3, head should be hash1"""
-        for client in sandbox.all_clients():
-            head = client.get_head()
-            assert session['hash1'] == head['hash']
+    # TODO: This needs to be rewritten for babylon, as the fitness no longer
+    # depends on the number of endorsements.
+    # def test_check_head(self, sandbox, session):
+    #     """All nodes are at level 3, head should be hash1"""
+    #     for client in sandbox.all_clients():
+    #         head = client.get_head()
+    #         assert session['hash1'] == head['hash']

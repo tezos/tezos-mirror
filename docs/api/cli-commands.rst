@@ -8,7 +8,7 @@ using the following shell commands.
 
 ::
 
-   tezos-client -protocol Pt24m4xiPbLD man -verbosity 3
+   tezos-client -protocol PsBABY5HQTSk man -verbosity 3
    tezos-admin-client man -verbosity 3
 
 
@@ -45,7 +45,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker-alpha.html
+         :file: tezos-baker-005-PsBABY5H.html
 
 
 .. _endorser_manual:
@@ -54,7 +54,7 @@ Endorser manual
 ===============
 
 .. raw:: html
-         :file: tezos-endorser-alpha.html
+         :file: tezos-endorser-005-PsBABY5H.html
 
 
 .. _accuser_manual:
@@ -63,4 +63,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser-alpha.html
+         :file: tezos-accuser-005-PsBABY5H.html
