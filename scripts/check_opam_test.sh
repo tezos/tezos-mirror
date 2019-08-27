@@ -13,13 +13,13 @@ missing=
 for opam in $opams; do
     file=$(basename $opam)
     package=${file%.opam}
-    if ! grep -qe "opam:..:$package:\$" "$yml"; then
+    if ! grep -qe "opam:...:$package:\$" "$yml"; then
         missing=yes
         echo "Missing test for package '$package'."
     fi
 done
 
-tested=$(grep -e '^opam:..:tezos-.*:$' "$yml" | cut -d: -f3)
+tested=$(grep -e '^opam:...:tezos-.*:$' "$yml" | cut -d: -f3)
 for package in $tested; do
     found=$(find "$src_dir/src" "$src_dir/vendors" -name $package.opam | wc -l 2>&1)
     if [ $found != 1 ] ; then
