@@ -9,7 +9,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { >= "1.0.1" }
   "genspio" { = "0.0.2" }
   "dum"
   "tezos-stdlib-unix"
