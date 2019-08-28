@@ -152,7 +152,9 @@ let headers_fetch_worker_loop pipeline =
      | None ->
          Block_locator.to_steps seed pipeline.locator
      | Some (save_point_level, save_point) ->
-         let (head, _) = (pipeline.locator : Block_locator.t :> _ * _) in
+         let (head, _) =
+           (pipeline.locator : Block_locator.t :> Block_header.t * _)
+         in
          let head_level = head.shell.level in
          let truncate_limit = Int32.(sub head_level save_point_level) in
          Block_locator.to_steps_truncate

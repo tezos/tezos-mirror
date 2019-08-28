@@ -1418,22 +1418,7 @@ module Block = struct
             Lwt.return Block_locator.Known_valid )
 
   let known_ancestor chain_state locator =
-    Shared.use chain_state.global_state.global_data (fun {global_store; _} ->
-        Store.Configuration.History_mode.read_opt global_store
-        >|= Option.unopt_assert ~loc:__POS__)
-    >>= fun history_mode ->
     Block_locator.unknown_prefix ~is_known:(block_validity chain_state) locator
-    >>= function
-    | (Known_valid, prefix_locator) ->
-        Lwt.return_some prefix_locator
-    | (Known_invalid, _) ->
-        Lwt.return_none
-    | (Unknown, _) -> (
-      match history_mode with
-      | Archive ->
-          Lwt.return_none
-      | Rolling | Full ->
-          Lwt.return_some locator )
 
   (* Hypothesis : genesis' predecessor is itself. *)
   let get_rpc_directory ({chain_state; _} as block) =

@@ -279,20 +279,10 @@ module Block : sig
 
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
-  (** [known_ancestor chain_state locator] computes the unknown prefix in
-      the [locator] according to [chain_state].
-      It either returns:
-      - [Some (h, hist)] when we find a valid block, where [hist]
-        is the unknown prefix, ending with the first valid block found.
-      - [Some (h, hist)] when we don't find any block known valid nor invalid
-        and the node runs in full or rolling mode. In this case
-        [(h, hist)] is the given [locator].
-      - [None] when the node runs in archive history mode and
-        we find an invalid block or no valid block in the [locator].
-      - [None] when the node runs in full or rolling mode and we find
-        an invalid block in the [locator]. *)
   val known_ancestor :
-    Chain.t -> Block_locator.t -> Block_locator.t option Lwt.t
+    Chain.t ->
+    Block_locator.t ->
+    (Block_locator.validity * Block_locator.t) Lwt.t
 
   val get_rpc_directory : t -> t RPC_directory.t option Lwt.t
 

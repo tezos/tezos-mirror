@@ -332,8 +332,22 @@ let may_validate_new_branch w distant_hash locator =
   >>=? fun () ->
   let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
   State.Block.known_ancestor chain_state locator
-  >>= function
-  | None ->
+  >>= fun (validity, prefix) ->
+  match validity with
+  | Known_valid ->
+      let (_, history) = (prefix : Block_locator.t :> _ * Block_hash.t list) in
+      if history <> [] then bootstrap_new_branch w distant_header prefix
+      else return_unit
+  | Known_invalid ->
+      debug
+        w
+        "ignoring branch %a with invalid locator from peer: %a."
+        Block_hash.pp_short
+        distant_hash
+        P2p_peer.Id.pp_short
+        pv.peer_id ;
+      fail (Validation_errors.Invalid_locator (pv.peer_id, locator))
+  | Unknown ->
       debug
         w
         "ignoring branch %a without common ancestor from peer: %a."
@@ -342,13 +356,6 @@ let may_validate_new_branch w distant_hash locator =
         P2p_peer.Id.pp_short
         pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
-  | Some unknown_prefix ->
-      let (_, history) =
-        (unknown_prefix : Block_locator.t :> Block_header.t * _)
-      in
-      if history <> [] then
-        bootstrap_new_branch w distant_header unknown_prefix
-      else return_unit
 
 let on_no_request w =
   let pv = Worker.state w in
@@ -394,8 +401,7 @@ let on_completion w r _ st =
 let on_error w r st err =
   let pv = Worker.state w in
   match err with
-  | ( Validation_errors.Unknown_ancestor
-    | Validation_errors.Invalid_locator _
+  | ( Validation_errors.Invalid_locator _
     | Block_validator_errors.Invalid_block _ )
     :: _ as errors ->
       Distributed_db.greylist pv.parameters.chain_db pv.peer_id
@@ -437,7 +443,8 @@ let on_error w r st err =
             protocol ;
           Worker.record_event w (Event.Request (r, st, Some err)) ;
           Lwt.return_error err )
-  | Validation_errors.Too_short_locator _ :: _ ->
+  | (Validation_errors.Unknown_ancestor | Validation_errors.Too_short_locator _)
+    :: _ ->
       debug
         w
         "Terminating the validation worker for peer %a (kick)."
