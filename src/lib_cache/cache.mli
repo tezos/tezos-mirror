@@ -23,116 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell - High-level API for the Gossip network and local
-                  storage (helpers). *)
+(** Generic cache / request scheduling service.
 
-(** {1 Indexes} *)
+    This module defines a generic key-value cache service [Distributed_db].
+    It is parameterized by abstract services [Disk], [Scheduler], [Memory_table]
+    and [Precheck].
 
-(** Generic interface for a "distributed" index.
+    Values are looked up in [Disk] and cached in [Memory_table]. Using its
+    [Scheduler], the service can also schedule requests for missing keys
+    to an external source (e.g. network). The key is then *pending* and
+    the service waits synchronously for the value to be available.
 
-    By "distributed", it means that this interface abstract the P2P
-    gossip layer and it is able to fetch missing data from known
-    peers in a "synchronous" interface.
+    The [Scheduler] is also a generic service, parameterized by
+    the [Memory_table] and [Request] modules. Importantly, the [Memory_table]
+    must be shared between the [Scheduler] and the [Distributed_db] as it
+    used to store both pending requests and found values.
 
-*)
-module type DISTRIBUTED_DB = sig
-  type t
+    TODO: this can maybe statically enforced by reviewing the set of exported
+          functors. We may not need to export the scheduler interface to the
+          client
 
-  (** The index key *)
-  type key
+    The cache is "semi"-readthrough. It sends a request via
+    [Request.send] to query a value to the network, but it is the
+    responsibility of the client to *notify the cache* with
+    [Distributed_db.notify] when the requested value is available.
 
-  (** The indexed data *)
-  type value
-
-  (** An extra parameter for the network lookup, usually
-      used for prevalidating data. *)
-  type param
-
-  (** Is the value known locally? *)
-  val known : t -> key -> bool Lwt.t
-
-  type error += Missing_data of key
-
-  type error += Canceled of key
-
-  type error += Timeout of key
-
-  (** Return the value if it is known locally, otherwise fail with
-      the error [Missing_data]. *)
-  val read : t -> key -> value tzresult Lwt.t
-
-  (** Return the value if it is known locally, otherwise fail with
-      the value [None]. *)
-  val read_opt : t -> key -> value option Lwt.t
-
-  (** Same as `fetch` but the call is non-blocking: the data will be
-      stored in the local index when received. *)
-  val prefetch :
-    t ->
-    ?peer:P2p_peer.Id.t ->
-    ?timeout:Time.System.Span.t ->
-    key ->
-    param ->
-    unit
-
-  (** Return the value if it is known locally, or block until the data
-      is received from the network. By default, the data will be
-      requested to all the active peers in the network; if the [peer]
-      argument is provided, the data will only be requested to the
-      provided peer. By default, the resulting promise will block
-      forever if the data is never received. If [timeout] is provided
-      the promise will be resolved with the error [Timeout] after the
-      provided timespan.
-
-      A internal scheduler is able to re-send the request with an
-      exponential back-off until the data is received. If the function
-      is called multiple time with the same key but with distinct
-      peers, the internal scheduler randomly chooses the requested
-      peer (at each retry). *)
-  val fetch :
-    t ->
-    ?peer:P2p_peer.Id.t ->
-    ?timeout:Time.System.Span.t ->
-    key ->
-    param ->
-    value tzresult Lwt.t
-
-  (** Remove the data from the local index or cancel all pending
-      request. Any pending [fetch] promises are resolved with the
-      error [Canceled]. *)
-  val clear_or_cancel : t -> key -> unit
-
-  (** [resolve_pending t pids k v] resolves pending request (if any) in the
-      local index for key k with [Found v]. It notifies the scheduler using
-      'notify_cancellation' for this key and wakes up the waiter on this
-      request. *)
-  val resolve_pending : t -> key -> value -> unit
-
-  val inject : t -> key -> value -> bool Lwt.t
-
-  (** Monitor all the fetched data. A given data will appear only
-      once. *)
-  val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
-
-  val pending : t -> key -> bool
-end
-
-module type DISK_TABLE = sig
-  type store
-
-  type key
-
-  type value
-
-  val known : store -> key -> bool Lwt.t
-
-  val read : store -> key -> value tzresult Lwt.t
-
-  val read_opt : store -> key -> value option Lwt.t
-end
+    Notified values are validated before being inserted in the cache,
+    using the [Precheck] module. *)
 
 module type MEMORY_TABLE = sig
-  (* A subtype of Hashtbl.S *)
+  (** subtypes Hashtbl.S *)
   type 'a t
 
   type key
@@ -154,6 +74,21 @@ module type MEMORY_TABLE = sig
   val length : 'a t -> int
 end
 
+module type REQUEST = sig
+  type key
+
+  type param
+
+  val initial_delay : Time.System.Span.t
+
+  val active : param -> P2p_peer.Set.t
+
+  val send : param -> P2p_peer.Id.t -> key list -> unit
+end
+
+(** This defines the scheduler interface to be used by the cache. Only
+    [memory_table_length] is used outside this module.
+    TODO: enforce this statically. *)
 module type SCHEDULER_EVENTS = sig
   type t
 
@@ -171,9 +106,148 @@ module type SCHEDULER_EVENTS = sig
 
   val notify_invalid : t -> P2p_peer.Id.t -> key -> unit
 
+  (** Returns the number of requests currently pending *)
   val memory_table_length : t -> int
 end
 
+(** Creates a request scheduler to be used by the cache. The request scheduler
+    relies on the worker. [create] / [shutdown] extends the [SCHEDULER_EVENTS]
+    signature to start and cleanup the worker. They must be called resp.
+    before first use / after last use of the cache. The client shouldn't
+    use directly other functions of this module. TODO enforce this statically *)
+module Make_request_scheduler (Hash : sig
+  type t
+
+  val name : string
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  module Logging : sig
+    val tag : t Tag.def
+  end
+end)
+(Table : MEMORY_TABLE with type key := Hash.t)
+(Request : REQUEST with type key := Hash.t) : sig
+  type t
+
+  val create : Request.param -> t
+
+  val shutdown : t -> unit Lwt.t
+
+  include SCHEDULER_EVENTS with type t := t and type key := Hash.t
+end
+
+module type DISTRIBUTED_DB = sig
+  type t
+
+  (** The index key *)
+  type key
+
+  (** The indexed data *)
+  type value
+
+  (** An extra parameter for the network lookup, usually
+      used for prevalidating data. *)
+  type param
+
+  (** [know t k] returns true iff the key is present in the memory table or
+      the disk. *)
+  val known : t -> key -> bool Lwt.t
+
+  type error += Missing_data of key
+
+  type error += Canceled of key
+
+  type error += Timeout of key
+
+  (** Return value if it is found in-memory, or else on disk. Otherwise fail
+      with error [Missing_data]. *)
+  val read : t -> key -> value tzresult Lwt.t
+
+  (** Same as [read] but returns [None] if not found. *)
+  val read_opt : t -> key -> value option Lwt.t
+
+  (** Same as [fetch] but the call is non-blocking: the data will be
+      stored in the memory table when received. *)
+  val prefetch :
+    t ->
+    ?peer:P2p_peer.Id.t ->
+    ?timeout:Time.System.Span.t ->
+    key ->
+    param ->
+    unit
+
+  (** [fetch t ?peer ?timeout k param] returns the value when it is known.
+      It can fail with [Timeout k] if [timeout] is provided and the value
+      isn't know before the timeout expires. It can fail with [Cancel] if
+      the request is canceled.
+
+      The key is first looked up in memory, then on disk. If not present and
+      not already requested, it schedules a request for this key using
+      [Scheduler.request] with optional [peer] parameter and blocks until
+      the cache is notified with [notify] or [resolve_pending].
+
+      [param] is used to validate the value notified using [notify].
+      (see [PRECHECK] and [notify] doc). *)
+  val fetch :
+    t ->
+    ?peer:P2p_peer.Id.t ->
+    ?timeout:Time.System.Span.t ->
+    key ->
+    param ->
+    value tzresult Lwt.t
+
+  (** Remove the data from the local index or cancel all pending
+      request. Any pending [fetch] promises are resolved with the
+      error [Canceled]. *)
+  val clear_or_cancel : t -> key -> unit
+
+  (** [resolve_pending t k v] resolves pending request (if any) in the
+      memory table for key k with [Found v]. It notifies the scheduler using
+      [notify_cancelation] for this key and wakes up the the waiter on this
+      request. *)
+  val resolve_pending : t -> key -> value -> unit
+
+  (* [inject t k v] returns [false] if [k] is already present in the memory table
+     or in the disk, or has already been request.  Otherwise it updates the
+     memory table and return [true] *)
+  val inject : t -> key -> value -> bool Lwt.t
+
+  (** Monitor all the fetched data. A given data will appear only
+      once. *)
+  val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
+
+  (** [pending t k] returns [true] iff a the key status is pending *)
+  val pending : t -> key -> bool
+end
+
+module type DISK_TABLE = sig
+  type store
+
+  type key
+
+  type value
+
+  val known : store -> key -> bool Lwt.t
+
+  val read : store -> key -> value tzresult Lwt.t
+
+  val read_opt : store -> key -> value option Lwt.t
+end
+
+(** When a requested value is received, it goes to a validation phase.
+
+    At fetching time, the client gives a [param].
+    At notification time, the client provides a [notified_value].
+    [precheck] tries to construct a [value] from [param] and [notified_value].
+
+    In the simplest case, [precheck] is defined as
+
+    let precheck k () v -> Some v
+
+    And no validation takes places. *)
 module type PRECHECK = sig
   type key
 
@@ -211,44 +285,20 @@ end)
     Disk_table.store ->
     t
 
+  (** [notify t peer k p] notifies the cache that a value has been received
+      for key [k], from peer [peer].
+
+      If the key is not pending (e.g. the request has been resolved already),
+      the notification is essentially ignored (the scheduler is notified which
+      simply generate log events).
+
+      If the key is pending, the notified value is validated using
+      [Precheck.precheck] against the [param] provided at fetching time,
+      and all threads waiting on this key are woken up. *)
   val notify :
     t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
 
+  (** [memory_table_length t] returns the number of keys either known or
+      pending in the memory table of [t] *)
   val memory_table_length : t -> int
-end
-
-module type REQUEST = sig
-  type key
-
-  type param
-
-  val initial_delay : Time.System.Span.t
-
-  val active : param -> P2p_peer.Set.t
-
-  val send : param -> P2p_peer.Id.t -> key list -> unit
-end
-
-module Make_request_scheduler (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  module Logging : sig
-    val tag : t Tag.def
-  end
-end)
-(Table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t) : sig
-  type t
-
-  val create : Request.param -> t
-
-  val shutdown : t -> unit Lwt.t
-
-  include SCHEDULER_EVENTS with type t := t and type key := Hash.t
 end
