@@ -93,10 +93,12 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
              let lambda =
                match delegate with
                | Some delegate ->
+                   let (`Hex delegate) =
+                     Signature.Public_key_hash.to_hex delegate
+                   in
                    Format.asprintf
-                     "{ DROP ; NIL operation ; PUSH key_hash \"%a\" ; SOME ; \
+                     "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; \
                       SET_DELEGATE ; CONS }"
-                     Signature.Public_key_hash.pp
                      delegate
                | None ->
                    "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; \
@@ -118,10 +120,10 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
                  let delegate_data =
                    match delegate with
                    | Some delegate ->
-                       Format.asprintf
-                         "\"%a\""
-                         Signature.Public_key_hash.pp
-                         delegate
+                       let (`Hex delegate) =
+                         Signature.Public_key_hash.to_hex delegate
+                       in
+                       "0x" ^ delegate
                    | None ->
                        "Unit"
                  in
@@ -209,10 +211,13 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   >>=? fun parameters ->
   let parameters = Option.unopt ~default:d_unit parameters in
   let lambda =
+    let destination =
+      Data_encoding.Binary.to_bytes_exn Contract.encoding destination
+    in
+    let (`Hex destination) = MBytes.to_hex destination in
     Format.asprintf
-      "{ DROP ; NIL operation ;PUSH address \"%a\"; CONTRACT %s %a; \
+      "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
        ASSERT_SOME;PUSH mutez %a ;PUSH %a %a;TRANSFER_TOKENS ; CONS }"
-      Contract.pp
       destination
       (match entrypoint with "default" -> "" | s -> "%" ^ s)
       Michelson_v1_printer.print_expr
