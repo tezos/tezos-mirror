@@ -55,8 +55,8 @@ module Make_raw (Hash : sig
     val tag : t Tag.def
   end
 end)
-(Disk_table : Distributed_db_functors.DISK_TABLE with type key := Hash.t)
-(Memory_table : Distributed_db_functors.MEMORY_TABLE with type key := Hash.t)
+(Disk_table : Cache.DISK_TABLE with type key := Hash.t)
+(Memory_table : Cache.MEMORY_TABLE with type key := Hash.t)
 (Request_message : sig
   type param
 
@@ -66,7 +66,7 @@ end)
 
   val forge : param -> Hash.t list -> Message.t
 end)
-(Precheck : Distributed_db_functors.PRECHECK
+(Precheck : Cache.PRECHECK
               with type key := Hash.t
                and type value := Disk_table.value) =
 struct
@@ -107,12 +107,9 @@ struct
   end
 
   module Scheduler =
-    Distributed_db_functors.Make_request_scheduler (Hash) (Memory_table)
-      (Request)
+    Cache.Make_request_scheduler (Hash) (Memory_table) (Request)
   module Table =
-    Distributed_db_functors.Make_table (Hash) (Disk_table) (Memory_table)
-      (Scheduler)
-      (Precheck)
+    Cache.Make_table (Hash) (Disk_table) (Memory_table) (Scheduler) (Precheck)
 
   type t = {scheduler : Scheduler.t; table : Table.t}
 
@@ -1086,7 +1083,7 @@ let watch_operation {operation_input; _} =
   Lwt_watcher.create_stream operation_input
 
 module Make
-    (Table : Distributed_db_functors.DISTRIBUTED_DB) (Kind : sig
+    (Table : Cache.DISTRIBUTED_DB) (Kind : sig
       type t
 
       val proj : t -> Table.t
@@ -1135,7 +1132,7 @@ module Block_header = struct
 
         let proj chain = chain.block_header_db.table
       end) :
-        Distributed_db_functors.DISTRIBUTED_DB
+        Cache.DISTRIBUTED_DB
           with type t := chain_db
            and type key := Block_hash.t
            and type value := Block_header.t
@@ -1171,7 +1168,7 @@ module Operation = struct
 
         let proj chain = chain.operation_db.table
       end) :
-        Distributed_db_functors.DISTRIBUTED_DB
+        Cache.DISTRIBUTED_DB
           with type t := chain_db
            and type key := Operation_hash.t
            and type value := Operation.t
@@ -1189,7 +1186,7 @@ module Protocol = struct
 
         let proj db = db.protocol_db.table
       end) :
-        Distributed_db_functors.DISTRIBUTED_DB
+        Cache.DISTRIBUTED_DB
           with type t := db
            and type key := Protocol_hash.t
            and type value := Protocol.t

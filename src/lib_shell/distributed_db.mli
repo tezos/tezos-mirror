@@ -26,8 +26,8 @@
 
 (** Tezos Shell - High-level API for the Gossip network and local storage. *)
 
-open Distributed_db_functors
 module Message = Distributed_db_message
+open Cache
 
 type t
 
