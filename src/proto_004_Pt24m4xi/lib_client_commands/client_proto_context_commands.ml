@@ -1103,7 +1103,7 @@ let commands version () =
       command
         ~group
         ~desc:"Submit a ballot"
-        (args1 dry_run_switch)
+        (args2 verbose_signing_switch dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
         @@ ContractAlias.destination_param
              ~name:"delegate"
@@ -1134,7 +1134,7 @@ let commands version () =
                   | s ->
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
-        (fun dry_run
+        (fun (verbose_signing, dry_run)
              (_name, source)
              proposal
              ballot
@@ -1159,6 +1159,7 @@ let commands version () =
             ~block:cctxt#block
             ~src_sk
             src_pkh
+            ~verbose_signing
             ~dry_run
             proposal
             ballot
