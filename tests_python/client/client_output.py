@@ -179,6 +179,7 @@ class SetDelegateResult:
             raise InvalidClientOutput(client_output)
         self.branch_hash = match.groups()[0]
 
+
 class GetDelegateResult:
     """Result of a 'get delegate' query."""
 

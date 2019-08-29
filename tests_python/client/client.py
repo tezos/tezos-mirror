@@ -288,7 +288,7 @@ class Client:
             args = []
         cmd += args
         res = self.run(cmd)
-        return client_output.SetDelegateResult(res)              # TODO : extract_results
+        return client_output.SetDelegateResult(res)
 
     def get_delegate(self,
                      account1: str,
@@ -298,11 +298,12 @@ class Client:
             args = []
         cmd += args
         res = self.run(cmd)
-        return client_output.GetDelegateResult(res).delegate              # TODO : extract_results
+        return client_output.GetDelegateResult(res).delegate
 
-    def withdraw_delegate(self,
-                          account1: str,
-                          args: List[str] = None) -> client_output.TransferResult:
+    def withdraw_delegate(
+            self,
+            account1: str,
+            args: List[str] = None) -> client_output.TransferResult:
         cmd = ['withdraw', 'delegate', 'from', account1]
         if args is None:
             args = []
