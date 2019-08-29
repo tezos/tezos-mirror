@@ -85,9 +85,10 @@ let set_delegate
         let lambda =
           match delegate with
           | Some delegate ->
+              let `Hex delegate = Signature.Public_key_hash.to_hex delegate in
               Format.asprintf
-                "{ DROP ; NIL operation ; PUSH key_hash \"%a\" ; SOME ; SET_DELEGATE ; CONS }"
-                Signature.Public_key_hash.pp delegate
+                "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; SET_DELEGATE ; CONS }"
+                delegate
           | None ->
               "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
         in
@@ -102,8 +103,8 @@ let set_delegate
               let delegate_data =
                 match delegate with
                 | Some delegate ->
-                    Format.asprintf "\"%a\""
-                      Signature.Public_key_hash.pp delegate
+                    let `Hex delegate = Signature.Public_key_hash.to_hex delegate in
+                    "0x" ^ delegate
                 | None -> "Unit"
               in
               let entrypoint =
@@ -172,13 +173,15 @@ let transfer
       ~default:d_unit
       parameters in
   let lambda =
+    let destination = Data_encoding.Binary.to_bytes_exn Contract.encoding destination in
+    let `Hex destination = MBytes.to_hex destination in
     Format.asprintf
       "{ DROP ; NIL operation ;\
-       PUSH address \"%a\"; CONTRACT %s %a; ASSERT_SOME;\
+       PUSH address 0x%s; CONTRACT %s %a; ASSERT_SOME;\
        PUSH mutez %a ;\
        PUSH %a %a;\
        TRANSFER_TOKENS ; CONS }"
-      Contract.pp destination
+      destination
       (match entrypoint with "default" -> "" | s -> "%"^s)
       Michelson_v1_printer.print_expr parameter_type
       Tez.pp amount
