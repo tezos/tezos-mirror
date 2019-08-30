@@ -1083,7 +1083,7 @@ let watch_operation {operation_input; _} =
   Lwt_watcher.create_stream operation_input
 
 module Make
-    (Table : Cache.DISTRIBUTED_DB) (Kind : sig
+    (Table : Cache.CACHE) (Kind : sig
       type t
 
       val proj : t -> Table.t
@@ -1132,7 +1132,7 @@ module Block_header = struct
 
         let proj chain = chain.block_header_db.table
       end) :
-        Cache.DISTRIBUTED_DB
+        Cache.CACHE
           with type t := chain_db
            and type key := Block_hash.t
            and type value := Block_header.t
@@ -1168,7 +1168,7 @@ module Operation = struct
 
         let proj chain = chain.operation_db.table
       end) :
-        Cache.DISTRIBUTED_DB
+        Cache.CACHE
           with type t := chain_db
            and type key := Operation_hash.t
            and type value := Operation.t
@@ -1186,7 +1186,7 @@ module Protocol = struct
 
         let proj db = db.protocol_db.table
       end) :
-        Cache.DISTRIBUTED_DB
+        Cache.CACHE
           with type t := db
            and type key := Protocol_hash.t
            and type value := Protocol.t

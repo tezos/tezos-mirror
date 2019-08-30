@@ -25,7 +25,7 @@
 
 (** Generic cache / request scheduling service.
 
-    This module defines a generic key-value cache service [Distributed_db].
+    This module defines a generic key-value cache service [Cache].
     It is parameterized by abstract services [Disk], [Scheduler], [Memory_table]
     and [Precheck].
 
@@ -36,7 +36,7 @@
 
     The [Scheduler] is also a generic service, parameterized by
     the [Memory_table] and [Request] modules. Importantly, the [Memory_table]
-    must be shared between the [Scheduler] and the [Distributed_db] as it
+    must be shared between the [Scheduler] and the [Cache] as it
     used to store both pending requests and found values.
 
     TODO: this can maybe statically enforced by reviewing the set of exported
@@ -46,7 +46,7 @@
     The cache is "semi"-readthrough. It sends a request via
     [Request.send] to query a value to the network, but it is the
     responsibility of the client to *notify the cache* with
-    [Distributed_db.notify] when the requested value is available.
+    [Cache.notify] when the requested value is available.
 
     Notified values are validated before being inserted in the cache,
     using the [Precheck] module. *)
@@ -139,7 +139,7 @@ end)
   include SCHEDULER_EVENTS with type t := t and type key := Hash.t
 end
 
-module type DISTRIBUTED_DB = sig
+module type CACHE = sig
   type t
 
   (** The index key *)
@@ -274,7 +274,7 @@ end)
 (Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
 (Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
   include
-    DISTRIBUTED_DB
+    CACHE
       with type key = Hash.t
        and type value = Disk_table.value
        and type param = Precheck.param

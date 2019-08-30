@@ -1,4 +1,3 @@
-(*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
@@ -23,7 +22,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type DISTRIBUTED_DB = sig
+module type CACHE = sig
   type t
 
   type key
@@ -153,7 +152,7 @@ end)
 (Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
 (Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
   include
-    DISTRIBUTED_DB
+    CACHE
       with type key = Hash.t
        and type value = Disk_table.value
        and type param = Precheck.param
@@ -220,9 +219,9 @@ end = struct
     (* Missing data key *)
     register_error_kind
       `Permanent
-      ~id:("distributed_db." ^ Hash.name ^ ".missing")
+      ~id:("cache." ^ Hash.name ^ ".missing")
       ~title:("Missing " ^ Hash.name)
-      ~description:("Some " ^ Hash.name ^ " is missing from the distributed db")
+      ~description:("Some " ^ Hash.name ^ " is missing from the chache")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
       (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
@@ -233,7 +232,7 @@ end = struct
       `Permanent
       ~title:("Canceled fetch of a " ^ Hash.name)
       ~description:("The fetch of a " ^ Hash.name ^ " has been canceled")
-      ~id:("distributed_db." ^ Hash.name ^ ".fetch_canceled")
+      ~id:("cache." ^ Hash.name ^ ".fetch_canceled")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Fetch of %s %a canceled" Hash.name Hash.pp key)
       Data_encoding.(obj1 (req "key" Hash.encoding))
@@ -244,7 +243,7 @@ end = struct
       `Permanent
       ~title:("Timed out fetch of a " ^ Hash.name)
       ~description:("The fetch of a " ^ Hash.name ^ " has timed out")
-      ~id:("distributed_db." ^ Hash.name ^ ".fetch_timeout")
+      ~id:("cache." ^ Hash.name ^ ".fetch_timeout")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Fetch of %s %a timed out" Hash.name Hash.pp key)
       Data_encoding.(obj1 (req "key" Hash.encoding))
@@ -430,7 +429,7 @@ end)
   val memory_table_length : t -> int
 end = struct
   include Internal_event.Legacy_logging.Make_semantic (struct
-    let name = "node.distributed_db.scheduler." ^ Hash.name
+    let name = "node.cache.scheduler." ^ Hash.name
   end)
 
   type key = Hash.t

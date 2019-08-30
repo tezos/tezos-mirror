@@ -124,7 +124,7 @@ module Block_header : sig
   type t = Block_header.t (* avoid shadowing. *)
 
   include
-    DISTRIBUTED_DB
+    CACHE
       with type t := chain_db
        and type key := Block_hash.t
        and type value := Block_header.t
@@ -137,7 +137,7 @@ val read_block_header :
 
 (** Index of all the operations of a given block (per validation pass). *)
 module Operations :
-  DISTRIBUTED_DB
+  CACHE
     with type t := chain_db
      and type key = Block_hash.t * int
      and type value = Operation.t list
@@ -146,7 +146,7 @@ module Operations :
 (** Index of all the hashes of operations of a given block (per
     validation pass). *)
 module Operation_hashes :
-  DISTRIBUTED_DB
+  CACHE
     with type t := chain_db
      and type key = Block_hash.t * int
      and type value = Operation_hash.t list
@@ -183,7 +183,7 @@ module Operation : sig
   type t = Operation.t (* avoid shadowing. *)
 
   include
-    DISTRIBUTED_DB
+    CACHE
       with type t := chain_db
        and type key := Operation_hash.t
        and type value := Operation.t
@@ -205,7 +205,7 @@ module Protocol : sig
   type t = Protocol.t (* avoid shadowing. *)
 
   include
-    DISTRIBUTED_DB
+    CACHE
       with type t := db
        and type key := Protocol_hash.t
        and type value := Protocol.t
