@@ -1,3 +1,4 @@
+(*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
@@ -43,14 +44,6 @@ module type CACHE = sig
 
   val read_opt : t -> key -> value option Lwt.t
 
-  val prefetch :
-    t ->
-    ?peer:P2p_peer.Id.t ->
-    ?timeout:Time.System.Span.t ->
-    key ->
-    param ->
-    unit
-
   val fetch :
     t ->
     ?peer:P2p_peer.Id.t ->
@@ -60,12 +53,36 @@ module type CACHE = sig
     value tzresult Lwt.t
 
   val clear_or_cancel : t -> key -> unit
+end
 
-  val inject : t -> key -> value -> bool Lwt.t
+module type FULL_CACHE = sig
+  include CACHE
+
+  type store
+
+  type request_param
+
+  type notified_value
+
+  val pending : t -> key -> bool
 
   val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
-  val pending : t -> key -> bool
+  val inject : t -> key -> value -> bool Lwt.t
+
+  val notify : t -> P2p_peer.Id.t -> key -> notified_value -> unit Lwt.t
+
+  val memory_table_length : t -> int
+
+  val pending_requests : t -> int
+
+  val create :
+    ?global_input:(key * value) Lwt_watcher.input ->
+    request_param ->
+    store ->
+    t
+
+  val shutdown : t -> unit Lwt.t
 end
 
 module type DISK_TABLE = sig
@@ -104,10 +121,12 @@ module type MEMORY_TABLE = sig
   val length : 'a t -> int
 end
 
-module type SCHEDULER_EVENTS = sig
+module type SCHEDULER = sig
   type t
 
   type key
+
+  type param
 
   val request : t -> P2p_peer.Id.t option -> key -> unit
 
@@ -121,7 +140,11 @@ module type SCHEDULER_EVENTS = sig
 
   val notify_invalid : t -> P2p_peer.Id.t -> key -> unit
 
-  val memory_table_length : t -> int
+  val pending_requests : t -> int
+
+  val create : param -> t
+
+  val shutdown : t -> unit Lwt.t
 end
 
 module type PRECHECK = sig
@@ -136,251 +159,6 @@ module type PRECHECK = sig
   val precheck : key -> param -> notified_value -> value option
 end
 
-module Make_table (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : DISK_TABLE with type key := Hash.t)
-(Memory_table : MEMORY_TABLE with type key := Hash.t)
-(Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
-(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
-  include
-    CACHE
-      with type key = Hash.t
-       and type value = Disk_table.value
-       and type param = Precheck.param
-
-  val create :
-    ?global_input:(key * value) Lwt_watcher.input ->
-    Scheduler.t ->
-    Disk_table.store ->
-    t
-
-  val notify :
-    t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
-
-  val memory_table_length : t -> int
-end = struct
-  type key = Hash.t
-
-  type value = Disk_table.value
-
-  type param = Precheck.param
-
-  type t = {
-    scheduler : Scheduler.t;
-    disk : Disk_table.store;
-    memory : status Memory_table.t;
-    global_input : (key * value) Lwt_watcher.input option;
-    input : (key * value) Lwt_watcher.input;
-  }
-
-  and status =
-    | Pending of {
-        waiter : value tzresult Lwt.t;
-        wakener : value tzresult Lwt.u;
-        mutable waiters : int;
-        param : param;
-      }
-    | Found of value
-
-  let known s k =
-    match Memory_table.find_opt s.memory k with
-    | None ->
-        Disk_table.known s.disk k
-    | Some (Pending _) ->
-        Lwt.return_false
-    | Some (Found _) ->
-        Lwt.return_true
-
-  let read_opt s k =
-    match Memory_table.find_opt s.memory k with
-    | None ->
-        Disk_table.read_opt s.disk k
-    | Some (Found v) ->
-        Lwt.return_some v
-    | Some (Pending _) ->
-        Lwt.return_none
-
-  type error += Missing_data of key
-
-  type error += Canceled of key
-
-  type error += Timeout of key
-
-  let () =
-    (* Missing data key *)
-    register_error_kind
-      `Permanent
-      ~id:("cache." ^ Hash.name ^ ".missing")
-      ~title:("Missing " ^ Hash.name)
-      ~description:("Some " ^ Hash.name ^ " is missing from the chache")
-      ~pp:(fun ppf key ->
-        Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
-      (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
-      (function Missing_data key -> Some key | _ -> None)
-      (fun key -> Missing_data key) ;
-    (* Canceled key *)
-    register_error_kind
-      `Permanent
-      ~title:("Canceled fetch of a " ^ Hash.name)
-      ~description:("The fetch of a " ^ Hash.name ^ " has been canceled")
-      ~id:("cache." ^ Hash.name ^ ".fetch_canceled")
-      ~pp:(fun ppf key ->
-        Format.fprintf ppf "Fetch of %s %a canceled" Hash.name Hash.pp key)
-      Data_encoding.(obj1 (req "key" Hash.encoding))
-      (function Canceled key -> Some key | _ -> None)
-      (fun key -> Canceled key) ;
-    (* Timeout key *)
-    register_error_kind
-      `Permanent
-      ~title:("Timed out fetch of a " ^ Hash.name)
-      ~description:("The fetch of a " ^ Hash.name ^ " has timed out")
-      ~id:("cache." ^ Hash.name ^ ".fetch_timeout")
-      ~pp:(fun ppf key ->
-        Format.fprintf ppf "Fetch of %s %a timed out" Hash.name Hash.pp key)
-      Data_encoding.(obj1 (req "key" Hash.encoding))
-      (function Timeout key -> Some key | _ -> None)
-      (fun key -> Timeout key)
-
-  let read s k =
-    match Memory_table.find_opt s.memory k with
-    | None ->
-        trace (Missing_data k) @@ Disk_table.read s.disk k
-    | Some (Found v) ->
-        return v
-    | Some (Pending _) ->
-        fail (Missing_data k)
-
-  let wrap s k ?timeout t =
-    let t = Lwt.protected t in
-    Lwt.on_cancel t (fun () ->
-        match Memory_table.find_opt s.memory k with
-        | None ->
-            ()
-        | Some (Found _) ->
-            ()
-        | Some (Pending data) ->
-            data.waiters <- data.waiters - 1 ;
-            if data.waiters = 0 then (
-              Memory_table.remove s.memory k ;
-              Scheduler.notify_cancellation s.scheduler k )) ;
-    match timeout with
-    | None ->
-        t
-    | Some delay ->
-        let timeout = Systime_os.sleep delay >>= fun () -> fail (Timeout k) in
-        Lwt.pick [t; timeout]
-
-  let fetch s ?peer ?timeout k param =
-    match Memory_table.find_opt s.memory k with
-    | None -> (
-        Disk_table.read_opt s.disk k
-        >>= function
-        | Some v ->
-            return v
-        | None -> (
-          match Memory_table.find_opt s.memory k with
-          | None ->
-              let (waiter, wakener) = Lwt.wait () in
-              Memory_table.add
-                s.memory
-                k
-                (Pending {waiter; wakener; waiters = 1; param}) ;
-              Scheduler.request s.scheduler peer k ;
-              wrap s k ?timeout waiter
-          | Some (Pending data) ->
-              Scheduler.request s.scheduler peer k ;
-              data.waiters <- data.waiters + 1 ;
-              wrap s k ?timeout data.waiter
-          | Some (Found v) ->
-              return v ) )
-    | Some (Pending data) ->
-        Scheduler.request s.scheduler peer k ;
-        data.waiters <- data.waiters + 1 ;
-        wrap s k ?timeout data.waiter
-    | Some (Found v) ->
-        return v
-
-  let prefetch s ?peer ?timeout k param =
-    try ignore (fetch s ?peer ?timeout k param) with _ -> ()
-
-  let notify s p k v =
-    match Memory_table.find_opt s.memory k with
-    | None -> (
-        Disk_table.known s.disk k
-        >>= function
-        | true ->
-            Scheduler.notify_duplicate s.scheduler p k ;
-            Lwt.return_unit
-        | false ->
-            Scheduler.notify_unrequested s.scheduler p k ;
-            Lwt.return_unit )
-    | Some (Pending {wakener = w; param; _}) -> (
-      match Precheck.precheck k param v with
-      | None ->
-          Scheduler.notify_invalid s.scheduler p k ;
-          Lwt.return_unit
-      | Some v ->
-          Scheduler.notify s.scheduler p k ;
-          Memory_table.replace s.memory k (Found v) ;
-          Lwt.wakeup_later w (Ok v) ;
-          Option.iter s.global_input ~f:(fun input ->
-              Lwt_watcher.notify input (k, v)) ;
-          Lwt_watcher.notify s.input (k, v) ;
-          Lwt.return_unit )
-    | Some (Found _) ->
-        Scheduler.notify_duplicate s.scheduler p k ;
-        Lwt.return_unit
-
-  let inject s k v =
-    match Memory_table.find_opt s.memory k with
-    | None -> (
-        Disk_table.known s.disk k
-        >>= function
-        | true ->
-            Lwt.return_false
-        | false ->
-            Memory_table.add s.memory k (Found v) ;
-            Lwt.return_true )
-    | Some (Pending _) | Some (Found _) ->
-        Lwt.return_false
-
-  let clear_or_cancel s k =
-    match Memory_table.find_opt s.memory k with
-    | None ->
-        ()
-    | Some (Pending {wakener = w; _}) ->
-        Scheduler.notify_cancellation s.scheduler k ;
-        Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (error (Canceled k))
-    | Some (Found _) ->
-        Memory_table.remove s.memory k
-
-  let watch s = Lwt_watcher.create_stream s.input
-
-  let create ?global_input scheduler disk =
-    let memory = Memory_table.create 17 in
-    let input = Lwt_watcher.create_input () in
-    {scheduler; disk; memory; input; global_input}
-
-  let pending s k =
-    match Memory_table.find_opt s.memory k with
-    | None ->
-        false
-    | Some (Found _) ->
-        false
-    | Some (Pending _) ->
-        true
-
-  let memory_table_length s = Memory_table.length s.memory
-end
-
 module type REQUEST = sig
   type key
 
@@ -393,6 +171,10 @@ module type REQUEST = sig
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
+(** The cache uses a generic scheduler to schedule its requests.
+    The [Memory_table] must be shared between the scheduler and the cache
+    as it used to store both pending requests and found values. *)
+
 module Make_request_scheduler (Hash : sig
   type t
 
@@ -404,15 +186,7 @@ module Make_request_scheduler (Hash : sig
 end)
 (Table : MEMORY_TABLE with type key := Hash.t)
 (Request : REQUEST with type key := Hash.t) : sig
-  type t
-
-  val create : Request.param -> t
-
-  val shutdown : t -> unit Lwt.t
-
-  include SCHEDULER_EVENTS with type t := t and type key := Hash.t
-
-  val memory_table_length : t -> int
+  include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
   include Internal_event.Legacy_logging.Make_semantic (struct
     let name = "node.cache.scheduler." ^ Hash.name
@@ -704,5 +478,256 @@ end = struct
 
   let shutdown s = Lwt_canceler.cancel s.canceler >>= fun () -> s.worker
 
-  let memory_table_length s = Table.length s.pending
+  let pending_requests s = Table.length s.pending
+end
+
+module Make (Hash : sig
+  type t
+
+  val name : string
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  module Logging : sig
+    val tag : t Tag.def
+  end
+end)
+(Disk_table : DISK_TABLE with type key := Hash.t)
+(Memory_table : MEMORY_TABLE with type key := Hash.t)
+(Request : REQUEST with type key := Hash.t)
+(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
+  include
+    FULL_CACHE
+      with type key = Hash.t
+       and type value = Disk_table.value
+       and type param = Precheck.param
+       and type request_param = Request.param
+       and type notified_value = Precheck.notified_value
+       and type store = Disk_table.store
+end = struct
+  type key = Hash.t
+
+  type value = Disk_table.value
+
+  type param = Precheck.param
+
+  type request_param = Request.param
+
+  type notified_value = Precheck.notified_value
+
+  type store = Disk_table.store
+
+  module Scheduler = Make_request_scheduler (Hash) (Memory_table) (Request)
+
+  type t = {
+    scheduler : Scheduler.t;
+    disk : Disk_table.store;
+    memory : status Memory_table.t;
+    global_input : (key * value) Lwt_watcher.input option;
+    input : (key * value) Lwt_watcher.input;
+  }
+
+  and status =
+    | Pending of {
+        waiter : value tzresult Lwt.t;
+        wakener : value tzresult Lwt.u;
+        mutable waiters : int;
+        param : param;
+      }
+    | Found of value
+
+  let known s k =
+    match Memory_table.find_opt s.memory k with
+    | None ->
+        Disk_table.known s.disk k
+    | Some (Pending _) ->
+        Lwt.return_false
+    | Some (Found _) ->
+        Lwt.return_true
+
+  let read_opt s k =
+    match Memory_table.find_opt s.memory k with
+    | None ->
+        Disk_table.read_opt s.disk k
+    | Some (Found v) ->
+        Lwt.return_some v
+    | Some (Pending _) ->
+        Lwt.return_none
+
+  type error += Missing_data of key
+
+  type error += Canceled of key
+
+  type error += Timeout of key
+
+  let () =
+    (* Missing data key *)
+    register_error_kind
+      `Permanent
+      ~id:("cache." ^ Hash.name ^ ".missing")
+      ~title:("Missing " ^ Hash.name)
+      ~description:("Some " ^ Hash.name ^ " is missing from the chache")
+      ~pp:(fun ppf key ->
+        Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
+      (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
+      (function Missing_data key -> Some key | _ -> None)
+      (fun key -> Missing_data key) ;
+    (* Canceled key *)
+    register_error_kind
+      `Permanent
+      ~title:("Canceled fetch of a " ^ Hash.name)
+      ~description:("The fetch of a " ^ Hash.name ^ " has been canceled")
+      ~id:("cache." ^ Hash.name ^ ".fetch_canceled")
+      ~pp:(fun ppf key ->
+        Format.fprintf ppf "Fetch of %s %a canceled" Hash.name Hash.pp key)
+      Data_encoding.(obj1 (req "key" Hash.encoding))
+      (function Canceled key -> Some key | _ -> None)
+      (fun key -> Canceled key) ;
+    (* Timeout key *)
+    register_error_kind
+      `Permanent
+      ~title:("Timed out fetch of a " ^ Hash.name)
+      ~description:("The fetch of a " ^ Hash.name ^ " has timed out")
+      ~id:("cache." ^ Hash.name ^ ".fetch_timeout")
+      ~pp:(fun ppf key ->
+        Format.fprintf ppf "Fetch of %s %a timed out" Hash.name Hash.pp key)
+      Data_encoding.(obj1 (req "key" Hash.encoding))
+      (function Timeout key -> Some key | _ -> None)
+      (fun key -> Timeout key)
+
+  let read s k =
+    match Memory_table.find_opt s.memory k with
+    | None ->
+        trace (Missing_data k) @@ Disk_table.read s.disk k
+    | Some (Found v) ->
+        return v
+    | Some (Pending _) ->
+        fail (Missing_data k)
+
+  let wrap s k ?timeout t =
+    let t = Lwt.protected t in
+    Lwt.on_cancel t (fun () ->
+        match Memory_table.find_opt s.memory k with
+        | None ->
+            ()
+        | Some (Found _) ->
+            ()
+        | Some (Pending data) ->
+            data.waiters <- data.waiters - 1 ;
+            if data.waiters = 0 then (
+              Memory_table.remove s.memory k ;
+              Scheduler.notify_cancellation s.scheduler k )) ;
+    match timeout with
+    | None ->
+        t
+    | Some delay ->
+        let timeout = Systime_os.sleep delay >>= fun () -> fail (Timeout k) in
+        Lwt.pick [t; timeout]
+
+  let fetch s ?peer ?timeout k param =
+    match Memory_table.find_opt s.memory k with
+    | None -> (
+        Disk_table.read_opt s.disk k
+        >>= function
+        | Some v ->
+            return v
+        | None -> (
+          match Memory_table.find_opt s.memory k with
+          | None ->
+              let (waiter, wakener) = Lwt.wait () in
+              Memory_table.add
+                s.memory
+                k
+                (Pending {waiter; wakener; waiters = 1; param}) ;
+              Scheduler.request s.scheduler peer k ;
+              wrap s k ?timeout waiter
+          | Some (Pending data) ->
+              Scheduler.request s.scheduler peer k ;
+              data.waiters <- data.waiters + 1 ;
+              wrap s k ?timeout data.waiter
+          | Some (Found v) ->
+              return v ) )
+    | Some (Pending data) ->
+        Scheduler.request s.scheduler peer k ;
+        data.waiters <- data.waiters + 1 ;
+        wrap s k ?timeout data.waiter
+    | Some (Found v) ->
+        return v
+
+  let notify s p k v =
+    match Memory_table.find_opt s.memory k with
+    | None -> (
+        Disk_table.known s.disk k
+        >>= function
+        | true ->
+            Scheduler.notify_duplicate s.scheduler p k ;
+            Lwt.return_unit
+        | false ->
+            Scheduler.notify_unrequested s.scheduler p k ;
+            Lwt.return_unit )
+    | Some (Pending {wakener = w; param; _}) -> (
+      match Precheck.precheck k param v with
+      | None ->
+          Scheduler.notify_invalid s.scheduler p k ;
+          Lwt.return_unit
+      | Some v ->
+          Scheduler.notify s.scheduler p k ;
+          Memory_table.replace s.memory k (Found v) ;
+          Lwt.wakeup_later w (Ok v) ;
+          Option.iter s.global_input ~f:(fun input ->
+              Lwt_watcher.notify input (k, v)) ;
+          Lwt_watcher.notify s.input (k, v) ;
+          Lwt.return_unit )
+    | Some (Found _) ->
+        Scheduler.notify_duplicate s.scheduler p k ;
+        Lwt.return_unit
+
+  let inject s k v =
+    match Memory_table.find_opt s.memory k with
+    | None -> (
+        Disk_table.known s.disk k
+        >>= function
+        | true ->
+            Lwt.return_false
+        | false ->
+            Memory_table.add s.memory k (Found v) ;
+            Lwt.return_true )
+    | Some (Pending _) | Some (Found _) ->
+        Lwt.return_false
+
+  let clear_or_cancel s k =
+    match Memory_table.find_opt s.memory k with
+    | None ->
+        ()
+    | Some (Pending {wakener = w; _}) ->
+        Scheduler.notify_cancellation s.scheduler k ;
+        Memory_table.remove s.memory k ;
+        Lwt.wakeup_later w (error (Canceled k))
+    | Some (Found _) ->
+        Memory_table.remove s.memory k
+
+  let watch s = Lwt_watcher.create_stream s.input
+
+  let create ?global_input request_param disk =
+    let scheduler = Scheduler.create request_param in
+    let memory = Memory_table.create 17 in
+    let input = Lwt_watcher.create_input () in
+    {scheduler; disk; memory; input; global_input}
+
+  let pending s k =
+    match Memory_table.find_opt s.memory k with
+    | None ->
+        false
+    | Some (Found _) ->
+        false
+    | Some (Pending _) ->
+        true
+
+  let memory_table_length s = Memory_table.length s.memory
+
+  let pending_requests s = Scheduler.pending_requests s.scheduler
+
+  let shutdown s = Scheduler.shutdown s.scheduler
 end
