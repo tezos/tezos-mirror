@@ -23,9 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val cmd: unit Cmdliner.Term.t * Cmdliner.Term.info
+val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
 
 module Manpage : sig
-  val command_description: string
-  val examples: Cmdliner.Manpage.block list
+  val command_description : string
+
+  val examples : Cmdliner.Manpage.block list
 end

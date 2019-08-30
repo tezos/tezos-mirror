@@ -28,92 +28,88 @@ open Protocol
 open Alpha_context
 
 type error += Failed_to_checkout_context
+
 type error += Invalid_context
 
-let (>>=??) x k = x >>= fun x -> Lwt.return (Environment.wrap_error x) >>=? k
+let ( >>=?? ) x k = x >>= fun x -> Lwt.return (Environment.wrap_error x) >>=? k
 
 let () =
   register_error_kind
     `Permanent
     ~id:"Client_baking_simulator.failed_to_checkout_context"
-    ~title: "Failed to checkout context"
-    ~description: "The given context hash does not exists in the context."
+    ~title:"Failed to checkout context"
+    ~description:"The given context hash does not exists in the context."
     ~pp:(fun ppf () -> Format.fprintf ppf "Failed to checkout the context")
     Data_encoding.unit
-    (function
-      | Failed_to_checkout_context -> Some ()
-      | _ -> None)
+    (function Failed_to_checkout_context -> Some () | _ -> None)
     (fun () -> Failed_to_checkout_context) ;
   register_error_kind
     `Permanent
     ~id:"Client_baking_simulator.invalid_context"
-    ~title: "Invalid context"
-    ~description: "Occurs when the context is inconsistent."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "The given context is invalid.")
+    ~title:"Invalid context"
+    ~description:"Occurs when the context is inconsistent."
+    ~pp:(fun ppf () -> Format.fprintf ppf "The given context is invalid.")
     Data_encoding.unit
-    (function
-      | Invalid_context -> Some ()
-      | _ -> None)
+    (function Invalid_context -> Some () | _ -> None)
     (fun () -> Invalid_context)
 
 type incremental = {
-  predecessor: Client_baking_blocks.block_info ;
-  context : Tezos_protocol_environment.Context.t ;
-  state: Protocol.validation_state ;
-  rev_operations: Operation.packed list ;
-  header: Tezos_base.Block_header.shell_header ;
+  predecessor : Client_baking_blocks.block_info;
+  context : Tezos_protocol_environment.Context.t;
+  state : Protocol.validation_state;
+  rev_operations : Operation.packed list;
+  header : Tezos_base.Block_header.shell_header;
 }
 
-let load_context ~context_path =
-  Context.init ~readonly:true context_path
+let load_context ~context_path = Context.init ~readonly:true context_path
 
 let check_context_consistency index context_hash =
   (* Hypothesis : the version key exists *)
   let version_key = ["version"] in
-  Context.checkout index context_hash >>= function
-  | None -> fail Failed_to_checkout_context
-  | Some context ->
-      Context.mem context version_key >>= function
-      | true -> return_unit
-      | false -> fail Invalid_context
+  Context.checkout index context_hash
+  >>= function
+  | None ->
+      fail Failed_to_checkout_context
+  | Some context -> (
+      Context.mem context version_key
+      >>= function true -> return_unit | false -> fail Invalid_context )
 
 let begin_construction ~timestamp ?protocol_data index predecessor =
-  let { Client_baking_blocks.context ; _ } = predecessor in
-  Shell_context.checkout index context >>= function
-  | None -> fail Failed_to_checkout_context
+  let {Client_baking_blocks.context; _} = predecessor in
+  Shell_context.checkout index context
+  >>= function
+  | None ->
+      fail Failed_to_checkout_context
   | Some context ->
-      let header : Tezos_base.Block_header.shell_header = Tezos_base.Block_header.{
-          predecessor = predecessor.hash  ;
-          proto_level = predecessor.proto_level ;
-          validation_passes = 0 ;
-          fitness = predecessor.fitness ;
-          timestamp ;
-          level = Raw_level.to_int32 predecessor.level ;
-          context = Context_hash.zero ;
-          operations_hash = Operation_list_list_hash.zero ;
-        } in
+      let header : Tezos_base.Block_header.shell_header =
+        Tezos_base.Block_header.
+          {
+            predecessor = predecessor.hash;
+            proto_level = predecessor.proto_level;
+            validation_passes = 0;
+            fitness = predecessor.fitness;
+            timestamp;
+            level = Raw_level.to_int32 predecessor.level;
+            context = Context_hash.zero;
+            operations_hash = Operation_list_list_hash.zero;
+          }
+      in
       Protocol.begin_construction
-        ~chain_id: predecessor.chain_id
-        ~predecessor_context: context
-        ~predecessor_timestamp: predecessor.timestamp
-        ~predecessor_fitness: predecessor.fitness
-        ~predecessor_level: (Raw_level.to_int32 predecessor.level)
-        ~predecessor: predecessor.hash
+        ~chain_id:predecessor.chain_id
+        ~predecessor_context:context
+        ~predecessor_timestamp:predecessor.timestamp
+        ~predecessor_fitness:predecessor.fitness
+        ~predecessor_level:(Raw_level.to_int32 predecessor.level)
+        ~predecessor:predecessor.hash
         ?protocol_data
         ~timestamp
-        () >>=?? fun state ->
-      return {
-        predecessor ;
-        context ;
-        state ;
-        rev_operations = [] ;
-        header ;
-      }
+        ()
+      >>=?? fun state ->
+      return {predecessor; context; state; rev_operations = []; header}
 
-let add_operation st ( op : Operation.packed ) =
-  Protocol.apply_operation st.state op >>=?? fun (state, receipt) ->
-  return ({ st with state ; rev_operations = op :: st.rev_operations }, receipt)
+let add_operation st (op : Operation.packed) =
+  Protocol.apply_operation st.state op
+  >>=?? fun (state, receipt) ->
+  return ({st with state; rev_operations = op :: st.rev_operations}, receipt)
 
-let finalize_construction inc =
-  Protocol.finalize_block inc.state >>=?? return
+let finalize_construction inc = Protocol.finalize_block inc.state >>=?? return

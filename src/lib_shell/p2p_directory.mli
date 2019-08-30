@@ -24,4 +24,4 @@
 (*****************************************************************************)
 
 val build_rpc_directory :
-  (_, Peer_metadata.t , Connection_metadata.t) P2p.t -> unit RPC_directory.t
+  (_, Peer_metadata.t, Connection_metadata.t) P2p.t -> unit RPC_directory.t

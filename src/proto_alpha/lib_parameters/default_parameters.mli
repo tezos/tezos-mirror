@@ -25,18 +25,21 @@
 
 open Protocol
 
-val constants_mainnet: Constants_repr.parametric
-val constants_sandbox: Constants_repr.parametric
-val constants_test: Constants_repr.parametric
+val constants_mainnet : Constants_repr.parametric
 
-val make_bootstrap_account:
+val constants_sandbox : Constants_repr.parametric
+
+val constants_test : Constants_repr.parametric
+
+val make_bootstrap_account :
   Signature.public_key_hash * Signature.public_key * Tez_repr.t ->
   Parameters_repr.bootstrap_account
 
-val parameters_of_constants:
+val parameters_of_constants :
   ?bootstrap_accounts:Parameters_repr.bootstrap_account list ->
   ?bootstrap_contracts:Parameters_repr.bootstrap_contract list ->
   ?with_commitments:bool ->
-  Constants_repr.parametric -> Parameters_repr.t
+  Constants_repr.parametric ->
+  Parameters_repr.t
 
-val json_of_parameters: Parameters_repr.t -> Data_encoding.json
+val json_of_parameters : Parameters_repr.t -> Data_encoding.json

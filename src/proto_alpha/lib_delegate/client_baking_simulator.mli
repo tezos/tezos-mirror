@@ -27,20 +27,33 @@ open Protocol
 open Alpha_context
 
 type incremental = {
-  predecessor: Client_baking_blocks.block_info ;
-  context : Tezos_protocol_environment.Context.t ;
-  state: validation_state ;
-  rev_operations: Operation.packed list ;
-  header: Tezos_base.Block_header.shell_header ;
+  predecessor : Client_baking_blocks.block_info;
+  context : Tezos_protocol_environment.Context.t;
+  state : validation_state;
+  rev_operations : Operation.packed list;
+  header : Tezos_base.Block_header.shell_header;
 }
 
 val load_context : context_path:string -> Context.index Lwt.t
 
 (** Make sure that the given context is consistent by trying to read in it *)
-val check_context_consistency : Context.index -> Context_hash.t -> unit tzresult Lwt.t
+val check_context_consistency :
+  Context.index -> Context_hash.t -> unit tzresult Lwt.t
 
-val begin_construction : timestamp:Time.Protocol.t -> ?protocol_data: block_header_data -> Context.index -> Client_baking_blocks.block_info -> incremental tzresult Lwt.t
+val begin_construction :
+  timestamp:Time.Protocol.t ->
+  ?protocol_data:block_header_data ->
+  Context.index ->
+  Client_baking_blocks.block_info ->
+  incremental tzresult Lwt.t
 
-val add_operation : incremental -> Operation.packed -> (incremental * operation_receipt) tzresult Lwt.t
+val add_operation :
+  incremental ->
+  Operation.packed ->
+  (incremental * operation_receipt) tzresult Lwt.t
 
-val finalize_construction : incremental -> (Tezos_protocol_environment.validation_result * block_header_metadata) tzresult Lwt.t
+val finalize_construction :
+  incremental ->
+  (Tezos_protocol_environment.validation_result * block_header_metadata)
+  tzresult
+  Lwt.t

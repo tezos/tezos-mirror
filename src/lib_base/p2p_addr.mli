@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 type t = Ipaddr.V6.t
+
 type port = int
 
 val encoding : t Data_encoding.t
@@ -31,6 +32,7 @@ val encoding : t Data_encoding.t
 val pp : Format.formatter -> t -> unit
 
 val of_string_opt : string -> t option
+
 val of_string_exn : string -> t
 
 val to_string : t -> string

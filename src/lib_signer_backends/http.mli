@@ -23,10 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make(RPC_client : RPC_client.S)(P : sig
-    val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
-    val logger: RPC_client.logger
-  end)
-  : Client_keys.SIGNER
+module Make
+    (RPC_client : RPC_client.S) (P : sig
+      val authenticate :
+        Signature.Public_key_hash.t list ->
+        MBytes.t ->
+        Signature.t tzresult Lwt.t
 
-val make_base: string -> int -> Uri.t
+      val logger : RPC_client.logger
+    end) : Client_keys.SIGNER
+
+val make_base : string -> int -> Uri.t

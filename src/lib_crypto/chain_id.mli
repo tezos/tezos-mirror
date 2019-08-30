@@ -25,4 +25,4 @@
 
 include S.HASH
 
-val of_block_hash: Block_hash.t -> t
+val of_block_hash : Block_hash.t -> t

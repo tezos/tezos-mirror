@@ -27,8 +27,9 @@ open Protocol
 open Alpha_context
 open Tezos_micheline
 
-module Program : Client_aliases.Alias
-  with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
+module Program :
+  Client_aliases.Alias
+    with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
 val run :
   #Protocol_client_context.rpc_context ->
@@ -42,9 +43,9 @@ val run :
   ?payer:Contract.t ->
   ?gas:Z.t ->
   unit ->
-  (Script.expr *
-   packed_internal_operation list *
-   Contract.big_map_diff option) tzresult Lwt.t
+  (Script.expr * packed_internal_operation list * Contract.big_map_diff option)
+  tzresult
+  Lwt.t
 
 val trace :
   #Protocol_client_context.rpc_context ->
@@ -58,28 +59,33 @@ val trace :
   ?payer:Contract.t ->
   ?gas:Z.t ->
   unit ->
-  (Script.expr *
-   packed_internal_operation list *
-   Script_interpreter.execution_trace *
-   Contract.big_map_diff option) tzresult Lwt.t
+  ( Script.expr
+  * packed_internal_operation list
+  * Script_interpreter.execution_trace
+  * Contract.big_map_diff option )
+  tzresult
+  Lwt.t
 
 val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr *
-   packed_internal_operation list *
-   Contract.big_map_diff option) tzresult -> unit tzresult Lwt.t
+  ( Script_repr.expr
+  * packed_internal_operation list
+  * Contract.big_map_diff option )
+  tzresult ->
+  unit tzresult Lwt.t
 
 val print_trace_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr *
-   packed_internal_operation list *
-   Script_interpreter.execution_trace *
-   Contract.big_map_diff option)
-    tzresult -> unit tzresult Lwt.t
+  ( Script_repr.expr
+  * packed_internal_operation list
+  * Script_interpreter.execution_trace
+  * Contract.big_map_diff option )
+  tzresult ->
+  unit tzresult Lwt.t
 
 val typecheck_data :
   #Protocol_client_context.rpc_context ->

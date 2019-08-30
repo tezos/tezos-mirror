@@ -25,21 +25,19 @@
 (*****************************************************************************)
 
 class unix_wallet :
-  base_dir:string ->
-  password_filename: string option ->
-  Client_context.wallet
-class unix_prompter :
-  Client_context.prompter
-class unix_logger :
-  base_dir:string ->
-  Client_context.printer
-class unix_ui :
-  Client_context.ui
+  base_dir:string -> password_filename:string option -> Client_context.wallet
+
+class unix_prompter : Client_context.prompter
+
+class unix_logger : base_dir:string -> Client_context.printer
+
+class unix_ui : Client_context.ui
+
 class unix_full :
-  base_dir:string ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  confirmations:int option ->
-  password_filename: string option ->
-  rpc_config:RPC_client_unix.config ->
-  Client_context.full
+  base_dir:string
+  -> chain:Shell_services.chain
+  -> block:Shell_services.block
+  -> confirmations:int option
+  -> password_filename:string option
+  -> rpc_config:RPC_client_unix.config
+  -> Client_context.full

@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val create:
+val create :
   #Protocol_client_context.full ->
-  preserved_levels: int ->
+  preserved_levels:int ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

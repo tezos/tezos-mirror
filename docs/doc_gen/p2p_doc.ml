@@ -23,9 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let protocols = [
-  "Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
-]
+let protocols =
+  [("Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")]
 
 let main _node =
   (* Style : hack *)
@@ -37,34 +36,40 @@ let main _node =
   (* include/copy usage.rst from input  *)
   let rec loop () =
     let s = read_line () in
-    Format.printf "%s@\n" s ;
-    loop () in
-  begin try loop () with End_of_file -> () end ;
+    Format.printf "%s@\n" s ; loop ()
+  in
+  (try loop () with End_of_file -> ()) ;
   Format.printf "@\n" ;
   (* Data *)
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Block header (shell)"
+  Format.printf
+    "%a@\n@\n%a@\n@."
+    Rst.pp_h2
+    "Block header (shell)"
     Data_encoding.Binary_schema.pp
     (Data_encoding.Binary.describe Block_header.encoding) ;
-  Format.printf "%a@\n@\n%a@\n@."
-    Rst.pp_h2 "Operation (shell)"
+  Format.printf
+    "%a@\n@\n%a@\n@."
+    Rst.pp_h2
+    "Operation (shell)"
     Data_encoding.Binary_schema.pp
     (Data_encoding.Binary.describe Operation.encoding) ;
   List.iter
     (fun (_name, hash) ->
-       let hash = Protocol_hash.of_b58check_exn hash in
-       let (module Proto) = Registered_protocol.get_exn hash in
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Block_header (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
-       Format.printf "%a@\n@\n%a@\n@."
-         Rst.pp_h2 "Operation (alpha-specific)"
-         Data_encoding.Binary_schema.pp
-         (Data_encoding.Binary.describe Proto.operation_data_encoding) ;
-    )
+      let hash = Protocol_hash.of_b58check_exn hash in
+      let (module Proto) = Registered_protocol.get_exn hash in
+      Format.printf
+        "%a@\n@\n%a@\n@."
+        Rst.pp_h2
+        "Block_header (alpha-specific)"
+        Data_encoding.Binary_schema.pp
+        (Data_encoding.Binary.describe Proto.block_header_data_encoding) ;
+      Format.printf
+        "%a@\n@\n%a@\n@."
+        Rst.pp_h2
+        "Operation (alpha-specific)"
+        Data_encoding.Binary_schema.pp
+        (Data_encoding.Binary.describe Proto.operation_data_encoding))
     protocols ;
   return ()
 
-let () =
-  Lwt_main.run (Node_helpers.with_node main)
+let () = Lwt_main.run (Node_helpers.with_node main)

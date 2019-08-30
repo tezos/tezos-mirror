@@ -25,39 +25,34 @@
 (*****************************************************************************)
 
 let get_context index hash =
-  Context.checkout index hash >>= function
-  | None -> fail (Block_validator_errors.Failed_to_checkout_context hash)
-  | Some ctx -> return ctx
+  Context.checkout index hash
+  >>= function
+  | None ->
+      fail (Block_validator_errors.Failed_to_checkout_context hash)
+  | Some ctx ->
+      return ctx
 
 (** The standard block validation method *)
 module Seq_validator = struct
-
   include Internal_event.Legacy_logging.Make (struct
-      let name = "validation_process.sequential"
-    end)
+    let name = "validation_process.sequential"
+  end)
 
-  type validation_context = {
-    context_index : Context.index ;
-  }
+  type validation_context = {context_index : Context.index}
 
   type t = validation_context
 
   let init context_index =
-    lwt_log_notice "Initialized" >>= fun () ->
-    Lwt.return { context_index }
+    lwt_log_notice "Initialized" >>= fun () -> Lwt.return {context_index}
 
-  let close _ =
-    lwt_log_notice "Shutting down..."
+  let close _ = lwt_log_notice "Shutting down..."
 
-  let apply_block
-      validator_process
-      chain_id
-      ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t)
-      ~block_header
-      operations =
-    get_context validator_process.context_index
-      predecessor_block_header.shell.context >>=? fun predecessor_context ->
+  let apply_block validator_process chain_id ~max_operations_ttl
+      ~(predecessor_block_header : Block_header.t) ~block_header operations =
+    get_context
+      validator_process.context_index
+      predecessor_block_header.shell.context
+    >>=? fun predecessor_context ->
     Block_validation.apply
       chain_id
       ~max_operations_ttl
@@ -65,42 +60,43 @@ module Seq_validator = struct
       ~predecessor_context
       ~block_header
       operations
-
 end
 
-type validator_kind =
-  | Internal of Context.index
+type validator_kind = Internal of Context.index
 
-type t =
-  | Sequential of Seq_validator.t
+type t = Sequential of Seq_validator.t
 
 let init = function
   | Internal index ->
-      Seq_validator.init index >>= fun v ->
-      Lwt.return (Sequential v)
+      Seq_validator.init index >>= fun v -> Lwt.return (Sequential v)
 
-let close = function
-  | Sequential vp -> Seq_validator.close vp
+let close = function Sequential vp -> Seq_validator.close vp
 
 let apply_block bvp ~predecessor block_header operations =
   let chain_state = State.Block.chain_state predecessor in
   let chain_id = State.Block.chain_id predecessor in
   let predecessor_block_header = State.Block.header predecessor in
-  State.Block.max_operations_ttl predecessor >>=? fun max_operations_ttl ->
+  State.Block.max_operations_ttl predecessor
+  >>=? fun max_operations_ttl ->
   let block_hash = Block_header.hash block_header in
-  begin
-    Chain.data chain_state >>= fun chain_data ->
-    if State.Block.equal chain_data.current_head predecessor then
-      return (chain_data.live_blocks, chain_data.live_operations)
-    else
-      Chain_traversal.live_blocks
-        predecessor max_operations_ttl
-  end >>=? fun (live_blocks, live_operations) ->
+  Chain.data chain_state
+  >>= (fun chain_data ->
+        if State.Block.equal chain_data.current_head predecessor then
+          return (chain_data.live_blocks, chain_data.live_operations)
+        else Chain_traversal.live_blocks predecessor max_operations_ttl)
+  >>=? fun (live_blocks, live_operations) ->
   Block_validation.check_liveness
-    ~live_operations ~live_blocks block_hash operations >>=? fun () ->
+    ~live_operations
+    ~live_blocks
+    block_hash
+    operations
+  >>=? fun () ->
   match bvp with
   | Sequential vp ->
-      Seq_validator.apply_block vp
+      Seq_validator.apply_block
+        vp
         ~max_operations_ttl
-        chain_id ~predecessor_block_header
-        ~block_header operations
+        chain_id
+        ~predecessor_block_header
+        ~block_header
+        operations

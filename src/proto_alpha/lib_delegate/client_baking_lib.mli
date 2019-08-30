@@ -27,48 +27,46 @@ open Protocol
 open Alpha_context
 
 (** Mine a block *)
-val bake_block:
+val bake_block :
   #Protocol_client_context.full ->
-  ?minimal_fees: Tez.t ->
-  ?minimal_nanotez_per_gas_unit: Z.t ->
-  ?minimal_nanotez_per_byte: Z.t ->
-  ?await_endorsements: bool ->
-  ?force: bool ->
-  ?max_priority: int ->
-  ?minimal_timestamp: bool ->
-  ?mempool: string ->
-  ?context_path: string ->
-  ?src_sk: Client_keys.sk_uri ->
-  chain: Chain_services.chain ->
-  head: Block_services.block ->
+  ?minimal_fees:Tez.t ->
+  ?minimal_nanotez_per_gas_unit:Z.t ->
+  ?minimal_nanotez_per_byte:Z.t ->
+  ?await_endorsements:bool ->
+  ?force:bool ->
+  ?max_priority:int ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?context_path:string ->
+  ?src_sk:Client_keys.sk_uri ->
+  chain:Chain_services.chain ->
+  head:Block_services.block ->
   public_key_hash ->
   unit tzresult Lwt.t
 
 (** Endorse a block *)
-val endorse_block:
+val endorse_block :
   #Protocol_client_context.full ->
-  chain: Chain_services.chain ->
+  chain:Chain_services.chain ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 
 (** Get the previous cycle of the given cycle *)
-val get_predecessor_cycle:
-  #Protocol_client_context.full ->
-  Cycle.t ->
-  Cycle.t Lwt.t
+val get_predecessor_cycle :
+  #Protocol_client_context.full -> Cycle.t -> Cycle.t Lwt.t
 
 (** Reveal the nonces used to bake each block in the given list *)
 val reveal_block_nonces :
   #Protocol_client_context.full ->
-  chain: Chain_services.chain ->
-  block: Block_services.block ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
   Block_hash.t list ->
   unit Error_monad.tzresult Lwt.t
 
 (** Reveal all unrevealed nonces *)
 val reveal_nonces :
   #Protocol_client_context.full ->
-  chain: Chain_services.chain ->
-  block: Block_services.block ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
   unit ->
   unit Error_monad.tzresult Lwt.t

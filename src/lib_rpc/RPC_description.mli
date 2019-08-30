@@ -25,11 +25,12 @@
 
 open Error_monad
 
-include (module type of struct include Resto.Description end)
+include module type of struct
+  include Resto.Description
+end
 
-val describe:
+val describe :
   #RPC_context.simple ->
   ?recurse:bool ->
   string list ->
   RPC_encoding.schema directory tzresult Lwt.t
-

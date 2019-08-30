@@ -25,74 +25,79 @@
 
 exception Exit
 
-let termination_thread, exit_wakener = Lwt.wait ()
-let exit x = Lwt.wakeup exit_wakener x; raise Exit
+let (termination_thread, exit_wakener) = Lwt.wait ()
+
+let exit x = Lwt.wakeup exit_wakener x ; raise Exit
 
 let () =
   Lwt.async_exception_hook :=
-    (function
-      | Exit -> ()
-      | e ->
-          let backtrace = Printexc.get_backtrace () in
-          let pp_exn_trace ppf backtrace =
-            if String.length backtrace <> 0 then
-              Format.fprintf ppf
-                "@,Backtrace:@,  @[<h>%a@]"
-                Format.pp_print_text backtrace
-          in
-          (* TODO Improve this *)
-          Format.eprintf
-            "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
-            (Unix.getpid ())
-            (Printexc.to_string e)
-            pp_exn_trace backtrace ;
-          Lwt.wakeup exit_wakener 1)
-
+    function
+    | Exit ->
+        ()
+    | e ->
+        let backtrace = Printexc.get_backtrace () in
+        let pp_exn_trace ppf backtrace =
+          if String.length backtrace <> 0 then
+            Format.fprintf
+              ppf
+              "@,Backtrace:@,  @[<h>%a@]"
+              Format.pp_print_text
+              backtrace
+        in
+        (* TODO Improve this *)
+        Format.eprintf
+          "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
+          (Unix.getpid ())
+          (Printexc.to_string e)
+          pp_exn_trace
+          backtrace ;
+        Lwt.wakeup exit_wakener 1
 
 let signals =
-  let open Sys in [
-    (sigabrt, "ABRT") ;
-    (sigalrm, "ALRM") ;
-    (sigfpe, "FPE") ;
-    (sighup, "HUP") ;
-    (sigill, "ILL") ;
-    (sigint, "INT") ;
-    (sigkill, "KILL") ;
-    (sigpipe, "PIPE") ;
-    (sigquit, "QUIT") ;
-    (sigsegv, "SEGV") ;
-    (sigterm, "TERM") ;
-    (sigusr1, "USR1") ;
-    (sigusr2, "USR2") ;
-    (sigchld, "CHLD") ;
-    (sigcont, "CONT") ;
-    (sigstop, "STOP") ;
-    (sigtstp, "TSTP") ;
-    (sigttin, "TTIN") ;
-    (sigttou, "TTOU") ;
-    (sigvtalrm, "VTALRM") ;
-    (sigprof, "PROF") ;
-    (sigbus, "BUS") ;
-    (sigpoll, "POLL") ;
-    (sigsys, "SYS") ;
-    (sigtrap, "TRAP") ;
-    (sigurg, "URG") ;
-    (sigxcpu, "XCPU") ;
-    (sigxfsz, "XFSZ") ;
-  ]
+  let open Sys in
+  [ (sigabrt, "ABRT");
+    (sigalrm, "ALRM");
+    (sigfpe, "FPE");
+    (sighup, "HUP");
+    (sigill, "ILL");
+    (sigint, "INT");
+    (sigkill, "KILL");
+    (sigpipe, "PIPE");
+    (sigquit, "QUIT");
+    (sigsegv, "SEGV");
+    (sigterm, "TERM");
+    (sigusr1, "USR1");
+    (sigusr2, "USR2");
+    (sigchld, "CHLD");
+    (sigcont, "CONT");
+    (sigstop, "STOP");
+    (sigtstp, "TSTP");
+    (sigttin, "TTIN");
+    (sigttou, "TTOU");
+    (sigvtalrm, "VTALRM");
+    (sigprof, "PROF");
+    (sigbus, "BUS");
+    (sigpoll, "POLL");
+    (sigsys, "SYS");
+    (sigtrap, "TRAP");
+    (sigurg, "URG");
+    (sigxcpu, "XCPU");
+    (sigxfsz, "XFSZ") ]
 
 let set_exit_handler ?(log = fun _ -> ()) signal =
   match List.assoc_opt signal signals with
   | None ->
       Format.kasprintf
         invalid_arg
-        "Killable.set_exit_handler: unknown signal %d" signal
+        "Killable.set_exit_handler: unknown signal %d"
+        signal
   | Some name ->
       let handler signal =
         try
           Format.kasprintf
             log
-            "Received the %s signal, triggering shutdown." name ;
+            "Received the %s signal, triggering shutdown."
+            name ;
           exit signal
         with _ -> ()
       in
@@ -105,33 +110,28 @@ let exit_on ?log signal =
   if List.mem signal !signals_to_exit_on then
     Format.kasprintf
       failwith
-      "Killable.exit_on: already registered signal %d" signal
-  else begin
-    signals_to_exit_on := signal :: !signals_to_exit_on;
-    set_exit_handler ?log signal
-  end
+      "Killable.exit_on: already registered signal %d"
+      signal
+  else (
+    signals_to_exit_on := signal :: !signals_to_exit_on ;
+    set_exit_handler ?log signal )
 
-type 'a outcome =
-  | Resolved of 'a Error_monad.tzresult
-  | Exited of int
+type 'a outcome = Resolved of 'a Error_monad.tzresult | Exited of int
 
 let wrap_promise (p : unit Error_monad.tzresult Lwt.t) =
   let open Lwt.Infix in
   Lwt.choose
-    [ (p >|= fun v -> Resolved v) ;
-      (termination_thread >|= fun s -> Exited s) ] >>= function
-  | Resolved r -> Lwt.return r
+    [(p >|= fun v -> Resolved v); (termination_thread >|= fun s -> Exited s)]
+  >>= function
+  | Resolved r ->
+      Lwt.return r
   | Exited s ->
       (*TODO: what are the correct expected behaviour here?*)
-      if List.mem s !signals_to_exit_on then
+      if List.mem s !signals_to_exit_on then (
         (* Exit because of signal *)
-        begin
-          Lwt.cancel p;
-          Error_monad.return_unit
-        end
-      else
+        Lwt.cancel p ;
+        Error_monad.return_unit )
+      else (
         (* Other exit *)
-        begin
-          Lwt.cancel p;
-          Error_monad.return_unit
-        end
+        Lwt.cancel p ;
+        Error_monad.return_unit )

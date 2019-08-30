@@ -45,69 +45,77 @@
 
 *)
 
-
-
 (** An (abstract) prevalidator context. Separate prevalidator contexts should be
  * used for separate chains (e.g., mainchain vs testchain). *)
 type t
 
 type limits = {
-  max_refused_operations : int ;
-  operation_timeout : Time.System.Span.t ;
-  worker_limits : Worker_types.limits ;
-  operations_batch_size : int ;
+  max_refused_operations : int;
+  operation_timeout : Time.System.Span.t;
+  worker_limits : Worker_types.limits;
+  operations_batch_size : int;
 }
 
 (** Creates/tear-down a new prevalidator context. *)
-val create:
+val create :
   limits ->
   (module Registered_protocol.T) ->
   Distributed_db.chain_db ->
   t tzresult Lwt.t
-val shutdown: t -> unit Lwt.t
+
+val shutdown : t -> unit Lwt.t
 
 (** Notify the prevalidator that the identified peer has sent a bunch of
  * operations relevant to the specified context. *)
-val notify_operations: t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
+val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 
 (** Notify the prevalidator worker of a new injected operation. *)
-val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
+val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
 
 (** Notify the prevalidator that a new head has been selected. *)
-val flush: t -> Block_hash.t -> unit tzresult Lwt.t
+val flush : t -> Block_hash.t -> unit tzresult Lwt.t
 
 (** Returns the timestamp of the prevalidator worker, that is the timestamp of the last
     reset of the prevalidation context *)
-val timestamp: t -> Time.System.t
+val timestamp : t -> Time.System.t
 
 (** Returns the fitness of the current prevalidation context *)
-val fitness: t -> Fitness.t Lwt.t
+val fitness : t -> Fitness.t Lwt.t
 
 (** Returns the list of valid operations known to this prevalidation worker *)
-val operations: t -> (error Preapply_result.t * Operation.t Operation_hash.Map.t)
+val operations :
+  t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
 
 (** Returns the list of pending operations known to this prevalidation worker *)
-val pending: t -> Operation.t Operation_hash.Map.t Lwt.t
+val pending : t -> Operation.t Operation_hash.Map.t Lwt.t
 
 (** Returns the list of prevalidation contexts running and their associated chain *)
-val running_workers: unit -> (Chain_id.t * Protocol_hash.t * t) list
+val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 
 (** Two functions that are useful for managing the prevalidator's transition
  * from one protocol to the next. *)
 
 (** Returns the hash of the protocol the prevalidator was instantiated with *)
-val protocol_hash: t -> Protocol_hash.t
+val protocol_hash : t -> Protocol_hash.t
 
 (** Returns the parameters the prevalidator was created with. *)
-val parameters: t -> limits * Distributed_db.chain_db
+val parameters : t -> limits * Distributed_db.chain_db
 
 (** Worker status and events *)
 
 (* None indicates the there are no workers for the current protocol. *)
-val status: t -> Worker_types.worker_status
-val pending_requests : t -> (Time.System.t * Prevalidator_worker_state.Request.view) list
-val current_request : t -> (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view) option
-val last_events : t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
+val status : t -> Worker_types.worker_status
+
+val pending_requests :
+  t -> (Time.System.t * Prevalidator_worker_state.Request.view) list
+
+val current_request :
+  t ->
+  (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view)
+  option
+
+val last_events :
+  t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 
 val information : t -> Worker_types.worker_information
 

@@ -25,21 +25,23 @@
 
 type t = Archive | Full | Rolling
 
-let encoding = Data_encoding.string_enum
-    [ ("archive", Archive) ;
-      ("full", Full) ;
-      ("rolling", Rolling) ;
-    ]
+let encoding =
+  Data_encoding.string_enum
+    [("archive", Archive); ("full", Full); ("rolling", Rolling)]
 
-let equal hm1 hm2 = match (hm1, hm2) with
-  | (Archive, Archive)
-  | (Full, Full)
-  | (Rolling, Rolling) -> true
-  | (Archive, _) | (Full, _) | (Rolling, _) -> false
+let equal hm1 hm2 =
+  match (hm1, hm2) with
+  | (Archive, Archive) | (Full, Full) | (Rolling, Rolling) ->
+      true
+  | (Archive, _) | (Full, _) | (Rolling, _) ->
+      false
 
 let pp ppf = function
-  | Archive -> Format.fprintf ppf "archive"
-  | Full -> Format.fprintf ppf "full"
-  | Rolling -> Format.fprintf ppf "rolling"
+  | Archive ->
+      Format.fprintf ppf "archive"
+  | Full ->
+      Format.fprintf ppf "full"
+  | Rolling ->
+      Format.fprintf ppf "rolling"
 
 let tag = Tag.def "history_mode" pp

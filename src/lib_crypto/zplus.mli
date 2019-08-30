@@ -23,37 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val serialize: Z.t -> string
-val deserialize: string -> Z.t
+val serialize : Z.t -> string
 
-val leq: Z.t -> Z.t -> bool
+val deserialize : string -> Z.t
+
 (** Less than or equal. *)
+val leq : Z.t -> Z.t -> bool
 
-val geq: Z.t -> Z.t -> bool
 (** Greater than or equal. *)
+val geq : Z.t -> Z.t -> bool
 
-val lt: Z.t -> Z.t -> bool
 (** Less than (and not equal). *)
+val lt : Z.t -> Z.t -> bool
 
-val gt: Z.t -> Z.t -> bool
 (** Greater than (and not equal). *)
+val gt : Z.t -> Z.t -> bool
 
-val (<=): Z.t -> Z.t -> bool
 (** Less than or equal. *)
+val ( <= ) : Z.t -> Z.t -> bool
 
-val (>=): Z.t -> Z.t -> bool
 (** Greater than or equal. *)
+val ( >= ) : Z.t -> Z.t -> bool
 
-val (<): Z.t -> Z.t -> bool
 (** Less than (and not equal). *)
+val ( < ) : Z.t -> Z.t -> bool
 
-val (>): Z.t -> Z.t -> bool
 (** Greater than (and not equal). *)
+val ( > ) : Z.t -> Z.t -> bool
 
-val zero: Z.t
+val zero : Z.t
 
-val one: Z.t
+val one : Z.t
 
-val invert: Z.t -> Z.t -> Z.t option
 (** Invert the first argument modulo the second. Returns
     none if there is no inverse *)
+val invert : Z.t -> Z.t -> Z.t option

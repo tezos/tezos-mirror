@@ -29,28 +29,29 @@
     prevalidation_state. *)
 
 module type T = sig
-
-  module Proto: Registered_protocol.T
+  module Proto : Registered_protocol.T
 
   type t
 
   type operation = private {
-    hash: Operation_hash.t ;
-    raw: Operation.t ;
-    protocol_data: Proto.operation_data ;
+    hash : Operation_hash.t;
+    raw : Operation.t;
+    protocol_data : Proto.operation_data;
   }
-  val compare: operation -> operation -> int
 
-  val parse: Operation.t -> operation tzresult
+  val compare : operation -> operation -> int
+
+  val parse : Operation.t -> operation tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
-    ?protocol_data: MBytes.t ->
-    predecessor: State.Block.t ->
-    timestamp: Time.Protocol.t ->
-    unit -> t tzresult Lwt.t
+    ?protocol_data:MBytes.t ->
+    predecessor:State.Block.t ->
+    timestamp:Time.Protocol.t ->
+    unit ->
+    t tzresult Lwt.t
 
   type result =
     | Applied of t * Proto.operation_receipt
@@ -60,20 +61,20 @@ module type T = sig
     | Duplicate
     | Outdated
 
-  val apply_operation: t -> operation -> result Lwt.t
+  val apply_operation : t -> operation -> result Lwt.t
 
   type status = {
-    applied_operations : (operation * Proto.operation_receipt) list ;
-    block_result : Tezos_protocol_environment.validation_result ;
-    block_metadata : Proto.block_header_metadata ;
+    applied_operations : (operation * Proto.operation_receipt) list;
+    block_result : Tezos_protocol_environment.validation_result;
+    block_metadata : Proto.block_header_metadata;
   }
 
-  val status: t -> status tzresult Lwt.t
+  val status : t -> status tzresult Lwt.t
 
-  val pp_result: Format.formatter -> result -> unit
+  val pp_result : Format.formatter -> result -> unit
 end
 
-module Make(Proto : Registered_protocol.T) : T with module Proto = Proto
+module Make (Proto : Registered_protocol.T) : T with module Proto = Proto
 
 (** Pre-apply creates a new block and returns it. *)
 val preapply :

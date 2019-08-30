@@ -120,9 +120,9 @@
 
 *)
 
-type formatter
 (** Abstract data corresponding to a pretty-printer (also called a
     formatter) and all its machinery. See also {!section:formatter}. *)
+type formatter
 
 (** {1:boxes Pretty-printing boxes} *)
 
@@ -148,7 +148,6 @@ type formatter
     split the line.
 *)
 
-val pp_open_box : formatter -> int -> unit
 (** [pp_open_box ppf d] opens a new compacting pretty-printing box with
     offset [d] in the formatter [ppf].
 
@@ -168,12 +167,11 @@ val pp_open_box : formatter -> int -> unit
     If the pretty-printer splits the line in the box, offset [d] is added to
     the current indentation.
 *)
+val pp_open_box : formatter -> int -> unit
 
-
-val pp_close_box : formatter -> unit -> unit
 (** Closes the most recently open pretty-printing box. *)
+val pp_close_box : formatter -> unit -> unit
 
-val pp_open_hbox : formatter -> unit -> unit
 (** [pp_open_hbox ppf ()] opens a new 'horizontal' pretty-printing box.
 
     This box prints material on a single line.
@@ -181,8 +179,8 @@ val pp_open_hbox : formatter -> unit -> unit
     Break hints in a horizontal box never split the line.
     (Line splitting may still occur inside boxes nested deeper).
 *)
+val pp_open_hbox : formatter -> unit -> unit
 
-val pp_open_vbox : formatter -> int -> unit
 (** [pp_open_vbox ppf d] opens a new 'vertical' pretty-printing box
     with offset [d].
 
@@ -193,8 +191,8 @@ val pp_open_vbox : formatter -> int -> unit
     If the pretty-printer splits the line in the box, [d] is added to the
     current indentation.
 *)
+val pp_open_vbox : formatter -> int -> unit
 
-val pp_open_hvbox : formatter -> int -> unit
 (** [pp_open_hvbox ppf d] opens a new 'horizontal/vertical' pretty-printing box
     with offset [d].
 
@@ -204,8 +202,8 @@ val pp_open_hvbox : formatter -> int -> unit
     If the pretty-printer splits the line in the box, [d] is added to the
     current indentation.
 *)
+val pp_open_hvbox : formatter -> int -> unit
 
-val pp_open_hovbox : formatter -> int -> unit
 (** [pp_open_hovbox ppf d] opens a new 'horizontal-or-vertical'
     pretty-printing box with offset [d].
 
@@ -217,28 +215,29 @@ val pp_open_hovbox : formatter -> int -> unit
     If the pretty-printer splits the line in the box, [d] is added to the
     current indentation.
 *)
+val pp_open_hovbox : formatter -> int -> unit
 
 (** {1 Formatting functions} *)
 
-val pp_print_string : formatter -> string -> unit
 (** [pp_print_string ppf s] prints [s] in the current pretty-printing box. *)
+val pp_print_string : formatter -> string -> unit
 
-val pp_print_as : formatter -> int -> string -> unit
 (** [pp_print_as ppf len s] prints [s] in the current pretty-printing box.
     The pretty-printer formats [s] as if it were of length [len].
 *)
+val pp_print_as : formatter -> int -> string -> unit
 
-val pp_print_int : formatter -> int -> unit
 (** Print an integer in the current pretty-printing box. *)
+val pp_print_int : formatter -> int -> unit
 
-val pp_print_float : formatter -> float -> unit
 (** Print a floating point number in the current pretty-printing box. *)
+val pp_print_float : formatter -> float -> unit
 
-val pp_print_char : formatter -> char -> unit
 (** Print a character in the current pretty-printing box. *)
+val pp_print_char : formatter -> char -> unit
 
-val pp_print_bool : formatter -> bool -> unit
 (** Print a boolean in the current pretty-printing box. *)
+val pp_print_bool : formatter -> bool -> unit
 
 (** {1:breaks Break hints} *)
 
@@ -261,23 +260,22 @@ val pp_print_bool : formatter -> bool -> unit
     means printing a newline character (ASCII code 10).
 *)
 
-val pp_print_space : formatter -> unit -> unit
 (** [pp_print_space ppf ()] emits a 'space' break hint:
     the pretty-printer may split the line at this point,
     otherwise it prints one space.
 
     [pp_print_space ppf ()] is equivalent to [pp_print_break ppf 1 0].
 *)
+val pp_print_space : formatter -> unit -> unit
 
-val pp_print_cut : formatter -> unit -> unit
 (** [pp_print_cut ppf ()] emits a 'cut' break hint:
     the pretty-printer may split the line at this point,
     otherwise it prints nothing.
 
     [pp_print_cut ppf ()] is equivalent to [pp_print_break ppf 0 0].
 *)
+val pp_print_cut : formatter -> unit -> unit
 
-val pp_print_break : formatter -> int -> int -> unit
 (** [pp_print_break ppf nspaces offset] emits a 'full' break hint:
     the pretty-printer may split the line at this point,
     otherwise it prints [nspaces] spaces.
@@ -285,8 +283,8 @@ val pp_print_break : formatter -> int -> int -> unit
     If the pretty-printer splits the line, [offset] is added to
     the current indentation.
 *)
+val pp_print_break : formatter -> int -> int -> unit
 
-val pp_force_newline : formatter -> unit -> unit
 (** Force a new line in the current pretty-printing box.
 
     The pretty-printer must split the line at this point,
@@ -296,16 +294,16 @@ val pp_force_newline : formatter -> unit -> unit
     Using break hints within an enclosing vertical box is a better
     alternative.
 *)
+val pp_force_newline : formatter -> unit -> unit
 
-val pp_print_if_newline : formatter -> unit -> unit
 (** Execute the next formatting command if the preceding line
     has just been split. Otherwise, ignore the next formatting
     command.
 *)
+val pp_print_if_newline : formatter -> unit -> unit
 
 (** {1 Pretty-printing termination} *)
 
-val pp_print_flush : formatter -> unit -> unit
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
     All open pretty-printing boxes are closed, all pending text is printed.
@@ -329,8 +327,8 @@ val pp_print_flush : formatter -> unit -> unit
     buffering strategy of output channels and could dramatically impact
     efficiency.
 *)
+val pp_print_flush : formatter -> unit -> unit
 
-val pp_print_newline : formatter -> unit -> unit
 (** End of pretty-printing: resets the pretty-printer to initial state.
 
     All open pretty-printing boxes are closed, all pending text is printed.
@@ -342,10 +340,10 @@ val pp_print_newline : formatter -> unit -> unit
     the preferred method is using break hints within a vertical pretty-printing
     box.
 *)
+val pp_print_newline : formatter -> unit -> unit
 
 (** {1 Margin} *)
 
-val pp_set_margin : formatter -> int -> unit
 (** [pp_set_margin ppf d] sets the right margin to [d] (in characters):
     the pretty-printer splits lines that overflow the right margin according to
     the break hints given.
@@ -357,13 +355,13 @@ val pp_set_margin : formatter -> int -> unit
     a minimal ratio [max_indent/margin>=50%] and if possible
     the current difference [margin - max_indent].
 *)
+val pp_set_margin : formatter -> int -> unit
 
-val pp_get_margin : formatter -> unit -> int
 (** Returns the position of the right margin. *)
+val pp_get_margin : formatter -> unit -> int
 
 (** {1 Maximum indentation limit} *)
 
-val pp_set_max_indent : formatter -> int -> unit
 (** [pp_set_max_indent ppf d] sets the maximum indentation limit of lines
     to [d] (in characters):
     once this limit is reached, new pretty-printing boxes are rejected to the
@@ -376,9 +374,10 @@ val pp_set_max_indent : formatter -> int -> unit
     If [d] is greater or equal than the current margin, it is ignored,
     and the current maximum indentation limit is kept.
 *)
+val pp_set_max_indent : formatter -> int -> unit
 
-val pp_get_max_indent : formatter -> unit -> int
 (** Return the maximum indentation limit (in characters). *)
+val pp_get_max_indent : formatter -> unit -> int
 
 (** {1 Maximum formatting depth} *)
 
@@ -389,7 +388,6 @@ val pp_get_max_indent : formatter -> unit -> int
     precisely as the text returned by {!get_ellipsis_text} [()]).
 *)
 
-val pp_set_max_boxes : formatter -> int -> unit
 (** [pp_set_max_boxes ppf max] sets the maximum number of pretty-printing
     boxes simultaneously open.
 
@@ -398,16 +396,17 @@ val pp_set_max_boxes : formatter -> int -> unit
 
     Nothing happens if [max] is smaller than 2.
 *)
+val pp_set_max_boxes : formatter -> int -> unit
 
-val pp_get_max_boxes : formatter -> unit -> int
 (** Returns the maximum number of pretty-printing boxes allowed before
     ellipsis.
 *)
+val pp_get_max_boxes : formatter -> unit -> int
 
-val pp_over_max_boxes : formatter -> unit -> bool
 (** Tests if the maximum number of pretty-printing boxes allowed have already
     been opened.
 *)
+val pp_over_max_boxes : formatter -> unit -> bool
 
 (** {1 Tabulation boxes} *)
 
@@ -427,7 +426,6 @@ val pp_over_max_boxes : formatter -> unit -> bool
    module {!Format}.
 *)
 
-val pp_open_tbox : formatter -> unit -> unit
 (** [open_tbox ()] opens a new tabulation box.
 
     This box prints lines separated into cells of fixed width.
@@ -440,22 +438,22 @@ val pp_open_tbox : formatter -> unit -> unit
     tabulation marker or split the line. Function {!Format.print_tbreak} prints
     a tabulation break.
 *)
+val pp_open_tbox : formatter -> unit -> unit
 
-val pp_close_tbox : formatter -> unit -> unit
 (** Closes the most recently opened tabulation box. *)
+val pp_close_tbox : formatter -> unit -> unit
 
-val pp_set_tab : formatter -> unit -> unit
 (** Sets a tabulation marker at current insertion point. *)
+val pp_set_tab : formatter -> unit -> unit
 
-val pp_print_tab : formatter -> unit -> unit
 (** [print_tab ()] emits a 'next' tabulation break hint: if not already set on
     a tabulation marker, the insertion point moves to the first tabulation
     marker on the right, or the pretty-printer splits the line and insertion
     point moves to the leftmost tabulation marker.
 
     It is equivalent to [print_tbreak 0 0]. *)
+val pp_print_tab : formatter -> unit -> unit
 
-val pp_print_tbreak : formatter -> int -> int -> unit
 (** [print_tbreak nspaces offset] emits a 'full' tabulation break hint.
 
     If not already set on a tabulation marker, the insertion point moves to the
@@ -469,16 +467,17 @@ val pp_print_tbreak : formatter -> int -> int -> unit
     If the pretty-printer splits the line, [offset] is added to
     the current indentation.
 *)
+val pp_print_tbreak : formatter -> int -> int -> unit
 
 (** {1 Ellipsis} *)
 
-val pp_set_ellipsis_text : formatter -> string -> unit
 (** Set the text of the ellipsis printed when too many pretty-printing boxes
     are open (a single dot, [.], by default).
 *)
+val pp_set_ellipsis_text : formatter -> string -> unit
 
-val pp_get_ellipsis_text : formatter -> unit -> string
 (** Return the text of the ellipsis. *)
+val pp_get_ellipsis_text : formatter -> unit -> string
 
 (** {1:tags Semantic tags} *)
 
@@ -554,44 +553,41 @@ type tag = string
     Tag-printing operations may be set on or off with {!set_print_tags}.
 *)
 
-val pp_open_tag : formatter -> string -> unit
 (** [pp_open_tag ppf t] opens the semantic tag named [t].
 
     The [print_open_tag] tag-printing function of the formatter is called with
     [t] as argument; then the opening tag marker for [t], as given by
     [mark_open_tag t], is written into the output device of the formatter.
 *)
+val pp_open_tag : formatter -> string -> unit
 
-val pp_close_tag : formatter -> unit -> unit
 (** [pp_close_tag ppf ()] closes the most recently opened semantic tag [t].
 
     The closing tag marker, as given by [mark_close_tag t], is written into the
     output device of the formatter; then the [print_close_tag] tag-printing
     function of the formatter is called with [t] as argument.
 *)
+val pp_close_tag : formatter -> unit -> unit
 
-val pp_set_tags : formatter -> bool -> unit
 (** [pp_set_tags ppf b] turns on or off the treatment of semantic tags
     (default is off).
 *)
+val pp_set_tags : formatter -> bool -> unit
 
-val pp_set_print_tags : formatter -> bool -> unit
 (** [pp_set_print_tags ppf b] turns on or off the tag-printing operations. *)
+val pp_set_print_tags : formatter -> bool -> unit
 
-val pp_set_mark_tags : formatter -> bool -> unit
 (** [pp_set_mark_tags ppf b] turns on or off the tag-marking operations. *)
+val pp_set_mark_tags : formatter -> bool -> unit
 
-val pp_get_print_tags : formatter -> unit -> bool
 (** Return the current status of tag-printing operations. *)
+val pp_get_print_tags : formatter -> unit -> bool
 
-val pp_get_mark_tags : formatter -> unit -> bool
 (** Return the current status of tag-marking operations. *)
+val pp_get_mark_tags : formatter -> unit -> bool
 
 (** {1 Convenience formatting functions.} *)
 
-val pp_print_list:
-  ?pp_sep:(formatter -> unit -> unit) ->
-  (formatter -> 'a -> unit) -> (formatter -> 'a list -> unit)
 (** [pp_print_list ?pp_sep pp_v ppf l] prints items of list [l],
     using [pp_v] to print each item, and calling [pp_sep]
     between items ([pp_sep] defaults to {!pp_print_cut}.
@@ -599,13 +595,19 @@ val pp_print_list:
 
     @since 4.02.0
 *)
+val pp_print_list :
+  ?pp_sep:(formatter -> unit -> unit) ->
+  (formatter -> 'a -> unit) ->
+  formatter ->
+  'a list ->
+  unit
 
-val pp_print_text : formatter -> string -> unit
 (** [pp_print_text ppf s] prints [s] with spaces and newlines respectively
     printed using {!pp_print_space} and {!pp_force_newline}.
 
     @since 4.02.0
 *)
+val pp_print_text : formatter -> string -> unit
 
 (** {1:fpp Formatted pretty-printing} *)
 
@@ -695,7 +697,6 @@ val fprintf : formatter -> ('a, formatter, unit) format -> 'a
 
 *)
 
-val sprintf : ('a, unit, string) format -> 'a
 (** Same as [printf] above, but instead of printing on a formatter,
     returns a string containing the result of formatting the arguments.
     Note that the pretty-printer queue is flushed at the end of {e each
@@ -710,8 +711,8 @@ val sprintf : ('a, unit, string) format -> 'a
     buffer of your own: flushing the formatter and the buffer at the end of
     pretty-printing returns the desired string.
 *)
+val sprintf : ('a, unit, string) format -> 'a
 
-val asprintf : ('a, formatter, unit, string) format4 -> 'a
 (** Same as [printf] above, but instead of printing on a formatter,
     returns a string containing the result of formatting the arguments.
     The type of [asprintf] is general enough to interact nicely with [%a]
@@ -719,38 +720,37 @@ val asprintf : ('a, formatter, unit, string) format4 -> 'a
 
     @since 4.01.0
 *)
+val asprintf : ('a, formatter, unit, string) format4 -> 'a
 
-val ifprintf : formatter -> ('a, formatter, unit) format -> 'a
 (** Same as [fprintf] above, but does not print anything.
     Useful to ignore some material when conditionally printing.
 
     @since 3.10.0
 *)
+val ifprintf : formatter -> ('a, formatter, unit) format -> 'a
 
 (** Formatted Pretty-Printing with continuations. *)
 
-val kfprintf :
-  (formatter -> 'a) -> formatter ->
-  ('b, formatter, unit, 'a) format4 -> 'b
 (** Same as [fprintf] above, but instead of returning immediately,
     passes the formatter to its first argument at the end of printing. *)
+val kfprintf :
+  (formatter -> 'a) -> formatter -> ('b, formatter, unit, 'a) format4 -> 'b
 
-val ikfprintf :
-  (formatter -> 'a) -> formatter ->
-  ('b, formatter, unit, 'a) format4 -> 'b
 (** Same as [kfprintf] above, but does not print anything.
     Useful to ignore some material when conditionally printing.
 
     @since 3.12.0
 *)
+val ikfprintf :
+  (formatter -> 'a) -> formatter -> ('b, formatter, unit, 'a) format4 -> 'b
 
-val ksprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
 (** Same as [sprintf] above, but instead of returning the string,
     passes it to the first argument. *)
+val ksprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
 
-val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 (** Same as [asprintf] above, but instead of returning the string,
     passes it to the first argument.
 
     @since 4.03
 *)
+val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b

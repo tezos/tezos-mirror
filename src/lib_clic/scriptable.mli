@@ -28,21 +28,15 @@ open Error_monad
 (** Manage a common ["--for-script <FORMAT>"] option to make the
     output of certain commands script-friendly. *)
 
-type output_format
 (** A representation of the output format. *)
+type output_format
 
-val clic_arg : unit -> (output_format option, _) Clic.arg
 (** Command line argument for {!Clic.command} (and the [Clic.args*]
     functions). Not that this is the only way to obtain a value of type
     [output_format]. On the command line, it appears as [--for-script] with
     values [TSV] or [CSV]. *)
+val clic_arg : unit -> (output_format option, _) Clic.arg
 
-val output :
-  ?channel: Lwt_io.output_channel ->
-  output_format option ->
-  for_human:(unit -> unit tzresult Lwt.t) ->
-  for_script:(unit -> string list list) ->
-  unit tzresult Lwt.t
 (** [output fmt_opt ~for_human ~for_script] behaves in one of two ways.
     If [fmt_opt] is [Some _], then it formats the value returned by
     [for_script ()]. The function's return value is formatted as lines of
@@ -53,20 +47,26 @@ val output :
 
     The optional argument [channel] is used when automatically formatting the
     value returned by [for_script ()]. It has no effect on [for_human ()]. *)
+val output :
+  ?channel:Lwt_io.output_channel ->
+  output_format option ->
+  for_human:(unit -> unit tzresult Lwt.t) ->
+  for_script:(unit -> string list list) ->
+  unit tzresult Lwt.t
 
+(** Same as {!output} but for a single row of data. *)
 val output_row :
-  ?channel: Lwt_io.output_channel ->
+  ?channel:Lwt_io.output_channel ->
   output_format option ->
   for_human:(unit -> unit tzresult Lwt.t) ->
   for_script:(unit -> string list) ->
   unit tzresult Lwt.t
-(** Same as {!output} but for a single row of data. *)
 
-val output_for_human :
-  output_format option -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 (** [output_for_human fmt_opt for_human] behaves in either of two ways.
     If [fmt_opt] is [None], then it calls [for_human ()].
     Otherwise, it does nothing.
 
     Use this function to provide output that is of no interest to automatic
     tools. *)
+val output_for_human :
+  output_format option -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t

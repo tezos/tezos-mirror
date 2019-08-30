@@ -25,37 +25,24 @@
 
 let make_simple blocks =
   let rec loop pred n =
-    if n <= 0 then
-      return pred
-    else
-      Block.bake pred >>=? fun block ->
-      loop block (n - 1) in
-  Context.init 5 >>=? fun (genesis, _) ->
-  loop genesis blocks
+    if n <= 0 then return pred
+    else Block.bake pred >>=? fun block -> loop block (n - 1)
+  in
+  Context.init 5 >>=? fun (genesis, _) -> loop genesis blocks
 
-type args = {
-  blocks : int ;
-  accounts : int ;
-}
+type args = {blocks : int; accounts : int}
 
-let default_args = {
-  blocks = 1000 ;
-  accounts = 5 ;
-}
+let default_args = {blocks = 1000; accounts = 5}
 
-let set_blocks cf blocks =
-  cf := { !cf with blocks }
+let set_blocks cf blocks = cf := {!cf with blocks}
 
-let set_accounts cf accounts =
-  cf := { !cf with accounts }
+let set_accounts cf accounts = cf := {!cf with accounts}
 
 let read_args () =
   let args = ref default_args in
   let specific =
-    [
-      ("--blocks", Arg.Int (set_blocks args), "number of blocks");
-      ("--accounts", Arg.Int (set_accounts args), "number of acount");
-    ]
+    [ ("--blocks", Arg.Int (set_blocks args), "number of blocks");
+      ("--accounts", Arg.Int (set_accounts args), "number of acount") ]
   in
   let usage = "Usage: [--blocks n] [--accounts n] " in
   Arg.parse specific (fun _ -> ()) usage ;
@@ -65,8 +52,7 @@ let () =
   let args = read_args () in
   match Lwt_main.run (make_simple args.blocks) with
   | Ok _head ->
-      Format.printf "Success.@." ;
-      exit 0
+      Format.printf "Success.@." ; exit 0
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
       exit 1

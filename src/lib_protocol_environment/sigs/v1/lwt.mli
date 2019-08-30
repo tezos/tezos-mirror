@@ -20,7 +20,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
-*)
+ *)
 
 (* TEZOS CHANGES
 
@@ -35,7 +35,6 @@
      * thread storage
      * lwt exceptions
 *)
-
 
 (** Module [Lwt]: cooperative light-weight threads. *)
 
@@ -61,17 +60,16 @@
 
 (** {2 Definitions and basics} *)
 
-type +'a t
 (** The type of threads returning a result of type ['a]. *)
+type +'a t
 
-val return : 'a -> 'a t
 (** [return e] is a thread whose return value is the value of the
     expression [e]. *)
+val return : 'a -> 'a t
 
 (* val fail : exn -> 'a t *)
 (*   (\** [fail e] is a thread that fails with the exception [e]. *\) *)
 
-val bind : 'a t -> ('a -> 'b t) -> 'b t
 (** [bind t f] is a thread which first waits for the thread [t] to
     terminate and then, if the thread succeeds, behaves as the
     application of function [f] to the return value of [t].  If the
@@ -86,39 +84,40 @@ val bind : 'a t -> ('a -> 'b t) -> 'b t
     purpose: [t'] will not execute before [t] is terminated.
 
     The result of a thread can be bound several time. *)
+val bind : 'a t -> ('a -> 'b t) -> 'b t
 
-val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 (** [t >>= f] is an alternative notation for [bind t f]. *)
+val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
 
-val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
 (** [f =<< t] is [t >>= f] *)
+val ( =<< ) : ('a -> 'b t) -> 'a t -> 'b t
 
-val map : ('a -> 'b) -> 'a t -> 'b t
 (** [map f m] map the result of a thread. This is the same as [bind
     m (fun x -> return (f x))] *)
+val map : ('a -> 'b) -> 'a t -> 'b t
 
-val (>|=) : 'a t -> ('a -> 'b) -> 'b t
 (** [m >|= f] is [map f m] *)
+val ( >|= ) : 'a t -> ('a -> 'b) -> 'b t
 
-val (=|<) : ('a -> 'b) -> 'a t -> 'b t
 (** [f =|< m] is [map f m] *)
+val ( =|< ) : ('a -> 'b) -> 'a t -> 'b t
 
 (** {3 Pre-allocated threads} *)
 
-val return_unit : unit t
 (** [return_unit = return ()] *)
+val return_unit : unit t
 
-val return_none : 'a option t
 (** [return_none = return None] *)
+val return_none : 'a option t
 
-val return_nil : 'a list t
 (** [return_nil = return \[\]] *)
+val return_nil : 'a list t
 
-val return_true : bool t
 (** [return_true = return true] *)
+val return_true : bool t
 
-val return_false : bool t
 (** [return_false = return false] *)
+val return_false : bool t
 
 (* (\** {2 Thread storage} *\) *)
 
@@ -222,19 +221,19 @@ val return_false : bool t
 (*   (\** [nchoose_split l] does the same as {!nchoose} but also retrurns *)
 (*       the list of threads that have not yet terminated. *\) *)
 
-val join : unit t list -> unit t
 (** [join l] waits for all threads in [l] to terminate. If one of
     the threads fails, then [join l] will fails with the same
     exception as the first one to terminate.
 
     Note: {!join} leaves the local values of the current thread
     unchanged. *)
+val join : unit t list -> unit t
 
 (* val ( <?> ) : 'a t -> 'a t -> 'a t *)
 (*   (\** [t <?> t'] is the same as [choose [t; t']] *\) *)
 
-val ( <&> ) : unit t -> unit t -> unit t
 (** [t <&> t'] is the same as [join [t; t']] *)
+val ( <&> ) : unit t -> unit t -> unit t
 
 (* val async : (unit -> 'a t) -> unit *)
 (*   (\** [async f] starts a thread without waiting for the result. If it *)

@@ -29,51 +29,53 @@ let dump_file oc file =
   let buf = Bytes.create buflen in
   let rec loop () =
     let len = input ic buf 0 buflen in
-    if len <> 0 then begin
-      Printf.fprintf oc "%s"
-        (if len = buflen then Bytes.unsafe_to_string buf else Bytes.sub_string buf 0 len) ;
-      loop ()
-    end
+    if len <> 0 then (
+      Printf.fprintf
+        oc
+        "%s"
+        ( if len = buflen then Bytes.unsafe_to_string buf
+        else Bytes.sub_string buf 0 len ) ;
+      loop () )
   in
-  loop () ;
-  close_in ic
+  loop () ; close_in ic
 
 let include_ml oc file =
   let unit =
-    String.capitalize_ascii
-      (Filename.chop_extension (Filename.basename file)) in
+    String.capitalize_ascii (Filename.chop_extension (Filename.basename file))
+  in
   (* FIXME insert .mli... *)
   Printf.fprintf oc "module %s " unit ;
-  if Sys.file_exists (file ^ "i") then begin
+  if Sys.file_exists (file ^ "i") then (
     Printf.fprintf oc ": sig\n" ;
-    Printf.fprintf oc "# 1 %S\n" (file ^ "i");
+    Printf.fprintf oc "# 1 %S\n" (file ^ "i") ;
     dump_file oc (file ^ "i") ;
-    Printf.fprintf oc "end " ;
-  end ;
+    Printf.fprintf oc "end " ) ;
   Printf.fprintf oc "= struct\n" ;
   Printf.fprintf oc "# 1 %S\n" file ;
   dump_file oc file ;
   Printf.fprintf oc "end\n%!"
 
-let opened_modules = [
-  "Tezos_protocol_environment" ;
-  "Pervasives" ;
-  "Error_monad" ;
-  "Logging" ;
-]
+let opened_modules =
+  ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"; "Logging"]
 
 let dump oc hash files =
-  Printf.fprintf oc
-    "module Make (Tezos_protocol_environment : Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
+  Printf.fprintf
+    oc
+    "module Make (Tezos_protocol_environment : \
+     Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
   Printf.fprintf oc "[@@@ocaml.warning \"-33\"]\n" ;
   List.iter (Printf.fprintf oc "open %s\n") opened_modules ;
   Printf.fprintf oc "[@@@ocaml.warning \"+33\"]\n" ;
-  Printf.fprintf oc "let hash = Protocol_hash.of_b58check_exn %S;;\n"
+  Printf.fprintf
+    oc
+    "let hash = Protocol_hash.of_b58check_exn %S;;\n"
     (Protocol_hash.to_b58check hash) ;
   for i = 0 to Array.length files - 1 do
-    include_ml oc files.(i) ;
+    include_ml oc files.(i)
   done ;
-  Printf.fprintf oc "  include %s\n"
+  Printf.fprintf
+    oc
+    "  include %s\n"
     (String.capitalize_ascii
        (Filename.basename
           (Filename.chop_extension files.(Array.length files - 1)))) ;

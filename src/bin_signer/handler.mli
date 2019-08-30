@@ -23,42 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Storage for keys that have been authorized for baking. *)
 module Authorized_key :
   Client_aliases.Alias with type t := Signature.public_key
-(** Storage for keys that have been authorized for baking. *)
 
-val public_key :
-  #Client_context.wallet ->
-  Signature.public_key_hash -> Signature.public_key tzresult Lwt.t
 (** [public_key cctxt pkh] returns the public key whose hash is [pkh]
     iff it is present if [cctxt]. *)
+val public_key :
+  #Client_context.wallet ->
+  Signature.public_key_hash ->
+  Signature.public_key tzresult Lwt.t
 
+(** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
+    signs [req] and returns a signature. *)
 val sign :
   #Client_context.wallet ->
   Signer_messages.Sign.Request.t ->
   ?magic_bytes:int list ->
-  check_high_watermark:bool -> require_auth:bool -> Signature.t tzresult Lwt.t
-(** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
-    signs [req] and returns a signature. *)
+  check_high_watermark:bool ->
+  require_auth:bool ->
+  Signature.t tzresult Lwt.t
 
+(** [deterministic_nonce cctxt req ~require_auth] generates
+    deterministically a nonce from [req.data]. *)
 val deterministic_nonce :
   #Client_context.wallet ->
   Signer_messages.Deterministic_nonce.Request.t ->
-  require_auth:bool -> MBytes.t tzresult Lwt.t
-(** [deterministic_nonce cctxt req ~require_auth] generates
-    deterministically a nonce from [req.data]. *)
+  require_auth:bool ->
+  MBytes.t tzresult Lwt.t
 
-val deterministic_nonce_hash :
-  #Client_context.wallet ->
-  Signer_messages.Deterministic_nonce_hash.Request.t ->
-  require_auth:bool -> MBytes.t tzresult Lwt.t
 (** [deterministic_nonce_hash cctxt req ~require_auth] generates
     deterministically a nonce from [req.data] and returns the hash of
     this nonce. *)
-
-val supports_deterministic_nonces :
+val deterministic_nonce_hash :
   #Client_context.wallet ->
-  Signature.public_key_hash ->
-  bool tzresult Lwt.t
+  Signer_messages.Deterministic_nonce_hash.Request.t ->
+  require_auth:bool ->
+  MBytes.t tzresult Lwt.t
+
 (** [supports_deterministic_nonces cctxt pkh] determines whether the
     the signer provides the determinsitic nonce functionality. *)
+val supports_deterministic_nonces :
+  #Client_context.wallet -> Signature.public_key_hash -> bool tzresult Lwt.t

@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let list ctxt =
-  RPC_context.make_call RPC_service.error_service ctxt () () ()
+let list ctxt = RPC_context.make_call RPC_service.error_service ctxt () () ()
 
 let encoding = RPC_service.error_encoding

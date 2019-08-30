@@ -26,128 +26,117 @@
 open Store_sigs
 
 type t
+
 type global_store = t
 
 (** [init ~mapsize path] returns an initialized store at [path] of
     maximum capacity [mapsize] bytes. *)
-val init: ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
-val close: t -> unit
+val init : ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
 
-val open_with_atomic_rw:
-  ?mapsize:int64 -> string ->
+val close : t -> unit
+
+val open_with_atomic_rw :
+  ?mapsize:int64 ->
+  string ->
   (t -> 'a Error_monad.tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
-val with_atomic_rw:
-  t ->
-  (unit -> 'a Lwt.t) ->
-  'a Lwt.t
+val with_atomic_rw : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Configuration} **********************************************************)
 
 module Configuration : sig
-
-  module History_mode : SINGLE_STORE
-    with type t := global_store
-     and type value := History_mode.t
+  module History_mode :
+    SINGLE_STORE with type t := global_store and type value := History_mode.t
 end
 
 (** {2 Chain store} **********************************************************)
 
 module Chain : sig
+  val list : global_store -> Chain_id.t list Lwt.t
 
-  val list: global_store -> Chain_id.t list Lwt.t
-  val destroy: global_store -> Chain_id.t -> unit Lwt.t
+  val destroy : global_store -> Chain_id.t -> unit Lwt.t
 
   type store
-  val get: global_store -> Chain_id.t -> store
 
-  module Genesis_hash : SINGLE_STORE
-    with type t := store
-     and type value := Block_hash.t
+  val get : global_store -> Chain_id.t -> store
 
-  module Genesis_time : SINGLE_STORE
-    with type t := store
-     and type value := Time.Protocol.t
+  module Genesis_hash :
+    SINGLE_STORE with type t := store and type value := Block_hash.t
 
-  module Genesis_protocol : SINGLE_STORE
-    with type t := store
-     and type value := Protocol_hash.t
+  module Genesis_time :
+    SINGLE_STORE with type t := store and type value := Time.Protocol.t
 
-  module Genesis_test_protocol : SINGLE_STORE
-    with type t := store
-     and type value := Protocol_hash.t
+  module Genesis_protocol :
+    SINGLE_STORE with type t := store and type value := Protocol_hash.t
 
-  module Expiration : SINGLE_STORE
-    with type t := store
-     and type value := Time.Protocol.t
+  module Genesis_test_protocol :
+    SINGLE_STORE with type t := store and type value := Protocol_hash.t
 
-  module Allow_forked_chain : SET_STORE
-    with type t := t
-     and type elt := Chain_id.t
+  module Expiration :
+    SINGLE_STORE with type t := store and type value := Time.Protocol.t
 
-  module Protocol_info : MAP_STORE
-    with type t = store
-     and type key = int
-     and type value = Protocol_hash.t * Int32.t
+  module Allow_forked_chain :
+    SET_STORE with type t := t and type elt := Chain_id.t
 
+  module Protocol_info :
+    MAP_STORE
+      with type t = store
+       and type key = int
+       and type value = Protocol_hash.t * Int32.t
 end
-
 
 (** {2 Mutable chain data} *)
 
 module Chain_data : sig
-
   type store
-  val get: Chain.store -> store
 
-  module Current_head : SINGLE_STORE
-    with type t := store
-     and type value := Block_hash.t
+  val get : Chain.store -> store
 
-  module Known_heads : BUFFERED_SET_STORE
-    with type t := store
-     and type elt := Block_hash.t
-     and module Set := Block_hash.Set
+  module Current_head :
+    SINGLE_STORE with type t := store and type value := Block_hash.t
 
-  module In_main_branch : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := Block_hash.t (* successor *)
+  module Known_heads :
+    BUFFERED_SET_STORE
+      with type t := store
+       and type elt := Block_hash.t
+       and module Set := Block_hash.Set
 
-  module Checkpoint : SINGLE_STORE
-    with type t := store
-     and type value := Block_header.t
+  module In_main_branch :
+    SINGLE_STORE
+      with type t = store * Block_hash.t
+       and type value := Block_hash.t
 
-  module Save_point : SINGLE_STORE
-    with type t := store
-     and type value := Int32.t * Block_hash.t
+  (* successor *)
 
-  module Caboose : SINGLE_STORE
-    with type t := store
-     and type value := Int32.t * Block_hash.t
+  module Checkpoint :
+    SINGLE_STORE with type t := store and type value := Block_header.t
 
+  module Save_point :
+    SINGLE_STORE with type t := store and type value := Int32.t * Block_hash.t
+
+  module Caboose :
+    SINGLE_STORE with type t := store and type value := Int32.t * Block_hash.t
 end
-
 
 (** {2 Block header store} *)
 
 module Block : sig
-
   type store
-  val get: Chain.store -> store
+
+  val get : Chain.store -> store
 
   type contents = {
-    header: Block_header.t ;
-    message: string option ;
-    max_operations_ttl: int ;
-    last_allowed_fork_level: Int32.t ;
-    context: Context_hash.t ;
-    metadata: MBytes.t ;
+    header : Block_header.t;
+    message : string option;
+    max_operations_ttl : int;
+    last_allowed_fork_level : Int32.t;
+    context : Context_hash.t;
+    metadata : MBytes.t;
   }
 
-  module Contents : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := contents
+  module Contents :
+    SINGLE_STORE with type t = store * Block_hash.t and type value := contents
 
   (** Block header storage used for pruned blocks.
       Blocks that are not pruned have their header
@@ -156,73 +145,74 @@ module Block : sig
       the {!State.Block.Header} module.
   *)
 
-  type pruned_contents = {
-    header: Block_header.t ;
-  }
+  type pruned_contents = {header : Block_header.t}
 
-  module Pruned_contents : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := pruned_contents
+  module Pruned_contents :
+    SINGLE_STORE
+      with type t = store * Block_hash.t
+       and type value := pruned_contents
 
-  module Operation_hashes : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = Operation_hash.t list
+  module Operation_hashes :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = Operation_hash.t list
 
-  module Operations : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = Operation.t list
+  module Operations :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = Operation.t list
 
-  module Operations_metadata : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = MBytes.t list
+  module Operations_metadata :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = MBytes.t list
 
-  type invalid_block = {
-    level: int32 ;
-    errors: Error_monad.error list ;
-  }
+  type invalid_block = {level : int32; errors : Error_monad.error list}
 
-  module Invalid_block : MAP_STORE
-    with type t = store
-     and type key = Block_hash.t
-     and type value = invalid_block
+  module Invalid_block :
+    MAP_STORE
+      with type t = store
+       and type key = Block_hash.t
+       and type value = invalid_block
 
   (**
      Block predecessors under
      [/blocks/<block_id>/predecessors/<distance>/<block_id>].
      Used to compute block predecessors in [lib_node_shell/state.ml].
   *)
-  module Predecessors : MAP_STORE
-    with type t = store * Block_hash.t
-     and type key = int
-     and type value = Block_hash.t
-
+  module Predecessors :
+    MAP_STORE
+      with type t = store * Block_hash.t
+       and type key = int
+       and type value = Block_hash.t
 end
-
 
 (** {2 Protocol store} *)
 
 module Protocol : sig
-
   type store
-  val get: global_store -> store
 
-  module Contents : MAP_STORE
-    with type t := store
-     and type key := Protocol_hash.t
-     and type value := Protocol.t
+  val get : global_store -> store
 
-  module RawContents : SINGLE_STORE
-    with type t = store * Protocol_hash.t
-     and type value := MBytes.t
+  module Contents :
+    MAP_STORE
+      with type t := store
+       and type key := Protocol_hash.t
+       and type value := Protocol.t
 
+  module RawContents :
+    SINGLE_STORE
+      with type t = store * Protocol_hash.t
+       and type value := MBytes.t
 end
 
 (** {2 Temporary test chain forking block store} *)
 
-module Forking_block_hash : MAP_STORE
-  with type t = global_store
-   and type key := Chain_id.t
-   and type value := Block_hash.t
+module Forking_block_hash :
+  MAP_STORE
+    with type t = global_store
+     and type key := Chain_id.t
+     and type value := Block_hash.t

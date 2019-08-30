@@ -29,6 +29,7 @@
 type name = string
 
 let pp_name = Format.pp_print_string
+
 let name_encoding =
   let open Data_encoding in
   def
@@ -37,11 +38,13 @@ let name_encoding =
     string
 
 let chain_name = "TEZOS"
+
 let sandboxed_chain_name = "SANDBOXED_TEZOS"
 
 type t = int
 
 let pp = Format.pp_print_int
+
 let encoding =
   let open Data_encoding in
   def
@@ -53,4 +56,4 @@ let zero = 0
 
 let () =
   Data_encoding.Registration.register ~pp:pp_name name_encoding ;
-  Data_encoding.Registration.register ~pp:pp encoding
+  Data_encoding.Registration.register ~pp encoding

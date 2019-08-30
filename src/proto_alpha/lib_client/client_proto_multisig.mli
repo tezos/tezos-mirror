@@ -32,18 +32,17 @@ type multisig_action =
   | Change_delegate of public_key_hash option
   | Change_keys of Z.t * public_key list
 
-type multisig_prepared_action =
-  {
-    bytes : MBytes.t;
-    threshold : Z.t;
-    keys : public_key list;
-    counter : Z.t;
-  }
+type multisig_prepared_action = {
+  bytes : MBytes.t;
+  threshold : Z.t;
+  keys : public_key list;
+  counter : Z.t;
+}
 
-val originate_multisig:
+val originate_multisig :
   full ->
-  chain: Shell_services.chain ->
-  block: Shell_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
@@ -61,29 +60,31 @@ val originate_multisig:
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
+  unit ->
+  (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
-val prepare_multisig_transaction:
+val prepare_multisig_transaction :
   full ->
-  chain: Shell_services.chain ->
-  block: Shell_services.block ->
-  multisig_contract: Contract.t ->
-  action: multisig_action ->
-  unit -> multisig_prepared_action tzresult Lwt.t
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  multisig_contract:Contract.t ->
+  action:multisig_action ->
+  unit ->
+  multisig_prepared_action tzresult Lwt.t
 
-val call_multisig:
+val call_multisig :
   full ->
-  chain: Shell_services.chain ->
-  block: Shell_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  multisig_contract: Contract.t ->
-  action: multisig_action ->
-  signatures: Signature.t list ->
+  multisig_contract:Contract.t ->
+  action:multisig_action ->
+  signatures:Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->
@@ -91,21 +92,22 @@ val call_multisig:
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t
 
-val call_multisig_on_bytes:
+val call_multisig_on_bytes :
   full ->
-  chain: Shell_services.chain ->
-  block: Shell_services.block ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  multisig_contract: Contract.t ->
-  bytes: MBytes.t ->
-  signatures: Signature.t list ->
+  multisig_contract:Contract.t ->
+  bytes:MBytes.t ->
+  signatures:Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->
@@ -113,4 +115,5 @@ val call_multisig_on_bytes:
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t

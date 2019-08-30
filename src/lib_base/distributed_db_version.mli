@@ -28,16 +28,19 @@
 
 type name = private string
 
-val pp_name: Format.formatter -> name -> unit
-val name_encoding: name Data_encoding.t
+val pp_name : Format.formatter -> name -> unit
 
-val chain_name: name
-val sandboxed_chain_name: name
+val name_encoding : name Data_encoding.t
+
+val chain_name : name
+
+val sandboxed_chain_name : name
 
 (** An abstract version number for the high-level distributed_db messages. *)
 type t = private int
 
-val pp: Format.formatter -> t -> unit
-val encoding: t Data_encoding.t
+val pp : Format.formatter -> t -> unit
 
-val zero: t
+val encoding : t Data_encoding.t
+
+val zero : t

@@ -26,18 +26,19 @@
 (** A global thread that resumes the first time {!exit} is called
     anywhere in the program. Called by the main to wait for any other
     thread in the system to call {!exit}. *)
-val termination_thread: int Lwt.t
+val termination_thread : int Lwt.t
 
 (** Awakens the {!termination_thread} with the given return value, and
     raises an exception that cannot be caught, except by a
     catch-all. Should only be called once. *)
-val exit: int -> 'a
+val exit : int -> 'a
 
 (** [exit_on signal] sets a signal handler for [signal] that exits cleanly using
     the [exit] function above. *)
-val exit_on: ?log:(string -> unit) -> int -> unit
+val exit_on : ?log:(string -> unit) -> int -> unit
 
 (** [wrap_promise p] is a promise [w] that resolves when either [p] resolves, or
     when [termination_thread] resolves. In the latter case, [p] is canceled,
     giving it a chance to clean up resources. *)
-val wrap_promise: unit Error_monad.tzresult Lwt.t -> unit Error_monad.tzresult Lwt.t
+val wrap_promise :
+  unit Error_monad.tzresult Lwt.t -> unit Error_monad.tzresult Lwt.t

@@ -27,12 +27,12 @@
 (** Distributing validation work between different workers, one for each peer. *)
 
 type limits = {
-  max_promises_per_request : int ;
-  worker_limits : Worker_types.limits ;
+  max_promises_per_request : int;
+  worker_limits : Worker_types.limits;
 }
 
 module type T = sig
-  module Mempool_worker: Mempool_worker.T
+  module Mempool_worker : Mempool_worker.T
 
   (** The type of a peer worker. Each peer worker should be used for treating
       all the operations from a given peer. *)
@@ -49,25 +49,23 @@ module type T = sig
       to be used for validating batches of operations sent by the peer
       [peer_id]. The validation of each operations is delegated to the
       associated [mempool_worker]. *)
-  val create: limits -> P2p_peer.Id.t -> Mempool_worker.t -> t tzresult Lwt.t
+  val create : limits -> P2p_peer.Id.t -> Mempool_worker.t -> t tzresult Lwt.t
 
   (** [shutdown t] closes the peer worker [t]. It returns a list of operation
       hashes that can be recycled when a new worker is created for the same peer.
   *)
-  val shutdown: t -> input Lwt.t
+  val shutdown : t -> input Lwt.t
 
   (** [validate worker input] validates the batch of operations [input]. The
       work is performed by [worker] and the underlying validation of each
       operation is performed by the [mempool_worker] that was used to [create]
       [worker]. *)
-  val validate: t -> input -> unit tzresult Lwt.t
-
+  val validate : t -> input -> unit tzresult Lwt.t
 end
-
 
 module type STATIC = sig
   val max_pending_requests : int
 end
 
-module Make (Static: STATIC) (Mempool_worker: Mempool_worker.T)
-  : T with module Mempool_worker = Mempool_worker
+module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
+  T with module Mempool_worker = Mempool_worker

@@ -33,17 +33,19 @@ type 'o t =
   | `Forbidden of RPC_service.error option (* 403 *)
   | `Not_found of RPC_service.error option (* 404 *)
   | `Conflict of RPC_service.error option (* 409 *)
-  | `Error of RPC_service.error option (* 500 *)
-  ]
+  | `Error of RPC_service.error option (* 500 *) ]
 
 and 'a stream = 'a Resto_directory.Answer.stream = {
-  next: unit -> 'a option Lwt.t ;
-  shutdown: unit -> unit ;
+  next : unit -> 'a option Lwt.t;
+  shutdown : unit -> unit;
 }
 
-val return: 'o -> 'o t Lwt.t
-val return_unit: unit t Lwt.t
-val return_stream: 'o stream -> 'o t Lwt.t
-val not_found: 'o t Lwt.t
+val return : 'o -> 'o t Lwt.t
 
-val fail: Error_monad.error list -> 'a t Lwt.t
+val return_unit : unit t Lwt.t
+
+val return_stream : 'o stream -> 'o t Lwt.t
+
+val not_found : 'o t Lwt.t
+
+val fail : Error_monad.error list -> 'a t Lwt.t

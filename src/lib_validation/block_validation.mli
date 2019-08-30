@@ -24,24 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val may_patch_protocol:
+val may_patch_protocol :
   level:Int32.t ->
   Tezos_protocol_environment.validation_result ->
   Tezos_protocol_environment.validation_result Lwt.t
 
-val update_testchain_status:
-  Context.t ->
-  Block_header.t ->
-  Time.Protocol.t ->
-  Context.t tzresult Lwt.t
+val update_testchain_status :
+  Context.t -> Block_header.t -> Time.Protocol.t -> Context.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
-val init_test_chain:
-  Context.t ->
-  Block_header.t ->
-  Block_header.t tzresult Lwt.t
+val init_test_chain :
+  Context.t -> Block_header.t -> Block_header.t tzresult Lwt.t
 
-val check_liveness:
+val check_liveness :
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->
   Block_hash.t ->
@@ -49,17 +44,18 @@ val check_liveness:
   unit tzresult Lwt.t
 
 type result = {
-  validation_result: Tezos_protocol_environment.validation_result ;
-  block_metadata: MBytes.t ;
-  ops_metadata: MBytes.t list list ;
-  context_hash: Context_hash.t ;
-  forking_testchain: bool ;
+  validation_result : Tezos_protocol_environment.validation_result;
+  block_metadata : MBytes.t;
+  ops_metadata : MBytes.t list list;
+  context_hash : Context_hash.t;
+  forking_testchain : bool;
 }
 
-val apply:
+val apply :
   Chain_id.t ->
   max_operations_ttl:int ->
   predecessor_block_header:Block_header.t ->
   predecessor_context:Context.t ->
   block_header:Block_header.t ->
-  Operation.t list list -> result tzresult Lwt.t
+  Operation.t list list ->
+  result tzresult Lwt.t

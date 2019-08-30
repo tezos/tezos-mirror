@@ -25,16 +25,14 @@
 
 open Worker
 
-module Make
-    (Event : EVENT)
-    (Request : REQUEST) = struct
-
+module Make (Event : EVENT) (Request : REQUEST) = struct
   module Event = Event
   module Request = Request
 
   type status =
-      WorkerEvent of Event.t
-    | Request of (Request.view * Worker_types.request_status * error list option)
+    | WorkerEvent of Event.t
+    | Request of
+        (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -46,81 +44,92 @@ module Make
 
   let status_encoding =
     let open Data_encoding in
-    Time.System.stamped_encoding @@
-    union
-      [ case (Tag 0)
-          ~title: "Event"
-          Event.encoding
-          (function WorkerEvent e -> Some e | _ -> None)
-          (fun e -> WorkerEvent e) ;
-        case (Tag 1)
-          ~title: "Request"
-          (obj3
-             (req "request_view"  (dynamic_size  (Request.encoding)))
-             (req "request_status" Worker_types.request_status_encoding)
-             (req "errors" (option (list error_encoding)))
-          )
-          (function Request (v,s,e) -> Some (v,s,e) | _ -> None)
-          (fun (v,s,e) -> Request (v,s,e)) ;
-        case (Tag 2)
-          ~title:"Terminated"
-          Data_encoding.empty
-          (function Terminated  -> Some () | _ -> None)
-          (fun () -> Terminated) ;
-        case (Tag 3)
-          ~title:"Timeout"
-          Data_encoding.empty
-          (function Timeout  -> Some () | _ -> None)
-          (fun () -> Timeout) ;
-        case (Tag 4)
-          ~title:"Crashed"
-          (list error_encoding)
-          (function Crashed errs -> Some errs | _ -> None)
-          (fun errs -> Crashed errs) ;
-        case (Tag 5)
-          ~title:"Started"
-          (option string)
-          (function Started n -> Some n | _ -> None)
-          (fun n -> Started n) ;
-        case (Tag 6)
-          ~title:"Triggering_shutdown"
-          Data_encoding.empty
-          (function Triggering_shutdown  -> Some () | _ -> None)
-          (fun () -> Triggering_shutdown) ;
-        case (Tag 7)
-          ~title:"Duplicate"
-          string
-          (function Duplicate n -> Some n | _ -> None)
-          (fun n -> Duplicate n) ;
-      ]
+    Time.System.stamped_encoding
+    @@ union
+         [ case
+             (Tag 0)
+             ~title:"Event"
+             Event.encoding
+             (function WorkerEvent e -> Some e | _ -> None)
+             (fun e -> WorkerEvent e);
+           case
+             (Tag 1)
+             ~title:"Request"
+             (obj3
+                (req "request_view" (dynamic_size Request.encoding))
+                (req "request_status" Worker_types.request_status_encoding)
+                (req "errors" (option (list error_encoding))))
+             (function Request (v, s, e) -> Some (v, s, e) | _ -> None)
+             (fun (v, s, e) -> Request (v, s, e));
+           case
+             (Tag 2)
+             ~title:"Terminated"
+             Data_encoding.empty
+             (function Terminated -> Some () | _ -> None)
+             (fun () -> Terminated);
+           case
+             (Tag 3)
+             ~title:"Timeout"
+             Data_encoding.empty
+             (function Timeout -> Some () | _ -> None)
+             (fun () -> Timeout);
+           case
+             (Tag 4)
+             ~title:"Crashed"
+             (list error_encoding)
+             (function Crashed errs -> Some errs | _ -> None)
+             (fun errs -> Crashed errs);
+           case
+             (Tag 5)
+             ~title:"Started"
+             (option string)
+             (function Started n -> Some n | _ -> None)
+             (fun n -> Started n);
+           case
+             (Tag 6)
+             ~title:"Triggering_shutdown"
+             Data_encoding.empty
+             (function Triggering_shutdown -> Some () | _ -> None)
+             (fun () -> Triggering_shutdown);
+           case
+             (Tag 7)
+             ~title:"Duplicate"
+             string
+             (function Duplicate n -> Some n | _ -> None)
+             (fun n -> Duplicate n) ]
 
   let pp base_name ppf = function
     | WorkerEvent evt ->
-        Format.fprintf ppf "%a"
-          Event.pp evt
-    | Request (view, { pushed ; treated ; completed }, None)  ->
-        Format.fprintf ppf
+        Format.fprintf ppf "%a" Event.pp evt
+    | Request (view, {pushed; treated; completed}, None) ->
+        Format.fprintf
+          ppf
           "@[<v 0>%a@, %a@]"
-          Request.pp view
-          Worker_types.pp_status {pushed ; treated ; completed }
-    | Request (view, { pushed ; treated ; completed }, Some errors)  ->
-        Format.fprintf ppf
+          Request.pp
+          view
+          Worker_types.pp_status
+          {pushed; treated; completed}
+    | Request (view, {pushed; treated; completed}, Some errors) ->
+        Format.fprintf
+          ppf
           "@[<v 0>%a@, %a, %a@]"
-          Request.pp view
-          Worker_types.pp_status {pushed ; treated ; completed }
-          (Format.pp_print_list Error_monad.pp) errors
+          Request.pp
+          view
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errors
     | Terminated ->
-        Format.fprintf ppf  "@[Worker terminated [%s] @]"
-          base_name
+        Format.fprintf ppf "@[Worker terminated [%s] @]" base_name
     | Timeout ->
-        Format.fprintf ppf
-          "@[Worker terminated with timeout [%s] @]"
-          base_name
+        Format.fprintf ppf "@[Worker terminated with timeout [%s] @]" base_name
     | Crashed errs ->
-        Format.fprintf ppf
+        Format.fprintf
+          ppf
           "@[<v 0>Worker crashed [%s]:@,%a@]"
           base_name
-          (Format.pp_print_list Error_monad.pp) errs
+          (Format.pp_print_list Error_monad.pp)
+          errs
     | Started None ->
         Format.fprintf ppf "Worker started"
     | Started (Some n) ->
@@ -129,31 +138,41 @@ module Make
         Format.fprintf ppf "Triggering shutdown"
     | Duplicate name ->
         let full_name =
-          if name = "" then base_name else Format.asprintf "%s_%s" base_name name in
+          if name = "" then base_name
+          else Format.asprintf "%s_%s" base_name name
+        in
         Format.fprintf ppf "Worker.launch: duplicate worker %s" full_name
 
-  module MakeDefinition (Static : sig val worker_name : string end) :
-    Internal_event.EVENT_DEFINITION with type t = t=  struct
+  module MakeDefinition (Static : sig
+    val worker_name : string
+  end) : Internal_event.EVENT_DEFINITION with type t = t = struct
     let name = Static.worker_name
+
     type nonrec t = t
+
     let encoding =
       let open Data_encoding in
-      let v0_encoding =  status_encoding in
+      let v0_encoding = status_encoding in
       With_version.(encoding ~name (first_version v0_encoding))
-    let pp ppf (status: t)  =
-      Format.fprintf ppf "%a"
-        (pp Static.worker_name) status.data
+
+    let pp ppf (status : t) =
+      Format.fprintf ppf "%a" (pp Static.worker_name) status.data
+
     let doc = "Worker status."
-    let level (status : t)  =
+
+    let level (status : t) =
       match status.data with
       | WorkerEvent evt ->
           Event.level evt
-      | Request _ -> Internal_event.Debug
-      | Terminated
-      | Timeout
-      | Started _ -> Internal_event.Notice
-      | Crashed _ -> Internal_event.Error
-      | Triggering_shutdown -> Internal_event.Debug
-      | Duplicate _ -> Internal_event.Error
+      | Request _ ->
+          Internal_event.Debug
+      | Terminated | Timeout | Started _ ->
+          Internal_event.Notice
+      | Crashed _ ->
+          Internal_event.Error
+      | Triggering_shutdown ->
+          Internal_event.Debug
+      | Duplicate _ ->
+          Internal_event.Error
   end
 end

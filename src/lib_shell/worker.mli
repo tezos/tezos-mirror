@@ -31,7 +31,6 @@
 (** The name of the group of workers corresponding to an instanciation
     of {!Make}, as well as the name of each worker in that group. *)
 module type NAME = sig
-
   (** The name/path of the worker group *)
   val base : string list
 
@@ -43,14 +42,12 @@ module type NAME = sig
 
   (** Pretty printer for displaying the worker name *)
   val pp : Format.formatter -> t -> unit
-
 end
 
 (** Events that are used for logging and introspection.
     Events are pretty printed immediately in the log, and stored in
     the worker's event backlog for introspection. *)
 module type EVENT = sig
-
   (** The type of an event. *)
   type t
 
@@ -65,12 +62,10 @@ module type EVENT = sig
 
   (** Pretty printer, also used for logging *)
   val pp : Format.formatter -> t -> unit
-
 end
 
 (** The type of messages that are fed to the worker's event loop. *)
 module type REQUEST = sig
-
   (** The type of events.
       It is possible to wait for an event to be processed from outside
       the worker using {!push_request_and_wait}. In this case, the
@@ -91,12 +86,10 @@ module type REQUEST = sig
 
   (** Pretty printer, also used for logging by {!Request_event}. *)
   val pp : Format.formatter -> view -> unit
-
 end
 
 (** The (imperative) state of the event loop. *)
 module type TYPES = sig
-
   (** The internal state that is passed to the event handlers. *)
   type state
 
@@ -114,16 +107,17 @@ module type TYPES = sig
 
   (** Pretty printer for introspection. *)
   val pp : Format.formatter -> view -> unit
-
 end
 
 module type LOGGER = sig
   module Event : EVENT
+
   module Request : REQUEST
 
   type status =
-      WorkerEvent of Event.t
-    | Request of (Request.view* Worker_types.request_status * error list option)
+    | WorkerEvent of Event.t
+    | Request of
+        (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -133,15 +127,17 @@ module type LOGGER = sig
 
   type t = status Time.System.stamped
 
-  module MakeDefinition (Static : sig val worker_name : string end) :
-    Internal_event.EVENT_DEFINITION with type t = t
+  module MakeDefinition (Static : sig
+    val worker_name : string
+  end) : Internal_event.EVENT_DEFINITION with type t = t
 end
 
 (** {2 Worker group maker} *)
 
 (** An error returned when trying to communicate with a worker that
     has been closed. *)
-type worker_name = {base: string; name:string}
+type worker_name = {base : string; name : string}
+
 type Error_monad.error += Closed of worker_name
 
 (** Functor to build a group of workers.
@@ -149,11 +145,13 @@ type Error_monad.error += Closed of worker_name
     but the actual parameters and event handlers can be tweaked
     for each individual worker. *)
 module type T = sig
+  module Name : NAME
 
-  module Name: NAME
-  module Event: EVENT
-  module Request: REQUEST
-  module Types: TYPES
+  module Event : EVENT
+
+  module Request : REQUEST
+
+  module Types : TYPES
 
   (** A handle to a specific worker, parameterized by the type of
       internal message buffer. *)
@@ -163,20 +161,24 @@ module type T = sig
   type 'kind table
 
   (** Internal buffer kinds used as parameters to {!t}. *)
-  type 'a queue and bounded and infinite
-  type dropbox
+  type 'a queue
 
+  and bounded
+
+  and infinite
+
+  type dropbox
 
   (** Supported kinds of internal buffers. *)
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
-    | Bounded : { size : int } -> bounded queue buffer_kind
-    | Dropbox :
-        { merge : (dropbox t ->
-                   any_request ->
-                   any_request option ->
-                   any_request option) }
-      -> dropbox buffer_kind
+    | Bounded : {size : int} -> bounded queue buffer_kind
+    | Dropbox : {
+        merge :
+          dropbox t -> any_request -> any_request option -> any_request option;
+      }
+        -> dropbox buffer_kind
+
   and any_request = Any_request : _ Request.t -> any_request
 
   (** Create a table of workers. *)
@@ -184,7 +186,6 @@ module type T = sig
 
   (** The callback handlers specific to each worker instance. *)
   module type HANDLERS = sig
-
     (** Placeholder replaced with {!t} with the right parameters
         provided by the type of buffer chosen at {!launch}.*)
     type self
@@ -196,17 +197,14 @@ module type T = sig
       self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
 
     (** The main request processor, i.e. the body of the event loop. *)
-    val on_request :
-      self -> 'a Request.t -> 'a tzresult Lwt.t
+    val on_request : self -> 'a Request.t -> 'a tzresult Lwt.t
 
     (** Called when no request has been made before the timeout, if
         the parameter has been passed to {!launch}. *)
-    val on_no_request :
-      self -> unit tzresult Lwt.t
+    val on_no_request : self -> unit tzresult Lwt.t
 
     (** A function called when terminating a worker. *)
-    val on_close :
-      self -> unit Lwt.t
+    val on_close : self -> unit Lwt.t
 
     (** A function called at the end of the worker loop in case of an
         abnormal error. This function can handle the error by
@@ -224,66 +222,73 @@ module type T = sig
     (** A function called at the end of the worker loop in case of a
         successful treatment of the current request. *)
     val on_completion :
-      self ->
-      'a Request.t -> 'a ->
-      Worker_types.request_status ->
-      unit Lwt.t
-
+      self -> 'a Request.t -> 'a -> Worker_types.request_status -> unit Lwt.t
   end
 
   (** Creates a new worker instance.
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
-    'kind table -> ?timeout:Time.System.Span.t ->
-    Worker_types.limits -> Name.t -> Types.parameters ->
+    'kind table ->
+    ?timeout:Time.System.Span.t ->
+    Worker_types.limits ->
+    Name.t ->
+    Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t tzresult Lwt.t
 
   (** Triggers a worker termination and waits for its completion.
       Cannot be called from within the handlers.  *)
-  val shutdown :
-    _ t -> unit Lwt.t
+  val shutdown : _ t -> unit Lwt.t
 
   (** The following interface are common elements of multiple modules below.
       They are used to minimize repetition. *)
   module type BOX = sig
     (** With [BOX]es, you can put a request right at the front *)
     type t
+
     val put_request : t -> 'a Request.t -> unit
+
     val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
   end
+
   module type QUEUE = sig
     (** With [QUEUE]s, you can push requests in the queue *)
     type 'a t
+
     val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+
     val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
+
     val pending_requests_length : 'a t -> int
   end
+
   module type BOUNDED_QUEUE = sig
     (** With [BOUNDED_QUEUE]s, you can push requests in the queue tentatively *)
     type t
+
     val try_push_request_now : t -> 'a Request.t -> bool
   end
 
   module Dropbox : sig
     include BOX with type t := dropbox t
   end
+
   module Queue : sig
     include QUEUE with type 'a t := 'a queue t
+
     include BOUNDED_QUEUE with type t := bounded queue t
 
     (** Adds a message to the queue immediately. *)
-    val push_request_now :
-      infinite queue t -> 'a Request.t -> unit
+    val push_request_now : infinite queue t -> 'a Request.t -> unit
   end
-
 
   (** Detects cancelation from within the request handler to stop
       asynchronous operations. *)
   val protect :
     _ t ->
-    ?on_error: (error list -> 'b tzresult Lwt.t) ->
+    ?on_error:(error list -> 'b tzresult Lwt.t) ->
     (unit -> 'b tzresult Lwt.t) ->
     'b tzresult Lwt.t
 
@@ -315,7 +320,8 @@ module type T = sig
   (** Get the request being treated by a worker.
       Gives the time the request was pushed, and the time its
       treatment started. *)
-  val current_request : _ t -> (Time.System.t * Time.System.t * Request.view) option
+  val current_request :
+    _ t -> (Time.System.t * Time.System.t * Request.view) option
 
   val information : _ t -> Worker_types.worker_information
 
@@ -328,13 +334,16 @@ module type T = sig
   (** [find_opt table n] is [Some worker] if the [worker] is in the [table] and
       has name [n]. *)
   val find_opt : 'a table -> Name.t -> 'a t option
-
 end
 
-module Make (Name : NAME) (Event : EVENT)
-    (Request : REQUEST) (Types : TYPES)
-    (Logger: LOGGER with module Event = Event and module Request = Request)
-  : T with module Name = Name
-       and module Event = Event
-       and module Request = Request
-       and module Types = Types
+module Make
+    (Name : NAME)
+    (Event : EVENT)
+    (Request : REQUEST)
+    (Types : TYPES)
+    (Logger : LOGGER with module Event = Event and module Request = Request) :
+  T
+    with module Name = Name
+     and module Event = Event
+     and module Request = Request
+     and module Types = Types
