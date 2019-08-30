@@ -187,10 +187,8 @@ module type CACHE = sig
       The key is first looked up in memory, then on disk. If not present and
       not already requested, it schedules a request for this key using
       [Scheduler.request] with optional [peer] parameter and blocks until
-      the cache is notified with [notify] or [resolve_pending].
-
-      [param] is used to validate the value notified using [notify].
-      (see [PRECHECK] and [notify] doc). *)
+      the cache is notified with [notify]. [param] is used to validate the
+      notified value using [notify]. (see [PRECHECK] and [notify] doc). *)
   val fetch :
     t ->
     ?peer:P2p_peer.Id.t ->
@@ -203,12 +201,6 @@ module type CACHE = sig
       request. Any pending [fetch] promises are resolved with the
       error [Canceled]. *)
   val clear_or_cancel : t -> key -> unit
-
-  (** [resolve_pending t k v] resolves pending request (if any) in the
-      memory table for key k with [Found v]. It notifies the scheduler using
-      [notify_cancelation] for this key and wakes up the the waiter on this
-      request. *)
-  val resolve_pending : t -> key -> value -> unit
 
   (* [inject t k v] returns [false] if [k] is already present in the memory table
      or in the disk, or has already been request.  Otherwise it updates the

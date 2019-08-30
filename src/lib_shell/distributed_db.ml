@@ -1117,8 +1117,6 @@ struct
   let pending t k = Table.pending (Kind.proj t) k
 
   let watch t = Table.watch (Kind.proj t)
-
-  let resolve_pending t k v = Table.resolve_pending (Kind.proj t) k v
 end
 
 module Block_header = struct
