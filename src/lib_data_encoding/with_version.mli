@@ -32,4 +32,4 @@ val first_version : 'a Encoding.t -> 'a t
 
 val next_version : 'a Encoding.t -> ('b -> 'a) -> 'b t -> 'a t
 
-val encoding : name: string -> 'a t -> 'a Encoding.t
+val encoding : name:string -> 'a t -> 'a Encoding.t

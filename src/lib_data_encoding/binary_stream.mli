@@ -25,16 +25,16 @@
 
 type t
 
-type buffer = {
-  buffer : MBytes.t ;
-  ofs : int ;
-  len : int ;
-}
+type buffer = {buffer : MBytes.t; ofs : int; len : int}
 
 exception Need_more_data
 
-val is_empty: t -> bool
-val empty: t
-val of_buffer: buffer -> t
-val read: t -> int -> buffer * t
-val push: MBytes.t -> t -> t
+val is_empty : t -> bool
+
+val empty : t
+
+val of_buffer : buffer -> t
+
+val read : t -> int -> buffer * t
+
+val push : MBytes.t -> t -> t
