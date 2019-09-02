@@ -3,22 +3,6 @@
        protocol_parameters.json))
 
 (alias
- (name runtest_contracts_opcode.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files contracts/opcodes/*))
-  (locks /tcp-port/18731
-         /tcp-port/19731)
-  (action
-  (run bash %{dep:test_contracts_opcode.sh}
-            %{bin:tezos-sandboxed-node.sh}
-            %{bin:tezos-node}
-            %{bin:tezos-init-sandboxed-client.sh}
-            %{bin:tezos-client}
-            %{bin:tezos-admin-client})))
-
-(alias
  (name runtest_contracts_macros.sh)
  (deps sandbox.json
        protocol_parameters.json

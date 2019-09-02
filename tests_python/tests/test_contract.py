@@ -212,10 +212,6 @@ def all_deprecated_contract():
 class TestContracts:
     """Test type checking and execution of a bunch of contracts"""
 
-    def test_gen_keys(self, client):
-        client.gen_key('foo')
-        client.gen_key('bar')
-
     @pytest.mark.parametrize("contract", all_contracts())
     def test_typecheck(self, client, contract):
         if contract.endswith('.tz'):
@@ -320,7 +316,7 @@ class TestGasBound:
         args = ['-G', '8000', '--burn-cap', '10']
 
         def client_cmd():
-            client.originate(f'{name}', 'bootstrap1', 0,
+            client.originate(f'{name}', 0,
                              'bootstrap1', contract, args)
         expected_error = "Gas limit exceeded during typechecking or execution"
         assert utils.check_run_failure(client_cmd, expected_error)
@@ -357,7 +353,7 @@ class TestGasBound:
              " value within the provided gas bounds.")
         assert utils.check_run_failure(client_cmd, expected_error)
 
-    def test_typecheck_map_dup_key(self, client, _session):
+    def test_typecheck_map_dup_key(self, client):
 
         def client_cmd():
             client.typecheck_data('{ Elt 0 1 ; Elt 0 1}', '(map nat nat)')
@@ -366,7 +362,7 @@ class TestGasBound:
              ' keys, however a duplicate key was found')
         assert utils.check_run_failure(client_cmd, expected_error)
 
-    def test_typecheck_map_bad_ordering(self, client, _session):
+    def test_typecheck_map_bad_ordering(self, client):
 
         def client_cmd():
             client.typecheck_data('{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }',
@@ -376,7 +372,7 @@ class TestGasBound:
              " ascending order, but they were unordered in literal")
         assert utils.check_run_failure(client_cmd, expected_error)
 
-    def test_typecheck_set_bad_ordering(self, client, _session):
+    def test_typecheck_set_bad_ordering(self, client):
 
         def client_cmd():
             client.typecheck_data('{ "A" ; "C" ; "B" }', '(set string)')
@@ -385,7 +381,7 @@ class TestGasBound:
              " ascending order, but they were unordered in literal")
         assert utils.check_run_failure(client_cmd, expected_error)
 
-    def test_typecheck_set_no_duplicates(self, client, _session):
+    def test_typecheck_set_no_duplicates(self, client):
         def client_cmd():
             client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
         expected_error = \
@@ -448,7 +444,7 @@ class TestNonRegression:
         path = f'{CONTRACT_PATH}/non_regression/bug_262.tz'
         originate(client, session, path, 'Unit', 1)
 
-    def test_issue_242_assert_balance(self, client, _session):
+    def test_issue_242_assert_balance(self, client):
         assert client.get_balance('bug_262') == 1
 
 
@@ -461,46 +457,25 @@ class TestMiniScenarios:
         path = f'{CONTRACT_PATH}/mini_scenarios/replay.tz'
         originate(client, session, path, 'Unit', 0)
 
-    def test_replay_transfer_fail(self, client, _session):
+    def test_replay_transfer_fail(self, client):
         def client_cmd():
             client.transfer(0, "bootstrap1", "replay", [])
         assert utils.check_run_failure(client_cmd,
                                        "Internal operation replay attempt")
-
-    # create_account.tz related tests
-    def test_create_account_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/create_account.tz'
-        originate(client, session, path, 'None', 1000)
-
-    def test_create_account_balance(self, client, _session):
-        assert client.get_balance('create_account') == 1000
-
-    def test_create_account_perform_creation(self, client, _session):
-        tz1 = IDENTITIES['bootstrap1']['identity']
-        transfer_result = client.transfer(100, "bootstrap1", "create_account",
-                                          ['-arg',
-                                           f'(Left "{tz1}")',
-                                           '--burn-cap', '10'])
-        pattern = r"New contract (\w*) originated"
-        match = re.search(pattern, transfer_result.client_output)
-        kt_1 = match.groups()[0]
-        client.bake('bootstrap5', BAKE_ARGS)
-        assert client.get_balance(kt_1) == 100
-        assert client.get_balance('create_account') == 1000
 
     # create_contract.tz related tests
     def test_create_contract_originate(self, client, session):
         path = f'{CONTRACT_PATH}/mini_scenarios/create_contract.tz'
         originate(client, session, path, 'Unit', 1000)
 
-    def test_create_contract_balance(self, client, _session):
+    def test_create_contract_balance(self, client):
         assert client.get_balance('create_contract') == 1000
 
-    def test_create_contract_perform_creation(self, client, _session):
+    def test_create_contract_perform_creation(self, client):
         tz1 = IDENTITIES['bootstrap1']['identity']
         transfer_result = client.transfer(0, "bootstrap1", "create_contract",
                                           ['-arg',
-                                           f'(Left "{tz1}")',
+                                           'None',
                                            '--burn-cap',
                                            '10'])
         client.bake('bootstrap5', BAKE_ARGS)
@@ -516,7 +491,7 @@ class TestMiniScenarios:
         path = f'{CONTRACT_PATH}/mini_scenarios/default_account.tz'
         originate(client, session, path, 'Unit', 1000)
 
-    def test_default_account_transfer_then_bake(self, client, _session):
+    def test_default_account_transfer_then_bake(self, client):
         tz1 = IDENTITIES['bootstrap4']['identity']
         client.transfer(0, "bootstrap1", "default_account",
                         ['-arg', f'"{tz1}"', '--burn-cap', '10'])
@@ -536,7 +511,7 @@ class TestMiniScenarios:
         storage = f'(Pair {byt} "{sign}")'
         originate(client, session, path, storage, 1000)
 
-    def test_wrong_preimage(self, client, _session):
+    def test_wrong_preimage(self, client):
         byt = ('0x050100000027566f756c657a2d766f75732' +
                '0636f75636865722061766563206d6f692c20636520736f6972')
         sign = ('p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJ' +
@@ -550,7 +525,7 @@ class TestMiniScenarios:
         assert utils.check_run_failure(client_cmd,
                                        "At line 8 characters 9 to 21")
 
-    def test_wrong_signature(self, client, _session):
+    def test_wrong_signature(self, client):
         byt = ('0x050100000027566f756c657a2d766f757320636' +
                'f75636865722061766563206d6f692c20636520736f6972203f')
         sign = ('p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6' +
@@ -564,7 +539,7 @@ class TestMiniScenarios:
         assert utils.check_run_failure(client_cmd,
                                        "At line 15 characters 9 to 15")
 
-    def test_good_preimage_and_signature(self, client, _session):
+    def test_good_preimage_and_signature(self, client):
         byt = ('0x050100000027566f756c657a2d766f757320636f7563' +
                '6865722061766563206d6f692c20636520736f6972203f')
         sign = ('p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1F' +
@@ -583,7 +558,7 @@ class TestMiniScenarios:
         originate(client, session, path, storage, 1000)
         assert client.get_delegate('vote_for_delegate').delegate is None
 
-    def test_vote_for_delegate_wrong_identity1(self, client, _session):
+    def test_vote_for_delegate_wrong_identity1(self, client):
         def client_cmd():
             client.transfer(0, "bootstrap1", "vote_for_delegate",
                             ['-arg', 'None', '--burn-cap', '10'])
@@ -591,7 +566,7 @@ class TestMiniScenarios:
         assert utils.check_run_failure(client_cmd,
                                        "At line 15 characters 57 to 61")
 
-    def test_vote_for_delegate_wrong_identity2(self, client, _session):
+    def test_vote_for_delegate_wrong_identity2(self, client):
         def client_cmd():
             client.transfer(0, "bootstrap2", "vote_for_delegate",
                             ['-arg', 'None', '--burn-cap', '10'])
@@ -599,7 +574,7 @@ class TestMiniScenarios:
         assert utils.check_run_failure(client_cmd,
                                        "At line 15 characters 57 to 61")
 
-    def test_vote_for_delegate_b3_vote_for_b5(self, client, _session):
+    def test_vote_for_delegate_b3_vote_for_b5(self, client):
         b_5 = IDENTITIES['bootstrap5']['identity']
         client.transfer(0, "bootstrap3", "vote_for_delegate",
                         ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'])
@@ -607,10 +582,10 @@ class TestMiniScenarios:
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
 
-    def test_vote_for_delegate_still_no_delegate1(self, client, _session):
+    def test_vote_for_delegate_still_no_delegate1(self, client):
         assert client.get_delegate('vote_for_delegate').delegate is None
 
-    def test_vote_for_delegate_b4_vote_for_b2(self, client, _session):
+    def test_vote_for_delegate_b4_vote_for_b2(self, client):
         b_2 = IDENTITIES['bootstrap2']['identity']
         client.transfer(0, "bootstrap4", "vote_for_delegate",
                         ['-arg', f'(Some "{b_2}")', '--burn-cap', '10'])
@@ -618,10 +593,10 @@ class TestMiniScenarios:
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_2, storage)
 
-    def test_vote_for_delegate_still_no_delegate2(self, client, _session):
+    def test_vote_for_delegate_still_no_delegate2(self, client):
         assert client.get_delegate('vote_for_delegate').delegate is None
 
-    def test_vote_for_delegate_b4_vote_for_b5(self, client, _session):
+    def test_vote_for_delegate_b4_vote_for_b5(self, client):
         b_5 = IDENTITIES['bootstrap5']['identity']
         client.transfer(0, "bootstrap4", "vote_for_delegate",
                         ['-arg', f'(Some "{b_5}")', '--burn-cap', '10'])
@@ -629,7 +604,7 @@ class TestMiniScenarios:
         storage = client.get_storage('vote_for_delegate')
         assert re.search(b_5, storage)
 
-    def test_vote_for_delegate_has_delegate(self, client, _session):
+    def test_vote_for_delegate_has_delegate(self, client):
         b_5 = IDENTITIES['bootstrap5']['identity']
         result = client.get_delegate('vote_for_delegate')
         assert result.delegate == b_5
