@@ -135,8 +135,9 @@ class HashResult:
     def __init__(self, client_output: str):
 
         pattern = r'''Raw packed data: ?(0x[0-9a-f]*)
-Hash: ?(\w*)
-Raw Blake2b hash: ?(\w*)
+Script-expression-ID-Hash: ?(\w*)
+Raw Script-expression-ID-Hash: ?(\w*)
+.*
 Raw Sha256 hash: ?(\w*)
 Raw Sha512 hash: ?(\w*)'''
         match = re.search(pattern, client_output)
