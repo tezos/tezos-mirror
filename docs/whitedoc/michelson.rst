@@ -1964,7 +1964,7 @@ type must be unnamed.
 For instance, the following Michelson program which put its integer
 parameter in the storage is not well typed:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage (int :s) ;
@@ -1972,7 +1972,7 @@ parameter in the storage is not well typed:
 
 Whereas this one is:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage int ;
@@ -2483,7 +2483,7 @@ Empty contract
 The simplest contract is the contract for which the ``parameter`` and
 ``storage`` are all of type ``unit``. This contract is as follows:
 
-::
+.. code-block:: michelson
 
     code { CDR ;           # keep the storage
            NIL operation ; # return no internal operation
@@ -2514,7 +2514,7 @@ been verified
 using the Coq proof assistant.
 
 
-::
+.. code-block:: michelson
 
    parameter (pair
                 (pair :payload

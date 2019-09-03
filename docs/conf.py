@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.abspath('.') + '/_extensions')
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.extlinks', 'tezos_custom_roles']
+extensions = ['sphinx.ext.extlinks', 'tezos_custom_roles', 'michelsonlexer']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -81,9 +81,6 @@ pygments_style = 'sphinx'
 # - http://www.sphinx-doc.org/en/stable/markup/code.html#code-examples
 # - http://www.sphinx-doc.org/en/stable/config.html#confval-highlight_language
 highlight_language = 'none'
-# TODO write a Pygments lexer for Michelson
-# cf. http://pygments.org/docs/lexerdevelopment/ and http://pygments.org/docs/lexers/
-
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
