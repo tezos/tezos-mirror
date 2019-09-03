@@ -23,5 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Pervasives.exit (Lwt_main.run @@ Validator.main ())
+let () = Pervasives.exit (Lwt_main.run @@ Validator.main ())
