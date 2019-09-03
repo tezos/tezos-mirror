@@ -35,352 +35,6 @@ type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 type connection =
   (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.connection
 
-type 'a request_param = {
-  p2p : (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.t;
-  data : 'a;
-  active : unit -> P2p_peer.Set.t;
-  send : P2p_peer.Id.t -> Message.t -> unit;
-}
-
-module Make_raw (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  module Logging : sig
-    val tag : t Tag.def
-  end
-end)
-(Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-(Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
-(Request_message : sig
-  type param
-
-  val max_length : int
-
-  val initial_delay : Time.System.Span.t
-
-  val forge : param -> Hash.t list -> Message.t
-end)
-(Precheck : Requester.PRECHECK
-              with type key := Hash.t
-               and type value := Disk_table.value) =
-struct
-  module Request = struct
-    type param = Request_message.param request_param
-
-    let active {active; _} = active ()
-
-    let initial_delay = Request_message.initial_delay
-
-    let rec send state gid keys =
-      let (first_keys, keys) = List.split_n Request_message.max_length keys in
-      let msg = Request_message.forge state.data first_keys in
-      state.send gid msg ;
-      let open Peer_metadata in
-      let (req : requests_kind) =
-        match msg with
-        | Get_current_branch _ ->
-            Branch
-        | Get_current_head _ ->
-            Head
-        | Get_block_headers _ ->
-            Block_header
-        | Get_operations _ ->
-            Operations
-        | Get_protocols _ ->
-            Protocols
-        | Get_operation_hashes_for_blocks _ ->
-            Operation_hashes_for_block
-        | Get_operations_for_blocks _ ->
-            Operations_for_block
-        | _ ->
-            Other
-      in
-      let meta = P2p.get_peer_metadata state.p2p gid in
-      Peer_metadata.incr meta @@ Scheduled_request req ;
-      if keys <> [] then send state gid keys
-  end
-
-  module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Precheck)
-
-  type t = Table.t
-
-  let state_of_t t =
-    let table_length = Table.memory_table_length t in
-    let scheduler_length = Table.pending_requests t in
-    {
-      Chain_validator_worker_state.Distributed_db_state.table_length;
-      scheduler_length;
-    }
-
-  let create ?global_input request_param disk =
-    Table.create ?global_input request_param disk
-
-  let shutdown t =
-    Logging.lwt_log_notice "Shutting down the requester..."
-    >>= fun () -> Table.shutdown t
-end
-
-module Fake_operation_storage = struct
-  type store = State.Chain.t
-
-  type value = Operation.t
-
-  let known _ _ = Lwt.return_false
-
-  let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
-
-  let read_opt _ _ = Lwt.return_none
-end
-
-module Raw_operation =
-  Make_raw (Operation_hash) (Fake_operation_storage) (Operation_hash.Table)
-    (struct
-      type param = unit
-
-      let max_length = 10
-
-      let initial_delay = Time.System.Span.of_seconds_exn 0.5
-
-      let forge () keys = Message.Get_operations keys
-    end)
-    (struct
-      type param = unit
-
-      type notified_value = Operation.t
-
-      let precheck _ _ v = Some v
-    end)
-
-module Block_header_storage = struct
-  type store = State.Chain.t
-
-  type value = Block_header.t
-
-  let known = State.Block.known_valid
-
-  let read chain_state h =
-    State.Block.read chain_state h >>=? fun b -> return (State.Block.header b)
-
-  let read_opt chain_state h =
-    State.Block.read_opt chain_state h
-    >>= fun b -> Lwt.return (Option.map ~f:State.Block.header b)
-end
-
-module Raw_block_header =
-  Make_raw (Block_hash) (Block_header_storage) (Block_hash.Table)
-    (struct
-      type param = unit
-
-      let max_length = 10
-
-      let initial_delay = Time.System.Span.of_seconds_exn 0.5
-
-      let forge () keys = Message.Get_block_headers keys
-    end)
-    (struct
-      type param = unit
-
-      type notified_value = Block_header.t
-
-      let precheck _ _ v = Some v
-    end)
-
-module Operation_hashes_storage = struct
-  type store = State.Chain.t
-
-  type value = Operation_hash.t list
-
-  let known chain_state (h, _) = State.Block.known_valid chain_state h
-
-  let read chain_state (h, i) =
-    State.Block.read chain_state h
-    >>=? fun b ->
-    State.Block.operation_hashes b i >>= fun (ops, _) -> return ops
-
-  let read_opt chain_state (h, i) =
-    State.Block.read_opt chain_state h
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some b ->
-        State.Block.operation_hashes b i
-        >>= fun (ops, _) -> Lwt.return_some ops
-end
-
-module Operations_table = Hashtbl.Make (struct
-  type t = Block_hash.t * int
-
-  let hash = Hashtbl.hash
-
-  let equal (b1, i1) (b2, i2) = Block_hash.equal b1 b2 && i1 = i2
-end)
-
-module Raw_operation_hashes = struct
-  include Make_raw
-            (struct
-              type t = Block_hash.t * int
-
-              let name = "operation_hashes"
-
-              let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
-
-              let encoding =
-                let open Data_encoding in
-                obj2 (req "block" Block_hash.encoding) (req "index" uint16)
-
-              module Logging = struct
-                let tag = Tag.def ~doc:"Operation hashes" "operation_hashes" pp
-              end
-            end)
-            (Operation_hashes_storage)
-            (Operations_table)
-            (struct
-              type param = unit
-
-              let max_length = 10
-
-              let initial_delay = Time.System.Span.of_seconds_exn 1.
-
-              let forge () keys = Message.Get_operation_hashes_for_blocks keys
-            end)
-            (struct
-              type param = Operation_list_list_hash.t
-
-              type notified_value =
-                Operation_hash.t list * Operation_list_list_hash.path
-
-              let precheck (_block, expected_ofs) expected_hash (ops, path) =
-                let (received_hash, received_ofs) =
-                  Operation_list_list_hash.check_path
-                    path
-                    (Operation_list_hash.compute ops)
-                in
-                if
-                  received_ofs = expected_ofs
-                  && Operation_list_list_hash.compare
-                       expected_hash
-                       received_hash
-                     = 0
-                then Some ops
-                else None
-            end)
-
-  let clear_all table hash n =
-    List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n - 1))
-end
-
-module Operations_storage = struct
-  type store = State.Chain.t
-
-  type value = Operation.t list
-
-  let known chain_state (h, _) = State.Block.known_valid chain_state h
-
-  let read chain_state (h, i) =
-    State.Block.read chain_state h
-    >>=? fun b -> State.Block.operations b i >>= fun (ops, _) -> return ops
-
-  let read_opt chain_state (h, i) =
-    State.Block.read_opt chain_state h
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some b ->
-        State.Block.operations b i >>= fun (ops, _) -> Lwt.return_some ops
-end
-
-module Raw_operations = struct
-  include Make_raw
-            (struct
-              type t = Block_hash.t * int
-
-              let name = "operations"
-
-              let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
-
-              let encoding =
-                let open Data_encoding in
-                obj2 (req "block" Block_hash.encoding) (req "index" uint16)
-
-              module Logging = struct
-                let tag = Tag.def ~doc:"Operations" "operations" pp
-              end
-            end)
-            (Operations_storage)
-            (Operations_table)
-            (struct
-              type param = unit
-
-              let max_length = 10
-
-              let initial_delay = Time.System.Span.of_seconds_exn 1.
-
-              let forge () keys = Message.Get_operations_for_blocks keys
-            end)
-            (struct
-              type param = Operation_list_list_hash.t
-
-              type notified_value =
-                Operation.t list * Operation_list_list_hash.path
-
-              let precheck (_block, expected_ofs) expected_hash (ops, path) =
-                let (received_hash, received_ofs) =
-                  Operation_list_list_hash.check_path
-                    path
-                    (Operation_list_hash.compute (List.map Operation.hash ops))
-                in
-                if
-                  received_ofs = expected_ofs
-                  && Operation_list_list_hash.compare
-                       expected_hash
-                       received_hash
-                     = 0
-                then Some ops
-                else None
-            end)
-
-  let clear_all table hash n =
-    List.iter (fun i -> Table.clear_or_cancel table (hash, i)) (0 -- (n - 1))
-end
-
-module Protocol_storage = struct
-  type store = State.t
-
-  type value = Protocol.t
-
-  let known = State.Protocol.known
-
-  let read = State.Protocol.read
-
-  let read_opt = State.Protocol.read_opt
-end
-
-module Raw_protocol =
-  Make_raw (Protocol_hash) (Protocol_storage) (Protocol_hash.Table)
-    (struct
-      type param = unit
-
-      let initial_delay = Time.System.Span.of_seconds_exn 10.
-
-      let max_length = 10
-
-      let forge () keys = Message.Get_protocols keys
-    end)
-    (struct
-      type param = unit
-
-      type notified_value = Protocol.t
-
-      let precheck _ _ v = Some v
-    end)
-
 type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
   notify_head : P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit;
@@ -392,7 +46,7 @@ type db = {
   p2p_readers : p2p_reader P2p_peer.Table.t;
   disk : State.t;
   active_chains : chain_db Chain_id.Table.t;
-  protocol_db : Raw_protocol.t;
+  protocol_db : Distributed_db_requester.Raw_protocol.t;
   block_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
   operation_input : (Operation_hash.t * Operation.t) Lwt_watcher.input;
 }
@@ -400,10 +54,10 @@ type db = {
 and chain_db = {
   chain_state : State.Chain.t;
   global_db : db;
-  operation_db : Raw_operation.t;
-  block_header_db : Raw_block_header.t;
-  operation_hashes_db : Raw_operation_hashes.t;
-  operations_db : Raw_operations.t;
+  operation_db : Distributed_db_requester.Raw_operation.t;
+  block_header_db : Distributed_db_requester.Raw_block_header.t;
+  operation_hashes_db : Distributed_db_requester.Raw_operation_hashes.t;
+  operations_db : Distributed_db_requester.Raw_operations.t;
   mutable callback : callback;
   active_peers : P2p_peer.Set.t ref;
   active_connections : p2p_reader P2p_peer.Table.t;
@@ -446,10 +100,15 @@ let information
     Chain_validator_worker_state.Distributed_db_state.p2p_readers_length =
       P2p_peer.Table.length p2p_readers;
     active_chains_length = Chain_id.Table.length active_chains;
-    operation_db = Raw_operation.state_of_t operation_db;
-    operations_db = Raw_operations.state_of_t operations_db;
-    block_header_db = Raw_block_header.state_of_t block_header_db;
-    operations_hashed_db = Raw_operation_hashes.state_of_t operation_hashes_db;
+    operation_db =
+      Distributed_db_requester.Raw_operation.state_of_t operation_db;
+    operations_db =
+      Distributed_db_requester.Raw_operations.state_of_t operations_db;
+    block_header_db =
+      Distributed_db_requester.Raw_block_header.state_of_t block_header_db;
+    operations_hashed_db =
+      Distributed_db_requester.Raw_operation_hashes.state_of_t
+        operation_hashes_db;
     active_connections_length = P2p_peer.Table.length active_connections;
     active_peers_length = P2p_peer.Set.cardinal !active_peers;
   }
@@ -472,7 +131,10 @@ let find_pending_block_header {peer_active_chains; _} h =
       match acc with
       | Some _ ->
           acc
-      | None when Raw_block_header.Table.pending chain_db.block_header_db h ->
+      | None
+        when Distributed_db_requester.Raw_block_header.pending
+               chain_db.block_header_db
+               h ->
           Some chain_db
       | None ->
           None)
@@ -485,7 +147,10 @@ let find_pending_operations {peer_active_chains; _} h i =
       match acc with
       | Some _ ->
           acc
-      | None when Raw_operations.Table.pending chain_db.operations_db (h, i) ->
+      | None
+        when Distributed_db_requester.Raw_operations.pending
+               chain_db.operations_db
+               (h, i) ->
           Some chain_db
       | None ->
           None)
@@ -499,7 +164,7 @@ let find_pending_operation_hashes {peer_active_chains; _} h i =
       | Some _ ->
           acc
       | None
-        when Raw_operation_hashes.Table.pending
+        when Distributed_db_requester.Raw_operation_hashes.pending
                chain_db.operation_hashes_db
                (h, i) ->
           Some chain_db
@@ -514,7 +179,10 @@ let find_pending_operation {peer_active_chains; _} h =
       match acc with
       | Some _ ->
           acc
-      | None when Raw_operation.Table.pending chain_db.operation_db h ->
+      | None
+        when Distributed_db_requester.Raw_operation.pending
+               chain_db.operation_db
+               h ->
           Some chain_db
       | None ->
           None)
@@ -529,7 +197,9 @@ let read_operation {active_chains; _} h =
       | Some _ ->
           acc
       | None -> (
-          Raw_operation.Table.read_opt chain_db.operation_db h
+          Distributed_db_requester.Raw_operation.read_opt
+            chain_db.operation_db
+            h
           >>= function
           | None -> Lwt.return_none | Some bh -> Lwt.return_some (chain_id, bh)
           ))
@@ -733,7 +403,7 @@ module P2p_reader = struct
             Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
-            Raw_block_header.Table.notify
+            Distributed_db_requester.Raw_block_header.notify
               chain_db.block_header_db
               state.gid
               hash
@@ -763,7 +433,7 @@ module P2p_reader = struct
             Peer_metadata.incr meta Unexpected_response ;
             Lwt.return_unit
         | Some chain_db ->
-            Raw_operation.Table.notify
+            Distributed_db_requester.Raw_operation.notify
               chain_db.operation_db
               state.gid
               hash
@@ -788,7 +458,11 @@ module P2p_reader = struct
           hashes
     | Protocol protocol ->
         let hash = Protocol.hash protocol in
-        Raw_protocol.Table.notify global_db.protocol_db state.gid hash protocol
+        Distributed_db_requester.Raw_protocol.notify
+          global_db.protocol_db
+          state.gid
+          hash
+          protocol
         >>= fun () ->
         Peer_metadata.incr meta @@ Received_response Protocols ;
         Lwt.return_unit
@@ -814,7 +488,7 @@ module P2p_reader = struct
           Peer_metadata.incr meta Unexpected_response ;
           Lwt.return_unit
       | Some chain_db ->
-          Raw_operation_hashes.Table.notify
+          Distributed_db_requester.Raw_operation_hashes.notify
             chain_db.operation_hashes_db
             state.gid
             (block, ofs)
@@ -845,7 +519,7 @@ module P2p_reader = struct
           Peer_metadata.incr meta Unexpected_response ;
           Lwt.return_unit
       | Some chain_db ->
-          Raw_operations.Table.notify
+          Distributed_db_requester.Raw_operations.notify
             chain_db.operations_db
             state.gid
             (block, ofs)
@@ -914,9 +588,12 @@ let raw_try_send p2p peer_id msg =
 
 let create disk p2p =
   let global_request =
-    {p2p; data = (); active = active_peer_ids p2p; send = raw_try_send p2p}
+    Distributed_db_requester.
+      {p2p; data = (); active = active_peer_ids p2p; send = raw_try_send p2p}
   in
-  let protocol_db = Raw_protocol.create global_request disk in
+  let protocol_db =
+    Distributed_db_requester.Raw_protocol.create global_request disk
+  in
   let active_chains = Chain_id.Table.create 17 in
   let p2p_readers = P2p_peer.Table.create 17 in
   let block_input = Lwt_watcher.create_input () in
@@ -943,29 +620,34 @@ let activate ({p2p; active_chains; _} as global_db) chain_state =
   | None ->
       let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
-        {
-          p2p;
-          data = ();
-          active = (fun () -> !active_peers);
-          send = raw_try_send p2p;
-        }
+        Distributed_db_requester.
+          {
+            p2p;
+            data = ();
+            active = (fun () -> !active_peers);
+            send = raw_try_send p2p;
+          }
       in
       let operation_db =
-        Raw_operation.create
+        Distributed_db_requester.Raw_operation.create
           ~global_input:global_db.operation_input
           p2p_request
           chain_state
       in
       let block_header_db =
-        Raw_block_header.create
+        Distributed_db_requester.Raw_block_header.create
           ~global_input:global_db.block_input
           p2p_request
           chain_state
       in
       let operation_hashes_db =
-        Raw_operation_hashes.create p2p_request chain_state
+        Distributed_db_requester.Raw_operation_hashes.create
+          p2p_request
+          chain_state
       in
-      let operations_db = Raw_operations.create p2p_request chain_state in
+      let operations_db =
+        Distributed_db_requester.Raw_operations.create p2p_request chain_state
+      in
       let chain =
         {
           global_db;
@@ -997,8 +679,9 @@ let deactivate chain_db =
       P2p_reader.deactivate reader chain_db ;
       Lwt.async (fun () -> P2p.send p2p reader.conn (Deactivate chain_id)))
     chain_db.active_connections ;
-  Raw_operation.shutdown chain_db.operation_db
-  >>= fun () -> Raw_block_header.shutdown chain_db.block_header_db
+  Distributed_db_requester.Raw_operation.shutdown chain_db.operation_db
+  >>= fun () ->
+  Distributed_db_requester.Raw_block_header.shutdown chain_db.block_header_db
 
 let get_chain {active_chains; _} chain_id =
   Chain_id.Table.find_opt active_chains chain_id
@@ -1021,16 +704,26 @@ let shutdown {p2p_readers; active_chains; _} =
   >>= fun () ->
   Chain_id.Table.fold
     (fun _ chain_db acc ->
-      Raw_operation.shutdown chain_db.operation_db
+      Distributed_db_requester.Raw_operation.shutdown chain_db.operation_db
       >>= fun () ->
-      Raw_block_header.shutdown chain_db.block_header_db >>= fun () -> acc)
+      Distributed_db_requester.Raw_block_header.shutdown
+        chain_db.block_header_db
+      >>= fun () -> acc)
     active_chains
     Lwt.return_unit
 
 let clear_block chain_db hash n =
-  Raw_operations.clear_all chain_db.operations_db hash n ;
-  Raw_operation_hashes.clear_all chain_db.operation_hashes_db hash n ;
-  Raw_block_header.Table.clear_or_cancel chain_db.block_header_db hash
+  Distributed_db_requester.Raw_operations.clear_all
+    chain_db.operations_db
+    hash
+    n ;
+  Distributed_db_requester.Raw_operation_hashes.clear_all
+    chain_db.operation_hashes_db
+    hash
+    n ;
+  Distributed_db_requester.Raw_block_header.clear_or_cancel
+    chain_db.block_header_db
+    hash
 
 let commit_block chain_db hash header header_data operations operations_data
     result ~forking_testchain =
@@ -1057,12 +750,12 @@ let commit_invalid_block chain_db hash header errors =
 
 let inject_operation chain_db h op =
   assert (Operation_hash.equal h (Operation.hash op)) ;
-  Raw_operation.Table.inject chain_db.operation_db h op
+  Distributed_db_requester.Raw_operation.inject chain_db.operation_db h op
 
 let commit_protocol db h p =
   State.Protocol.store db.disk p
   >>= fun res ->
-  Raw_protocol.Table.clear_or_cancel db.protocol_db h ;
+  Distributed_db_requester.Raw_protocol.clear_or_cancel db.protocol_db h ;
   return (res <> None)
 
 let watch_block_header {block_input; _} = Lwt_watcher.create_stream block_input
@@ -1103,7 +796,7 @@ module Block_header = struct
 
   include (
     Make
-      (Raw_block_header.Table)
+      (Distributed_db_requester.Raw_block_header)
       (struct
         type t = chain_db
 
@@ -1118,7 +811,7 @@ end
 
 module Operation_hashes =
   Make
-    (Raw_operation_hashes.Table)
+    (Distributed_db_requester.Raw_operation_hashes)
     (struct
       type t = chain_db
 
@@ -1127,7 +820,7 @@ module Operation_hashes =
 
 module Operations =
   Make
-    (Raw_operations.Table)
+    (Distributed_db_requester.Raw_operations)
     (struct
       type t = chain_db
 
@@ -1139,7 +832,7 @@ module Operation = struct
 
   include (
     Make
-      (Raw_operation.Table)
+      (Distributed_db_requester.Raw_operation)
       (struct
         type t = chain_db
 
@@ -1157,7 +850,7 @@ module Protocol = struct
 
   include (
     Make
-      (Raw_protocol.Table)
+      (Distributed_db_requester.Raw_protocol)
       (struct
         type t = db
 
