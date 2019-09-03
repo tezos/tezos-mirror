@@ -822,20 +822,31 @@ let reconstruct chain_id store chain_state context_index =
   let low_limit = 1l in
   lwt_emit Reconstruct_start_default
   >>= fun () ->
-  Store.Chain_data.Current_head.read chain_data_store
-  >>=? fun current_head_hash ->
-  State.Block.Header.read (block_store, current_head_hash)
-  >>=? fun ending_block_header ->
-  lwt_emit (Reconstruct_end_default current_head_hash)
+  Store.Chain_data.Save_point.read chain_data_store
+  >>=? fun (_, savepoint_hash) ->
+  lwt_emit (Reconstruct_end_default savepoint_hash)
   >>= fun () ->
-  let high_limit = ending_block_header.Block_header.shell.predecessor in
+  State.Block.Header.read (block_store, savepoint_hash)
+  >>=? fun savepoint_header ->
+  let high_limit = savepoint_header.Block_header.shell.predecessor in
   lwt_emit Reconstruct_enum
   >>= fun () ->
   let rec gather_history low_limit block_hash acc =
-    Store.Block.Pruned_contents.read (block_store, block_hash)
-    >>=? fun {header; _} ->
-    if header.shell.level = low_limit then return (block_hash :: acc)
-    else gather_history low_limit header.shell.predecessor (block_hash :: acc)
+    Store.Block.Pruned_contents.read_opt (block_store, block_hash)
+    >>= function
+    | Some {header; _} ->
+        if header.shell.level = low_limit then return (block_hash :: acc)
+        else
+          gather_history low_limit header.shell.predecessor (block_hash :: acc)
+    | None ->
+        Store.Block.Contents.known (block_store, block_hash)
+        >>= fun is_contents_known ->
+        if is_contents_known then return acc
+        else
+          failwith
+            "Unexpected missing block in store: %a"
+            Block_hash.pp
+            block_hash
   in
   gather_history low_limit high_limit []
   >>=? fun hash_history ->
