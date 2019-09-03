@@ -28,6 +28,9 @@
 (** The JSON-file-friendly definition of the configuration of the
     internal-events framework. It allows one to activate registered
     event sinks.  *)
+
+open Error_monad
+
 module Configuration : sig
   type t
 

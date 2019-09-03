@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 module Configuration = struct
   type t = {activate : Uri.t list}
 
@@ -64,10 +66,10 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
       return_unit
   | Some s ->
       let uris =
-        String.split ' ' s
-        |> List.map (String.split '\n')
+        TzString.split ' ' s
+        |> List.map (TzString.split '\n')
         |> List.concat
-        |> List.map (String.split '\t')
+        |> List.map (TzString.split '\t')
         |> List.concat
         |> List.filter (( <> ) "")
         |> List.map Uri.of_string

@@ -117,7 +117,7 @@ let read_proto destination =
       Filename.concat current_dir (Filename.dirname destination)
     else Filename.dirname destination
   in
-  match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
+  match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
   | Ok (None, proto) ->
       (Protocol.hash proto, proto)
   | Ok (Some hash, proto) ->

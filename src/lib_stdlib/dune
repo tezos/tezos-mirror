@@ -7,9 +7,8 @@
             hex
             re
             zarith
-            lwt
-            )
- (flags (:standard -safe-string)))
+            lwt)
+ (flags (:standard)))
 
 (alias
  (name runtest_lint)

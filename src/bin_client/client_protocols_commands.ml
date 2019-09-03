@@ -65,7 +65,7 @@ let commands () =
       (fun () dirname (cctxt : #Client_context.full) ->
         Lwt.catch
           (fun () ->
-            Lwt_utils_unix.Protocol.read_dir dirname
+            Tezos_base_unix.Protocol_files.read_dir dirname
             >>=? fun (_hash, proto) ->
             Shell_services.Injection.protocol cctxt proto
             >>= function
@@ -99,7 +99,7 @@ let commands () =
       (fun () ph (cctxt : #Client_context.full) ->
         Shell_services.Protocol.contents cctxt ph
         >>=? fun proto ->
-        Lwt_utils_unix.Protocol.write_dir
+        Tezos_base_unix.Protocol_files.write_dir
           (Protocol_hash.to_short_b58check ph)
           ~hash:ph
           proto

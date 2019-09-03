@@ -2,6 +2,7 @@
  (names main_client main_admin)
  (public_names tezos-client tezos-admin-client)
  (libraries tezos-base
+            tezos-base.unix
             tezos-rpc-http-client
             tezos-shell-services
             tezos-stdlib-unix

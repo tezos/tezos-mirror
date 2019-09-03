@@ -32,7 +32,7 @@ let srcdir =
   else srcdir
 
 let (hash, sources) =
-  match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir srcdir) with
+  match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir srcdir) with
   | Ok (None, proto) ->
       (Protocol.hash proto, proto)
   | Ok (Some hash, proto) ->

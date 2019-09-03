@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 module Micro_seconds : sig
   (** Module with time-stamps with “at least micro-seconds” precision. *)
   type t = private float
@@ -212,7 +214,7 @@ module Section_dir = struct
     | "no-section" ->
         Ok None
     | other -> (
-      match String.remove_prefix ~prefix:"section-" other with
+      match TzString.remove_prefix ~prefix:"section-" other with
       | None ->
           Error "wrong-dir-name"
       | Some s ->

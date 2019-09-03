@@ -22,4 +22,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 val memory_stats : unit -> (Memory.mem_stats, error) result Lwt.t

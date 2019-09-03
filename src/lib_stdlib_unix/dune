@@ -1,8 +1,16 @@
 (library
  (name tezos_stdlib_unix)
  (public_name tezos-stdlib-unix)
- (flags (:standard -open Tezos_base__TzPervasives))
- (libraries tezos-base
+ (flags (:standard -open Tezos_error_monad
+                   -open Tezos_event_logging
+                   -open Tezos_rpc
+                   -open Tezos_stdlib
+                   -open Tezos_data_encoding))
+ (libraries tezos-data-encoding
+            tezos-error-monad
+            tezos-event-logging
+            tezos-rpc
+            tezos-stdlib
             lwt.unix
             ipaddr.unix
             ptime
