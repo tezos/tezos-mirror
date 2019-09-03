@@ -43,7 +43,7 @@ module Term = struct
     Lwt_utils_unix.remove_dir @@ store_dir data_dir
     >>= fun () -> Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-  let process subcommand args snapshot_file block export_rolling =
+  let process subcommand args snapshot_file block export_rolling reconstruct =
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
@@ -76,6 +76,7 @@ module Term = struct
             (Node_data_version.lock_file data_dir)
           >>=? fun () ->
           Snapshots.import
+            ~reconstruct
             ~data_dir
             ~dir_cleaner
             ~genesis
@@ -130,11 +131,21 @@ module Term = struct
       value & flag
       & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
 
+  let reconstruct =
+    let open Cmdliner in
+    let doc =
+      "Start a storage reconstruction from a full mode snapshot to an archive \
+       storage. This operation can be quite long."
+    in
+    Arg.(
+      value & flag
+      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
+
   let term =
     let open Cmdliner.Term in
     ret
       ( const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
-      $ blocks $ export_rolling )
+      $ blocks $ export_rolling $ reconstruct )
 end
 
 module Manpage = struct
@@ -158,7 +169,11 @@ module Manpage = struct
           "$(mname) snapshot export latest.rolling --rolling" );
       `I
         ( "$(b,Import a snapshot located in file.full)",
-          "$(mname) snapshot import file.full" ) ]
+          "$(mname) snapshot import file.full" );
+      `I
+        ( "$(b,Import a full mode snapshot and then reconstruct the whole \
+           storage to obtain an archive mode storage)",
+          "$(mname) snapshot import file.full --reconstruct" ) ]
 
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 
