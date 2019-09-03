@@ -57,7 +57,8 @@ let description =
     `P Node_run_command.Manpage.command_description;
     `P Node_config_command.Manpage.command_description;
     `P Node_upgrade_command.Manpage.command_description;
-    `P Node_snapshot_command.Manpage.command_description ]
+    `P Node_snapshot_command.Manpage.command_description;
+    `P Node_reconstruct_command.Manpage.command_description ]
 
 let man = description @ Node_run_command.Manpage.examples
 
@@ -73,7 +74,8 @@ let commands =
     Node_config_command.cmd;
     Node_identity_command.cmd;
     Node_upgrade_command.cmd;
-    Node_snapshot_command.cmd ]
+    Node_snapshot_command.cmd;
+    Node_reconstruct_command.cmd ]
 
 let () =
   Random.self_init () ;
