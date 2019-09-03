@@ -392,7 +392,9 @@ be seen equivalently as an object with a single method, and a single attribute.
 The method updates the state (the storage), and submits operations as a side
 effect.
 
-For the sake of this example, here is the `id.tz` contract::
+For the sake of this example, here is the `id.tz` contract:
+
+.. code-block:: michelson
 
     parameter string;
     storage string;
