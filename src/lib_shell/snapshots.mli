@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Cannot_reconstruct of History_mode.t
+
 val export :
   ?export_rolling:bool ->
   context_index:Context.index ->
@@ -34,10 +36,18 @@ val export :
   unit tzresult Lwt.t
 
 val import :
+  ?reconstruct:bool ->
   data_dir:string ->
   dir_cleaner:(string -> unit Lwt.t) ->
   patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
   genesis:State.Chain.genesis ->
   string ->
   string option ->
+  unit tzresult Lwt.t
+
+val reconstruct :
+  Chain_id.t ->
+  Store.t ->
+  State.Chain.t ->
+  Context.index ->
   unit tzresult Lwt.t
