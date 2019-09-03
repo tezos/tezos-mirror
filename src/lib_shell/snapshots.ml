@@ -34,6 +34,10 @@ type status =
   | Import_loading
   | Set_head of Block_hash.t
   | Import_success of string
+  | Reconstruct_start_default
+  | Reconstruct_end_default of Block_hash.t
+  | Reconstruct_enum
+  | Reconstruct_success
 
 let status_pp ppf = function
   | Export_unspecified_hash h ->
@@ -63,7 +67,7 @@ let status_pp ppf = function
       Format.fprintf
         ppf
         "You may consider using the --block <block_hash> argument to verify \
-         that the block imported is the one you expect"
+         that the block imported is the one you expected"
   | Import_loading ->
       Format.fprintf
         ppf
@@ -73,6 +77,18 @@ let status_pp ppf = function
       Format.fprintf ppf "Setting current head to block %a" Block_hash.pp h
   | Import_success filename ->
       Format.fprintf ppf "@[Successful import from file %s@]" filename
+  | Reconstruct_start_default ->
+      Format.fprintf ppf "Starting reconstruct from genesis"
+  | Reconstruct_end_default h ->
+      Format.fprintf
+        ppf
+        "Starting reconstruct toward the predecessor of the current head (%a)"
+        Block_hash.pp
+        h
+  | Reconstruct_enum ->
+      Format.fprintf ppf "Enumerating all blocks to reconstruct"
+  | Reconstruct_success ->
+      Format.fprintf ppf "The storage was successfully reconstructed."
 
 type t = status Time.System.stamped
 
@@ -141,7 +157,31 @@ module Definition = struct
              ~title:"Import_success"
              string
              (function Import_success s -> Some s | _ -> None)
-             (fun s -> Import_success s) ]
+             (fun s -> Import_success s);
+           case
+             (Tag 9)
+             ~title:"Reconstruct_start_default"
+             empty
+             (function Reconstruct_start_default -> Some () | _ -> None)
+             (fun () -> Reconstruct_start_default);
+           case
+             (Tag 10)
+             ~title:"Reconstruct_end_default"
+             Block_hash.encoding
+             (function Reconstruct_end_default h -> Some h | _ -> None)
+             (fun h -> Reconstruct_end_default h);
+           case
+             (Tag 11)
+             ~title:"Reconstruct_enum"
+             empty
+             (function Reconstruct_enum -> Some () | _ -> None)
+             (fun () -> Reconstruct_enum);
+           case
+             (Tag 12)
+             ~title:"Reconstruct_success"
+             empty
+             (function Reconstruct_success -> Some () | _ -> None)
+             (fun () -> Reconstruct_success) ]
 
   let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
 
@@ -157,7 +197,11 @@ module Definition = struct
     | Import_unspecified_hash
     | Import_loading
     | Set_head _
-    | Import_success _ ->
+    | Import_success _
+    | Reconstruct_start_default
+    | Reconstruct_end_default _
+    | Reconstruct_enum
+    | Reconstruct_success ->
         Internal_event.Notice
 end
 
@@ -194,6 +238,8 @@ type error +=
   | Inconsistent_operation_hashes of
       (Operation_list_list_hash.t * Operation_list_list_hash.t)
 
+type error += Cannot_reconstruct of History_mode.t
+
 let () =
   let open Data_encoding in
   register_error_kind
@@ -220,7 +266,7 @@ let () =
       | `Pruned ->
           "is pruned"
       | `Too_few_predecessors ->
-          "has not enough predecessors"
+          "does not have enough predecessors"
       | `Cannot_be_found ->
           "cannot be found"
     in
@@ -240,7 +286,7 @@ let () =
     ~pp:(fun ppf (bh, kind) ->
       Format.fprintf
         ppf
-        "Fails to export snapshot as the block with block hash %a %a."
+        "Fails to export snapshot using the block %a because it %a."
         Block_hash.pp
         bh
         pp_wrong_block_export_error
@@ -318,7 +364,21 @@ let () =
           Some (oph, oph')
       | _ ->
           None)
-    (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph'))
+    (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph')) ;
+  register_error_kind
+    `Permanent
+    ~id:"CannotReconstruct"
+    ~title:"Cannot reconstruct"
+    ~description:"Cannot reconstruct"
+    ~pp:(fun ppf hm ->
+      Format.fprintf
+        ppf
+        "Cannot reconstruct storage from %a mode."
+        History_mode.pp
+        hm)
+    (obj1 (req "history_mode " History_mode.encoding))
+    (function Cannot_reconstruct hm -> Some hm | _ -> None)
+    (fun hm -> Cannot_reconstruct hm)
 
 let ( // ) = Filename.concat
 
@@ -457,8 +517,7 @@ let check_operations_consistency block_header operations operation_hashes =
     (fun (_, op) (_, oph) ->
       let expected_op_hash = List.map Operation.hash op in
       List.iter2
-        (fun expected found ->
-          assert (Operation_hash.equal expected found) (* paul:here *))
+        (fun expected found -> assert (Operation_hash.equal expected found))
         expected_op_hash
         oph)
     operations
@@ -499,14 +558,10 @@ let check_context_hash_consistency block_validation_result block_header =
     (Snapshot_import_failure "resulting context hash does not match")
 
 let set_history_mode store history_mode =
-  match history_mode with
-  | History_mode.Full | History_mode.Rolling ->
-      lwt_emit (Set_history_mode history_mode)
-      >>= fun () ->
-      Store.Configuration.History_mode.store store history_mode
-      >>= fun () -> return_unit
-  | History_mode.Archive ->
-      fail (Snapshot_import_failure "cannot import an archive context")
+  lwt_emit (Set_history_mode history_mode)
+  >>= fun () ->
+  Store.Configuration.History_mode.store store history_mode
+  >>= fun () -> return_unit
 
 let store_new_head chain_state chain_data ~genesis block_header operations
     block_validation_result =
@@ -527,7 +582,8 @@ let store_new_head chain_state chain_data ~genesis block_header operations
   | None ->
       (* Should not happen as the data-dir must be empty *)
       fail
-        (Snapshot_import_failure "a chain head is already present in the store")
+        (Snapshot_import_failure
+           "a chain head is already registered in the store")
   | Some new_head ->
       (* New head is set*)
       Store.Chain_data.Known_heads.remove chain_data genesis
@@ -635,7 +691,7 @@ let verify_predecessors header_opt pred_hash =
       fail_unless
         ( header.Block_header.shell.level >= 2l
         && Block_hash.equal header.shell.predecessor pred_hash )
-        (Snapshot_import_failure "inconsistent predecessors")
+        (Snapshot_import_failure "predecessors inconsistency")
 
 let verify_oldest_header oldest_header genesis_hash =
   let oldest_level = oldest_header.Block_header.shell.level in
@@ -645,7 +701,7 @@ let verify_oldest_header oldest_header genesis_hash =
        && Block_hash.equal
             oldest_header.Block_header.shell.predecessor
             genesis_hash )
-    (Snapshot_import_failure "inconsistent oldest level")
+    (Snapshot_import_failure "oldest level inconsistency")
 
 let block_validation succ_header_opt header_hash
     {Context.Pruned_block.block_header; operations; operation_hashes} =
@@ -654,7 +710,147 @@ let block_validation succ_header_opt header_hash
   check_operations_consistency block_header operations operation_hashes
   >>=? fun () -> return_unit
 
-let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
+(* Reconstruct the storage (without checking if the context/store is already populated) *)
+let reconstruct_storage store context_index chain_id block_store chain_state
+    chain_store (history_list : Block_hash.t list) =
+  let history = Array.of_list history_list in
+  let limit = Array.length history in
+  let rec reconstruct_chunks level =
+    Store.with_atomic_rw store (fun () ->
+        let rec reconstruct_chunks level =
+          Tezos_stdlib_unix.Utils.display_progress
+            "Reconstructing contexts: %i/%i"
+            level
+            limit ;
+          if level = limit then return level
+          else
+            let block_hash = history.(level) in
+            State.Block.Header.read (block_store, block_hash)
+            >>=? fun block_header ->
+            let validations_passes = block_header.shell.validation_passes in
+            map_s
+              (fun i ->
+                Store.Block.Operations.read (block_store, block_hash) i)
+              (0 -- (validations_passes - 1))
+            >>=? fun operations ->
+            let predecessor_block_hash = block_header.shell.predecessor in
+            State.Block.Header.read (block_store, predecessor_block_hash)
+            >>=? fun pred_block_header ->
+            let context_hash = pred_block_header.shell.context in
+            Context.checkout_exn context_index context_hash
+            >>= fun pred_context ->
+            Tezos_validation.Block_validation.apply
+              chain_id
+              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
+              ~predecessor_block_header:pred_block_header
+              ~predecessor_context:pred_context
+              ~block_header
+              operations
+            >>=? fun block_validation_result ->
+            check_context_hash_consistency
+              block_validation_result.validation_store
+              block_header
+            >>=? fun () ->
+            let { Tezos_validation.Block_validation.validation_store;
+                  block_metadata;
+                  ops_metadata;
+                  _ } =
+              block_validation_result
+            in
+            let contents =
+              {
+                header = block_header;
+                Store.Block.message = validation_store.message;
+                max_operations_ttl = validation_store.max_operations_ttl;
+                last_allowed_fork_level =
+                  validation_store.last_allowed_fork_level;
+                context = validation_store.context_hash;
+                metadata = block_metadata;
+              }
+            in
+            let st = (block_store, block_hash) in
+            Store.Block.Pruned_contents.remove st
+            >>= fun () ->
+            Store.Block.Contents.store st contents
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops ->
+                Store.Block.Operation_hashes.store
+                  st
+                  i
+                  (List.map Operation.hash ops))
+              operations
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops -> Store.Block.Operations.store st i ops)
+              operations
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops -> Store.Block.Operations_metadata.store st i ops)
+              ops_metadata
+            >>= fun () -> reconstruct_chunks (level + 1)
+        in
+        if (level + 1) mod 1000 = 0 then return level
+        else reconstruct_chunks level)
+    >>=? fun level ->
+    if level = limit then return_unit else reconstruct_chunks limit
+  in
+  set_history_mode store History_mode.Archive
+  >>=? fun () ->
+  reconstruct_chunks 0
+  >>=? fun _cpt ->
+  Tezos_stdlib_unix.Utils.display_progress_end () ;
+  Store.Chain.Genesis_hash.read chain_store
+  >>=? fun genesis_hash ->
+  let new_savepoint = (0l, genesis_hash) in
+  update_savepoint chain_state new_savepoint
+  >>= fun () ->
+  let chain_data = Store.Chain_data.get chain_store in
+  Store.Chain_data.Caboose.store chain_data (0l, genesis_hash)
+  >>= fun () -> return_unit
+
+let reconstruct chain_id store chain_state context_index =
+  let chain_store = Store.Chain.get store chain_id in
+  let block_store = Store.Block.get chain_store in
+  let chain_data_store = Store.Chain_data.get chain_store in
+  Store.Configuration.History_mode.read store
+  >>=? fun history_mode ->
+  fail_unless
+    (history_mode = History_mode.Full)
+    (Cannot_reconstruct history_mode)
+  >>=? fun () ->
+  let low_limit = 1l in
+  lwt_emit Reconstruct_start_default
+  >>= fun () ->
+  Store.Chain_data.Current_head.read chain_data_store
+  >>=? fun current_head_hash ->
+  State.Block.Header.read (block_store, current_head_hash)
+  >>=? fun ending_block_header ->
+  lwt_emit (Reconstruct_end_default current_head_hash)
+  >>= fun () ->
+  let high_limit = ending_block_header.Block_header.shell.predecessor in
+  lwt_emit Reconstruct_enum
+  >>= fun () ->
+  let rec gather_history low_limit block_hash acc =
+    Store.Block.Pruned_contents.read (block_store, block_hash)
+    >>=? fun {header; _} ->
+    if header.shell.level = low_limit then return (block_hash :: acc)
+    else gather_history low_limit header.shell.predecessor (block_hash :: acc)
+  in
+  gather_history low_limit high_limit []
+  >>=? fun hash_history ->
+  reconstruct_storage
+    store
+    context_index
+    chain_id
+    block_store
+    chain_state
+    chain_store
+    hash_history
+  >>=? fun () -> lwt_emit Reconstruct_success >>= fun () -> return_unit
+
+let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context
+    ~genesis filename block =
   lwt_emit (Import_info filename)
   >>= fun () ->
   ( match block with
@@ -803,8 +999,8 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
       >>=? fun () ->
       verify_oldest_header oldest_header genesis.block
       >>=? fun () ->
-      (* ... we set the history mode regarding the snapshot version hint ... *)
-      set_history_mode store history_mode
+      ( if not reconstruct then set_history_mode store history_mode
+      else return_unit )
       >>=? fun () ->
       (* ... and we import protocol data...*)
       import_protocol_data_list
@@ -834,6 +1030,23 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
         block_header
         oldest_header
         block_validation_result.validation_store.max_operations_ttl
+      >>=? fun () ->
+      ( match reconstruct with
+      | true ->
+          if history_mode = History_mode.Full then
+            reconstruct_storage
+              store
+              context_index
+              chain_id
+              block_store
+              chain_state
+              chain_store
+              rev_block_hashes
+            >>=? fun () ->
+            lwt_emit Reconstruct_success >>= fun () -> return_unit
+          else fail (Cannot_reconstruct history_mode)
+      | false ->
+          return_unit )
       >>=? fun () ->
       Store.close store ;
       State.close state >>= fun () -> return_unit)
