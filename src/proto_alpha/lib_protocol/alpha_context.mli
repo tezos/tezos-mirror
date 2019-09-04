@@ -306,6 +306,7 @@ module Script : sig
     | I_LAMBDA
     | I_LE
     | I_LEFT
+    | I_LEVEL
     | I_LOOP
     | I_LSL
     | I_LSR

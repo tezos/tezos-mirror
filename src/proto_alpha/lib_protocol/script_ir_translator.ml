@@ -403,6 +403,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Now ->
       0
+  | Level ->
+      0
   | Balance ->
       0
   | Check_signature ->
@@ -4277,6 +4279,10 @@ and parse_instr :
       parse_var_annot loc annot ~default:default_balance_annot
       >>?= fun annot ->
       typed ctxt loc Balance (Item_t (Mutez_t None, stack, annot))
+  | (Prim (loc, I_LEVEL, [], annot), stack) ->
+      parse_var_annot loc annot ~default:default_level_annot
+      >>?= fun annot ->
+      typed ctxt loc Level (Item_t (Nat_t None, stack, annot))
   | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
@@ -4398,6 +4404,7 @@ and parse_instr :
             | I_IMPLICIT_ACCOUNT
             | I_AMOUNT
             | I_BALANCE
+            | I_LEVEL
             | I_CHECK_SIGNATURE
             | I_HASH_KEY
             | I_SOURCE
@@ -4636,6 +4643,7 @@ and parse_instr :
              I_NOW;
              I_AMOUNT;
              I_BALANCE;
+             I_LEVEL;
              I_IMPLICIT_ACCOUNT;
              I_CHECK_SIGNATURE;
              I_BLAKE2B;

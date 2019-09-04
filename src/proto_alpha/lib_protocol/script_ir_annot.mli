@@ -34,6 +34,8 @@ val default_amount_annot : var_annot option
 
 val default_balance_annot : var_annot option
 
+val default_level_annot : var_annot option
+
 val default_steps_annot : var_annot option
 
 val default_source_annot : var_annot option
