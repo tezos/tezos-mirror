@@ -515,6 +515,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.set_delegate
   | (Balance, _) ->
       Interp_costs.balance
+  | (Level, _) ->
+      Interp_costs.level
   | (Now, _) ->
       Interp_costs.now
   | (Check_signature, (key, (_, (message, _)))) ->
@@ -1281,6 +1283,12 @@ let rec step_bounded :
   | (Balance, rest) ->
       Contract.get_balance_carbonated ctxt step_constants.self
       >>=? fun (ctxt, balance) -> logged_return ((balance, rest), ctxt)
+  | (Level, rest) ->
+      let level =
+        (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
+        |> Script_int.abs
+      in
+      logged_return ((level, rest), ctxt)
   | (Now, rest) ->
       let now = Script_timestamp.now ctxt in
       logged_return ((now, rest), ctxt)
