@@ -231,7 +231,7 @@ def extract_rpc_answer(client_output: str) -> dict:
 def extract_balance(client_output: str) -> float:
     """Extract float balance from the output of 'get_balance' operation."""
     try:
-        pattern= r"(\w*) ꜩ"
+        pattern = r"([\w.]*) ꜩ"
         match = re.search(pattern, client_output)
         return float(match.groups()[0])
     except Exception:
