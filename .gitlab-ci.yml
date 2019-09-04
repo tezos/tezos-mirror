@@ -234,21 +234,6 @@ integration:contracts_macros.sh:
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
 
-integration:multinode.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_multinode.sh
-
-integration:inject.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_injection.sh
-
-integration:voting.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_voting.sh
-
 integration:proto:sandbox:
   <<: *integration_definition
   script:
