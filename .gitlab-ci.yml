@@ -293,132 +293,145 @@ integration:sandboxes:acc-endorsement:
 ## Stage: run python integration tests                    ##
 ############################################################
 
+# definition for the environment to run all integration tests
+.integration_template: &integration_python_definition
+  <<: *test_definition
+  dependencies:
+    - build
+  before_script:
+    - make
+    - mkdir tmp
+  after_script:
+    - tail -n +1 tmp/*
+  tags:
+    - gitlab-org
+
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
 integration:baker_endorser:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_baker_endorser.py
+    - pytest tests_python/tests/test_baker_endorser.py -s --log-dir=tmp
   stage: test
 
 integration:basic:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_basic.py
+    - pytest tests_python/tests/test_basic.py -s --log-dir=tmp
   stage: test
 
 integration:contract:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract.py
+    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:contract_baker:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_baker.py
+    - pytest tests_python/tests/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
 integration:contract_onchain_opcodes:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_onchain_opcodes.py
+    - pytest tests_python/tests/test_contract_onchain_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:contract_opcodes:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_opcodes.py
+    - pytest tests_python/tests/test_contract_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:cors:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_cors.py
+    - pytest tests_python/tests/test_cors.py -s --log-dir=tmp
   stage: test
 
 integration:double_endorsement:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_double_endorsement.py
+    - pytest tests_python/tests/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
 integration:fork:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_fork.py
+    - pytest tests_python/tests/test_fork.py -s --log-dir=tmp
   stage: test
 
 integration:injection:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_injection.py
+    - pytest tests_python/tests/test_injection.py -s --log-dir=tmp
   stage: test
 
 integration:many_bakers:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_many_bakers.py
+    - pytest tests_python/tests/test_many_bakers.py -s --log-dir=tmp
   stage: test
 
 integration:many_nodes:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_many_nodes.py
+    - pytest tests_python/tests/test_many_nodes.py -s --log-dir=tmp
   stage: test
 
 integration:mempool:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_mempool.py
+    - pytest tests_python/tests/test_mempool.py -s --log-dir=tmp
   stage: test
 
 integration:multinode:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode.py
+    - pytest tests_python/tests/test_multinode.py -s --log-dir=tmp
   stage: test
 
 integration:multinode_snapshot:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode_snapshot.py
+    - pytest tests_python/tests/test_multinode_snapshot.py -s --log-dir=tmp
   stage: test
 
 integration:multinode_storage_reconstruction:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode_storage_reconstruction.py
+    - pytest tests_python/tests/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
 integration:multisig:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multisig.py
+    - pytest tests_python/tests/test_multisig.py -s --log-dir=tmp
   stage: test
 
 integration:proto_demo_noops_manual_bake:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
+    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
 integration:rpc:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_rpc.py
+    - pytest tests_python/tests/test_rpc.py -s --log-dir=tmp
   stage: test
 
 integration:tls:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_tls.py
+    - pytest tests_python/tests/test_tls.py -s --log-dir=tmp
   stage: test
 
 integration:voting:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_voting.py
+    - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
   stage: test
 
 integration:examples_forge_transfer:
