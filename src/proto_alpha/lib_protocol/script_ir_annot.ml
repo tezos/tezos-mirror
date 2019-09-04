@@ -34,6 +34,8 @@ let default_amount_annot = Some (`Var_annot "amount")
 
 let default_balance_annot = Some (`Var_annot "balance")
 
+let default_level_annot = Some (`Var_annot "level")
+
 let default_steps_annot = Some (`Var_annot "steps")
 
 let default_source_annot = Some (`Var_annot "source")

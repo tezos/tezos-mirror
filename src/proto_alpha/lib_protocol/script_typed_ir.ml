@@ -379,6 +379,7 @@ and ('bef, 'aft) instr =
   | Set_delegate : (public_key_hash option * 'rest, operation * 'rest) instr
   | Now : ('rest, Script_timestamp.t * 'rest) instr
   | Balance : ('rest, Tez.t * 'rest) instr
+  | Level : ('rest, n num * 'rest) instr
   | Check_signature
       : (public_key * (signature * (MBytes.t * 'rest)), bool * 'rest) instr
   | Hash_key : (public_key * 'rest, public_key_hash * 'rest) instr

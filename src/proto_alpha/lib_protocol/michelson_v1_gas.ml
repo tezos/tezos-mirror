@@ -342,6 +342,8 @@ module Cost_of = struct
 
     let amount = atomic_step_cost 10
 
+    let level = step_cost 2
+
     let chain_id = step_cost 1
 
     let stack_n_op n =
@@ -697,6 +699,8 @@ module Cost_of = struct
       | Now ->
           alloc_cost 1
       | Balance ->
+          alloc_cost 1
+      | Level ->
           alloc_cost 1
       | Check_signature ->
           alloc_cost 1

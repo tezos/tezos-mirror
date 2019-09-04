@@ -156,6 +156,8 @@ module Cost_of : sig
 
     val balance : Gas.cost
 
+    val level : Gas.cost
+
     val now : Gas.cost
 
     val check_signature : public_key -> MBytes.t -> Gas.cost

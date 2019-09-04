@@ -580,6 +580,8 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Interp_costs.create_account
     | (Balance, _) ->
         Interp_costs.balance
+    | (Level, _) ->
+        Interp_costs.level
     | (Now, _) ->
         Interp_costs.now
     | (Check_signature, Item (key, Item (_, Item (message, _)))) ->
@@ -1328,6 +1330,12 @@ let rec step :
   | (Balance, rest) ->
       Contract.get_balance ctxt step_constants.self
       >>=? fun balance -> logged_return (Item (balance, rest), ctxt)
+  | (Level, rest) ->
+      let level =
+        (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
+        |> Script_int.abs
+      in
+      logged_return (Item (level, rest), ctxt)
   | (Now, rest) ->
       let now = Script_timestamp.now ctxt in
       logged_return (Item (now, rest), ctxt)

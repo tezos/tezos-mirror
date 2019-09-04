@@ -89,6 +89,7 @@ type prim =
   | I_LAMBDA
   | I_LE
   | I_LEFT
+  | I_LEVEL
   | I_LOOP
   | I_LSL
   | I_LSR
@@ -220,6 +221,7 @@ let namespace = function
   | I_LAMBDA
   | I_LE
   | I_LEFT
+  | I_LEVEL
   | I_LOOP
   | I_LOOP_LEFT
   | I_LSL
@@ -408,6 +410,8 @@ let string_of_prim = function
       "LE"
   | I_LEFT ->
       "LEFT"
+  | I_LEVEL ->
+      "LEVEL"
   | I_LOOP ->
       "LOOP"
   | I_LSL ->
@@ -646,6 +650,8 @@ let prim_of_string = function
       ok I_LE
   | "LEFT" ->
       ok I_LEFT
+  | "LEVEL" ->
+      ok I_LEVEL
   | "LOOP" ->
       ok I_LOOP
   | "LSL" ->
@@ -950,7 +956,10 @@ let prim_encoding =
          ("EMPTY_BIG_MAP", I_EMPTY_BIG_MAP);
          ("APPLY", I_APPLY);
          ("chain_id", T_chain_id);
-         ("CHAIN_ID", I_CHAIN_ID)
+         ("CHAIN_ID", I_CHAIN_ID);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* Alpha_007 addition *)
+         ("LEVEL", I_LEVEL)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 
