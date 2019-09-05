@@ -38,7 +38,7 @@ type global_state = t
 
 (** {2 Network} *)
 
-(** Data specific to a given chain (e.g the main chain or the current
+(** Data specific to a given chain (e.g. the main chain or the current
     test chain).  *)
 module Chain : sig
   type t
