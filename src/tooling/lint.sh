@@ -92,18 +92,17 @@ update_all_dot_ocamlformats () {
 
 check_with_dune () {
     for f in $* ; do
-        say "Checking '$f'"
         case "$PWD" in
             */src/proto_demo_noops/lib_protocol$ )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check $f && say "Success!"
+                ocamlformat --check $f
                 ;;
             */src/proto_*/lib_protocol$ )
                 say "This a protocol file, ignoring"
                 ;;
             * )
                 make_dot_ocamlformat .ocamlformat
-                ocamlformat --check $f && say "Success!"
+                ocamlformat --check $f
                 ;;
         esac
     done
@@ -111,7 +110,6 @@ check_with_dune () {
 
 
 if [ -f "$1" ] ; then
-    say "Assuming action: check.dune"
     action=check.dune
     files="$@"
 else
