@@ -58,15 +58,9 @@ val get_chain : t -> Chain_id.t -> chain_db option
     that it does not care anymore about this chain. *)
 val deactivate : chain_db -> unit Lwt.t
 
-type callback = {
-  notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
-  notify_head : P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit;
-  disconnection : P2p_peer.Id.t -> unit;
-}
-
 (** Register all the possible callback from the distributed DB to the
     validator. *)
-val set_callback : chain_db -> callback -> unit
+val set_callback : chain_db -> P2p_reader.callback -> unit
 
 (** Kick a given peer. *)
 val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t
