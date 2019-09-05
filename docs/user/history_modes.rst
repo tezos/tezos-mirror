@@ -41,7 +41,7 @@ Three history modes are provided:
 
     + Only requires a minimal and bounded disk storage.
     + Can run on low resources architectures.
-    + Can be bootstrap within minutes.
+    + Can be bootstrapped within minutes.
 
   * Downsides
 

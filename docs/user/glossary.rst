@@ -47,7 +47,7 @@ Operation
     change. Operations are grouped into blocks so that the chain progresses in
     batches.
 
-Score (a.k.a. Fitness, a.k.aa.k.a. Weight)
+Score (a.k.a. Fitness, a.k.a. Weight)
     The score is a metric used to compare contexts. For example, when several
     blocks claim to be heads of the chain, their context's scores are compared.
     The highest scoring block is selected as the head of the chain.

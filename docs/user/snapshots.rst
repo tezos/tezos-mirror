@@ -33,7 +33,7 @@ This same wisdom must be applied when using a snapshot.
 
 After that careful selection and verification of the imported block
 hash, you can trust the node with the rest of the procedure. In
-particular, you need do not need to trust the source of the file. The snapshot
+particular, you do not need to trust the source of the file. The snapshot
 format contains everything necessary for the node to detect any
 inconsistency, malicious or not.
 

@@ -2224,7 +2224,7 @@ and variable annotations).
    NONE %some 'a
    :: 'S -> (option ('a %some))
 
-   Some %some
+   SOME %some
    :: 'a : 'S -> (option ('a %some))
 
 To improve readability and robustness, instructions ``CAR`` and ``CDR``
@@ -2405,7 +2405,7 @@ type (which can be changed). For instance the annotated typing rule for
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
 
-The special variable annotations ``@%%`` can be used on instructions
+The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
 a name for the value on the stack. The following typing rule
 demonstrates their use for instruction ``CAR``.
@@ -2422,7 +2422,7 @@ The special variable annotation ``%@`` can be used on instructions
 ``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
 name annotation in the stack as a field name for the constructed
 element. Two examples with ``PAIR`` follows, notice the special
-treatment of annotations with `.`.
+treatment of annotations with ``.``.
 
 ::
 
