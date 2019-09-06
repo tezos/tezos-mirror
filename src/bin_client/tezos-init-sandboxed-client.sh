@@ -122,7 +122,7 @@ usage() {
 
 main () {
 
-    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
