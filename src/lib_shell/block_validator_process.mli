@@ -52,3 +52,6 @@ val commit_genesis :
   time:Time.Protocol.t ->
   protocol:Protocol_hash.t ->
   Context_hash.t tzresult Lwt.t
+
+(** [init_test_chain] must only be called on a forking block. *)
+val init_test_chain : t -> State.Block.t -> Block_header.t tzresult Lwt.t

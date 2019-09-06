@@ -25,14 +25,6 @@
 
 let ( // ) = Filename.concat
 
-let get_context index hash =
-  Context.checkout index hash
-  >>= function
-  | None ->
-      fail (Block_validator_errors.Failed_to_checkout_context hash)
-  | Some ctx ->
-      return ctx
-
 type proto_status = Embeded | Dynlinked
 
 let load_protocol proto protocol_root =
@@ -105,9 +97,18 @@ let run stdin stdout =
                 operations;
                 max_operations_ttl } ->
               Error_monad.protect (fun () ->
-                  get_context
-                    context_index
+                  let pred_context_hash =
                     predecessor_block_header.shell.context
+                  in
+                  Context.checkout context_index pred_context_hash
+                  >>= (function
+                        | Some context ->
+                            return context
+                        | None ->
+                            fail
+                              (Block_validator_errors
+                               .Failed_to_checkout_context
+                                 pred_context_hash))
                   >>=? fun predecessor_context ->
                   Context.get_protocol predecessor_context
                   >>= fun protocol_hash ->
@@ -147,6 +148,23 @@ let run stdin stdout =
                 stdout
                 (Error_monad.result_encoding Data_encoding.empty)
                 (Ok ())
+          | Fork_validation.Fork_test_chain {context_hash; forked_header} -> (
+              Context.checkout context_index context_hash
+              >>= function
+              | Some ctxt ->
+                  Block_validation.init_test_chain ctxt forked_header
+                  >>= fun genesis_header ->
+                  Fork_validation.send
+                    stdout
+                    (Error_monad.result_encoding Block_header.encoding)
+                    genesis_header
+              | None ->
+                  Fork_validation.send
+                    stdout
+                    (Error_monad.result_encoding Data_encoding.empty)
+                    (error
+                       (Block_validator_errors.Failed_to_checkout_context
+                          context_hash)) )
           | Fork_validation.Terminate ->
               Lwt_io.flush_all () >>= fun () -> exit 0)
     >>= fun () -> loop ()

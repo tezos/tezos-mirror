@@ -40,6 +40,10 @@ type request =
       time : Time.Protocol.t;
       protocol : Protocol_hash.t;
     }
+  | Fork_test_chain of {
+      context_hash : Context_hash.t;
+      forked_header : Block_header.t;
+    }
   | Terminate
 
 let magic = MBytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
@@ -59,7 +63,10 @@ let request_encoding =
         ~title:"init"
         empty
         (function
-          | Init -> Some () | Commit_genesis _ | Validate _ | Terminate -> None)
+          | Init ->
+              Some ()
+          | Commit_genesis _ | Validate _ | Fork_test_chain _ | Terminate ->
+              None)
         (fun () -> Init);
       case
         (Tag 1)
@@ -83,7 +90,7 @@ let request_encoding =
                   predecessor_block_header,
                   max_operations_ttl,
                   operations )
-          | Init | Commit_genesis _ | Terminate ->
+          | Init | Commit_genesis _ | Fork_test_chain _ | Terminate ->
               None)
         (fun ( chain_id,
                block_header,
@@ -109,16 +116,32 @@ let request_encoding =
         (function
           | Commit_genesis {chain_id; time; genesis_hash; protocol} ->
               Some (chain_id, time, genesis_hash, protocol)
-          | Init | Validate _ | Terminate ->
+          | Init | Validate _ | Fork_test_chain _ | Terminate ->
               None)
         (fun (chain_id, time, genesis_hash, protocol) ->
           Commit_genesis {chain_id; time; genesis_hash; protocol});
       case
         (Tag 3)
+        ~title:"fork_test_chain"
+        (obj2
+           (req "context_hash" Context_hash.encoding)
+           (req "forked_header" Block_header.encoding))
+        (function
+          | Fork_test_chain {context_hash; forked_header} ->
+              Some (context_hash, forked_header)
+          | Init | Validate _ | Commit_genesis _ | Terminate ->
+              None)
+        (fun (context_hash, forked_header) ->
+          Fork_test_chain {context_hash; forked_header});
+      case
+        (Tag 4)
         ~title:"terminate"
         unit
         (function
-          | Terminate -> Some () | Init | Validate _ | Commit_genesis _ -> None)
+          | Terminate ->
+              Some ()
+          | Init | Validate _ | Commit_genesis _ | Fork_test_chain _ ->
+              None)
         (fun () -> Terminate) ]
 
 let data_size msg = String.length msg

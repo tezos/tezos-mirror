@@ -357,6 +357,7 @@ let create ?(sandboxed = false) ~singleprocess
     validator
     ?max_child_ttl
     ~start_prevalidator
+    ~validator_process
     mainchain_state
   >>=? fun mainchain_validator ->
   let shutdown () =

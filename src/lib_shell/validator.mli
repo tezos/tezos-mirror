@@ -46,6 +46,7 @@ val activate :
   t ->
   ?max_child_ttl:int ->
   start_prevalidator:bool ->
+  validator_process:Block_validator_process.t ->
   State.Chain.t ->
   Chain_validator.t tzresult Lwt.t
 
