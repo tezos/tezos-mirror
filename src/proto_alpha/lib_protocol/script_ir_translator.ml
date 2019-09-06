@@ -5820,9 +5820,6 @@ type big_map_ids = Ids.t
 let no_big_map_id = Ids.empty
 
 let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
-  Lwt.return
-    (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list diff))
-  >>=? fun ctxt ->
   ( match id with
   | Some id ->
       if Ids.mem id ids then
@@ -5934,10 +5931,7 @@ let rec extract_big_map_updates :
       >>=? fun (ctxt, l, ids, acc) ->
       let reversed = {length = l.length; elements = List.rev l.elements} in
       return (ctxt, reversed, ids, acc)
-  | (Map_t (_, ty, _, true), ((module M) as m)) ->
-      Lwt.return
-        (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list m))
-      >>=? fun ctxt ->
+  | (Map_t (_, ty, _, true), (module M)) ->
       fold_left_s
         (fun (ctxt, m, ids, acc) (k, x) ->
           Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)

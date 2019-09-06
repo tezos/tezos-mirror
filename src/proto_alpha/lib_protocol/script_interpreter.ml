@@ -391,7 +391,7 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
     | (Empty_set _, _) ->
         Interp_costs.empty_set
     | (Set_iter _, Item (set, _)) ->
-        Gas.(Interp_costs.set_to_list set +@ Interp_costs.set_iter set)
+        Interp_costs.set_iter set
     | (Set_mem, Item (v, Item (set, _))) ->
         Interp_costs.set_mem v set
     | (Set_update, Item (v, Item (presence, Item (set, _)))) ->
@@ -401,9 +401,9 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
     | (Empty_map _, _) ->
         Interp_costs.empty_map
     | (Map_map _, Item (map, _)) ->
-        Gas.(Interp_costs.map_to_list map +@ Interp_costs.map_map map)
+        Interp_costs.map_map map
     | (Map_iter _, Item (map, _)) ->
-        Gas.(Interp_costs.map_to_list map +@ Interp_costs.map_iter map)
+        Interp_costs.map_iter map
     | (Map_mem, Item (v, Item (map, _rest))) ->
         Interp_costs.map_mem v map
     | (Map_get, Item (v, Item (map, _rest))) ->

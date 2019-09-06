@@ -77,15 +77,6 @@ module Cost_of = struct
   module Legacy = struct
     let zint z = alloc_bits_cost (Z.numbits z)
 
-    let set_to_list : type item. item Script_typed_ir.set -> cost =
-     fun (module Box) -> alloc_cost @@ Pervasives.(Box.size * 2)
-
-    let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost
-        =
-     fun (module Box) ->
-      let size = snd Box.boxed in
-      3 *@ alloc_cost size
-
     let z_to_int64 = step_cost 2 +@ alloc_cost 1
 
     let hash data len = (10 *@ step_cost (MBytes.length data)) +@ bytes len
@@ -125,9 +116,6 @@ module Cost_of = struct
 
     let empty_set = atomic_step_cost 10
 
-    let set_to_list : type elt. elt Script_typed_ir.set -> cost =
-     fun (module Box) -> atomic_step_cost (Box.size * 20)
-
     let set_iter : type elt. elt Script_typed_ir.set -> cost =
      fun (module Box) -> atomic_step_cost (20 + (Box.size * 20))
 
@@ -144,12 +132,6 @@ module Cost_of = struct
     let set_size = atomic_step_cost 10
 
     let empty_map = atomic_step_cost 10
-
-    let map_to_list : type key value. (key, value) Script_typed_ir.map -> cost
-        =
-     fun (module Box) ->
-      let size = snd Box.boxed in
-      atomic_step_cost (size * 20)
 
     let map_map : type key value. (key, value) Script_typed_ir.map -> cost =
      fun (module Box) ->
@@ -766,9 +748,5 @@ module Cost_of = struct
     let one_arg_type = prim_cost 1
 
     let two_arg_type = prim_cost 2
-
-    let set_to_list = Legacy.set_to_list
-
-    let map_to_list = Legacy.map_to_list
   end
 end
