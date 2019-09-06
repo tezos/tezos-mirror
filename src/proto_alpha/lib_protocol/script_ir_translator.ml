@@ -5787,9 +5787,6 @@ type big_map_ids = Ids.t
 let no_big_map_id = Ids.empty
 
 let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
-  Lwt.return
-    (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list diff))
-  >>=? fun ctxt ->
   ( match id with
   | Some id ->
       if Ids.mem id ids then
@@ -5823,9 +5820,8 @@ let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
               } ],
           id ) )
   >>=? fun (ctxt, init, big_map) ->
-  let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
-  fold_left_s
-    (fun (acc, ctxt) (key, value) ->
+  map_fold_m
+    (fun (key, value) (acc, ctxt) ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
       >>=? fun ctxt ->
       hash_data ctxt key_type key
@@ -5845,9 +5841,9 @@ let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
         Contract.Update {big_map; diff_key; diff_key_hash; diff_value}
       in
       return (diff_item :: acc, ctxt))
+    diff
     ([], ctxt)
-    pairs
-  >>=? fun (diff, ctxt) -> return (init @ diff, big_map, ctxt)
+  >>=? fun (diff, ctxt) -> return (init @ List.rev diff, big_map, ctxt)
 
 let rec extract_big_map_updates :
     type a.
@@ -5902,18 +5898,15 @@ let rec extract_big_map_updates :
       let reversed = {length = l.length; elements = List.rev l.elements} in
       return (ctxt, reversed, ids, acc)
   | (Map_t (_, ty, _, true), ((module M) as m)) ->
-      Lwt.return
-        (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list m))
-      >>=? fun ctxt ->
-      fold_left_s
-        (fun (ctxt, m, ids, acc) (k, x) ->
+      map_fold_m
+        (fun (k, x) (ctxt, m, ids, acc) ->
           Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
           >>=? fun ctxt ->
           extract_big_map_updates ctxt fresh mode ids acc ty x
           >>=? fun (ctxt, x, ids, acc) ->
           return (ctxt, M.OPS.add k x m, ids, acc))
+        m
         (ctxt, M.OPS.empty, ids, acc)
-        (M.OPS.bindings (fst M.boxed))
       >>=? fun (ctxt, m, ids, acc) ->
       let module M = struct
         module OPS = M.OPS
