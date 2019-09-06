@@ -420,7 +420,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
-      return Event.Head_incrememt
+      return Event.Head_increment
     else return Event.Branch_switch
 
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =

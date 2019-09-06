@@ -32,7 +32,7 @@ module Request = struct
 end
 
 module Event = struct
-  type update = Ignored_head | Branch_switch | Head_incrememt
+  type update = Ignored_head | Branch_switch | Head_increment
 
   type t =
     | Processed_block of {
@@ -48,7 +48,7 @@ module Event = struct
       match req.update with
       | Ignored_head ->
           Internal_event.Info
-      | Branch_switch | Head_incrememt ->
+      | Branch_switch | Head_increment ->
           Internal_event.Notice )
     | Could_not_switch_testchain _ ->
         Internal_event.Error
@@ -67,7 +67,7 @@ module Event = struct
                 (string_enum
                    [ ("ignored", Ignored_head);
                      ("branch", Branch_switch);
-                     ("increment", Head_incrememt) ]))
+                     ("increment", Head_increment) ]))
              (req "fitness" Fitness.encoding))
           (function
             | Processed_block {request; request_status; update; fitness} ->
@@ -95,7 +95,7 @@ module Event = struct
             Format.fprintf
               ppf
               "Update current head to %a (fitness %a), changing branch@,"
-        | Head_incrememt ->
+        | Head_increment ->
             Format.fprintf
               ppf
               "Update current head to %a (fitness %a), same branch@," )
