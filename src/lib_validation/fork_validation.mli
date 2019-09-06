@@ -40,6 +40,10 @@ type request =
       time : Time.Protocol.t;
       protocol : Protocol_hash.t;
     }
+  | Fork_test_chain of {
+      context_hash : Context_hash.t;
+      forked_header : Block_header.t;
+    }
   | Terminate
 
 val magic : MBytes.t

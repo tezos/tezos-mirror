@@ -282,3 +282,16 @@ let commit_genesis bvp ~genesis_hash ~chain_id ~time ~protocol =
         Fork_validation.Commit_genesis {genesis_hash; chain_id; time; protocol}
       in
       Fork_validator.send_request vp request Context_hash.encoding
+
+let init_test_chain bvp forking_block =
+  let forked_header = State.Block.header forking_block in
+  match bvp with
+  | Sequential _ ->
+      State.Block.context forking_block
+      >>= fun context -> Block_validation.init_test_chain context forked_header
+  | Fork vp ->
+      let context_hash = forked_header.shell.context in
+      let request =
+        Fork_validation.Fork_test_chain {context_hash; forked_header}
+      in
+      Fork_validator.send_request vp request Block_header.encoding

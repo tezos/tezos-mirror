@@ -68,7 +68,8 @@ let create state db peer_validator_limits block_validator_limits
       active_chains = Chain_id.Table.create 7;
     }
 
-let activate v ?max_child_ttl ~start_prevalidator chain_state =
+let activate v ?max_child_ttl ~start_prevalidator ~validator_process
+    chain_state =
   let chain_id = State.Chain.id chain_state in
   lwt_log_notice
     Tag.DSL.(
@@ -85,6 +86,7 @@ let activate v ?max_child_ttl ~start_prevalidator chain_state =
         ~start_prevalidator
         ~start_testchain:v.start_testchain
         ~active_chains:v.active_chains
+        ~block_validator_process:validator_process
         v.peer_validator_limits
         v.prevalidator_limits
         v.block_validator

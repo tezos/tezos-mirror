@@ -59,6 +59,7 @@ module Types = struct
     chain_state : State.Chain.t;
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
+    block_validator_process : Block_validator_process.t;
     global_valid_block_input : State.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     prevalidator_limits : Prevalidator.limits;
@@ -252,12 +253,9 @@ let may_switch_test_chain w active_chains spawn_child block =
                 >>= fun () -> return chain_state
             | Error _ ->
                 (* TODO proper error matching (Not_found ?) or use `get_opt` ? *)
-                State.Block.context forking_block
-                >>= fun context ->
                 let try_init_test_chain cont =
-                  Block_validation.init_test_chain
-                    context
-                    (State.Block.header forking_block)
+                  let bvp = nv.parameters.block_validator_process in
+                  Block_validator_process.init_test_chain bvp forking_block
                   >>= function
                   | Ok genesis_header ->
                       State.fork_testchain
@@ -556,15 +554,16 @@ let on_launch start_prevalidator w _ parameters =
   return nv
 
 let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
-    ~active_chains ?parent peer_validator_limits prevalidator_limits
-    block_validator global_valid_block_input global_chains_input db chain_state
-    limits =
+    ~active_chains ?parent ~block_validator_process peer_validator_limits
+    prevalidator_limits block_validator global_valid_block_input
+    global_chains_input db chain_state limits =
   let spawn_child ~parent pvl pl bl gvbi gci db n l =
     create
       ~start_prevalidator
       ~start_testchain
       ~active_chains
       ~parent
+      ~block_validator_process
       pvl
       pl
       bl
@@ -597,6 +596,7 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
       peer_validator_limits;
       prevalidator_limits;
       block_validator;
+      block_validator_process;
       global_valid_block_input;
       global_chains_input;
       db;
@@ -621,14 +621,16 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
 (** Current block computation *)
 
 let create ?max_child_ttl ~start_prevalidator ~start_testchain ~active_chains
-    peer_validator_limits prevalidator_limits block_validator
-    global_valid_block_input global_chains_input global_db state limits =
+    ~block_validator_process peer_validator_limits prevalidator_limits
+    block_validator global_valid_block_input global_chains_input global_db
+    state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
     ~start_prevalidator
     ~start_testchain
     ~active_chains
+    ~block_validator_process
     peer_validator_limits
     prevalidator_limits
     block_validator

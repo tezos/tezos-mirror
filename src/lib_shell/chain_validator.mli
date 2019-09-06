@@ -33,6 +33,7 @@ val create :
   start_prevalidator:bool ->
   start_testchain:bool ->
   active_chains:t Chain_id.Table.t ->
+  block_validator_process:Block_validator_process.t ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
