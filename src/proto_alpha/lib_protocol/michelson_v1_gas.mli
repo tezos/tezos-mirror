@@ -33,8 +33,6 @@ module Cost_of : sig
 
     val hash : MBytes.t -> int -> Gas.cost
 
-    val map_to_list : ('b, 'c) Script_typed_ir.map -> Gas.cost
-
     val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
   end
 
@@ -79,16 +77,12 @@ module Cost_of : sig
 
     val map_mem : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
 
-    val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
-
     val map_get : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
 
     val map_update :
       'a -> 'b option -> ('a, 'b) Script_typed_ir.map -> Gas.cost
 
     val map_size : Gas.cost
-
-    val set_to_list : 'a Script_typed_ir.set -> Gas.cost
 
     val set_update : 'a -> bool -> 'a Script_typed_ir.set -> Gas.cost
 
@@ -310,9 +304,5 @@ module Cost_of : sig
     val one_arg_type : Script.annot -> Gas.cost
 
     val two_arg_type : Script.annot -> Gas.cost
-
-    val set_to_list : 'a Script_typed_ir.set -> Gas.cost
-
-    val map_to_list : ('a, 'b) Script_typed_ir.map -> Gas.cost
   end
 end
