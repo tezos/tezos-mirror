@@ -32,7 +32,7 @@ module Request : sig
 end
 
 module Event : sig
-  type update = Ignored_head | Branch_switch | Head_incrememt
+  type update = Ignored_head | Branch_switch | Head_increment
 
   type t =
     | Processed_block of {
