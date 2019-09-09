@@ -106,7 +106,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_opt chain genesis_hash
   >|= Option.unopt_assert ~loc:__POS__
   >>= fun genesis ->
-  State.Block.context genesis
+  State.Block.context_exn genesis
   >>= fun empty_context ->
   let header = State.Block.header genesis in
   let timestamp = State.Block.timestamp genesis in

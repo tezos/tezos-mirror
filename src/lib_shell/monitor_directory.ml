@@ -84,7 +84,7 @@ let build_rpc_directory validator mainchain_validator =
             | None ->
                 Lwt.return_false (* won't happen *)
             | Some pred ->
-                State.Block.context pred
+                State.Block.context_exn pred
                 >>= fun context ->
                 Context.get_protocol context
                 >>= fun protocol ->
@@ -96,7 +96,7 @@ let build_rpc_directory validator mainchain_validator =
         | [] ->
             Lwt.return_true
         | protocols ->
-            State.Block.context block
+            State.Block.context_exn block
             >>= fun context ->
             Context.get_protocol context
             >>= fun next_protocol ->
@@ -141,7 +141,7 @@ let build_rpc_directory validator mainchain_validator =
             | [] ->
                 Lwt.return_true
             | protocols ->
-                State.Block.context block
+                State.Block.context_exn block
                 >>= fun context ->
                 Context.get_protocol context
                 >>= fun next_protocol ->

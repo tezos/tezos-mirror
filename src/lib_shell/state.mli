@@ -253,9 +253,15 @@ module Block : sig
 
   val is_valid_for_checkpoint : t -> Block_header.t -> bool Lwt.t
 
-  val context : t -> Context.t Lwt.t
+  val context : t -> Context.t tzresult Lwt.t
 
-  val protocol_hash : t -> Protocol_hash.t Lwt.t
+  val context_opt : t -> Context.t option Lwt.t
+
+  val context_exn : t -> Context.t Lwt.t
+
+  val protocol_hash : t -> Protocol_hash.t tzresult Lwt.t
+
+  val protocol_hash_exn : t -> Protocol_hash.t Lwt.t
 
   val test_chain : t -> (Test_chain_status.t * t option) Lwt.t
 

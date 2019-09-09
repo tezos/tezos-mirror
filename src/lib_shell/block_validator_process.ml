@@ -288,7 +288,8 @@ let init_test_chain bvp forking_block =
   match bvp with
   | Sequential _ ->
       State.Block.context forking_block
-      >>= fun context -> Block_validation.init_test_chain context forked_header
+      >>=? fun context ->
+      Block_validation.init_test_chain context forked_header
   | Fork vp ->
       let context_hash = forked_header.shell.context in
       let request =
