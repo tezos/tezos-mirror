@@ -244,15 +244,14 @@ let may_switch_test_chain w active_chains spawn_child block =
       || not (State.Chain.allow_forked_chain nv.parameters.chain_state)
     then return_unit
     else
-      State.Chain.get
+      State.Chain.get_opt
         (State.Chain.global_state nv.parameters.chain_state)
         chain_id
       >>= (function
-            | Ok chain_state ->
+            | Some chain_state ->
                 State.update_testchain block ~testchain_state:chain_state
                 >>= fun () -> return chain_state
-            | Error _ ->
-                (* TODO proper error matching (Not_found ?) or use `get_opt` ? *)
+            | None ->
                 let try_init_test_chain cont =
                   let bvp = nv.parameters.block_validator_process in
                   Block_validator_process.init_test_chain bvp forking_block

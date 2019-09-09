@@ -740,6 +740,11 @@ module Chain = struct
     Shared.use state.global_data (fun data ->
         Lwt.return (Chain_id.Table.find data.chains id))
 
+  let get_opt state id =
+    Lwt.catch
+      (fun () -> get_exn state id >>= Lwt.return_some)
+      (function _ -> Lwt.return_none)
+
   let get state id =
     Lwt.catch
       (fun () -> get_exn state id >>= return)

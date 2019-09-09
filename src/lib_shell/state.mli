@@ -71,6 +71,8 @@ module Chain : sig
   (** Look up for a chain by the hash of its genesis block. *)
   val get : global_state -> Chain_id.t -> chain_state tzresult Lwt.t
 
+  val get_opt : global_state -> Chain_id.t -> chain_state option Lwt.t
+
   val get_exn : global_state -> Chain_id.t -> chain_state Lwt.t
 
   val main : global_state -> Chain_id.t
