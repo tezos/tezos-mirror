@@ -30,26 +30,28 @@ val map : f:('a -> 'b) -> 'a option -> 'b option
 (** [(f x)] if input is [Some x], or [None] if it's [None] *)
 val apply : f:('a -> 'b option) -> 'a option -> 'b option
 
+(** [x >>= f] is an infix notation for [apply ~f x] *)
 val ( >>= ) : 'a option -> ('a -> 'b option) -> 'b option
 
+(** [x >>| f] is an infix notation for [map ~f x] *)
 val ( >>| ) : 'a option -> ('a -> 'b) -> 'b option
 
 (** Call [(f x)] if input is [Some x], noop if it's [None] *)
 val iter : f:('a -> unit) -> 'a option -> unit
 
-(** [x] if input is [Some x], default if it's [None] *)
+(** [x] if input is [Some x], [default] if it's [None] *)
 val unopt : default:'a -> 'a option -> 'a
 
-(** [unopt_map f d x] is [f y] if [x] is [Some y], [d] if [x] is [None] *)
+(** [unopt_map ~f ~default x] is [f y] if [x] is [Some y], [default] if [x] is [None] *)
 val unopt_map : f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
 (** [unopt_exn exn x] is [y] if [x] is [Some y], or raises [exn] if [x] is [None] *)
 val unopt_exn : exn -> 'a option -> 'a
 
-(** [unopt_assert loc x] is [y] if [x] is [Some y], or raises Assert_failure loc if [x] is None *)
+(** [unopt_assert ~loc x] is [y] if [x] is [Some y], or raises [Assert_failure loc] if [x] is [None] *)
 val unopt_assert : loc:string * int * int * 'a -> 'b option -> 'b
 
-(** First input of form [Some x], or [None] if none *)
+(** First input of form [Some x], or [None] if both are [None] *)
 val first_some : 'a option -> 'a option -> 'a option
 
 (** [Some (f ())] if [f] does not raise, [None] otherwise *)
