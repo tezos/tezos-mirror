@@ -149,7 +149,7 @@ let build_rpc_directory validator mainchain_validator =
   end ;
 
   gen_register0 Monitor_services.S.commit_hash begin fun () () ->
-    RPC_answer.return Tezos_base.Current_git_info.commit_hash end ;
+    RPC_answer.return Tezos_version.Current_git_info.commit_hash end ;
 
   gen_register0 Monitor_services.S.active_chains begin fun () () ->
     let stream, stopper = Validator.chains_watcher validator in

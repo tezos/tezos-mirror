@@ -266,86 +266,104 @@ integration:baker_endorser:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_baker_endorser.py
+  stage: test
 
 integration:basic:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_basic.py
+  stage: test
 
 integration:contract:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract.py
+  stage: test
 
 integration:contract_baker:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py
+  stage: test
 
 integration:cors:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_cors.py
-
-integration:injection:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_injection.py
-
-integration:many_bakers:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_many_bakers.py
-
-integration:many_nodes:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_many_nodes.py
-
-integration:mempool:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_mempool.py
-
-integration:multinode:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_multinode.py
-
-integration:rpc:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_rpc.py
-
-integration:tls:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_tls.py
-
-integration:voting:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_voting.py
+  stage: test
 
 integration:double_endorsement:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_double_endorsement.py
-
-integration:snapshot:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_multinode_snapshot.py
-
-integration:proto_demo_noops:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
+  stage: test
 
 integration:fork:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_fork.py
+  stage: test
+
+integration:injection:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_injection.py
+  stage: test
+
+integration:many_bakers:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_bakers.py
+  stage: test
+
+integration:many_nodes:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_many_nodes.py
+  stage: test
+
+integration:mempool:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_mempool.py
+  stage: test
+
+integration:multinode:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode.py
+  stage: test
+
+integration:multinode_snapshot:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode_snapshot.py
+  stage: test
+
+integration:proto_demo_noops_manual_bake:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py
+  stage: test
+
+integration:rpc:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_rpc.py
+  stage: test
+
+integration:tls:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_tls.py
+  stage: test
+
+integration:voting:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_voting.py
+  stage: test
+
 
 ##END_INTEGRATION_PYTHON##
 
@@ -854,42 +872,47 @@ opam:093:tezos-endorser-005-PsBABY5H-commands:
   variables:
     package: tezos-endorser-005-PsBABY5H-commands
 
-opam:094:tezos-accuser-005-PsBABY5H:
+opam:094:tezos-version:
+  <<: *opam_definition
+  variables:
+    package: tezos-version
+
+opam:095:tezos-accuser-005-PsBABY5H:
   <<: *opam_definition
   variables:
     package: tezos-accuser-005-PsBABY5H
 
-opam:095:tezos-baker-004-Pt24m4xi:
+opam:096:tezos-baker-004-Pt24m4xi:
   <<: *opam_definition
   variables:
     package: tezos-baker-004-Pt24m4xi
 
-opam:096:tezos-endorser-004-Pt24m4xi-commands:
+opam:097:tezos-endorser-004-Pt24m4xi-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-004-Pt24m4xi-commands
 
-opam:097:tezos-endorser-005-PsBABY5H:
+opam:098:tezos-endorser-005-PsBABY5H:
   <<: *opam_definition
   variables:
     package: tezos-endorser-005-PsBABY5H
 
-opam:098:tezos-baker-005-PsBABY5H:
+opam:099:tezos-baker-005-PsBABY5H:
   <<: *opam_definition
   variables:
     package: tezos-baker-005-PsBABY5H
 
-opam:099:tezos-network-sandbox:
+opam:100:tezos-network-sandbox:
   <<: *opam_definition
   variables:
     package: tezos-network-sandbox
 
-opam:100:tezos-signer:
+opam:101:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:101:tezos-node:
+opam:102:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
