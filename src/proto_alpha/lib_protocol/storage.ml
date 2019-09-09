@@ -481,7 +481,7 @@ module Roll = struct
 
 end
 
-(** Votes **)
+(** Votes *)
 
 module Vote = struct
 

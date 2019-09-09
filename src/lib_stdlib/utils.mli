@@ -37,8 +37,8 @@ end
     [sub] used internally. *)
 val cut : ?copy:bool -> int -> Bytes.t -> Bytes.t list
 
-(** Print a paragraph in a box **)
+(** Print a paragraph in a box *)
 val display_paragraph : Format.formatter -> string -> unit
 
-(** [finalize f g ] ensures g() called after f(), even if exception raised **)
+(** [finalize f g ] ensures g() called after f(), even if exception raised *)
 val finalize : (unit -> 'a) -> (unit -> unit) -> 'a

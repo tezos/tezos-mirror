@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**  Print string over the current line **)
+(**  Print string over the current line *)
 val display_progress :
   ?refresh_rate:int * int -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
-(** Finalizes progress display **)
+(** Finalizes progress display *)
 val display_progress_end : unit -> unit

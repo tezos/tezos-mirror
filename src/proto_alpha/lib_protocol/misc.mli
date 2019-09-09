@@ -37,7 +37,7 @@ val pp_print_paragraph : Format.formatter -> string -> unit
 
 val take: int -> 'a list -> ('a list * 'a list) option
 
-(** Some (input with [prefix] removed), if string has [prefix], else [None] **)
+(** Some (input with [prefix] removed), if string has [prefix], else [None] *)
 val remove_prefix: prefix:string -> string -> string option
 
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)

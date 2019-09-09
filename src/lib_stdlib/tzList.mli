@@ -26,7 +26,7 @@
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove : int -> 'a list -> 'a list
 
-(** [repeat n x] is a list of [n] [x]'s **)
+(** [repeat n x] is a list of [n] [x]'s *)
 val repeat : int -> 'a -> 'a list
 
 (** [shift (hd :: tl)] computes [tl @ [hd]] *)
@@ -55,10 +55,10 @@ module Bounded (E : Set.OrderedType) : sig
   val get : t -> E.t list
 end
 
-(** [select n l] is ([n]th element of [l], [l] without that element) **)
+(** [select n l] is ([n]th element of [l], [l] without that element) *)
 val select : int -> 'a list -> 'a * 'a list
 
-(** [filter_map f l] is [[y for x in l where (f x) = Some y]] **)
+(** [filter_map f l] is [[y for x in l where (f x) = Some y]] *)
 val filter_map : ('a -> 'b option) -> 'a list -> 'b list
 
 (** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
@@ -67,10 +67,10 @@ val rev_sub : 'a list -> int -> 'a list
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
 
-(** Like [List.hd], but [Some hd] or [None] if empty **)
+(** Like [List.hd], but [Some hd] or [None] if empty *)
 val hd_opt : 'a list -> 'a option
 
-(** Last elt of list, or raise Not_found if empty **)
+(** Last elt of list, or raise Not_found if empty *)
 val last_exn : 'a list -> 'a
 
 (** [merge_filter2 ~compare ~f l1 l2] merges two lists ordered by [compare]
