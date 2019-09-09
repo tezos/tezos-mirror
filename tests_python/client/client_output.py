@@ -81,6 +81,15 @@ class RunScriptResult:
             raise InvalidClientOutput(client_output)
         self.storage = match.groups()[0]
 
+        # read map diff output
+        self.big_map_diff = []
+        pattern = r"big_map diff\n"
+        match = re.search(pattern, client_output)
+        if match is not None:
+            pattern = re.compile(r"  ([^ ].*?)\n")
+            for match_diff in pattern.finditer(client_output, match.end(0)):
+                self.big_map_diff.append([match_diff.group(1)])
+
 
 class OriginationResult:
     """Result of an 'originate contract' operation."""

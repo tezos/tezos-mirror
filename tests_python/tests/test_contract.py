@@ -472,7 +472,6 @@ class TestMiniScenarios:
         assert client.get_balance('create_contract') == 1000
 
     def test_create_contract_perform_creation(self, client):
-        tz1 = IDENTITIES['bootstrap1']['identity']
         transfer_result = client.transfer(0, "bootstrap1", "create_contract",
                                           ['-arg',
                                            'None',
