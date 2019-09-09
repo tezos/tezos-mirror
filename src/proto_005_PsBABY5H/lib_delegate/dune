@@ -2,6 +2,7 @@
  (name tezos_baking_005_PsBABY5H)
  (public_name tezos-baking-005-PsBABY5H)
  (libraries tezos-base
+            tezos-version
             tezos-protocol-005-PsBABY5H
             tezos-protocol-environment
             tezos-shell-context

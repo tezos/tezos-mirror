@@ -2,6 +2,7 @@
  (name tezos_baking_004_Pt24m4xi)
  (public_name tezos-baking-004-Pt24m4xi)
  (libraries tezos-base
+            tezos-version
             tezos-protocol-004-Pt24m4xi
             tezos-protocol-environment
             tezos-shell-context
