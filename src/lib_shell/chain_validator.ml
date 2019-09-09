@@ -386,7 +386,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     ( match nv.prevalidator with
     | Some old_prevalidator ->
         State.Block.protocol_hash block
-        >>= fun new_protocol ->
+        >>=? fun new_protocol ->
         let old_protocol = Prevalidator.protocol_hash old_prevalidator in
         if not (Protocol_hash.equal old_protocol new_protocol) then (
           safe_get_protocol new_protocol
@@ -460,7 +460,7 @@ let on_launch start_prevalidator w _ parameters =
       (fun _ {State.current_head; _} -> Lwt.return current_head)
     >>= fun head ->
     State.Block.protocol_hash head
-    >>= fun head_hash ->
+    >>=? fun head_hash ->
     safe_get_protocol head_hash
     >>= function
     | Ok (module Proto) -> (

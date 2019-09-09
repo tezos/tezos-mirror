@@ -129,7 +129,7 @@ struct
       State.Block.header predecessor
     in
     State.Block.context predecessor
-    >>= fun predecessor_context ->
+    >>=? fun predecessor_context ->
     let predecessor_header = State.Block.header predecessor in
     let predecessor_hash = State.Block.hash predecessor in
     State.Block.max_operations_ttl predecessor
@@ -230,7 +230,7 @@ end
 
 let preapply ~predecessor ~timestamp ~protocol_data operations =
   State.Block.context predecessor
-  >>= fun predecessor_context ->
+  >>=? fun predecessor_context ->
   Context.get_protocol predecessor_context
   >>= fun protocol ->
   ( match Registered_protocol.get protocol with
@@ -314,7 +314,7 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   Block_validation.may_patch_protocol ~level block_result
   >>= fun {fitness; context; message; _} ->
   State.Block.protocol_hash predecessor
-  >>= fun pred_protocol ->
+  >>=? fun pred_protocol ->
   let context = Shell_context.unwrap_disk_context context in
   Context.get_protocol context
   >>= fun protocol ->

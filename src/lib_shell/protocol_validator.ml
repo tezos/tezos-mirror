@@ -159,7 +159,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : State.Block.t) =
   let protocol_level = State.Block.protocol_level block in
   let chain_state = State.Block.chain_state block in
   State.Block.context block
-  >>= fun context ->
+  >>=? fun context ->
   let protocol =
     Context.get_protocol context
     >>= fun protocol_hash ->

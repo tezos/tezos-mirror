@@ -1324,7 +1324,7 @@ module Block = struct
             >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.shell.validation_passes - 1)))
 
-  let context {chain_state; hash; _} =
+  let context_exn {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
         Store.Block.Contents.read_opt (block_store, hash))
     >|= Option.unopt_assert ~loc:__POS__
@@ -1332,13 +1332,32 @@ module Block = struct
     Shared.use chain_state.context_index (fun context_index ->
         Context.checkout_exn context_index commit)
 
+  let context_opt {chain_state; hash; _} =
+    Shared.use chain_state.block_store (fun block_store ->
+        Store.Block.Contents.read_opt (block_store, hash))
+    >|= Option.unopt_assert ~loc:__POS__
+    >>= fun {context = commit; _} ->
+    Shared.use chain_state.context_index (fun context_index ->
+        Context.checkout context_index commit)
+
+  let context block =
+    context_opt block
+    >>= function
+    | Some context ->
+        return context
+    | None ->
+        failwith "State.Block.context failed to checkout context"
+
   let protocol_hash block =
-    context block >>= fun context -> Context.get_protocol context
+    context block >>=? fun context -> Context.get_protocol context >>= return
+
+  let protocol_hash_exn block =
+    context_exn block >>= fun context -> Context.get_protocol context
 
   let protocol_level block = block.header.shell.proto_level
 
   let test_chain block =
-    context block
+    context_exn block
     >>= fun context ->
     Context.get_test_chain context
     >>= fun status ->
@@ -1415,7 +1434,7 @@ module Block = struct
         >>= fun (save_point_level, _) ->
         ( if Compare.Int32.(level pred < save_point_level) then
           Chain.get_level_indexed_protocol chain_state pred.header
-        else protocol_hash pred )
+        else protocol_hash_exn pred )
         >>= fun protocol ->
         match
           Protocol_hash.Table.find_opt
@@ -1425,7 +1444,7 @@ module Block = struct
         | None ->
             Lwt.return_none
         | Some map ->
-            protocol_hash block
+            protocol_hash_exn block
             >>= fun next_protocol ->
             Lwt.return (Protocol_hash.Map.find_opt next_protocol map) )
 
@@ -1433,13 +1452,13 @@ module Block = struct
     read_opt chain_state block.header.shell.predecessor
     >|= Option.unopt_assert ~loc:__POS__
     >>= fun pred ->
-    protocol_hash block
+    protocol_hash_exn block
     >>= fun next_protocol ->
     Chain.save_point chain_state
     >>= fun (save_point_level, _) ->
     ( if Compare.Int32.(level pred < save_point_level) then
       Chain.get_level_indexed_protocol chain_state (header pred)
-    else protocol_hash pred )
+    else protocol_hash_exn pred )
     >>= fun protocol ->
     let map =
       Option.unopt

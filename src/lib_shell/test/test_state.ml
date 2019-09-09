@@ -108,7 +108,7 @@ let zero = Bytes.create 0
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
-      State.Block.context pred
+      State.Block.context_exn pred
       >>= fun predecessor_context ->
       let max_trials = 100 in
       let rec attempt trials context =
