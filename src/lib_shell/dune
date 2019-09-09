@@ -2,6 +2,7 @@
  (name tezos_shell)
  (public_name tezos-shell)
  (libraries tezos-base
+            tezos-version
             tezos-storage
             tezos-shell-context
             tezos-p2p

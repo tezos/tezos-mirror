@@ -2,6 +2,7 @@
  (name main)
  (public_name tezos-node)
  (libraries tezos-base
+            tezos-version
             tezos-stdlib-unix
             tezos-shell-services
             tezos-rpc-http-server

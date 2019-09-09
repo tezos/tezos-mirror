@@ -25,11 +25,6 @@
             lwt
             ipaddr))
 
-(rule
-    (targets generated_git_info.ml)
-    (deps get-git-info.mlt)
-    (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{deps}))))
-
 (alias
  (name runtest_lint)
  (deps (glob_files *.ml{,i}))

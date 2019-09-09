@@ -743,42 +743,47 @@ opam:67:tezos-tooling:
   variables:
     package: tezos-tooling
 
-opam:68:tezos-protocol-alpha-tests:
+opam:68:tezos-version:
+  <<: *opam_definition
+  variables:
+    package: tezos-version
+
+opam:69:tezos-protocol-alpha-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-alpha-tests
 
-opam:69:tezos-alpha-test-helpers:
+opam:70:tezos-alpha-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-alpha-test-helpers
 
-opam:70:tezos-endorser-alpha:
+opam:71:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha
 
-opam:71:tezos-accuser-alpha-commands:
+opam:72:tezos-accuser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-alpha-commands
 
-opam:72:tezos-baker-alpha:
+opam:73:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
 
-opam:73:tezos-network-sandbox:
+opam:74:tezos-network-sandbox:
   <<: *opam_definition
   variables:
     package: tezos-network-sandbox
 
-opam:74:tezos-signer:
+opam:75:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:75:tezos-node:
+opam:76:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
