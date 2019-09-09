@@ -2,6 +2,7 @@
  (name tezos_baking_alpha)
  (public_name tezos-baking-alpha)
  (libraries tezos-base
+            tezos-version
             tezos-protocol-alpha
             tezos-protocol-environment
             tezos-shell-context

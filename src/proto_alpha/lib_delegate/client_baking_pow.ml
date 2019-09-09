@@ -27,7 +27,11 @@ open Protocol
 
 (* add a version to the pow *)
 let generate_proof_of_work_nonce () =
-  let is_updated_constant = "\x00\x00\x00\x03" in
+  let is_updated_constant =
+    let commit_hash = Tezos_version.Current_git_info.commit_hash in
+    if String.length commit_hash >= 4 then String.sub commit_hash 0 4
+    else "\x00\x00\x00\x05"
+  in
   let is_updated_cstruct = Bytes.of_string is_updated_constant in
   let is_updated_constant_len = String.length is_updated_constant in
   Bytes.concat
