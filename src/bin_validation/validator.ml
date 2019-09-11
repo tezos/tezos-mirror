@@ -53,12 +53,13 @@ let inconsistent_handshake msg =
     Validation_process_failed (Inconsistent_handshake msg))
 
 let run stdin stdout =
-  Fork_validation.recv stdin Data_encoding.Variable.bytes
+  External_validation.recv stdin Data_encoding.Variable.bytes
   >>= fun magic ->
   fail_when
-    (not (Bytes.equal magic Fork_validation.magic))
-    (inconsistent_handshake "bad magic") >>=? fun () ->
-  Fork_validation.recv stdin Fork_validation.parameters_encoding
+    (not (Bytes.equal magic External_validation.magic))
+    (inconsistent_handshake "bad magic")
+  >>=? fun () ->
+  External_validation.recv stdin External_validation.parameters_encoding
   >>= fun {context_root; protocol_root} ->
   let genesis_block = ref Block_hash.zero in
   let genesis_time = ref Time.Protocol.epoch in
@@ -88,9 +89,9 @@ let run stdin stdout =
   Context.init ~patch_context context_root
   >>= fun context_index ->
   let rec loop () =
-    Fork_validation.recv stdin Fork_validation.request_encoding
+    External_validation.recv stdin External_validation.request_encoding
     >>= (function
-          | Fork_validation.Validate
+          | External_validation.Validate
               { chain_id;
                 block_header;
                 predecessor_block_header;
@@ -122,11 +123,11 @@ let run stdin stdout =
                     ~block_header
                     operations)
               >>= fun result ->
-              Fork_validation.send
+              External_validation.send
                 stdout
                 (Error_monad.result_encoding Block_validation.result_encoding)
                 result
-          | Fork_validation.Commit_genesis
+          | External_validation.Commit_genesis
               {chain_id; time; genesis_hash; protocol} ->
               genesis_time := time ;
               genesis_block := genesis_hash ;
@@ -139,33 +140,34 @@ let run stdin stdout =
                     ~protocol
                   >>= fun commit -> return commit)
               >>= fun commit ->
-              Fork_validation.send
+              External_validation.send
                 stdout
                 (Error_monad.result_encoding Context_hash.encoding)
                 commit
-          | Fork_validation.Init ->
-              Fork_validation.send
+          | External_validation.Init ->
+              External_validation.send
                 stdout
                 (Error_monad.result_encoding Data_encoding.empty)
                 (Ok ())
-          | Fork_validation.Fork_test_chain {context_hash; forked_header} -> (
+          | External_validation.Fork_test_chain {context_hash; forked_header}
+            -> (
               Context.checkout context_index context_hash
               >>= function
               | Some ctxt ->
                   Block_validation.init_test_chain ctxt forked_header
                   >>= fun genesis_header ->
-                  Fork_validation.send
+                  External_validation.send
                     stdout
                     (Error_monad.result_encoding Block_header.encoding)
                     genesis_header
               | None ->
-                  Fork_validation.send
+                  External_validation.send
                     stdout
                     (Error_monad.result_encoding Data_encoding.empty)
                     (error
                        (Block_validator_errors.Failed_to_checkout_context
                           context_hash)) )
-          | Fork_validation.Terminate ->
+          | External_validation.Terminate ->
               Lwt_io.flush_all () >>= fun () -> exit 0)
     >>= fun () -> loop ()
   in
@@ -181,7 +183,7 @@ let main () =
   | Ok v ->
       Lwt.return v
   | Error _ as errs ->
-      Fork_validation.send
+      External_validation.send
         stdout
         (Error_monad.result_encoding Data_encoding.unit)
         errs
