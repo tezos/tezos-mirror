@@ -63,10 +63,10 @@ module Seq_validator = struct
       operations
 end
 
-(* Block validation using forked processes *)
-module Fork_validator = struct
+(* Block validation using an external processes *)
+module External_validator = struct
   include Internal_event.Legacy_logging.Make_semantic (struct
-    let name = "shell.validation_process.fork"
+    let name = "shell.validation_process.external"
   end)
 
   type validation_context = {
@@ -117,10 +117,10 @@ module Fork_validator = struct
     >>= fun () ->
     match vp.validator_process with
     | Some process ->
-        Fork_validation.send
+        External_validation.send
           process#stdin
-          Fork_validation.request_encoding
-          Fork_validation.Terminate
+          External_validation.request_encoding
+          External_validation.Terminate
         >>= fun () ->
         process#status
         >>= (function
@@ -147,19 +147,19 @@ module Fork_validator = struct
       >>= fun () ->
       let parameters =
         {
-          Fork_validation.context_root = vp.context_root;
+          External_validation.context_root = vp.context_root;
           protocol_root = vp.protocol_root;
         }
       in
       vp.validator_process <- Some process ;
-      Fork_validation.send
+      External_validation.send
         process#stdin
         Data_encoding.Variable.bytes
-        Fork_validation.magic
+        External_validation.magic
       >>= fun () ->
-      Fork_validation.send
+      External_validation.send
         process#stdin
-        Fork_validation.parameters_encoding
+        External_validation.parameters_encoding
         parameters
       >>= fun () -> Lwt.return process
     in
@@ -183,12 +183,12 @@ module Fork_validator = struct
         (* Make sure that the promise is not canceled between a send and recv *)
         Lwt.protected
           (Lwt_mutex.with_lock vp.lock (fun () ->
-               Fork_validation.send
+               External_validation.send
                  process#stdin
-                 Fork_validation.request_encoding
+                 External_validation.request_encoding
                  request
                >>= fun () ->
-               Fork_validation.recv_result process#stdout result_encoding))
+               External_validation.recv_result process#stdout result_encoding))
         >>=? fun res ->
         match process#state with
         | Running ->
@@ -214,22 +214,25 @@ type validator_kind =
       process_path : string;
     }
 
-type t = Sequential of Seq_validator.t | Fork of Fork_validator.t
+type t = Sequential of Seq_validator.t | External of External_validator.t
 
 let init = function
   | Internal index ->
       Seq_validator.init index >>= fun v -> return (Sequential v)
   | External {context_root; protocol_root; process_path} ->
-      Fork_validator.init ~context_root ~protocol_root ~process_path
+      External_validator.init ~context_root ~protocol_root ~process_path
       >>= fun v ->
-      Fork_validator.send_request v Fork_validation.Init Data_encoding.empty
-      >>=? fun () -> return (Fork v)
+      External_validator.send_request
+        v
+        External_validation.Init
+        Data_encoding.empty
+      >>=? fun () -> return (External v)
 
 let close = function
   | Sequential vp ->
       Seq_validator.close vp
-  | Fork vp ->
-      Fork_validator.close vp
+  | External vp ->
+      External_validator.close vp
 
 let apply_block bvp ~predecessor block_header operations =
   let chain_state = State.Block.chain_state predecessor in
@@ -258,10 +261,10 @@ let apply_block bvp ~predecessor block_header operations =
         ~predecessor_block_header
         ~block_header
         operations
-  | Fork vp ->
+  | External vp ->
       let chain_id = State.Chain.id chain_state in
       let request =
-        Fork_validation.Validate
+        External_validation.Validate
           {
             chain_id;
             block_header;
@@ -270,18 +273,22 @@ let apply_block bvp ~predecessor block_header operations =
             max_operations_ttl;
           }
       in
-      Fork_validator.send_request vp request Block_validation.result_encoding
+      External_validator.send_request
+        vp
+        request
+        Block_validation.result_encoding
 
 let commit_genesis bvp ~genesis_hash ~chain_id ~time ~protocol =
   match bvp with
   | Sequential {context_index} ->
       Context.commit_genesis context_index ~chain_id ~time ~protocol
       >>= fun res -> return res
-  | Fork vp ->
+  | External vp ->
       let request =
-        Fork_validation.Commit_genesis {genesis_hash; chain_id; time; protocol}
+        External_validation.Commit_genesis
+          {genesis_hash; chain_id; time; protocol}
       in
-      Fork_validator.send_request vp request Context_hash.encoding
+      External_validator.send_request vp request Context_hash.encoding
 
 let init_test_chain bvp forking_block =
   let forked_header = State.Block.header forking_block in
@@ -290,9 +297,9 @@ let init_test_chain bvp forking_block =
       State.Block.context forking_block
       >>=? fun context ->
       Block_validation.init_test_chain context forked_header
-  | Fork vp ->
+  | External vp ->
       let context_hash = forked_header.shell.context in
       let request =
-        Fork_validation.Fork_test_chain {context_hash; forked_header}
+        External_validation.Fork_test_chain {context_hash; forked_header}
       in
-      Fork_validator.send_request vp request Block_header.encoding
+      External_validator.send_request vp request Block_header.encoding
