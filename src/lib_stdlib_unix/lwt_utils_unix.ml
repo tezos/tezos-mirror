@@ -60,11 +60,11 @@ let read_string ~len fd =
   read_bytes fd b >>= fun () -> Lwt.return @@ Bytes.to_string b
 
 let read_mbytes ?(pos = 0) ?len fd buf =
-  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_bytes.read fd buf pos len
+      Lwt_unix.read fd buf pos len
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -75,11 +75,11 @@ let read_mbytes ?(pos = 0) ?len fd buf =
   inner pos len
 
 let write_mbytes ?(pos = 0) ?len descr buf =
-  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_bytes.write descr buf pos len
+      Lwt_unix.write descr buf pos len
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -356,7 +356,7 @@ module Socket = struct
     >>=? fun () ->
     (* len is the length of int16 plus the length of the message we want to send *)
     let len = message_len_size + encoded_message_len in
-    let buf = MBytes.create len in
+    let buf = Bytes.create len in
     match
       Data_encoding.Binary.write
         encoding
@@ -371,15 +371,15 @@ module Socket = struct
         fail_unless (last = len) Encoding_error
         >>=? fun () ->
         (* we set the beginning of the buf with the length of what is next *)
-        MBytes.set_int16 buf 0 encoded_message_len ;
+        TzEndian.set_int16 buf 0 encoded_message_len ;
         write_mbytes fd buf >>= fun () -> return_unit
 
   let recv fd encoding =
-    let header_buf = MBytes.create message_len_size in
+    let header_buf = Bytes.create message_len_size in
     read_mbytes ~len:message_len_size fd header_buf
     >>= fun () ->
-    let len = MBytes.get_uint16 header_buf 0 in
-    let buf = MBytes.create len in
+    let len = TzEndian.get_uint16 header_buf 0 in
+    let buf = Bytes.create len in
     read_mbytes ~len fd buf
     >>= fun () ->
     match Data_encoding.Binary.read encoding buf 0 len with

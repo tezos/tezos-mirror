@@ -336,9 +336,11 @@ struct
   module MBytes = MBytes
 
   module Raw_hashes = struct
-    let sha256 msg = Hacl.Hash.SHA256.digest msg
+    let conv f x = Bigstring.to_bytes (f (Bigstring.of_bytes x))
 
-    let sha512 msg = Hacl.Hash.SHA512.digest msg
+    let sha256 msg = conv Hacl.Hash.SHA256.digest msg
+
+    let sha512 msg = conv Hacl.Hash.SHA512.digest msg
 
     let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
   end
@@ -350,9 +352,10 @@ struct
       let bits = to_bits z in
       let len = Pervasives.((numbits z + 7) / 8) in
       let full_len = Compare.Int.max pad_to len in
-      if full_len = 0 then MBytes.empty
+      if full_len = 0 then MBytes.create 0
       else
-        let res = MBytes.make full_len '\000' in
+        let res = MBytes.create full_len in
+        Bytes.fill res 0 full_len '\000' ;
         MBytes.blit_of_string bits 0 res 0 len ;
         res
 

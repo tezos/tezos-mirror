@@ -11,7 +11,6 @@ depends: [
   "dune" { build & >= "1.7" }
   "bigstring"
   "hex"
-  "ocplib-endian"
   "re"
   "lwt"
   "lwt_log" { with-test }

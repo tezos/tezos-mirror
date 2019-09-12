@@ -48,11 +48,11 @@ type shell_header = {
 
 val shell_header_encoding : shell_header Data_encoding.t
 
-type t = {shell : shell_header; protocol_data : MBytes.t}
+type t = {shell : shell_header; protocol_data : Bytes.t}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 
-val of_bytes_exn : MBytes.t -> t
+val of_bytes_exn : Bytes.t -> t
 
 val to_b58check : t -> string
 

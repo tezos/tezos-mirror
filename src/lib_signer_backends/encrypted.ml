@@ -24,11 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Base58.data += Encrypted_ed25519 of MBytes.t
+type Base58.data += Encrypted_ed25519 of Bytes.t
 
-type Base58.data += Encrypted_secp256k1 of MBytes.t
+type Base58.data += Encrypted_secp256k1 of Bytes.t
 
-type Base58.data += Encrypted_p256 of MBytes.t
+type Base58.data += Encrypted_p256 of Bytes.t
 
 open Client_keys
 
@@ -48,7 +48,7 @@ module Raw = struct
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
 
   let encrypt ~password sk =
-    let salt = Rand.generate salt_len in
+    let salt = Hacl.Rand.gen salt_len in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     let msg =
       match (sk : Signature.secret_key) with
@@ -59,11 +59,11 @@ module Raw = struct
       | P256 sk ->
           Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
     in
-    MBytes.concat "" [salt; Crypto_box.Secretbox.box key msg nonce]
+    Bigstring.concat "" [salt; Crypto_box.Secretbox.box key msg nonce]
 
   let decrypt algo ~password ~encrypted_sk =
-    let salt = MBytes.sub encrypted_sk 0 salt_len in
-    let encrypted_sk = MBytes.sub encrypted_sk salt_len encrypted_size in
+    let salt = Bigstring.sub encrypted_sk 0 salt_len in
+    let encrypted_sk = Bigstring.sub encrypted_sk salt_len encrypted_size in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     match (Crypto_box.Secretbox.box_open key encrypted_sk nonce, algo) with
     | (None, _) ->
@@ -103,10 +103,10 @@ module Encodings = struct
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_encrypted_seed
       ~length
-      ~to_raw:(fun sk -> MBytes.to_string sk)
+      ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
         if String.length buf <> length then None
-        else Some (MBytes.of_string buf))
+        else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_ed25519 sk)
 
   let secp256k1 =
@@ -115,10 +115,10 @@ module Encodings = struct
     Base58.register_encoding
       ~prefix:Base58.Prefix.secp256k1_encrypted_secret_key
       ~length
-      ~to_raw:(fun sk -> MBytes.to_string sk)
+      ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
         if String.length buf <> length then None
-        else Some (MBytes.of_string buf))
+        else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_secp256k1 sk)
 
   let p256 =
@@ -128,10 +128,10 @@ module Encodings = struct
     Base58.register_encoding
       ~prefix:Base58.Prefix.p256_encrypted_secret_key
       ~length
-      ~to_raw:(fun sk -> MBytes.to_string sk)
+      ~to_raw:(fun sk -> Bytes.to_string sk)
       ~of_raw:(fun buf ->
         if String.length buf <> length then None
-        else Some (MBytes.of_string buf))
+        else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_p256 sk)
 
   let () =
@@ -167,7 +167,7 @@ let password_file_load ctxt =
   match ctxt#load_passwords with
   | Some stream ->
       Lwt_stream.iter
-        (fun p -> passwords := MBytes.of_string p :: !passwords)
+        (fun p -> passwords := Bigstring.of_string p :: !passwords)
         stream
       >>= fun () -> return_unit
   | None ->
@@ -195,6 +195,7 @@ let decrypt_payload cctxt ?name encrypted_sk =
   | _ ->
       failwith "Not a Base58Check-encoded encrypted key" )
   >>=? fun (algo, encrypted_sk) ->
+  let encrypted_sk = Bigstring.of_bytes encrypted_sk in
   noninteractive_decrypt_loop algo ~encrypted_sk !passwords
   >>=? function
   | Some sk ->
@@ -239,7 +240,7 @@ let rec read_password (cctxt : #Client_context.io) =
   >>=? fun password ->
   cctxt#prompt_password "Confirm password: "
   >>=? fun confirm ->
-  if not (MBytes.equal password confirm) then
+  if not (Bigstring.equal password confirm) then
     cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
   else return password
 
@@ -256,6 +257,7 @@ let encrypt cctxt sk =
     | P256 _ ->
         Encodings.p256
   in
+  let payload = Bigstring.to_bytes payload in
   let path = Base58.simple_encode encoding payload in
   let sk_uri = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
   Hashtbl.replace decrypted sk_uri sk ;

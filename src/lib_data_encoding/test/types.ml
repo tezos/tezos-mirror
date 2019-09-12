@@ -47,9 +47,9 @@ let record_to_string {a; b; c; d} =
   let c = match c with None -> "none" | Some c -> Z.to_string c in
   Format.asprintf "(%d, %B, %s, %f)" a b c d
 
-type variable_record = {p : int; q : MBytes.t}
+type variable_record = {p : int; q : Bytes.t}
 
-let default_variable_record = {p = 23; q = MBytes.of_string "wwwxxyyzzz"}
+let default_variable_record = {p = 23; q = Bytes.of_string "wwwxxyyzzz"}
 
 let variable_record_obj_enc =
   conv
@@ -64,12 +64,12 @@ let variable_record_tup_enc =
     (tup2 int31 Variable.bytes)
 
 let variable_record_to_string {p; q} =
-  Format.asprintf "(%d, %a)" p MBytes.pp_hex q
+  Format.asprintf "(%d, %a)" p Hex.pp (Hex.of_bytes q)
 
-type variable_left_record = {x : int; y : MBytes.t; z : int}
+type variable_left_record = {x : int; y : Bytes.t; z : int}
 
 let default_variable_left_record =
-  {x = 98; y = MBytes.of_string "765"; z = 4321}
+  {x = 98; y = Bytes.of_string "765"; z = 4321}
 
 let variable_left_record_obj_enc =
   conv
@@ -84,7 +84,7 @@ let variable_left_record_tup_enc =
     (tup3 int31 Variable.bytes int31)
 
 let variable_left_record_to_string {x; y; z} =
-  Format.asprintf "(%d, %a, %d)" x MBytes.pp_hex y z
+  Format.asprintf "(%d, %a, %d)" x Hex.pp (Hex.of_bytes y) z
 
 type union = A of int | B of string | C of int | D of string | E
 
@@ -182,9 +182,9 @@ module Alcotest = struct
   let bytes =
     testable
       (Fmt.of_to_string (fun s ->
-           let (`Hex s) = MBytes.to_hex s in
+           let (`Hex s) = Hex.of_bytes s in
            s))
-      MBytes.equal
+      Bytes.equal
 
   let z = testable (Fmt.of_to_string Z.to_string) Z.equal
 

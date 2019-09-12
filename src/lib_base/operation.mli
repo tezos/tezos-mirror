@@ -27,11 +27,11 @@ type shell_header = {branch : Block_hash.t}
 
 val shell_header_encoding : shell_header Data_encoding.t
 
-type t = {shell : shell_header; proto : MBytes.t}
+type t = {shell : shell_header; proto : Bytes.t}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 
-val of_bytes_exn : MBytes.t -> t
+val of_bytes_exn : Bytes.t -> t
 
 val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
 

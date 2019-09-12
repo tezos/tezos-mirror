@@ -325,9 +325,8 @@ let init () =
     @@ (amount /? Int64.of_int args.accounts))
   >>=? fun initial_amount ->
   (* Ensure a deterministic run *)
-  let new_seed () : MBytes.t =
-    String.(make 32 '\000' |> map (fun _ -> Random.int 0x100 |> char_of_int))
-    |> MBytes.of_string
+  let new_seed () : Bytes.t =
+    Bytes.(make 32 '\000' |> map (fun _ -> Random.int 0x100 |> char_of_int))
   in
   map_s
     (fun _ ->

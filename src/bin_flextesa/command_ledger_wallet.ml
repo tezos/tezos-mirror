@@ -299,7 +299,6 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
   let bytes_hash =
     Tezos_crypto.(
       `Hex batch_transaction_bytes |> Hex.to_bytes
-      |> Tezos_stdlib.MBytes.of_bytes
       |> (fun x -> [x])
       |> Blake2B.hash_bytes |> Blake2B.to_string |> Base58.raw_encode)
   in

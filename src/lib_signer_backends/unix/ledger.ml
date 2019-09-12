@@ -209,34 +209,37 @@ module Ledger_commands = struct
               ~main_hwm
               ~test_hwm) )
     >>|? fun pk ->
-    let pk = Cstruct.to_bigarray pk in
     match curve with
     | Ed25519 | Bip32_ed25519 ->
-        MBytes.set_int8 pk 0 0 ;
+        let pk = Cstruct.to_bytes pk in
+        TzEndian.set_int8 pk 0 0 ;
         (* hackish, but works. *)
         Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
     | Secp256k1 ->
         let open Libsecp256k1.External in
-        let buf = MBytes.create (Key.compressed_pk_bytes + 1) in
-        let pk = Key.read_pk_exn secp256k1_ctx pk in
-        MBytes.set_int8 buf 0 1 ;
+        let buf = Bigstring.create (Key.compressed_pk_bytes + 1) in
+        let pk = Key.read_pk_exn secp256k1_ctx (Cstruct.to_bigarray pk) in
+        EndianBigstring.BigEndian.set_int8 buf 0 1 ;
         let _nb_written = Key.write secp256k1_ctx ~pos:1 buf pk in
-        Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
+        Data_encoding.Binary.of_bytes_exn
+          Signature.Public_key.encoding
+          (Bigstring.to_bytes buf)
     | Secp256r1 -> (
         let open Uecc in
         let pklen = compressed_size secp256r1 in
-        let buf = MBytes.create (pklen + 1) in
-        match pk_of_bytes secp256r1 pk with
+        let buf = Bigstring.create (pklen + 1) in
+        match pk_of_bytes secp256r1 (Cstruct.to_bigarray pk) with
         | None ->
             Pervasives.failwith
               "Impossible to read P256 public key from Ledger"
         | Some pk ->
-            MBytes.set_int8 buf 0 2 ;
+            EndianBigstring.BigEndian.set_int8 buf 0 2 ;
             let _nb_written =
-              write_key ~compress:true (MBytes.sub buf 1 pklen) pk
+              write_key ~compress:true (Bigstring.sub buf 1 pklen) pk
             in
-            Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf
-        )
+            Data_encoding.Binary.of_bytes_exn
+              Signature.Public_key.encoding
+              (Bigstring.to_bytes buf) )
 
   let get_public_key = public_key_returning_instruction `Get_public_key
 
@@ -284,17 +287,19 @@ module Ledger_commands = struct
       | Ok (path, curve) ->
           return (`Path_curve (path, curve))
 
-  let sign ?watermark ~version hid curve path (base_msg : MBytes.t) =
+  let sign ?watermark ~version hid curve path (base_msg : Bytes.t) =
     let msg =
       Option.unopt_map watermark ~default:base_msg ~f:(fun watermark ->
-          MBytes.concat "" [Signature.bytes_of_watermark watermark; base_msg])
+          Bytes.concat
+            (Bytes.of_string "")
+            [Signature.bytes_of_watermark watermark; base_msg])
     in
     let path = Bip32_path.tezos_root @ path in
     wrap_ledger_cmd (fun pp ->
         let {Ledgerwallet_tezos.Version.major; minor; patch; _} = version in
         let open Rresult.R.Infix in
         if (major, minor, patch) <= (2, 0, 0) then
-          Ledgerwallet_tezos.sign ~pp hid curve path (Cstruct.of_bigarray msg)
+          Ledgerwallet_tezos.sign ~pp hid curve path (Cstruct.of_bytes msg)
           >>= fun s -> Ok (None, s)
         else
           Ledgerwallet_tezos.sign_and_hash
@@ -302,7 +307,7 @@ module Ledger_commands = struct
             hid
             curve
             path
-            (Cstruct.of_bigarray msg)
+            (Cstruct.of_bytes msg)
           >>= fun (h, s) -> Ok (Some h, s))
     >>=? fun (hash_opt, signature) ->
     ( match hash_opt with
@@ -310,7 +315,7 @@ module Ledger_commands = struct
         return_unit
     | Some hsh ->
         let hash_msg = Blake2B.hash_bytes [msg] in
-        let ledger_one = Blake2B.of_bytes_exn (Cstruct.to_bigarray hsh) in
+        let ledger_one = Blake2B.of_bytes_exn (Cstruct.to_bytes hsh) in
         if Blake2B.equal hash_msg ledger_one then return_unit
         else
           fail
@@ -319,8 +324,7 @@ module Ledger_commands = struct
     >>=? fun () ->
     match curve with
     | Ed25519 | Bip32_ed25519 ->
-        let signature = Cstruct.to_bigarray signature in
-        let signature = Ed25519.of_bytes_exn signature in
+        let signature = Ed25519.of_bytes_exn (Cstruct.to_bytes signature) in
         return (Signature.of_ed25519 signature)
     | Secp256k1 ->
         (* Remove parity info *)
@@ -329,7 +333,7 @@ module Ledger_commands = struct
         let open Libsecp256k1.External in
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let bytes = Sign.to_bytes secp256k1_ctx signature in
-        let signature = Secp256k1.of_bytes_exn bytes in
+        let signature = Secp256k1.of_bytes_exn (Bigstring.to_bytes bytes) in
         return (Signature.of_secp256k1 signature)
     | Secp256r1 ->
         (* Remove parity info *)
@@ -339,10 +343,10 @@ module Ledger_commands = struct
         (* We use secp256r1 library to extract P256 DER signature. *)
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let buf = Sign.to_bytes secp256k1_ctx signature in
-        let signature = P256.of_bytes_exn buf in
+        let signature = P256.of_bytes_exn (Bigstring.to_bytes buf) in
         return (Signature.of_p256 signature)
 
-  let get_deterministic_nonce hid curve path (msg : MBytes.t) =
+  let get_deterministic_nonce hid curve path msg =
     let path = Bip32_path.tezos_root @ path in
     wrap_ledger_cmd (fun pp ->
         Ledgerwallet_tezos.get_deterministic_nonce
@@ -350,8 +354,8 @@ module Ledger_commands = struct
           hid
           curve
           path
-          (Cstruct.of_bigarray msg))
-    >>=? fun nonce -> return (Cstruct.to_bigarray nonce : MBytes.t)
+          (Cstruct.of_bytes msg))
+    >>=? fun nonce -> return (Bigstring.of_bytes (Cstruct.to_bytes nonce))
 end
 
 (** Identification of a ledger's root key through crouching-tigers
@@ -790,7 +794,8 @@ module Signer_implementation : Client_keys.SIGNER = struct
 
   let deterministic_nonce_hash (sk : sk_uri) msg =
     deterministic_nonce sk msg
-    >>=? fun nonce -> return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
+    >>=? fun nonce ->
+    return (Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce]))
 
   let supports_deterministic_nonces _ = return_true
 end
@@ -926,8 +931,8 @@ let generic_commands group =
                       cctxt#message
                         "@[Attempting a signature@ (of `%a`),@ please@ \
                          validate on@ the ledger.@]"
-                        MBytes.pp_hex
-                        pkh_bytes
+                        Hex.pp
+                        (Hex.of_bytes pkh_bytes)
                       >>= fun () ->
                       Ledger_commands.sign
                         ~version

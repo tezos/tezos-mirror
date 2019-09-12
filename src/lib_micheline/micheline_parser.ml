@@ -663,7 +663,7 @@ let rec parse ?(check = true) errors tokens stack =
         else (errors, contents)
       in
       let bytes =
-        MBytes.of_hex
+        Hex.to_bytes
           (`Hex (String.sub contents 2 (String.length contents - 2)))
       in
       let expr : node = Bytes (loc, bytes) in

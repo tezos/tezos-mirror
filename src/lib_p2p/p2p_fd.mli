@@ -30,11 +30,11 @@ type t
 
 val id : t -> int
 
-val read : t -> Lwt_bytes.t -> int -> int -> int Lwt.t
+val read : t -> Bytes.t -> int -> int -> int Lwt.t
 
 val close : t -> unit Lwt.t
 
-val write : t -> MBytes.t -> unit Lwt.t
+val write : t -> Bytes.t -> unit Lwt.t
 
 val socket : Lwt_unix.socket_domain -> Lwt_unix.socket_type -> int -> t
 

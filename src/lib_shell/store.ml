@@ -170,7 +170,7 @@ module Block = struct
     max_operations_ttl : int;
     last_allowed_fork_level : Int32.t;
     context : Context_hash.t;
-    metadata : MBytes.t;
+    metadata : Bytes.t;
   }
 
   module Contents =
@@ -276,7 +276,7 @@ module Block = struct
         let name = ["metadata"]
       end)
       (Store_helpers.Make_value (struct
-        type t = MBytes.t list
+        type t = Bytes.t list
 
         let encoding = Data_encoding.(list bytes)
       end))

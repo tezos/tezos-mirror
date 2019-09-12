@@ -13,7 +13,7 @@ let loops = 10
 
 let passwords =
   List.map
-    MBytes.of_string
+    Bigstring.of_string
     [ "ahThie5H";
       "aVah7eid";
       "Hihohh1n";
@@ -55,7 +55,7 @@ let fake_ctx () =
       Format.kasprintf (fun _ -> return "")
 
     method prompt_password : type a.
-        (a, MBytes.t tzresult) Client_context.lwt_format -> a =
+        (a, Bigstring.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun _ ->
           (* return Bigstring.empty *)
           match distributed with

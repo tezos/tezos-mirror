@@ -66,10 +66,10 @@ let fitness_from_int64 fitness =
   let version_number = "\000" in
   (* definitions taken from src/proto_alpha/lib_protocol/src/fitness_repr.ml *)
   let int64_to_bytes i =
-    let b = MBytes.create 8 in
-    MBytes.set_int64 b 0 i ; b
+    let b = Bytes.create 8 in
+    TzEndian.set_int64 b 0 i ; b
   in
-  [MBytes.of_string version_number; int64_to_bytes fitness]
+  [Bytes.of_string version_number; int64_to_bytes fitness]
 
 let timestamp_arg =
   Clic.arg

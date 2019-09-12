@@ -32,7 +32,7 @@ let unix_scheme = "unix"
 
 module Make (P : sig
   val authenticate :
-    Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+    Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
 end) =
 struct
   type request_type =
@@ -87,7 +87,9 @@ struct
       | None ->
           msg
       | Some watermark ->
-          MBytes.concat "" [Signature.bytes_of_watermark watermark; msg]
+          Bytes.concat
+            (Bytes.of_string "")
+            [Signature.bytes_of_watermark watermark; msg]
     in
     signer_operation path pkh msg Sign_request
     >>=? fun conn ->

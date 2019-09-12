@@ -132,7 +132,7 @@ module Block : sig
     max_operations_ttl : int;
     last_allowed_fork_level : Int32.t;
     context : Context_hash.t;
-    metadata : MBytes.t;
+    metadata : Bytes.t;
   }
 
   module Contents :
@@ -168,7 +168,7 @@ module Block : sig
     MAP_STORE
       with type t = store * Block_hash.t
        and type key = int
-       and type value = MBytes.t list
+       and type value = Bytes.t list
 
   type invalid_block = {level : int32; errors : Error_monad.error list}
 
@@ -206,7 +206,7 @@ module Protocol : sig
   module RawContents :
     SINGLE_STORE
       with type t = store * Protocol_hash.t
-       and type value := MBytes.t
+       and type value := Bytes.t
 end
 
 (** {2 Temporary test chain forking block store} *)

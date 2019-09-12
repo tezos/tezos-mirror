@@ -27,19 +27,19 @@
 
 module IrminPath = Irmin.Path.String_list
 
-module MBytesContent = struct
-  type t = MBytes.t
+module BytesContent = struct
+  type t = Bytes.t
 
   let t =
-    Irmin.Type.(like cstruct)
-      (fun x -> Cstruct.to_bigarray x)
-      (fun x -> Cstruct.of_bigarray x)
+    Irmin.Type.(like string)
+      (fun x -> Bytes.of_string x)
+      (fun x -> Bytes.to_string x)
 
   let merge = Irmin.Merge.default Irmin.Type.(option t)
 
-  let pp ppf b = Format.pp_print_string ppf (MBytes.to_string b)
+  let pp ppf b = Format.pp_print_string ppf (Bytes.to_string b)
 
-  let of_string s = Ok (MBytes.of_string s)
+  let of_string s = Ok (Bytes.of_string s)
 end
 
 module Metadata = struct
@@ -57,10 +57,10 @@ module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
 
   let digest_size = Context_hash.size
 
-  let to_raw t = Cstruct.of_bigarray (Context_hash.to_bytes t)
+  let to_raw t = Cstruct.of_bytes (Context_hash.to_bytes t)
 
   let of_raw t =
-    match Context_hash.of_bytes_opt (Cstruct.to_bigarray t) with
+    match Context_hash.of_bytes_opt (Cstruct.to_bytes t) with
     | Some t ->
         t
     | None ->
@@ -70,8 +70,7 @@ module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
   let t = Irmin.Type.like Irmin.Type.cstruct of_raw to_raw
 
   let digest t x =
-    Context_hash.hash_bytes
-      [Cstruct.to_bigarray (Irmin.Type.encode_cstruct t x)]
+    Context_hash.hash_bytes [Cstruct.to_bytes (Irmin.Type.encode_cstruct t x)]
 
   let pp = Context_hash.pp
 
@@ -85,11 +84,11 @@ module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
   let has_kind = function `SHA1 -> true | _ -> false
 
   let to_raw_int c =
-    Int64.to_int @@ MBytes.get_int64 (Context_hash.to_bytes c) 0
+    Int64.to_int @@ TzEndian.get_int64 (Context_hash.to_bytes c) 0
 end
 
 module GitStore =
-  Irmin_lmdb.Make (Metadata) (MBytesContent) (Irmin.Path.String_list)
+  Irmin_lmdb.Make (Metadata) (BytesContent) (Irmin.Path.String_list)
     (Irmin.Branch.String)
     (IrminBlake2B)
 
@@ -366,7 +365,7 @@ let data_key key = current_data_key @ key
 
 type key = string list
 
-type value = MBytes.t
+type value = Bytes.t
 
 let mem ctxt key =
   GitStore.Tree.mem ctxt.tree (data_key key) >>= fun v -> Lwt.return v
@@ -518,7 +517,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
   let genesis_header : Block_header.t =
     {
       shell = {faked_shell_header with predecessor = genesis_hash};
-      protocol_data = MBytes.create 0;
+      protocol_data = Bytes.create 0;
     }
   in
   let branch = get_branch chain_id in

@@ -55,7 +55,7 @@ let signed_wrong = Ed25519.append_signature wrong_account.secret_key
 (* forge a block from a list of operations *)
 let block_forged ?prev ops =
   let from_int64 x =
-    [ MBytes.of_string Proto.Constants_repr.version_number;
+    [ Bytes.of_string Proto.Constants_repr.version_number;
       Proto.Fitness_repr.int64_to_bytes x ]
   in
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
@@ -199,7 +199,7 @@ let request_op_times op_signed n conn =
   send conn (Get_operations op_hashes)
 
 let send_block_size n conn =
-  let bytes = MBytes.create n in
+  let bytes = Bytes.create n in
   let open Block_hash in
   lwt_log_notice
     "propagating fake %d byte block %a"
@@ -209,7 +209,7 @@ let send_block_size n conn =
   >>= fun () -> send conn (Block bytes)
 
 let send_protocol_size n conn =
-  let bytes = MBytes.create n in
+  let bytes = Bytes.create n in
   let open Protocol_hash in
   lwt_log_notice
     "propagating fake %d byte protocol %a"
@@ -219,7 +219,7 @@ let send_protocol_size n conn =
   >>= fun () -> send conn (Protocol bytes)
 
 let send_operation_size n conn =
-  let op_faked = MBytes.create n in
+  let op_faked = Bytes.create n in
   let op_hashed = Operation_hash.hash_bytes [op_faked] in
   lwt_log_notice
     "propagating fake %d byte operation %a"

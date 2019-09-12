@@ -33,7 +33,7 @@ module Make
 
       val authenticate :
         Signature.Public_key_hash.t list ->
-        MBytes.t ->
+        Bytes.t ->
         Signature.t tzresult Lwt.t
 
       val logger : RPC_client.logger

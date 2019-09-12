@@ -10,7 +10,11 @@ depends: [
   "ocamlfind" { build }
   "base-unix"
   "dune" { build & >= "1.7" }
-  "tezos-base"
+  "tezos-data-encoding"
+  "tezos-error-monad"
+  "tezos-event-logging"
+  "tezos-rpc"
+  "tezos-stdlib"
   "lwt" { >= "3.0.0" }
   "ptime" { >= "0.8.4" }
   "mtime" { >= "1.0.0" }

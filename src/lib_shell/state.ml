@@ -329,7 +329,7 @@ module Locked_block = struct
         context;
       }
     in
-    let header : Block_header.t = {shell; protocol_data = MBytes.create 0} in
+    let header : Block_header.t = {shell; protocol_data = Bytes.create 0} in
     Store.Block.Contents.store
       (store, genesis.block)
       {
@@ -337,7 +337,7 @@ module Locked_block = struct
         Store.Block.message = Some "Genesis";
         max_operations_ttl = 0;
         context;
-        metadata = MBytes.create 0;
+        metadata = Bytes.create 0;
         last_allowed_fork_level = 0l;
       }
     >>= fun () -> Lwt.return header
@@ -1553,7 +1553,7 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol
           Store.Block.message = Some "Genesis";
           max_operations_ttl = 0;
           context = genesis_header.shell.context;
-          metadata = MBytes.create 0;
+          metadata = Bytes.create 0;
           last_allowed_fork_level = 0l;
         }
       >>= fun () ->

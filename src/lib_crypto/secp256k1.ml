@@ -47,7 +47,7 @@ open Libsecp256k1.External
 
 let context =
   let ctx = Context.create () in
-  match Context.randomize ctx (Rand.generate 32) with
+  match Context.randomize ctx (Hacl.Rand.gen 32) with
   | false ->
       failwith "Secp256k1 context randomization failed. Aborting."
   | true ->
@@ -60,13 +60,14 @@ module Public_key = struct
 
   let title = "A Secp256k1 public key"
 
-  let to_bytes pk = Key.to_bytes context pk
+  let to_bytes pk = Bigstring.to_bytes (Key.to_bytes context pk)
 
-  let of_bytes_opt s = try Some (Key.read_pk_exn context s) with _ -> None
+  let of_bytes_opt s =
+    try Some (Key.read_pk_exn context (Bigstring.of_bytes s)) with _ -> None
 
-  let to_string s = MBytes.to_string (to_bytes s)
+  let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let size = Key.compressed_pk_bytes
 
@@ -87,7 +88,7 @@ module Public_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b = MBytes.compare (to_bytes a) (to_bytes b)
+    let compare a b = Bytes.compare (to_bytes a) (to_bytes b)
   end)
 
   include Helpers.MakeRaw (struct
@@ -145,13 +146,19 @@ module Secret_key = struct
   let size = Key.secret_bytes
 
   let of_bytes_opt s =
-    match Key.read_sk context s with Ok x -> Some x | _ -> None
+    match Key.read_sk context (Bigstring.of_bytes s) with
+    | Ok x ->
+        Some x
+    | _ ->
+        None
 
-  let to_bytes x = Key.to_bytes context x
+  let to_bigstring = Key.to_bytes context
 
-  let to_string s = MBytes.to_string (to_bytes s)
+  let to_bytes x = Bigstring.to_bytes (to_bigstring x)
 
-  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+  let to_string s = Bytes.to_string (to_bytes s)
+
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let to_public_key key = Key.neuterize_exn context key
 
@@ -170,7 +177,7 @@ module Secret_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b = MBytes.compare (Key.buffer a) (Key.buffer b)
+    let compare a b = Bigstring.compare (Key.buffer a) (Key.buffer b)
   end)
 
   include Helpers.MakeRaw (struct
@@ -220,7 +227,7 @@ end
 
 type t = Sign.plain Sign.t
 
-type watermark = MBytes.t
+type watermark = Bytes.t
 
 let name = "Secp256k1"
 
@@ -229,13 +236,17 @@ let title = "A Secp256k1 signature"
 let size = Sign.plain_bytes
 
 let of_bytes_opt s =
-  match Sign.read context s with Ok s -> Some s | Error _ -> None
+  match Sign.read context (Bigstring.of_bytes s) with
+  | Ok s ->
+      Some s
+  | Error _ ->
+      None
 
-let to_bytes = Sign.to_bytes ~der:false context
+let to_bytes t = Bigstring.to_bytes (Sign.to_bytes ~der:false context t)
 
-let to_string s = MBytes.to_string (to_bytes s)
+let to_string s = Bytes.to_string (to_bytes s)
 
-let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
 type Base58.data += Data of t
 
@@ -252,7 +263,7 @@ let () = Base58.check_encoded_prefix b58check_encoding "spsig1" 99
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare a b = MBytes.compare (Sign.buffer a) (Sign.buffer b)
+  let compare a b = Bigstring.compare (Sign.buffer a) (Sign.buffer b)
 end)
 
 include Helpers.MakeRaw (struct
@@ -299,30 +310,37 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = of_bytes_exn (MBytes.make size '\000')
+let zero = of_bytes_exn (Bytes.make size '\000')
 
 let sign ?watermark sk msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  Sign.sign_exn context ~sk msg
+  Sign.sign_exn context ~sk (Bigstring.of_bytes msg)
 
 let check ?watermark public_key signature msg =
   let msg =
     Blake2B.to_bytes @@ Blake2B.hash_bytes
     @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
   in
-  Sign.verify_exn context ~pk:public_key ~msg ~signature
+  Sign.verify_exn
+    context
+    ~pk:public_key
+    ~msg:(Bigstring.of_bytes msg)
+    ~signature
 
-let generate_key ?(seed = Rand.generate 32) () =
+let generate_key ?(seed = Hacl.Rand.gen 32) () =
   let sk = Key.read_sk_exn context seed in
   let pk = Key.neuterize_exn context sk in
   let pkh = Public_key.hash pk in
   (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
-  Hacl.Hash.SHA256.HMAC.digest ~key:(Secret_key.to_bytes sk) ~msg
+  let msg = Bigstring.of_bytes msg in
+  let key = Secret_key.to_bigstring sk in
+  Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
-  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
+  let nonce = deterministic_nonce sk msg in
+  Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce])

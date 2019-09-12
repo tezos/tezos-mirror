@@ -48,8 +48,8 @@ let component_encoding =
       {name; interface; implementation})
     (obj3
        (req "name" string)
-       (opt "interface" (conv MBytes.of_string MBytes.to_string bytes))
-       (req "implementation" (conv MBytes.of_string MBytes.to_string bytes)))
+       (opt "interface" string)
+       (req "implementation" string))
 
 let env_version_encoding =
   let open Data_encoding in

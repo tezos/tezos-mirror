@@ -30,7 +30,7 @@ module MakeRaw (H : sig
 
   val name : string
 
-  val of_bytes_opt : MBytes.t -> t option
+  val of_bytes_opt : Bytes.t -> t option
 
   val to_string : t -> string
 

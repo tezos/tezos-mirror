@@ -28,8 +28,8 @@ open Block_validator_errors
 
 type result = {
   validation_result : Tezos_protocol_environment.validation_result;
-  block_metadata : MBytes.t;
-  ops_metadata : MBytes.t list list;
+  block_metadata : Bytes.t;
+  ops_metadata : Bytes.t list list;
   context_hash : Context_hash.t;
   forking_testchain : bool;
 }

@@ -112,7 +112,7 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Ignore ->
       0
   | Bytes `Variable ->
-      MBytes.length value
+      Bytes.length value
   | String `Variable ->
       String.length value
   | Array (Some max_length, _e) when Array.length value > max_length ->

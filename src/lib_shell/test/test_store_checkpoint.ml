@@ -70,17 +70,17 @@ let lolblock ?(operations = []) header =
           predecessor = genesis_block;
           operations_hash;
           fitness =
-            [ MBytes.of_string @@ string_of_int @@ String.length header;
-              MBytes.of_string @@ string_of_int @@ 12 ];
+            [ Bytes.of_string @@ string_of_int @@ String.length header;
+              Bytes.of_string @@ string_of_int @@ 12 ];
           context = Context_hash.zero;
         };
-      protocol_data = MBytes.of_string header;
+      protocol_data = Bytes.of_string header;
     }
   in
   let block_contents =
     {
       header = block_header;
-      Store.Block.metadata = MBytes.create 0;
+      Store.Block.metadata = Bytes.create 0;
       max_operations_ttl = 0;
       message = None;
       context = Context_hash.zero;

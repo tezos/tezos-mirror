@@ -65,17 +65,17 @@ val register : t -> P2p_fd.t -> connection
 (** [write conn msg] returns [Ok ()] when [msg] has been added to
     [conn]'s write queue, or fail with an error. *)
 val write :
-  ?canceler:Lwt_canceler.t -> connection -> MBytes.t -> unit tzresult Lwt.t
+  ?canceler:Lwt_canceler.t -> connection -> Bytes.t -> unit tzresult Lwt.t
 
 (** [write_now conn msg] is [true] iff [msg] has been (immediately)
     added to [conn]'s write queue, [false] if it has been dropped. *)
-val write_now : connection -> MBytes.t -> bool
+val write_now : connection -> Bytes.t -> bool
 
 (** [read_now conn ~pos ~len buf] blits at most [len] bytes from
     [conn]'s read queue and returns the number of bytes written in
     [buf] starting at [pos]. *)
 val read_now :
-  connection -> ?pos:int -> ?len:int -> MBytes.t -> int tzresult option
+  connection -> ?pos:int -> ?len:int -> Bytes.t -> int tzresult option
 
 (** Like [read_now], but waits till [conn] read queue has at least one
     element instead of failing. *)
@@ -84,7 +84,7 @@ val read :
   connection ->
   ?pos:int ->
   ?len:int ->
-  MBytes.t ->
+  Bytes.t ->
   int tzresult Lwt.t
 
 (** Like [read], but blits exactly [len] bytes in [buf]. *)
@@ -93,7 +93,7 @@ val read_full :
   connection ->
   ?pos:int ->
   ?len:int ->
-  MBytes.t ->
+  Bytes.t ->
   unit tzresult Lwt.t
 
 (** [stat conn] is a snapshot of current bandwidth usage for

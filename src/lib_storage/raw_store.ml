@@ -32,7 +32,7 @@ type t = {
 
 type key = string list
 
-type value = MBytes.t
+type value = Bytes.t
 
 type error += Unknown of string list
 
@@ -108,10 +108,10 @@ let known {dir; parent} key =
 let read_opt {dir; parent} key =
   ( match Lwt.get parent with
   | Some (txn, db, _cursor) ->
-      Lmdb.get txn db (concat key) >>| MBytes.copy
+      Lmdb.get txn db (concat key) >>| Bigstring.to_bytes
   | None ->
       Lmdb.with_ro_db dir ~f:(fun txn db ->
-          Lmdb.get txn db (concat key) >>| MBytes.copy) )
+          Lmdb.get txn db (concat key) >>| Bigstring.to_bytes) )
   |> function
   | Ok v ->
       Lwt.return_some v
@@ -123,13 +123,14 @@ let read_opt {dir; parent} key =
 let read {dir; parent} key =
   ( match Lwt.get parent with
   | Some (txn, db, _cursor) ->
-      Lmdb.get txn db (concat key) >>| MBytes.copy
+      Lmdb.get txn db (concat key) >>| Bigstring.to_bytes
   | None ->
       Lmdb.with_ro_db dir ~f:(fun txn db ->
-          Lmdb.get txn db (concat key) >>| MBytes.copy) )
+          Lmdb.get txn db (concat key) >>| Bigstring.to_bytes) )
   |> function Ok v -> return v | Error _err -> fail (Unknown key)
 
 let store {dir; parent} k v =
+  let v = Bigstring.of_bytes v in
   ( match Lwt.get parent with
   | Some (txn, db, _cursor) ->
       Lmdb.put txn db (concat k) v
@@ -163,7 +164,7 @@ let known_dir {dir; parent} k =
     Lmdb.cursor_at cursor k
     >>= fun () ->
     Lmdb.cursor_get cursor
-    >>| fun (first_k, _v) -> is_prefix k (MBytes.to_string first_k)
+    >>| fun (first_k, _v) -> is_prefix k (Bigstring.to_string first_k)
   in
   ( match Lwt.get parent with
   | Some (txn, db, _cursor) ->
@@ -179,7 +180,7 @@ let remove_dir {dir; parent} k =
     Lmdb.cursor_at cursor k
     >>= fun () ->
     Lmdb.cursor_iter cursor ~f:(fun (kk, _v) ->
-        let kk_string = MBytes.to_string kk in
+        let kk_string = Bigstring.to_string kk in
         if is_prefix k kk_string then Lmdb.cursor_del cursor
         else Error KeyNotFound)
   in
@@ -285,7 +286,7 @@ let fold t k ~init ~f =
   let rec inner ht cursor acc =
     Lmdb.cursor_get cursor
     >>=? fun (kk, _v) ->
-    let kk = MBytes.to_string kk in
+    let kk = Bigstring.to_string kk in
     let kk_split = split kk in
     match is_child ~child:kk_split ~parent:k with
     | false ->
@@ -320,7 +321,7 @@ let fold_keys t k ~init ~f =
         (let rec inner acc =
            Lmdb.cursor_get cursor
            >>=? fun (kk, _v) ->
-           let kk = MBytes.to_string kk in
+           let kk = Bigstring.to_string kk in
            let kk_split = split kk in
            match is_child ~child:kk_split ~parent:k with
            | false ->

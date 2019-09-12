@@ -90,7 +90,7 @@ let binary ?(expected = fun _ -> true) read_encoding bytes () =
       ignore (Binary.of_bytes_exn read_encoding bytes))
 
 let stream ?(expected = fun _ -> true) read_encoding bytes () =
-  let len_data = MBytes.length bytes in
+  let len_data = Bytes.length bytes in
   for sz = 1 to max 1 len_data do
     let name = Format.asprintf "stream (%d)" sz in
     match chunked_read sz read_encoding bytes with
@@ -245,8 +245,8 @@ let tests =
       ~expected:invalid_string_length
       bytes
       (Fixed.bytes 4)
-      (MBytes.of_string "turlututu")
-  @ all "bytes.bounded" bytes (Bounded.bytes 4) (MBytes.of_string "turlututu")
+      (Bytes.of_string "turlututu")
+  @ all "bytes.bounded" bytes (Bounded.bytes 4) (Bytes.of_string "turlututu")
   @ all
       "unknown_case.B"
       ~expected:missing_case
@@ -258,49 +258,49 @@ let tests =
   @ test_bounded_string_list
   @ [ ( "n.truncated",
         `Quick,
-        binary ~expected:not_enough_data n (MBytes.of_string "\x83") );
+        binary ~expected:not_enough_data n (Bytes.of_string "\x83") );
       ( "n.trailing_zero",
         `Quick,
-        binary ~expected:trailing_zero n (MBytes.of_string "\x83\x00") );
+        binary ~expected:trailing_zero n (Bytes.of_string "\x83\x00") );
       ( "n.trailing_zero2",
         `Quick,
-        binary ~expected:trailing_zero n (MBytes.of_string "\x83\x00") );
+        binary ~expected:trailing_zero n (Bytes.of_string "\x83\x00") );
       ( "z.truncated",
         `Quick,
-        binary ~expected:not_enough_data z (MBytes.of_string "\x83") );
+        binary ~expected:not_enough_data z (Bytes.of_string "\x83") );
       ( "z.trailing_zero",
         `Quick,
-        binary ~expected:trailing_zero z (MBytes.of_string "\x83\x00") );
+        binary ~expected:trailing_zero z (Bytes.of_string "\x83\x00") );
       ( "z.trailing_zero2",
         `Quick,
-        binary ~expected:trailing_zero z (MBytes.of_string "\x83\x80\x00") );
+        binary ~expected:trailing_zero z (Bytes.of_string "\x83\x80\x00") );
       ( "dynamic_size.empty",
         `Quick,
         binary
           ~expected:not_enough_data
           (dynamic_size Variable.string)
-          (MBytes.of_string "") );
+          (Bytes.of_string "") );
       ( "dynamic_size.partial_size",
         `Quick,
         binary
           ~expected:not_enough_data
           (dynamic_size Variable.string)
-          (MBytes.of_string "\x00\x00") );
+          (Bytes.of_string "\x00\x00") );
       ( "dynamic_size.incomplete_data",
         `Quick,
         binary
           ~expected:not_enough_data
           (dynamic_size Variable.string)
-          (MBytes.of_string "\x00\x00\x00\x04\x00\x00") );
+          (Bytes.of_string "\x00\x00\x00\x04\x00\x00") );
       ( "dynamic_size.outer-garbage",
         `Quick,
         binary
           ~expected:extra_bytes
           (dynamic_size Variable.string)
-          (MBytes.of_string "\x00\x00\x00\x01\x00\x00") );
+          (Bytes.of_string "\x00\x00\x00\x01\x00\x00") );
       ( "dynamic_size.inner-garbage",
         `Quick,
         binary
           ~expected:extra_bytes
           (dynamic_size uint8)
-          (MBytes.of_string "\x00\x00\x00\x02\x00\x00") ) ]
+          (Bytes.of_string "\x00\x00\x00\x02\x00\x00") ) ]

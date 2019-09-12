@@ -194,7 +194,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
         "Watermark: `%a` (0x%s)"
         Signature.pp_watermark
         watermark
-        (MBytes.to_hex (Signature.bytes_of_watermark watermark) |> Hex.show)) ;
+        (Hex.of_bytes (Signature.bytes_of_watermark watermark) |> Hex.show)) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
       TzString.fold_left (* We split the bytes into lines for display: *)
@@ -206,7 +206,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
           then n + 1
           else (pp_print_space ppf () ; 0))
         0
-        (MBytes.to_hex bytes |> Hex.show)
+        (Hex.of_bytes bytes |> Hex.show)
       |> ignore) ;
   item (fun ppf () ->
       pp_print_text ppf "Blake 2B Hash (raw): " ;
@@ -260,7 +260,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = MBytes.length bytes + Signature.size in
+  let size = Bytes.length bytes + Signature.size in
   ( match fee_parameter with
   | Some fee_parameter ->
       check_fees cctxt fee_parameter contents size
@@ -710,8 +710,8 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
-      MBytes.pp_hex
-      bytes
+      Hex.pp
+      (Hex.of_bytes bytes)
       Operation_hash.pp
       oph
     >>= fun () ->

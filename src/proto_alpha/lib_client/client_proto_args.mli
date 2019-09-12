@@ -103,4 +103,4 @@ val int_parameter : (int, full) Clic.parameter
 
 val string_parameter : (string, full) Clic.parameter
 
-val bytes_parameter : (MBytes.t, full) Clic.parameter
+val bytes_parameter : (Bytes.t, full) Clic.parameter

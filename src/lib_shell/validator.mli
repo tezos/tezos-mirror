@@ -60,7 +60,7 @@ val validate_block :
   t ->
   ?force:bool ->
   ?chain_id:Chain_id.t ->
-  MBytes.t ->
+  Bytes.t ->
   Operation.t list list ->
   (Block_hash.t * State.Block.t option tzresult Lwt.t) tzresult Lwt.t
 

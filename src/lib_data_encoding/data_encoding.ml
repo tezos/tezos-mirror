@@ -63,20 +63,17 @@ module Encoding = struct
           (let open Json_encoding in
           conv
             (fun s ->
-              if MBytes.length s > length then invalid_arg "oversized string" ;
+              if Bytes.length s > length then invalid_arg "oversized string" ;
               s)
             (fun s ->
-              if MBytes.length s > length then
+              if Bytes.length s > length then
                 raise
                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
             Json.bytes_jsont)
   end
 
-  type 'a lazy_state =
-    | Value of 'a
-    | Bytes of MBytes.t
-    | Both of MBytes.t * 'a
+  type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a
 
   type 'a lazy_t = {mutable state : 'a lazy_state; encoding : 'a t}
 

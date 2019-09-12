@@ -165,7 +165,7 @@ module Encoding : sig
 
   (** Encoding of arbitrary bytes
       (encoded via hex in JSON and directly as a sequence byte in binary). *)
-  val bytes : MBytes.t encoding
+  val bytes : Bytes.t encoding
 
   (** {3 Descriptor combinators} *)
 
@@ -520,7 +520,7 @@ module Encoding : sig
     val string : int -> string encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
-    val bytes : int -> MBytes.t encoding
+    val bytes : int -> Bytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
         there are [n] null bytes ([\000]) added after the value encoded by [e].
@@ -535,7 +535,7 @@ module Encoding : sig
   module Variable : sig
     val string : string encoding
 
-    val bytes : MBytes.t encoding
+    val bytes : Bytes.t encoding
 
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
@@ -557,7 +557,7 @@ module Encoding : sig
     val string : int -> string encoding
 
     (** See {!string} above. *)
-    val bytes : int -> MBytes.t encoding
+    val bytes : int -> Bytes.t encoding
   end
 
   (** Mark an encoding as being of dynamic size.
@@ -614,7 +614,7 @@ module Encoding : sig
   (** Obtain the bytes without actually deserializing.  Will serialize
       and memoize the result if the value is not the result of a lazy
       deserialization. *)
-  val force_bytes : 'a lazy_t -> MBytes.t
+  val force_bytes : 'a lazy_t -> Bytes.t
 
   (** Make a lazy value from an immediate one. *)
   val make_lazy : 'a encoding -> 'a -> 'a lazy_t
@@ -622,7 +622,7 @@ module Encoding : sig
   (** Apply on structure of lazy value, and combine results *)
   val apply_lazy :
     fun_value:('a -> 'b) ->
-    fun_bytes:(MBytes.t -> 'b) ->
+    fun_bytes:(Bytes.t -> 'b) ->
     fun_combine:('b -> 'b -> 'b) ->
     'a lazy_t ->
     'b
@@ -656,7 +656,7 @@ module Registration : sig
   (** Printers for the encodings. *)
   val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
 
-  val binary_pretty_printer : t -> Format.formatter -> MBytes.t -> unit
+  val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
 
   (** [register ~id encoding] registers the [encoding] with the [id]. It can
       later be found using {!find} and providing the matching [id]. It will
@@ -672,9 +672,9 @@ module Registration : sig
   val list : unit -> (id * t) list
 
   (** Conversion functions from/to json to/from bytes. *)
-  val bytes_of_json : t -> Json.t -> MBytes.t option
+  val bytes_of_json : t -> Json.t -> Bytes.t option
 
-  val json_of_bytes : t -> MBytes.t -> Json.t option
+  val json_of_bytes : t -> Bytes.t -> Json.t option
 end
 
 module With_version : sig
@@ -854,14 +854,14 @@ module Binary : sig
       bytes in [buf] starting at offset [ofs] and reading at most
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf]. *)
-  val read : 'a Encoding.t -> MBytes.t -> int -> int -> (int * 'a) option
+  val read : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
     | Success of {result : 'ret; size : int; stream : Binary_stream.t}
         (** Fully decoded value, together with the total amount of bytes reads,
         and the remaining unread stream. *)
-    | Await of (MBytes.t -> 'ret status)  (** Partially decoded value.*)
+    | Await of (Bytes.t -> 'ret status)  (** Partially decoded value.*)
     | Error of read_error
         (** Failure. The stream is garbled and it should be dropped. *)
 
@@ -874,24 +874,24 @@ module Binary : sig
       and writing at most [len] bytes. The function returns the offset
       of first unwritten bytes, or returns [None] in case of failure.
       In the latter case, some data might have been written on the buffer. *)
-  val write : 'a Encoding.t -> 'a -> MBytes.t -> int -> int -> int option
+  val write : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
 
   (** [of_bytes enc buf] is equivalent to [read enc buf 0 (length buf)].
       The function fails if the buffer is not fully read. *)
-  val of_bytes : 'a Encoding.t -> MBytes.t -> 'a option
+  val of_bytes : 'a Encoding.t -> Bytes.t -> 'a option
 
   (** [of_bytes_exn enc buf] is equivalent to [to_bytes], except
       @raise [Read_error] instead of returning [None] in case of error. *)
-  val of_bytes_exn : 'a Encoding.t -> MBytes.t -> 'a
+  val of_bytes_exn : 'a Encoding.t -> Bytes.t -> 'a
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
       where [buf] is a newly allocated buffer of the expected
       length [len] (see [length env v]). *)
-  val to_bytes : 'a Encoding.t -> 'a -> MBytes.t option
+  val to_bytes : 'a Encoding.t -> 'a -> Bytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
       @raise [Write_error] instead of returning [None] in case of error. *)
-  val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
+  val to_bytes_exn : 'a Encoding.t -> 'a -> Bytes.t
 
   val describe : 'a Encoding.t -> Binary_schema.t
 end

@@ -28,6 +28,15 @@ module Infix : sig
   val ( -- ) : int -> int -> int list
 end
 
+(** [cut ?copy size bytes] cut [bytes] the in a list of successive
+    chunks of length [size] at most.
+
+    If [copy] is false (default), the blocks of the list
+    can be garbage-collected only when all the blocks are
+    unreachable (because of the 'optimized' implementation of
+    [sub] used internally. *)
+val cut : ?copy:bool -> int -> Bytes.t -> Bytes.t list
+
 (** Print a paragraph in a box **)
 val display_paragraph : Format.formatter -> string -> unit
 

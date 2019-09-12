@@ -136,7 +136,7 @@ let bytes_parameter =
       try
         if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
         else
-          return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+          return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
       with _ ->
         failwith
           "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)")

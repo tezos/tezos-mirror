@@ -10,6 +10,7 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-stdlib"
+  "tezos-stdlib-unix"
   "tezos-error-monad"
 ]
 build: [

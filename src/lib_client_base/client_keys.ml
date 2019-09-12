@@ -185,12 +185,12 @@ module type SIGNER = sig
   val sign :
     ?watermark:Signature.watermark ->
     sk_uri ->
-    MBytes.t ->
+    Bytes.t ->
     Signature.t tzresult Lwt.t
 
-  val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
 
-  val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end

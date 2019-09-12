@@ -89,7 +89,7 @@ let shell_header_encoding =
           (req "fitness" Fitness.encoding)
           (req "context" Context_hash.encoding))
 
-type t = {shell : shell_header; protocol_data : MBytes.t}
+type t = {shell : shell_header; protocol_data : Bytes.t}
 
 include Compare.Make (struct
   type nonrec t = t
@@ -149,11 +149,11 @@ let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
-let to_b58check v = Base58.safe_encode (MBytes.to_string (to_bytes v))
+let to_b58check v = Base58.safe_encode (Bytes.to_string (to_bytes v))
 
 let of_b58check b =
   Option.apply (Base58.safe_decode b) ~f:(fun s ->
-      Data_encoding.Binary.of_bytes encoding (MBytes.of_string s))
+      Data_encoding.Binary.of_bytes encoding (Bytes.of_string s))
 
 let hash block = Block_hash.hash_bytes [to_bytes block]
 

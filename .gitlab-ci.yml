@@ -64,6 +64,7 @@ build:
     - . ./scripts/version.sh
     - dune build @runtest_dune_template
     - make all build-test
+    - opam clean
   artifacts:
     name: "$CI_COMMIT_REF_NAME"
     paths:
@@ -412,15 +413,15 @@ opam:01:ocplib-json-typed-bson:
   variables:
     package: ocplib-json-typed-bson
 
-opam:02:tezos-stdlib:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib
-
-opam:03:tezos-data-encoding:
+opam:02:tezos-data-encoding:
   <<: *opam_definition
   variables:
     package: tezos-data-encoding
+
+opam:03:tezos-stdlib:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib
 
 opam:04:ocplib-resto:
   <<: *opam_definition

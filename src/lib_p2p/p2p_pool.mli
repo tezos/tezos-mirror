@@ -295,7 +295,7 @@ val write_sync :
 (**/**)
 
 val raw_write_sync :
-  ('msg, 'peer_meta, 'conn_meta) connection -> MBytes.t -> unit tzresult Lwt.t
+  ('msg, 'peer_meta, 'conn_meta) connection -> Bytes.t -> unit tzresult Lwt.t
 
 (**/**)
 

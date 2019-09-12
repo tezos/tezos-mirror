@@ -191,7 +191,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
     else
       cctxt#prompt_password "Enter word %d: " i
       >>=? fun word ->
-      match Bip39.index_of_word (MBytes.to_string word) with
+      match Bip39.index_of_word (Bigstring.to_string word) with
       | None ->
           loop_words acc i
       | Some wordidx ->
@@ -206,9 +206,9 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       cctxt#prompt_password "Enter the password used for the paper wallet: "
       >>=? fun password ->
       (* TODO: unicode normalization (NFKD)... *)
-      let passphrase = MBytes.(concat "" [of_string email; password]) in
+      let passphrase = Bigstring.(concat "" [of_string email; password]) in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = MBytes.sub sk 0 32 in
+      let sk = Bigstring.sub_bytes sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
@@ -367,7 +367,7 @@ let commands version : Client_context.full Clic.command list =
       (fun () (cctxt : Client_context.full) ->
         cctxt#prompt_password "Enter unencrypted secret key: "
         >>=? fun sk_uri ->
-        let sk_uri = Uri.of_string (MBytes.to_string sk_uri) in
+        let sk_uri = Uri.of_string (Bigstring.to_string sk_uri) in
         ( match Uri.scheme sk_uri with
         | None | Some "unencrypted" ->
             return_unit
@@ -589,7 +589,7 @@ let commands version : Client_context.full Clic.command list =
              ~desc:"string from which to deterministically generate the nonce"
         @@ stop )
         (fun () (name, _pkh) data (cctxt : Client_context.full) ->
-          let data = MBytes.of_string data in
+          let data = Bytes.of_string data in
           Secret_key.mem cctxt name
           >>=? fun sk_present ->
           fail_unless sk_present (failure "secret key not present for %s" name)
@@ -598,7 +598,8 @@ let commands version : Client_context.full Clic.command list =
           >>=? fun sk_uri ->
           Client_keys.deterministic_nonce sk_uri data
           >>=? fun nonce ->
-          cctxt#message "%a" MBytes.pp_hex nonce >>= fun () -> return_unit);
+          cctxt#message "%a" Hex.pp (Hex.of_bytes (Bigstring.to_bytes nonce))
+          >>= fun () -> return_unit);
       command
         ~group
         ~desc:"Compute deterministic nonce hash."
@@ -612,7 +613,7 @@ let commands version : Client_context.full Clic.command list =
                "string from which to deterministically generate the nonce hash"
         @@ stop )
         (fun () (name, _pkh) data (cctxt : Client_context.full) ->
-          let data = MBytes.of_string data in
+          let data = Bytes.of_string data in
           Secret_key.mem cctxt name
           >>=? fun sk_present ->
           fail_unless sk_present (failure "secret key not present for %s" name)
@@ -621,5 +622,5 @@ let commands version : Client_context.full Clic.command list =
           >>=? fun sk_uri ->
           Client_keys.deterministic_nonce_hash sk_uri data
           >>=? fun nonce_hash ->
-          cctxt#message "%a" MBytes.pp_hex nonce_hash >>= fun () -> return_unit)
-    ]
+          cctxt#message "%a" Hex.pp (Hex.of_bytes nonce_hash)
+          >>= fun () -> return_unit) ]

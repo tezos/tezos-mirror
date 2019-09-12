@@ -77,10 +77,10 @@ let secrets () =
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
         let passphrase =
-          MBytes.(concat "" [of_string email; of_string password])
+          Bigstring.(concat "" [of_string email; of_string password])
         in
         let sk = Bip39.to_seed ~passphrase t in
-        let sk = MBytes.sub sk 0 32 in
+        let sk = Bigstring.sub_bytes sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)
