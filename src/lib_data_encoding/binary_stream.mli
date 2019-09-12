@@ -25,7 +25,7 @@
 
 type t
 
-type buffer = {buffer : MBytes.t; ofs : int; len : int}
+type buffer = {buffer : Bytes.t; ofs : int; len : int}
 
 exception Need_more_data
 
@@ -37,4 +37,4 @@ val of_buffer : buffer -> t
 
 val read : t -> int -> buffer * t
 
-val push : MBytes.t -> t -> t
+val push : Bytes.t -> t -> t
