@@ -44,7 +44,7 @@ module type T = sig
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
-    ?protocol_data:MBytes.t ->
+    ?protocol_data:Bytes.t ->
     predecessor:State.Block.t ->
     timestamp:Time.Protocol.t ->
     unit ->

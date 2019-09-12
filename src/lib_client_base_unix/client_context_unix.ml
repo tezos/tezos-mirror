@@ -123,11 +123,11 @@ class unix_prompter : Client_context.prompter =
           return line)
 
     method prompt_password : type a.
-        (a, MBytes.t tzresult) Client_context.lwt_format -> a =
+        (a, Bigstring.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun msg ->
           print_string msg ;
           let line = Lwt_utils_unix.getpass () in
-          return (MBytes.of_string line))
+          return (Bigstring.of_string line))
   end
 
 class unix_logger ~base_dir : Client_context.printer =

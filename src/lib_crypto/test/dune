@@ -4,6 +4,7 @@
         test_ed25519
         test_blake2b
         test_pvss
+        test_crypto_box
 	test_deterministic_nonce)
  (libraries tezos-stdlib
             tezos-crypto
@@ -20,6 +21,7 @@
        test_ed25519.exe
        test_blake2b.exe
        test_pvss.exe
+       test_crypto_box.exe
        test_deterministic_nonce.exe))
 
 (alias
@@ -43,6 +45,10 @@
  (action (run %{exe:test_pvss.exe})))
 
 (alias
+ (name runtest_crypto_box)
+ (action (run %{exe:test_crypto_box.exe})))
+
+(alias
  (name runtest_deterministic_nonce)
  (action (run %{exe:test_deterministic_nonce.exe})))
 
@@ -53,6 +59,7 @@
        (alias runtest_ed25519)
        (alias runtest_blake2b)
        (alias runtest_pvss)
+       (alias runtest_crypto_box)
 	   (alias runtest_deterministic_nonce)))
 
 (alias

@@ -38,7 +38,7 @@ val description : t -> string option
 
 val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
 
-val binary_pretty_printer : t -> Format.formatter -> MBytes.t -> unit
+val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
 
 val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
 
@@ -46,6 +46,6 @@ val find : id -> t option
 
 val list : unit -> (id * t) list
 
-val bytes_of_json : t -> Json.t -> MBytes.t option
+val bytes_of_json : t -> Json.t -> Bytes.t option
 
-val json_of_bytes : t -> MBytes.t -> Json.t option
+val json_of_bytes : t -> Bytes.t -> Json.t option

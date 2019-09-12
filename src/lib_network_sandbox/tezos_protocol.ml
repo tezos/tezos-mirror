@@ -12,7 +12,7 @@ module Key = struct
 
     let make name =
       let seed =
-        Tezos_stdlib.MBytes.of_string
+        Bigstring.of_string
           (String.concat ~sep:"" (List.init 42 ~f:(fun _ -> name)))
       in
       let (pkh, pk, sk) = Tezos_crypto.Ed25519.generate_key ~seed () in

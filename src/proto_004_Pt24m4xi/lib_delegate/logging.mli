@@ -46,9 +46,9 @@ val timespan_tag : Time.System.Span.t Tag.def
 
 val filename_tag : string Tag.def
 
-val signed_header_tag : MBytes.t Tag.def
+val signed_header_tag : Bytes.t Tag.def
 
-val signed_operation_tag : MBytes.t Tag.def
+val signed_operation_tag : Bytes.t Tag.def
 
 val operations_tag : Tezos_base.Operation.t list list Tag.def
 

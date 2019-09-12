@@ -41,7 +41,7 @@ val pp_ocaml : Format.formatter -> t -> unit
 
 include S.HASHABLE with type t := t and type hash := Protocol_hash.t
 
-val of_bytes_exn : MBytes.t -> t
+val of_bytes_exn : Bytes.t -> t
 
 val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
 

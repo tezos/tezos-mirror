@@ -42,8 +42,8 @@ let is_updated_constant_len = String.length is_updated_constant
 
 (* add a version to the pow *)
 let generate_proof_of_work_nonce () =
-  MBytes.concat
-    ""
+  Bytes.concat
+    (Bytes.of_string "")
     [ is_updated_cstruct;
       Rand.generate
         ( Alpha_context.Constants.proof_of_work_nonce_size
@@ -55,7 +55,7 @@ let generate_proof_of_work_nonce () =
  *   Rand.generate Alpha_context.Constants.proof_of_work_nonce_size *)
 
 let empty_proof_of_work_nonce =
-  MBytes.of_string (String.make Constants_repr.proof_of_work_nonce_size '\000')
+  Bytes.of_string (String.make Constants_repr.proof_of_work_nonce_size '\000')
 
 let mine cctxt chain block shell builder =
   Alpha_services.Constants.all cctxt (chain, block)

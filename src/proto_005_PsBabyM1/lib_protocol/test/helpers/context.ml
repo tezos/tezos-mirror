@@ -208,7 +208,7 @@ module Vote = struct
     | None -> assert false | Some bytes -> return (MBytes.get_int32 bytes 0)
 
   let set_participation_ema (b : Block.t) ema =
-    let bytes = MBytes.make 4 '\000' in
+    let bytes = MBytes.create 4 in
     MBytes.set_int32 bytes 0 ema ;
     Environment.Context.set b.context ["votes"; "participation_ema"] bytes
     >>= fun context -> Lwt.return {b with context}

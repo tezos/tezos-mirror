@@ -57,28 +57,28 @@ module Crypto = struct
   let () = assert (Crypto_box.boxzerobytes >= header_length)
 
   let write_chunk ?canceler fd cryptobox_data msg =
-    let msglen = MBytes.length msg in
+    let msglen = Bytes.length msg in
     fail_unless (msglen <= max_content_length) P2p_errors.Invalid_message_size
     >>=? fun () ->
     let buf_length = msglen + Crypto_box.zerobytes in
-    let buf = MBytes.make buf_length '\x00' in
-    MBytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+    let buf = Bytes.make buf_length '\x00' in
+    Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
     let local_nonce = cryptobox_data.local_nonce in
     cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
     Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce buf ;
     let encrypted_length = buf_length - Crypto_box.boxzerobytes in
     let header_pos = Crypto_box.boxzerobytes - header_length in
-    MBytes.set_int16 buf header_pos encrypted_length ;
-    let payload = MBytes.sub buf header_pos (buf_length - header_pos) in
+    TzEndian.set_int16 buf header_pos encrypted_length ;
+    let payload = Bytes.sub buf header_pos (buf_length - header_pos) in
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
-    let header_buf = MBytes.create header_length in
+    let header_buf = Bytes.create header_length in
     P2p_io_scheduler.read_full ?canceler ~len:header_length fd header_buf
     >>=? fun () ->
-    let encrypted_length = MBytes.get_uint16 header_buf 0 in
+    let encrypted_length = TzEndian.get_uint16 header_buf 0 in
     let buf_length = encrypted_length + Crypto_box.boxzerobytes in
-    let buf = MBytes.make buf_length '\x00' in
+    let buf = Bytes.make buf_length '\x00' in
     P2p_io_scheduler.read_full
       ?canceler
       ~pos:Crypto_box.boxzerobytes
@@ -98,7 +98,7 @@ module Crypto = struct
         fail P2p_errors.Decipher_error
     | true ->
         return
-          (MBytes.sub
+          (Bytes.sub
              buf
              Crypto_box.zerobytes
              (buf_length - Crypto_box.zerobytes))
@@ -190,7 +190,7 @@ module Connection_message = struct
       P2p_errors.Encoding_error
     >>=? fun () ->
     let len = Crypto.header_length + encoded_message_len in
-    let buf = MBytes.create len in
+    let buf = Bytes.create len in
     match
       Data_encoding.Binary.write encoding message buf Crypto.header_length len
     with
@@ -199,7 +199,7 @@ module Connection_message = struct
     | Some last ->
         fail_unless (last = len) P2p_errors.Encoding_error
         >>=? fun () ->
-        MBytes.set_int16 buf 0 encoded_message_len ;
+        TzEndian.set_int16 buf 0 encoded_message_len ;
         P2p_io_scheduler.write ~canceler fd buf
         >>=? fun () ->
         (* We return the raw message as it is used later to compute
@@ -207,17 +207,17 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
-    let header_buf = MBytes.create Crypto.header_length in
+    let header_buf = Bytes.create Crypto.header_length in
     P2p_io_scheduler.read_full
       ~canceler
       ~len:Crypto.header_length
       fd
       header_buf
     >>=? fun () ->
-    let len = MBytes.get_uint16 header_buf 0 in
+    let len = TzEndian.get_uint16 header_buf 0 in
     let pos = Crypto.header_length in
-    let buf = MBytes.create (pos + len) in
-    MBytes.set_int16 buf 0 len ;
+    let buf = Bytes.create (pos + len) in
+    TzEndian.set_int16 buf 0 len ;
     P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf
     >>=? fun () ->
     match Data_encoding.Binary.read encoding buf pos len with
@@ -239,7 +239,7 @@ module Metadata = struct
     let encoded_message_len =
       Data_encoding.Binary.length metadata_config.conn_meta_encoding message
     in
-    let buf = MBytes.create encoded_message_len in
+    let buf = Bytes.create encoded_message_len in
     match
       Data_encoding.Binary.write
         metadata_config.conn_meta_encoding
@@ -257,7 +257,7 @@ module Metadata = struct
   let read ~canceler metadata_config fd cryptobox_data =
     Crypto.read_chunk ~canceler fd cryptobox_data
     >>=? fun buf ->
-    let length = MBytes.length buf in
+    let length = Bytes.length buf in
     let encoding = metadata_config.conn_meta_encoding in
     match Data_encoding.Binary.read encoding buf 0 length with
     | None ->
@@ -294,7 +294,7 @@ module Ack = struct
 
   let write ?canceler fd cryptobox_data message =
     let encoded_message_len = Data_encoding.Binary.length encoding message in
-    let buf = MBytes.create encoded_message_len in
+    let buf = Bytes.create encoded_message_len in
     match
       Data_encoding.Binary.write encoding message buf 0 encoded_message_len
     with
@@ -307,7 +307,7 @@ module Ack = struct
   let read ?canceler fd cryptobox_data =
     Crypto.read_chunk ?canceler fd cryptobox_data
     >>=? fun buf ->
-    let length = MBytes.length buf in
+    let length = Bytes.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
     | None ->
         fail P2p_errors.Decoding_error
@@ -418,7 +418,7 @@ module Reader = struct
           >>=? fun buf ->
           lwt_debug
             "reading %d bytes from %a"
-            (MBytes.length buf)
+            (Bytes.length buf)
             P2p_peer.Id.pp
             st.conn.info.peer_id
           >>= fun () -> loop (decode_next_buf buf)
@@ -485,7 +485,7 @@ module Writer = struct
     canceler : Lwt_canceler.t;
     conn : 'meta authenticated_connection;
     encoding : 'msg Data_encoding.t;
-    messages : (MBytes.t list * unit tzresult Lwt.u option) Lwt_pipe.t;
+    messages : (Bytes.t list * unit tzresult Lwt.u option) Lwt_pipe.t;
     mutable worker : unit Lwt.t;
     binary_chunks_size : int; (* in bytes *)
   }
@@ -503,7 +503,7 @@ module Writer = struct
           >>=? fun () ->
           lwt_debug
             "writing %d bytes to %a"
-            (MBytes.length buf)
+            (Bytes.length buf)
             P2p_peer.Id.pp
             st.conn.info.peer_id
           >>= fun () -> loop l
@@ -513,7 +513,7 @@ module Writer = struct
   let encode_message st msg =
     try
       ok
-        (MBytes.cut
+        (Utils.cut
            st.binary_chunks_size
            (Data_encoding.Binary.to_bytes_exn st.encoding msg))
     with Data_encoding.Binary.Write_error _ ->
@@ -580,7 +580,7 @@ module Writer = struct
     let compute_size =
       let buf_list_size =
         List.fold_left
-          (fun sz buf -> sz + MBytes.length buf + (2 * Sys.word_size))
+          (fun sz buf -> sz + Bytes.length buf + (2 * Sys.word_size))
           0
       in
       function
@@ -727,10 +727,10 @@ let write_now {writer; conn; _} msg =
   with Lwt_pipe.Closed -> error P2p_errors.Connection_closed
 
 let rec split_bytes size bytes =
-  if MBytes.length bytes <= size then [bytes]
+  if Bytes.length bytes <= size then [bytes]
   else
-    MBytes.sub bytes 0 size
-    :: split_bytes size (MBytes.sub bytes size (MBytes.length bytes - size))
+    Bytes.sub bytes 0 size
+    :: split_bytes size (Bytes.sub bytes size (Bytes.length bytes - size))
 
 let raw_write_sync {writer; _} bytes =
   let bytes = split_bytes writer.binary_chunks_size bytes in

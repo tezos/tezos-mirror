@@ -46,7 +46,7 @@ module type MINIMAL_HASH = sig
 
   include Compare.S with type t := t
 
-  val hash_bytes : ?key:MBytes.t -> MBytes.t list -> t
+  val hash_bytes : ?key:Bytes.t -> Bytes.t list -> t
 
   val hash_string : ?key:string -> string list -> t
 
@@ -74,13 +74,13 @@ module type RAW_DATA = sig
 
   val of_string_exn : string -> t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t tzresult
+  val of_bytes : Bytes.t -> t tzresult
 
-  val of_bytes_opt : MBytes.t -> t option
+  val of_bytes_opt : Bytes.t -> t option
 
-  val of_bytes_exn : MBytes.t -> t
+  val of_bytes_exn : Bytes.t -> t
 end
 
 module type B58_DATA = sig
@@ -194,7 +194,7 @@ end
 module type MERKLE_TREE = sig
   type elt
 
-  val elt_bytes : elt -> MBytes.t
+  val elt_bytes : elt -> Bytes.t
 
   include HASH
 
@@ -280,14 +280,16 @@ module type SIGNATURE = sig
 
   type watermark
 
-  val sign : ?watermark:watermark -> Secret_key.t -> MBytes.t -> t
+  val sign : ?watermark:watermark -> Secret_key.t -> Bytes.t -> t
 
-  val check : ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
+  val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
 
   val generate_key :
-    ?seed:MBytes.t -> unit -> Public_key_hash.t * Public_key.t * Secret_key.t
+    ?seed:Bigstring.t ->
+    unit ->
+    Public_key_hash.t * Public_key.t * Secret_key.t
 
-  val deterministic_nonce : Secret_key.t -> MBytes.t -> MBytes.t
+  val deterministic_nonce : Secret_key.t -> Bytes.t -> Bigstring.t
 
-  val deterministic_nonce_hash : Secret_key.t -> MBytes.t -> MBytes.t
+  val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
 end

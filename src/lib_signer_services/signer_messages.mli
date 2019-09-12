@@ -26,11 +26,11 @@
 module type Authenticated_request = sig
   type t = {
     pkh : Signature.Public_key_hash.t;
-    data : MBytes.t;
+    data : Bytes.t;
     signature : Signature.t option;
   }
 
-  val to_sign : pkh:Signature.Public_key_hash.t -> data:MBytes.t -> MBytes.t
+  val to_sign : pkh:Signature.Public_key_hash.t -> data:Bytes.t -> Bytes.t
 
   val encoding : t Data_encoding.t
 end
@@ -49,7 +49,7 @@ module Deterministic_nonce : sig
   module Request : Authenticated_request
 
   module Response : sig
-    type t = MBytes.t
+    type t = Bigstring.t
 
     val encoding : t Data_encoding.t
   end
@@ -59,7 +59,7 @@ module Deterministic_nonce_hash : sig
   module Request : Authenticated_request
 
   module Response : sig
-    type t = MBytes.t
+    type t = Bytes.t
 
     val encoding : t Data_encoding.t
   end

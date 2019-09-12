@@ -31,7 +31,7 @@ val read_bytes :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
 
 val read_mbytes :
-  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> MBytes.t -> unit Lwt.t
+  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> Bytes.t -> unit Lwt.t
 
 val write_string :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> string -> unit Lwt.t
@@ -40,7 +40,7 @@ val write_bytes :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
 
 val write_mbytes :
-  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> MBytes.t -> unit Lwt.t
+  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> Bytes.t -> unit Lwt.t
 
 val remove_dir : string -> unit Lwt.t
 

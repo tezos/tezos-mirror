@@ -96,10 +96,10 @@ let block_header ?(context = Context_hash.zero) (pred : State.Block.t) :
         fitness;
         context;
       };
-    Block_header.protocol_data = MBytes.of_string "";
+    Block_header.protocol_data = Bytes.of_string "";
   }
 
-let zero = MBytes.create 0
+let zero = Bytes.create 0
 
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =

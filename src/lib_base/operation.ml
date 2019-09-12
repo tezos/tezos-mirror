@@ -33,7 +33,7 @@ let shell_header_encoding =
        (fun branch -> {branch})
        (obj1 (req "branch" Block_hash.encoding))
 
-type t = {shell : shell_header; proto : MBytes.t}
+type t = {shell : shell_header; proto : Bytes.t}
 
 include Compare.Make (struct
   type nonrec t = t
@@ -41,7 +41,7 @@ include Compare.Make (struct
   let compare o1 o2 =
     let ( >> ) x y = if x = 0 then y () else x in
     Block_hash.compare o1.shell.branch o1.shell.branch
-    >> fun () -> MBytes.compare o1.proto o2.proto
+    >> fun () -> Bytes.compare o1.proto o2.proto
 end)
 
 let encoding =

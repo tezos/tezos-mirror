@@ -56,11 +56,11 @@ module High_watermark = struct
       @@ fun () ->
       cctxt#load file ~default:[] encoding
       >>=? fun all ->
-      if MBytes.length bytes < 9 then
+      if Bytes.length bytes < 9 then
         failwith "byte sequence too short to be %s %s" art name
       else
         let hash = Blake2B.hash_bytes [bytes] in
-        let chain_id = Chain_id.of_bytes_exn (MBytes.sub bytes 1 4) in
+        let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
         let level = get_level () in
         ( match List.assoc_opt chain_id all with
         | None ->
@@ -113,11 +113,11 @@ module High_watermark = struct
             cctxt#write file (update all) encoding
             >>=? fun () -> return signature
     in
-    if MBytes.length bytes > 0 && MBytes.get_uint8 bytes 0 = 0x01 then
-      mark "a" "block" (fun () -> MBytes.get_int32 bytes 5)
-    else if MBytes.length bytes > 0 && MBytes.get_uint8 bytes 0 = 0x02 then
+    if Bytes.length bytes > 0 && TzEndian.get_uint8 bytes 0 = 0x01 then
+      mark "a" "block" (fun () -> TzEndian.get_int32 bytes 5)
+    else if Bytes.length bytes > 0 && TzEndian.get_uint8 bytes 0 = 0x02 then
       mark "an" "endorsement" (fun () ->
-          MBytes.get_int32 bytes (MBytes.length bytes - 4))
+          TzEndian.get_int32 bytes (Bytes.length bytes - 4))
     else sign bytes
 end
 
@@ -136,8 +136,8 @@ let check_magic_byte magic_bytes data =
   | None ->
       return_unit
   | Some magic_bytes ->
-      let byte = MBytes.get_uint8 data 0 in
-      if MBytes.length data > 1 && List.mem byte magic_bytes then return_unit
+      let byte = TzEndian.get_uint8 data 0 in
+      if Bytes.length data > 1 && List.mem byte magic_bytes then return_unit
       else failwith "magic byte 0x%02X not allowed" byte
 
 let check_authorization cctxt pkh data require_auth signature =
@@ -166,9 +166,9 @@ let sign (cctxt : #Client_context.wallet)
       fun f ->
         f "Request for signing %d bytes of data for key %a, magic byte = %02X"
         -% t event "request_for_signing"
-        -% s num_bytes (MBytes.length data)
+        -% s num_bytes (Bytes.length data)
         -% a Signature.Public_key_hash.Logging.tag pkh
-        -% s magic_byte (MBytes.get_uint8 data 0))
+        -% s magic_byte (TzEndian.get_uint8 data 0))
   >>= fun () ->
   check_magic_byte magic_bytes data
   >>=? fun () ->
@@ -196,7 +196,7 @@ let deterministic_nonce (cctxt : #Client_context.wallet)
       fun f ->
         f "Request for creating a nonce from %d input bytes for key %a"
         -% t event "request_for_deterministic_nonce"
-        -% s num_bytes (MBytes.length data)
+        -% s num_bytes (Bytes.length data)
         -% a Signature.Public_key_hash.Logging.tag pkh)
   >>= fun () ->
   check_authorization cctxt pkh data require_auth signature
@@ -219,7 +219,7 @@ let deterministic_nonce_hash (cctxt : #Client_context.wallet)
       fun f ->
         f "Request for creating a nonce hash from %d input bytes for key %a"
         -% t event "request_for_deterministic_nonce_hash"
-        -% s num_bytes (MBytes.length data)
+        -% s num_bytes (Bytes.length data)
         -% a Signature.Public_key_hash.Logging.tag pkh)
   >>= fun () ->
   check_authorization cctxt pkh data require_auth signature

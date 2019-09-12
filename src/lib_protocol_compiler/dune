@@ -25,7 +25,6 @@
             tezos-stdlib-unix
             compiler-libs.common
             lwt.unix
-            ocplib-endian
             ocplib-ocamlres
             unix)
  (flags (:standard -open Tezos_base__TzPervasives

@@ -60,7 +60,7 @@ let incr_timestamp timestamp =
 
 let operation op =
   let op : Operation.t =
-    {shell = {branch = genesis_block}; proto = MBytes.of_string op}
+    {shell = {branch = genesis_block}; proto = Bytes.of_string op}
   in
   (Operation.hash op, op, Data_encoding.Binary.to_bytes Operation.encoding op)
 
@@ -101,7 +101,7 @@ let parsed_block ({shell; protocol_data} : Block_header.t) =
   in
   ({shell; protocol_data} : Proto.block_header)
 
-let zero = MBytes.create 0
+let zero = Bytes.create 0
 
 let block_header_data_encoding =
   Data_encoding.(obj1 (req "proto_block_header" string))

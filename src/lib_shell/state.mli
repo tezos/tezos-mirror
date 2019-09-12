@@ -206,9 +206,9 @@ module Block : sig
     ?dont_enforce_context_hash:bool ->
     Chain.t ->
     Block_header.t ->
-    MBytes.t ->
+    Bytes.t ->
     Operation.t list list ->
-    MBytes.t list list ->
+    Bytes.t list list ->
     validation_store ->
     forking_testchain:bool ->
     block option tzresult Lwt.t
@@ -244,7 +244,7 @@ module Block : sig
 
   val max_operations_ttl : t -> int tzresult Lwt.t
 
-  val metadata : t -> MBytes.t tzresult Lwt.t
+  val metadata : t -> Bytes.t tzresult Lwt.t
 
   val last_allowed_fork_level : t -> Int32.t tzresult Lwt.t
 
@@ -274,9 +274,9 @@ module Block : sig
 
   val all_operations : t -> Operation.t list list Lwt.t
 
-  val operations_metadata : t -> int -> MBytes.t list Lwt.t
+  val operations_metadata : t -> int -> Bytes.t list Lwt.t
 
-  val all_operations_metadata : t -> MBytes.t list list Lwt.t
+  val all_operations_metadata : t -> Bytes.t list list Lwt.t
 
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
@@ -373,9 +373,9 @@ module Protocol : sig
   val read_opt : global_state -> Protocol_hash.t -> Protocol.t option Lwt.t
 
   (** Read a value in the local database (without parsing). *)
-  val read_raw : global_state -> Protocol_hash.t -> MBytes.t tzresult Lwt.t
+  val read_raw : global_state -> Protocol_hash.t -> Bytes.t tzresult Lwt.t
 
-  val read_raw_opt : global_state -> Protocol_hash.t -> MBytes.t option Lwt.t
+  val read_raw_opt : global_state -> Protocol_hash.t -> Bytes.t option Lwt.t
 
   val store : global_state -> Protocol.t -> Protocol_hash.t option Lwt.t
 

@@ -59,11 +59,11 @@ let create_block2 idx genesis_commit =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      set ctxt ["a"; "b"] (MBytes.of_string "Novembre")
+      set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt ->
-      set ctxt ["a"; "c"] (MBytes.of_string "Juin")
+      set ctxt ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt ->
-      set ctxt ["version"] (MBytes.of_string "0.0") >>= fun ctxt -> commit ctxt
+      set ctxt ["version"] (Bytes.of_string "0.0") >>= fun ctxt -> commit ctxt
 
 let block3a =
   Block_hash.of_hex_exn
@@ -77,7 +77,7 @@ let create_block3a idx block2_commit =
   | Some ctxt ->
       del ctxt ["a"; "b"]
       >>= fun ctxt ->
-      set ctxt ["a"; "d"] (MBytes.of_string "Mars") >>= fun ctxt -> commit ctxt
+      set ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
 
 let block3b =
   Block_hash.of_hex_exn
@@ -95,7 +95,7 @@ let create_block3b idx block2_commit =
   | Some ctxt ->
       del ctxt ["a"; "c"]
       >>= fun ctxt ->
-      set ctxt ["a"; "d"] (MBytes.of_string "Février")
+      set ctxt ["a"; "d"] (Bytes.of_string "Février")
       >>= fun ctxt -> commit ctxt
 
 type t = {
@@ -128,7 +128,7 @@ let wrap_context_init f _ () =
 
 (** Simple test *)
 
-let c = function None -> None | Some s -> Some (MBytes.to_string s)
+let c = function None -> None | Some s -> Some (Bytes.to_string s)
 
 let test_simple {idx; block2; _} =
   checkout idx block2
@@ -193,17 +193,17 @@ let test_replay {idx; genesis; _} =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt0 ->
-      set ctxt0 ["version"] (MBytes.of_string "0.0")
+      set ctxt0 ["version"] (Bytes.of_string "0.0")
       >>= fun ctxt1 ->
-      set ctxt1 ["a"; "b"] (MBytes.of_string "Novembre")
+      set ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt2 ->
-      set ctxt2 ["a"; "c"] (MBytes.of_string "Juin")
+      set ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt3 ->
-      set ctxt3 ["a"; "d"] (MBytes.of_string "July")
+      set ctxt3 ["a"; "d"] (Bytes.of_string "July")
       >>= fun ctxt4a ->
-      set ctxt3 ["a"; "d"] (MBytes.of_string "Juillet")
+      set ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
       >>= fun ctxt4b ->
-      set ctxt4a ["a"; "b"] (MBytes.of_string "November")
+      set ctxt4a ["a"; "b"] (Bytes.of_string "November")
       >>= fun ctxt5a ->
       get ctxt4a ["a"; "b"]
       >>= fun novembre ->
@@ -237,15 +237,15 @@ let test_fold {idx; genesis; _} =
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      set ctxt ["a"; "b"] (MBytes.of_string "Novembre")
+      set ctxt ["a"; "b"] (Bytes.of_string "Novembre")
       >>= fun ctxt ->
-      set ctxt ["a"; "c"] (MBytes.of_string "Juin")
+      set ctxt ["a"; "c"] (Bytes.of_string "Juin")
       >>= fun ctxt ->
-      set ctxt ["a"; "d"; "e"] (MBytes.of_string "Septembre")
+      set ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
       >>= fun ctxt ->
-      set ctxt ["f"] (MBytes.of_string "Avril")
+      set ctxt ["f"] (Bytes.of_string "Avril")
       >>= fun ctxt ->
-      set ctxt ["g"; "h"] (MBytes.of_string "Avril")
+      set ctxt ["g"; "h"] (Bytes.of_string "Avril")
       >>= fun ctxt ->
       keys ctxt []
       >>= fun l ->
@@ -278,7 +278,7 @@ let test_dump {idx; block3b; _} =
       let empty_block_header context =
         Block_header.
           {
-            protocol_data = MBytes.empty;
+            protocol_data = Bytes.empty;
             shell =
               {
                 level = 0l;

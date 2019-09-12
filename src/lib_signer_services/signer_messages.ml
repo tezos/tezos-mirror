@@ -26,11 +26,11 @@
 module type Authenticated_request = sig
   type t = {
     pkh : Signature.Public_key_hash.t;
-    data : MBytes.t;
+    data : Bytes.t;
     signature : Signature.t option;
   }
 
-  val to_sign : pkh:Signature.Public_key_hash.t -> data:MBytes.t -> MBytes.t
+  val to_sign : pkh:Signature.Public_key_hash.t -> data:Bytes.t -> Bytes.t
 
   val encoding : t Data_encoding.t
 end
@@ -42,16 +42,16 @@ end
 module Make_authenticated_request (T : Tag) : Authenticated_request = struct
   type t = {
     pkh : Signature.Public_key_hash.t;
-    data : MBytes.t;
+    data : Bytes.t;
     signature : Signature.t option;
   }
 
   let to_sign ~pkh ~data =
-    let tag = MBytes.make 1 '0' in
-    MBytes.set_int8 tag 0 T.tag ;
-    MBytes.concat
-      ""
-      [ MBytes.of_string "\x04";
+    let tag = Bytes.make 1 '0' in
+    TzEndian.set_int8 tag 0 T.tag ;
+    Bytes.concat
+      (Bytes.of_string "")
+      [ Bytes.of_string "\x04";
         tag;
         Signature.Public_key_hash.to_bytes pkh;
         data ]
@@ -88,12 +88,16 @@ module Deterministic_nonce = struct
   end)
 
   module Response = struct
-    type t = MBytes.t
+    type t = Bigstring.t
+
+    let bigstring =
+      let open Data_encoding in
+      conv Bigstring.to_bytes Bigstring.of_bytes bytes
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.deterministic_nonce.response"
-      @@ obj1 (req "deterministic_nonce" bytes)
+      @@ obj1 (req "deterministic_nonce" bigstring)
   end
 end
 
@@ -103,7 +107,7 @@ module Deterministic_nonce_hash = struct
   end)
 
   module Response = struct
-    type t = MBytes.t
+    type t = Bytes.t
 
     let encoding =
       let open Data_encoding in

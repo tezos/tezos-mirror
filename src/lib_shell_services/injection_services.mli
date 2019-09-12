@@ -35,7 +35,7 @@ val block :
   ?async:bool ->
   ?force:bool ->
   ?chain:Chain_services.chain ->
-  MBytes.t ->
+  Bytes.t ->
   Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 
@@ -43,7 +43,7 @@ val operation :
   #simple ->
   ?async:bool ->
   ?chain:Chain_services.chain ->
-  MBytes.t ->
+  Bytes.t ->
   Operation_hash.t tzresult Lwt.t
 
 val protocol :
@@ -55,7 +55,7 @@ module S : sig
       unit,
       unit,
       < async : bool ; force : bool ; chain : Chain_services.chain option >,
-      MBytes.t * Operation.t list list,
+      Bytes.t * Operation.t list list,
       Block_hash.t )
     RPC_service.t
 
@@ -64,7 +64,7 @@ module S : sig
       unit,
       unit,
       < async : bool ; chain : Chain_services.chain option >,
-      MBytes.t,
+      Bytes.t,
       Operation_hash.t )
     RPC_service.t
 

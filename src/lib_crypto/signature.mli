@@ -42,9 +42,9 @@ type watermark =
   | Block_header of Chain_id.t
   | Endorsement of Chain_id.t
   | Generic_operation
-  | Custom of MBytes.t
+  | Custom of Bytes.t
 
-val bytes_of_watermark : watermark -> MBytes.t
+val bytes_of_watermark : watermark -> Bytes.t
 
 val pp_watermark : Format.formatter -> watermark -> unit
 
@@ -57,11 +57,11 @@ include
 
 (** [append sk buf] is the concatenation of [buf] and the
     serialization of the signature of [buf] signed by [sk]. *)
-val append : ?watermark:watermark -> secret_key -> MBytes.t -> MBytes.t
+val append : ?watermark:watermark -> secret_key -> Bytes.t -> Bytes.t
 
 (** [concat buf t] is the concatenation of [buf] and the serialization
     of [t]. *)
-val concat : MBytes.t -> t -> MBytes.t
+val concat : Bytes.t -> t -> Bytes.t
 
 include S.RAW_DATA with type t := t
 
@@ -75,6 +75,6 @@ type algo = Ed25519 | Secp256k1 | P256
 
 val generate_key :
   ?algo:algo ->
-  ?seed:MBytes.t ->
+  ?seed:Bigstring.t ->
   unit ->
   public_key_hash * public_key * secret_key

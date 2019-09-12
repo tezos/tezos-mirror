@@ -31,7 +31,7 @@ let name = "Chain_id"
 
 let title = "Network identifier"
 
-let extract bh = MBytes.sub_string (Block_hash.to_bytes bh) 0 4
+let extract bh = Bytes.sub_string (Block_hash.to_bytes bh) 0 4
 
 let hash_bytes ?key l = extract (Block_hash.hash_bytes ?key l)
 
@@ -73,7 +73,7 @@ let of_hex_exn s = of_string_exn (Hex.to_string s)
 let to_hex s = Hex.of_string (to_string s)
 
 let of_bytes_opt b =
-  if MBytes.length b <> size then None else Some (MBytes.to_string b)
+  if Bytes.length b <> size then None else Some (Bytes.to_string b)
 
 let of_bytes_exn b =
   match of_bytes_opt b with
@@ -82,7 +82,7 @@ let of_bytes_exn b =
         Printf.sprintf
           "%s.of_bytes: wrong string size (%d)"
           name
-          (MBytes.length b)
+          (Bytes.length b)
       in
       raise (Invalid_argument msg)
   | Some h ->
@@ -95,10 +95,7 @@ let of_bytes s =
   | None ->
       generic_error "Failed to deserialize a hash (%s)" name
 
-let to_bytes = MBytes.of_string
-
-(* let read src off = of_bytes_exn @@ MBytes.sub src off size *)
-(* let write dst off h = MBytes.blit (to_bytes h) 0 dst off size *)
+let to_bytes = Bytes.of_string
 
 let path_length = 1
 
@@ -134,7 +131,7 @@ let raw_encoding =
   let open Data_encoding in
   conv to_bytes of_bytes_exn (Fixed.bytes size)
 
-let hash h = Int32.to_int (MBytes.get_int32 (to_bytes h) 0)
+let hash h = Int32.to_int (TzEndian.get_int32 (to_bytes h) 0)
 
 let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 

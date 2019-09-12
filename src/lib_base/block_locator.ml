@@ -101,20 +101,25 @@ module Step : sig
 
   val next : state -> int * state
 end = struct
-  type state = Int32.t * int * MBytes.t
+  (* (step, counter, seed) .
+     The seed is stored in a bigstring and should be mlocked *)
+  type state = Int32.t * int * Bigstring.t
+
+  let update st b = Hacl.Hash.SHA256.update st (Bigstring.of_bytes b)
 
   let init seed head =
     let open Hacl.Hash in
     let st = SHA256.init () in
     List.iter
-      (SHA256.update st)
+      (update st)
       [ P2p_peer.Id.to_bytes seed.sender_id;
         P2p_peer.Id.to_bytes seed.receiver_id;
         Block_hash.to_bytes head ] ;
     (1l, 9, SHA256.finish st)
 
   let draw seed n =
-    (Int32.rem (MBytes.get_int32 seed 0) n, Hacl.Hash.SHA256.digest seed)
+    ( Int32.rem (TzEndian.get_int32 (Bigstring.to_bytes seed) 0) n,
+      Hacl.Hash.SHA256.digest seed )
 
   let next (step, counter, seed) =
     let (random_gap, seed) =

@@ -36,11 +36,11 @@ module type IO = sig
 
   type in_param
 
-  val pop : in_param -> MBytes.t tzresult Lwt.t
+  val pop : in_param -> Bytes.t tzresult Lwt.t
 
   type out_param
 
-  val push : out_param -> MBytes.t -> unit tzresult Lwt.t
+  val push : out_param -> Bytes.t -> unit tzresult Lwt.t
 
   val close : out_param -> error list -> unit Lwt.t
 end
@@ -56,8 +56,8 @@ module Scheduler (IO : IO) = struct
     mutable quota : int;
     quota_updated : unit Lwt_condition.t;
     readys : unit Lwt_condition.t;
-    readys_high : (connection * MBytes.t tzresult) Queue.t;
-    readys_low : (connection * MBytes.t tzresult) Queue.t;
+    readys_high : (connection * Bytes.t tzresult) Queue.t;
+    readys_low : (connection * Bytes.t tzresult) Queue.t;
   }
 
   and connection = {
@@ -66,7 +66,7 @@ module Scheduler (IO : IO) = struct
     canceler : Lwt_canceler.t;
     in_param : IO.in_param;
     out_param : IO.out_param;
-    mutable current_pop : MBytes.t tzresult Lwt.t;
+    mutable current_pop : Bytes.t tzresult Lwt.t;
     mutable current_push : unit tzresult Lwt.t;
     counter : Moving_average.t;
     mutable quota : int;
@@ -162,7 +162,7 @@ module Scheduler (IO : IO) = struct
                   err
                 >>= fun () ->
                 cancel conn err >>= fun () -> Lwt.return_error err ) ;
-          let len = MBytes.length msg in
+          let len = Bytes.length msg in
           lwt_debug "Handle: %d (%d, %s)" len conn.id IO.name
           >>= fun () ->
           Moving_average.add st.counter len ;
@@ -243,18 +243,18 @@ module ReadScheduler = Scheduler (struct
   let pop (fd, maxlen) =
     Lwt.catch
       (fun () ->
-        let buf = MBytes.create maxlen in
+        let buf = Bytes.create maxlen in
         P2p_fd.read fd buf 0 maxlen
         >>= fun len ->
         if len = 0 then fail P2p_errors.Connection_closed
-        else return (MBytes.sub buf 0 len))
+        else return (Bytes.sub buf 0 len))
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
             fail P2p_errors.Connection_closed
         | exn ->
             Lwt.return (error_exn exn))
 
-  type out_param = MBytes.t tzresult Lwt_pipe.t
+  type out_param = Bytes.t tzresult Lwt_pipe.t
 
   let push p msg =
     Lwt.catch
@@ -270,7 +270,7 @@ end)
 module WriteScheduler = Scheduler (struct
   let name = "io_scheduler(write)"
 
-  type in_param = MBytes.t Lwt_pipe.t
+  type in_param = Bytes.t Lwt_pipe.t
 
   let pop p =
     Lwt.catch
@@ -299,10 +299,10 @@ type connection = {
   conn : P2p_fd.t;
   canceler : Lwt_canceler.t;
   read_conn : ReadScheduler.connection;
-  read_queue : MBytes.t tzresult Lwt_pipe.t;
+  read_queue : Bytes.t tzresult Lwt_pipe.t;
   write_conn : WriteScheduler.connection;
-  write_queue : MBytes.t Lwt_pipe.t;
-  mutable partial_read : MBytes.t option;
+  write_queue : Bytes.t Lwt_pipe.t;
+  mutable partial_read : Bytes.t option;
 }
 
 and t = {
@@ -362,7 +362,7 @@ exception Closed
 
 let read_size = function
   | Ok buf ->
-      (Sys.word_size / 8 * 8) + MBytes.length buf + Lwt_pipe.push_overhead
+      (Sys.word_size / 8 * 8) + Bytes.length buf + Lwt_pipe.push_overhead
   | Error _ ->
       0
 
@@ -370,7 +370,7 @@ let read_size = function
                     we don't fear memory leaks in that case... *)
 
 let write_size mbytes =
-  (Sys.word_size / 8 * 6) + MBytes.length mbytes + Lwt_pipe.push_overhead
+  (Sys.word_size / 8 * 6) + Bytes.length mbytes + Lwt_pipe.push_overhead
 
 let register st conn =
   if st.closed then (
@@ -433,19 +433,18 @@ let write ?canceler {write_queue; _} msg =
 let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
-  let maxlen = MBytes.length buf in
+  let maxlen = Bytes.length buf in
   let pos = Option.unopt ~default:0 pos in
   assert (0 <= pos && pos < maxlen) ;
   let len = Option.unopt ~default:(maxlen - pos) len in
   assert (len <= maxlen - pos) ;
   match msg with
   | Ok msg ->
-      let msg_len = MBytes.length msg in
+      let msg_len = Bytes.length msg in
       let read_len = min len msg_len in
-      MBytes.blit msg 0 buf pos read_len ;
+      Bytes.blit msg 0 buf pos read_len ;
       if read_len < msg_len then
-        conn.partial_read <-
-          Some (MBytes.sub msg read_len (msg_len - read_len)) ;
+        conn.partial_read <- Some (Bytes.sub msg read_len (msg_len - read_len)) ;
       Ok read_len
   | Error _ ->
       error P2p_errors.Connection_closed
@@ -475,7 +474,7 @@ let read ?canceler conn ?pos ?len buf =
         (fun _ -> fail P2p_errors.Connection_closed)
 
 let read_full ?canceler conn ?pos ?len buf =
-  let maxlen = MBytes.length buf in
+  let maxlen = Bytes.length buf in
   let pos = Option.unopt ~default:0 pos in
   let len = Option.unopt ~default:(maxlen - pos) len in
   assert (0 <= pos && pos < maxlen) ;

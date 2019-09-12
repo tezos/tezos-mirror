@@ -242,13 +242,17 @@ let commands () : #Alpha_client_context.full Clic.command list =
           if bytes_only then
             Format.printf
               "0x%a@."
-              MBytes.pp_hex
-              prepared_command.Client_proto_multisig.bytes
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
               "%a@.%a@.%a@."
-              (fun ppf ->
-                Format.fprintf ppf "Bytes to sign: '0x%a'" MBytes.pp_hex)
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -296,13 +300,17 @@ let commands () : #Alpha_client_context.full Clic.command list =
           if bytes_only then
             Format.printf
               "0x%a@."
-              MBytes.pp_hex
-              prepared_command.Client_proto_multisig.bytes
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
               "%a@.%a@.%a@."
-              (fun ppf ->
-                Format.fprintf ppf "Bytes to sign: '0x%a'" MBytes.pp_hex)
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -346,13 +354,17 @@ let commands () : #Alpha_client_context.full Clic.command list =
           if bytes_only then
             Format.printf
               "0x%a@."
-              MBytes.pp_hex
-              prepared_command.Client_proto_multisig.bytes
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
               "%a@.%a@.%a@."
-              (fun ppf ->
-                Format.fprintf ppf "Bytes to sign: '0x%a'" MBytes.pp_hex)
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf
@@ -403,13 +415,17 @@ let commands () : #Alpha_client_context.full Clic.command list =
           if bytes_only then
             Format.printf
               "0x%a@."
-              MBytes.pp_hex
-              prepared_command.Client_proto_multisig.bytes
+              Hex.pp
+              (Hex.of_bytes prepared_command.Client_proto_multisig.bytes)
           else
             Format.printf
               "%a@.%a@.%a@."
-              (fun ppf ->
-                Format.fprintf ppf "Bytes to sign: '0x%a'" MBytes.pp_hex)
+              (fun ppf x ->
+                Format.fprintf
+                  ppf
+                  "Bytes to sign: '0x%a'"
+                  Hex.pp
+                  (Hex.of_bytes x))
               prepared_command.Client_proto_multisig.bytes
               (fun ppf z ->
                 Format.fprintf

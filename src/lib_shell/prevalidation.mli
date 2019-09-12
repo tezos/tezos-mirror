@@ -47,7 +47,7 @@ module type T = sig
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
-    ?protocol_data:MBytes.t ->
+    ?protocol_data:Bytes.t ->
     predecessor:State.Block.t ->
     timestamp:Time.Protocol.t ->
     unit ->
@@ -82,6 +82,6 @@ module Make (Proto : Registered_protocol.T) : T with module Proto = Proto
 val preapply :
   predecessor:State.Block.t ->
   timestamp:Time.Protocol.t ->
-  protocol_data:MBytes.t ->
+  protocol_data:Bytes.t ->
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t

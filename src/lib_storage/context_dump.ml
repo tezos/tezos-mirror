@@ -46,16 +46,16 @@ module type Dump_interface = sig
 
   val hash_encoding : hash Data_encoding.t
 
-  val blob_encoding : [`Blob of MBytes.t] Data_encoding.t
+  val blob_encoding : [`Blob of Bytes.t] Data_encoding.t
 
-  val node_encoding : [`Node of MBytes.t] Data_encoding.t
+  val node_encoding : [`Node of Bytes.t] Data_encoding.t
 
   module Block_header : sig
     type t = Block_header.t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val equal : t -> t -> bool
 
@@ -65,9 +65,9 @@ module type Dump_interface = sig
   module Pruned_block : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -77,9 +77,9 @@ module type Dump_interface = sig
   module Block_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -89,9 +89,9 @@ module type Dump_interface = sig
   module Protocol_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val encoding : t Data_encoding.t
   end
@@ -99,17 +99,17 @@ module type Dump_interface = sig
   module Commit_hash : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t tzresult
+    val of_bytes : Bytes.t -> t tzresult
 
     val encoding : t Data_encoding.t
   end
 
   (* hash manipulation *)
-  val hash_export : hash -> [`Node | `Blob] * MBytes.t
+  val hash_export : hash -> [`Node | `Blob] * Bytes.t
 
-  val hash_import : [`Node | `Blob] -> MBytes.t -> hash tzresult
+  val hash_import : [`Node | `Blob] -> Bytes.t -> hash tzresult
 
   val hash_equal : hash -> hash -> bool
 
@@ -142,7 +142,7 @@ module type Dump_interface = sig
 
   val tree_list : tree -> (step * [`Contents | `Node]) list Lwt.t
 
-  val tree_content : tree -> MBytes.t option Lwt.t
+  val tree_content : tree -> Bytes.t option Lwt.t
 
   (* for restoring *)
   val make_context : index -> context
@@ -151,7 +151,7 @@ module type Dump_interface = sig
 
   val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
 
-  val add_mbytes : index -> MBytes.t -> tree Lwt.t
+  val add_mbytes : index -> Bytes.t -> tree Lwt.t
 
   val add_dir : index -> (step * hash) list -> tree option Lwt.t
 end
@@ -199,9 +199,9 @@ end
 
 type error += System_write_error of string
 
-type error += Bad_hash of string * MBytes.t * MBytes.t
+type error += Bad_hash of string * Bytes.t * Bytes.t
 
-type error += Context_not_found of MBytes.t
+type error += Context_not_found of Bytes.t
 
 type error += System_read_error of string
 
@@ -237,8 +237,8 @@ let () =
         ppf
         "Wrong hash [%s] given: %s, should be %s"
         ty
-        (MBytes.to_string his)
-        (MBytes.to_string hshould))
+        (Bytes.to_string his)
+        (Bytes.to_string hshould))
     (obj3
        (req "hash_ty" string)
        (req "hash_is" bytes)
@@ -252,7 +252,7 @@ let () =
     ~title:"Context not found"
     ~description:"Cannot find context corresponding to hash"
     ~pp:(fun ppf mb ->
-      Format.fprintf ppf "No context with hash: %s" (MBytes.to_string mb))
+      Format.fprintf ppf "No context with hash: %s" (Bytes.to_string mb))
     (obj1 (req "context_not_found" bytes))
     (function Context_not_found mb -> Some mb | _ -> None)
     (fun mb -> Context_not_found mb) ;
@@ -344,7 +344,7 @@ module Make (I : Dump_interface) = struct
         block_data : I.Block_data.t;
       }
     | Node of (string * I.hash) list
-    | Blob of MBytes.t
+    | Blob of Bytes.t
     | Proot of I.Pruned_block.t
     | Loot of I.Protocol_data.t
     | End
@@ -448,9 +448,9 @@ module Make (I : Dump_interface) = struct
       return res
 
   let read_mbytes rbuf b =
-    read_string rbuf ~len:(MBytes.length b)
+    read_string rbuf ~len:(Bytes.length b)
     >>=? fun string ->
-    MBytes.blit_of_string string 0 b 0 (MBytes.length b) ;
+    Bytes.blit_string string 0 b 0 (Bytes.length b) ;
     return ()
 
   let set_int64 buf i =
@@ -463,13 +463,13 @@ module Make (I : Dump_interface) = struct
     >>=? fun s -> return @@ EndianString.BigEndian.get_int64 s 0
 
   let set_mbytes buf b =
-    set_int64 buf (Int64.of_int (MBytes.length b)) ;
-    Buffer.add_bytes buf (MBytes.to_bytes b)
+    set_int64 buf (Int64.of_int (Bytes.length b)) ;
+    Buffer.add_bytes buf b
 
   let get_mbytes rbuf =
     get_int64 rbuf >>|? Int64.to_int
     >>=? fun l ->
-    let b = MBytes.create l in
+    let b = Bytes.create l in
     read_mbytes rbuf b >>=? fun () -> return b
 
   (* Getter and setters *)

@@ -278,7 +278,7 @@ module Garbled = struct
         false
 
   let write_bad_all conns =
-    let bad_msg = MBytes.of_string (String.make 16 '\000') in
+    let bad_msg = Bytes.of_string (String.make 16 '\000') in
     iter_p
       (fun conn -> trace Write @@ P2p_pool.raw_write_sync conn bad_msg)
       conns

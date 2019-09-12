@@ -105,16 +105,16 @@ module type SIGNER = sig
   val sign :
     ?watermark:Signature.watermark ->
     sk_uri ->
-    MBytes.t ->
+    Bytes.t ->
     Signature.t tzresult Lwt.t
 
   (** [deterministic_nonce sk data] is a nonce obtained
       deterministically from [data] and [sk]. *)
-  val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
 
   (** [deterministic_nonce_hash sk data] is a nonce hash obtained
       deterministically from [data] and [sk]. *)
-  val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   (** [supports_deterministic_nonces] indicates whether the
       [deterministic_nonce] functionality is supported. *)
@@ -143,26 +143,26 @@ val sign :
   #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri ->
-  MBytes.t ->
+  Bytes.t ->
   Signature.t tzresult Lwt.t
 
 val append :
   #Client_context.wallet ->
   ?watermark:Signature.watermark ->
   sk_uri ->
-  MBytes.t ->
-  MBytes.t tzresult Lwt.t
+  Bytes.t ->
+  Bytes.t tzresult Lwt.t
 
 val check :
   ?watermark:Signature.watermark ->
   pk_uri ->
   Signature.t ->
-  MBytes.t ->
+  Bytes.t ->
   bool tzresult Lwt.t
 
-val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
 
-val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
 val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 

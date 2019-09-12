@@ -26,9 +26,9 @@
 
 type error += System_write_error of string
 
-type error += Bad_hash of string * MBytes.t * MBytes.t
+type error += Bad_hash of string * Bytes.t * Bytes.t
 
-type error += Context_not_found of MBytes.t
+type error += Context_not_found of Bytes.t
 
 type error += System_read_error of string
 
@@ -61,16 +61,16 @@ module type Dump_interface = sig
 
   val hash_encoding : hash Data_encoding.t
 
-  val blob_encoding : [`Blob of MBytes.t] Data_encoding.t
+  val blob_encoding : [`Blob of Bytes.t] Data_encoding.t
 
-  val node_encoding : [`Node of MBytes.t] Data_encoding.t
+  val node_encoding : [`Node of Bytes.t] Data_encoding.t
 
   module Block_header : sig
     type t = Block_header.t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val equal : t -> t -> bool
 
@@ -80,9 +80,9 @@ module type Dump_interface = sig
   module Pruned_block : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -92,9 +92,9 @@ module type Dump_interface = sig
   module Block_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -104,9 +104,9 @@ module type Dump_interface = sig
   module Protocol_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val encoding : t Data_encoding.t
   end
@@ -114,17 +114,17 @@ module type Dump_interface = sig
   module Commit_hash : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t tzresult
+    val of_bytes : Bytes.t -> t tzresult
 
     val encoding : t Data_encoding.t
   end
 
   (* hash manipulation *)
-  val hash_export : hash -> [`Node | `Blob] * MBytes.t
+  val hash_export : hash -> [`Node | `Blob] * Bytes.t
 
-  val hash_import : [`Node | `Blob] -> MBytes.t -> hash tzresult
+  val hash_import : [`Node | `Blob] -> Bytes.t -> hash tzresult
 
   val hash_equal : hash -> hash -> bool
 
@@ -157,7 +157,7 @@ module type Dump_interface = sig
 
   val tree_list : tree -> (step * [`Contents | `Node]) list Lwt.t
 
-  val tree_content : tree -> MBytes.t option Lwt.t
+  val tree_content : tree -> Bytes.t option Lwt.t
 
   (* for restoring *)
   val make_context : index -> context
@@ -166,7 +166,7 @@ module type Dump_interface = sig
 
   val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
 
-  val add_mbytes : index -> MBytes.t -> tree Lwt.t
+  val add_mbytes : index -> Bytes.t -> tree Lwt.t
 
   val add_dir : index -> (step * hash) list -> tree option Lwt.t
 end

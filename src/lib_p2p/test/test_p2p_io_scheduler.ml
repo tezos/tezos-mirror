@@ -64,22 +64,22 @@ let connect addr port =
   P2p_fd.connect fd uaddr >>= fun () -> return fd
 
 let simple_msgs =
-  [| MBytes.create (1 lsl 6);
-     MBytes.create (1 lsl 7);
-     MBytes.create (1 lsl 8);
-     MBytes.create (1 lsl 9);
-     MBytes.create (1 lsl 10);
-     MBytes.create (1 lsl 11);
-     MBytes.create (1 lsl 12);
-     MBytes.create (1 lsl 13);
-     MBytes.create (1 lsl 14);
-     MBytes.create (1 lsl 15);
-     MBytes.create (1 lsl 16) |]
+  [| Bytes.create (1 lsl 6);
+     Bytes.create (1 lsl 7);
+     Bytes.create (1 lsl 8);
+     Bytes.create (1 lsl 9);
+     Bytes.create (1 lsl 10);
+     Bytes.create (1 lsl 11);
+     Bytes.create (1 lsl 12);
+     Bytes.create (1 lsl 13);
+     Bytes.create (1 lsl 14);
+     Bytes.create (1 lsl 15);
+     Bytes.create (1 lsl 16) |]
 
 let nb_simple_msgs = Array.length simple_msgs
 
 let receive conn =
-  let buf = MBytes.create (1 lsl 16) in
+  let buf = Bytes.create (1 lsl 16) in
   let rec loop () =
     P2p_io_scheduler.read conn buf
     >>= function
@@ -128,7 +128,7 @@ let max_size ?max_upload_speed () =
   | Some max_upload_speed ->
       let rec loop n =
         if n <= 1 then 1
-        else if MBytes.length simple_msgs.(n - 1) <= max_upload_speed then n
+        else if Bytes.length simple_msgs.(n - 1) <= max_upload_speed then n
         else loop (n - 1)
       in
       loop nb_simple_msgs

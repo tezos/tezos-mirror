@@ -64,6 +64,7 @@ build:
     - . ./scripts/version.sh
     - dune build @runtest_dune_template
     - make all build-test
+    - opam clean
   artifacts:
     name: "$CI_COMMIT_REF_NAME"
     paths:
@@ -412,15 +413,15 @@ opam:001:ocplib-json-typed-bson:
   variables:
     package: ocplib-json-typed-bson
 
-opam:002:tezos-stdlib:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib
-
-opam:003:tezos-data-encoding:
+opam:002:tezos-data-encoding:
   <<: *opam_definition
   variables:
     package: tezos-data-encoding
+
+opam:003:tezos-stdlib:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib
 
 opam:004:ocplib-resto:
   <<: *opam_definition
@@ -437,85 +438,85 @@ opam:006:ocplib-resto-directory:
   variables:
     package: ocplib-resto-directory
 
-opam:007:blake2:
-  <<: *opam_definition
-  variables:
-    package: blake2
-
-opam:008:hacl:
-  <<: *opam_definition
-  variables:
-    package: hacl
-
-opam:009:secp256k1:
-  <<: *opam_definition
-  variables:
-    package: secp256k1
-
-opam:010:tezos-clic:
-  <<: *opam_definition
-  variables:
-    package: tezos-clic
-
-opam:011:tezos-rpc:
-  <<: *opam_definition
-  variables:
-    package: tezos-rpc
-
-opam:012:uecc:
-  <<: *opam_definition
-  variables:
-    package: uecc
-
-opam:013:tezos-crypto:
-  <<: *opam_definition
-  variables:
-    package: tezos-crypto
-
-opam:014:tezos-event-logging:
+opam:007:tezos-event-logging:
   <<: *opam_definition
   variables:
     package: tezos-event-logging
 
-opam:015:tezos-micheline:
+opam:008:tezos-rpc:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc
+
+opam:009:tezos-stdlib-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-unix
+
+opam:010:blake2:
+  <<: *opam_definition
+  variables:
+    package: blake2
+
+opam:011:hacl:
+  <<: *opam_definition
+  variables:
+    package: hacl
+
+opam:012:secp256k1:
+  <<: *opam_definition
+  variables:
+    package: secp256k1
+
+opam:013:tezos-clic:
+  <<: *opam_definition
+  variables:
+    package: tezos-clic
+
+opam:014:uecc:
+  <<: *opam_definition
+  variables:
+    package: uecc
+
+opam:015:tezos-crypto:
+  <<: *opam_definition
+  variables:
+    package: tezos-crypto
+
+opam:016:tezos-micheline:
   <<: *opam_definition
   variables:
     package: tezos-micheline
 
-opam:016:lmdb:
+opam:017:lmdb:
   <<: *opam_definition
   variables:
     package: lmdb
 
-opam:017:tezos-base:
+opam:018:tezos-base:
   <<: *opam_definition
   variables:
     package: tezos-base
 
-opam:018:ocplib-resto-cohttp:
+opam:019:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
 
-opam:019:pbkdf:
+opam:020:pbkdf:
   <<: *opam_definition
   variables:
     package: pbkdf
 
-opam:020:irmin-lmdb:
+opam:021:irmin-lmdb:
   <<: *opam_definition
   variables:
     package: irmin-lmdb
 
-opam:021:tezos-shell-services:
+opam:022:tezos-shell-services:
   <<: *opam_definition
   variables:
     package: tezos-shell-services
-
-opam:022:tezos-stdlib-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib-unix
 
 opam:023:ocplib-resto-cohttp-client:
   <<: *opam_definition

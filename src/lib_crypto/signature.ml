@@ -44,7 +44,7 @@ type watermark =
   | Block_header of Chain_id.t
   | Endorsement of Chain_id.t
   | Generic_operation
-  | Custom of MBytes.t
+  | Custom of Bytes.t
 
 module Public_key_hash = struct
   type t = public_key_hash =
@@ -94,9 +94,9 @@ module Public_key_hash = struct
 
   let of_bytes_opt s = Data_encoding.Binary.of_bytes raw_encoding s
 
-  let to_string s = MBytes.to_string (to_bytes s)
+  let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let size = 1 + Ed25519.size
 
@@ -533,7 +533,7 @@ type t =
   | Ed25519 of Ed25519.t
   | Secp256k1 of Secp256k1.t
   | P256 of P256.t
-  | Unknown of MBytes.t
+  | Unknown of Bytes.t
 
 let name = "Signature"
 
@@ -553,11 +553,11 @@ let to_bytes = function
   | Unknown b ->
       b
 
-let of_bytes_opt s = if MBytes.length s = size then Some (Unknown s) else None
+let of_bytes_opt s = if Bytes.length s = size then Some (Unknown s) else None
 
-let to_string s = MBytes.to_string (to_bytes s)
+let to_string s = Bytes.to_string (to_bytes s)
 
-let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
 type Base58.data += Data of t
 
@@ -588,7 +588,7 @@ include Compare.Make (struct
 
   let compare a b =
     let a = to_bytes a and b = to_bytes b in
-    MBytes.compare a b
+    Bytes.compare a b
 end)
 
 let of_b58check_opt s =
@@ -668,11 +668,15 @@ let zero = of_ed25519 Ed25519.zero
 
 let bytes_of_watermark = function
   | Block_header chain_id ->
-      MBytes.concat "" [MBytes.of_string "\x01"; Chain_id.to_bytes chain_id]
+      Bytes.concat
+        (Bytes.of_string "")
+        [Bytes.of_string "\x01"; Chain_id.to_bytes chain_id]
   | Endorsement chain_id ->
-      MBytes.concat "" [MBytes.of_string "\x02"; Chain_id.to_bytes chain_id]
+      Bytes.concat
+        (Bytes.of_string "")
+        [Bytes.of_string "\x02"; Chain_id.to_bytes chain_id]
   | Generic_operation ->
-      MBytes.of_string "\x03"
+      Bytes.of_string "\x03"
   | Custom bytes ->
       bytes
 
@@ -686,7 +690,7 @@ let pp_watermark ppf =
   | Generic_operation ->
       pp_print_string ppf "Generic-operation"
   | Custom bytes ->
-      let hexed = MBytes.to_hex bytes |> Hex.show in
+      let hexed = Hex.of_bytes bytes |> Hex.show in
       fprintf
         ppf
         "Custom: 0x%s"
@@ -733,9 +737,10 @@ let check ?watermark public_key signature message =
       false
 
 let append ?watermark sk msg =
-  MBytes.concat "" [msg; to_bytes (sign ?watermark sk msg)]
+  Bytes.concat (Bytes.of_string "") [msg; to_bytes (sign ?watermark sk msg)]
 
-let concat msg signature = MBytes.concat "" [msg; to_bytes signature]
+let concat msg signature =
+  Bytes.concat (Bytes.of_string "") [msg; to_bytes signature]
 
 type algo = Ed25519 | Secp256k1 | P256
 

@@ -60,7 +60,7 @@ val commit_test_chain_genesis :
 (** [key] indicates a path in a context. *)
 type key = string list
 
-type value = MBytes.t
+type value = Bytes.t
 
 val mem : context -> key -> bool Lwt.t
 
@@ -134,17 +134,17 @@ module Pruned_block : sig
 
   val encoding : t Data_encoding.t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 end
 
 module Block_data : sig
   type t = {block_header : Block_header.t; operations : Operation.t list list}
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 
   val encoding : t Data_encoding.t
 end
@@ -162,9 +162,9 @@ module Protocol_data : sig
     parents : Context_hash.t list;
   }
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 
   val encoding : t Data_encoding.t
 end

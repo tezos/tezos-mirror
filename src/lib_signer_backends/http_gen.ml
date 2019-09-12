@@ -35,7 +35,7 @@ struct
       (RPC_client : RPC_client.S) (P : sig
         val authenticate :
           Signature.Public_key_hash.t list ->
-          MBytes.t ->
+          Bytes.t ->
           Signature.t tzresult Lwt.t
 
         val logger : RPC_client.logger
@@ -157,7 +157,9 @@ struct
         | None ->
             msg
         | Some watermark ->
-            MBytes.concat "" [Signature.bytes_of_watermark watermark; msg]
+            Bytes.concat
+              (Bytes.of_string "")
+              [Signature.bytes_of_watermark watermark; msg]
       in
       get_signature base pkh msg
       >>=? fun signature ->

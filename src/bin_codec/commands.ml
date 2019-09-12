@@ -51,8 +51,7 @@ let json_parameter =
       | Error err ->
           cctxt#error "%s" err)
 
-let bytes_parameter =
-  parameter (fun _ hex -> return (MBytes.of_hex (`Hex hex)))
+let bytes_parameter = parameter (fun _ hex -> return (Hex.to_bytes (`Hex hex)))
 
 let commands () =
   [ command
@@ -134,7 +133,8 @@ let commands () =
               "Impossible to the JSON convert to binary.@,\
                This error should not happen."
         | Some bytes ->
-            cctxt#message "%a" MBytes.pp_hex bytes >>= fun () -> return_unit);
+            cctxt#message "%a" Hex.pp (Hex.of_bytes bytes)
+            >>= fun () -> return_unit);
     (* Binary -> JSON *)
     command
       ~group

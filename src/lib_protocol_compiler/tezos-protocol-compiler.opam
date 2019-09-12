@@ -16,7 +16,6 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-environment-sigs"
   "tezos-stdlib-unix"
-  "ocplib-endian"
   "ocp-ocamlres" { >= "0.4" }
 ]
 build: [
