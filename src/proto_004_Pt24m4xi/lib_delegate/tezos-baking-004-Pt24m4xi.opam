@@ -10,6 +10,7 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-version"
   "tezos-protocol-environment"
   "tezos-protocol-004-Pt24m4xi"
   "tezos-shell-context"
