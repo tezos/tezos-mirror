@@ -74,3 +74,18 @@ let fold_left f init s =
   let acc = ref init in
   String.iter (fun c -> acc := f !acc c) s ;
   !acc
+
+let is_hex s =
+  let len = String.length s in
+  len mod 2 = 0
+  &&
+  try
+    for i = 0 to len - 1 do
+      match s.[i] with
+      | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' ->
+          ()
+      | _ ->
+          raise Exit
+    done ;
+    true
+  with Exit -> false
