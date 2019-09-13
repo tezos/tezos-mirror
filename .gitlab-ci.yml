@@ -438,85 +438,85 @@ opam:06:ocplib-resto-directory:
   variables:
     package: ocplib-resto-directory
 
-opam:07:blake2:
-  <<: *opam_definition
-  variables:
-    package: blake2
-
-opam:08:hacl:
-  <<: *opam_definition
-  variables:
-    package: hacl
-
-opam:09:secp256k1:
-  <<: *opam_definition
-  variables:
-    package: secp256k1
-
-opam:10:tezos-clic:
-  <<: *opam_definition
-  variables:
-    package: tezos-clic
-
-opam:11:tezos-rpc:
-  <<: *opam_definition
-  variables:
-    package: tezos-rpc
-
-opam:12:uecc:
-  <<: *opam_definition
-  variables:
-    package: uecc
-
-opam:13:tezos-crypto:
-  <<: *opam_definition
-  variables:
-    package: tezos-crypto
-
-opam:14:tezos-event-logging:
+opam:07:tezos-event-logging:
   <<: *opam_definition
   variables:
     package: tezos-event-logging
 
-opam:15:tezos-micheline:
+opam:08:tezos-rpc:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc
+
+opam:09:tezos-stdlib-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-unix
+
+opam:10:blake2:
+  <<: *opam_definition
+  variables:
+    package: blake2
+
+opam:11:hacl:
+  <<: *opam_definition
+  variables:
+    package: hacl
+
+opam:12:secp256k1:
+  <<: *opam_definition
+  variables:
+    package: secp256k1
+
+opam:13:tezos-clic:
+  <<: *opam_definition
+  variables:
+    package: tezos-clic
+
+opam:14:uecc:
+  <<: *opam_definition
+  variables:
+    package: uecc
+
+opam:15:tezos-crypto:
+  <<: *opam_definition
+  variables:
+    package: tezos-crypto
+
+opam:16:tezos-micheline:
   <<: *opam_definition
   variables:
     package: tezos-micheline
 
-opam:16:lmdb:
+opam:17:lmdb:
   <<: *opam_definition
   variables:
     package: lmdb
 
-opam:17:tezos-base:
+opam:18:tezos-base:
   <<: *opam_definition
   variables:
     package: tezos-base
 
-opam:18:ocplib-resto-cohttp:
+opam:19:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
 
-opam:19:pbkdf:
+opam:20:pbkdf:
   <<: *opam_definition
   variables:
     package: pbkdf
 
-opam:20:irmin-lmdb:
+opam:21:irmin-lmdb:
   <<: *opam_definition
   variables:
     package: irmin-lmdb
 
-opam:21:tezos-shell-services:
+opam:22:tezos-shell-services:
   <<: *opam_definition
   variables:
     package: tezos-shell-services
-
-opam:22:tezos-stdlib-unix:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib-unix
 
 opam:23:ocplib-resto-cohttp-client:
   <<: *opam_definition
