@@ -16,6 +16,7 @@ depends: [
   "tezos-base"
   "lwt"
   "fmt"
+  "cohttp-lwt-unix"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
