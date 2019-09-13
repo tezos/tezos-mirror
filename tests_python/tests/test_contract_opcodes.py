@@ -217,9 +217,6 @@ class TestContractOpcodes:
             ('exec_concat.tz', '"?"', '""', '"_abc"'),
             ('exec_concat.tz', '"?"', '"test"', '"test_abc"'),
 
-            # Get current steps to quota
-            ('steps_to_quota.tz', '111', 'Unit', '799813'),
-
             # Get the current balance of the contract
             ('balance.tz', '111', 'Unit', '4000000000000'),
 
