@@ -13,6 +13,7 @@ depends: [
   "genspio" { = "0.0.2" }
   "dum"
   "tezos-stdlib-unix"
+  "tezos-base"
   "lwt"
   "fmt"
 ]
