@@ -25,19 +25,28 @@
 
 open Protocol
 
+let default_constant = "\x00\x00\x00\x04"
+
+let is_updated_constant =
+  let commit_hash =
+    if TzString.is_hex Tezos_version.Current_git_info.commit_hash then
+      Hex.to_string (`Hex Tezos_version.Current_git_info.commit_hash)
+    else Tezos_version.Current_git_info.commit_hash
+  in
+  if String.length commit_hash >= 4 then String.sub commit_hash 0 4
+  else default_constant
+
+let is_updated_cstruct = MBytes.of_string is_updated_constant
+
+let is_updated_constant_len = String.length is_updated_constant
+
 (* add a version to the pow *)
 let generate_proof_of_work_nonce () =
-  let is_updated_constant =
-    let commit_hash = Tezos_version.Current_git_info.commit_hash in
-    if String.length commit_hash >= 4 then String.sub commit_hash 0 4
-    else "\x00\x00\x00\x04"
-  in
-  let is_updated_cstruct = MBytes.of_string is_updated_constant in
-  let is_updated_constant_len = String.length is_updated_constant in
   MBytes.concat ""
-    [is_updated_cstruct ;
-     Rand.generate
-       (Alpha_context.Constants.proof_of_work_nonce_size - is_updated_constant_len)]
+    [ is_updated_cstruct;
+      Rand.generate
+        ( Alpha_context.Constants.proof_of_work_nonce_size
+          - is_updated_constant_len ) ]
 
 (* This was used before November 2018 *)
 (* (\* Random proof of work *\)
