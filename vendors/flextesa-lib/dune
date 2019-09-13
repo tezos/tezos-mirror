@@ -14,5 +14,6 @@
     ezjsonm
     tezos-stdlib-unix
     tezos-crypto
+    tezos-base
     ))
 
