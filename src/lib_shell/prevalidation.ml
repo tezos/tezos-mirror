@@ -349,6 +349,5 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
         let context = Shell_context.unwrap_disk_context context in
         return (context, message) )
   >>=? fun (context, message) ->
-  Context.hash ?message ~time:timestamp context
-  >>= fun context ->
+  let context = Context.hash ?message ~time:timestamp context in
   return ({shell_header with context}, validation_result_list)

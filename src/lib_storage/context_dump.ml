@@ -42,13 +42,13 @@ module type Dump_interface = sig
 
   type commit_info
 
+  type batch
+
+  val batch : index -> (batch -> 'a Lwt.t) -> 'a Lwt.t
+
   val commit_info_encoding : commit_info Data_encoding.t
 
   val hash_encoding : hash Data_encoding.t
-
-  val blob_encoding : [`Blob of Bytes.t] Data_encoding.t
-
-  val node_encoding : [`Node of Bytes.t] Data_encoding.t
 
   module Block_header : sig
     type t = Block_header.t
@@ -106,22 +106,11 @@ module type Dump_interface = sig
     val encoding : t Data_encoding.t
   end
 
-  (* hash manipulation *)
-  val hash_export : hash -> [`Node | `Blob] * Bytes.t
-
-  val hash_import : [`Node | `Blob] -> Bytes.t -> hash tzresult
-
-  val hash_equal : hash -> hash -> bool
-
   (* commit manipulation (for parents) *)
-  val context_parents : context -> Commit_hash.t list Lwt.t
+  val context_parents : context -> Commit_hash.t list
 
   (* Commit info *)
   val context_info : context -> commit_info
-
-  val context_info_export : commit_info -> Int64.t * string * string
-
-  val context_info_import : Int64.t * string * string -> commit_info
 
   (* block header manipulation *)
   val get_context : index -> Block_header.t -> context option Lwt.t
@@ -136,24 +125,22 @@ module type Dump_interface = sig
   (* for dumping *)
   val context_tree : context -> tree
 
-  val tree_hash : context -> tree -> hash Lwt.t
+  val tree_hash : tree -> hash
 
   val sub_tree : tree -> key -> tree option Lwt.t
 
   val tree_list : tree -> (step * [`Contents | `Node]) list Lwt.t
 
-  val tree_content : tree -> Bytes.t option Lwt.t
+  val tree_content : tree -> string option Lwt.t
 
   (* for restoring *)
   val make_context : index -> context
 
   val update_context : context -> tree -> context
 
-  val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
+  val add_string : batch -> string -> tree Lwt.t
 
-  val add_mbytes : index -> Bytes.t -> tree Lwt.t
-
-  val add_dir : index -> (step * hash) list -> tree option Lwt.t
+  val add_dir : batch -> (step * hash) list -> tree option Lwt.t
 end
 
 module type S = sig
@@ -344,7 +331,7 @@ module Make (I : Dump_interface) = struct
         block_data : I.Block_data.t;
       }
     | Node of (string * I.hash) list
-    | Blob of Bytes.t
+    | Blob of string
     | Proot of I.Pruned_block.t
     | Loot of I.Protocol_data.t
     | End
@@ -356,9 +343,9 @@ module Make (I : Dump_interface) = struct
     case
       ~title:"blob"
       (Tag (Char.code 'b'))
-      bytes
-      (function Blob bytes -> Some bytes | _ -> None)
-      (function bytes -> Blob bytes)
+      string
+      (function Blob string -> Some string | _ -> None)
+      (function string -> Blob string)
 
   let node_encoding =
     let open Data_encoding in
@@ -574,8 +561,7 @@ module Make (I : Dump_interface) = struct
             | None ->
                 assert false
             | Some sub_tree ->
-                I.tree_hash ctxt sub_tree
-                >>= fun hash ->
+                let hash = I.tree_hash sub_tree in
                 ( if visited hash then Lwt.return_unit
                 else (
                   Tezos_stdlib_unix.Utils.display_progress
@@ -596,7 +582,7 @@ module Make (I : Dump_interface) = struct
                           assert false
                       | Some data ->
                           set_blob buf data ; maybe_flush () ) ) )
-                >>= fun () -> Lwt.return (name, hash))
+                >|= fun () -> (name, hash))
           keys
         >>= fun sub_keys -> set_node buf sub_keys ; maybe_flush ()
       in
@@ -615,8 +601,7 @@ module Make (I : Dump_interface) = struct
             fold_tree_path ctxt tree
             >>= fun () ->
             Tezos_stdlib_unix.Utils.display_progress_end () ;
-            I.context_parents ctxt
-            >>= fun parents ->
+            let parents = I.context_parents ctxt in
             set_root buf bh (I.context_info ctxt) parents block_data ;
             (* Dump pruned blocks *)
             let dump_pruned cpt pruned =
@@ -672,14 +657,14 @@ module Make (I : Dump_interface) = struct
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
-    let add_blob blob = I.add_mbytes index blob >>= fun tree -> return tree in
-    let add_dir keys =
-      I.add_dir index keys
+    let add_blob t blob = I.add_string t blob >>= fun tree -> return tree in
+    let add_dir t keys =
+      I.add_dir t keys
       >>= function
       | None -> fail Restore_context_failure | Some tree -> return tree
     in
     let restore history_mode =
-      let rec first_pass ctxt cpt =
+      let rec first_pass batch ctxt cpt =
         Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Context: %dK elements, %dMiB read"
@@ -695,11 +680,13 @@ module Make (I : Dump_interface) = struct
             | Some block_header ->
                 return (block_header, block_data) )
         | Node contents ->
-            add_dir contents
-            >>=? fun tree -> first_pass (I.update_context ctxt tree) (cpt + 1)
+            add_dir batch contents
+            >>=? fun tree ->
+            first_pass batch (I.update_context ctxt tree) (cpt + 1)
         | Blob data ->
-            add_blob data
-            >>=? fun tree -> first_pass (I.update_context ctxt tree) (cpt + 1)
+            add_blob batch data
+            >>=? fun tree ->
+            first_pass batch (I.update_context ctxt tree) (cpt + 1)
         | _ ->
             fail Inconsistent_snapshot_data
       in
@@ -744,7 +731,7 @@ module Make (I : Dump_interface) = struct
         | _ ->
             fail Inconsistent_snapshot_data
       in
-      first_pass (I.make_context index) 0
+      I.batch index (fun batch -> first_pass batch (I.make_context index) 0)
       >>=? fun (block_header, block_data) ->
       Tezos_stdlib_unix.Utils.display_progress_end () ;
       second_pass None ([], []) [] 0
