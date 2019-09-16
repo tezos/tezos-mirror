@@ -12,6 +12,7 @@ depends: [
   "tezos-base"
   "lmdb"
   "irmin-pack"
+  "digestif" {>= "0.7.3"}
   "tezos-shell-services"
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test }
