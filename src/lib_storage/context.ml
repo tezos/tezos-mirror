@@ -51,15 +51,30 @@ let reporter () =
   in
   {Logs.report}
 
+let index_log_size = ref None
+
 let () =
+  let verbose () =
+    Logs.set_level (Some Logs.Debug) ;
+    Logs.set_reporter (reporter ())
+  in
+  let index_log_size n = index_log_size := Some (int_of_string n) in
   match Unix.getenv "TEZOS_STORAGE" with
-  | "v" | "verbose" | "vv" ->
-      Logs.set_level (Some Logs.Debug) ;
-      Logs.set_reporter (reporter ())
-  | _ ->
-      ()
   | exception Not_found ->
       ()
+  | v ->
+      let args = String.split ',' v in
+      List.iter
+        (function
+          | "v" | "verbose" | "vv" ->
+              verbose ()
+          | v -> (
+            match String.split '=' v with
+            | ["index-log-size"; n] ->
+                index_log_size n
+            | _ ->
+                () ))
+        args
 
 module Hash : sig
   include Irmin.Hash.S
@@ -400,7 +415,8 @@ let fork_test_chain v ~protocol ~expiration =
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ?mapsize:_ ?readonly root =
-  Store.Repo.v (Irmin_pack.config ?readonly root)
+  Store.Repo.v
+    (Irmin_pack.config ?readonly ?index_log_size:!index_log_size root)
   >>= fun repo ->
   Lwt.return
     {
