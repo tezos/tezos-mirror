@@ -110,8 +110,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   >>= fun empty_context ->
   let header = State.Block.header genesis in
   let timestamp = State.Block.timestamp genesis in
-  Context.hash ~time:timestamp empty_context
-  >>= fun empty_context_hash ->
+  let empty_context_hash = Context.hash ~time:timestamp empty_context in
   Context.commit ~time:header.shell.timestamp empty_context
   >>= fun context ->
   let header = {header with shell = {header.shell with context}} in
