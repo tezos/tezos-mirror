@@ -39,38 +39,38 @@ module Hash : sig
 
   val of_context_hash : Context_hash.t -> t
 end = struct
-  module H = Context_hash
+  module H = Digestif.Make_BLAKE2B (struct
+    let digest_size = 32
+  end)
 
-  type t = string
+  type t = H.t
 
-  let to_context_hash s = H.of_string_exn s
+  let of_context_hash s = H.of_raw_string (Context_hash.to_string s)
 
-  let of_context_hash h = H.to_string h
+  let to_context_hash h = Context_hash.of_string_exn (H.to_raw_string h)
 
-  let pp ppf t = H.pp ppf (H.of_string_exn t)
+  let pp ppf t = Context_hash.pp ppf (to_context_hash t)
 
   let of_string x =
-    match H.of_b58check x with
-    | Ok _ ->
-        Ok x
+    match Context_hash.of_b58check x with
+    | Ok x ->
+        Ok (of_context_hash x)
     | Error _ ->
         todo "Hash.of_string"
 
-  let short_hash h = H.hash (to_context_hash h)
+  let short_hash t = Irmin.Type.(short_hash string (H.to_raw_string t))
 
   let t : t Irmin.Type.t =
-    Irmin.Type.like
+    Irmin.Type.map
       ~cli:(pp, of_string)
-      Irmin.Type.(string_of (`Fixed H.size))
+      Irmin.Type.(string_of (`Fixed H.digest_size))
       ~short_hash
+      H.of_raw_string
+      H.to_raw_string
 
-  let hash_size = H.size
+  let hash_size = H.digest_size
 
-  let hash f =
-    let init = ref [] in
-    f (fun x -> init := x :: !init) ;
-    let h = H.hash_string (List.rev !init) in
-    H.to_string h
+  let hash = H.digesti_string
 end
 
 module Node = struct
