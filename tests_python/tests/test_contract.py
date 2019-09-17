@@ -238,3 +238,14 @@ class TestChainId:
         client.transfer(0, 'bootstrap2', 'authentication',
                         ['--arg', f'Pair {operation} \"{signature}\"'])
         client.bake('bootstrap5', BAKE_ARGS)
+
+@pytest.mark.contract
+class TestBigMapToSelf:
+
+    def test_big_map_to_self_origination(self, client, session):
+        path = f'{CONTRACT_PATH}/opcodes/big_map_to_self.tz'
+        originate(client, session, path, '{}', 0)
+        client.bake('bootstrap5', BAKE_ARGS)
+
+    def test_big_map_to_self_transfer(self, client):
+        client.transfer(0, 'bootstrap2', "big_map_to_self", [])
