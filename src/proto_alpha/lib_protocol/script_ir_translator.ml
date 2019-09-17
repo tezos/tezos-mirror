@@ -1038,7 +1038,7 @@ let has_big_map
     | Bool_t _ -> false
     | Lambda_t (_, _, _) -> false
     | Set_t (_, _) -> false
-    | Big_map_t (_, _, _) -> false
+    | Big_map_t (_, _, _) -> true
     | Contract_t (_, _) -> false
     | Operation_t _ -> false
     | Chain_id_t _ -> false
