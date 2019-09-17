@@ -185,6 +185,8 @@ module Cost_of : sig
 
     val chain_id : Gas.cost
 
+    val get_voting_power : Gas.cost
+
     val wrap : Gas.cost
 
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost

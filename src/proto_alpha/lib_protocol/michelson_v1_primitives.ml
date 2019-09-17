@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -133,6 +134,7 @@ type prim =
   | I_DIG
   | I_DUG
   | I_NEVER
+  | I_VOTING_POWER
   | T_bool
   | T_contract
   | T_int
@@ -265,6 +267,7 @@ let namespace = function
   | I_UNPACK
   | I_UNPAIR
   | I_UPDATE
+  | I_VOTING_POWER
   | I_XOR ->
       Instr_namespace
   | T_address
@@ -506,6 +509,8 @@ let string_of_prim = function
       "DUG"
   | I_NEVER ->
       "NEVER"
+  | I_VOTING_POWER ->
+      "VOTING_POWER"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -754,6 +759,8 @@ let prim_of_string = function
       ok I_DUG
   | "NEVER" ->
       ok I_NEVER
+  | "VOTING_POWER" ->
+      ok I_VOTING_POWER
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -987,7 +994,8 @@ let prim_encoding =
          ("SELF_ADDRESS", I_SELF_ADDRESS);
          ("never", T_never);
          ("NEVER", I_NEVER);
-         ("UNPAIR", I_UNPAIR)
+         ("UNPAIR", I_UNPAIR);
+         ("VOTING_POWER", I_VOTING_POWER)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

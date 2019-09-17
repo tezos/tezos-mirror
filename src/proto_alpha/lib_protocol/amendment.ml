@@ -107,21 +107,18 @@ let check_approval_and_update_participation_ema ctxt =
 *)
 let start_new_voting_period ctxt =
   Vote.get_current_period_kind ctxt
-  >>=? function
+  >>=? fun kind ->
+  ( match kind with
   | Proposal -> (
       select_winning_proposal ctxt
       >>=? fun proposal ->
       Vote.clear_proposals ctxt
       >>= fun ctxt ->
-      Vote.clear_listings ctxt
-      >>=? fun ctxt ->
       match proposal with
       | None ->
-          Vote.freeze_listings ctxt >>=? fun ctxt -> return ctxt
+          return ctxt
       | Some proposal ->
           Vote.init_current_proposal ctxt proposal
-          >>=? fun ctxt ->
-          Vote.freeze_listings ctxt
           >>=? fun ctxt ->
           Vote.set_current_period_kind ctxt Testing_vote
           >>=? fun ctxt -> return ctxt )
@@ -130,8 +127,6 @@ let start_new_voting_period ctxt =
       >>=? fun (ctxt, approved) ->
       Vote.clear_ballots ctxt
       >>= fun ctxt ->
-      Vote.clear_listings ctxt
-      >>=? fun ctxt ->
       if approved then
         let expiration =
           (* in two days maximum... *)
@@ -147,12 +142,8 @@ let start_new_voting_period ctxt =
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt ->
-        Vote.freeze_listings ctxt
-        >>=? fun ctxt ->
         Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
   | Testing ->
-      Vote.freeze_listings ctxt
-      >>=? fun ctxt ->
       Vote.set_current_period_kind ctxt Promotion_vote
       >>=? fun ctxt -> return ctxt
   | Promotion_vote ->
@@ -165,13 +156,11 @@ let start_new_voting_period ctxt =
       >>=? fun ctxt ->
       Vote.clear_ballots ctxt
       >>= fun ctxt ->
-      Vote.clear_listings ctxt
-      >>=? fun ctxt ->
       Vote.clear_current_proposal ctxt
       >>=? fun ctxt ->
-      Vote.freeze_listings ctxt
-      >>=? fun ctxt ->
       Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
+  )
+  >>=? fun ctxt -> Vote.freeze_listings ctxt
 
 type error +=
   | (* `Branch *)

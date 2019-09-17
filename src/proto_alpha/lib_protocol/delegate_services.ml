@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +35,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
+  voting_power : int32;
 }
 
 let info_encoding =
@@ -46,7 +48,8 @@ let info_encoding =
            delegated_contracts;
            delegated_balance;
            deactivated;
-           grace_period } ->
+           grace_period;
+           voting_power } ->
       ( balance,
         frozen_balance,
         frozen_balance_by_cycle,
@@ -54,7 +57,8 @@ let info_encoding =
         delegated_contracts,
         delegated_balance,
         deactivated,
-        grace_period ))
+        grace_period,
+        voting_power ))
     (fun ( balance,
            frozen_balance,
            frozen_balance_by_cycle,
@@ -62,7 +66,8 @@ let info_encoding =
            delegated_contracts,
            delegated_balance,
            deactivated,
-           grace_period ) ->
+           grace_period,
+           voting_power ) ->
       {
         balance;
         frozen_balance;
@@ -72,8 +77,9 @@ let info_encoding =
         delegated_balance;
         deactivated;
         grace_period;
+        voting_power;
       })
-    (obj8
+    (obj9
        (req "balance" Tez.encoding)
        (req "frozen_balance" Tez.encoding)
        (req "frozen_balance_by_cycle" Delegate.frozen_balance_by_cycle_encoding)
@@ -81,7 +87,8 @@ let info_encoding =
        (req "delegated_contracts" (list Contract_repr.encoding))
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
-       (req "grace_period" Cycle.encoding))
+       (req "grace_period" Cycle.encoding)
+       (req "voting_power" int32))
 
 module S = struct
   let path = RPC_path.(open_root / "context" / "delegates")
@@ -190,6 +197,14 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
+
+  let voting_power =
+    RPC_service.get_service
+      ~description:
+        "The number of rolls in the vote listings for a given delegate"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int32
+      RPC_path.(path / "voting_power")
 end
 
 let register () =
@@ -229,6 +244,8 @@ let register () =
       >>=? fun deactivated ->
       Delegate.grace_period ctxt pkh
       >>=? fun grace_period ->
+      Vote.get_voting_power ctxt pkh
+      >>=? fun voting_power ->
       return
         {
           balance;
@@ -239,6 +256,7 @@ let register () =
           delegated_balance;
           deactivated;
           grace_period;
+          voting_power;
         }) ;
   register1 S.balance (fun ctxt pkh () () -> Delegate.full_balance ctxt pkh) ;
   register1 S.frozen_balance (fun ctxt pkh () () ->
@@ -253,7 +271,9 @@ let register () =
       Delegate.delegated_balance ctxt pkh) ;
   register1 S.deactivated (fun ctxt pkh () () -> Delegate.deactivated ctxt pkh) ;
   register1 S.grace_period (fun ctxt pkh () () ->
-      Delegate.grace_period ctxt pkh)
+      Delegate.grace_period ctxt pkh) ;
+  register1 S.voting_power (fun ctxt pkh () () ->
+      Vote.get_voting_power ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =
   RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
@@ -283,6 +303,9 @@ let deactivated ctxt block pkh =
 
 let grace_period ctxt block pkh =
   RPC_context.make_call1 S.grace_period ctxt block pkh () ()
+
+let voting_power ctxt block pkh =
+  RPC_context.make_call1 S.voting_power ctxt block pkh () ()
 
 let requested_levels ~default ctxt cycles levels =
   match (levels, cycles) with

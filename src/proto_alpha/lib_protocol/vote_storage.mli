@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -71,8 +72,6 @@ val listings_encoding :
     sets Listings_size. Delegates without rolls are not included in the listing. *)
 val freeze_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val clear_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
 (** Returns the sum of all rolls of all delegates. *)
 val listing_size : Raw_context.t -> int32 tzresult Lwt.t
 
@@ -81,6 +80,9 @@ val in_listings : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 
 val get_listings :
   Raw_context.t -> (Signature.Public_key_hash.t * int32) list Lwt.t
+
+val get_voting_power :
+  Raw_context.t -> Signature.public_key_hash -> int32 tzresult Lwt.t
 
 val get_current_quorum : Raw_context.t -> int32 tzresult Lwt.t
 
