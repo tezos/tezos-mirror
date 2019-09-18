@@ -351,7 +351,7 @@ struct
     let to_bits ?(pad_to = 0) z =
       let bits = to_bits z in
       let len = Pervasives.((numbits z + 7) / 8) in
-      let full_len = Compare.Int.max pad_to len in
+      let full_len = Tezos_stdlib.Compare.Int.max pad_to len in
       if full_len = 0 then MBytes.create 0
       else
         let res = MBytes.create full_len in
