@@ -106,10 +106,6 @@ let () =
   let open Tezos_data_encoding.Data_encoding in
   let stamp_proto id ids = String.concat "." (Protocol.name :: id :: ids) in
   register
-  @@ def
-       (stamp_proto "parameters" ["constants"])
-       Protocol.Parameters_repr.constants_encoding ;
-  register
   @@ def (stamp_proto "parameters" []) Protocol.Parameters_repr.encoding ;
   register ~pp:Protocol.Alpha_context.Tez.pp
   @@ def (stamp_proto "tez" []) Protocol.Alpha_context.Tez.encoding ;
@@ -252,10 +248,8 @@ let () =
        Protocol.Alpha_context.Voting_period.kind_encoding ;
   register
   @@ Data_encoding.def
-       "error.alpha"
+       (stamp_proto "errors" [])
        ~description:
-         "The full list of RPC errors would be too long to include.\n\
-          It is available at RPC `/errors` (GET).\n\
-          Errors specific to protocol Alpha have an id that starts with \
-          `proto.alpha`."
+         "The full list of RPC errors would be too long to include.It is\n\
+          available through the RPC `/errors` (GET)."
        error_encoding
