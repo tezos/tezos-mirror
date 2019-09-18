@@ -123,7 +123,7 @@ val fork_test_chain :
 
 val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
-(** {2 Context dumping} ******************************************************)
+(** {2 Context dumping} *)
 
 module Pruned_block : sig
   type t = {

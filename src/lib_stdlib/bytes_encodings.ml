@@ -15,7 +15,7 @@
 
 (* this module is a temporary fix waiting for ocaml 4.08 *)
 
-(** {6 Binary encoding/decoding of integers} *)
+(** {1 Binary encoding/decoding of integers} *)
 
 external get_uint8 : bytes -> int -> int = "%bytes_safe_get"
 
@@ -114,13 +114,15 @@ module type S = sig
       unsigned numbers.
       8-bit and 16-bit integers are represented by the [int] type,
       which has more bits than the binary encoding.  These extra bits
-      are handled as follows: {ul
-      {- Functions that decode signed (resp. unsigned) 8-bit or 16-bit
-      integers represented by [int] values sign-extend
-      (resp. zero-extend) their result.}
-      {- Functions that encode 8-bit or 16-bit integers represented by
-      [int] values truncate their input to their least significant
-      bytes.}}
+      are handled as follows:
+        {ul
+          {- Functions that decode signed (resp. unsigned) 8-bit or 16-bit
+          integers represented by [int] values sign-extend
+          (resp. zero-extend) their result.}
+          {- Functions that encode 8-bit or 16-bit integers represented by
+          [int] values truncate their input to their least significant
+          bytes.}
+        }
   *)
 
   (** [get_uint8 b i] is [b]'s unsigned 8-bit integer starting at byte index [i].
