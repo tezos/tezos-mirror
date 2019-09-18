@@ -30,7 +30,7 @@ endif
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json)
 	@cp _build/default/src/bin_node/main.exe tezos-node
-	@cp _build/default/src/bin_validation/main_validator.exe tezos-fork-validator
+	@cp _build/default/src/bin_validation/main_validator.exe tezos-validator
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
@@ -123,7 +123,7 @@ clean:
 	@-find . -name dune-project -delete
 	@-rm -f \
 		tezos-node \
-		tezos-fork-validator \
+		tezos-validator \
 		tezos-client \
 		tezos-signer \
 		tezos-admin-client \

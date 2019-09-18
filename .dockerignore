@@ -13,7 +13,7 @@ docs/api/tezos-client.html
 docs/api/tezos-admin-client.html
 
 tezos-node
-tezos-fork-validator
+tezos-validator
 tezos-protocol-compiler
 tezos-client
 tezos-admin-client
