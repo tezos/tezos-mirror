@@ -97,10 +97,10 @@ let () =
   @@ Term.eval_choice
        (help : unit Term.t * _)
        ( Small_utilities.all ~pp_error ()
-       @ [ Command_mini_network.cmd () ~pp_error;
-           Command_daemons_protocol_change.cmd () ~pp_error;
+       @ [ Command_daemons_protocol_change.cmd () ~pp_error;
            Command_voting.cmd () ~pp_error;
            Command_accusations.cmd () ~pp_error;
            Command_prevalidation.cmd () ~pp_error;
            Command_ledger_baking.cmd () ~pp_error;
-           Command_ledger_wallet.cmd () ~pp_error ] )
+           Command_ledger_wallet.cmd () ~pp_error;
+           Flextesa.Interactive_mini_network.cmd ~pp_error () ] )
