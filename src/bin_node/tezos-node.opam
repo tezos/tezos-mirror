@@ -15,6 +15,7 @@ depends: [
   "tezos-p2p"
   "tezos-shell"
   "tezos-protocol-updater"
+  "tezos-validator"
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-alpha"

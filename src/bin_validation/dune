@@ -4,14 +4,11 @@
  (libraries tezos-base
             tezos-storage
             tezos-stdlib-unix
-            tezos-shell
-            tezos-shell-services
-            tezos-validation
+            tezos-protocol-environment
             tezos-protocol-updater
+            tezos-shell
             tezos-shell-context
-            tezos-embedded-protocol-genesis
-            tezos-embedded-protocol-demo-noops
-            tezos-embedded-protocol-alpha)
+            tezos-validation)
  (flags (:standard -w -9+27-30-32-40@8
                    -safe-string
                    -open Tezos_base__TzPervasives

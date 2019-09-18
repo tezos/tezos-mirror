@@ -9,7 +9,13 @@ depends: [
   "ocamlfind" { build }
   "dune" { build & >= "1.7" }
   "tezos-base"
+  "tezos-storage"
+  "tezos-stdlib-unix"
+  "tezos-protocol-environment"
+  "tezos-protocol-updater"
   "tezos-shell"
+  "tezos-shell-context"
+  "tezos-validation"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
