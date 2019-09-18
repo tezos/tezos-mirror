@@ -978,7 +978,7 @@ and interp
           log := (code.loc, Gas.level ctxt, stack) :: !log ;
           return_unit
     end >>=? fun () ->
-    step ctxt step_constants code stack >>=? fun (Item (ret, Empty), ctxt) ->
+    step ?log ctxt step_constants code stack >>=? fun (Item (ret, Empty), ctxt) ->
     return (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
