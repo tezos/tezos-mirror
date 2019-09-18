@@ -113,7 +113,7 @@ let result_encoding =
        (req "ops_metadata" (list @@ list @@ bytes))
        (req "forking_testchain" bool))
 
-let may_patch_protocol ~level
+let may_force_protocol_upgrade ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
   match Block_header.get_forced_protocol_upgrade ~level with
   | None ->
@@ -123,6 +123,22 @@ let may_patch_protocol ~level
         Shell_context.unwrap_disk_context validation_result.context
       in
       Context.set_protocol context hash
+      >>= fun context ->
+      let context = Shell_context.wrap_disk_context context in
+      Lwt.return {validation_result with context}
+
+(** Applies user activated updates based either on block level or on
+    voted protocols *)
+let may_patch_protocol ~level
+    (validation_result : Tezos_protocol_environment.validation_result) =
+  let context = Shell_context.unwrap_disk_context validation_result.context in
+  Context.get_protocol context
+  >>= fun protocol ->
+  match Block_header.get_voted_protocol_overrides protocol with
+  | None ->
+      may_force_protocol_upgrade ~level validation_result
+  | Some replacement_protocol ->
+      Context.set_protocol context replacement_protocol
       >>= fun context ->
       let context = Shell_context.wrap_disk_context context in
       Lwt.return {validation_result with context}

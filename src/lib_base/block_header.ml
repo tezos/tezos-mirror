@@ -162,6 +162,12 @@ let hash_raw bytes = Block_hash.hash_bytes [bytes]
 let forced_protocol_upgrades : (Int32.t * Protocol_hash.t) list =
   [ (* nothing *) ]
 
+let voted_protocol_overrides : (Protocol_hash.t * Protocol_hash.t) list =
+  List.map
+    (fun (a, b) ->
+      (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
+    [ (* nothing *) ]
+
 module LevelMap = Map.Make (struct
   type t = Int32.t
 
@@ -176,6 +182,9 @@ let get_forced_protocol_upgrade =
       forced_protocol_upgrades
   in
   fun ~level -> LevelMap.find_opt level table
+
+let get_voted_protocol_overrides proto_hash =
+  List.assoc_opt proto_hash voted_protocol_overrides
 
 let () =
   Data_encoding.Registration.register shell_header_encoding ;
