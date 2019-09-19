@@ -4,6 +4,10 @@ import subprocess
 from . import utils
 
 
+# Timeout before killing a baker which doesn't react to SIGTERM
+TERM_TIMEOUT = 10
+
+
 class Baker(subprocess.Popen):
     """Fork a baker process linked to a node and a client"""
 
@@ -41,3 +45,10 @@ class Baker(subprocess.Popen):
         print(cmd_string)
         stdout, stderr = utils.prepare_log(cmd, log_file)
         subprocess.Popen.__init__(self, cmd, stdout=stdout, stderr=stderr)
+
+    def terminate_or_kill(self):
+        self.terminate()
+        try:
+            return self.wait(timeout=TERM_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return self.kill()

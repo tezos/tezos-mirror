@@ -7,6 +7,10 @@ import shutil
 from . import utils
 
 
+# Timeout before killing a node which doesn't react to SIGTERM
+TERM_TIMEOUT = 10
+
+
 class Node:
     """Forks a tezos node and manages its persistent state.
 
@@ -185,7 +189,14 @@ class Node:
 
     def kill(self):
         assert self._process
-        return self._process.kill()
+        return self._process.terminate()
+
+    def terminate_or_kill(self):
+        self._process.terminate()
+        try:
+            return self._process.wait(timeout=TERM_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return self._process.kill()
 
     def poll(self):
         assert self._process
