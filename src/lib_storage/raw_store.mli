@@ -27,15 +27,14 @@ open Store_sigs
 
 include STORE
 
-val init: ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
-val close: t -> unit
+val init : ?readonly:bool -> ?mapsize:int64 -> string -> t tzresult Lwt.t
 
-val with_atomic_rw:
-  t ->
-  (unit -> 'a Lwt.t) ->
-  'a Lwt.t
+val close : t -> unit
 
-val open_with_atomic_rw:
-  ?mapsize:int64 -> string ->
+val with_atomic_rw : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+
+val open_with_atomic_rw :
+  ?mapsize:int64 ->
+  string ->
   (t -> 'a Error_monad.tzresult Lwt.t) ->
   'a tzresult Lwt.t

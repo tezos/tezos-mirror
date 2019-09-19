@@ -73,150 +73,111 @@
     neighbors. *)
 type 'peer_meta peer_meta_config = {
   peer_meta_encoding : 'peer_meta Data_encoding.t;
-  (** Encoding of the peer meta data. *)
-
+      (** Encoding of the peer meta data. *)
   peer_meta_initial : unit -> 'peer_meta;
-  (** Initial value for this peer meta-data *)
-
-  score : 'peer_meta -> float ;
-  (** Score of a peer. *)
+      (** Initial value for this peer meta-data *)
+  score : 'peer_meta -> float;  (** Score of a peer. *)
 }
 
 (* Metadata for a connection. *)
 type 'conn_meta conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta ;
-  private_node : 'conn_meta -> bool ;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta;
+  private_node : 'conn_meta -> bool;
 }
 
 (* Configuration for the application protocol. ['msg] represents
    the type of the application level protocol *)
 type 'msg message_config = {
-  encoding : 'msg P2p_message.encoding list ;
-  (** Encoding of the messages. *)
-
-  chain_name : Distributed_db_version.name ;
-  (** Identifier for this P2p protocol when establishing session. *)
-
-  distributed_db_versions : Distributed_db_version.t list ;
-  (** List of versions supported by this P2p protocol. *)
+  encoding : 'msg P2p_message.encoding list;  (** Encoding of the messages. *)
+  chain_name : Distributed_db_version.name;
+      (** Identifier for this P2p protocol when establishing session. *)
+  distributed_db_versions : Distributed_db_version.t list;
+      (** List of versions supported by this P2p protocol. *)
 }
 
 (** Network configuration *)
 type config = {
-
   listening_port : P2p_addr.port option;
-  (** Tells if incoming connections accepted, precising the TCP port
+      (** Tells if incoming connections accepted, precising the TCP port
       on which the peer can be reached (default: [9732])*)
-
   listening_addr : P2p_addr.t option;
-  (** When incoming connections are accepted, precise on which
+      (** When incoming connections are accepted, precise on which
       IP adddress the node listen (default: [[::]]). *)
-
   discovery_port : P2p_addr.port option;
-  (** Tells if local peer discovery is enabled, precising the TCP port
+      (** Tells if local peer discovery is enabled, precising the TCP port
       on which the peer can be reached (default: [10732]) *)
-
   discovery_addr : Ipaddr.V4.t option;
-  (** When local peer discovery is enabled, precise on which
+      (** When local peer discovery is enabled, precise on which
       IP address messages are broadcasted (default: [255.255.255.255]). *)
-
-  trusted_points : P2p_point.Id.t list ;
-  (** List of hard-coded known peers to bootstrap the network from. *)
-
-  peers_file : string ;
-  (** The path to the JSON file where the metadata associated to
+  trusted_points : P2p_point.Id.t list;
+      (** List of hard-coded known peers to bootstrap the network from. *)
+  peers_file : string;
+      (** The path to the JSON file where the metadata associated to
       peer_ids are loaded / stored. *)
-
-  private_mode : bool ;
-  (** If [true], only open outgoing/accept incoming connections
+  private_mode : bool;
+      (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
-
-  identity : P2p_identity.t ;
-  (** Cryptographic identity of the peer. *)
-
-  proof_of_work_target : Crypto_box.target ;
-  (** Expected level of proof of work of peers' identity. *)
-
-  disable_mempool : bool ;
-  (** If [true], all non-empty mempools will be ignored. *)
+  identity : P2p_identity.t;  (** Cryptographic identity of the peer. *)
+  proof_of_work_target : Crypto_box.target;
+      (** Expected level of proof of work of peers' identity. *)
+  disable_mempool : bool;
+      (** If [true], all non-empty mempools will be ignored. *)
   (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
-
-  trust_discovered_peers : bool ;
-  (** If [true], peers discovered on the local network will be trusted. *)
-
-  disable_testchain : bool ;
-  (** If [true], testchain related messages will be ignored. *)
+  trust_discovered_peers : bool;
+      (** If [true], peers discovered on the local network will be trusted. *)
+  disable_testchain : bool;
+      (** If [true], testchain related messages will be ignored. *)
   (* TODO this option is unused in lib_p2p. Should be moved outside the lib. *)
-
-  greylisting_config : P2p_point_state.Info.greylisting_config ;
-  (** The greylisting configuration. *)
+  greylisting_config : P2p_point_state.Info.greylisting_config;
+      (** The greylisting configuration. *)
 }
 
 (** Network capacities *)
 type limits = {
-
-  connection_timeout : Time.System.Span.t ;
-  (** Maximum time allowed to the establishment of a connection. *)
-
-  authentication_timeout : Time.System.Span.t ;
-  (** Delay granted to a peer to perform authentication, in seconds. *)
-
-  greylist_timeout : Time.System.Span.t ;
-  (** GC delay for the grelists tables, in seconds. *)
-
-  maintenance_idle_time: Time.System.Span.t ;
-  (** How long to wait at most, in seconds, before running a maintenance loop. *)
-
-  min_connections : int ;
-  (** Strict minimum number of connections (triggers an urgent maintenance) *)
-
-  expected_connections : int ;
-  (** Targeted number of connections to reach when bootstrapping / maintaining *)
-
-  max_connections : int ;
-  (** Maximum number of connections (exceeding peers are disconnected) *)
-
-  backlog : int ;
-  (** Argument of [Lwt_unix.accept].*)
-
-  max_incoming_connections : int ;
-  (** Maximum not-yet-authenticated incoming connections. *)
-
-  max_download_speed : int option ;
-  (** Hard-limit in the number of bytes received per second. *)
-
-  max_upload_speed : int option ;
-  (** Hard-limit in the number of bytes sent per second. *)
-
-  read_buffer_size : int ;
-  (** Size in bytes of the buffer passed to [Lwt_unix.read]. *)
-
-  read_queue_size : int option ;
-  write_queue_size : int option ;
-  incoming_app_message_queue_size : int option ;
-  incoming_message_queue_size : int option ;
-  outgoing_message_queue_size : int option ;
-  (** Various bounds for internal queues. *)
-
-  known_peer_ids_history_size : int ;
-  known_points_history_size : int ;
-  (** Size of circular log buffers, in number of events recorded. *)
-
-  max_known_peer_ids : (int * int) option ;
-  max_known_points : (int * int) option ;
-  (** Optional limitation of internal hashtables (max, target) *)
-
-  swap_linger : Time.System.Span.t ;
-  (** Peer swapping does not occur more than once during a timespan of
+  connection_timeout : Time.System.Span.t;
+      (** Maximum time allowed to the establishment of a connection. *)
+  authentication_timeout : Time.System.Span.t;
+      (** Delay granted to a peer to perform authentication, in seconds. *)
+  greylist_timeout : Time.System.Span.t;
+      (** GC delay for the grelists tables, in seconds. *)
+  maintenance_idle_time : Time.System.Span.t;
+      (** How long to wait at most, in seconds, before running a maintenance loop. *)
+  min_connections : int;
+      (** Strict minimum number of connections (triggers an urgent maintenance) *)
+  expected_connections : int;
+      (** Targeted number of connections to reach when bootstrapping / maintaining *)
+  max_connections : int;
+      (** Maximum number of connections (exceeding peers are disconnected) *)
+  backlog : int;  (** Argument of [Lwt_unix.accept].*)
+  max_incoming_connections : int;
+      (** Maximum not-yet-authenticated incoming connections. *)
+  max_download_speed : int option;
+      (** Hard-limit in the number of bytes received per second. *)
+  max_upload_speed : int option;
+      (** Hard-limit in the number of bytes sent per second. *)
+  read_buffer_size : int;
+      (** Size in bytes of the buffer passed to [Lwt_unix.read]. *)
+  read_queue_size : int option;
+  write_queue_size : int option;
+  incoming_app_message_queue_size : int option;
+  incoming_message_queue_size : int option;
+  outgoing_message_queue_size : int option;
+      (** Various bounds for internal queues. *)
+  known_peer_ids_history_size : int;
+  known_points_history_size : int;
+      (** Size of circular log buffers, in number of events recorded. *)
+  max_known_peer_ids : (int * int) option;
+  max_known_points : (int * int) option;
+      (** Optional limitation of internal hashtables (max, target) *)
+  swap_linger : Time.System.Span.t;
+      (** Peer swapping does not occur more than once during a timespan of
       [swap_linger] seconds. *)
-
-  binary_chunks_size : int option ;
-  (** Size (in bytes) of binary blocks that are sent to other
+  binary_chunks_size : int option;
+      (** Size (in bytes) of binary blocks that are sent to other
       peers. Default value is 64 kB. Max value is 64kB. *)
-
 }
 
 (** Type of a P2P layer instance, parametrized by:
@@ -225,11 +186,14 @@ type limits = {
     ['conn_meta]: type of the metadata associated with connection (ack_cfg)
 *)
 type ('msg, 'peer_meta, 'conn_meta) t
+
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
 
-val announced_version :  ('msg, 'peer_meta, 'conn_meta) net -> Network_version.t
+val announced_version : ('msg, 'peer_meta, 'conn_meta) net -> Network_version.t
 
-val pool :  ('msg, 'peer_meta, 'conn_meta) net -> ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option
+val pool :
+  ('msg, 'peer_meta, 'conn_meta) net ->
+  ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option
 
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
@@ -241,9 +205,12 @@ val faked_network :
 
 (** Main network initialisation function *)
 val create :
-  config:config -> limits:limits ->
-  'peer_meta peer_meta_config -> 'conn_meta conn_meta_config ->
-  'msg message_config ->  ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
+  config:config ->
+  limits:limits ->
+  'peer_meta peer_meta_config ->
+  'conn_meta conn_meta_config ->
+  'msg message_config ->
+  ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
 
 val activate : ('msg, 'peer_meta, 'conn_meta) net -> unit
 
@@ -278,14 +245,17 @@ val connection_info :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   'conn_meta P2p_connection.Info.t
+
 val connection_local_metadata :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   'conn_meta
+
 val connection_remote_metadata :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
   'conn_meta
+
 val connection_stat :
   ('msg, 'peer_meta, 'conn_meta) net ->
   ('msg, 'peer_meta, 'conn_meta) connection ->
@@ -303,6 +273,7 @@ val global_stat : ('msg, 'peer_meta, 'conn_meta) net -> P2p_stat.t
 (** Accessors for meta information about a global identifier *)
 val get_peer_metadata :
   ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta
+
 val set_peer_metadata :
   ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> 'peer_meta -> unit
 
@@ -344,11 +315,14 @@ val fold_connections :
 
 val iter_connections :
   ('msg, 'peer_meta, 'conn_meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
+  unit
 
 val on_new_connection :
   ('msg, 'peer_meta, 'conn_meta) net ->
-  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) -> unit
+  (P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection -> unit) ->
+  unit
 
 val greylist_addr : ('msg, 'peer_meta, 'conn_meta) net -> P2p_addr.t -> unit
+
 val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit

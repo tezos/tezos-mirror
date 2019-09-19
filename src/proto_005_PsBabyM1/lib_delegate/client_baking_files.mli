@@ -25,11 +25,12 @@
 
 type _ location
 
-val resolve_location:
+val resolve_location :
   #Client_context.full ->
-  chain: Chain_services.chain ->
-  ([< `Block | `Endorsement | `Nonce ] as 'kind) ->
+  chain:Chain_services.chain ->
+  ([< `Block | `Endorsement | `Nonce] as 'kind) ->
   'kind location tzresult Lwt.t
 
 val filename : _ location -> string
+
 val chain : _ location -> Chain_services.chain

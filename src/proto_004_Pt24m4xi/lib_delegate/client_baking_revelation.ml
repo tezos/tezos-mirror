@@ -25,35 +25,46 @@
 
 open Protocol
 
-include Internal_event.Legacy_logging.Make_semantic(struct
-    let name = Protocol.name ^ ".baking.nonce_revelation"
-  end)
+include Internal_event.Legacy_logging.Make_semantic (struct
+  let name = Protocol.name ^ ".baking.nonce_revelation"
+end)
 
-let inject_seed_nonce_revelation
-    (cctxt: #Alpha_client_context.full)
-    ~chain ~block ?async nonces =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+let inject_seed_nonce_revelation (cctxt : #Alpha_client_context.full) ~chain
+    ~block ?async nonces =
+  Shell_services.Blocks.hash cctxt ~chain ~block ()
+  >>=? fun hash ->
   match nonces with
   | [] ->
-      lwt_log_notice Tag.DSL.(fun f ->
-          f "Nothing to reveal for block %a"
-          -% t event "no_nonce_reveal"
-          -% a Block_hash.Logging.tag hash
-        ) >>= fun () ->
-      return_unit
+      lwt_log_notice
+        Tag.DSL.(
+          fun f ->
+            f "Nothing to reveal for block %a"
+            -% t event "no_nonce_reveal"
+            -% a Block_hash.Logging.tag hash)
+      >>= fun () -> return_unit
   | _ ->
-      iter_s (fun (level, nonce) ->
-          Alpha_services.Forge.seed_nonce_revelation cctxt
-            (chain, block) ~branch:hash ~level ~nonce () >>=? fun bytes ->
+      iter_s
+        (fun (level, nonce) ->
+          Alpha_services.Forge.seed_nonce_revelation
+            cctxt
+            (chain, block)
+            ~branch:hash
+            ~level
+            ~nonce
+            ()
+          >>=? fun bytes ->
           let bytes = Signature.concat bytes Signature.zero in
-          Shell_services.Injection.operation cctxt ?async ~chain bytes >>=? fun oph ->
-          lwt_log_notice Tag.DSL.(fun f ->
-              f "Revealing nonce %a from level %a for chain %a, block %a with operation %a"
-              -% t event "reveal_nonce"
-              -% a Logging.nonce_tag nonce
-              -% a Logging.level_tag level
-              -% a Logging.chain_tag chain
-              -% a Logging.block_tag block
-              -% a Operation_hash.Logging.tag oph) >>= fun () ->
-          return_unit
-        ) nonces
+          Shell_services.Injection.operation cctxt ?async ~chain bytes
+          >>=? fun oph ->
+          lwt_log_notice
+            Tag.DSL.(
+              fun f ->
+                f
+                  "Revealing nonce %a from level %a for chain %a, block %a \
+                   with operation %a"
+                -% t event "reveal_nonce" -% a Logging.nonce_tag nonce
+                -% a Logging.level_tag level -% a Logging.chain_tag chain
+                -% a Logging.block_tag block
+                -% a Operation_hash.Logging.tag oph)
+          >>= fun () -> return_unit)
+        nonces

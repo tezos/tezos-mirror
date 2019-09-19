@@ -24,53 +24,48 @@
 (*****************************************************************************)
 
 (** HTTP methods. *)
-type meth = [
-  | `GET
-  | `POST
-  | `DELETE
-  | `PUT
-  | `PATCH
-]
+type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t
-  constraint 'meth = [< meth ]
+  constraint 'meth = [< meth]
+
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
   ('meth, 'prefix, 'params, 'query, 'input, 'output) t
 
-val get_service:
-  ?description: string ->
-  query: 'query RPC_query.t ->
-  output: 'output Data_encoding.t ->
-  ('prefix, 'params) RPC_path.t ->
-  ([ `GET ], 'prefix, 'params, 'query, unit, 'output) service
-
-val post_service:
-  ?description: string ->
+val get_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `POST ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`GET], 'prefix, 'params, 'query, unit, 'output) service
 
-val delete_service:
-  ?description: string ->
+val post_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  output: 'output Data_encoding.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `DELETE ], 'prefix, 'params, 'query, unit, 'output) service
+  ([`POST], 'prefix, 'params, 'query, 'input, 'output) service
 
-val patch_service:
-  ?description: string ->
+val delete_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `PATCH ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`DELETE], 'prefix, 'params, 'query, unit, 'output) service
 
-val put_service:
-  ?description: string ->
+val patch_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `PUT ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`PATCH], 'prefix, 'params, 'query, 'input, 'output) service
+
+val put_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service

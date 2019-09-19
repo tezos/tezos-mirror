@@ -23,12 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Blake2B.Make_merkle_tree (Base58) (struct
-    let name = "Operation_list_hash"
-    let title = "A list of operations"
-    let b58check_prefix = Base58.Prefix.operation_list_hash
-    let size = None
-  end) (Operation_hash)
+include Blake2B.Make_merkle_tree
+          (Base58)
+          (struct
+            let name = "Operation_list_hash"
 
-let () =
-  Base58.check_encoded_prefix b58check_encoding "Lo" 52
+            let title = "A list of operations"
+
+            let b58check_prefix = Base58.Prefix.operation_list_hash
+
+            let size = None
+          end)
+          (Operation_hash)
+
+let () = Base58.check_encoded_prefix b58check_encoding "Lo" 52

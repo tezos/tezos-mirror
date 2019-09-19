@@ -23,5 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val build_rpc_directory:
-  Block_validator.t -> State.t -> unit RPC_directory.t
+val build_rpc_directory : Block_validator.t -> State.t -> unit RPC_directory.t

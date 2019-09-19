@@ -26,43 +26,42 @@
 open Protocol
 open Alpha_context
 
-val list_contract_labels:
+val list_contract_labels :
   #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   (string * string * string) list tzresult Lwt.t
 
-val get_storage:
+val get_storage :
   #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
-val get_big_map_value:
+val get_big_map_value :
   #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  (Script.expr * Script.expr) ->
+  Script.expr * Script.expr ->
   Script.expr option tzresult Lwt.t
 
-val get_script:
+val get_script :
   #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 
-val get_manager:
+val get_manager :
   #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  (string * public_key_hash *
-   public_key * Client_keys.sk_uri) tzresult Lwt.t
+  (string * public_key_hash * public_key * Client_keys.sk_uri) tzresult Lwt.t
 
-val get_balance:
+val get_balance :
   #Alpha_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -70,17 +69,17 @@ val get_balance:
   Tez.t tzresult Lwt.t
 
 type period_info = {
-  current_period_kind : Voting_period.kind ;
-  position : Int32.t ;
-  remaining : Int32.t ;
-  current_proposal : Protocol_hash.t option ;
+  current_period_kind : Voting_period.kind;
+  position : Int32.t;
+  remaining : Int32.t;
+  current_proposal : Protocol_hash.t option;
 }
 
 type ballots_info = {
-  current_quorum : Int32.t ;
-  participation : Int32.t ;
-  supermajority : Int32.t ;
-  ballots : Vote.ballots ;
+  current_quorum : Int32.t;
+  participation : Int32.t;
+  supermajority : Int32.t;
+  ballots : Vote.ballots;
 }
 
 val get_period_info :
@@ -101,7 +100,7 @@ val get_proposals :
   block:Shell_services.block ->
   Int32.t Environment.Protocol_hash.Map.t tzresult Lwt.t
 
-val display_receipt_for_operation:
+val display_receipt_for_operation :
   #Alpha_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->

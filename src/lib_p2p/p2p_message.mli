@@ -45,27 +45,26 @@
           mechanism on an actual network. Is it the added complexity
           worth it, wouldn't it  be enough to rely on [Advertise]? *)
 
-type 'msg encoding = Encoding : {
-    tag: int ;
-    title: string ;
-    encoding: 'a Data_encoding.t ;
-    wrap: 'a -> 'msg ;
-    unwrap: 'msg -> 'a option ;
-    max_length: int option ;
-  } -> 'msg encoding
+type 'msg encoding =
+  | Encoding : {
+      tag : int;
+      title : string;
+      encoding : 'a Data_encoding.t;
+      wrap : 'a -> 'msg;
+      unwrap : 'msg -> 'a option;
+      max_length : int option;
+    }
+      -> 'msg encoding
 
 type 'msg t =
-  | Bootstrap
-  (** Welcome message sent by a peer upon connection *)
+  | Bootstrap  (** Welcome message sent by a peer upon connection *)
   | Advertise of P2p_point.Id.t list
-  (** Response to a [Bootstrap] message, contains list of known points *)
+      (** Response to a [Bootstrap] message, contains list of known points *)
   | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-  (** Propose new peer/point and ask a peer/point to swap with *)
+      (** Propose new peer/point and ask a peer/point to swap with *)
   | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-  (** Response to a swap request and propose peer/point to swap with. *)
-  | Message of 'msg
-  (** Generic upper-layer message *)
-  | Disconnect
-  (** Ending of connection *)
+      (** Response to a swap request and propose peer/point to swap with. *)
+  | Message of 'msg  (** Generic upper-layer message *)
+  | Disconnect  (** Ending of connection *)
 
 val encoding : 'a encoding list -> 'a t Data_encoding.t

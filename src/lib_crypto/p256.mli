@@ -26,4 +26,5 @@
 (** Tezos - P256 cryptography *)
 
 include S.SIGNATURE with type watermark = MBytes.t
+
 include S.RAW_DATA with type t := t

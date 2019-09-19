@@ -27,22 +27,10 @@ type t = Ipaddr.V6.t
 
 let encoding =
   let open Data_encoding in
-  def "p2p_address"
-    ~description:"An address for locating peers."
-  @@
-  splitted
-    ~json:begin
-      conv
-        Ipaddr.V6.to_string
-        Ipaddr.V6.of_string_exn
-        string
-    end
-    ~binary:begin
-      conv
-        Ipaddr.V6.to_bytes
-        Ipaddr.V6.of_bytes_exn
-        string
-    end
+  def "p2p_address" ~description:"An address for locating peers."
+  @@ splitted
+       ~json:(conv Ipaddr.V6.to_string Ipaddr.V6.of_string_exn string)
+       ~binary:(conv Ipaddr.V6.to_bytes Ipaddr.V6.of_bytes_exn string)
 
 type port = int
 
@@ -55,16 +43,20 @@ let pp ppf addr =
 
 let of_string_opt str =
   match Ipaddr.of_string str with
-  | Ok (Ipaddr.V4 addr) -> Some (Ipaddr.v6_of_v4 addr)
-  | Ok (V6 addr) -> Some addr
-  | Error (`Msg _) -> None
+  | Ok (Ipaddr.V4 addr) ->
+      Some (Ipaddr.v6_of_v4 addr)
+  | Ok (V6 addr) ->
+      Some addr
+  | Error (`Msg _) ->
+      None
 
 let of_string_exn str =
   match of_string_opt str with
-  | None -> Pervasives.failwith "P2p_addr.of_string"
-  | Some t -> t
+  | None ->
+      Pervasives.failwith "P2p_addr.of_string"
+  | Some t ->
+      t
 
 let to_string saddr = Format.asprintf "%a" pp saddr
 
-let () =
-  Data_encoding.Registration.register ~pp:pp encoding
+let () = Data_encoding.Registration.register ~pp encoding

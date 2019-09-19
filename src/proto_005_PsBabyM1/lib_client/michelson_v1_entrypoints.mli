@@ -26,22 +26,24 @@
 open Protocol
 
 (** Returns [Some type] if the contract has an entrypoint of type [type]. None if it does not exists.  *)
-val script_entrypoint_type:
+val script_entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   Alpha_context.Script.expr ->
-  entrypoint:string -> Alpha_context.Script.expr option tzresult Lwt.t
+  entrypoint:string ->
+  Alpha_context.Script.expr option tzresult Lwt.t
 
 (** Returns [Some type] if the script has an entrypoint of type [type]. None if it does not exists.  *)
-val contract_entrypoint_type:
+val contract_entrypoint_type :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
-  entrypoint:string -> Alpha_context.Script.expr option tzresult Lwt.t
+  entrypoint:string ->
+  Alpha_context.Script.expr option tzresult Lwt.t
 
-val print_entrypoint_type:
+val print_entrypoint_type :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->
@@ -54,21 +56,21 @@ val print_entrypoint_type:
 (** List paths of unreachable parameters.
     Only useful to test the stitching, as no such parameter should be
     allowed in originated contracts.  *)
-val list_contract_unreachables:
+val list_contract_unreachables :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
-val list_unreachables:
+val list_unreachables :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   Alpha_context.Script.expr ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
-val print_unreachables:
+val print_unreachables :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->
@@ -80,25 +82,23 @@ val print_unreachables:
 (** List the contract entrypoints with their types.
     If their is no explicit default, th type of default entrypoint will still be given.
 *)
-val list_contract_entrypoints:
+val list_contract_entrypoints :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
   (string * Alpha_context.Script.expr) list tzresult Lwt.t
 
-
 (** List the script entrypoints with their types.  *)
-val list_entrypoints:
+val list_entrypoints :
   #Protocol_client_context.rpc_context ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   Alpha_context.Script.expr ->
   (string * Alpha_context.Script.expr) list tzresult Lwt.t
 
-
 (** Print the contract entrypoints with their types.  *)
-val print_entrypoints_list:
+val print_entrypoints_list :
   #Client_context.printer ->
   ?on_errors:(error list -> unit tzresult Lwt.t) ->
   emacs:bool ->

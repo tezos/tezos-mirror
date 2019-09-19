@@ -26,44 +26,40 @@
 open Lwt.Infix
 
 type t = {
-  cancelation: unit Lwt_condition.t ;
-  cancelation_complete: unit Lwt_condition.t ;
-  mutable cancel_hook: unit -> unit Lwt.t ;
-  mutable canceling: bool ;
-  mutable canceled: bool ;
+  cancelation : unit Lwt_condition.t;
+  cancelation_complete : unit Lwt_condition.t;
+  mutable cancel_hook : unit -> unit Lwt.t;
+  mutable canceling : bool;
+  mutable canceled : bool;
 }
 
 let create () =
   let cancelation = Lwt_condition.create () in
   let cancelation_complete = Lwt_condition.create () in
-  { cancelation ; cancelation_complete ;
-    cancel_hook = (fun () -> Lwt.return_unit) ;
-    canceling = false ;
-    canceled = false ;
+  {
+    cancelation;
+    cancelation_complete;
+    cancel_hook = (fun () -> Lwt.return_unit);
+    canceling = false;
+    canceled = false;
   }
 
 let cancel st =
-  if st.canceled then
-    Lwt.return_unit
-  else if st.canceling then
-    Lwt_condition.wait st.cancelation_complete
-  else begin
+  if st.canceled then Lwt.return_unit
+  else if st.canceling then Lwt_condition.wait st.cancelation_complete
+  else (
     st.canceling <- true ;
     Lwt_condition.broadcast st.cancelation () ;
-    Lwt.finalize
-      st.cancel_hook
-      (fun () ->
-         st.canceled <- true ;
-         Lwt_condition.broadcast st.cancelation_complete () ;
-         Lwt.return_unit)
-  end
+    Lwt.finalize st.cancel_hook (fun () ->
+        st.canceled <- true ;
+        Lwt_condition.broadcast st.cancelation_complete () ;
+        Lwt.return_unit) )
 
 let on_cancel st cb =
   let hook = st.cancel_hook in
   st.cancel_hook <- (fun () -> hook () >>= cb)
 
 let cancelation st =
-  if st.canceling then Lwt.return_unit
-  else Lwt_condition.wait st.cancelation
+  if st.canceling then Lwt.return_unit else Lwt_condition.wait st.cancelation
 
 let canceled st = st.canceling

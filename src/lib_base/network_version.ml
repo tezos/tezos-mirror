@@ -25,78 +25,70 @@
 (*****************************************************************************)
 
 type t = {
-  chain_name : Distributed_db_version.name ;
-  distributed_db_version : Distributed_db_version.t ;
-  p2p_version : P2p_version.t ;
+  chain_name : Distributed_db_version.name;
+  distributed_db_version : Distributed_db_version.t;
+  p2p_version : P2p_version.t;
 }
 
-let pp ppf { chain_name ; distributed_db_version ; p2p_version } =
-  Format.fprintf ppf
+let pp ppf {chain_name; distributed_db_version; p2p_version} =
+  Format.fprintf
+    ppf
     "%a.%a (p2p: %a)"
-    Distributed_db_version.pp_name chain_name
-    Distributed_db_version.pp distributed_db_version
-    P2p_version.pp p2p_version
+    Distributed_db_version.pp_name
+    chain_name
+    Distributed_db_version.pp
+    distributed_db_version
+    P2p_version.pp
+    p2p_version
 
 let encoding =
   let open Data_encoding in
-  def "network_version"
-    ~description:"A version number for the network protocol (includes \
-                  distributed DB version and p2p version)"
-  @@
-  conv
-    (fun { chain_name ; distributed_db_version ; p2p_version } ->
-       (chain_name, distributed_db_version, p2p_version))
-    (fun (chain_name, distributed_db_version, p2p_version) ->
-       { chain_name ; distributed_db_version ; p2p_version })
-    (obj3
-       (req "chain_name" Distributed_db_version.name_encoding)
-       (req "distributed_db_version" Distributed_db_version.encoding)
-       (req "p2p_version" P2p_version.encoding))
+  def
+    "network_version"
+    ~description:
+      "A version number for the network protocol (includes distributed DB \
+       version and p2p version)"
+  @@ conv
+       (fun {chain_name; distributed_db_version; p2p_version} ->
+         (chain_name, distributed_db_version, p2p_version))
+       (fun (chain_name, distributed_db_version, p2p_version) ->
+         {chain_name; distributed_db_version; p2p_version})
+       (obj3
+          (req "chain_name" Distributed_db_version.name_encoding)
+          (req "distributed_db_version" Distributed_db_version.encoding)
+          (req "p2p_version" P2p_version.encoding))
 
 let greatest = function
-  | [] -> raise (Invalid_argument "Network_version.greatest")
-  | h :: t -> List.fold_left max h t
+  | [] ->
+      raise (Invalid_argument "Network_version.greatest")
+  | h :: t ->
+      List.fold_left max h t
 
-let announced
-    ~chain_name
-    ~distributed_db_versions
-    ~p2p_versions =
+let announced ~chain_name ~distributed_db_versions ~p2p_versions =
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
-  { chain_name ;
-    distributed_db_version = greatest distributed_db_versions ;
-    p2p_version = greatest p2p_versions ;
+  {
+    chain_name;
+    distributed_db_version = greatest distributed_db_versions;
+    p2p_version = greatest p2p_versions;
   }
 
 let may_select_version accepted_versions remote_version =
   let best_local_version = greatest accepted_versions in
-  if best_local_version <= remote_version then
-    Some best_local_version
-  else if List.mem remote_version accepted_versions then
-    Some remote_version
-  else
-    None
+  if best_local_version <= remote_version then Some best_local_version
+  else if List.mem remote_version accepted_versions then Some remote_version
+  else None
 
-let select
-    ~chain_name
-    ~distributed_db_versions
-    ~p2p_versions
-    remote =
+let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
-  if chain_name <> remote.chain_name then
-    None
+  if chain_name <> remote.chain_name then None
   else
     let open Option in
-    may_select_version
-      distributed_db_versions
-      remote.distributed_db_version >>= fun distributed_db_version ->
-    may_select_version
-      p2p_versions
-      remote.p2p_version >>= fun p2p_version ->
-    some { chain_name ;
-           distributed_db_version ;
-           p2p_version }
+    may_select_version distributed_db_versions remote.distributed_db_version
+    >>= fun distributed_db_version ->
+    may_select_version p2p_versions remote.p2p_version
+    >>= fun p2p_version ->
+    some {chain_name; distributed_db_version; p2p_version}
 
-let () =
-  Data_encoding.Registration.register ~pp:pp encoding
+let () = Data_encoding.Registration.register ~pp encoding

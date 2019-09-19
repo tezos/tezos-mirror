@@ -24,10 +24,12 @@
 (*****************************************************************************)
 
 type cors = Resto_cohttp.Cors.t = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
+  allowed_headers : string list;
+  allowed_origins : string list;
 }
 
-module RPC_logging = Internal_event.Legacy_logging.Make(struct let name = "rpc" end)
+module RPC_logging = Internal_event.Legacy_logging.Make (struct
+  let name = "rpc"
+end)
 
-include Resto_cohttp_server.Server.Make(RPC_encoding)(RPC_logging)
+include Resto_cohttp_server.Server.Make (RPC_encoding) (RPC_logging)

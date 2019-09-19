@@ -75,10 +75,10 @@
 
 *)
 
-module Encoding: sig
-
+module Encoding : sig
   (** The type descriptors for values of type ['a]. *)
   type 'a t = 'a Encoding.t
+
   type 'a encoding = 'a t
 
   (** {3 Ground descriptors} *)
@@ -209,9 +209,11 @@ module Encoding: sig
 
       A schema may optionally be provided as documentation of the new encoding. *)
   val conv :
-    ('a -> 'b) -> ('b -> 'a) ->
+    ('a -> 'b) ->
+    ('b -> 'a) ->
     ?schema:Json_schema.schema ->
-    'b encoding -> 'a encoding
+    'b encoding ->
+    'a encoding
 
   (** Association list.
       An object in JSON, a list of pairs in binary. *)
@@ -228,29 +230,38 @@ module Encoding: sig
 
   (** Required field. *)
   val req :
-    ?title:string -> ?description:string ->
-    string -> 't encoding -> 't field
+    ?title:string -> ?description:string -> string -> 't encoding -> 't field
 
   (** Optional field. Omitted entirely in JSON encoding if None.
       Omitted in binary if the only optional field in a [`Variable]
       encoding, otherwise a 1-byte prefix (`0` or `255`) tells if the
       field is present or not. *)
   val opt :
-    ?title:string -> ?description:string ->
-    string -> 't encoding -> 't option field
+    ?title:string ->
+    ?description:string ->
+    string ->
+    't encoding ->
+    't option field
 
   (** Optional field of variable length.
       Only one can be present in a given object. *)
   val varopt :
-    ?title:string -> ?description:string ->
-    string -> 't encoding -> 't option field
+    ?title:string ->
+    ?description:string ->
+    string ->
+    't encoding ->
+    't option field
 
   (** Required field with a default value.
       If the default value is passed, the field is omitted in JSON.
       The value is always serialized in binary. *)
   val dft :
-    ?title:string -> ?description:string ->
-    string -> 't encoding -> 't -> 't field
+    ?title:string ->
+    ?description:string ->
+    string ->
+    't encoding ->
+    't ->
+    't field
 
   (** {4 Constructors for objects with N fields} *)
 
@@ -264,37 +275,80 @@ module Encoding: sig
 
       @raise Invalid_argument if more than one field is a variable one. *)
 
-  val obj1 :
-    'f1 field -> 'f1 encoding
-  val obj2 :
-    'f1 field -> 'f2 field -> ('f1 * 'f2) encoding
-  val obj3 :
-    'f1 field -> 'f2 field -> 'f3 field -> ('f1 * 'f2 * 'f3) encoding
+  val obj1 : 'f1 field -> 'f1 encoding
+
+  val obj2 : 'f1 field -> 'f2 field -> ('f1 * 'f2) encoding
+
+  val obj3 : 'f1 field -> 'f2 field -> 'f3 field -> ('f1 * 'f2 * 'f3) encoding
+
   val obj4 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
     ('f1 * 'f2 * 'f3 * 'f4) encoding
+
   val obj5 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5) encoding
+
   val obj6 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
     'f6 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) encoding
+
   val obj7 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
-    'f6 field -> 'f7 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) encoding
+
   val obj8 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
-    'f6 field -> 'f7 field -> 'f8 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) encoding
+
   val obj9 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
-    'f6 field -> 'f7 field -> 'f8 field -> 'f9 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
+    'f9 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) encoding
+
   val obj10 :
-    'f1 field -> 'f2 field -> 'f3 field -> 'f4 field -> 'f5 field ->
-    'f6 field -> 'f7 field -> 'f8 field -> 'f9 field -> 'f10 field ->
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
+    'f9 field ->
+    'f10 field ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
   (** Create a larger object from the encodings of two smaller ones.
@@ -314,45 +368,82 @@ module Encoding: sig
 
       @raise Invalid_argument if more than one field is a variable one. *)
 
-  val tup1 :
-    'f1 encoding ->
-    'f1 encoding
-  val tup2 :
-    'f1 encoding -> 'f2 encoding ->
-    ('f1 * 'f2) encoding
+  val tup1 : 'f1 encoding -> 'f1 encoding
+
+  val tup2 : 'f1 encoding -> 'f2 encoding -> ('f1 * 'f2) encoding
+
   val tup3 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding ->
-    ('f1 * 'f2 * 'f3) encoding
+    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> ('f1 * 'f2 * 'f3) encoding
+
   val tup4 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4) encoding
+
   val tup5 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
     'f5 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5) encoding
+
   val tup6 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
-    'f5 encoding -> 'f6 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
+    'f5 encoding ->
+    'f6 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) encoding
+
   val tup7 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
-    'f5 encoding -> 'f6 encoding -> 'f7 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
+    'f5 encoding ->
+    'f6 encoding ->
+    'f7 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) encoding
+
   val tup8 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
-    'f5 encoding -> 'f6 encoding -> 'f7 encoding -> 'f8 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
+    'f5 encoding ->
+    'f6 encoding ->
+    'f7 encoding ->
+    'f8 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) encoding
+
   val tup9 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
-    'f5 encoding -> 'f6 encoding -> 'f7 encoding -> 'f8 encoding ->
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
+    'f5 encoding ->
+    'f6 encoding ->
+    'f7 encoding ->
+    'f8 encoding ->
     'f9 encoding ->
     ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) encoding
-  val tup10 :
-    'f1 encoding -> 'f2 encoding -> 'f3 encoding -> 'f4 encoding ->
-    'f5 encoding -> 'f6 encoding -> 'f7 encoding -> 'f8 encoding ->
-    'f9 encoding -> 'f10 encoding ->
-    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
+  val tup10 :
+    'f1 encoding ->
+    'f2 encoding ->
+    'f3 encoding ->
+    'f4 encoding ->
+    'f5 encoding ->
+    'f6 encoding ->
+    'f7 encoding ->
+    'f8 encoding ->
+    'f9 encoding ->
+    'f10 encoding ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
   (** Create a large tuple encoding from two smaller ones.
       @raise Invalid_argument if both values are not tuples or if both
@@ -366,6 +457,7 @@ module Encoding: sig
       case, providing its encoder, and converter functions to and from
       the union type. *)
   type 't case
+
   type case_tag = Tag of int | Json_only
 
   (** Encodes a variant constructor. Takes the encoding for the specific
@@ -383,7 +475,10 @@ module Encoding: sig
     title:string ->
     ?description:string ->
     case_tag ->
-    'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+    'a encoding ->
+    ('t -> 'a option) ->
+    ('a -> 't) ->
+    't case
 
   (** Create a single encoding from a series of cases.
 
@@ -396,11 +491,9 @@ module Encoding: sig
 
       @raise Invalid_argument if it is given the empty list
       or if there are more cases than can fit in the tag size. *)
-  val union :
-    ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
+  val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
 
   (** {3 Predicates over descriptors} *)
-
 
   (** Is the given encoding serialized as a JSON object? *)
   val is_obj : 'a encoding -> bool
@@ -410,7 +503,7 @@ module Encoding: sig
 
   (** Classify the binary serialization of an encoding as explained in the
       preamble. *)
-  val classify : 'a encoding -> [ `Fixed of int | `Dynamic | `Variable ]
+  val classify : 'a encoding -> [`Fixed of int | `Dynamic | `Variable]
 
   (** {3 Specialized descriptors} *)
 
@@ -423,7 +516,6 @@ module Encoding: sig
   (** Create encodings that produce data of a fixed length when binary encoded.
       See the preamble for an explanation. *)
   module Fixed : sig
-
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val string : int -> string encoding
 
@@ -441,8 +533,8 @@ module Encoding: sig
   (** Create encodings that produce data of a variable length when binary encoded.
       See the preamble for an explanation. *)
   module Variable : sig
-
     val string : string encoding
+
     val bytes : MBytes.t encoding
 
     (** @raise Invalid_argument if the encoding argument is variable length
@@ -452,7 +544,6 @@ module Encoding: sig
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val list : ?max_length:int -> 'a encoding -> 'a list encoding
-
   end
 
   module Bounded : sig
@@ -474,8 +565,7 @@ module Encoding: sig
       Typically used to combine two variable encodings in a same
       objects or tuple, or to use a variable encoding in an array or a list. *)
   val dynamic_size :
-    ?kind: [ `Uint30 | `Uint16 | `Uint8 ] ->
-    'a encoding -> 'a encoding
+    ?kind:[`Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
       of a value will not be allowed to exceed [size] bytes. The reader
@@ -494,9 +584,10 @@ module Encoding: sig
   (** Combinator for recursive encodings. *)
   val mu :
     string ->
-    ?title: string ->
-    ?description: string ->
-    ('a encoding -> 'a encoding) -> 'a encoding
+    ?title:string ->
+    ?description:string ->
+    ('a encoding -> 'a encoding) ->
+    'a encoding
 
   (** {3 Documenting descriptors} *)
 
@@ -504,8 +595,10 @@ module Encoding: sig
       add documentation to an encoding. *)
   val def :
     string ->
-    ?title:string -> ?description:string ->
-    't encoding ->'t encoding
+    ?title:string ->
+    ?description:string ->
+    't encoding ->
+    't encoding
 
   (** See {!lazy_encoding} below.*)
   type 'a lazy_t
@@ -528,8 +621,11 @@ module Encoding: sig
 
   (** Apply on structure of lazy value, and combine results *)
   val apply_lazy :
-    fun_value:('a -> 'b) -> fun_bytes:(MBytes.t -> 'b) -> fun_combine:('b -> 'b -> 'b) ->
-    'a lazy_t -> 'b
+    fun_value:('a -> 'b) ->
+    fun_bytes:(MBytes.t -> 'b) ->
+    fun_combine:('b -> 'b -> 'b) ->
+    'a lazy_t ->
+    'b
 
   (** Create a {!Data_encoding.t} value which records knowledge of
       older versions of a given encoding as long as one can "upgrade"
@@ -539,13 +635,11 @@ module Encoding: sig
       See the module [Documented_example] in ["./test/versioned.ml"]
       for a tutorial.
   *)
-
 end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
 
 module Registration : sig
-
   type id = string
 
   (** A encoding that has been {!register}ed. It can be retreived using either
@@ -554,20 +648,20 @@ module Registration : sig
 
   (** Descriptions and schemas of registered encodings. *)
   val binary_schema : t -> Binary_schema.t
+
   val json_schema : t -> Json.schema
+
   val description : t -> string option
 
   (** Printers for the encodings. *)
-  val json_pretty_printer: t -> (Format.formatter -> Json.t -> unit)
-  val binary_pretty_printer: t -> (Format.formatter -> MBytes.t -> unit)
+  val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
+
+  val binary_pretty_printer : t -> Format.formatter -> MBytes.t -> unit
 
   (** [register ~id encoding] registers the [encoding] with the [id]. It can
       later be found using {!find} and providing the matching [id]. It will
       also appear in the results of {!list}. *)
-  val register :
-    ?pp:(Format.formatter -> 'a -> unit) ->
-    'a Encoding.t ->
-    unit
+  val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
 
   (** [find id] is [Some r] if [register id e] has been called, in which
       case [r] matches [e]. Otherwise, it is [None]. *)
@@ -579,12 +673,11 @@ module Registration : sig
 
   (** Conversion functions from/to json to/from bytes. *)
   val bytes_of_json : t -> Json.t -> MBytes.t option
-  val json_of_bytes : t -> MBytes.t -> Json.t option
 
+  val json_of_bytes : t -> MBytes.t -> Json.t option
 end
 
-module With_version: sig
-
+module With_version : sig
   (** An encapsulation of consecutive encoding versions. *)
   type _ t
 
@@ -599,11 +692,10 @@ module With_version: sig
   (** Make an encoding from an encapsulation of versions; the
       argument [~name] is used to prefix the version "tag" in the
       encoding, it should not change from one version to the next. *)
-  val encoding : name: string -> 'a t -> 'a encoding
+  val encoding : name:string -> 'a t -> 'a encoding
 end
 
-module Json: sig
-
+module Json : sig
   (** In memory JSON data, compatible with [Ezjsonm]. *)
   type json =
     [ `O of (string * json) list
@@ -612,9 +704,10 @@ module Json: sig
     | `A of json list
     | `Null
     | `String of string ]
-  type t = json
-  type schema = Json_schema.schema
 
+  type t = json
+
+  type schema = Json_schema.schema
 
   (** Encodes raw JSON data (BSON is used for binary). *)
   val encoding : json Encoding.t
@@ -641,15 +734,10 @@ module Json: sig
 
   (** A set of accessors that point to a location in a JSON object. *)
   and path_item =
-    [ `Field of string
-    (** A field in an object. *)
-    | `Index of int
-    (** An index in an array. *)
-    | `Star
-    (** Any / every field or index. *)
-    | `Next
-      (** The next element after an array. *)
-    ]
+    [ `Field of string  (** A field in an object. *)
+    | `Index of int  (** An index in an array. *)
+    | `Star  (** Any / every field or index. *)
+    | `Next  (** The next element after an array. *) ]
 
   (** Exception raised by destructors, with the location in the original
       JSON structure and the specific error. *)
@@ -671,11 +759,14 @@ module Json: sig
   exception Unexpected_field of string
 
   val print_error :
-    ?print_unknown: (Format.formatter -> exn -> unit) ->
-    Format.formatter -> exn -> unit
+    ?print_unknown:(Format.formatter -> exn -> unit) ->
+    Format.formatter ->
+    exn ->
+    unit
 
   (** Helpers for writing encoders. *)
   val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
   val wrap_error : ('a -> 'b) -> 'a -> 'b
 
   (** Read a JSON document from a string. *)
@@ -691,12 +782,11 @@ module Json: sig
   val to_string : ?newline:bool -> ?minify:bool -> json -> string
 
   val pp : Format.formatter -> json -> unit
-
 end
 
-module Bson: sig
-
+module Bson : sig
   type bson = Json_repr_bson.bson
+
   type t = bson
 
   (** Construct a BSON object from an encoding. *)
@@ -705,17 +795,17 @@ module Bson: sig
   (** Destruct a BSON object into a value.
       Fail with an exception if the JSON object and encoding do not match.. *)
   val destruct : 't Encoding.t -> bson -> 't
-
 end
 
 module Binary_schema : sig
   type t
-  val pp: Format.formatter -> t -> unit
-  val encoding: t Encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding : t Encoding.t
 end
 
-module Binary: sig
-
+module Binary : sig
   (** All the errors that might be returned while reading a binary value *)
   type read_error =
     | Not_enough_data
@@ -723,27 +813,31 @@ module Binary: sig
     | No_case_matched
     | Unexpected_tag of int
     | Invalid_size of int
-    | Invalid_int of { min : int ; v : int ; max : int }
-    | Invalid_float of { min : float ; v : float ; max : float }
+    | Invalid_int of {min : int; v : int; max : int}
+    | Invalid_float of {min : float; v : float; max : float}
     | Trailing_zero
     | Size_limit_exceeded
     | List_too_long
     | Array_too_long
+
   exception Read_error of read_error
-  val pp_read_error: Format.formatter -> read_error -> unit
+
+  val pp_read_error : Format.formatter -> read_error -> unit
 
   (** All the errors that might be returned while writing a binary value *)
   type write_error =
     | Size_limit_exceeded
     | No_case_matched
-    | Invalid_int of { min : int ; v : int ; max : int }
-    | Invalid_float of { min : float ; v : float ; max : float }
-    | Invalid_bytes_length of { expected : int ; found : int }
-    | Invalid_string_length of { expected : int ; found : int }
+    | Invalid_int of {min : int; v : int; max : int}
+    | Invalid_float of {min : float; v : float; max : float}
+    | Invalid_bytes_length of {expected : int; found : int}
+    | Invalid_string_length of {expected : int; found : int}
     | Invalid_natural
     | List_too_long
     | Array_too_long
+
   val pp_write_error : Format.formatter -> write_error -> unit
+
   exception Write_error of write_error
 
   (** Compute the expected length of the binary representation of a value *)
@@ -753,23 +847,23 @@ module Binary: sig
       encoding might produce, only when the size of the representation
       does not depends of the value itself. *)
   val fixed_length : 'a Encoding.t -> int option
+
   val fixed_length_exn : 'a Encoding.t -> int
 
   (** [read enc buf ofs len] tries to reconstruct a value from the
       bytes in [buf] starting at offset [ofs] and reading at most
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf]. *)
-  val read : 'a Encoding.t -> MBytes.t -> int ->  int -> (int * 'a) option
+  val read : 'a Encoding.t -> MBytes.t -> int -> int -> (int * 'a) option
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
-    | Success of { result : 'ret ; size : int ; stream : Binary_stream.t }
-    (** Fully decoded value, together with the total amount of bytes reads,
+    | Success of {result : 'ret; size : int; stream : Binary_stream.t}
+        (** Fully decoded value, together with the total amount of bytes reads,
         and the remaining unread stream. *)
-    | Await of (MBytes.t -> 'ret status)
-    (** Partially decoded value.*)
+    | Await of (MBytes.t -> 'ret status)  (** Partially decoded value.*)
     | Error of read_error
-    (** Failure. The stream is garbled and it should be dropped. *)
+        (** Failure. The stream is garbled and it should be dropped. *)
 
   (** Streamed equivalent of [read]. This variant cannot be called on
       variable-size encodings. *)
@@ -800,11 +894,14 @@ module Binary: sig
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
 
   val describe : 'a Encoding.t -> Binary_schema.t
-
 end
 
 type json = Json.t
-val json: json Encoding.t
+
+val json : json Encoding.t
+
 type json_schema = Json.schema
-val json_schema: json_schema Encoding.t
+
+val json_schema : json_schema Encoding.t
+
 type bson = Bson.t

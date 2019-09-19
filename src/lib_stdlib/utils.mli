@@ -24,14 +24,12 @@
 (*****************************************************************************)
 
 module Infix : sig
-
   (** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
-  val (--) : int -> int -> int list
-
+  val ( -- ) : int -> int -> int list
 end
 
 (** Print a paragraph in a box **)
-val display_paragraph: Format.formatter -> string -> unit
+val display_paragraph : Format.formatter -> string -> unit
 
 (** [finalize f g ] ensures g() called after f(), even if exception raised **)
-val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
+val finalize : (unit -> 'a) -> (unit -> unit) -> 'a

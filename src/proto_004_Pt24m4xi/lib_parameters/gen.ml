@@ -29,18 +29,19 @@
 
 let () =
   let print_usage_and_fail s =
-    Printf.eprintf "Usage: %s [ --sandbox | --test | --mainnet ]"
-      Sys.argv.(0) ;
+    Printf.eprintf "Usage: %s [ --sandbox | --test | --mainnet ]" Sys.argv.(0) ;
     raise (Invalid_argument s)
   in
   let dump parameters file =
-    let str = Data_encoding.Json.to_string
-        (Default_parameters.json_of_parameters parameters) in
+    let str =
+      Data_encoding.Json.to_string
+        (Default_parameters.json_of_parameters parameters)
+    in
     let fd = open_out file in
-    output_string fd str ;
-    close_out fd
+    output_string fd str ; close_out fd
   in
-  if Array.length Sys.argv < 2 then print_usage_and_fail "" else
+  if Array.length Sys.argv < 2 then print_usage_and_fail ""
+  else
     match Sys.argv.(1) with
     | "--sandbox" ->
         dump
@@ -48,10 +49,13 @@ let () =
           "sandbox-parameters.json"
     | "--test" ->
         dump
-          Default_parameters.(parameters_of_constants ~with_commitments:true constants_sandbox)
+          Default_parameters.(
+            parameters_of_constants ~with_commitments:true constants_sandbox)
           "test-parameters.json"
     | "--mainnet" ->
         dump
-          Default_parameters.(parameters_of_constants ~with_commitments:true constants_mainnet)
+          Default_parameters.(
+            parameters_of_constants ~with_commitments:true constants_mainnet)
           "mainnet-parameters.json"
-    | s -> print_usage_and_fail s
+    | s ->
+        print_usage_and_fail s

@@ -25,7 +25,6 @@
 
 (** Type of a protocol-specific mempool filter plug-in. *)
 module type FILTER = sig
-
   (** Type of protocol-specific mempool configuration, as specifiable
       in the node's configuration file, and updatable via RPCs. *)
   type config
@@ -43,14 +42,17 @@ module type FILTER = sig
   val pre_filter : config -> Proto.operation_data -> bool
 
   (** Tells if an operation should be kept and propagated considering its result. *)
-  val post_filter : config ->
-    validation_state_before: Proto.validation_state ->
-    validation_state_after: Proto.validation_state ->
-    Proto.operation_data * Proto.operation_receipt -> bool Lwt.t
+  val post_filter :
+    config ->
+    validation_state_before:Proto.validation_state ->
+    validation_state_after:Proto.validation_state ->
+    Proto.operation_data * Proto.operation_receipt ->
+    bool Lwt.t
 end
 
 (** Dummy filter that does nothing *)
-module No_filter (Proto : Registered_protocol.T) : FILTER with module Proto = Proto
+module No_filter (Proto : Registered_protocol.T) :
+  FILTER with module Proto = Proto
 
 (** Registers a mempool plug-in for a specific protocol (according to its [Proto.hash]). *)
 val register : (module FILTER) -> unit

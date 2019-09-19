@@ -26,13 +26,18 @@
 open Protocol
 open Alpha_context
 
-val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose
     hash is commited in the block they bake. They will typically
     reveal the aforementionned nonce during the next cycle. *)
+val generate_seed_nonce : unit -> Nonce.t
 
-val inject_block:
+(** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
+    ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
+    [?force] is set, the fitness check will be bypassed. [priority]
+    will be used to compute the baking slot (level is
+    precomputed). [src_sk] is used to sign the block header. *)
+val inject_block :
   #Protocol_client_context.full ->
   ?force:bool ->
   ?seed_nonce_hash:Nonce_hash.t ->
@@ -41,37 +46,12 @@ val inject_block:
   priority:int ->
   delegate_pkh:Signature.Public_key_hash.t ->
   delegate_sk:Client_keys.sk_uri ->
-  level: Raw_level.t ->
+  level:Raw_level.t ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
-(** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
-    ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
-    [?force] is set, the fitness check will be bypassed. [priority]
-    will be used to compute the baking slot (level is
-    precomputed). [src_sk] is used to sign the block header. *)
 
-type error +=
-  | Failed_to_preapply of Tezos_base.Operation.t * error list
+type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 
-val forge_block:
-  #Protocol_client_context.full ->
-  ?force:bool ->
-  ?operations: Operation.packed list ->
-  ?best_effort:bool ->
-  ?sort:bool ->
-  ?minimal_fees: Tez.t ->
-  ?minimal_nanotez_per_gas_unit: Z.t ->
-  ?minimal_nanotez_per_byte: Z.t ->
-  ?timestamp:Time.Protocol.t ->
-  ?mempool:string ->
-  ?context_path:string ->
-  ?seed_nonce_hash:Nonce_hash.t ->
-  chain:Chain_services.chain ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
-  delegate_pkh: Signature.Public_key_hash.t ->
-  delegate_sk: Client_keys.sk_uri ->
-  Block_services.block ->
-  Block_hash.t tzresult Lwt.t
 (** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort
     ?sort ?timestamp ?max_priority ?priority ~seed_nonce ~src_sk
     pk_hash parent_blk] injects a block in the node. In addition of inject_block,
@@ -92,15 +72,34 @@ val forge_block:
     * Fee Threshold: If [?fee_threshold] is given, operations with fees lower than it
       are not added to the block.
 *)
-
-val create:
+val forge_block :
   #Protocol_client_context.full ->
-  ?minimal_fees: Tez.t ->
-  ?minimal_nanotez_per_gas_unit: Z.t ->
-  ?minimal_nanotez_per_byte: Z.t ->
-  ?max_priority: int ->
-  chain: Chain_services.chain ->
-  context_path: string ->
+  ?force:bool ->
+  ?operations:Operation.packed list ->
+  ?best_effort:bool ->
+  ?sort:bool ->
+  ?minimal_fees:Tez.t ->
+  ?minimal_nanotez_per_gas_unit:Z.t ->
+  ?minimal_nanotez_per_byte:Z.t ->
+  ?timestamp:Time.Protocol.t ->
+  ?mempool:string ->
+  ?context_path:string ->
+  ?seed_nonce_hash:Nonce_hash.t ->
+  chain:Chain_services.chain ->
+  priority:[`Set of int | `Auto of public_key_hash * int option] ->
+  delegate_pkh:Signature.Public_key_hash.t ->
+  delegate_sk:Client_keys.sk_uri ->
+  Block_services.block ->
+  Block_hash.t tzresult Lwt.t
+
+val create :
+  #Protocol_client_context.full ->
+  ?minimal_fees:Tez.t ->
+  ?minimal_nanotez_per_gas_unit:Z.t ->
+  ?minimal_nanotez_per_byte:Z.t ->
+  ?max_priority:int ->
+  chain:Chain_services.chain ->
+  context_path:string ->
   public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

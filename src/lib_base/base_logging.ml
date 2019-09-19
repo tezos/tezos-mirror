@@ -23,13 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic(struct let name = "base" end)
+include Internal_event.Legacy_logging.Make_semantic (struct
+  let name = "base"
+end)
 
 let pp_exn_trace ppf backtrace =
   if String.length backtrace <> 0 then
-    Format.fprintf ppf
+    Format.fprintf
+      ppf
       "@,Backtrace:@,  @[<h>%a@]"
-      Format.pp_print_text backtrace
+      Format.pp_print_text
+      backtrace
 
-let pid = Tag.def ~doc:"unix process ID where problem occurred" "pid" Format.pp_print_int
-let exn_trace = Tag.def ~doc:"backtrace from native Ocaml exception" "exn_trace" pp_exn_trace
+let pid =
+  Tag.def
+    ~doc:"unix process ID where problem occurred"
+    "pid"
+    Format.pp_print_int
+
+let exn_trace =
+  Tag.def ~doc:"backtrace from native Ocaml exception" "exn_trace" pp_exn_trace

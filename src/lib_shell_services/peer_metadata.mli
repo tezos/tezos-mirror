@@ -27,25 +27,29 @@
 
 type t
 
-val encoding: t Data_encoding.t
+val encoding : t Data_encoding.t
+
 val empty : unit -> t
-
-
 
 (** the aggregate score function computed from
     the metadata collected for a peer *)
 val distributed_db_score : t -> float
+
 val prevalidation_score : t -> float
+
 val score : t -> float
 
 type requests_kind =
-  | Branch | Head | Block_header
-  | Operations | Protocols
-  | Operation_hashes_for_block | Operations_for_block
+  | Branch
+  | Head
+  | Block_header
+  | Operations
+  | Protocols
+  | Operation_hashes_for_block
+  | Operations_for_block
   | Other
 
-type resource_kind =
-  | Block | Operations | Protocol
+type resource_kind = Block | Operations | Protocol
 
 type advertisement = Head | Branch
 
@@ -66,18 +70,23 @@ type metadata =
   | Received_advertisement of advertisement
   | Outdated_response (* TODO : unused *)
   (* Peer validator *)
-  | Valid_blocks | Old_heads
+  | Valid_blocks
+  | Old_heads
   (* Prevalidation *)
-  | Cannot_download | Cannot_parse
+  | Cannot_download
+  | Cannot_parse
   | Refused_by_prefilter
   | Refused_by_postfilter
-  | Applied | Branch_delayed
+  | Applied
+  | Branch_delayed
   | Branch_refused
-  | Refused | Duplicate | Outdated
+  | Refused
+  | Duplicate
+  | Outdated
 
 (** incr score counters . Used to compute the final score for a peer *)
-val incr : t ->   metadata -> unit
+val incr : t -> metadata -> unit
+
 val update_requests : t -> requests_kind -> bool -> unit
+
 val update_responses : t -> requests_kind -> bool -> unit
-
-

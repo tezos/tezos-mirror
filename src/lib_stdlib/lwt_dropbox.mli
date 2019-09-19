@@ -25,38 +25,37 @@
 
 (** A 'dropbox' with a single element. *)
 
-type 'a t
 (** Type of dropbox holding a value of type ['a] *)
+type 'a t
 
-val create: unit -> 'a t
 (** Create an empty dropbox. *)
+val create : unit -> 'a t
 
-val put: 'a t -> 'a -> unit
 (** Put an element inside the dropbox. If the dropbox was already
     containing an element, the old element is replaced by the new one.
     The function might return [Closed] if the dropbox has been closed
     with [close]. *)
+val put : 'a t -> 'a -> unit
 
-val take: 'a t -> 'a Lwt.t
 (** Wait until the dropbox contains an element, then returns the elements.
     The elements is removed from the dropbox. The function might return
     [Closed] if the dropbox is empty and closed. *)
+val take : 'a t -> 'a Lwt.t
 
-val take_with_timeout: unit Lwt.t -> 'a t -> 'a option Lwt.t
 (** Like [take] except that it returns [None] after [timeout seconds]
     if the dropbox is still empty. *)
+val take_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 
-val peek: 'a t -> 'a option
 (** Read the current element of the dropbox without removing it. It
     immediatly returns [None] if the dropbox is empty. *)
+val peek : 'a t -> 'a option
 
-exception Closed
 (** The exception returned when trying to access a 'closed' dropbox. *)
+exception Closed
 
-val close: 'a t -> unit
 (** Close the dropox. It terminates all the waiting reader with the
     exception [Closed]. All further read or write will also immediatly
     fail with [Closed], except if the dropbox is not empty when
     [close] is called. In that can, a single (and last) [take] will
     succeed. *)
-
+val close : 'a t -> unit

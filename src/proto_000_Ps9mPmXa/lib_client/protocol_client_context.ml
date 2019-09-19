@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Genesis_block_services = Block_services.Make(Protocol)(Protocol)
+module Genesis_block_services = Block_services.Make (Protocol) (Protocol)

@@ -25,9 +25,10 @@
 (*****************************************************************************)
 
 let () =
-  Client_commands.register Protocol.hash @@ fun network  ->
-  List.map (Clic.map_command (new Alpha_client_context.wrap_full)) @@
-  Client_proto_programs_commands.commands () @
-  Client_proto_contracts_commands.commands () @
-  Client_proto_context_commands.commands network () @
-  Client_proto_multisig_commands.commands ()
+  Client_commands.register Protocol.hash
+  @@ fun network ->
+  List.map (Clic.map_command (new Alpha_client_context.wrap_full))
+  @@ Client_proto_programs_commands.commands ()
+  @ Client_proto_contracts_commands.commands ()
+  @ Client_proto_context_commands.commands network ()
+  @ Client_proto_multisig_commands.commands ()

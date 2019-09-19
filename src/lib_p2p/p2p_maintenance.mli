@@ -50,48 +50,39 @@
     This is reiterated indefinitely every [require_new_points_time] seconds. *)
 
 type config = {
-
-  maintenance_idle_time: Time.System.Span.t ;
-  (** How long to wait at most, in seconds, before running a maintenance loop. *)
-
-  greylist_timeout: Time.System.Span.t ;
-  (** GC delay for the greylists tables, in seconds. *)
-
-  private_mode: bool ;
-  (** If [true], only open outgoing/accept incoming connections
+  maintenance_idle_time : Time.System.Span.t;
+      (** How long to wait at most, in seconds, before running a maintenance loop. *)
+  greylist_timeout : Time.System.Span.t;
+      (** GC delay for the greylists tables, in seconds. *)
+  private_mode : bool;
+      (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
-
-  min_connections : int ;
-  (** Strict minimum number of connections *)
-
-  max_connections : int ;
-  (** Maximum number of connections *)
-
-  expected_connections : int ;
-  (** Targeted number of connections to reach *)
+  min_connections : int;  (** Strict minimum number of connections *)
+  max_connections : int;  (** Maximum number of connections *)
+  expected_connections : int;  (** Targeted number of connections to reach *)
 }
 
-type ('msg, 'meta, 'meta_conn) t
 (** Type of a maintenance worker. *)
+type ('msg, 'meta, 'meta_conn) t
 
-val create:
+(** [starts ?discovery config pool] returns a maintenance worker, with
+    the [discovery] worker if present, for [pool]. *)
+val create :
   ?discovery:P2p_discovery.t ->
   config ->
   ('msg, 'meta, 'meta_conn) P2p_pool.t ->
   ('msg, 'meta, 'meta_conn) t
-(** [starts ?discovery config pool] returns a maintenance worker, with
-    the [discovery] worker if present, for [pool]. *)
 
-val activate: ('msg, 'meta, 'meta_conn) t -> unit
 (** [activate t] starts the worker that will maintain connections *)
+val activate : ('msg, 'meta, 'meta_conn) t -> unit
 
-val maintain: ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 (** [maintain t] gives a hint to maintenance worker [t] that
     maintenance is needed and returns whenever [t] has done a
     maintenance cycle. *)
+val maintain : ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 
-val shutdown: ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 (** [shutdown t] is a thread that returns whenever [t] has
     successfully shut down. *)
+val shutdown : ('msg, 'meta, 'meta_conn) t -> unit Lwt.t

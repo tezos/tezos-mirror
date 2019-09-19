@@ -27,36 +27,37 @@ open Protocol
 open Alpha_context
 
 type error += Level_previously_endorsed of Raw_level.t
+
 type error += Level_previously_baked of Raw_level.t
 
 type t
 
-val encoding: t Data_encoding.t
+val encoding : t Data_encoding.t
 
-val may_inject_block:
+val may_inject_block :
   #Protocol_client_context.full ->
-  [ `Block ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
+  [`Block] Client_baking_files.location ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
-val may_inject_endorsement:
+val may_inject_endorsement :
   #Protocol_client_context.full ->
-  [ `Endorsement ] Client_baking_files.location ->
-  delegate: Signature.public_key_hash ->
+  [`Endorsement] Client_baking_files.location ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
-val record_block:
+val record_block :
   #Protocol_client_context.full ->
-  [ `Block ] Client_baking_files.location ->
+  [`Block] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t
 
-val record_endorsement:
+val record_endorsement :
   #Protocol_client_context.full ->
-  [ `Endorsement ] Client_baking_files.location ->
+  [`Endorsement] Client_baking_files.location ->
   delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t

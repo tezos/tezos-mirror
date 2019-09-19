@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands: Client_commands.command list
+val commands : Client_commands.command list

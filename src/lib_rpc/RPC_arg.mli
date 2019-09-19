@@ -24,4 +24,7 @@
 (*****************************************************************************)
 
 type ('i, 'j) eq = ('i, 'j) Resto.eq = Eq : ('a, 'a) eq
-include (module type of struct include Resto.Arg end)
+
+include module type of struct
+  include Resto.Arg
+end

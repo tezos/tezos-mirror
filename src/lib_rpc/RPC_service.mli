@@ -23,78 +23,88 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
+type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
-val string_of_meth: [< meth ] -> string
-val meth_of_string: string -> [> meth ] option
-val meth_encoding: meth Data_encoding.t
+val string_of_meth : [< meth] -> string
+
+val meth_of_string : string -> [> meth] option
+
+val meth_encoding : meth Data_encoding.t
 
 module MethMap = Resto.MethMap
 
-type (+'m,'pr,'p,'q,'i,'o, 'e) raw =
-  ('m,'pr,'p,'q,'i,'o, 'e) Resto.MakeService(RPC_encoding).t
-  constraint 'meth = [< meth ]
+type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) raw =
+  ('m, 'pr, 'p, 'q, 'i, 'o, 'e) Resto.MakeService(RPC_encoding).t
+  constraint 'meth = [< meth]
 
 type error = Error_monad.error list
 
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t =
   ('meth, 'prefix, 'params, 'query, 'input, 'output, error) raw
-  constraint 'meth = [< meth ]
+  constraint 'meth = [< meth]
 
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
   ('meth, 'prefix, 'params, 'query, 'input, 'output, error) raw
-  constraint 'meth = [< meth ]
+  constraint 'meth = [< meth]
 
-include (module type of struct include Resto.MakeService(RPC_encoding) end
-    with type (+'m,'pr,'p,'q,'i,'o, 'e) t := ('m,'pr,'p,'q,'i,'o, 'e) raw
-     and type (+'m,'pr,'p,'q,'i,'o, 'e) service := ('m,'pr,'p,'q,'i,'o, 'e) raw)
+include module type of struct
+    include Resto.MakeService (RPC_encoding)
+  end
+  with type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) t :=
+        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
+   and type (+'m, 'pr, 'p, 'q, 'i, 'o, 'e) service :=
+        ('m, 'pr, 'p, 'q, 'i, 'o, 'e) raw
 
-val get_service:
-  ?description: string ->
-  query: 'query RPC_query.t ->
-  output: 'output Data_encoding.t ->
-  ('prefix, 'params) RPC_path.t ->
-  ([ `GET ], 'prefix, 'params, 'query, unit, 'output) service
-
-val post_service:
-  ?description: string ->
+val get_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `POST ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`GET], 'prefix, 'params, 'query, unit, 'output) service
 
-val delete_service:
-  ?description: string ->
+val post_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  output: 'output Data_encoding.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `DELETE ], 'prefix, 'params, 'query, unit, 'output) service
+  ([`POST], 'prefix, 'params, 'query, 'input, 'output) service
 
-val patch_service:
-  ?description: string ->
+val delete_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `PATCH ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`DELETE], 'prefix, 'params, 'query, unit, 'output) service
 
-val put_service:
-  ?description: string ->
+val patch_service :
+  ?description:string ->
   query:'query RPC_query.t ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
-  ([ `PUT ], 'prefix, 'params, 'query, 'input, 'output) service
+  ([`PATCH], 'prefix, 'params, 'query, 'input, 'output) service
 
+val put_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 
 (**/**)
 
-val description_service:
-  ([ `GET ], unit, unit * string list, Resto.Description.request,
-   unit, RPC_encoding.schema Resto.Description.directory) service
+val description_service :
+  ( [`GET],
+    unit,
+    unit * string list,
+    Resto.Description.request,
+    unit,
+    RPC_encoding.schema Resto.Description.directory )
+  service
 
-val error_service:
-  ([ `GET ], unit, unit, unit, unit, Json_schema.schema) service
+val error_service :
+  ([`GET], unit, unit, unit, unit, Json_schema.schema) service
 
-val error_encoding: error Data_encoding.t
+val error_encoding : error Data_encoding.t

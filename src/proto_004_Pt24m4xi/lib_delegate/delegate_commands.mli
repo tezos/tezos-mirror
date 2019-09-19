@@ -26,5 +26,7 @@
 val delegate_commands : unit -> Alpha_client_context.full Clic.command list
 
 val baker_commands : unit -> Alpha_client_context.full Clic.command list
+
 val endorser_commands : unit -> Alpha_client_context.full Clic.command list
+
 val accuser_commands : unit -> Alpha_client_context.full Clic.command list

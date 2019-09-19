@@ -26,15 +26,19 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
-val get_contract_manager :
-  #full ->
-  Contract.t ->
-  public_key_hash tzresult Lwt.t
 (** Retreive the manager key in a contract storage.
     The storage has to be of type `pair key_hash 'a`.
 *)
+val get_contract_manager :
+  #full -> Contract.t -> public_key_hash tzresult Lwt.t
 
-val set_delegate : #Protocol_client_context.full ->
+(** Set the delegate of a manageable contract.
+    For a contract with a `do`entrypoint, it builds the lamba that set
+    the provided delegate.
+    `~source` has to be the registered manager of the contract.
+*)
+val set_delegate :
+  #Protocol_client_context.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   ?confirmations:int ->
@@ -49,14 +53,14 @@ val set_delegate : #Protocol_client_context.full ->
   Contract.t ->
   public_key_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
-(** Set the delegate of a manageable contract.
-    For a contract with a `do`entrypoint, it builds the lamba that set
-    the provided delegate.
+
+(** Perform a transfer on behalf of a managed contract .
+    For a contract with a `do`entrypoint, it builds the lamba that
+    does the requested operation.
     `~source` has to be the registered manager of the contract.
 *)
-
-
-val transfer : #Protocol_client_context.full ->
+val transfer :
+  #Protocol_client_context.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
   ?confirmations:int ->
@@ -77,9 +81,5 @@ val transfer : #Protocol_client_context.full ->
   ?counter:counter ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
-(** Perform a transfer on behalf of a managed contract .
-    For a contract with a `do`entrypoint, it builds the lamba that
-    does the requested operation.
-    `~source` has to be the registered manager of the contract.
-*)
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t

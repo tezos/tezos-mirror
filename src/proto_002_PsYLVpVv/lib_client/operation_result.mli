@@ -26,9 +26,10 @@
 open Protocol
 open Alpha_context
 
-val pp_internal_operation:
+val pp_internal_operation :
   Format.formatter -> packed_internal_operation -> unit
 
-val pp_operation_result:
+val pp_operation_result :
   Format.formatter ->
-  ('kind contents_list * 'kind Apply_results.contents_result_list) -> unit
+  'kind contents_list * 'kind Apply_results.contents_result_list ->
+  unit

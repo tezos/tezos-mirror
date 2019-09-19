@@ -27,29 +27,31 @@ open Protocol
 open Alpha_context
 
 module Endorser : sig
-  val run:
+  val run :
     #Protocol_client_context.full ->
-    chain: Chain_services.chain ->
-    delay: int ->
-    public_key_hash list -> unit tzresult Lwt.t
+    chain:Chain_services.chain ->
+    delay:int ->
+    public_key_hash list ->
+    unit tzresult Lwt.t
 end
 
 module Baker : sig
-  val run:
+  val run :
     #Protocol_client_context.full ->
-    ?minimal_fees: Tez.t ->
-    ?minimal_nanotez_per_gas_unit: Z.t ->
-    ?minimal_nanotez_per_byte: Z.t ->
-    ?max_priority: int ->
-    chain: Chain_services.chain ->
-    context_path: string ->
-    public_key_hash list -> unit tzresult Lwt.t
+    ?minimal_fees:Tez.t ->
+    ?minimal_nanotez_per_gas_unit:Z.t ->
+    ?minimal_nanotez_per_byte:Z.t ->
+    ?max_priority:int ->
+    chain:Chain_services.chain ->
+    context_path:string ->
+    public_key_hash list ->
+    unit tzresult Lwt.t
 end
 
 module Accuser : sig
-  val run:
+  val run :
     #Protocol_client_context.full ->
-    chain: Chain_services.chain ->
-    preserved_levels: int ->
+    chain:Chain_services.chain ->
+    preserved_levels:int ->
     unit tzresult Lwt.t
 end

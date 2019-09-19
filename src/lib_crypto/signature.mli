@@ -44,37 +44,39 @@ type watermark =
   | Generic_operation
   | Custom of MBytes.t
 
-val bytes_of_watermark: watermark -> MBytes.t
+val bytes_of_watermark : watermark -> MBytes.t
 
 val pp_watermark : Format.formatter -> watermark -> unit
 
-include S.SIGNATURE with type Public_key_hash.t = public_key_hash
-                     and type Public_key.t = public_key
-                     and type Secret_key.t = secret_key
-                     and type watermark := watermark
+include
+  S.SIGNATURE
+    with type Public_key_hash.t = public_key_hash
+     and type Public_key.t = public_key
+     and type Secret_key.t = secret_key
+     and type watermark := watermark
 
-val append : ?watermark:watermark -> secret_key -> MBytes.t -> MBytes.t
 (** [append sk buf] is the concatenation of [buf] and the
     serialization of the signature of [buf] signed by [sk]. *)
+val append : ?watermark:watermark -> secret_key -> MBytes.t -> MBytes.t
 
-val concat : MBytes.t -> t -> MBytes.t
 (** [concat buf t] is the concatenation of [buf] and the serialization
     of [t]. *)
+val concat : MBytes.t -> t -> MBytes.t
 
 include S.RAW_DATA with type t := t
 
 val of_secp256k1 : Secp256k1.t -> t
+
 val of_ed25519 : Ed25519.t -> t
+
 val of_p256 : P256.t -> t
 
-type algo =
-  | Ed25519
-  | Secp256k1
-  | P256
+type algo = Ed25519 | Secp256k1 | P256
 
-val algo_param: unit -> (algo, 'a) Clic.parameter
+val algo_param : unit -> (algo, 'a) Clic.parameter
 
-val generate_key:
+val generate_key :
   ?algo:algo ->
   ?seed:MBytes.t ->
-  unit -> public_key_hash * public_key * secret_key
+  unit ->
+  public_key_hash * public_key * secret_key

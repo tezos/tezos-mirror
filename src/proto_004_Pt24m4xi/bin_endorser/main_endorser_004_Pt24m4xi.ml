@@ -24,19 +24,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Log = Internal_event.Legacy_logging.Make(struct
-    let name = "endorser.main"
-  end)
+module Log = Internal_event.Legacy_logging.Make (struct
+  let name = "endorser.main"
+end)
 
 let () =
   let log s = Log.fatal_error "%s" s in
-  Lwt_exit.exit_on ~log Sys.sigint;
+  Lwt_exit.exit_on ~log Sys.sigint ;
   Lwt_exit.exit_on ~log Sys.sigterm
 
 let () =
-  Client_commands.register Protocol.hash @@ fun _network ->
-  List.map (Clic.map_command (new Alpha_client_context.wrap_full)) @@
-  Delegate_commands.delegate_commands ()
+  Client_commands.register Protocol.hash
+  @@ fun _network ->
+  List.map (Clic.map_command (new Alpha_client_context.wrap_full))
+  @@ Delegate_commands.delegate_commands ()
 
 let select_commands _ _ =
   return

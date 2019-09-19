@@ -25,23 +25,36 @@
 
 module type FILTER = sig
   type config
+
   val config_encoding : config Data_encoding.t
+
   val default_config : config
+
   module Proto : Registered_protocol.T
+
   val pre_filter : config -> Proto.operation_data -> bool
-  val post_filter : config ->
-    validation_state_before: Proto.validation_state ->
-    validation_state_after: Proto.validation_state ->
-    Proto.operation_data * Proto.operation_receipt -> bool Lwt.t
+
+  val post_filter :
+    config ->
+    validation_state_before:Proto.validation_state ->
+    validation_state_after:Proto.validation_state ->
+    Proto.operation_data * Proto.operation_receipt ->
+    bool Lwt.t
 end
 
 module No_filter (Proto : Registered_protocol.T) = struct
   type config = unit
+
   let config_encoding = Data_encoding.empty
+
   let default_config = ()
+
   module Proto = Proto
+
   let pre_filter _ _ = true
-  let post_filter _ ~validation_state_before:_ ~validation_state_after:_ _ = Lwt.return_true
+
+  let post_filter _ ~validation_state_before:_ ~validation_state_after:_ _ =
+    Lwt.return_true
 end
 
 let table : (module FILTER) Protocol_hash.Table.t =

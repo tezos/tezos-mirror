@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val export:
+val export :
   ?export_rolling:bool ->
   context_index:Context.index ->
   store:Store.t ->
@@ -33,7 +33,7 @@ val export:
   string option ->
   unit tzresult Lwt.t
 
-val import:
+val import :
   data_dir:string ->
   dir_cleaner:(string -> unit Lwt.t) ->
   patch_context:('a option -> Context.t -> Context.t Lwt.t) ->

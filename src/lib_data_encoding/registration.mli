@@ -31,19 +31,21 @@ type id = string
 type t
 
 val binary_schema : t -> Binary_schema.t
+
 val json_schema : t -> Json.schema
+
 val description : t -> string option
 
-val json_pretty_printer: t -> (Format.formatter -> Json.t -> unit)
-val binary_pretty_printer: t -> (Format.formatter -> MBytes.t -> unit)
+val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
 
-val register :
-  ?pp:(Format.formatter -> 'a -> unit) ->
-  'a Encoding.t ->
-  unit
+val binary_pretty_printer : t -> Format.formatter -> MBytes.t -> unit
+
+val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
 
 val find : id -> t option
+
 val list : unit -> (id * t) list
 
 val bytes_of_json : t -> Json.t -> MBytes.t option
+
 val json_of_bytes : t -> MBytes.t -> Json.t option

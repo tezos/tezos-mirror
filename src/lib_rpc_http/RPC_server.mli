@@ -25,10 +25,7 @@
 
 (** Typed RPC services: server implementation. *)
 
-type cors = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
-}
+type cors = {allowed_headers : string list; allowed_origins : string list}
 
 (** A handle on the server worker. *)
 type server

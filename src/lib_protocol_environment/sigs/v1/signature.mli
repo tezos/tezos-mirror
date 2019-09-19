@@ -39,6 +39,8 @@ type watermark =
   | Generic_operation
   | Custom of MBytes.t
 
-include S.SIGNATURE with type Public_key_hash.t = public_key_hash
-                     and type Public_key.t = public_key
-                     and type watermark := watermark
+include
+  S.SIGNATURE
+    with type Public_key_hash.t = public_key_hash
+     and type Public_key.t = public_key
+     and type watermark := watermark

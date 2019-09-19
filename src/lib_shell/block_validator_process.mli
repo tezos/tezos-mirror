@@ -24,12 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type validator_kind =
-  | Internal of Context.index
+type validator_kind = Internal of Context.index
 
 type t
 
 val init : validator_kind -> t Lwt.t
+
 val close : t -> unit Lwt.t
 
 val apply_block :

@@ -63,6 +63,7 @@ val elements : 'a t -> 'a list
 (** Ring Buffer Table *)
 module type TABLE = sig
   type t
+
   type v
 
   (** [create size] inizialize an empty ring *)
@@ -71,6 +72,7 @@ module type TABLE = sig
   (** [add t v] add a value to the ring. If the ring already contains size elements,
       the first element is removed and [v] is added. *)
   val add : t -> v -> unit
+
   val add_and_return_erased : t -> v -> v option
 
   (** [mem t v] check if v is in the ring. O(1) *)
@@ -84,7 +86,6 @@ module type TABLE = sig
 
   (** [elements t] return the list of elements currently in the ring *)
   val elements : t -> v list
-
 end
 
-module MakeTable (V: Hashtbl.HashedType) : TABLE with type v = V.t
+module MakeTable (V : Hashtbl.HashedType) : TABLE with type v = V.t

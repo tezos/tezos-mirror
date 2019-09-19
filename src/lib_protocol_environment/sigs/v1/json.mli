@@ -41,4 +41,5 @@ val to_string : json -> string
 
 (** Helpers for [Data_encoding] *)
 val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
 val wrap_error : ('a -> 'b) -> 'a -> 'b
