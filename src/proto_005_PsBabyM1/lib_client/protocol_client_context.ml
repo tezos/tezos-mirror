@@ -247,10 +247,8 @@ let () =
        Protocol.Alpha_context.Voting_period.kind_encoding ;
   register
   @@ Data_encoding.def
-       "error.alpha"
+       (stamp_proto "errors" [])
        ~description:
-         "The full list of RPC errors would be too long to include.\n\
-          It is available at RPC `/errors` (GET).\n\
-          Errors specific to protocol Alpha have an id that starts with \
-          `proto.alpha`."
+         "The full list of RPC errors would be too long to include.It is\n\
+          available through the RPC `/errors` (GET)."
        error_encoding
