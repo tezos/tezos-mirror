@@ -68,6 +68,8 @@ read -p "Link in the Node? (no if you want to test injection) (Y/n) " ans
 if [[ "$ans" == "Y" || "$ans" == "y" || -z "$ans" ]]; then
     duplicate_and_replace -${pattern} -${replacement} \
                           src/bin_node/{dune,tezos-node.opam}
+    duplicate_and_replace -${pattern} -${replacement} \
+                          src/bin_validation/{dune,tezos-validator.opam}
 fi
 
 read -p "User-activated update in 3 blocks? (Y/n) " ans
