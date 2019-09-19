@@ -148,7 +148,7 @@ in the :ref:`introduction <howtoget>`.
 
    protocols/003_PsddFKi3
    protocols/004_Pt24m4xi
-   protocols/005_PsBABY5H
+   protocols/005_babylon
 
 .. toctree::
    :maxdepth: 2
