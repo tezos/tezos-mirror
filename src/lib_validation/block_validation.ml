@@ -74,8 +74,7 @@ let init_test_chain
       Context.commit_test_chain_genesis test_ctxt forked_header >>= fun genesis_header ->
       return genesis_header
 
-let may_patch_protocol
-    ~level
+let may_force_protocol_upgrade ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
   match Block_header.get_forced_protocol_upgrade ~level with
   | None ->
@@ -86,8 +85,23 @@ let may_patch_protocol
       let context = Shell_context.wrap_disk_context context in
       Lwt.return { validation_result with context }
 
-module Make(Proto : Registered_protocol.T) = struct
+(** Applies user activated updates based either on block level or on
+    voted protocols *)
+let may_patch_protocol ~level
+    (validation_result : Tezos_protocol_environment.validation_result) =
+  let context = Shell_context.unwrap_disk_context validation_result.context in
+  Context.get_protocol context
+  >>= fun protocol ->
+  match Block_header.get_voted_protocol_overrides protocol with
+  | None ->
+      may_force_protocol_upgrade ~level validation_result
+  | Some replacement_protocol ->
+      Context.set_protocol context replacement_protocol
+      >>= fun context ->
+      let context = Shell_context.wrap_disk_context context in
+      Lwt.return {validation_result with context}
 
+module Make(Proto : Registered_protocol.T) = struct
   let check_block_header
       ~(predecessor_block_header : Block_header.t)
       hash (block_header: Block_header.t) =

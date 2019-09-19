@@ -62,4 +62,6 @@ val of_b58check: string -> t option
 
 val bounded_encoding: ?max_size:int -> unit -> t Data_encoding.t
 
-val get_forced_protocol_upgrade: level:Int32.t -> Protocol_hash.t option
+val get_forced_protocol_upgrade: level:int32 -> Protocol_hash.t option
+
+val get_voted_protocol_overrides: Protocol_hash.t -> Protocol_hash.t option

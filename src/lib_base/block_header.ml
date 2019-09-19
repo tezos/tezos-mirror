@@ -122,8 +122,15 @@ let forced_protocol_upgrades : (Int32.t * Protocol_hash.t) list = [
   204761l, Protocol_hash.of_b58check_exn "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP" ;
 ]
 
+let voted_protocol_overrides : (Protocol_hash.t * Protocol_hash.t) list =
+  List.map
+    (fun (a, b) ->
+       (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
+    [ (* nothing *) ]
+
 module LevelMap =
   Map.Make(struct type t = Int32.t let compare = Int32.compare end)
+
 let get_forced_protocol_upgrade =
   let table =
     List.fold_left
@@ -131,3 +138,6 @@ let get_forced_protocol_upgrade =
       LevelMap.empty
       forced_protocol_upgrades in
   fun ~level -> LevelMap.find_opt level table
+
+let get_voted_protocol_overrides proto_hash =
+  List.assoc_opt proto_hash voted_protocol_overrides
