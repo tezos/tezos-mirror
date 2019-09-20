@@ -29,7 +29,7 @@ The Community
 
 - A few community run websites collect useful Tezos links:
 
-    - https://www.tezos.help
+    - http://www.tezos.help
     - https://tezos.rocks
 
  - There is a matrix channel *Tezos* that you can join [here](https://riot.im/app/#/room/#tezos:matrix.org)

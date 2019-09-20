@@ -39,7 +39,7 @@ The Community
 
 - A few community-run websites collect useful Tezos links:
 
-    - https://www.tezos.help
+    - http://www.tezos.help
     - https://tezos.rocks
 
 - More resources can be found in the :ref:`support` page.
