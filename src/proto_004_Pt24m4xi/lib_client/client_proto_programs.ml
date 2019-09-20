@@ -72,7 +72,9 @@ let print_big_map_diff ppf = function
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = function
   | Ok (storage, operations, maybe_diff) ->
-      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>emitted operations@,%a@]@,@[%a@]@]@."
+      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>emitted \
+                     operations@,%a@]@,@[<v 2>big_map \
+                     diff@,%a@]@]@."
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_diff >>= fun () ->
@@ -85,7 +87,8 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   | Ok (storage, operations, trace, maybe_big_map_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,%a@]@,\
-         @[<v 2>emitted operations@,%a@]@,%a@[<v 2>@[<v 2>trace@,%a@]@]@."
+         @[<v 2>emitted operations@,%a@]@,@[<v 2>big_map diff@,\
+         %a@]@,@[<v 2>@[<v 2>trace@,%a@]@]@."
         print_expr storage
         (Format.pp_print_list Operation_result.pp_internal_operation) operations
         print_big_map_diff maybe_big_map_diff
