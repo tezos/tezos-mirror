@@ -688,6 +688,67 @@ class TestContractOpcodes:
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
+    @pytest.mark.parametrize(
+        "param,storage,expected,big_map_diff",
+        [   # test swap
+            ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
+             '(Left Unit)',
+             '(Left (Pair 0 1))',
+             [ ['New map(1) of type (big_map string string)'],
+               ['Set map(1)["1"] to "one"'],
+               ['New map(0) of type (big_map string string)'],
+               ['Set map(0)["2"] to "two"'] ]),
+            # test reset with new map
+            ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
+             '(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))',
+             '(Left (Pair 0 1))',
+             [ ['New map(1) of type (big_map string string)'],
+               ['Set map(1)["4"] to "four"'],
+               ['New map(0) of type (big_map string string)'],
+               ['Set map(0)["3"] to "three"'] ]),
+            # test reset to unit
+            ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
+             '(Right (Left (Right Unit)))',
+             '(Right Unit)',
+             [ ['\n'] ] ),
+            # test import to big_map
+            ('(Right Unit)',
+             '(Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) )))',
+             '(Left (Pair 0 1))',
+             [ ['New map(1) of type (big_map string string)'],
+               ['Set map(1)["gaz"] to "baz"'],
+               ['New map(0) of type (big_map string string)'],
+               ['Set map(0)["foo"] to "bar"'] ]),
+            # test add to big_map
+            ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }) )',
+             '(Right (Right (Right (Left { Pair "3" "three" }))))',
+             '(Left (Pair 0 1))',
+             [ ['New map(1) of type (big_map string string)'],
+               ['Set map(1)["2"] to "two"'],
+               ['New map(0) of type (big_map string string)'],
+               ['Set map(0)["1"] to "one"'],
+               ['Set map(0)["3"] to "three"'] ]),
+            # test remove from big_map
+            ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
+             '(Right (Right (Right (Right { "1" }))))',
+             '(Left (Pair 0 1))',
+             [ ['New map(1) of type (big_map string string)'],
+               ['Set map(1)["2"] to "two"'],
+               ['New map(0) of type (big_map string string)'],
+               ['Unset map(0)["1"]'] ])
+        ])
+    def test_big_map_magic(self,
+                           client,
+                           param,
+                           storage,
+                           expected,
+                           big_map_diff):
+        contract = f'{paths.TEZOS_HOME}/src/bin_client/test/' + \
+            'contracts/mini_scenarios/big_map_magic.tz'
+        run_script_res = client.run_script(contract, param, storage)
+        assert run_script_res.storage == expected
+        assert run_script_res.big_map_diff == big_map_diff
+
     def test_packunpack(self, client):
         """Test PACK/UNPACK and binary format."""
         assert_run_script_success(
