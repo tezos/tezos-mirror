@@ -206,6 +206,11 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
               let status = `Forbidden in
               Lwt.return_ok
                 (Response.make ~status ~encoding ~headers (), body)
+          | `Gone e ->
+              let body, encoding = error e in
+              let status = `Gone in
+              Lwt.return_ok
+                (Response.make ~status ~encoding ~headers (), body)
           | `Not_found e ->
               let body, encoding = error e in
               let status = `Not_found in

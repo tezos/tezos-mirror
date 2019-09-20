@@ -22,6 +22,7 @@ module Answer : sig
     | `Forbidden of 'e option (* 403 *)
     | `Not_found of 'e option (* 404 *)
     | `Conflict of 'e option (* 409 *)
+    | `Gone of 'e option (* 410 *)
     | `Error of 'e option (* 500 *)
     ]
 

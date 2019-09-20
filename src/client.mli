@@ -25,6 +25,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
     | `Error of 'e
     | `Forbidden of 'e
     | `Not_found of 'e
+    | `Gone of 'e
     | `Unauthorized of 'e
     | `Bad_request of string
     | `Method_not_allowed of string list

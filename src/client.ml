@@ -42,6 +42,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
     | `Error of 'e
     | `Forbidden of 'e
     | `Not_found of 'e
+    | `Gone of 'e
     | `Unauthorized of 'e
     | `Bad_request of string
     | `Method_not_allowed of string list
@@ -199,6 +200,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
           Lwt.return (`Unauthorized_host host)
       | `Forbidden -> Lwt.return (`Forbidden (ansbody, media_name, media))
       | `Not_found -> Lwt.return (`Not_found (ansbody, media_name, media))
+      | `Gone -> Lwt.return (`Gone (ansbody, media_name, media))
       | `Conflict -> Lwt.return (`Conflict (ansbody, media_name, media))
       | `Internal_server_error ->
           if media_name = Some ("text", "ocaml.exception") then
@@ -301,6 +303,8 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
           handle_error log service body `Internal_server_error (fun v -> `Error v)
       | `Forbidden body ->
           handle_error log service body `Forbidden (fun v -> `Forbidden v)
+      | `Gone body ->
+          handle_error log service body `Gone (fun v -> `Gone v)
       | `Not_found body ->
           handle_error log service body `Not_found (fun v -> `Not_found v)
       | `Unauthorized body ->
@@ -366,6 +370,8 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
           handle_error log service body `Internal_server_error (fun v -> `Error v)
       | `Forbidden body ->
           handle_error log service body `Forbidden (fun v -> `Forbidden v)
+      | `Gone body ->
+          handle_error log service body `Gone (fun v -> `Gone v)
       | `Not_found body ->
           handle_error log service body `Not_found (fun v -> `Not_found v)
       | `Unauthorized body ->
