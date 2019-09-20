@@ -4,7 +4,7 @@ open Console
 
 let default_attempts = 35
 
-let little_mesh_with_bakers ?base_port ?generate_kiln_config state
+let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     ~starting_level ~node_exec ~client_exec ~bakers () =
   Helpers.clear_root state
   >>= fun () ->
@@ -14,8 +14,8 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
   >>= fun () ->
   let block_interval = 1 in
   let (protocol, baker_list) =
+    let d = protocol in
     let open Tezos_protocol in
-    let d = default () in
     let bakers = List.take d.bootstrap_accounts bakers in
     ( {
         d with
@@ -144,10 +144,11 @@ let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec
             (`Not_done
               (sprintf "Waiting for %S to show up in the mempool" kind)))
 
-let simple_double_baking ~starting_level ?generate_kiln_config ~state
+let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
     ~base_port node_exec client_exec () =
   little_mesh_with_bakers
     ~bakers:1
+    ~protocol
     state
     ~node_exec
     ~client_exec
@@ -300,9 +301,10 @@ let find_endorsement_in_mempool state ~client =
           return (`Done e))
 
 let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
-    ~base_port node_exec client_exec () =
+    ~protocol ~base_port node_exec client_exec () =
   little_mesh_with_bakers
     ~bakers:2
+    ~protocol
     state
     ~node_exec
     ~client_exec
@@ -464,13 +466,14 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
                  last_level)))
   >>= fun () -> say state EF.(af "Test done.")
 
-let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
+let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
+    client_exec () =
   Helpers.clear_root state
   >>= fun () ->
   let block_interval = 2 in
   let (protocol, baker_0_account) =
+    let d = protocol in
     let open Tezos_protocol in
-    let d = default () in
     let baker = List.hd_exn d.bootstrap_accounts in
     ( {
         d with
@@ -524,7 +527,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
     Interactive_test.Commands.(
       all_defaults state ~nodes:all_nodes
       @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
-      @ arbitrary_commands_for_each_client
+      @ arbitrary_commands_for_each_and_all_clients
           state
           ~clients:[client_0; client_1; client_2]) ;
   let pause ?force msgs = Interactive_test.Pauser.generic state ?force msgs in
@@ -758,6 +761,7 @@ let cmd ~pp_error () =
              bcli
              accex
              generate_kiln_config
+             protocol
              state
              ->
           let checks () =
@@ -772,7 +776,7 @@ let cmd ~pp_error () =
             | `With_accusers ->
                 checks ()
                 >>= fun () ->
-                with_accusers ~state bnod accex bcli ~base_port ()
+                with_accusers ~state bnod accex bcli ~base_port () ~protocol
             | `Simple_double_baking ->
                 checks ()
                 >>= fun () ->
@@ -783,6 +787,7 @@ let cmd ~pp_error () =
                   ~base_port
                   ?generate_kiln_config
                   ~starting_level
+                  ~protocol
                   ()
             | `Simple_double_endorsing ->
                 checks ()
@@ -794,6 +799,7 @@ let cmd ~pp_error () =
                   ~base_port
                   ?generate_kiln_config
                   ~starting_level
+                  ~protocol
                   ()
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test))
@@ -822,6 +828,7 @@ let cmd ~pp_error () =
     $ Tezos_executable.cli_term `Client "tezos"
     $ Tezos_executable.cli_term `Accuser "tezos"
     $ Kiln.Configuration_directory.cli_term ()
+    $ Tezos_protocol.cli_term ()
     $ Test_command_line.cli_state ~name:"accusing" () )
     (let doc = "Sandbox networks which record double-bakings." in
      let man : Manpage.block list =
