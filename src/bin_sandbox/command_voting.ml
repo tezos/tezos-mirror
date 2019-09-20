@@ -141,7 +141,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
       | Error e ->
           fail e)
 
-let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
+let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
   let default_attempts = 50 in
@@ -159,15 +159,12 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= fun () ->
   let (protocol, baker_0_account, baker_0_balance) =
     let open Tezos_protocol in
-    let d = default () in
-    let baker = List.nth_exn d.bootstrap_accounts 0 in
-    let hash = Option.value ~default:d.hash current_hash in
+    let baker = List.nth_exn protocol.bootstrap_accounts 0 in
     ( {
-        d with
-        hash;
+        protocol with
         time_between_blocks = [1; 0];
         bootstrap_accounts =
-          List.map d.bootstrap_accounts ~f:(fun (n, v) ->
+          List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
               if fst baker = n then (n, v) else (n, 1_000L));
       },
       fst baker,
@@ -817,10 +814,10 @@ let cmd ~pp_error () =
              winner_client_exec
              size
              (`Clueless_winner clueless_winner)
-             (`Hash current_hash)
              (`Base_port base_port)
              (`With_ledger with_ledger)
              (`Serialize_proposals serialize_proposals)
+             protocol
              state
              ->
           ( state,
@@ -830,7 +827,6 @@ let cmd ~pp_error () =
               (run
                  state
                  ~serialize_proposals
-                 ~current_hash
                  ~winner_path
                  ~clueless_winner
                  ~demo_path
@@ -840,6 +836,7 @@ let cmd ~pp_error () =
                  ~base_port
                  ~client_exec
                  ~winner_client_exec
+                 ~protocol
                  ?with_ledger) ))
     $ Arg.(
         pure Filename.dirname
@@ -883,7 +880,8 @@ let cmd ~pp_error () =
                   ~doc:
                     "Do not fail if the client does not know about “next” \
                      protocol.")))
-    $ Arg.(
+    (*
+$ Arg.(
         pure (fun p -> `Hash p)
         $ value
             (opt
@@ -892,6 +890,7 @@ let cmd ~pp_error () =
                (info
                   ["current-hash"]
                   ~doc:"The hash to advertise as the current protocol.")))
+ *)
     $ Arg.(
         pure (fun p -> `Base_port p)
         $ value
@@ -920,6 +919,7 @@ let cmd ~pp_error () =
                   ~doc:
                     "Run the proposals one-by-one instead of all together \
                      (preferred by the Ledger).")))
+    $ Tezos_protocol.cli_term ()
     $ Test_command_line.cli_state ~name:"voting" () )
     (let doc = "Sandbox network with a full round of voting." in
      let man : Manpage.block list =
