@@ -29,7 +29,7 @@ let () =
 
 let () =
   Prevalidator_filters.register
-    (module Tezos_mempool_005_PsBABY5H.Filter)
+    (module Tezos_mempool_005_PsBabyM1.Filter)
 
 (** Commands *)
 

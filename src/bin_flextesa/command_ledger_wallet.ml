@@ -206,7 +206,7 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
       ~f:(fun proc -> find_and_print_signature_hash state proc#stdout)
       [ "submit"; "proposals"; "for"
       ; Tezos_protocol.Account.pubkey_hash ledger_account
-      ; "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU"
+      ; "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
       ; "Psd1ynUBhMZAeajwcZJAeq5NrxorM6UCU4GJqxZ7Bx2e9vUWB6z"; "--force"
       ; "--verbose-signing" ]
   in

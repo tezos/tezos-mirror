@@ -91,7 +91,7 @@ class TestManager:
         client.transfer(0, 'manager', 'target',
                         ['--entrypoint', 'add_left',
                          '--arg', arg,
-                         '--burn-cap', '0.014'
+                         '--burn-cap', '0.068'
                         ])
         client.bake('bootstrap5', BAKE_ARGS)
         client.transfer(0, 'manager', 'target',

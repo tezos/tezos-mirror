@@ -14,8 +14,8 @@ depends: [
   "dum"
   "tezos-stdlib-unix"
   "tezos-signer-backends"
-  "tezos-client-005-PsBABY5H"
-  "tezos-protocol-005-PsBABY5H"
+  "tezos-client-005-PsBabyM1"
+  "tezos-protocol-005-PsBabyM1"
   "lwt"
 ]
 build: [
