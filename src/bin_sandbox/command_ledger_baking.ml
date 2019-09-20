@@ -258,8 +258,8 @@ let setup_baking_ledger state uri ~client ~protocol =
         "Setting up %S for baking.\n\
          Address: %S\n\
          Chain: mainnet\n\
-         Main HWM: 0\n\
-         Test HWM: 0"
+         Main Chain HWM: 0\n\
+         Test Chain HWM: 0"
         uri
         (Tezos_protocol.Account.pubkey_hash account))
     (fun () ->

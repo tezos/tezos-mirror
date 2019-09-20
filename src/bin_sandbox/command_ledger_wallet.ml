@@ -268,6 +268,19 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
       MFmt.
         [ (fun ppf () -> wf ppf "Submitting single proposal %s" tested_proposal);
           (fun ppf () ->
+            match protocol_kind with
+            | `Athens ->
+                ()
+            | `Babylon ->
+                wf
+                  ppf
+                  "On Babylon, You will first be asked to provide the public \
+                   key." ;
+                cut ppf () ;
+                wf
+                  ppf
+                  "Accept this prompt, regardless of below, then continue.");
+          (fun ppf () ->
             vertical_box ppf ~indent:4 (fun ppf ->
                 wf
                   ppf
@@ -278,7 +291,9 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                 cut ppf () ;
                 wf ppf "* Source: `%s`" source_display ;
                 cut ppf () ;
-                wf ppf "* Protocol hash: `%s`" tested_proposal)) ]
+                wf ppf "* Period: `0`" ;
+                cut ppf () ;
+                wf ppf "* Protocol: `%s`" tested_proposal)) ]
     (submit_proposals ~display_expectation:false [tested_proposal])
   >>= fun () ->
   test_reject_and_accept
@@ -293,13 +308,28 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
   >>= fun () ->
   go_to_next_period ()
   >>= fun () ->
-  List_sequential.iter ["yea"; "nay"] ~f:(fun vote ->
+  List_sequential.iteri ["yea"; "nay"] ~f:(fun n vote ->
       test_reject_and_accept
         (Fmt.strf "vote-%s" vote)
         ~messages:
           MFmt.
-            [ (fun ppf () -> wf ppf "Voting %s for %s" vote tested_proposal);
-              (fun ppf () -> wf ppf "Source: `%s`" source_display) ]
+            [ (fun ppf () ->
+                match protocol_kind with
+                | `Athens ->
+                    ()
+                | `Babylon ->
+                    wf
+                      ppf
+                      "On Babylon, You will first be asked to provide the \
+                       public key." ;
+                    cut ppf () ;
+                    wf
+                      ppf
+                      "Accept this prompt, regardless of below, then continue.");
+              (fun ppf () -> wf ppf "Voting %s for %s" vote tested_proposal);
+              (fun ppf () -> wf ppf "Source: `%s`" source_display);
+              (fun ppf () -> wf ppf "Period: `%i`" (n + 1));
+              (fun ppf () -> wf ppf "Protocol: `%s`" tested_proposal) ]
         (fun () ->
           Tezos_client.client_cmd
             state
@@ -356,16 +386,17 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
           [ (fun ppf () -> wf ppf "Self-delegating account `%s`" ledger_pkh);
             show_command_message command;
             (fun ppf () ->
-              match protocol_kind with
-              | `Athens ->
-                  ledger_should_display
-                    ppf
-                    [ ("Fee", const string "0.00xxx");
-                      ("Source", const string ledger_pkh);
-                      ("Delegate", const string ledger_pkh);
-                      ("Storage", const int 0) ]
-              | `Babylon ->
-                  please_check_the_hash ppf ()) ]
+              wf
+                ppf
+                "Note that X is a placeholder for some value that will vary \
+                 between runs");
+            (fun ppf () ->
+              ledger_should_display
+                ppf
+                [ ("Fee", const string "0.00XXX");
+                  ("Source", const string ledger_pkh);
+                  ("Delegate", const string ledger_pkh);
+                  ("Storage", const int 0) ]) ]
       (fun ~user_answer ->
         client_async_cmd
           state
@@ -410,16 +441,17 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
               wf ppf "Delegating account `%s` to `%s`" ledger_pkh delegate);
             show_command_message command;
             (fun ppf () ->
-              match protocol_kind with
-              | `Athens ->
-                  ledger_should_display
-                    ppf
-                    [ ("Fee", const string "0.00xxx");
-                      ("Source", const string ledger_pkh);
-                      ("Delegate", const string delegate);
-                      ("Storage", const int 0) ]
-              | `Babylon ->
-                  please_check_the_hash ppf ()) ]
+              wf
+                ppf
+                "Note that X is a placeholder for some value that will vary \
+                 between runs");
+            (fun ppf () ->
+              ledger_should_display
+                ppf
+                [ ("Fee", const string "0.00XXX");
+                  ("Source", const string ledger_pkh);
+                  ("Delegate", const string delegate);
+                  ("Storage", const int 0) ]) ]
       (fun ~user_answer ->
         client_async_cmd
           state
@@ -612,16 +644,21 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
           [ (fun ppf () -> wf ppf "%s with account `%s`" name ledger_pkh);
             show_command_message command;
             (fun ppf () ->
-              match (protocol_kind, arguments) with
-              | (`Athens, None) ->
+              wf
+                ppf
+                "Note that X is a placeholder for some value that will vary \
+                 between runs");
+            (fun ppf () ->
+              match arguments with
+              | None ->
                   ledger_should_display
                     ppf
-                    [ ("amount", const string amount);
-                      ("Fee", const string "0.00xxx");
+                    [ ("Amount", const string amount);
+                      ("Fee", const string "0.00XXX");
                       ("Source", const string ledger_pkh);
                       ("Destination", const string dst_pkh);
                       ("Storage", const int storage) ]
-              | _ (* babylon or arguments *) ->
+              | _ (* some arguments *) ->
                   please_check_the_hash ppf ()) ]
       (fun ~user_answer ->
         client_async_cmd
@@ -670,13 +707,13 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
   >>= fun () ->
   test_transaction
     ~name:"parameterless-transaction-to-kt1"
-    ~dst_pkh:"KT1..."
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     ~dst_name:unit_kt1_account
     ()
   >>= fun () ->
   test_transaction
     ~name:"parameterfull-transaction-to-kt1"
-    ~dst_pkh:"KT1..."
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     ~arguments:"Pair \"hello from the ledger\" 51"
     ~dst_name:pair_string_nat_kt1_account
     ()
