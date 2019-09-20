@@ -20,12 +20,12 @@ let dump_connections state nodes =
 
 let clear_root state =
   let root = Paths.(root state) in
-  Lwt_exception.catch
+  System_error.catch
     (fun () -> ksprintf Lwt_unix.system "rm -fr %s" (Filename.quote root))
     ()
   >>= function
   | Unix.WEXITED 0 -> return ()
-  | _ -> System_error.fail "cannot delete root path (%S)" root
+  | _ -> System_error.fail_fatalf "cannot delete root path (%S)" root
 
 let wait_for state ~attempts ~seconds f =
   let rec attempt nth =
@@ -48,8 +48,9 @@ let kill_node state nod =
   >>= fun states ->
   ( match states with
   | [one] -> return one
-  | _ -> System_error.fail "Expecting one state for node %s" nod.Tezos_node.id
-  )
+  | _ ->
+      System_error.fail_fatalf "Expecting one state for node %s"
+        nod.Tezos_node.id )
   >>= fun node_state_0 -> Running_processes.kill state node_state_0
 
 let restart_node ~client_exec state nod =
@@ -113,7 +114,7 @@ module System_dependencies = struct
       ~f:(fun prev_m path ->
         prev_m
         >>= fun prev ->
-        Lwt_exception.catch Lwt_unix.file_exists (path // "TEZOS_PROTOCOL")
+        System_error.catch Lwt_unix.file_exists (path // "TEZOS_PROTOCOL")
         >>= function
         | true -> return prev
         | false -> return (`Not_a_protocol_path path :: prev))

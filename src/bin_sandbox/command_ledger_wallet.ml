@@ -4,9 +4,9 @@ open Internal_pervasives
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
 let client_async_cmd state ~client args ~f =
-  Running_processes.run_async_cmdf
+  Running_processes.Async.run_cmdf
     state
-    f
+    ~f
     "sh -c %s"
     ( Tezos_client.client_command client ~state args
     |> Genspio.Compile.to_one_liner |> Filename.quote )
@@ -108,7 +108,7 @@ let assert_eq to_string ~expected ~actual =
 let rec ask state ef =
   Console.say state EF.(list [ef; wf " (y/n)?"])
   >>= fun () ->
-  Lwt_exception.catch Lwt_io.read_char Lwt_io.stdin
+  System_error.catch Lwt_io.read_char Lwt_io.stdin
   >>= function
   | 'y' | 'Y' -> return true | 'n' | 'N' -> return false | _ -> ask state ef
 
@@ -210,14 +210,11 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~command_names:["all-clients"]
-            ~make_admin
-            ~clients:
-              (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec)) ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~make_admin
+          ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
   Interactive_test.Pauser.generic state EF.[af "About to really start playing"]
   >>= fun () ->
   let client n =
@@ -244,7 +241,7 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
     client_async_cmd
       state
       ~client:(client 0)
-      ~f:(fun proc -> find_and_print_signature_hash state proc#stdout)
+      ~f:(fun _ proc -> find_and_print_signature_hash state proc#stdout)
       [ "submit";
         "proposals";
         "for";

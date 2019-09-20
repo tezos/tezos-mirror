@@ -80,9 +80,7 @@ let () =
         Format.fprintf fmt "%a" Test_scenario.Inconsistency_error.pp e
     | #Process_result.Error.t as e ->
         Format.fprintf fmt "%a" Process_result.Error.pp e
-    | `Lwt_exn _ as e ->
-        Format.fprintf fmt "%a" Lwt_exception.pp e
-    | `Sys_error _ as e ->
+    | #System_error.t as e ->
         Format.fprintf fmt "%a" System_error.pp e
     | `Client_command_error _ as e ->
         Tezos_client.Command_error.pp fmt e
@@ -92,6 +90,8 @@ let () =
         Format.fprintf fmt "WAITING-FOR “%s”: Time-out" msg
     | `Precheck_failure _ as p ->
         Helpers.System_dependencies.Error.pp fmt p
+    | `Die _ ->
+        ()
   in
   Term.exit
   @@ Term.eval_choice

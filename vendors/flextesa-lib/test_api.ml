@@ -27,7 +27,7 @@ let call ?comment ?(expect = `Status `OK) ?(show_body = `All)
         | Ok j -> Ezjsonm.value_to_string ~minify:false j
         | Error _ -> b ) in
     (json, lines) in
-  Lwt_exception.catch
+  System_error.catch
     Lwt.(
       fun () ->
         Cohttp_lwt_unix.Client.call http_method ?body

@@ -14,10 +14,12 @@ let base_dir t ~state = Paths.root state // sprintf "Client-base-%s" t.id
 
 open Tezos_executable.Make_cli
 
-let client_command t ~state args =
+let client_command ?(wait = "none") t ~state args =
   Tezos_executable.call t.exec
     ~path:(base_dir t ~state // "exec-client")
-    (optf "port" "%d" t.port @ opt "base-dir" (base_dir ~state t) @ args)
+    ( ("--wait" :: wait :: optf "port" "%d" t.port)
+    @ opt "base-dir" (base_dir ~state t)
+    @ args )
 
 let bootstrapped_script t ~state =
   let open Genspio.EDSL in
@@ -104,16 +106,16 @@ end
 open Command_error
 open Console
 
-let client_cmd state ~client args =
+let client_cmd ?wait state ~client args =
   Running_processes.run_cmdf state "sh -c %s"
-    ( client_command client ~state args
+    ( client_command ?wait client ~state args
     |> Genspio.Compile.to_one_liner |> Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
   >>= fun success -> return (success, res)
 
-let successful_client_cmd state ~client args =
-  client_cmd state ~client args
+let successful_client_cmd ?wait state ~client args =
+  client_cmd state ?wait ~client args
   >>= fun (success, res) ->
   match success with
   | true -> return res

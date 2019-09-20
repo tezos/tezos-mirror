@@ -186,14 +186,11 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~command_names:["all-clients"]
-            ~make_admin
-            ~clients:
-              (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec)) ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~make_admin
+          ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
   Interactive_test.Pauser.generic state EF.[af "About to really start playing"]
   >>= fun () ->
   let client n =
@@ -241,7 +238,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_clients
+      [ arbitrary_command_on_all_clients
           state
           ~command_names:["wc"; "winner-client"]
           ?make_admin:None
@@ -253,7 +250,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_clients
+      [ arbitrary_command_on_all_clients
           state
           ~command_names:["baker"]
           ~make_admin

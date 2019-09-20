@@ -8,7 +8,11 @@ type t =
   ; (* Ports: *)
     peers: int list
   ; exec: Tezos_executable.t
-  ; protocol: Tezos_protocol.t }
+  ; protocol: Tezos_protocol.t
+  ; history_mode: [`Full | `Archive | `Rolling] option }
+
+let compare a b = Base.String.compare a.id b.id
+let equal a b = Base.String.equal a.id b.id
 
 let ef t =
   EF.(
@@ -18,10 +22,18 @@ let ef t =
       ; desc_list (af "peers") (List.map t.peers ~f:(af ":%d")) ])
 
 let pp fmt t = Easy_format.Pretty.to_formatter fmt (ef t)
+let id t = t.id
 
-let make ~exec ?(protocol = Tezos_protocol.default ()) id ~expected_connections
-    ~rpc_port ~p2p_port peers =
-  {id; expected_connections; rpc_port; p2p_port; peers; exec; protocol}
+let make ~exec ?(protocol = Tezos_protocol.default ()) ?history_mode id
+    ~expected_connections ~rpc_port ~p2p_port peers =
+  { id
+  ; expected_connections
+  ; rpc_port
+  ; p2p_port
+  ; peers
+  ; exec
+  ; protocol
+  ; history_mode }
 
 let make_path p ~config t = Paths.root config // sprintf "node-%s" t.id // p
 
@@ -40,22 +52,33 @@ module Config_file = struct
   *)
   let of_node state t =
     let open Ezjsonm in
-    dict
-      [ ("data-dir", data_dir ~config:state t |> string)
-      ; ( "rpc"
-        , dict [("listen-addrs", strings [sprintf "0.0.0.0:%d" t.rpc_port])] )
-      ; ( "p2p"
-        , dict
-            [ ( "expected-proof-of-work"
-              , int (Tezos_protocol.expected_pow t.protocol) )
-            ; ("listen-addr", ksprintf string "0.0.0.0:%d" t.p2p_port)
-            ; ( "limits"
-              , dict
-                  [ ("maintenance-idle-time", int 3)
-                  ; ("swap-linger", int 2)
-                  ; ("connection-timeout", int 2) ] ) ] )
-      ; ("log", dict [("output", string (log_output ~config:state t))]) ]
-    |> to_string ~minify:false
+    let shell =
+      match t.history_mode with
+      | None -> []
+      | Some h ->
+          [ ( "shell"
+            , dict
+                [ ( "history_mode"
+                  , match h with
+                    | `Archive -> string "archive"
+                    | `Full -> string "full"
+                    | `Rolling -> string "rolling" ) ] ) ] in
+    [ ("data-dir", data_dir ~config:state t |> string)
+    ; ( "rpc"
+      , dict [("listen-addrs", strings [sprintf "0.0.0.0:%d" t.rpc_port])] )
+    ; ( "p2p"
+      , dict
+          [ ( "expected-proof-of-work"
+            , int (Tezos_protocol.expected_pow t.protocol) )
+          ; ("listen-addr", ksprintf string "0.0.0.0:%d" t.p2p_port)
+          ; ( "limits"
+            , dict
+                [ ("maintenance-idle-time", int 3)
+                ; ("swap-linger", int 2)
+                ; ("connection-timeout", int 2) ] ) ] )
+    ; ("log", dict [("output", string (log_output ~config:state t))]) ]
+    @ shell
+    |> dict |> to_string ~minify:false
 end
 
 open Tezos_executable.Make_cli
@@ -115,7 +138,7 @@ let connections node_list =
 
     let compare a b =
       match (a, b) with
-      | `Duplex (a, b), `Duplex (c, d) when a = d && b = c -> 0
+      | `Duplex (a, b), `Duplex (c, d) when equal a d && equal b c -> 0
       | `Duplex _, _ -> -1
       | _, `Duplex _ -> 1
       | _, _ -> Caml.Pervasives.compare a b
@@ -140,3 +163,48 @@ let connections node_list =
                 else `From_to (node, peer) in
           res := Connection_set.add conn !res)) ;
   Connection_set.elements !res
+
+module History_modes = struct
+  type 'error edit = t list -> (t list, 'error) Asynchronous_result.t
+
+  let cmdliner_term () : _ edit Cmdliner.Term.t =
+    let open Cmdliner in
+    let open Term in
+    let history_mode_converter =
+      Arg.enum [("archive", `Archive); ("full", `Full); ("rolling", `Rolling)]
+    in
+    pure (fun edits node_list ->
+        try
+          return
+            (List.map node_list ~f:(fun node ->
+                 match
+                   List.filter edits ~f:(fun (prefix, _) ->
+                       String.is_prefix node.id ~prefix)
+                 with
+                 | [] -> node
+                 | [one] -> (
+                   match
+                     List.filter node_list ~f:(fun n ->
+                         String.is_prefix n.id ~prefix:(fst one))
+                   with
+                   | [_] -> {node with history_mode= Some (snd one)}
+                   | a_bunch_maybe_zero ->
+                       Fmt.kstrf failwith
+                         "Prefix %S does not match exactly one node: [%s]"
+                         (fst one)
+                         (String.concat ~sep:", "
+                            (List.map a_bunch_maybe_zero ~f:id)) )
+                 | more ->
+                     Fmt.kstrf failwith "Prefixes %s match the same node: %s"
+                       (String.concat ~sep:", " (List.map more ~f:fst))
+                       node.id))
+        with Failure s ->
+          System_error.fail_fatalf "Failed to compose history-modes: %s" s)
+    $ Arg.(
+        value
+          (opt_all
+             (pair ~sep:':' string history_mode_converter)
+             []
+             (info ["set-history-mode"]
+                ~doc:"Set the history mode for a given (named) node.")))
+end

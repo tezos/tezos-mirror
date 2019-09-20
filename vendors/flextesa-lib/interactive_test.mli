@@ -22,7 +22,7 @@ module Commands : sig
     -> string list
     -> (   unit
         -> ( unit
-           , [`Command_line of string | `Lwt_exn of exn] )
+           , [`Command_line of string | System_error.t] )
            Asynchronous_result.t)
     -> Console.Prompt.item
 
@@ -50,7 +50,7 @@ module Commands : sig
     -> port:int
     -> path:string
     -> ( Ezjsonm.value option
-       , [> `Command_line of string | `Lwt_exn of exn] )
+       , [> `Command_line of string | System_error.t] )
        Asynchronous_result.t
 
   val do_jq :
@@ -125,7 +125,7 @@ module Commands : sig
     -> protocol:Tezos_protocol.t
     -> Console.Prompt.item
 
-  val arbitrary_command_on_clients :
+  val arbitrary_command_on_all_clients :
        ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
     -> ?command_names:string list
     -> < application_name: string
@@ -134,6 +134,39 @@ module Commands : sig
        ; runner: Running_processes.State.t
        ; .. >
     -> clients:Tezos_client.t list
+    -> Console.Prompt.item
+
+  val arbitrary_commands_for_each_client :
+       ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
+    -> ?make_command_names:(int -> string list)
+    -> < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> clients:Tezos_client.t list
+    -> Console.Prompt.item list
+
+  val arbitrary_commands_for_each_and_all_clients :
+       ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
+    -> ?make_individual_command_names:(int -> string list)
+    -> ?all_clients_command_names:string list
+    -> < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> clients:Tezos_client.t list
+    -> Console.Prompt.item list
+
+  val bake_command :
+       < application_name: string
+       ; console: Console.t
+       ; operations_log: Log_recorder.Operations.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> clients:Tezos_client.Keyed.t list
     -> Console.Prompt.item
 
   val all_defaults :
@@ -177,7 +210,7 @@ module Pauser : sig
        ; .. >
     -> ?force:bool
     -> Easy_format.t list
-    -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
+    -> (unit, [> System_error.t]) Asynchronous_result.t
   (** Pause the test according to [state#interactivity] (overridden
       with [~force:true]), the pause displays the list of
       {!Easy_format.t}s and prompts the user for commands (see
@@ -191,10 +224,10 @@ module Pauser : sig
        ; runner: Running_processes.State.t
        ; test_interactivity: Interactivity.t
        ; .. >
-    -> (unit -> (unit, ([> `Lwt_exn of exn] as 'errors)) Asynchronous_result.t)
+    -> (unit -> (unit, ([> System_error.t] as 'errors)) Asynchronous_result.t)
     -> pp_error:(Format.formatter -> 'errors -> unit)
     -> unit
-    -> (unit, 'errors) Asynchronous_result.t
+    -> (unit, [> System_error.t | `Die of int]) Asynchronous_result.t
   (** Run a test-scenario and deal with potential errors according
       to [state#test_interactivity]. *)
 end

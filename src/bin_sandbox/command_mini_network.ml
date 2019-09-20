@@ -116,12 +116,11 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       ~commands:
         Interactive_test.Commands.(
           all_defaults state ~nodes
-          @ [ secret_keys state ~protocol;
-              arbitrary_command_on_clients
-                state
-                ~clients:
-                  (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))
-            ]))
+          @ [secret_keys state ~protocol]
+          @ arbitrary_commands_for_each_client
+              state
+              ~clients:
+                (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))))
 
 let cmd ~pp_error () =
   let open Cmdliner in

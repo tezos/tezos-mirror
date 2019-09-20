@@ -87,7 +87,7 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
     pp_print_newline ppf () ;
     pp_close_box ppf () ;
     pp_print_flush ppf ()) ;
-  Lwt_exception.catch (do_output o#console) ()
+  System_error.catch (do_output o#console) ()
 
 let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
   let date =
@@ -103,7 +103,7 @@ let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
     fprintf fmt "%a" Easy_format.Pretty.to_formatter msg ;
     pp_print_newline fmt () ;
     pp_print_flush fmt ()) ;
-  Lwt_exception.catch (do_output o#console) ()
+  System_error.catch (do_output o#console) ()
 
 module Prompt = struct
   type item =
@@ -112,7 +112,7 @@ module Prompt = struct
     ; action:
            Base.Sexp.t list
         -> ( [`Help | `Quit | `Loop]
-           , [`Lwt_exn of exn | `Command_line of string] )
+           , [System_error.t | `Command_line of string] )
            Asynchronous_result.t }
 
   let item doc commands action = {commands; doc; action}
@@ -134,7 +134,7 @@ module Prompt = struct
     let rec loop () =
       say state EF.(af "Please enter command:")
       >>= fun () ->
-      Lwt_exception.catch Lwt_io.read_line Lwt_io.stdin
+      System_error.catch Lwt_io.read_line Lwt_io.stdin
       >>= fun line ->
       let open Base.Sexp in
       match Parsexp.Single.parse_string (sprintf "( %s )" line) with
@@ -144,7 +144,9 @@ module Prompt = struct
               List.mem m.commands c ~equal:String.equal)
         with
         | Some {action; _} -> (
-            Asynchronous_result.bind_on_error (action more)
+            Asynchronous_result.bind_on_error
+              ( try action more
+                with e -> System_error.fail_fatalf "Exn: %a" Exn.pp e )
               ~f:(fun ~result _ ->
                 say state
                   EF.(
@@ -153,7 +155,7 @@ module Prompt = struct
                            Attached_result.pp ppf result (* Error.pp ppf err *)
                              ~pp_error:(fun fmt ->
                              function
-                             | `Lwt_exn _ as e -> Lwt_exception.pp fmt e
+                             | #System_error.t as e -> System_error.pp fmt e
                              | `Command_line s ->
                                  Format.fprintf fmt "Wrong command line: %s" s))))
                 >>= fun () -> return `Loop)

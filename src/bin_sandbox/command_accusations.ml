@@ -63,10 +63,10 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
   >>= fun (client_2, baker_2) ->
   Interactive_test.Pauser.add_commands
     state
-    Interactive_test.Commands.
-      [ arbitrary_command_on_clients
-          state
-          ~clients:[client_0; client_1; client_2] ] ;
+    Interactive_test.Commands.(
+      arbitrary_commands_for_each_and_all_clients
+        state
+        ~clients:[client_0; client_1; client_2]) ;
   Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
       Tezos_client.rpc
         state
@@ -523,11 +523,10 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes:all_nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~clients:[client_0; client_1; client_2] ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_client
+          state
+          ~clients:[client_0; client_1; client_2]) ;
   let pause ?force msgs = Interactive_test.Pauser.generic state ?force msgs in
   let starting_level = 10 in
   List.fold

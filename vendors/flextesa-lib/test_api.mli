@@ -14,5 +14,5 @@ val call :
   -> api_prefix:string
   -> path:string
   -> ( < body_json: (Ezjsonm.value, string) result ; body_lines: string list >
-     , [> `Lwt_exn of exn | `Scenario_error of string] )
+     , [> System_error.t | `Scenario_error of string] )
      Asynchronous_result.t
