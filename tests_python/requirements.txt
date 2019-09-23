@@ -24,3 +24,4 @@ base58check==1.0.2
 pyblake2==1.1.2
 ed25519==1.4
 requests==2.20.1
+git+https://gitlab.com/nomadic-labs/pytest-regtest@c65bf6ea
