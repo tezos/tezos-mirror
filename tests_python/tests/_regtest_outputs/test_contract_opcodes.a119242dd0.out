@@ -1,0 +1,35 @@
+storage
+  { "Hello test1" ; "Hello test2" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 799692 units remaining)
+    [ (Pair { "test1" ; "test2" } {})  	 ]
+  - location: 9 (remaining gas: 799692 units remaining)
+    [ { "test1" ; "test2" }  	@parameter ]
+  - location: 12 (remaining gas: 799691 units remaining)
+    [ "Hello "  	@hello
+      "test1"  	@parameter.elt ]
+  - location: 15 (remaining gas: 799690 units remaining)
+    [ "Hello test1"  	 ]
+  - location: -1 (remaining gas: 799690 units remaining)
+    [ "Hello test1"  	 ]
+  - location: 12 (remaining gas: 799689 units remaining)
+    [ "Hello "  	@hello
+      "test2"  	@parameter.elt ]
+  - location: 15 (remaining gas: 799688 units remaining)
+    [ "Hello test2"  	 ]
+  - location: -1 (remaining gas: 799688 units remaining)
+    [ "Hello test2"  	 ]
+  - location: 10 (remaining gas: 799687 units remaining)
+    [ { "Hello test1" ; "Hello test2" }  	 ]
+  - location: 16 (remaining gas: 799687 units remaining)
+    [ {}  	
+      { "Hello test1" ; "Hello test2" }  	 ]
+  - location: 18 (remaining gas: 799687 units remaining)
+    [ (Pair {} { "Hello test1" ; "Hello test2" })  	 ]
+  - location: -1 (remaining gas: 799686 units remaining)
+    [ (Pair {} { "Hello test1" ; "Hello test2" })  	 ]
+

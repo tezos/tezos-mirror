@@ -1,0 +1,21 @@
+storage
+  (Some "abcd")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 799795 units remaining)
+    [ (Pair "abcd" None)  	 ]
+  - location: 8 (remaining gas: 799795 units remaining)
+    [ "abcd"  	@parameter ]
+  - location: 9 (remaining gas: 799795 units remaining)
+    [ (Some "abcd")  	 ]
+  - location: 10 (remaining gas: 799794 units remaining)
+    [ {}  	
+      (Some "abcd")  	 ]
+  - location: 12 (remaining gas: 799794 units remaining)
+    [ (Pair {} (Some "abcd"))  	 ]
+  - location: -1 (remaining gas: 799793 units remaining)
+    [ (Pair {} (Some "abcd"))  	 ]
+

@@ -1,0 +1,23 @@
+storage
+  (Some True)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 799767 units remaining)
+    [ (Pair False None)  	 ]
+  - location: 8 (remaining gas: 799767 units remaining)
+    [ False  	@parameter ]
+  - location: 9 (remaining gas: 799767 units remaining)
+    [ True  	 ]
+  - location: 10 (remaining gas: 799766 units remaining)
+    [ (Some True)  	 ]
+  - location: 11 (remaining gas: 799766 units remaining)
+    [ {}  	
+      (Some True)  	 ]
+  - location: 13 (remaining gas: 799765 units remaining)
+    [ (Pair {} (Some True))  	 ]
+  - location: -1 (remaining gas: 799765 units remaining)
+    [ (Pair {} (Some True))  	 ]
+

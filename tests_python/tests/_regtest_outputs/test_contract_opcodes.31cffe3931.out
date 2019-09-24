@@ -1,0 +1,48 @@
+storage
+  (Pair 0 None)
+emitted operations
+  
+big_map diff
+  New map(0) of type (big_map string string)
+  Set map(0)["hello"] to "hi"
+trace
+  - location: 11 (remaining gas: 799434 units remaining)
+    [ (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+  - location: 12 (remaining gas: 799434 units remaining)
+    [ (Pair "" (Pair { Elt "hello" "hi" } None))  	
+      (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+  - location: 13 (remaining gas: 799434 units remaining)
+    [ ""  	@parameter
+      (Pair "" (Pair { Elt "hello" "hi" } None))  	 ]
+  - location: 17 (remaining gas: 799432 units remaining)
+    [ (Pair { Elt "hello" "hi" } None)  	@storage ]
+  - location: 18 (remaining gas: 799432 units remaining)
+    [ { Elt "hello" "hi" }  	 ]
+  - location: -1 (remaining gas: 799432 units remaining)
+    [ { Elt "hello" "hi" }  	 ]
+  - location: 19 (remaining gas: 799431 units remaining)
+    [ { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: -1 (remaining gas: 799431 units remaining)
+    [ { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 14 (remaining gas: 799431 units remaining)
+    [ ""  	@parameter
+      { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 20 (remaining gas: 799431 units remaining)
+    [ None  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 21 (remaining gas: 799430 units remaining)
+    [ { Elt "hello" "hi" }  	
+      None  	 ]
+  - location: 22 (remaining gas: 799430 units remaining)
+    [ (Pair { Elt "hello" "hi" } None)  	 ]
+  - location: 23 (remaining gas: 799429 units remaining)
+    [ {}  	
+      (Pair { Elt "hello" "hi" } None)  	 ]
+  - location: 25 (remaining gas: 799429 units remaining)
+    [ (Pair {} (Pair { Elt "hello" "hi" } None))  	 ]
+  - location: -1 (remaining gas: 799429 units remaining)
+    [ (Pair {} (Pair { Elt "hello" "hi" } None))  	 ]
+

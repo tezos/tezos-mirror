@@ -1,0 +1,27 @@
+storage
+  0
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 799697 units remaining)
+    [ (Pair {} 111)  	 ]
+  - location: 8 (remaining gas: 799697 units remaining)
+    [ {}  	@parameter ]
+  - location: 9 (remaining gas: 799697 units remaining)
+    [ 0  	
+      {}  	@parameter ]
+  - location: 12 (remaining gas: 799696 units remaining)
+    [ {}  	@parameter
+      0  	 ]
+  - location: 13 (remaining gas: 799695 units remaining)
+    [ 0  	 ]
+  - location: 16 (remaining gas: 799695 units remaining)
+    [ {}  	
+      0  	 ]
+  - location: 18 (remaining gas: 799695 units remaining)
+    [ (Pair {} 0)  	 ]
+  - location: -1 (remaining gas: 799694 units remaining)
+    [ (Pair {} 0)  	 ]
+

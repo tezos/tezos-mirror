@@ -1,0 +1,139 @@
+storage
+  5
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 14 (remaining gas: 798979 units remaining)
+    [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0)  	 ]
+  - location: 15 (remaining gas: 798979 units remaining)
+    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
+  - location: 18 (remaining gas: 798978 units remaining)
+    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter
+      (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
+  - location: 19 (remaining gas: 798978 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)  	
+      (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
+  - location: 22 (remaining gas: 798977 units remaining)
+    [ 5  	 ]
+  - location: 21 (remaining gas: 798977 units remaining)
+    [ 5  	 ]
+  - location: 20 (remaining gas: 798977 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)  	
+      5  	 ]
+  - location: -1 (remaining gas: 798977 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)  	
+      5  	 ]
+  - location: 16 (remaining gas: 798976 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)  	
+      5  	 ]
+  - location: 25 (remaining gas: 798976 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)  	
+      (Pair (Pair (Pair 1 2) 3) 4)  	
+      5  	 ]
+  - location: 26 (remaining gas: 798975 units remaining)
+    [ (Pair (Pair 1 2) 3)  	
+      (Pair (Pair (Pair 1 2) 3) 4)  	
+      5  	 ]
+  - location: 29 (remaining gas: 798974 units remaining)
+    [ 4  	
+      5  	 ]
+  - location: 28 (remaining gas: 798974 units remaining)
+    [ 4  	
+      5  	 ]
+  - location: 27 (remaining gas: 798974 units remaining)
+    [ (Pair (Pair 1 2) 3)  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 798974 units remaining)
+    [ (Pair (Pair 1 2) 3)  	
+      4  	
+      5  	 ]
+  - location: 23 (remaining gas: 798974 units remaining)
+    [ (Pair (Pair 1 2) 3)  	
+      4  	
+      5  	 ]
+  - location: 32 (remaining gas: 798973 units remaining)
+    [ (Pair (Pair 1 2) 3)  	
+      (Pair (Pair 1 2) 3)  	
+      4  	
+      5  	 ]
+  - location: 33 (remaining gas: 798972 units remaining)
+    [ (Pair 1 2)  	
+      (Pair (Pair 1 2) 3)  	
+      4  	
+      5  	 ]
+  - location: 36 (remaining gas: 798972 units remaining)
+    [ 3  	
+      4  	
+      5  	 ]
+  - location: 35 (remaining gas: 798971 units remaining)
+    [ 3  	
+      4  	
+      5  	 ]
+  - location: 34 (remaining gas: 798971 units remaining)
+    [ (Pair 1 2)  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 798971 units remaining)
+    [ (Pair 1 2)  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 30 (remaining gas: 798971 units remaining)
+    [ (Pair 1 2)  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 39 (remaining gas: 798970 units remaining)
+    [ (Pair 1 2)  	
+      (Pair 1 2)  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 40 (remaining gas: 798970 units remaining)
+    [ 1  	
+      (Pair 1 2)  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 43 (remaining gas: 798969 units remaining)
+    [ 2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 42 (remaining gas: 798969 units remaining)
+    [ 2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 41 (remaining gas: 798969 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 798969 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 37 (remaining gas: 798968 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 44 (remaining gas: 798968 units remaining)
+    [ 5  	 ]
+  - location: 46 (remaining gas: 798967 units remaining)
+    [ {}  	
+      5  	 ]
+  - location: 48 (remaining gas: 798967 units remaining)
+    [ (Pair {} 5)  	 ]
+  - location: -1 (remaining gas: 798967 units remaining)
+    [ (Pair {} 5)  	 ]
+

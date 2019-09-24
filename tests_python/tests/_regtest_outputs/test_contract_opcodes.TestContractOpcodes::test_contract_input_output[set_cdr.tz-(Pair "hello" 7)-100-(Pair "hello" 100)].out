@@ -1,0 +1,48 @@
+storage
+  (Pair "hello" 100)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 799516 units remaining)
+    [ (Pair 100 (Pair "hello" 7))  	 ]
+  - location: 9 (remaining gas: 799516 units remaining)
+    [ (Pair 100 (Pair "hello" 7))  	
+      (Pair 100 (Pair "hello" 7))  	 ]
+  - location: 10 (remaining gas: 799516 units remaining)
+    [ (Pair "hello" 7)  	@storage
+      (Pair 100 (Pair "hello" 7))  	 ]
+  - location: 13 (remaining gas: 799515 units remaining)
+    [ 100  	@parameter ]
+  - location: 12 (remaining gas: 799514 units remaining)
+    [ 100  	@parameter ]
+  - location: 11 (remaining gas: 799514 units remaining)
+    [ (Pair "hello" 7)  	@storage
+      100  	@parameter ]
+  - location: 15 (remaining gas: 799514 units remaining)
+    [ (Pair "hello" 7)  	@storage
+      (Pair "hello" 7)  	@storage
+      100  	@parameter ]
+  - location: 16 (remaining gas: 799513 units remaining)
+    [ 7  	
+      (Pair "hello" 7)  	@storage
+      100  	@parameter ]
+  - location: 17 (remaining gas: 799513 units remaining)
+    [ (Pair "hello" 7)  	@storage
+      100  	@parameter ]
+  - location: 18 (remaining gas: 799512 units remaining)
+    [ "hello"  	@storage.s
+      100  	@parameter ]
+  - location: 19 (remaining gas: 799512 units remaining)
+    [ (Pair "hello" 100)  	@storage ]
+  - location: -1 (remaining gas: 799512 units remaining)
+    [ (Pair "hello" 100)  	@storage ]
+  - location: 20 (remaining gas: 799511 units remaining)
+    [ {}  	
+      (Pair "hello" 100)  	@storage ]
+  - location: 22 (remaining gas: 799511 units remaining)
+    [ (Pair {} (Pair "hello" 100))  	 ]
+  - location: -1 (remaining gas: 799511 units remaining)
+    [ (Pair {} (Pair "hello" 100))  	 ]
+

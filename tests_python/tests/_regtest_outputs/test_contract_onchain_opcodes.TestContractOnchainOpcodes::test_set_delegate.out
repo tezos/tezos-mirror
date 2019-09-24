@@ -1,0 +1,119 @@
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 11839 units (will add 100 for safety)
+Estimated storage: 329 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.001497
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 11939
+    Storage limit: 349 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.001497
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001497
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ1000
+      Script:
+        { parameter (option key_hash) ;
+          storage unit ;
+          code { UNPAIR ; SET_DELEGATE ; DIP { NIL operation } ; CONS ; PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 72 bytes
+        Paid storage size diff: 72 bytes
+        Consumed gas: 11839
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.072
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ1000
+          [CONTRACT_HASH] ... +ꜩ1000
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as set_delegate.
+Injected block [BLOCK_HASH]
+Injected block [BLOCK_HASH]
+none
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 22123 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.00252
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 22223
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.00252
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.00252
+    Transaction:
+      Amount: ꜩ0
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: (Some "[CONTRACT_HASH]")
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 72 bytes
+      Consumed gas: 12123
+    Internal operations:
+      Delegation:
+        Contract: [CONTRACT_HASH]
+        To: [CONTRACT_HASH]
+        This delegation was successfully applied
+        Consumed gas: 10000
+
+Injected block [BLOCK_HASH]
+[CONTRACT_HASH] (known as bootstrap5)
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 22093 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.002476
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 22193
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.002476
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.002476
+    Transaction:
+      Amount: ꜩ0
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: None
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 72 bytes
+      Consumed gas: 12093
+    Internal operations:
+      Delegation:
+        Contract: [CONTRACT_HASH]
+        To: nobody
+        This delegation was successfully applied
+        Consumed gas: 10000
+
+Injected block [BLOCK_HASH]
+none

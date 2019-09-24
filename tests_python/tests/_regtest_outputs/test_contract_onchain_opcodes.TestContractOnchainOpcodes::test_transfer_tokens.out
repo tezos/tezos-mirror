@@ -1,0 +1,230 @@
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 10911 units (will add 100 for safety)
+Estimated storage: 295 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.00137
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 11011
+    Storage limit: 315 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.00137
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.00137
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ100
+      Script:
+        { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 38 bytes
+        Paid storage size diff: 38 bytes
+        Consumed gas: 10911
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.038
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ100
+          [CONTRACT_HASH] ... +ꜩ100
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as test_transfer_account1.
+Injected block [BLOCK_HASH]
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 10911 units (will add 100 for safety)
+Estimated storage: 295 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.00137
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 11011
+    Storage limit: 315 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.00137
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.00137
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ20
+      Script:
+        { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 38 bytes
+        Paid storage size diff: 38 bytes
+        Consumed gas: 10911
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.038
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ20
+          [CONTRACT_HASH] ... +ꜩ20
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as test_transfer_account2.
+Injected block [BLOCK_HASH]
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 11747 units (will add 100 for safety)
+Estimated storage: 323 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.001482
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 11847
+    Storage limit: 343 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.001482
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.001482
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ1000
+      Script:
+        { parameter (contract unit) ;
+          storage unit ;
+          code { CAR ;
+                 DIP { UNIT } ;
+                 PUSH mutez 100000000 ;
+                 UNIT ;
+                 TRANSFER_TOKENS ;
+                 NIL operation ;
+                 SWAP ;
+                 CONS ;
+                 PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 66 bytes
+        Paid storage size diff: 66 bytes
+        Consumed gas: 11747
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.066
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ1000
+          [CONTRACT_HASH] ... +ꜩ1000
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as transfer_tokens.
+Injected block [BLOCK_HASH]
+100 ꜩ
+[CONTRACT_HASH]
+
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 23905 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.002699
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 24005
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.002699
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.002699
+    Transaction:
+      Amount: ꜩ100
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 66 bytes
+      Consumed gas: 12686
+      Balance updates:
+        [CONTRACT_HASH] ... -ꜩ100
+        [CONTRACT_HASH] ... +ꜩ100
+    Internal operations:
+      Transaction:
+        Amount: ꜩ100
+        From: [CONTRACT_HASH]
+        To: [CONTRACT_HASH]
+        This transaction was successfully applied
+        Updated storage: Unit
+        Storage size: 38 bytes
+        Consumed gas: 11219
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ100
+          [CONTRACT_HASH] ... +ꜩ100
+
+Injected block [BLOCK_HASH]
+200 ꜩ
+[CONTRACT_HASH]
+
+Node is bootstrapped, ready for injecting operations.
+Estimated gas: 23905 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.002699
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 24005
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ........... -ꜩ0.002699
+      fees([CONTRACT_HASH],[CTR]) ... +ꜩ0.002699
+    Transaction:
+      Amount: ꜩ100
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 66 bytes
+      Consumed gas: 12686
+      Balance updates:
+        [CONTRACT_HASH] ... -ꜩ100
+        [CONTRACT_HASH] ... +ꜩ100
+    Internal operations:
+      Transaction:
+        Amount: ꜩ100
+        From: [CONTRACT_HASH]
+        To: [CONTRACT_HASH]
+        This transaction was successfully applied
+        Updated storage: Unit
+        Storage size: 38 bytes
+        Consumed gas: 11219
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ100
+          [CONTRACT_HASH] ... +ꜩ100
+
+Injected block [BLOCK_HASH]
+120 ꜩ

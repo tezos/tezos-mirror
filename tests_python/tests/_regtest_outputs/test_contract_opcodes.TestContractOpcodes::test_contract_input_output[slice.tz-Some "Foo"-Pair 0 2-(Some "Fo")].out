@@ -1,0 +1,74 @@
+storage
+  (Some "Fo")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 799246 units remaining)
+    [ (Pair (Pair 0 2) (Some "Foo"))  	 ]
+  - location: 12 (remaining gas: 799246 units remaining)
+    [ (Pair (Pair 0 2) (Some "Foo"))  	
+      (Pair (Pair 0 2) (Some "Foo"))  	 ]
+  - location: 13 (remaining gas: 799245 units remaining)
+    [ (Pair 0 2)  	@parameter
+      (Pair (Pair 0 2) (Some "Foo"))  	 ]
+  - location: 16 (remaining gas: 799244 units remaining)
+    [ (Some "Foo")  	@storage ]
+  - location: 15 (remaining gas: 799244 units remaining)
+    [ (Some "Foo")  	@storage ]
+  - location: 14 (remaining gas: 799244 units remaining)
+    [ (Pair 0 2)  	@parameter
+      (Some "Foo")  	@storage ]
+  - location: -1 (remaining gas: 799244 units remaining)
+    [ (Pair 0 2)  	@parameter
+      (Some "Foo")  	@storage ]
+  - location: 10 (remaining gas: 799244 units remaining)
+    [ (Pair 0 2)  	@parameter
+      (Some "Foo")  	@storage ]
+  - location: 17 (remaining gas: 799243 units remaining)
+    [ (Some "Foo")  	@storage
+      (Pair 0 2)  	@parameter ]
+  - location: 25 (remaining gas: 799242 units remaining)
+    [ (Pair 0 2)  	@parameter
+      "Foo"  	@storage.some ]
+  - location: 28 (remaining gas: 799241 units remaining)
+    [ (Pair 0 2)  	@parameter
+      (Pair 0 2)  	@parameter
+      "Foo"  	@storage.some ]
+  - location: 29 (remaining gas: 799241 units remaining)
+    [ 0  	
+      (Pair 0 2)  	@parameter
+      "Foo"  	@storage.some ]
+  - location: 32 (remaining gas: 799240 units remaining)
+    [ 2  	
+      "Foo"  	@storage.some ]
+  - location: 31 (remaining gas: 799240 units remaining)
+    [ 2  	
+      "Foo"  	@storage.some ]
+  - location: 30 (remaining gas: 799240 units remaining)
+    [ 0  	
+      2  	
+      "Foo"  	@storage.some ]
+  - location: -1 (remaining gas: 799240 units remaining)
+    [ 0  	
+      2  	
+      "Foo"  	@storage.some ]
+  - location: 26 (remaining gas: 799240 units remaining)
+    [ 0  	
+      2  	
+      "Foo"  	@storage.some ]
+  - location: 33 (remaining gas: 799239 units remaining)
+    [ (Some "Fo")  	@storage.some.slice ]
+  - location: -1 (remaining gas: 799239 units remaining)
+    [ (Some "Fo")  	@storage.some.slice ]
+  - location: 18 (remaining gas: 799238 units remaining)
+    [ (Some "Fo")  	 ]
+  - location: 34 (remaining gas: 799238 units remaining)
+    [ {}  	
+      (Some "Fo")  	 ]
+  - location: 36 (remaining gas: 799237 units remaining)
+    [ (Pair {} (Some "Fo"))  	 ]
+  - location: -1 (remaining gas: 799237 units remaining)
+    [ (Pair {} (Some "Fo"))  	 ]
+
