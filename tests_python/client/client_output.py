@@ -86,9 +86,11 @@ class RunScriptResult:
         pattern = r"big_map diff\n"
         match = re.search(pattern, client_output)
         if match is not None:
-            pattern = re.compile(r"  ([^ ].*?)\n")
+            pattern = re.compile(r"  ((New|Set|Del|Unset).*?)\n")
             for match_diff in pattern.finditer(client_output, match.end(0)):
                 self.big_map_diff.append([match_diff.group(1)])
+
+        self.client_output = client_output
 
 
 class OriginationResult:

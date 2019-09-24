@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, Callable, List, Tuple
 import tempfile
 import shutil
 import json
@@ -118,7 +118,8 @@ class Sandbox:
                  use_tls: Tuple[str, str] = None,
                  snapshot: str = None,
                  reconstruct: bool = False,
-                 branch: str = "") -> None:
+                 branch: str = "",
+                 client_factory: Callable = Client) -> None:
         """ Launches new node with given node_id and initializes client
 
         Args:
@@ -136,6 +137,8 @@ class Sandbox:
             branch (str): sub-dir where to lookup the node and client
                           binary, default = "". Allows execution of different
                           versions of nodes.
+            client_factory (Callable): the constructor of clients. Defaults to
+                                       Client. Allows e.g. regression testing.
 
         This launches a node with default sandbox parameters
 
@@ -193,8 +196,8 @@ class Sandbox:
             node.init_id()
             node.init_config()
         node.run()
-        client = Client(local_client, local_admin_client, rpc_port=rpc_node,
-                        use_tls=bool(use_tls))
+        client = client_factory(local_client, local_admin_client,
+                                rpc_port=rpc_node, use_tls=bool(use_tls))
 
         if not client.check_node_listening():
             assert node.poll() is None, '# Node {node_id} failed at startup'
@@ -448,8 +451,10 @@ class SandboxMultiBranch(Sandbox):
                  use_tls: Tuple[str, str] = None,
                  snapshot: str = None,
                  reconstruct: bool = False,
-                 branch: str = "") -> None:
+                 branch: str = "",
+                 client_factory: Callable = Client) -> None:
         assert not branch
         branch = self._branch_map[node_id]
         super().add_node(node_id, peers, params, log_levels, private,
-                         config_client, use_tls, snapshot, branch)
+                         config_client, use_tls, snapshot, branch,
+                         client_factory)

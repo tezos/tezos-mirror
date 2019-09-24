@@ -346,7 +346,7 @@ def assert_run_script_success(client: Client,
                               contract: str,
                               param: str,
                               storage: str) -> RunScriptResult:
-    return client.run_script(contract, param, storage)
+    return client.run_script(contract, param, storage, None, True)
 
 
 def assert_run_script_failwith(client: Client,
@@ -354,7 +354,7 @@ def assert_run_script_failwith(client: Client,
                                param: str,
                                storage: str) -> None:
     def cmd():
-        client.run_script(contract, param, storage)
+        client.run_script(contract, param, storage, None, True)
 
     assert check_run_failure(cmd, r'script reached FAILWITH instruction')
 
@@ -364,3 +364,48 @@ def check_typecheck_data_failure(client, data: str, typ: str) -> None:
         client.typecheck_data(data, typ)
 
     return check_run_failure(cmd, 'ill-typed data')
+
+
+def client_output_converter(pre):
+    """Remove variable substrings from client output for regression testing.
+
+       This function is used to remove strings from client output that
+       are likely to change from one run to another, but whose content
+       is (presumably) not important to the regression test. This
+       includes timestamps, hashes, counters, nonces, etc.
+
+       For example, a timestamp such as 2019-09-23T10:59:00Z is
+       replaced by [TIMESTAMP].
+    """
+
+    # Scrub hashes
+    pre = re.sub(r'sig\w{93}', '[SIGNATURE]', pre)
+    pre = re.sub(r'\w{53}', '[OPERATION_HASH]', pre)
+    pre = re.sub(r'\w{51}', '[BLOCK_HASH]', pre)
+    pre = re.sub(r'tz\w{34}', '[CONTRACT_HASH]', pre)
+    pre = re.sub(r'fees\(\[CONTRACT_HASH\],\d+\)',
+                 'fees([CONTRACT_HASH],[CTR])', pre)
+
+    # Scrub receipt
+    pre = re.sub(r"Operation hash is '\w+'",
+                 "Operation hash is '[OPERATION_HASH]'", pre)
+    pre = re.sub(r'wait for \w+', 'wait for [OPERATION_HASH]', pre)
+    pre = re.sub(r'--branch \w+', '--branch [BRANCH_HASH]', pre)
+    pre = re.sub(r'KT\w{34}', '[CONTRACT_HASH]', pre)
+    pre = re.sub(r'To: KT\w{34} \.\.\.', 'To: [CONTRACT_HASH] ...', pre)
+    pre = re.sub(r'Injected block \w{12}', 'Injected block [BLOCK_HASH]', pre)
+    pre = re.sub(r'Expected counter: \w+',
+                 'Expected counter: [EXPECTED_COUNTER]', pre)
+
+    # Scrub constants
+    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
+                 '"proof_of_work_nonce": "[NONCE]"', pre)
+    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
+    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
+    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
+    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
+
+    # Scrub timestamps
+    pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)
+
+    return pre

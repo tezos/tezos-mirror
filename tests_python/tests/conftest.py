@@ -7,8 +7,10 @@ parameter.
 """
 import os
 import pytest
+from pytest_regtest import register_converter_pre, deregister_converter_pre
 from launchers.sandbox import Sandbox, SandboxMultiBranch
 from tools import constants, paths, utils
+from tools.client_regression import ClientRegression
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -82,6 +84,47 @@ def client(sandbox):
     client = sandbox.client(0)
     utils.activate_alpha(client)
     yield client
+
+
+@pytest.fixture(scope="class")
+def client_regtest_bis(sandbox):
+    """One node with protocol alpha, regression test enabled."""
+    def reg_client_factory(client_path: str,
+                           admin_client_path: str,
+                           host: str = '127.0.0.1',
+                           base_dir: str = None,
+                           rpc_port: int = 8732,
+                           use_tls: int = False,
+                           disable_disclaimer: bool = True):
+        client = ClientRegression(client_path,
+                                  admin_client_path,
+                                  host,
+                                  base_dir,
+                                  rpc_port,
+                                  use_tls,
+                                  disable_disclaimer)
+        return client
+
+    sandbox.add_node(1, client_factory=reg_client_factory)
+    client = sandbox.client(1)
+    utils.activate_alpha(client)
+    yield client
+
+
+@pytest.fixture(scope="function")
+def client_regtest(client_regtest_bis, regtest):
+    """The client for one node with protocol alpha, with a function level
+regression test fixture."""
+    client_regtest_bis.set_regtest(regtest)
+    yield client_regtest_bis
+
+
+@pytest.fixture(scope="function")
+def client_regtest_scrubbed(client_regtest):
+    """One node with protocol alpha, regression test and scrubbing enabled."""
+    register_converter_pre(utils.client_output_converter)
+    yield client_regtest
+    deregister_converter_pre(utils.client_output_converter)
 
 
 @pytest.fixture(scope="class")

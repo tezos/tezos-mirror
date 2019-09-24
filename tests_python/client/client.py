@@ -183,12 +183,15 @@ class Client:
                    contract: str,
                    storage: str,
                    inp: str,
-                   amount: float = None) -> client_output.RunScriptResult:
+                   amount: float = None,
+                   trace_stack: bool = False) -> client_output.RunScriptResult:
         assert os.path.isfile(contract), f'{contract} is not a file'
         cmd = ['run', 'script', contract, 'on', 'storage', storage, 'and',
                'input', inp]
         if amount is not None:
             cmd += ['-z', str(amount)]
+        if trace_stack:
+            cmd += ['--trace-stack']
         return client_output.RunScriptResult(self.run(cmd))
 
     def gen_key(self, alias: str, args: List[str] = None) -> str:

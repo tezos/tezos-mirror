@@ -15,12 +15,14 @@ KEY2 = 'bar'
 class TestContractOnchainOpcodes:
     """Tests for individual opcodes that requires origination."""
 
-    def test_gen_keys(self, client):
+    def test_gen_keys(self, client_regtest_scrubbed):
         """Add keys used by later tests."""
+        client = client_regtest_scrubbed
         client.gen_key(KEY1)
         client.gen_key(KEY2)
 
-    def test_store_input(self, client):
+    def test_store_input(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         client.transfer(1000, "bootstrap1", KEY1, ['--burn-cap', '0.257'])
         bake(client)
 
@@ -48,18 +50,27 @@ class TestContractOnchainOpcodes:
 
         assert_storage_contains(client, "store_input", '"xyz"')
 
-    def test_transfer_amount(self, client):
+    def test_transfer_amount(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(client,
                            f'{CONTRACT_PATH}/transfer_amount.tz',
                            '0', 100, 'bootstrap1')
 
         client.transfer(500, "bootstrap1", 'transfer_amount',
                         ['-arg', 'Unit', '--burn-cap', '10'])
+
         bake(client)
 
-        assert_storage_contains(client, "transfer_amount", '500000000')
+        assert_storage_contains(client, "transfer_amount",
+                                '500000000')
 
-    def test_now(self, client):
+    def test_now(self, client_regtest_scrubbed):
+        # Regtest is disabled for this test, since one would need to
+        # scrub storage for this one as it changes (the timestamp)
+        # on every run.
+        client = client_regtest_scrubbed
+        client.set_regtest(None)
+
         init_with_transfer(client,
                            f'{CONTRACT_PATH}/store_now.tz',
                            '"2017-07-13T09:19:01Z"', 100, 'bootstrap1')
@@ -71,8 +82,9 @@ class TestContractOnchainOpcodes:
         assert_storage_contains(client, 'store_now',
                                 f'"{client.get_now()}"')
 
-    def test_transfer_tokens(self, client):
+    def test_transfer_tokens(self, client_regtest_scrubbed):
         """Tests TRANSFER_TOKENS."""
+        client = client_regtest_scrubbed
         client.originate('test_transfer_account1',
                          100,
                          'bootstrap1',
@@ -107,18 +119,29 @@ class TestContractOnchainOpcodes:
 
         assert_balance(client, 'test_transfer_account2', 120)
 
-    def test_self(self, client):
+    def test_self(self, client_regtest_scrubbed):
+        # Regtest is disabled for this test, since one would need to
+        # scrub storage for this one as it changes (the contract
+        # address) on every run.
+        client = client_regtest_scrubbed
+        client.set_regtest(None)
+
         init_with_transfer(client, f'{CONTRACT_PATH}/self.tz',
                            '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
                            1000, 'bootstrap1')
 
-        client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
+        client.transfer(0, 'bootstrap1', 'self',
+                        ['--burn-cap', '10'])
         bake(client)
 
         self_addr = client.get_contract_address('self')
-        assert_storage_contains(client, 'self', f'"{self_addr}"')
+        assert_storage_contains(client, 'self',
+                                f'"{self_addr}"')
 
-    def test_contract_fails(self, client):
+    def test_contract_fails(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        client.set_regtest(None)
+
         init_with_transfer(client, f'{CONTRACT_PATH}/contract.tz',
                            'Unit',
                            1000, 'bootstrap1')
@@ -134,13 +157,15 @@ class TestContractOnchainOpcodes:
 
         assert check_run_failure(cmd, r'script reached FAILWITH instruction')
 
-    def test_init_proxy(self, client):
+    def test_init_proxy(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(client,
                            f'{CONTRACT_PATH}/proxy.tz',
                            'Unit',
                            1000, 'bootstrap1')
 
-    def test_source(self, client):
+    def test_source(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(client,
                            f'{CONTRACT_PATH}/source.tz',
@@ -161,7 +186,10 @@ class TestContractOnchainOpcodes:
         bake(client)
         assert_storage_contains(client, 'source', f'"{source_addr}"')
 
-    def test_sender(self, client):
+    def test_sender(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        client.set_regtest(None)
+
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(client,
                            f'{CONTRACT_PATH}/sender.tz',
@@ -183,7 +211,8 @@ class TestContractOnchainOpcodes:
         bake(client)
         assert_storage_contains(client, 'sender', f'"{proxy_addr}"')
 
-    def test_slice(self, client):
+    def test_slice(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(
             client, f'{CONTRACT_PATH}/slices.tz',
             '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"',
@@ -194,7 +223,9 @@ class TestContractOnchainOpcodes:
                               for line
                               in open(f'{paths.TEZOS_HOME}/tests_python/tests/'
                                       + 'test_slice_fails_params.txt')])
-    def test_slice_fails(self, client, contract_arg):
+    def test_slice_fails(self, client_regtest_scrubbed, contract_arg):
+        client = client_regtest_scrubbed
+
         def cmd():
             client.transfer(
                 0, 'bootstrap1', 'slices',
@@ -208,12 +239,14 @@ class TestContractOnchainOpcodes:
                               for line
                               in open(f'{paths.TEZOS_HOME}/tests_python/tests/'
                                       + 'test_slice_success_params.txt')])
-    def test_slice_success(self, client, contract_arg):
+    def test_slice_success(self, client_regtest_scrubbed, contract_arg):
+        client = client_regtest_scrubbed
         client.transfer(0, 'bootstrap1', 'slices',
                         ['-arg', contract_arg, '--burn-cap', '10'])
         bake(client)
 
-    def test_split_string(self, client):
+    def test_split_string(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(client, f'{CONTRACT_PATH}/split_string.tz',
                            '{}',
                            1000, 'bootstrap1')
@@ -230,7 +263,8 @@ class TestContractOnchainOpcodes:
         assert_storage_contains(client, 'split_string',
                                 '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }')
 
-    def test_split_bytes(self, client):
+    def test_split_bytes(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(client, f'{CONTRACT_PATH}/split_bytes.tz',
                            '{}',
                            1000, 'bootstrap1')
@@ -247,7 +281,8 @@ class TestContractOnchainOpcodes:
         assert_storage_contains(client, 'split_bytes',
                                 '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }')
 
-    def test_set_delegate(self, client):
+    def test_set_delegate(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
         init_with_transfer(client, f'{CONTRACT_PATH}/set_delegate.tz',
                            'Unit', 1000, 'bootstrap1')
         bake(client)

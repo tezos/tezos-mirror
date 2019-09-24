@@ -606,14 +606,16 @@ class TestContractOpcodes:
             ('chain_id_store.tz', 'None', 'Unit', '(Some 0x7a06a770)')
         ])
     def test_contract_input_output(self,
-                                   client,
+                                   client_regtest,
                                    contract,
                                    param,
                                    storage,
                                    expected):
+        client = client_regtest
         if contract.endswith('.tz'):
             contract = f'{CONTRACT_PATH}/{contract}'
-            run_script_res = client.run_script(contract, param, storage)
+            run_script_res = client.run_script(contract, param,
+                                               storage, None, True)
             assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
@@ -679,14 +681,16 @@ class TestContractOpcodes:
               ['Set map(0)["2"] to "two"']])
         ])
     def test__big_map_contract_io(self,
-                                  client,
+                                  client_regtest,
                                   contract,
                                   param,
                                   storage,
                                   expected,
                                   big_map_diff):
+        client = client_regtest
         contract = f'{CONTRACT_PATH}/{contract}'
-        run_script_res = client.run_script(contract, param, storage)
+        run_script_res = client.run_script(contract, param, storage,
+                                           None, True)
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
@@ -713,7 +717,7 @@ class TestContractOpcodes:
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
              '(Right (Left (Right Unit)))',
              '(Right Unit)',
-             [['\n']]),
+             []),
             # test import to big_map
             ('(Right Unit)',
              '(Right (Right (Left (Pair { Pair "foo" "bar" } ' +
@@ -742,19 +746,22 @@ class TestContractOpcodes:
               ['Unset map(0)["1"]']])
         ])
     def test_big_map_magic(self,
-                           client,
+                           client_regtest,
                            param,
                            storage,
                            expected,
                            big_map_diff):
+        client = client_regtest
         contract = f'{paths.TEZOS_HOME}/src/bin_client/test/' + \
             'contracts/mini_scenarios/big_map_magic.tz'
-        run_script_res = client.run_script(contract, param, storage)
+        run_script_res = client.run_script(contract, param, storage,
+                                           None, True)
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
 
-    def test_packunpack(self, client):
+    def test_packunpack(self, client_regtest):
         """Test PACK/UNPACK and binary format."""
+        client = client_regtest
         assert_run_script_success(
             client,
             f'{CONTRACT_PATH}/packunpack.tz',
@@ -772,7 +779,8 @@ class TestContractOpcodes:
             '0070009000102000000060001000200030004)'
         )
 
-    def test_check_signature(self, client):
+    def test_check_signature(self, client_regtest):
+        client = client_regtest
         sig = 'edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZA' \
               + 'e7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7'
         assert_run_script_success(
@@ -788,7 +796,8 @@ class TestContractOpcodes:
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
         )
 
-    def test_hash_consistency_michelson_cli(self, client):
+    def test_hash_consistency_michelson_cli(self, client_regtest):
+        client = client_regtest
         hash_result = client.hash(
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
             '(pair mutez (pair timestamp int))').blake2b
@@ -815,10 +824,11 @@ class TestContractOpcodes:
             ('mul_overflow.tz', 'Unit', 'Right Unit')
         ])
     def test_arithmetic_overflow(self,
-                                 client,
+                                 client_regtest_scrubbed,
                                  contract,
                                  param,
                                  storage):
+        client = client_regtest_scrubbed
         contract = f'{CONTRACT_PATH}/{contract}'
 
         def cmd():
@@ -826,8 +836,10 @@ class TestContractOpcodes:
         assert check_run_failure(cmd, r'unexpected arithmetic overflow')
 
     @pytest.mark.skip(reason="Bug in annotation system")
-    def test_fails_annotated_set_car_cdr(self, client):
+    def test_fails_annotated_set_car_cdr(self, client_regtest):
         """Tests the SET_CAR and SET_CDR instructions."""
+        client = client_regtest
+
         def cmd():
             client.run_script(f'{CONTRACT_PATH}/set_car.tz',
                               '(Pair %wrong %field "hello" 0)',
@@ -848,11 +860,12 @@ class TestContractOpcodes:
              '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
         ])
     def test_map_map_sideeffect(self,
-                                client,
+                                client_regtest,
                                 contract,
                                 param,
                                 storage,
                                 expected):
+        client = client_regtest
         contract = f'{CONTRACT_PATH}/{contract}'
         run_script_res = client.run_script(contract, param, storage)
         assert run_script_res.storage == expected
