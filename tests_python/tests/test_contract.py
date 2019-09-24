@@ -39,6 +39,8 @@ class TestManager:
         path = f'{CONTRACT_PATH}/entrypoints/manager.tz'
         pubkey = constants.IDENTITIES['bootstrap2']['identity']
         originate(client, session, path, f'"{pubkey}"', 1000)
+        originate(client, session, path, f'"{pubkey}"', 1000,
+                  contract_name="manager2")
 
     def test_delegatable_origination(self, client, session):
         path = f'{CONTRACT_PATH}/entrypoints/delegatable_target.tz'
@@ -91,16 +93,48 @@ class TestManager:
         assert client.get_delegate('delegatable_target', []) == "none"
 
     def test_transfer_to_manager(self, client):
-        client.transfer(10, 'bootstrap2', 'manager', [])
+        balance = client.get_balance('manager')
+        balance_bootstrap = client.get_balance('bootstrap2')
+        amount = 10.001
+        client.transfer(amount, 'bootstrap2', 'manager',
+                        ['--gas-limit', '15285'])
         client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_balance('manager')
+        new_balance_bootstrap = client.get_balance('bootstrap2')
+        fee = 0.00178
+        assert balance + amount == new_balance
+        assert (balance_bootstrap - fee - amount
+                == new_balance_bootstrap)
 
     def test_simple_transfer_from_manager_to_implicit(self, client):
-        client.transfer(10, 'manager', 'bootstrap2', [])
+        balance = client.get_balance('manager')
+        balance_bootstrap = client.get_balance('bootstrap2')
+        amount = 10.0002
+        client.transfer(amount, 'manager', 'bootstrap2',
+                        ['--gas-limit', '36558'])
         client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_balance('manager')
+        new_balance_bootstrap = client.get_balance('bootstrap2')
+        fee = 0.004001
+        assert balance - amount == new_balance
+        assert (balance_bootstrap + amount - fee
+                == new_balance_bootstrap)
 
     def test_transfer_from_manager_to_manager(self, client):
-        client.transfer(10, 'manager', 'manager', [])
+        balance = client.get_balance('manager')
+        balance_dest = client.get_balance('manager2')
+        balance_bootstrap = client.get_balance('bootstrap2')
+        amount = 10
+        client.transfer(amount, 'manager', 'manager2',
+                        ['--gas-limit', '44659'])
         client.bake('bootstrap5', BAKE_ARGS)
+        new_balance = client.get_balance('manager')
+        new_balance_dest = client.get_balance('manager2')
+        new_balance_bootstrap = client.get_balance('bootstrap2')
+        fee = 0.004811
+        assert balance_bootstrap - fee == new_balance_bootstrap
+        assert balance - amount == new_balance
+        assert balance_dest + amount == new_balance_dest
 
     def test_transfer_from_manager_to_default(self, client):
         client.transfer(10, 'manager', 'bootstrap2',
