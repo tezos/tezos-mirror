@@ -34,7 +34,6 @@ type config = {
   protocol_root : string;
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  test_chain_max_tll : int option;
   checkpoint : Block_header.t option;
 }
 
