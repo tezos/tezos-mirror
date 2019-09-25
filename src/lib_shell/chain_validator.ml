@@ -64,7 +64,6 @@ module Types = struct
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     prevalidator_limits : Prevalidator.limits;
     peer_validator_limits : Peer_validator.limits;
-    max_child_ttl : int option;
     limits : limits;
   }
 
@@ -224,23 +223,11 @@ let may_switch_test_chain w active_chains spawn_child block =
             (State.Chain.genesis child.parameters.chain_state).block
             genesis
     in
-    ( match nv.parameters.max_child_ttl with
-    | None ->
-        Lwt.return_false
-    | Some ttl ->
-        let forking_block_timestamp =
-          (State.Block.shell_header forking_block).Block_header.timestamp
-        in
-        let expiration =
-          let open Time.Protocol in
-          min expiration (add forking_block_timestamp (Int64.of_int ttl))
-        in
-        Lwt.return (expiration < block_header.shell.timestamp) )
-    >>= fun locally_expired ->
-    if locally_expired && activated then
+    let expired = expiration < block_header.shell.timestamp in
+    if expired && activated then
       shutdown_child nv active_chains >>= fun () -> return_unit
     else if
-      activated || locally_expired
+      activated || expired
       || not (State.Chain.allow_forked_chain nv.parameters.chain_state)
     then return_unit
     else
@@ -542,10 +529,10 @@ let on_launch start_prevalidator w _ parameters =
     } ;
   return nv
 
-let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
-    ~active_chains ?parent ~block_validator_process peer_validator_limits
-    prevalidator_limits block_validator global_valid_block_input
-    global_chains_input db chain_state limits =
+let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
+    ~block_validator_process peer_validator_limits prevalidator_limits
+    block_validator global_valid_block_input global_chains_input db chain_state
+    limits =
   let spawn_child ~parent pvl pl bl gvbi gci db n l =
     create
       ~start_prevalidator
@@ -580,7 +567,6 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
   end in
   let parameters =
     {
-      max_child_ttl;
       parent;
       peer_validator_limits;
       prevalidator_limits;
@@ -609,13 +595,12 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
 
 (** Current block computation *)
 
-let create ?max_child_ttl ~start_prevalidator ~start_testchain ~active_chains
+let create ~start_prevalidator ~start_testchain ~active_chains
     ~block_validator_process peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_chains_input global_db
     state limits =
   (* hide the optional ?parent *)
   create
-    ?max_child_ttl
     ~start_prevalidator
     ~start_testchain
     ~active_chains

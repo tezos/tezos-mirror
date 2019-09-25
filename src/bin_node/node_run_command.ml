@@ -156,8 +156,6 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
-      test_chain_max_tll = Some (48 * 3600);
-      (* 2 days *)
       checkpoint;
     }
   in
