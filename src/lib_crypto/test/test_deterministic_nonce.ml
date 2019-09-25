@@ -24,26 +24,24 @@
 (*****************************************************************************)
 
 let test_hash_matches (module X : S.SIGNATURE) () =
-  let _, _, sk = X.generate_key () in
-  let data = MBytes.of_string "ce input sa pun eu aici oare?" in
+  let (_, _, sk) = X.generate_key () in
+  let data = Bytes.of_string "ce input sa pun eu aici oare?" in
   let nonce = X.deterministic_nonce sk data in
   let nonce_hash = X.deterministic_nonce_hash sk data in
-  let hashed_nonce = Blake2B.hash_bytes [nonce] in
+  let hashed_nonce = Blake2B.hash_bytes [Bigstring.to_bytes nonce] in
   if nonce_hash <> Blake2B.to_bytes hashed_nonce then
-    Alcotest.failf "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
-
+    Alcotest.failf
+      "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
 
 let ed25519 = (module Ed25519 : S.SIGNATURE)
+
 let p256 = (module P256 : S.SIGNATURE)
+
 let secp256k1 = (module Secp256k1 : S.SIGNATURE)
 
-let tests = [
-  "hash_matches_ed25519", `Quick, (test_hash_matches ed25519);
-  "hash_matches_p256", `Quick, (test_hash_matches p256);
-  "hash_matches_secp256k1", `Quick, (test_hash_matches secp256k1);
-]
+let tests =
+  [ ("hash_matches_ed25519", `Quick, test_hash_matches ed25519);
+    ("hash_matches_p256", `Quick, test_hash_matches p256);
+    ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1) ]
 
-let () =
-  Alcotest.run "tezos-crypto" [
-    "deterministic_nonce", tests
-  ]
+let () = Alcotest.run "tezos-crypto" [("deterministic_nonce", tests)]

@@ -2,12 +2,14 @@
  (name main)
  (public_name tezos-node)
  (libraries tezos-base
+            tezos-version
             tezos-stdlib-unix
             tezos-shell-services
             tezos-rpc-http-server
             tezos-p2p
             tezos-shell
             tezos-storage
+            tezos-validator
             tezos-shell-context
             tezos-protocol-updater
             tezos-embedded-protocol-genesis
@@ -23,6 +25,7 @@
                    -open Tezos_p2p
                    -open Tezos_shell
                    -open Tezos_storage
+                   -open Tezos_validator
                    -open Tezos_shell_context
                    -open Tezos_protocol_updater
                    -linkall)))

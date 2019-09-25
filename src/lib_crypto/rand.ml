@@ -23,15 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let generate = Hacl.Rand.gen
+let generate len = Bigstring.to_bytes (Hacl.Rand.gen len)
 
-let generate_into ?(pos=0) ?len buf =
-  let buflen = MBytes.length buf in
-  let len = match len with
-    | Some len -> len
-    | None -> buflen - pos in
+let generate_into ?(pos = 0) ?len buf =
+  let buflen = Bytes.length buf in
+  let len = match len with Some len -> len | None -> buflen - pos in
   if pos < 0 || len < 0 || pos + len > buflen then
-    invalid_arg (Printf.sprintf "Rand.generate_into: \
-                                 invalid slice (pos=%d len=%d)" pos len) ;
-  let buf = MBytes.sub buf pos len in
-  Hacl.Rand.write buf
+    invalid_arg
+      (Printf.sprintf
+         "Rand.generate_into: invalid slice (pos=%d len=%d)"
+         pos
+         len) ;
+  let rand = Hacl.Rand.gen len in
+  Bigstring.blit_to_bytes rand 0 buf pos len

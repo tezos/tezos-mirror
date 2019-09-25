@@ -24,10 +24,14 @@
 (*****************************************************************************)
 
 let fail expected given msg =
-  Format.kasprintf Pervasives.failwith
-    "@[%s@ expected: %s@ got: %s@]" msg expected given
+  Format.kasprintf
+    Pervasives.failwith
+    "@[%s@ expected: %s@ got: %s@]"
+    msg
+    expected
+    given
 
 let default_printer _ = ""
 
-let equal ?(eq=(=)) ?(print=default_printer) ?(msg="") x y =
+let equal ?(eq = ( = )) ?(print = default_printer) ?(msg = "") x y =
   if not (eq x y) then fail (print x) (print y) msg

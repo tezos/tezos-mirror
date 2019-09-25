@@ -25,48 +25,71 @@
 
 (** Type for the group of integers modulo the order of the curve ℤ/pℤ *)
 module type SCALAR_SIG = sig
-
   (** Element of the scalar group *)
   type t
+
   include S.B58_DATA with type t := t
+
   include S.ENCODER with type t := t
 
   val zero : t
+
   val one : t
+
   val of_Z : Z.t -> t
+
   val to_Z : t -> Z.t
+
   val of_int : int -> t
-  val add: t -> t -> t
-  val mul: t -> t -> t
-  val negate: t -> t
-  val sub: t -> t -> t
-  val of_bits_exn: string -> t
-  val to_bits: t -> string
-  val inverse: t -> t option
+
+  val add : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val negate : t -> t
+
+  val sub : t -> t -> t
+
+  val of_bits_exn : string -> t
+
+  val to_bits : t -> string
+
+  val inverse : t -> t option
 
   (** Modular exponentiation*)
-  val pow: t -> Z.t -> t
-  val equal: t -> t -> bool
+  val pow : t -> Z.t -> t
+
+  val equal : t -> t -> bool
 end
 
 module Group : sig
-
   type t
+
   include S.B58_DATA with type t := t
+
   include S.ENCODER with type t := t
 
-  val order: Z.t
+  val order : Z.t
+
   module Scalar : SCALAR_SIG
-  val e: t
+
+  val e : t
+
   val g : t
+
   val h : t
-  val of_coordinates: x:Z.t -> y:Z.t  -> t
-  val of_bits_exn: string -> t
-  val to_bits: t -> string
 
-  val mul: Scalar.t -> t -> t
-  val (+): t -> t -> t
-  val (-): t -> t -> t
-  val (=): t -> t -> bool
+  val of_coordinates : x:Z.t -> y:Z.t -> t
 
+  val of_bits_exn : string -> t
+
+  val to_bits : t -> string
+
+  val mul : Scalar.t -> t -> t
+
+  val ( + ) : t -> t -> t
+
+  val ( - ) : t -> t -> t
+
+  val ( = ) : t -> t -> bool
 end

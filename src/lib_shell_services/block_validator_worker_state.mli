@@ -25,26 +25,34 @@
 
 module Request : sig
   type view = {
-    chain_id : Chain_id.t ;
-    block : Block_hash.t ;
-    peer: P2p_peer.Id.t option ;
+    chain_id : Chain_id.t;
+    block : Block_hash.t;
+    peer : P2p_peer.Id.t option;
   }
+
   val encoding : view Data_encoding.encoding
+
   val pp : Format.formatter -> view -> unit
 end
 
 module Event : sig
   type t =
     | Validation_success of Request.view * Worker_types.request_status
-    | Validation_failure of Request.view * Worker_types.request_status * error list
+    | Validation_failure of
+        Request.view * Worker_types.request_status * error list
     | Debug of string
+
   val level : t -> Internal_event.level
+
   val encoding : t Data_encoding.encoding
+
   val pp : Format.formatter -> t -> unit
 end
 
 module Worker_state : sig
   type view = unit
+
   val encoding : view Data_encoding.encoding
+
   val pp : Format.formatter -> view -> unit
 end

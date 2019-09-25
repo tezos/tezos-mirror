@@ -1,7 +1,6 @@
 (library
  (name tezos_base)
  (public_name tezos-base)
- (modules :standard \ Get-git-info)
  (flags (:standard -w -30
                    -open Tezos_stdlib
                    -open Tezos_crypto
@@ -24,12 +23,7 @@
             ptime
             ezjsonm
             lwt
-            ipaddr.unix))
-
-(rule
-    (targets generated_git_info.ml)
-    (deps get-git-info.ml)
-    (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{deps}))))
+            ipaddr))
 
 (alias
  (name runtest_lint)

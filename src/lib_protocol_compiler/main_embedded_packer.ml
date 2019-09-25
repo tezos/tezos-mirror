@@ -24,26 +24,29 @@
 (*****************************************************************************)
 
 let srcdir = Sys.argv.(1)
+
 let version = Sys.argv.(2)
 
 let srcdir =
-  if Filename.basename srcdir = "TEZOS_PROTOCOL" then
-    Filename.dirname srcdir
-  else
-    srcdir
+  if Filename.basename srcdir = "TEZOS_PROTOCOL" then Filename.dirname srcdir
+  else srcdir
 
-let hash, sources =
-  match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir srcdir) with
+let (hash, sources) =
+  match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir srcdir) with
   | Ok (None, proto) ->
       (Protocol.hash proto, proto)
   | Ok (Some hash, proto) ->
       (hash, proto)
   | Error err ->
-      Format.kasprintf Pervasives.failwith
-        "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err
+      Format.kasprintf
+        Pervasives.failwith
+        "Failed to read TEZOS_PROTOCOL: %a"
+        pp_print_error
+        err
 
 let () =
-  Format.printf {|
+  Format.printf
+    {|
 module Source = struct
   let hash =
     Some (Tezos_crypto.Protocol_hash.of_b58check_exn %S)
@@ -51,14 +54,17 @@ module Source = struct
 end
 @.|}
     (Protocol_hash.to_b58check hash)
-    Protocol.pp_ocaml sources
+    Protocol.pp_ocaml
+    sources
 
 let () =
-  Format.printf {|
+  Format.printf
+    {|
 module Registered =
   Tezos_protocol_updater.Registered_protocol.Register_embedded
     (Tezos_protocol_environment_%s.Environment)
     (Tezos_raw_protocol_%s.Main)
     (Source)
 @.|}
-    version version
+    version
+    version

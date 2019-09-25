@@ -22,50 +22,48 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-module type S =
-sig
+module type S = sig
   type 'a t
+
   type key
 
-  val create: int -> 'a t
   (** [create n] is a table with at most [n] elements except when it has more. *)
+  val create : int -> 'a t
 
-  val add: 'a t -> key -> 'a -> unit
   (** [add t k v] adds a mapping from key [k] to value [v] in the table.
       NOTE: when n values are bound to the same key, it may count as up to n
       elements.
       However, NOTE: when n values are bound to the same key, only the last
       binding can be found with [find_opt] or traversed with [fold]. *)
+  val add : 'a t -> key -> 'a -> unit
 
-  val add_and_return_erased: 'a t -> key -> 'a -> key option
+  val add_and_return_erased : 'a t -> key -> 'a -> key option
 
-  val iter: (key -> 'a -> unit) -> 'a t -> unit
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
 
-  val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
   (** [fold f t acc] folds the function [f] and value [acc] through the recently
       added elements of [t]. It never folds over more elements than the size
       bound of the table, even if the table temporarily holds more elements. *)
+  val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
-  val find_opt: 'a t -> key -> 'a option
   (** [find_opt t k] is [Some v] if [k] is bound to [v] in [t] and [None]
       otherwise. A key [k] is bound to a value [v] in [t] if [add t k v] has been
       called and not too many other bindings have been added since then. *)
+  val find_opt : 'a t -> key -> 'a option
 
-  val remove: 'a t -> key -> unit
   (** [remove t k] removes the binding from [key] to the associated element in
       [t]. Note that you may still be able to find the element using [find_opt]
       for some time. *)
+  val remove : 'a t -> key -> unit
 
-  val length: 'a t -> int
   (** [length t] is the number of elements currently in [t], including those
       that may be garbage collected. *)
-
+  val length : 'a t -> int
 end
 
-
-module Make (K: Hashtbl.HashedType): S with type key = K.t
 (** A bounded table which optimistically cheats on the bound and sometimes
     counts wrong.
     Specifically, the table retains a bounded number of elements. It will also
     retain more if given more than that, but it will always drop back to the
     bound if the garbage collector intervenes. *)
+module Make (K : Hashtbl.HashedType) : S with type key = K.t

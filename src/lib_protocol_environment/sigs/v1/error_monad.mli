@@ -29,10 +29,9 @@
 
 (** Categories of error *)
 type error_category =
-  [ `Branch (** Errors that may not happen in another context *)
-  | `Temporary (** Errors that may not happen in a later context *)
-  | `Permanent (** Errors that will happen no matter the context *)
-  ]
+  [ `Branch  (** Errors that may not happen in another context *)
+  | `Temporary  (** Errors that may not happen in a later context *)
+  | `Permanent  (** Errors that will happen no matter the context *) ]
 
 (** Custom error handling for economic protocols. *)
 
@@ -42,18 +41,21 @@ val pp : Format.formatter -> error -> unit
 
 (** A JSON error serializer *)
 val error_encoding : error Data_encoding.t
+
 val json_of_error : error -> Data_encoding.json
+
 val error_of_json : Data_encoding.json -> error
 
 (** Error information *)
-type error_info =
-  { category : error_category ;
-    id: string ;
-    title : string ;
-    description : string ;
-    schema : Data_encoding.json_schema }
+type error_info = {
+  category : error_category;
+  id : string;
+  title : string;
+  description : string;
+  schema : Data_encoding.json_schema;
+}
 
-val pp_info: Format.formatter -> error_info -> unit
+val pp_info : Format.formatter -> error_info -> unit
 
 (** Retrieves information of registered errors *)
 val get_registered_errors : unit -> error_info list
@@ -61,10 +63,13 @@ val get_registered_errors : unit -> error_info list
 (** For other modules to register specialized error serializers *)
 val register_error_kind :
   error_category ->
-  id:string -> title:string -> description:string ->
+  id:string ->
+  title:string ->
+  description:string ->
   ?pp:(Format.formatter -> 'err -> unit) ->
   'err Data_encoding.t ->
-  (error -> 'err option) -> ('err -> error) ->
+  (error -> 'err option) ->
+  ('err -> error) ->
   unit
 
 (** Classify an error using the registered kinds *)
@@ -113,20 +118,22 @@ val error : error -> 'a tzresult
 val fail : error -> 'a tzresult Lwt.t
 
 (** Non-Lwt bind operator *)
-val (>>?) : 'a tzresult -> ('a -> 'b tzresult) -> 'b tzresult
+val ( >>? ) : 'a tzresult -> ('a -> 'b tzresult) -> 'b tzresult
 
 (** Bind operator *)
-val (>>=?) : 'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+val ( >>=? ) :
+  'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
 
 (** Lwt's bind reexported *)
-val (>>=) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-val (>|=) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
 (** To operator *)
-val (>>|?) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
+val ( >>|? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
 
 (** Non-Lwt to operator *)
-val (>|?) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
+val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
 
 (** Enrich an error report (or do nothing on a successful result) manually *)
 val record_trace : error -> 'a tzresult -> 'a tzresult
@@ -138,7 +145,8 @@ val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 val record_trace_eval : (unit -> error tzresult) -> 'a tzresult -> 'a tzresult
 
 (** Same as trace, for unevaluated Lwt error *)
-val trace_eval : (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+val trace_eval :
+  (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 
 (** Erroneous return on failed assertion *)
 val fail_unless : bool -> error -> unit tzresult Lwt.t
@@ -150,32 +158,38 @@ val fail_when : bool -> error -> unit tzresult Lwt.t
 
 (** A {!List.iter} in the monad *)
 val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+
 val iter_p : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
 
 (** A {!List.map} in the monad *)
 val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+
 val map_p : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
 (** A {!List.map2} in the monad *)
-val map2 :
-  ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+val map2 : ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
 
 (** A {!List.map2} in the monad *)
 val map2_s :
-  ('a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
+  ('a -> 'b -> 'c tzresult Lwt.t) ->
+  'a list ->
+  'b list ->
   'c list tzresult Lwt.t
 
 (** A {!List.filter_map} in the monad *)
-val filter_map_s : ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+val filter_map_s :
+  ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
 (** A {!List.fold_left} in the monad *)
-val fold_left_s : ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
+val fold_left_s :
+  ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
 
 (** A {!List.fold_right} in the monad *)
-val fold_right_s : ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
-
+val fold_right_s :
+  ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
 
 (**/**)
 
 type shell_error
+
 type 'a shell_tzresult = ('a, shell_error list) result

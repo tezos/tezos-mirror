@@ -24,119 +24,181 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ('a, 'b) lwt_format =
-  ('a, Format.formatter, unit, 'b Lwt.t) format4
+type ('a, 'b) lwt_format = ('a, Format.formatter, unit, 'b Lwt.t) format4
 
-class type printer = object
-  method error : ('a, 'b) lwt_format -> 'a
-  method warning : ('a, unit) lwt_format -> 'a
-  method message : ('a, unit) lwt_format -> 'a
-  method answer :  ('a, unit) lwt_format -> 'a
-  method log : string -> ('a, unit) lwt_format -> 'a
-end
-
-class type prompter = object
-  method prompt : ('a, string tzresult) lwt_format -> 'a
-  method prompt_password : ('a, MBytes.t tzresult) lwt_format -> 'a
-end
-
-class type io = object
-  inherit printer
-  inherit prompter
-end
-
-class simple_printer log =
-  let message =
-    (fun x ->
-       Format.kasprintf (fun msg -> log "stdout" msg) x) in
+class type printer =
   object
-    method error : type a b. (a, b) lwt_format -> a =
-      Format.kasprintf
-        (fun msg ->
-           Lwt.fail (Failure msg))
-    method warning : type a. (a, unit) lwt_format -> a =
-      Format.kasprintf
-        (fun msg -> log "stderr" msg)
-    method message : type a. (a, unit) lwt_format -> a = message
-    method answer : type a. (a, unit) lwt_format -> a = message
-    method log : type a. string -> (a, unit) lwt_format -> a =
-      fun name ->
-        Format.kasprintf
-          (fun msg -> log name msg)
+    method error : ('a, 'b) lwt_format -> 'a
+
+    method warning : ('a, unit) lwt_format -> 'a
+
+    method message : ('a, unit) lwt_format -> 'a
+
+    method answer : ('a, unit) lwt_format -> 'a
+
+    method log : string -> ('a, unit) lwt_format -> 'a
   end
 
-class type wallet = object
-  method load_passwords : string Lwt_stream.t option
-  method read_file : string -> string tzresult Lwt.t
-  method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
-  method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
-  method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
-end
+class type prompter =
+  object
+    method prompt : ('a, string tzresult) lwt_format -> 'a
 
-class type chain = object
-  method chain : Shell_services.chain
-end
+    method prompt_password : ('a, Bigstring.t tzresult) lwt_format -> 'a
+  end
 
-class type block = object
-  method block : Shell_services.block
-  method confirmations : int option
-end
+class type io =
+  object
+    inherit printer
 
-class type io_wallet = object
-  inherit printer
-  inherit prompter
-  inherit wallet
-end
+    inherit prompter
+  end
 
-class type io_rpcs = object
-  inherit printer
-  inherit prompter
-  inherit RPC_context.json
-end
+class simple_printer log =
+  let message x = Format.kasprintf (fun msg -> log "stdout" msg) x in
+  object
+    method error : type a b. (a, b) lwt_format -> a =
+      Format.kasprintf (fun msg -> Lwt.fail (Failure msg))
 
-class type ui = object
-  method sleep : float -> unit Lwt.t
-  method now : unit -> Ptime.t
-end
+    method warning : type a. (a, unit) lwt_format -> a =
+      Format.kasprintf (fun msg -> log "stderr" msg)
 
-class type full = object
-  inherit printer
-  inherit prompter
-  inherit wallet
-  inherit RPC_context.json
-  inherit chain
-  inherit block
-  inherit ui
-end
+    method message : type a. (a, unit) lwt_format -> a = message
 
-class proxy_context (obj : full) = object
-  method load_passwords = obj#load_passwords
-  method read_file = obj#read_file
-  method base = obj#base
-  method chain = obj#chain
-  method block = obj#block
-  method confirmations = obj#confirmations
-  method answer : type a. (a, unit) lwt_format -> a = obj#answer
-  method call_service :
-    'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-    'p -> 'q -> 'i -> 'o tzresult Lwt.t = obj#call_service
-  method call_streamed_service :
-    'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-    on_chunk: ('o -> unit) ->
-    on_close: (unit -> unit) ->
-    'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = obj#call_streamed_service
-  method error : type a b. (a, b) lwt_format -> a = obj#error
-  method generic_json_call = obj#generic_json_call
-  method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
-  method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t = obj#load
-  method log : type a. string -> (a, unit) lwt_format -> a = obj#log
-  method message : type a. (a, unit) lwt_format -> a = obj#message
-  method warning : type a. (a, unit) lwt_format -> a  = obj#warning
-  method write : type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t = obj#write
-  method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
-  method prompt_password : type a. (a, MBytes.t tzresult) lwt_format -> a = obj#prompt_password
-  method sleep : float -> unit Lwt.t = obj#sleep
-  method now : unit -> Ptime.t = obj#now
-end
+    method answer : type a. (a, unit) lwt_format -> a = message
+
+    method log : type a. string -> (a, unit) lwt_format -> a =
+      fun name -> Format.kasprintf (fun msg -> log name msg)
+  end
+
+class type wallet =
+  object
+    method load_passwords : string Lwt_stream.t option
+
+    method read_file : string -> string tzresult Lwt.t
+
+    method with_lock : (unit -> 'a Lwt.t) -> 'a Lwt.t
+
+    method load :
+      string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
+
+    method write :
+      string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
+  end
+
+class type chain =
+  object
+    method chain : Shell_services.chain
+  end
+
+class type block =
+  object
+    method block : Shell_services.block
+
+    method confirmations : int option
+  end
+
+class type io_wallet =
+  object
+    inherit printer
+
+    inherit prompter
+
+    inherit wallet
+  end
+
+class type io_rpcs =
+  object
+    inherit printer
+
+    inherit prompter
+
+    inherit RPC_context.json
+  end
+
+class type ui =
+  object
+    method sleep : float -> unit Lwt.t
+
+    method now : unit -> Ptime.t
+  end
+
+class type full =
+  object
+    inherit printer
+
+    inherit prompter
+
+    inherit wallet
+
+    inherit RPC_context.json
+
+    inherit chain
+
+    inherit block
+
+    inherit ui
+  end
+
+class proxy_context (obj : full) =
+  object
+    method load_passwords = obj#load_passwords
+
+    method read_file = obj#read_file
+
+    method base = obj#base
+
+    method chain = obj#chain
+
+    method block = obj#block
+
+    method confirmations = obj#confirmations
+
+    method answer : type a. (a, unit) lwt_format -> a = obj#answer
+
+    method call_service
+        : 'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
+          'q -> 'i -> 'o tzresult Lwt.t =
+      obj#call_service
+
+    method call_streamed_service
+        : 'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          (unit -> unit) tzresult Lwt.t =
+      obj#call_streamed_service
+
+    method error : type a b. (a, b) lwt_format -> a = obj#error
+
+    method generic_json_call = obj#generic_json_call
+
+    method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
+
+    method load : type a.
+        string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
+      obj#load
+
+    method log : type a. string -> (a, unit) lwt_format -> a = obj#log
+
+    method message : type a. (a, unit) lwt_format -> a = obj#message
+
+    method warning : type a. (a, unit) lwt_format -> a = obj#warning
+
+    method write : type a.
+        string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
+      obj#write
+
+    method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
+
+    method prompt_password : type a. (a, Bigstring.t tzresult) lwt_format -> a
+        =
+      obj#prompt_password
+
+    method sleep : float -> unit Lwt.t = obj#sleep
+
+    method now : unit -> Ptime.t = obj#now
+  end
+
+let log _ _ = Lwt.return_unit
+
+let null_printer : #printer = new simple_printer log

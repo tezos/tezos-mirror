@@ -23,40 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let genesis : State.Chain.genesis = {
-  time =
-    Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z" ;
-  block =
-    Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94" ;
-  protocol =
-    Protocol_hash.of_b58check_exn
-      "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV" ;
-}
+let genesis : State.Chain.genesis =
+  {
+    time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
+    block =
+      Block_hash.of_b58check_exn
+        "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94";
+    protocol =
+      Protocol_hash.of_b58check_exn
+        "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+  }
 
 let with_node f =
   let run dir =
-    let (/) = Filename.concat in
-    let node_config : Node.config = {
-      genesis ;
-      patch_context = None ;
-      store_root = dir / "store" ;
-      context_root = dir / "context" ;
-      p2p = None ;
-      test_chain_max_tll = None ;
-      checkpoint = None ;
-    } in
+    let ( / ) = Filename.concat in
+    let node_config : Node.config =
+      {
+        genesis;
+        patch_context = None;
+        store_root = dir / "store";
+        context_root = dir / "context";
+        protocol_root = dir / "protocol";
+        p2p = None;
+        test_chain_max_tll = None;
+        checkpoint = None;
+      }
+    in
     Node.create
+      ~singleprocess:true
       node_config
       Node.default_peer_validator_limits
       Node.default_block_validator_limits
       Node.default_prevalidator_limits
       Node.default_chain_validator_limits
       None
-    >>=? fun node ->
-    f node >>=? fun () ->
-    return () in
-  Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run >>= function
+    >>=? fun node -> f node >>=? fun () -> return ()
+  in
+  Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run
+  >>= function
   | Ok () ->
       Lwt.return_unit
   | Error err ->

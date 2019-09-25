@@ -4,6 +4,7 @@
  (libraries tezos-stdlib
             alcotest
             lwt_log
+            bigstring
             lwt.unix)
  (flags (:standard -open Tezos_stdlib)))
 

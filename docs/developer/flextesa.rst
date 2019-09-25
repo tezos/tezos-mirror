@@ -69,14 +69,14 @@ sandbox before killing all the nodes.
          --root $PWD/double-endorsing-test \
          --base-port=20_000 \
          --pause-at-end=true
-         
+
 
 This test among other ones can generate configuration files for
 `Kiln <https://gitlab.com/obsidian.systems/tezos-bake-monitor/>`__
 to run alongside the *Ꜩ-sandbox*, for instance:
 
-Voting With a Ledger Nano S
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Voting With a Ledger Nano Device
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The voting test tries to do a full round of voting and protocol switch,
 including baking on the test-chain, see documentation in
@@ -85,7 +85,7 @@ including baking on the test-chain, see documentation in
 The test can run in a simpler-to-setup, or “degraded,” mode of operation
 (cf. call in ``./src/bin_flextesa/dune`` for the version which
 run in Gitlab-CI pipelines). In this example, we run instead a full test
-with a Ledger Nano S as one of the bakers/voters. The test automatically
+with a Ledger Nano device as one of the bakers/voters. The test automatically
 becomes **interactive** because the user has to press buttons on the
 device, including for changing between apps.
 

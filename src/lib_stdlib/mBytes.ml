@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +24,66 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Bigstring
+type t = bytes
 
-include EndianBigstring.BigEndian
-module LE = EndianBigstring.LittleEndian
+let create = Bytes.create
 
-let make sz c =
-  let buf = create sz in
-  fill buf c ;
-  buf
+let length = Bytes.length
 
-let to_hex t =
-  Hex.of_cstruct (Cstruct.of_bigarray t)
+let copy = Bytes.copy
 
-let of_hex hex =
-  Cstruct.to_bigarray (Hex.to_cstruct hex)
+let sub = Bytes.sub
 
-let pp_hex ppf s =
-  let `Hex hex = to_hex s in
-  Format.pp_print_string ppf hex
+let blit = Bytes.blit
 
-let cut ?(copy=false) sz bytes =
-  let length = length bytes in
-  if length <= sz then
-    [bytes] (* if the result fits in the given sz *)
-  else
-    let may_copy = if copy then Bigstring.copy else fun t -> t in
-    let nb_full = length / sz in (* nb of blocks of size sz *)
-    let sz_full = nb_full * sz in (* size of the full part *)
-    let acc = (* eventually init acc with a non-full block *)
-      if sz_full = length then []
-      else [may_copy (sub bytes sz_full (length - sz_full))]
-    in
-    let rec split_full_blocks curr_upper_limit acc =
-      let start = curr_upper_limit - sz in
-      assert (start >= 0);
-      (* copy the block [ start, curr_upper_limit [ of size sz *)
-      let acc = (may_copy (sub bytes start sz)) :: acc in
-      if start = 0 then acc else split_full_blocks start acc
-    in
-    split_full_blocks sz_full acc
+let blit_of_string = Bytes.blit_string
 
-include Compare.Make(struct
-    type nonrec t = t
-    let compare = Bigstring.compare
-  end)
+let blit_to_bytes = Bytes.blit
+
+let of_string = Bytes.of_string
+
+let to_string = Bytes.to_string
+
+let sub_string = Bytes.sub_string
+
+let get_char = Bytes.get
+
+let set_char = Bytes.set
+
+include TzEndian
+
+module LE = struct
+  let get_uint16 = Bytes_encodings.get_uint16_le
+
+  let get_int16 = Bytes_encodings.get_int16_le
+
+  let get_int32 = Bytes_encodings.get_int32_le
+
+  let get_int64 = Bytes_encodings.get_int64_le
+
+  let set_int16 = Bytes_encodings.set_int16_le
+
+  let set_int32 = Bytes_encodings.set_int32_le
+
+  let set_int64 = Bytes_encodings.set_int64_le
+end
+
+let ( = ) = Pervasives.( = )
+
+let ( <> ) = Pervasives.( <> )
+
+let ( < ) = Pervasives.( < )
+
+let ( <= ) = Pervasives.( <= )
+
+let ( >= ) = Pervasives.( >= )
+
+let ( > ) = Pervasives.( > )
+
+let compare = Bytes.compare
+
+let concat s bs = Bytes.concat (Bytes.of_string s) bs
+
+let to_hex t = Hex.of_bytes t
+
+let of_hex hex = Hex.to_bytes hex

@@ -24,33 +24,44 @@
 (*****************************************************************************)
 
 type t = {
-  peer_id : P2p_peer.Id.t ;
-  public_key : Crypto_box.public_key ;
-  secret_key : Crypto_box.secret_key ;
-  proof_of_work_stamp : Crypto_box.nonce ;
+  peer_id : P2p_peer.Id.t;
+  public_key : Crypto_box.public_key;
+  secret_key : Crypto_box.secret_key;
+  proof_of_work_stamp : Crypto_box.nonce;
 }
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun { peer_id ; public_key ; secret_key ; proof_of_work_stamp } ->
-       (Some peer_id, public_key, secret_key, proof_of_work_stamp))
-    (fun (peer_id_opt, public_key, secret_key, proof_of_work_stamp) ->
-       let peer_id =
-         match peer_id_opt with
-         | Some peer_id -> peer_id
-         | None -> Tezos_crypto.Crypto_box.hash public_key in
-       { peer_id ; public_key ; secret_key ; proof_of_work_stamp })
-    (obj4
-       (opt "peer_id" P2p_peer_id.encoding)
-       (req "public_key" Crypto_box.public_key_encoding)
-       (req "secret_key" Crypto_box.secret_key_encoding)
-       (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
+  def
+    "p2p_identity"
+    ~description:
+      "The identity of a peer. This includes cryptographic keys as well as a \
+       proof-of-work."
+  @@ conv
+       (fun {peer_id; public_key; secret_key; proof_of_work_stamp} ->
+         (Some peer_id, public_key, secret_key, proof_of_work_stamp))
+       (fun (peer_id_opt, public_key, secret_key, proof_of_work_stamp) ->
+         let peer_id =
+           match peer_id_opt with
+           | Some peer_id ->
+               peer_id
+           | None ->
+               Tezos_crypto.Crypto_box.hash public_key
+         in
+         {peer_id; public_key; secret_key; proof_of_work_stamp})
+       (obj4
+          (opt "peer_id" P2p_peer_id.encoding)
+          (req "public_key" Crypto_box.public_key_encoding)
+          (req "secret_key" Crypto_box.secret_key_encoding)
+          (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
 
 let generate_with_bound ?max target =
-  let secret_key, public_key, peer_id = Crypto_box.random_keypair () in
+  let (secret_key, public_key, peer_id) = Crypto_box.random_keypair () in
   let proof_of_work_stamp =
-    Crypto_box.generate_proof_of_work ?max public_key target in
-  { peer_id ; public_key ; secret_key ; proof_of_work_stamp }
+    Crypto_box.generate_proof_of_work ?max public_key target
+  in
+  {peer_id; public_key; secret_key; proof_of_work_stamp}
 
 let generate target = generate_with_bound target
+
+let () = Data_encoding.Registration.register encoding

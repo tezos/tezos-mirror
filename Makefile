@@ -19,18 +19,22 @@ ifneq (${current_ocaml_version},${ocaml_version})
 endif
 	@dune build \
 		src/bin_node/main.exe \
+		src/bin_validation/main_validator.exe \
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
 		src/bin_signer/main_signer.exe \
+		src/bin_codec/codec.exe \
 		src/lib_protocol_compiler/main_native.exe \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_baker/main_baker_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_endorser/main_endorser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/bin_accuser/main_accuser_$(p).exe) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json)
 	@cp _build/default/src/bin_node/main.exe tezos-node
+	@cp _build/default/src/bin_validation/main_validator.exe tezos-validator
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
+	@cp _build/default/src/bin_codec/codec.exe tezos-codec
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 	@for p in $(active_protocol_directories) ; do \
 	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
@@ -38,7 +42,6 @@ endif
 	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json sandbox-parameters.json ; \
 	 done
-
 
 PROTOCOLS := genesis 005_PsBABY5H demo_noops
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
@@ -82,8 +85,8 @@ doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
 build-sandbox:
-	@dune build src/bin_flextesa/main.exe
-	@cp _build/default/src/bin_flextesa/main.exe tezos-sandbox
+	@dune build src/bin_sandbox/main.exe
+	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 build-test: build-sandbox
 	@dune build @buildtest
@@ -96,8 +99,8 @@ test-lint:
 	@dune build @runtest_lint
 	make -C tests_python lint_all
 
-fix-lint:
-	@src/tooling/lint.sh fix
+fmt:
+	@src/tooling/lint.sh format
 
 build-deps:
 	@./scripts/install_build_deps.sh
@@ -120,6 +123,7 @@ clean:
 	@-find . -name dune-project -delete
 	@-rm -f \
 		tezos-node \
+		tezos-validator \
 		tezos-client \
 		tezos-signer \
 		tezos-admin-client \

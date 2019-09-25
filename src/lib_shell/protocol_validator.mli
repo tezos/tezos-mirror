@@ -25,30 +25,26 @@
 
 type t
 
-val create: Distributed_db.t -> t
+val create : Distributed_db.t -> t
 
-val validate:
+val validate :
+  t -> Protocol_hash.t -> Protocol.t -> Registered_protocol.t tzresult Lwt.t
+
+val shutdown : t -> unit Lwt.t
+
+val fetch_and_compile_protocol :
   t ->
-  Protocol_hash.t -> Protocol.t ->
+  ?peer:P2p_peer.Id.t ->
+  ?timeout:Ptime.Span.t ->
+  Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
-val shutdown: t -> unit Lwt.t
-
-val fetch_and_compile_protocol:
+val fetch_and_compile_protocols :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Ptime.Span.t ->
-  Protocol_hash.t -> Registered_protocol.t tzresult Lwt.t
+  State.Block.t ->
+  unit tzresult Lwt.t
 
-val fetch_and_compile_protocols:
-  t ->
-  ?peer:P2p_peer.Id.t ->
-  ?timeout:Ptime.Span.t ->
-  State.Block.t -> unit tzresult Lwt.t
-
-val prefetch_and_compile_protocols:
-  t ->
-  ?peer:P2p_peer.Id.t ->
-  ?timeout:Ptime.Span.t ->
-  State.Block.t -> unit
-
+val prefetch_and_compile_protocols :
+  t -> ?peer:P2p_peer.Id.t -> ?timeout:Ptime.Span.t -> State.Block.t -> unit

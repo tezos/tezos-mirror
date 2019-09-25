@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include (module type of struct include Resto.Path end)
+include module type of struct
+  include Resto.Path
+end

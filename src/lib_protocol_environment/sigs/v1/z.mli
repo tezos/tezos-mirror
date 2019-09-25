@@ -26,64 +26,65 @@
 (** Tezos Protocol Environment - Arbitrary precision arithmetic. *)
 
 type t
-val zero: t
-val one: t
 
-val succ: t -> t
+val zero : t
+
+val one : t
+
 (** Returns its argument plus one. *)
+val succ : t -> t
 
-val abs: t -> t
 (** Absolute value. *)
+val abs : t -> t
 
-val neg: t -> t
 (** Unary negation. *)
+val neg : t -> t
 
-val add: t -> t -> t
 (** Addition. *)
+val add : t -> t -> t
 
-val sub: t -> t -> t
 (** Subtraction. *)
+val sub : t -> t -> t
 
-val mul: t -> t -> t
 (** Multiplication. *)
+val mul : t -> t -> t
 
-val ediv_rem: t -> t -> (t * t)
 (** Euclidean division and remainder.  [ediv_rem a b] returns a pair [(q, r)]
     such that [a = b * q + r] and [0 <= r < |b|].
     Raises [Division_by_zero] if [b = 0].
 *)
+val ediv_rem : t -> t -> t * t
 
-val logand: t -> t -> t
 (** Bitwise logical and. *)
+val logand : t -> t -> t
 
-val logor: t -> t -> t
 (** Bitwise logical or. *)
+val logor : t -> t -> t
 
-val logxor: t -> t -> t
 (** Bitwise logical exclusive or. *)
+val logxor : t -> t -> t
 
-val lognot: t -> t
 (** Bitwise logical negation.
     The identity [lognot a]=[-a-1] always hold.
 *)
+val lognot : t -> t
 
-val shift_left: t -> int -> t
 (** Shifts to the left.
     Equivalent to a multiplication by a power of 2.
     The second argument must be non-negative.
 *)
+val shift_left : t -> int -> t
 
-val shift_right: t -> int -> t
 (** Shifts to the right.
     This is an arithmetic shift,
     equivalent to a division by a power of 2 with rounding towards -oo.
     The second argument must be non-negative.
 *)
+val shift_right : t -> int -> t
 
-val to_string: t -> string
 (** Gives a human-readable, decimal string representation of the argument. *)
+val to_string : t -> string
 
-val of_string: string -> t
 (** Converts a string to an integer.
     An optional [-] prefix indicates a negative number, while a [+]
     prefix is ignored.
@@ -95,28 +96,31 @@ val of_string: string -> t
     Raises an [Invalid_argument] exception if the string is not a
     syntactically correct representation of an integer.
 *)
+val of_string : string -> t
 
-val to_int64: t -> int64
 (** Converts to a 64-bit integer. May raise [Overflow]. *)
+val to_int64 : t -> int64
 
-val of_int64: int64 -> t
 (** Converts from a 64-bit integer. *)
+val of_int64 : int64 -> t
 
-val to_int: t -> int
 (** Converts to a base integer. May raise an [Overflow]. *)
+val to_int : t -> int
 
-val of_int: int -> t
 (** Converts from a base integer. *)
+val of_int : int -> t
 
-val to_bits: ?pad_to:int -> t -> MBytes.t
-val of_bits: MBytes.t -> t
+val to_bits : ?pad_to:int -> t -> MBytes.t
 
-val equal: t -> t -> bool
-val compare: t -> t -> int
+val of_bits : MBytes.t -> t
 
-val numbits: t -> int
+val equal : t -> t -> bool
+
+val compare : t -> t -> int
+
 (** Returns the number of significant bits in the given number.
     If [x] is zero, [numbits x] returns 0.  Otherwise,
     [numbits x] returns a positive integer [n] such that
     [2^{n-1} <= |x| < 2^n].  Note that [numbits] is defined
     for negative arguments, and that [numbits (-x) = numbits x]. *)
+val numbits : t -> int

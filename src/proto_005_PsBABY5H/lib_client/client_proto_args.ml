@@ -30,10 +30,15 @@ open Alpha_context
 open Clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
+
 type error += Bad_max_priority of string
+
 type error += Bad_minimal_fees of string
+
 type error += Bad_max_waiting_time of string
+
 type error += Bad_endorsement_delay of string
+
 type error += Bad_preserved_levels of string
 
 let () =
@@ -41,23 +46,27 @@ let () =
     `Permanent
     ~id:"badTezArg"
     ~title:"Bad Tez Arg"
-    ~description:("Invalid \xEA\x9C\xA9 notation in parameter.")
+    ~description:"Invalid \xEA\x9C\xA9 notation in parameter."
     ~pp:(fun ppf (arg_name, literal) ->
-        Format.fprintf ppf
-          "Invalid \xEA\x9C\xA9 notation in parameter %s: '%s'"
-          arg_name literal)
-    Data_encoding.(obj2
-                     (req "parameter" string)
-                     (req "literal" string))
-    (function Bad_tez_arg (parameter, literal) -> Some (parameter, literal) | _ -> None)
+      Format.fprintf
+        ppf
+        "Invalid \xEA\x9C\xA9 notation in parameter %s: '%s'"
+        arg_name
+        literal)
+    Data_encoding.(obj2 (req "parameter" string) (req "literal" string))
+    (function
+      | Bad_tez_arg (parameter, literal) ->
+          Some (parameter, literal)
+      | _ ->
+          None)
     (fun (parameter, literal) -> Bad_tez_arg (parameter, literal)) ;
   register_error_kind
     `Permanent
     ~id:"badMaxPriorityArg"
     ~title:"Bad -max-priority arg"
-    ~description:("invalid priority in -max-priority")
+    ~description:"invalid priority in -max-priority"
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "invalid priority '%s' in -max-priority" literal)
+      Format.fprintf ppf "invalid priority '%s' in -max-priority" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_priority parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_priority parameter) ;
@@ -65,9 +74,9 @@ let () =
     `Permanent
     ~id:"badMinimalFeesArg"
     ~title:"Bad -minimal-fees arg"
-    ~description:("invalid fee threshold in -fee-threshold")
+    ~description:"invalid fee threshold in -fee-threshold"
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "invalid minimal fees '%s'" literal)
+      Format.fprintf ppf "invalid minimal fees '%s'" literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_minimal_fees parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_minimal_fees parameter) ;
@@ -75,9 +84,13 @@ let () =
     `Permanent
     ~id:"badMaxWaitingTimeArg"
     ~title:"Bad -max-waiting-time arg"
-    ~description:("invalid duration in -max-waiting-time")
+    ~description:"invalid duration in -max-waiting-time"
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "Bad argument value for -max-waiting-time. Expected an integer, but given '%s'" literal)
+      Format.fprintf
+        ppf
+        "Bad argument value for -max-waiting-time. Expected an integer, but \
+         given '%s'"
+        literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_waiting_time parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_waiting_time parameter) ;
@@ -85,9 +98,13 @@ let () =
     `Permanent
     ~id:"badEndorsementDelayArg"
     ~title:"Bad -endorsement-delay arg"
-    ~description:("invalid duration in -endorsement-delay")
+    ~description:"invalid duration in -endorsement-delay"
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "Bad argument value for -endorsement-delay. Expected an integer, but given '%s'" literal)
+      Format.fprintf
+        ppf
+        "Bad argument value for -endorsement-delay. Expected an integer, but \
+         given '%s'"
+        literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_endorsement_delay parameter) ;
@@ -95,36 +112,34 @@ let () =
     `Permanent
     ~id:"badPreservedLevelsArg"
     ~title:"Bad -preserved-levels arg"
-    ~description:("invalid number of levels in -preserved-levels")
+    ~description:"invalid number of levels in -preserved-levels"
     ~pp:(fun ppf literal ->
-        Format.fprintf ppf "Bad argument value for -preserved_levels. Expected a positive integer, but given '%s'" literal)
+      Format.fprintf
+        ppf
+        "Bad argument value for -preserved_levels. Expected a positive \
+         integer, but given '%s'"
+        literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_preserved_levels parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_preserved_levels parameter)
 
+let tez_sym = "\xEA\x9C\xA9"
 
-let tez_sym =
-  "\xEA\x9C\xA9"
-
-let string_parameter =
-  parameter (fun _ x -> return x)
+let string_parameter = parameter (fun _ x -> return x)
 
 let int_parameter =
   parameter (fun _ p ->
-      try return (int_of_string p)
-      with _ -> failwith "Cannot read int")
+      try return (int_of_string p) with _ -> failwith "Cannot read int")
 
 let bytes_parameter =
   parameter (fun _ s ->
       try
-        if String.length s < 2
-        || s.[0] <> '0' || s.[1] <> 'x' then
-          raise Exit
+        if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
         else
-          return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
+          return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
       with _ ->
-        failwith "Invalid bytes, expecting hexadecimal notation \
-                  (e.g. 0x1234abcd)")
+        failwith
+          "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)")
 
 let init_arg =
   default_arg
@@ -145,16 +160,14 @@ let delegate_arg =
   Client_keys.Public_key_hash.source_arg
     ~long:"delegate"
     ~placeholder:"address"
-    ~doc:"delegate of the contract\n\
-          Must be a known address."
+    ~doc:"delegate of the contract\nMust be a known address."
     ()
 
 let source_arg =
   arg
     ~long:"source"
     ~placeholder:"address"
-    ~doc:"source of the deposits to be paid\n\
-          Must be a known address."
+    ~doc:"source of the deposits to be paid\nMust be a known address."
     string_parameter
 
 let entrypoint_arg =
@@ -174,39 +187,42 @@ let force_switch =
   switch
     ~long:"force"
     ~short:'f'
-    ~doc:"disables the node's injection checks\n\
-          Force the injection of branch-invalid operation or force \
-         \ the injection of block without a fitness greater than the \
-         \ current head."
+    ~doc:
+      "disables the node's injection checks\n\
+       Force the injection of branch-invalid operation or force  the \
+       injection of block without a fitness greater than the  current head."
     ()
 
 let minimal_timestamp_switch =
   switch
     ~long:"minimal-timestamp"
-    ~doc:"Use the minimal timestamp instead of the current date \
-          as timestamp of the baked block."
+    ~doc:
+      "Use the minimal timestamp instead of the current date as timestamp of \
+       the baked block."
     ()
 
 let delegatable_switch =
-  switch
-    ~long:"delegatable"
-    ~doc:"allow future delegate change"
-    ()
+  switch ~long:"delegatable" ~doc:"allow future delegate change" ()
 
 let tez_format =
   "Text format: `DDDDDDD.DDDDDD`.\n\
-   Tez and mutez and separated by a period sign. Trailing and pending \
-   zeroes are allowed."
+   Tez and mutez and separated by a period sign. Trailing and pending zeroes \
+   are allowed."
 
 let tez_parameter param =
-  parameter
-    (fun _ s ->
-       match Tez.of_string s with
-       | Some tez -> return tez
-       | None -> fail (Bad_tez_arg (param, s)))
+  parameter (fun _ s ->
+      match Tez.of_string s with
+      | Some tez ->
+          return tez
+      | None ->
+          fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg ~long:parameter ~placeholder:"amount" ~doc ~default
+  default_arg
+    ~long:parameter
+    ~placeholder:"amount"
+    ~doc
+    ~default
     (tez_parameter ("--" ^ parameter))
 
 let tez_param ~name ~desc next =
@@ -221,19 +237,20 @@ let fee_arg =
     ~long:"fee"
     ~placeholder:"amount"
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
-    (tez_parameter ("--fee"))
+    (tez_parameter "--fee")
 
 let gas_limit_arg =
   arg
     ~long:"gas-limit"
     ~short:'G'
     ~placeholder:"amount"
-    ~doc:"Set the gas limit of the transaction instead \
-          of letting the client decide based on a simulation"
+    ~doc:
+      "Set the gas limit of the transaction instead of letting the client \
+       decide based on a simulation"
     (parameter (fun _ s ->
          try
            let v = Z.of_string s in
-           assert Compare.Z.(v >= Z.zero) ;
+           assert (Compare.Z.(v >= Z.zero)) ;
            return v
          with _ -> failwith "invalid gas limit (must be a positive number)"))
 
@@ -242,14 +259,17 @@ let storage_limit_arg =
     ~long:"storage-limit"
     ~short:'S'
     ~placeholder:"amount"
-    ~doc:"Set the storage limit of the transaction instead \
-          of letting the client decide based on a simulation"
+    ~doc:
+      "Set the storage limit of the transaction instead of letting the client \
+       decide based on a simulation"
     (parameter (fun _ s ->
          try
            let v = Z.of_string s in
-           assert Compare.Z.(v >= Z.zero) ;
+           assert (Compare.Z.(v >= Z.zero)) ;
            return v
-         with _ -> failwith "invalid storage limit (must be a positive number of bytes)"))
+         with _ ->
+           failwith
+             "invalid storage limit (must be a positive number of bytes)"))
 
 let counter_arg =
   arg
@@ -260,9 +280,10 @@ let counter_arg =
     (parameter (fun _ s ->
          try
            let v = Z.of_string s in
-           assert Compare.Z.(v >= Z.zero) ;
+           assert (Compare.Z.(v >= Z.zero)) ;
            return v
-         with _ -> failwith "invalid counter (must be a positive number of bytes)"))
+         with _ ->
+           failwith "invalid counter (must be a positive number of bytes)"))
 
 let max_priority_arg =
   arg
@@ -270,12 +291,13 @@ let max_priority_arg =
     ~placeholder:"slot"
     ~doc:"maximum allowed baking slot"
     (parameter (fun _ s ->
-         try return (int_of_string s)
-         with _ -> fail (Bad_max_priority s)))
+         try return (int_of_string s) with _ -> fail (Bad_max_priority s)))
 
+let default_minimal_fees =
+  match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_fees = match Tez.of_mutez 100L with None -> assert false | Some t -> t
 let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+
 let default_minimal_nanotez_per_byte = Z.of_int 1000
 
 let minimal_fees_arg =
@@ -286,28 +308,32 @@ let minimal_fees_arg =
     ~default:(Tez.to_string default_minimal_fees)
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t -> return t
-         | None -> fail (Bad_minimal_fees s)))
+         | Some t ->
+             return t
+         | None ->
+             fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
   default_arg
     ~long:"minimal-nanotez-per-gas-unit"
     ~placeholder:"amount"
-    ~doc:"exclude operations with fees per gas lower than this threshold (in nanotez)"
+    ~doc:
+      "exclude operations with fees per gas lower than this threshold (in \
+       nanotez)"
     ~default:(Z.to_string default_minimal_nanotez_per_gas_unit)
     (parameter (fun _ s ->
-         try return (Z.of_string s)
-         with _ -> fail (Bad_minimal_fees s)))
+         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
   default_arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
     ~default:(Z.to_string default_minimal_nanotez_per_byte)
-    ~doc:"exclude operations with fees per byte lower than this threshold (in nanotez)"
+    ~doc:
+      "exclude operations with fees per byte lower than this threshold (in \
+       nanotez)"
     (parameter (fun _ s ->
-         try return (Z.of_string s)
-         with _ -> fail (Bad_minimal_fees s)))
+         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let force_low_fee_arg =
   switch
@@ -323,8 +349,10 @@ let fee_cap_arg =
     ~doc:"Set the fee cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad fee cap"))
+         | Some t ->
+             return t
+         | None ->
+             failwith "Bad fee cap"))
 
 let burn_cap_arg =
   default_arg
@@ -334,8 +362,10 @@ let burn_cap_arg =
     ~doc:"Set the burn cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad burn cap"))
+         | Some t ->
+             return t
+         | None ->
+             failwith "Bad burn cap"))
 
 let no_waiting_for_endorsements_arg =
   switch
@@ -353,15 +383,16 @@ let endorsement_delay_arg =
   default_arg
     ~long:"endorsement-delay"
     ~placeholder:"seconds"
-    ~doc:"delay before endorsing blocks\n\
-          Delay between notifications of new blocks from the node and \
-          production of endorsements for these blocks."
+    ~doc:
+      "delay before endorsing blocks\n\
+       Delay between notifications of new blocks from the node and production \
+       of endorsements for these blocks."
     ~default:"5"
     (parameter (fun _ s ->
          try
            let i = int_of_string s in
-           fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
-           return (int_of_string s)
+           fail_when (i < 0) (Bad_endorsement_delay s)
+           >>=? fun () -> return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
@@ -373,20 +404,19 @@ let preserved_levels_arg =
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in
-           if preserved_cycles < 0 then
-             fail (Bad_preserved_levels s)
-           else
-             return preserved_cycles
+           if preserved_cycles < 0 then fail (Bad_preserved_levels s)
+           else return preserved_cycles
          with _ -> fail (Bad_preserved_levels s)))
 
 let no_print_source_flag =
   switch
     ~long:"no-print-source"
     ~short:'q'
-    ~doc:"don't print the source code\n\
-          If an error is encountered, the client will print the \
-          contract's source code by default.\n\
-          This option disables this behaviour."
+    ~doc:
+      "don't print the source code\n\
+       If an error is encountered, the client will print the contract's \
+       source code by default.\n\
+       This option disables this behaviour."
     ()
 
 let no_confirmation =
@@ -396,26 +426,24 @@ let no_confirmation =
     ()
 
 let signature_parameter =
-  parameter
-    (fun _cctxt s ->
-       match Signature.of_b58check_opt s with
-       | Some s -> return s
-       | None -> failwith "Not given a valid signature")
+  parameter (fun _cctxt s ->
+      match Signature.of_b58check_opt s with
+      | Some s ->
+          return s
+      | None ->
+          failwith "Not given a valid signature")
 
 module Daemon = struct
   let baking_switch =
-    switch
-      ~long:"baking"
-      ~short:'B'
-      ~doc:"run the baking daemon" ()
+    switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
+
   let endorsement_switch =
-    switch
-      ~long:"endorsement"
-      ~short:'E'
-      ~doc:"run the endorsement daemon" ()
+    switch ~long:"endorsement" ~short:'E' ~doc:"run the endorsement daemon" ()
+
   let denunciation_switch =
     switch
       ~long:"denunciation"
       ~short:'D'
-      ~doc:"run the denunciation daemon" ()
+      ~doc:"run the denunciation daemon"
+      ()
 end

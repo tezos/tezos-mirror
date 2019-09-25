@@ -8,18 +8,19 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "tezos-protocol-genesis"
   "tezos-protocol-updater"
   "tezos-protocol-compiler"
 ]
 build: [
-  [ "%{tezos-protocol-compiler:lib}%/replace"
-      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "dune" "genesis" ]
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  [
+    "%{tezos-protocol-compiler:lib}%/replace"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "dune"
+    "genesis"
+  ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: genesis (economic-protocol definition, embedded in `tezos-node`)"

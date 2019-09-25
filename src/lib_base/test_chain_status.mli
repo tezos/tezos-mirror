@@ -25,17 +25,14 @@
 
 type t =
   | Not_running
-  | Forking of {
-      protocol: Protocol_hash.t ;
-      expiration: Time.Protocol.t ;
-    }
+  | Forking of {protocol : Protocol_hash.t; expiration : Time.Protocol.t}
   | Running of {
-      chain_id: Chain_id.t ;
-      genesis: Block_hash.t ;
-      protocol: Protocol_hash.t ;
-      expiration: Time.Protocol.t ;
+      chain_id : Chain_id.t;
+      genesis : Block_hash.t;
+      protocol : Protocol_hash.t;
+      expiration : Time.Protocol.t;
     }
 
-val encoding: t Data_encoding.t
+val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

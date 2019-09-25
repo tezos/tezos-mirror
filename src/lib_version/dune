@@ -1,0 +1,8 @@
+(library
+ (name tezos_version)
+ (public_name tezos-version))
+
+(rule
+    (targets generated_git_info.ml)
+    (deps (:script get-git-info.mlt))
+    (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))

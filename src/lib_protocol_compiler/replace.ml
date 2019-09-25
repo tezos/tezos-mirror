@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module StringMap = Map.Make(String)
+module StringMap = Map.Make (String)
 
 let regexp = Str.regexp "%%[^%]*%%"
 
@@ -39,16 +39,18 @@ let guess_version () =
       String.sub dirname x (n - x)
     else
       let updir = Filename.dirname dir in
-      if updir = dir then begin
+      if updir = dir then (
         Format.eprintf
           "Cannot guess protocol version in path!@.Looking for `%s*` in `%s`@."
-          prefix current_dir ;
-        exit 1
-      end;
-      loop updir in
+          prefix
+          current_dir ;
+        exit 1 ) ;
+      loop updir
+  in
   loop (Sys.getcwd ())
 
-let warning_message = {|
+let warning_message =
+  {|
 
 ;
 ;        /!\ /!\ Do not modify this file /!\ /!\
@@ -66,25 +68,25 @@ let replace ~template ~destination vars =
     while true do
       let line = input_line inch in
       let line =
-        Str.global_substitute regexp begin fun s ->
-          let matched = Str.matched_string s in
-          let var = String.sub matched 2 (String.length matched - 4) in
-          match StringMap.find_opt var vars with
-          | Some value -> value
-          | None ->
-              prerr_endline ("Unknown variable: " ^ var) ;
-              exit 1
-        end line in
-      output_string outch line ;
-      output_string outch "\n" ;
-    done ;
-  with End_of_file ->
-    flush outch ;
-    close_out outch ;
-    ()
+        Str.global_substitute
+          regexp
+          (fun s ->
+            let matched = Str.matched_string s in
+            let var = String.sub matched 2 (String.length matched - 4) in
+            match StringMap.find_opt var vars with
+            | Some value ->
+                value
+            | None ->
+                prerr_endline ("Unknown variable: " ^ var) ;
+                exit 1)
+          line
+      in
+      output_string outch line ; output_string outch "\n"
+    done
+  with End_of_file -> flush outch ; close_out outch ; ()
 
-let module_name (c : Protocol.component) =
-  String.capitalize_ascii c.name
+let module_name (c : Protocol.component) = String.capitalize_ascii c.name
+
 let sources_name (c : Protocol.component) =
   let name = String.lowercase_ascii c.name in
   match c.interface with
@@ -96,42 +98,43 @@ let sources_name (c : Protocol.component) =
 let process ~template ~destination (protocol : Protocol.t) lib_version hash =
   let version = String.concat "-" (String.split_on_char '_' lib_version) in
   let vars =
-    StringMap.empty |>
-    StringMap.add "VERSION" version |>
-    StringMap.add "LIB_VERSION" lib_version |>
-    StringMap.add "HASH" (Protocol_hash.to_b58check hash) |>
-    StringMap.add "MODULES"
-      (String.concat " " (List.map module_name protocol.components)) |>
-    StringMap.add "SOURCES"
-      (String.concat " " (List.map sources_name protocol.components)) in
+    StringMap.empty
+    |> StringMap.add "VERSION" version
+    |> StringMap.add "LIB_VERSION" lib_version
+    |> StringMap.add "HASH" (Protocol_hash.to_b58check hash)
+    |> StringMap.add
+         "MODULES"
+         (String.concat " " (List.map module_name protocol.components))
+    |> StringMap.add
+         "SOURCES"
+         (String.concat " " (List.map sources_name protocol.components))
+  in
   replace ~template ~destination vars
 
 let read_proto destination =
   let source_dir =
     if Filename.is_relative destination then
-      Filename.concat
-        current_dir (Filename.dirname destination)
-    else
-      Filename.dirname destination in
-  match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
+      Filename.concat current_dir (Filename.dirname destination)
+    else Filename.dirname destination
+  in
+  match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
   | Ok (None, proto) ->
       (Protocol.hash proto, proto)
   | Ok (Some hash, proto) ->
       (hash, proto)
   | Error err ->
-      Format.kasprintf Pervasives.failwith
+      Format.kasprintf
+        Pervasives.failwith
         "Failed to read TEZOS_PROTOCOL in %s:@ %a"
         source_dir
-        pp_print_error err
+        pp_print_error
+        err
 
 let main () =
   let template = Sys.argv.(1) in
   let destination = Sys.argv.(2) in
-  let version =
-    try Sys.argv.(3)
-    with _ -> guess_version () in
-  let hash, proto = read_proto destination in
+  let version = try Sys.argv.(3) with _ -> guess_version () in
+  let (hash, proto) = read_proto destination in
   process ~template ~destination proto version hash
 
-let () =
-  main ()
+let () = main ()

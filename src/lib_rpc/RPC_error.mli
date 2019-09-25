@@ -25,6 +25,6 @@
 
 open Error_monad
 
-val list: #RPC_context.simple -> Json_schema.schema tzresult Lwt.t
+val list : #RPC_context.simple -> Json_schema.schema tzresult Lwt.t
 
-val encoding: error list Data_encoding.t
+val encoding : error list Data_encoding.t

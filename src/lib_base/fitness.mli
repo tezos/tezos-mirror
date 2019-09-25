@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include S.T with type t = MBytes.t list
+include S.T with type t = Bytes.t list

@@ -18,7 +18,8 @@
                    -open Tezos_rpc_http
                    -open Tezos_rpc_http_server
                    -open Tezos_rpc_http_client_unix
-                   -open Tezos_stdlib_unix)))
+                   -open Tezos_stdlib_unix
+                   -open Tezos_stdlib)))
 
 (alias
  (name runtest_lint)

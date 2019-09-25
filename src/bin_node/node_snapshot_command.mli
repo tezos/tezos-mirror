@@ -24,9 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
 val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
 
 module Manpage : sig
-  val command_description: string
+  val command_description : string
 end

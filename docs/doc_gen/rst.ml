@@ -28,24 +28,30 @@ let pp_title ~char ppf title =
   Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
 
 let pp_h1 = pp_title ~char:'#'
+
 let pp_h2 = pp_title ~char:'*'
+
 let pp_h3 = pp_title ~char:'='
+
 let pp_h4 = pp_title ~char:'`'
 
 let pp_raw_html ppf str =
-  Format.fprintf ppf "@[<v>.. raw:: html@   @   %s@ @ @]"
+  Format.fprintf
+    ppf
+    "@[<v>.. raw:: html@   @   %s@ @ @]"
     (Re.Str.global_replace (Re.Str.regexp "\n") "\n  " str)
 
 let pp_html ppf f =
-  Format.fprintf ppf
+  Format.fprintf
+    ppf
     "@[<v 2>.. raw:: html@ @ %a@]@\n@\n"
-    (fun ppf () -> f ppf) ()
+    (fun ppf () -> f ppf)
+    ()
 
 let pp_ref ppf name = Format.fprintf ppf ".. _%s :@\n@\n" name
 
-
-
-let style = {css|
+let style =
+  {css|
 <style>
    .wy-nav-content {
       max-width: 100%;
@@ -94,7 +100,8 @@ let style = {css|
 </style>
 |css}
 
-let script = {script|
+let script =
+  {script|
 <script>
   function showTab(elt, tab, ref) {
     var i, tabcontent, tablinks;

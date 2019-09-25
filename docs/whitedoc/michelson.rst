@@ -1997,13 +1997,14 @@ Constants
 There are three kinds of constants:
 
 1. Integers or naturals in decimal notation.
-2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
-   ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
-   cannot appear in the middle of a string.
+2. Strings, with some usual escape sequences: ``\n``, ``\\``,
+   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
+   cannot appear in a string.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
 The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, plus the escaped characters mentioned above.
+subset of 7-bit ASCII, namely charactes with codes from within `[32, 126]`
+range, plus the escaped characters mentioned above.
 
 Primitive applications
 ~~~~~~~~~~~~~~~~~~~~~~

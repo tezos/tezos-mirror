@@ -29,84 +29,103 @@ open Signer_messages
 let log = lwt_log_notice
 
 let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
-  Lwt_utils_unix.Socket.recv fd Request.encoding >>=? function
+  Lwt_utils_unix.Socket.recv fd Request.encoding
+  >>=? function
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
-      Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
   | Deterministic_nonce req ->
       let encoding = result_encoding Deterministic_nonce.Response.encoding in
-      Handler.deterministic_nonce cctxt req ~require_auth >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      Handler.deterministic_nonce cctxt req ~require_auth
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
   | Deterministic_nonce_hash req ->
-      let encoding = result_encoding Deterministic_nonce_hash.Response.encoding in
-      Handler.deterministic_nonce_hash cctxt req ~require_auth >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      let encoding =
+        result_encoding Deterministic_nonce_hash.Response.encoding
+      in
+      Handler.deterministic_nonce_hash cctxt req ~require_auth
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
   | Supports_deterministic_nonces req ->
-      let encoding = result_encoding Supports_deterministic_nonces.Response.encoding in
-      Handler.supports_deterministic_nonces cctxt req >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      let encoding =
+        result_encoding Supports_deterministic_nonces.Response.encoding
+      in
+      Handler.supports_deterministic_nonces cctxt req
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
-      Handler.public_key cctxt pkh >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      Handler.public_key cctxt pkh
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
   | Authorized_keys ->
       let encoding = result_encoding Authorized_keys.Response.encoding in
-      begin if require_auth then
-          Handler.Authorized_key.load cctxt >>=? fun keys ->
-          return (Authorized_keys.Response.Authorized_keys
-                    (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
-        else return Authorized_keys.Response.No_authentication
-      end >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res >>= fun _ ->
-      Lwt_unix.close fd >>= fun () ->
-      return_unit
+      ( if require_auth then
+        Handler.Authorized_key.load cctxt
+        >>=? fun keys ->
+        return
+          (Authorized_keys.Response.Authorized_keys
+             (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
+      else return Authorized_keys.Response.No_authentication )
+      >>= fun res ->
+      Lwt_utils_unix.Socket.send fd encoding res
+      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
 
-let run (cctxt : #Client_context.wallet) path ?magic_bytes ~check_high_watermark ~require_auth =
+let run (cctxt : #Client_context.wallet) path ?magic_bytes
+    ~check_high_watermark ~require_auth =
   let open Lwt_utils_unix.Socket in
-  begin
-    match path with
-    | Tcp (host, service, _opts) ->
-        log Tag.DSL.(fun f ->
+  ( match path with
+  | Tcp (host, service, _opts) ->
+      log
+        Tag.DSL.(
+          fun f ->
             f "Accepting TCP requests on %s:%s"
             -% t event "accepting_tcp_requests"
-            -% s host_name host
-            -% s service_name service)
-    | Unix path ->
-        ListLabels.iter Sys.[sigint ; sigterm] ~f:begin fun signal ->
-          Sys.set_signal signal (Signal_handle begin fun _ ->
-              Format.printf "Removing the local socket file and quitting.@." ;
-              Unix.unlink path ;
-              exit 0
-            end)
-        end ;
-        log Tag.DSL.(fun f ->
+            -% s host_name host -% s service_name service)
+  | Unix path ->
+      ListLabels.iter
+        Sys.[sigint; sigterm]
+        ~f:(fun signal ->
+          Sys.set_signal
+            signal
+            (Signal_handle
+               (fun _ ->
+                 Format.printf "Removing the local socket file and quitting.@." ;
+                 Unix.unlink path ;
+                 exit 0))) ;
+      log
+        Tag.DSL.(
+          fun f ->
             f "Accepting UNIX requests on %s"
             -% t event "accepting_unix_requests"
-            -% s unix_socket_path path)
-  end >>= fun () ->
-  bind path >>=? fun fds ->
+            -% s unix_socket_path path) )
+  >>= fun () ->
+  bind path
+  >>=? fun fds ->
   let rec loop fd =
-    Lwt_unix.accept fd >>= fun (cfd, _) ->
-    Lwt.async begin fun () ->
-      protect
-        ~on_error:(function
-            | Exn End_of_file :: _ -> return_unit
-            | errs -> Lwt.return_error errs)
-        (fun () ->
-           handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt cfd)
-    end ;
+    Lwt_unix.accept fd
+    >>= fun (cfd, _) ->
+    Lwt.async (fun () ->
+        protect
+          ~on_error:(function
+            | Exn End_of_file :: _ ->
+                return_unit
+            | errs ->
+                Lwt.return_error errs)
+          (fun () ->
+            handle_client
+              ?magic_bytes
+              ~check_high_watermark
+              ~require_auth
+              cctxt
+              cfd)) ;
     loop fd
   in
-  Lwt_list.map_p loop fds >>=
-  return
+  Lwt_list.map_p loop fds >>= return

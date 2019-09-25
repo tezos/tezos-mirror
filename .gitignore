@@ -17,6 +17,7 @@ __pycache__
 /docs/api/tezos-endorser-alpha.html
 
 /tezos-node
+/tezos-validator
 /tezos-protocol-compiler
 /tezos-client
 /tezos-admin-client
@@ -25,6 +26,7 @@ __pycache__
 /tezos-accuser-*
 /tezos-signer
 /tezos-sandbox
+/tezos-codec
 /*-parameters.json
 
 /scripts/opam-test-all.sh.DONE

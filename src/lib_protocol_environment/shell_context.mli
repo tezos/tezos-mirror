@@ -28,16 +28,12 @@ open Tezos_crypto
 
 type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
 
-val checkout:
-  Tezos_storage.Context.index ->
-  Context_hash.t ->
-  Context.t option Lwt.t
+val checkout :
+  Tezos_storage.Context.index -> Context_hash.t -> Context.t option Lwt.t
 
-val checkout_exn:
-  Tezos_storage.Context.index ->
-  Context_hash.t ->
-  Context.t Lwt.t
+val checkout_exn :
+  Tezos_storage.Context.index -> Context_hash.t -> Context.t Lwt.t
 
-val wrap_disk_context: Tezos_storage.Context.t -> Context.t
+val wrap_disk_context : Tezos_storage.Context.t -> Context.t
 
-val unwrap_disk_context: Context.t -> Tezos_storage.Context.t
+val unwrap_disk_context : Context.t -> Tezos_storage.Context.t

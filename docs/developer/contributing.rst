@@ -26,7 +26,7 @@ First steps
 -----------
 
 First, make sure that you are proficient enough in OCaml. The community
-website http://www.ocaml.org below gives a few pointer for that. In
+website https://ocaml.org below gives a few pointer for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
 

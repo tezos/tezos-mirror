@@ -26,16 +26,14 @@
 
 type t
 
-type limits = {
-  bootstrap_threshold: int ;
-  worker_limits: Worker_types.limits
-}
+type limits = {bootstrap_threshold : int; worker_limits : Worker_types.limits}
 
-val create:
+val create :
   ?max_child_ttl:int ->
   start_prevalidator:bool ->
   start_testchain:bool ->
-  active_chains: t Chain_id.Table.t ->
+  active_chains:t Chain_id.Table.t ->
+  block_validator_process:Block_validator_process.t ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
@@ -46,32 +44,50 @@ val create:
   limits ->
   t tzresult Lwt.t
 
-val bootstrapped: t -> unit Lwt.t
+val bootstrapped : t -> unit Lwt.t
 
-val chain_id: t -> Chain_id.t
-val chain_state: t -> State.Chain.t
-val prevalidator: t -> Prevalidator.t option
-val chain_db: t -> Distributed_db.chain_db
-val child: t -> t option
+val chain_id : t -> Chain_id.t
 
-val validate_block:
+val chain_state : t -> State.Chain.t
+
+val prevalidator : t -> Prevalidator.t option
+
+val chain_db : t -> Distributed_db.chain_db
+
+val child : t -> t option
+
+val validate_block :
   t ->
   ?force:bool ->
-  Block_hash.t -> Block_header.t -> Operation.t list list ->
+  Block_hash.t ->
+  Block_header.t ->
+  Operation.t list list ->
   State.Block.t option tzresult Lwt.t
 
-val shutdown: t -> unit Lwt.t
+val shutdown : t -> unit Lwt.t
 
-val valid_block_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
-val new_head_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
+val valid_block_watcher : t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val running_workers: unit -> (Chain_id.t * t) list
-val status: t -> Worker_types.worker_status
-val information: t -> Worker_types.worker_information
+val new_head_watcher : t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val pending_requests : t -> (Time.System.t * Chain_validator_worker_state.Request.view) list
+val running_workers : unit -> (Chain_id.t * t) list
+
+val status : t -> Worker_types.worker_status
+
+val information : t -> Worker_types.worker_information
+
+val pending_requests :
+  t -> (Time.System.t * Chain_validator_worker_state.Request.view) list
+
 val pending_requests_length : t -> int
-val current_request : t -> (Time.System.t * Time.System.t * Chain_validator_worker_state.Request.view) option
-val last_events : t -> (Internal_event.level * Chain_validator_worker_state.Event.t list) list
 
-val ddb_information: t -> Chain_validator_worker_state.Distributed_db_state.view
+val current_request :
+  t ->
+  (Time.System.t * Time.System.t * Chain_validator_worker_state.Request.view)
+  option
+
+val last_events :
+  t -> (Internal_event.level * Chain_validator_worker_state.Event.t list) list
+
+val ddb_information :
+  t -> Chain_validator_worker_state.Distributed_db_state.view

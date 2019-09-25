@@ -24,28 +24,53 @@
 (*****************************************************************************)
 
 module Infix = struct
-
-  let (<<) g f = fun a -> g (f a)
-
-  let (--) i j =
-    let rec loop acc j =
-      if j < i then acc else loop (j :: acc) (pred j) in
-    loop [] j
-
+  let ( -- ) i j = List.init (j - i + 1) (fun x -> x + i)
 end
 
+let cut ?(copy = false) sz bytes =
+  let length = Bytes.length bytes in
+  if length <= sz then [bytes] (* if the result fits in the given sz *)
+  else
+    let may_copy = if copy then Bytes.copy else fun t -> t in
+    let nb_full = length / sz in
+    (* nb of blocks of size sz *)
+    let sz_full = nb_full * sz in
+    (* size of the full part *)
+    let acc =
+      (* eventually init acc with a non-full block *)
+      if sz_full = length then []
+      else [may_copy (Bytes.sub bytes sz_full (length - sz_full))]
+    in
+    let rec split_full_blocks curr_upper_limit acc =
+      let start = curr_upper_limit - sz in
+      assert (start >= 0) ;
+      (* copy the block [ start, curr_upper_limit [ of size sz *)
+      let acc = may_copy (Bytes.sub bytes start sz) :: acc in
+      if start = 0 then acc else split_full_blocks start acc
+    in
+    split_full_blocks sz_full acc
+
 let nbsp = Re.(compile (str "\xC2\xA0"))
+
 let display_paragraph ppf description =
-  Format.fprintf ppf "@[%a@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_newline
-       (fun ppf line ->
-          Format.pp_print_list ~pp_sep:Format.pp_print_space
-            (fun ppf w ->
-               (* replace &nbsp; by real spaces... *)
-               Format.fprintf ppf "%s@ "
-                 (Re.replace ~all:true nbsp ~f:(fun _ -> " ") w))
-            ppf
-            (TzString.split ' ' line)))
+  Format.fprintf
+    ppf
+    "@[%a@]"
+    (Format.pp_print_list ~pp_sep:Format.pp_print_newline (fun ppf line ->
+         Format.pp_print_list
+           ~pp_sep:Format.pp_print_space
+           (fun ppf w ->
+             (* replace &nbsp; by real spaces... *)
+             Format.fprintf
+               ppf
+               "%s@ "
+               (Re.replace ~all:true nbsp ~f:(fun _ -> " ") w))
+           ppf
+           (TzString.split ' ' line)))
     (TzString.split ~dup:false '\n' description)
 
-let finalize f g = try let res = f () in g (); res with exn -> g (); raise exn
+let finalize f g =
+  try
+    let res = f () in
+    g () ; res
+  with exn -> g () ; raise exn

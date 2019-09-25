@@ -12,7 +12,8 @@
             tezos-stdlib-unix
             tezos-storage
             tezos-rpc-http
-            tezos-rpc)
+            tezos-rpc
+	    tezos-version)
  (library_flags (:standard -linkall))
  (modules (:standard \
                      delegate_commands

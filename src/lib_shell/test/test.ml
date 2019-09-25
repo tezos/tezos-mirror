@@ -25,11 +25,9 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run "tezos-state" [
-    "store", Test_store.tests ;
-    "state", Test_state.tests ;
-    "store checkpoint", Test_store_checkpoint.tests ;
-    "state checkpoint", Test_state_checkpoint.tests ;
-    "pipeline-order", Test_pipeline.Order.tests ;
-    "pipeline-many-passes", Test_pipeline.Many_passes.tests ;
-  ]
+  Alcotest.run
+    "tezos-state"
+    [ ("store", Test_store.tests);
+      ("state", Test_state.tests);
+      ("store checkpoint", Test_store_checkpoint.tests);
+      ("state checkpoint", Test_state_checkpoint.tests) ]

@@ -27,7 +27,9 @@
 
 module type Value = sig
   type t
+
   val equal : t -> t -> bool
+
   val hash : t -> int
 end
 
@@ -35,19 +37,29 @@ module type Bits = sig
   type t
 
   val lnot : t -> t
-  val (land) : t -> t -> t
-  val (lxor) : t -> t -> t
-  val (lor) : t -> t -> t
-  val (lsr) : t -> int -> t
-  val (lsl) : t -> int -> t
+
+  val ( land ) : t -> t -> t
+
+  val ( lxor ) : t -> t -> t
+
+  val ( lor ) : t -> t -> t
+
+  val ( lsr ) : t -> int -> t
+
+  val ( lsl ) : t -> int -> t
+
   val pred : t -> t
 
   val less_than : t -> t -> bool
 
   val highest_bit : t -> t
+
   val equal : t -> t -> bool
+
   val hash : t -> int
+
   val zero : t
+
   val one : t
 
   val size : int
@@ -57,21 +69,27 @@ module type Size = sig
   val size : int
 end
 
-module Bits(S:Size) : sig
+module Bits (S : Size) : sig
   include Bits
+
   val of_z : Z.t -> t
+
   val to_z : t -> Z.t
 end
 
 module type S = sig
   type key
+
   type value
+
   type mask
+
   type t
 
   val equal : t -> t -> bool
 
   val empty : t
+
   val singleton : key:key -> value:value -> mask:mask -> t
 
   (** [add combine ~key ~value ?mask t]
@@ -80,8 +98,8 @@ module type S = sig
 
       Assumes that forall x, [combine x x = x]
   *)
-  val add : (value -> value -> value) -> key:key -> value:value ->
-    ?mask:mask -> t -> t
+  val add :
+    (value -> value -> value) -> key:key -> value:value -> ?mask:mask -> t -> t
 
   (** [remove key t] Remove the entire subtree speficied by the mask associated with
       key in the tree. Otherwise remove only the key *)
@@ -115,11 +133,15 @@ module type S = sig
 
   module type Map_Reduce = sig
     type result
+
     val default : result
+
     val map : t -> key -> value -> result
+
     val reduce : t -> result -> result -> result
   end
-  module Map_Reduce(M:Map_Reduce) : sig
+
+  module Map_Reduce (M : Map_Reduce) : sig
     (** run has a constant amortized complexity *)
     val run : t -> M.result
 
@@ -136,10 +158,16 @@ module type S = sig
     *)
     val filter : (M.result -> bool) -> t -> t
   end
-
 end
 
-module Make_LE(V:Value) : S with type key = int and type value = V.t and type mask = int
-module Make_BE(V:Value) : S with type key = int and type value = V.t and type mask = int
-module Make_BE_gen(V:Value)(B:Bits) : S with type key = B.t and type value = V.t and type mask = B.t
-module Make_BE_sized(V:Value)(S:Size) : S with type key = Bits(S).t and type value = V.t and type mask = Bits(S).t
+module Make_LE (V : Value) :
+  S with type key = int and type value = V.t and type mask = int
+
+module Make_BE (V : Value) :
+  S with type key = int and type value = V.t and type mask = int
+
+module Make_BE_gen (V : Value) (B : Bits) :
+  S with type key = B.t and type value = V.t and type mask = B.t
+
+module Make_BE_sized (V : Value) (S : Size) :
+  S with type key = Bits(S).t and type value = V.t and type mask = Bits(S).t

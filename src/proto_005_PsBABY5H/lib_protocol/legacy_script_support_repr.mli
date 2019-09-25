@@ -31,7 +31,7 @@
     https://gitlab.com/nomadic-labs/mi-cho-coq/blob/7b42f2e970e1541af54f8a9b6820b4f18e847575/src/contracts/manager.tz
     The formal proof is at:
     https://gitlab.com/nomadic-labs/mi-cho-coq/blob/a7603e12021166e15890f6d504feebec2f945502/src/contracts_coq/manager.v *)
-val manager_script_code: Script_repr.lazy_expr
+val manager_script_code : Script_repr.lazy_expr
 
 (** This code mimics the now defunct "spendable" flags of KT1s by
     adding a [do] entrypoint, preserving the original script's at
@@ -39,10 +39,10 @@ val manager_script_code: Script_repr.lazy_expr
 
     The pseudo-code for the applied transformations is from:
     https://gitlab.com/nomadic-labs/mi-cho-coq/blob/7b42f2e970e1541af54f8a9b6820b4f18e847575/src/contracts/transform/add_do.tz *)
-val add_do:
-  manager_pkh: Signature.Public_key_hash.t ->
-  script_code: Script_repr.lazy_expr ->
-  script_storage: Script_repr.lazy_expr ->
+val add_do :
+  manager_pkh:Signature.Public_key_hash.t ->
+  script_code:Script_repr.lazy_expr ->
+  script_storage:Script_repr.lazy_expr ->
   (Script_repr.lazy_expr * Script_repr.lazy_expr) tzresult Lwt.t
 
 (** This code mimics the now defunct "spendable" flags of KT1s by
@@ -51,19 +51,17 @@ val add_do:
 
     The pseudo-code for the applied transformations is from:
     https://gitlab.com/nomadic-labs/mi-cho-coq/blob/7b42f2e970e1541af54f8a9b6820b4f18e847575/src/contracts/transform/add_set_delegate.tz *)
-val add_set_delegate:
-  manager_pkh: Signature.Public_key_hash.t ->
-  script_code: Script_repr.lazy_expr ->
-  script_storage: Script_repr.lazy_expr ->
+val add_set_delegate :
+  manager_pkh:Signature.Public_key_hash.t ->
+  script_code:Script_repr.lazy_expr ->
+  script_storage:Script_repr.lazy_expr ->
   (Script_repr.lazy_expr * Script_repr.lazy_expr) tzresult Lwt.t
 
 (** Checks if a contract was declaring a default entrypoint somewhere
    else than at the root, in which case its type changes when
    entrypoints are activated. *)
-val has_default_entrypoint:
-  Script_repr.lazy_expr -> bool
+val has_default_entrypoint : Script_repr.lazy_expr -> bool
 
 (** Adds a [%root] annotation on the toplevel parameter construct. *)
-val add_root_entrypoint:
-  script_code: Script_repr.lazy_expr ->
-  Script_repr.lazy_expr tzresult Lwt.t
+val add_root_entrypoint :
+  script_code:Script_repr.lazy_expr -> Script_repr.lazy_expr tzresult Lwt.t

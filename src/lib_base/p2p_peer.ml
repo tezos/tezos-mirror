@@ -24,112 +24,145 @@
 (*****************************************************************************)
 
 module Id = P2p_peer_id
-
 module Table = Id.Table
 module Error_table = Id.Error_table
 module Map = Id.Map
 module Set = Id.Set
 
 module Filter = struct
-
-  type t =
-    | Accepted
-    | Running
-    | Disconnected
+  type t = Accepted | Running | Disconnected
 
   let rpc_arg =
     RPC_arg.make
       ~name:"p2p.point.state_filter"
       ~destruct:(function
-          | "accepted" -> Ok Accepted
-          | "running" -> Ok Running
-          | "disconnected" -> Ok Disconnected
-          | s -> Error (Format.asprintf "Invalid state: %s" s))
+        | "accepted" ->
+            Ok Accepted
+        | "running" ->
+            Ok Running
+        | "disconnected" ->
+            Ok Disconnected
+        | s ->
+            Error (Format.asprintf "Invalid state: %s" s))
       ~construct:(function
-          | Accepted -> "accepted"
-          | Running -> "running"
-          | Disconnected -> "disconnected")
+        | Accepted ->
+            "accepted"
+        | Running ->
+            "running"
+        | Disconnected ->
+            "disconnected")
       ()
-
 end
 
 module State = struct
-
-  type t =
-    | Accepted
-    | Running
-    | Disconnected
+  type t = Accepted | Running | Disconnected
 
   let pp_digram ppf = function
-    | Accepted -> Format.fprintf ppf "⚎"
-    | Running -> Format.fprintf ppf "⚌"
-    | Disconnected -> Format.fprintf ppf "⚏"
+    | Accepted ->
+        Format.fprintf ppf "⚎"
+    | Running ->
+        Format.fprintf ppf "⚌"
+    | Disconnected ->
+        Format.fprintf ppf "⚏"
 
   let encoding =
     let open Data_encoding in
-    string_enum [
-      "accepted", Accepted ;
-      "running", Running ;
-      "disconnected", Disconnected ;
-    ]
+    def
+      "p2p_peer.state"
+      ~description:
+        "The state a peer connection can be in: accepted (when the connection \
+         is being established), running (when the connection is already \
+         established), disconnected (otherwise)."
+    @@ string_enum
+         [ ("accepted", Accepted);
+           ("running", Running);
+           ("disconnected", Disconnected) ]
 
   let raw_filter (f : Filter.t) (s : t) =
-    match f, s with
-    | Accepted, Accepted -> true
-    | Accepted, (Running | Disconnected)
-    | (Running | Disconnected), Accepted -> false
-    | Running, Running -> true
-    | Disconnected, Disconnected -> true
-    | Running, Disconnected
-    | Disconnected, Running -> false
+    match (f, s) with
+    | (Accepted, Accepted) ->
+        true
+    | (Accepted, (Running | Disconnected))
+    | ((Running | Disconnected), Accepted) ->
+        false
+    | (Running, Running) ->
+        true
+    | (Disconnected, Disconnected) ->
+        true
+    | (Running, Disconnected) | (Disconnected, Running) ->
+        false
 
-  let filter filters state =
-    List.exists (fun f -> raw_filter f state) filters
-
+  let filter filters state = List.exists (fun f -> raw_filter f state) filters
 end
 
 module Info = struct
-
   type ('peer_meta, 'conn_meta) t = {
-    score : float ;
-    trusted : bool ;
-    conn_metadata : 'conn_meta option ;
-    peer_metadata : 'peer_meta ;
-    state : State.t ;
-    id_point : P2p_connection.Id.t option ;
-    stat : P2p_stat.t ;
-    last_failed_connection : (P2p_connection.Id.t * Time.System.t) option ;
-    last_rejected_connection : (P2p_connection.Id.t * Time.System.t) option ;
-    last_established_connection : (P2p_connection.Id.t * Time.System.t) option ;
-    last_disconnection : (P2p_connection.Id.t * Time.System.t) option ;
-    last_seen : (P2p_connection.Id.t * Time.System.t) option ;
-    last_miss : (P2p_connection.Id.t * Time.System.t) option ;
+    score : float;
+    trusted : bool;
+    conn_metadata : 'conn_meta option;
+    peer_metadata : 'peer_meta;
+    state : State.t;
+    id_point : P2p_connection.Id.t option;
+    stat : P2p_stat.t;
+    last_failed_connection : (P2p_connection.Id.t * Time.System.t) option;
+    last_rejected_connection : (P2p_connection.Id.t * Time.System.t) option;
+    last_established_connection : (P2p_connection.Id.t * Time.System.t) option;
+    last_disconnection : (P2p_connection.Id.t * Time.System.t) option;
+    last_seen : (P2p_connection.Id.t * Time.System.t) option;
+    last_miss : (P2p_connection.Id.t * Time.System.t) option;
   }
 
   let encoding peer_metadata_encoding conn_metadata_encoding =
     let open Data_encoding in
     conv
-      (fun (
-         { score ; trusted ; conn_metadata ; peer_metadata ;
-           state ; id_point ; stat ;
-           last_failed_connection ; last_rejected_connection ;
-           last_established_connection ; last_disconnection ;
-           last_seen ; last_miss }) ->
-         ((score, trusted, conn_metadata, peer_metadata,
-           state, id_point, stat),
-          (last_failed_connection, last_rejected_connection,
-           last_established_connection, last_disconnection,
-           last_seen, last_miss)))
-      (fun ((score, trusted, conn_metadata, peer_metadata,
-             state, id_point, stat),
-            (last_failed_connection, last_rejected_connection,
-             last_established_connection, last_disconnection,
-             last_seen, last_miss)) ->
-        { score ; trusted ; conn_metadata ; peer_metadata ;
-          state ; id_point ; stat ;
-          last_failed_connection ; last_rejected_connection ;
-          last_established_connection ; last_disconnection ;
-          last_seen ; last_miss })
+      (fun { score;
+             trusted;
+             conn_metadata;
+             peer_metadata;
+             state;
+             id_point;
+             stat;
+             last_failed_connection;
+             last_rejected_connection;
+             last_established_connection;
+             last_disconnection;
+             last_seen;
+             last_miss } ->
+        ( (score, trusted, conn_metadata, peer_metadata, state, id_point, stat),
+          ( last_failed_connection,
+            last_rejected_connection,
+            last_established_connection,
+            last_disconnection,
+            last_seen,
+            last_miss ) ))
+      (fun ( ( score,
+               trusted,
+               conn_metadata,
+               peer_metadata,
+               state,
+               id_point,
+               stat ),
+             ( last_failed_connection,
+               last_rejected_connection,
+               last_established_connection,
+               last_disconnection,
+               last_seen,
+               last_miss ) ) ->
+        {
+          score;
+          trusted;
+          conn_metadata;
+          peer_metadata;
+          state;
+          id_point;
+          stat;
+          last_failed_connection;
+          last_rejected_connection;
+          last_established_connection;
+          last_disconnection;
+          last_seen;
+          last_miss;
+        })
       (merge_objs
          (obj7
             (req "score" float)
@@ -140,17 +173,27 @@ module Info = struct
             (opt "reachable_at" P2p_connection.Id.encoding)
             (req "stat" P2p_stat.encoding))
          (obj6
-            (opt "last_failed_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
-            (opt "last_rejected_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
-            (opt "last_established_connection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
-            (opt "last_disconnection" (tup2 P2p_connection.Id.encoding Time.System.encoding))
-            (opt "last_seen" (tup2 P2p_connection.Id.encoding Time.System.encoding))
-            (opt "last_miss" (tup2 P2p_connection.Id.encoding Time.System.encoding))))
-
+            (opt
+               "last_failed_connection"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt
+               "last_rejected_connection"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt
+               "last_established_connection"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt
+               "last_disconnection"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt
+               "last_seen"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))
+            (opt
+               "last_miss"
+               (tup2 P2p_connection.Id.encoding Time.System.encoding))))
 end
 
 module Pool_event = struct
-
   type kind =
     | Accepting_request
     | Rejecting_request
@@ -160,32 +203,39 @@ module Pool_event = struct
     | External_disconnection
 
   let kind_encoding =
-    Data_encoding.string_enum [
-      "incoming_request", Accepting_request ;
-      "rejecting_request", Rejecting_request ;
-      "request_rejected", Request_rejected ;
-      "connection_established", Connection_established ;
-      "disconnection", Disconnection ;
-      "external_disconnection", External_disconnection ;
-    ]
+    Data_encoding.string_enum
+      [ ("incoming_request", Accepting_request);
+        ("rejecting_request", Rejecting_request);
+        ("request_rejected", Request_rejected);
+        ("connection_established", Connection_established);
+        ("disconnection", Disconnection);
+        ("external_disconnection", External_disconnection) ]
 
   type t = {
-    kind : kind ;
-    timestamp : Time.System.t ;
-    point : P2p_connection.Id.t ;
+    kind : kind;
+    timestamp : Time.System.t;
+    point : P2p_connection.Id.t;
   }
 
   let encoding =
     let open Data_encoding in
-    conv
-      (fun { kind ; timestamp ; point = (addr, port) } ->
-         (kind, timestamp, addr, port))
-      (fun (kind, timestamp, addr, port) ->
-         { kind ; timestamp ; point = (addr, port) })
-      (obj4
-         (req "kind" kind_encoding)
-         (req "timestamp" Time.System.encoding)
-         (req "addr" P2p_addr.encoding)
-         (opt "port" uint16))
-
+    def
+      "p2p_peer.pool_event"
+      ~description:
+        "An event that may happen during maintenance of and other operations \
+         on the connection to a specific peer."
+    @@ conv
+         (fun {kind; timestamp; point = (addr, port)} ->
+           (kind, timestamp, addr, port))
+         (fun (kind, timestamp, addr, port) ->
+           {kind; timestamp; point = (addr, port)})
+         (obj4
+            (req "kind" kind_encoding)
+            (req "timestamp" Time.System.encoding)
+            (req "addr" P2p_addr.encoding)
+            (opt "port" uint16))
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:State.pp_digram State.encoding ;
+  Data_encoding.Registration.register Pool_event.encoding

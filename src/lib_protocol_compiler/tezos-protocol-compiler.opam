@@ -10,19 +10,16 @@ depends: [
   ## ocaml should be in sync with `script/version.sh`
   "ocaml" { = "4.07.1" }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "base-unix"
   "tezos-base"
   "tezos-protocol-environment"
   "tezos-protocol-environment-sigs"
   "tezos-stdlib-unix"
-  "ocplib-endian"
   "ocp-ocamlres" { >= "0.4" }
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: economic-protocol compiler"

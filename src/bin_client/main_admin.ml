@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Log = Internal_event.Legacy_logging.Make (struct
+  let name = "admin-client.main"
+end)
+
+let () =
+  let log s = Log.fatal_error "%s" s in
+  Lwt_exit.exit_on ~log Sys.sigint ;
+  Lwt_exit.exit_on ~log Sys.sigterm
+
 let select_commands _ _ =
   return
     (List.flatten
-       [ Client_report_commands.commands () ;
-         Client_admin_commands.commands () ;
-         Client_p2p_commands.commands () ;
-         Client_protocols_commands.commands () ;
-         Client_rpc_commands.commands ;
+       [ Client_report_commands.commands ();
+         Client_admin_commands.commands ();
+         Client_p2p_commands.commands ();
+         Client_protocols_commands.commands ();
+         Client_rpc_commands.commands;
          Client_event_logging_commands.commands () ])
 
 let () = Client_main_run.run (module Client_config) ~select_commands

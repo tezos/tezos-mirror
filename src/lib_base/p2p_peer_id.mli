@@ -25,9 +25,12 @@
 
 include Tezos_crypto.S.HASH with type t = Crypto_box.Public_key_hash.t
 
-module Logging: sig
+module Logging : sig
   include Internal_event.Legacy_logging.SEMLOG
-  val tag: t Tag.def
-  val tag_opt: t option Tag.def
-  val tag_source: t option Tag.def
+
+  val tag : t Tag.def
+
+  val tag_opt : t option Tag.def
+
+  val tag_source : t option Tag.def
 end

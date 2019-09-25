@@ -23,33 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 module Configuration = struct
-  type t = { activate : Uri.t list }
+  type t = {activate : Uri.t list}
 
   let default =
-    { activate = [
-          Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()
-        ] }
+    {activate = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { activate } -> List.map Uri.to_string activate)
-      (fun activate -> { activate = List.map Uri.of_string activate })
+      (fun {activate} -> List.map Uri.to_string activate)
+      (fun activate -> {activate = List.map Uri.of_string activate})
       (obj1
-         (dft "activate"
-            ~description: "List of URIs to activate/configure sinks."
-            (list string) []))
+         (dft
+            "activate"
+            ~description:"List of URIs to activate/configure sinks."
+            (list string)
+            []))
 
   let of_file path =
-    Lwt_utils_unix.Json.read_file path >>=? fun json ->
+    Lwt_utils_unix.Json.read_file path
+    >>=? fun json ->
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 
-  let apply { activate } =
+  let apply {activate} =
     List.fold_left
       (fun prev uri ->
-         prev >>=? fun () ->
-         Internal_event.All_sinks.activate uri)
+        prev >>=? fun () -> Internal_event.All_sinks.activate uri)
       return_unit
       activate
 end
@@ -59,47 +61,58 @@ let env_var_name = "TEZOS_EVENTS_CONFIG"
 let init ?lwt_log_sink ?(configuration = Configuration.default) () =
   Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
   >>= fun () ->
-  begin
-    begin match Sys.(getenv_opt env_var_name) with
-      | None ->
-          return_unit
-      | Some s ->
-          let uris =
-            String.split ' ' s
-            |> List.map (String.split '\n') |> List.concat
-            |> List.map (String.split '\t') |> List.concat
-            |> List.filter ((<>) "")
-            |> List.map Uri.of_string in
-          List.fold_left
-            (fun prev uri ->
-               prev >>=? fun () ->
-               match Uri.scheme uri with
-               | None ->
-                   Configuration.of_file (Uri.path uri) >>=? fun cfg ->
-                   Configuration.apply cfg
-               | Some _ ->
-                   Internal_event.All_sinks.activate uri)
-            return_unit
-            uris >>=? fun () ->
-          Internal_event.Debug_event.(
-            emit (make "Loaded URIs from environment"
-                    ~attach:(`O [ "variable", `String env_var_name ;
-                                  "value", `String s ])))
-    end >>=? fun () ->
-    Configuration.apply configuration
-  end
+  ( match Sys.(getenv_opt env_var_name) with
+  | None ->
+      return_unit
+  | Some s ->
+      let uris =
+        TzString.split ' ' s
+        |> List.map (TzString.split '\n')
+        |> List.concat
+        |> List.map (TzString.split '\t')
+        |> List.concat
+        |> List.filter (( <> ) "")
+        |> List.map Uri.of_string
+      in
+      List.fold_left
+        (fun prev uri ->
+          prev
+          >>=? fun () ->
+          match Uri.scheme uri with
+          | None ->
+              Configuration.of_file (Uri.path uri)
+              >>=? fun cfg -> Configuration.apply cfg
+          | Some _ ->
+              Internal_event.All_sinks.activate uri)
+        return_unit
+        uris
+      >>=? fun () ->
+      Internal_event.Debug_event.(
+        emit
+          (make
+             "Loaded URIs from environment"
+             ~attach:
+               (`O [("variable", `String env_var_name); ("value", `String s)])))
+  )
+  >>=? (fun () -> Configuration.apply configuration)
   >>= function
-  | Ok () -> Lwt.return_unit
+  | Ok () ->
+      Lwt.return_unit
   | Error el ->
-      Format.kasprintf Lwt.fail_with
+      Format.kasprintf
+        Lwt.fail_with
         "ERROR@ Initializing Internal_event_unix:@ %a\n%!"
-        Error_monad.pp_print_error el
+        Error_monad.pp_print_error
+        el
 
 let close () =
   Internal_event.All_sinks.close ()
   >>= function
-  | Ok () -> Lwt.return_unit
+  | Ok () ->
+      Lwt.return_unit
   | Error el ->
-      Format.kasprintf Lwt.fail_with
+      Format.kasprintf
+        Lwt.fail_with
         "ERROR@ closing Internal_event_unix:@ %a\n%!"
-        Error_monad.pp_print_error el
+        Error_monad.pp_print_error
+        el

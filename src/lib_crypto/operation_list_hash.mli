@@ -24,4 +24,3 @@
 (*****************************************************************************)
 
 include S.MERKLE_TREE with type elt = Operation_hash.t
-

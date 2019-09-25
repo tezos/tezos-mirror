@@ -26,28 +26,28 @@
 open Protocol
 open Alpha_context
 
-val list_contract_labels:
+val list_contract_labels :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   (string * string * string) list tzresult Lwt.t
 
-val get_storage:
+val get_storage :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
-val get_contract_big_map_value:
+val get_contract_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  (Script.expr * Script.expr) ->
+  Script.expr * Script.expr ->
   Script.expr option tzresult Lwt.t
 
-val get_big_map_value:
+val get_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -55,27 +55,27 @@ val get_big_map_value:
   Script_expr_hash.t ->
   Script.expr tzresult Lwt.t
 
-val get_script:
+val get_script :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 
-val get_balance:
+val get_balance :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
-val set_delegate:
+val set_delegate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
-  ?verbose_signing: bool ->
+  ?verbose_signing:bool ->
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
@@ -84,7 +84,7 @@ val set_delegate:
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
-val register_as_delegate:
+val register_as_delegate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -104,7 +104,7 @@ val save_contract :
   Contract.t ->
   unit tzresult Lwt.t
 
-val originate_contract:
+val originate_contract :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -123,7 +123,8 @@ val originate_contract:
   src_sk:Client_keys.sk_uri ->
   code:Script.expr ->
   fee_parameter:Injection.fee_parameter ->
-  unit -> (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
+  unit ->
+  (Kind.origination Kind.manager Injection.result * Contract.t) tzresult Lwt.t
 
 val transfer :
   #Protocol_client_context.full ->
@@ -146,7 +147,8 @@ val transfer :
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult Lwt.t
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t
 
 val reveal :
   #Protocol_client_context.full ->
@@ -161,20 +163,21 @@ val reveal :
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->
   fee_parameter:Injection.fee_parameter ->
-  unit -> Kind.reveal Kind.manager Injection.result tzresult Lwt.t
+  unit ->
+  Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
-type activation_key =
-  { pkh : Ed25519.Public_key_hash.t ;
-    amount : Tez.t ;
-    activation_code : Blinded_public_key_hash.activation_code ;
-    mnemonic : string list ;
-    password : string ;
-    email : string ;
-  }
+type activation_key = {
+  pkh : Ed25519.Public_key_hash.t;
+  amount : Tez.t;
+  activation_code : Blinded_public_key_hash.activation_code;
+  mnemonic : string list;
+  password : string;
+  email : string;
+}
 
-val activation_key_encoding: activation_key Data_encoding.t
+val activation_key_encoding : activation_key Data_encoding.t
 
-val activate_account:
+val activate_account :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -186,7 +189,7 @@ val activate_account:
   string ->
   Kind.activate_account Injection.result tzresult Lwt.t
 
-val activate_existing_account:
+val activate_existing_account :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -197,17 +200,17 @@ val activate_existing_account:
   Kind.activate_account Injection.result tzresult Lwt.t
 
 type period_info = {
-  current_period_kind : Voting_period.kind ;
-  position : Int32.t ;
-  remaining : Int32.t ;
-  current_proposal : Protocol_hash.t option ;
+  current_period_kind : Voting_period.kind;
+  position : Int32.t;
+  remaining : Int32.t;
+  current_proposal : Protocol_hash.t option;
 }
 
 type ballots_info = {
-  current_quorum : Int32.t ;
-  participation : Int32.t ;
-  supermajority : Int32.t ;
-  ballots : Vote.ballots ;
+  current_quorum : Int32.t;
+  participation : Int32.t;
+  supermajority : Int32.t;
+  ballots : Vote.ballots;
 }
 
 val get_period_info :
@@ -228,9 +231,9 @@ val get_proposals :
   block:Shell_services.block ->
   Int32.t Environment.Protocol_hash.Map.t tzresult Lwt.t
 
-val submit_proposals:
+val submit_proposals :
   ?dry_run:bool ->
-  ?verbose_signing: bool ->
+  ?verbose_signing:bool ->
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -240,9 +243,9 @@ val submit_proposals:
   Protocol_hash.t list ->
   Kind.proposals Injection.result_list tzresult Lwt.t
 
-val submit_ballot:
+val submit_ballot :
   ?dry_run:bool ->
-  ?verbose_signing: bool ->
+  ?verbose_signing:bool ->
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -255,7 +258,7 @@ val submit_ballot:
 
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
-val display_receipt_for_operation:
+val display_receipt_for_operation :
   #Protocol_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->

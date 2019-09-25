@@ -24,11 +24,12 @@
 (*****************************************************************************)
 
 (** Some memory and time limits. *)
-type limits =
-  { backlog_size : int
-  (** Number of event stored in the backlog for each debug level. *) ;
-    backlog_level : Internal_event.level
-  (** Stores events at least as important as this value. *) ; }
+type limits = {
+  backlog_size : int;
+      (** Number of event stored in the backlog for each debug level. *)
+  backlog_level : Internal_event.level;
+      (** Stores events at least as important as this value. *)
+}
 
 (** The running status of an individual worker. *)
 type worker_status =
@@ -38,32 +39,35 @@ type worker_status =
   | Closed of Time.System.t * Time.System.t * error list option
 
 (** Worker status serializer for RPCs. *)
-val worker_status_encoding : error list Data_encoding.t -> worker_status Data_encoding.t
+val worker_status_encoding :
+  error list Data_encoding.t -> worker_status Data_encoding.t
 
 type worker_information = {
-  instances_number : int ;
-  wstatus: worker_status ;
-  queue_length : int ;
+  instances_number : int;
+  wstatus : worker_status;
+  queue_length : int;
 }
 
 val worker_information_encoding :
   error list Data_encoding.t -> worker_information Data_encoding.t
 
 (** The runnning status of an individual request. *)
-type request_status =
-  { pushed : Time.System.t ;
-    treated : Time.System.t ;
-    completed : Time.System.t }
+type request_status = {
+  pushed : Time.System.t;
+  treated : Time.System.t;
+  completed : Time.System.t;
+}
 
 (** Request status serializer for RPCs. *)
 val request_status_encoding : request_status Data_encoding.t
 
 (** The full status of an individual worker. *)
-type ('req, 'evt) full_status =
-  { status : worker_status ;
-    pending_requests : (Time.System.t * 'req) list ;
-    backlog : (Internal_event.level * 'evt list) list ;
-    current_request : (Time.System.t * Time.System.t * 'req) option }
+type ('req, 'evt) full_status = {
+  status : worker_status;
+  pending_requests : (Time.System.t * 'req) list;
+  backlog : (Internal_event.level * 'evt list) list;
+  current_request : (Time.System.t * Time.System.t * 'req) option;
+}
 
 (** Full worker status serializer for RPCs. *)
 val full_status_encoding :
@@ -71,3 +75,5 @@ val full_status_encoding :
   'evt Data_encoding.t ->
   error list Data_encoding.t ->
   ('req, 'evt) full_status Data_encoding.t
+
+val pp_status : Format.formatter -> request_status -> unit

@@ -24,269 +24,318 @@
 (*****************************************************************************)
 
 module Public_key_hash = struct
-  include Blake2B.Make(Base58)(struct
-      let name  = "P256.Public_key_hash"
-      let title = "A P256 public key hash"
-      let b58check_prefix = Base58.Prefix.p256_public_key_hash
-      let size = Some 20
-    end)
+  include Blake2B.Make
+            (Base58)
+            (struct
+              let name = "P256.Public_key_hash"
+
+              let title = "A P256 public key hash"
+
+              let b58check_prefix = Base58.Prefix.p256_public_key_hash
+
+              let size = Some 20
+            end)
 
   module Logging = struct
     let tag = Tag.def ~doc:title name pp
   end
 end
 
-let () =
-  Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
+let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 
 open Uecc
 
 module Public_key = struct
-
   type t = (secp256r1, public) key
 
-  let name  = "P256.Public_key"
+  let name = "P256.Public_key"
+
   let title = "A P256 public key"
 
-  let to_bytes = to_bytes ~compress:true
-  let of_bytes_opt = pk_of_bytes secp256r1
+  let to_bigstring = to_bytes ~compress:true
 
-  let to_string s = MBytes.to_string (to_bytes s)
-  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+  let to_bytes b = Bigstring.to_bytes (to_bigstring b)
+
+  let to_string s = Bytes.to_string (to_bytes s)
+
+  let of_bytes_opt b = pk_of_bytes secp256r1 (Bigstring.of_bytes b)
+
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let size = compressed_size secp256r1
 
-  type Base58.data +=
-    | Data of t
+  type Base58.data += Data of t
 
   let b58check_encoding =
     Base58.register_encoding
-      ~prefix: Base58.Prefix.p256_public_key
-      ~length: size
-      ~to_raw: to_string
-      ~of_raw: of_string_opt
-      ~wrap: (fun x -> Data x)
+      ~prefix:Base58.Prefix.p256_public_key
+      ~length:size
+      ~to_raw:to_string
+      ~of_raw:of_string_opt
+      ~wrap:(fun x -> Data x)
 
-  let () =
-    Base58.check_encoded_prefix b58check_encoding "p2pk" 55
+  let () = Base58.check_encoded_prefix b58check_encoding "p2pk" 55
 
-  let hash v =
-    Public_key_hash.hash_bytes [to_bytes v]
+  let hash v = Public_key_hash.hash_bytes [to_bytes v]
 
-  include Compare.Make(struct
-      type nonrec t = t
-      let compare a b =
-        MBytes.compare (to_bytes a) (to_bytes b)
-    end)
+  include Compare.Make (struct
+    type nonrec t = t
 
-  include Helpers.MakeRaw(struct
-      type nonrec t = t
-      let name = name
-      let of_bytes_opt = of_bytes_opt
-      let of_string_opt = of_string_opt
-      let to_string = to_string
-    end)
+    let compare a b = Bytes.compare (to_bytes a) (to_bytes b)
+  end)
 
-  include Helpers.MakeB58(struct
-      type nonrec t = t
-      let name = name
-      let b58check_encoding = b58check_encoding
-    end)
+  include Helpers.MakeRaw (struct
+    type nonrec t = t
 
-  include Helpers.MakeEncoder(struct
-      type nonrec t = t
-      let name = name
-      let title = title
-      let raw_encoding =
-        let open Data_encoding in
-        conv to_bytes of_bytes_exn (Fixed.bytes size)
-      let of_b58check = of_b58check
-      let of_b58check_opt = of_b58check_opt
-      let of_b58check_exn = of_b58check_exn
-      let to_b58check = to_b58check
-      let to_short_b58check = to_short_b58check
-    end)
+    let name = name
+
+    let of_bytes_opt = of_bytes_opt
+
+    let of_string_opt = of_string_opt
+
+    let to_string = to_string
+  end)
+
+  include Helpers.MakeB58 (struct
+    type nonrec t = t
+
+    let name = name
+
+    let b58check_encoding = b58check_encoding
+  end)
+
+  include Helpers.MakeEncoder (struct
+    type nonrec t = t
+
+    let name = name
+
+    let title = title
+
+    let raw_encoding =
+      let open Data_encoding in
+      conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+    let of_b58check = of_b58check
+
+    let of_b58check_opt = of_b58check_opt
+
+    let of_b58check_exn = of_b58check_exn
+
+    let to_b58check = to_b58check
+
+    let to_short_b58check = to_short_b58check
+  end)
 
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
-
 end
 
 module Secret_key = struct
-
   type t = (secp256r1, secret) key
 
   let name = "P256.Secret_key"
+
   let title = "A P256 secret key"
 
   let size = sk_size secp256r1
 
   let of_bytes_opt buf =
-    Option.map ~f:fst (sk_of_bytes secp256r1 buf)
+    Option.map ~f:fst (sk_of_bytes secp256r1 (Bigstring.of_bytes buf))
 
-  let to_bytes = to_bytes ~compress:true
+  let to_bigstring = to_bytes ~compress:true
 
-  let to_string s = MBytes.to_string (to_bytes s)
-  let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+  let to_bytes t = Bigstring.to_bytes (to_bigstring t)
+
+  let to_string s = Bytes.to_string (to_bytes s)
+
+  let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
   let to_public_key = neuterize
 
-  type Base58.data +=
-    | Data of t
+  type Base58.data += Data of t
 
   let b58check_encoding =
     Base58.register_encoding
-      ~prefix: Base58.Prefix.p256_secret_key
-      ~length: size
-      ~to_raw: to_string
-      ~of_raw: of_string_opt
-      ~wrap: (fun x -> Data x)
+      ~prefix:Base58.Prefix.p256_secret_key
+      ~length:size
+      ~to_raw:to_string
+      ~of_raw:of_string_opt
+      ~wrap:(fun x -> Data x)
 
-  let () =
-    Base58.check_encoded_prefix b58check_encoding "p2sk" 54
+  let () = Base58.check_encoded_prefix b58check_encoding "p2sk" 54
 
-  include Compare.Make(struct
-      type nonrec t = t
-      let compare a b =
-        MBytes.compare (to_bytes a) (to_bytes b)
-    end)
+  include Compare.Make (struct
+    type nonrec t = t
 
-  include Helpers.MakeRaw(struct
-      type nonrec t = t
-      let name = name
-      let of_bytes_opt = of_bytes_opt
-      let of_string_opt = of_string_opt
-      let to_string = to_string
-    end)
+    let compare a b = Bytes.compare (to_bytes a) (to_bytes b)
+  end)
 
-  include Helpers.MakeB58(struct
-      type nonrec t = t
-      let name = name
-      let b58check_encoding = b58check_encoding
-    end)
+  include Helpers.MakeRaw (struct
+    type nonrec t = t
 
-  include Helpers.MakeEncoder(struct
-      type nonrec t = t
-      let name = name
-      let title = title
-      let raw_encoding =
-        let open Data_encoding in
-        conv to_bytes of_bytes_exn (Fixed.bytes size)
-      let of_b58check = of_b58check
-      let of_b58check_opt = of_b58check_opt
-      let of_b58check_exn = of_b58check_exn
-      let to_b58check = to_b58check
-      let to_short_b58check = to_short_b58check
-    end)
+    let name = name
+
+    let of_bytes_opt = of_bytes_opt
+
+    let of_string_opt = of_string_opt
+
+    let to_string = to_string
+  end)
+
+  include Helpers.MakeB58 (struct
+    type nonrec t = t
+
+    let name = name
+
+    let b58check_encoding = b58check_encoding
+  end)
+
+  include Helpers.MakeEncoder (struct
+    type nonrec t = t
+
+    let name = name
+
+    let title = title
+
+    let raw_encoding =
+      let open Data_encoding in
+      conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+    let of_b58check = of_b58check
+
+    let of_b58check_opt = of_b58check_opt
+
+    let of_b58check_exn = of_b58check_exn
+
+    let to_b58check = to_b58check
+
+    let to_short_b58check = to_short_b58check
+  end)
 
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
-
 end
 
-type t = MBytes.t
+type t = Bigstring.t
 
-type watermark = MBytes.t
+type watermark = Bytes.t
 
 let name = "P256"
+
 let title = "A P256 signature"
 
 let size = pk_size secp256r1
 
 let of_bytes_opt s =
-  if MBytes.length s = size then Some s else None
+  if Bytes.length s = size then Some (Bigstring.of_bytes s) else None
 
-let to_bytes s = s
+let to_bytes s = Bigstring.to_bytes s
 
-let to_string s = MBytes.to_string (to_bytes s)
-let of_string_opt s = of_bytes_opt (MBytes.of_string s)
+let to_string s = Bytes.to_string (to_bytes s)
 
-type Base58.data +=
-  | Data of t
+let of_string_opt s = of_bytes_opt (Bytes.of_string s)
+
+type Base58.data += Data of t
 
 let b58check_encoding =
   Base58.register_encoding
-    ~prefix: Base58.Prefix.p256_signature
-    ~length: size
-    ~to_raw: to_string
-    ~of_raw: of_string_opt
-    ~wrap: (fun x -> Data x)
+    ~prefix:Base58.Prefix.p256_signature
+    ~length:size
+    ~to_raw:to_string
+    ~of_raw:of_string_opt
+    ~wrap:(fun x -> Data x)
 
-let () =
-  Base58.check_encoded_prefix b58check_encoding "p2sig" 98
+let () = Base58.check_encoded_prefix b58check_encoding "p2sig" 98
 
-include Helpers.MakeRaw(struct
-    type nonrec t = t
-    let name = name
-    let of_bytes_opt = of_bytes_opt
-    let of_string_opt = of_string_opt
-    let to_string = to_string
-  end)
+include Helpers.MakeRaw (struct
+  type nonrec t = t
 
-include Helpers.MakeB58(struct
-    type nonrec t = t
-    let name = name
-    let b58check_encoding = b58check_encoding
-  end)
+  let name = name
 
-include Helpers.MakeEncoder(struct
-    type nonrec t = t
-    let name = name
-    let title = title
-    let raw_encoding =
-      let open Data_encoding in
-      conv to_bytes of_bytes_exn (Fixed.bytes size)
-    let of_b58check = of_b58check
-    let of_b58check_opt = of_b58check_opt
-    let of_b58check_exn = of_b58check_exn
-    let to_b58check = to_b58check
-    let to_short_b58check = to_short_b58check
-  end)
+  let of_bytes_opt = of_bytes_opt
+
+  let of_string_opt = of_string_opt
+
+  let to_string = to_string
+end)
+
+include Helpers.MakeB58 (struct
+  type nonrec t = t
+
+  let name = name
+
+  let b58check_encoding = b58check_encoding
+end)
+
+include Helpers.MakeEncoder (struct
+  type nonrec t = t
+
+  let name = name
+
+  let title = title
+
+  let raw_encoding =
+    let open Data_encoding in
+    conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+  let of_b58check = of_b58check
+
+  let of_b58check_opt = of_b58check_opt
+
+  let of_b58check_exn = of_b58check_exn
+
+  let to_b58check = to_b58check
+
+  let to_short_b58check = to_short_b58check
+end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let zero = of_bytes_exn (MBytes.make size '\000')
+let zero = of_bytes_exn (Bytes.make size '\000')
 
 let sign ?watermark sk msg =
   let msg =
-    Blake2B.to_bytes @@
-    Blake2B.hash_bytes @@
-    match watermark with
-    | None -> [msg]
-    | Some prefix -> [ prefix ; msg ] in
-  match sign sk msg with
+    Blake2B.to_bytes @@ Blake2B.hash_bytes
+    @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
+  in
+  match sign sk (Bigstring.of_bytes msg) with
   | None ->
       (* Will never happen in practice. This can only happen in case
          of RNG error. *)
       invalid_arg "P256.sign: internal error"
-  | Some signature -> signature
+  | Some signature ->
+      signature
 
 let check ?watermark public_key signature msg =
   let msg =
-    Blake2B.to_bytes @@
-    Blake2B.hash_bytes @@
-    match watermark with
-    | None -> [msg]
-    | Some prefix -> [ prefix ; msg ] in
-  verify public_key ~msg ~signature
+    Blake2B.to_bytes @@ Blake2B.hash_bytes
+    @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
+  in
+  verify public_key ~msg:(Bigstring.of_bytes msg) ~signature
 
-let generate_key ?(seed=Rand.generate 32) () =
-  let seedlen = MBytes.length seed in
+let generate_key ?(seed = Hacl.Rand.gen 32) () =
+  let seedlen = Bigstring.length seed in
   if seedlen < 32 then
-    invalid_arg (Printf.sprintf "P256.generate_key: seed must be at \
-                                 least 32 bytes long (was %d)" seedlen) ;
+    invalid_arg
+      (Printf.sprintf
+         "P256.generate_key: seed must be at least 32 bytes long (was %d)"
+         seedlen) ;
   match sk_of_bytes secp256r1 seed with
-  | None -> invalid_arg "P256.generate_key: invalid seed (very rare!)"
+  | None ->
+      invalid_arg "P256.generate_key: invalid seed (very rare!)"
   | Some (sk, pk) ->
       let pkh = Public_key.hash pk in
-      pkh, pk, sk
+      (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
-  Hacl.Hash.SHA256.HMAC.digest ~key: (Secret_key.to_bytes sk) ~msg
+  let msg = Bigstring.of_bytes msg in
+  let key = Secret_key.to_bigstring sk in
+  Hacl.Hash.SHA256.HMAC.digest ~key ~msg
 
 let deterministic_nonce_hash sk msg =
-  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
+  let nonce = deterministic_nonce sk msg in
+  Blake2B.to_bytes (Blake2B.hash_bytes [Bigstring.to_bytes nonce])
 
+include Compare.Make (struct
+  type nonrec t = t
 
-include Compare.Make(struct
-    type nonrec t = t
-    let compare = MBytes.compare
-  end)
+  let compare = Bigstring.compare
+end)

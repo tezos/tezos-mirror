@@ -25,114 +25,107 @@
 (*****************************************************************************)
 
 let build_rpc_directory state =
-
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
-    dir := RPC_directory.register !dir s (fun () p q -> f p q) in
+    dir := RPC_directory.register !dir s (fun () p q -> f p q)
+  in
   let register1 s f =
-    dir := RPC_directory.register !dir s (fun ((), a) p q -> f a p q) in
+    dir := RPC_directory.register !dir s (fun ((), a) p q -> f a p q)
+  in
   let register2 s f =
-    dir := RPC_directory.register !dir s (fun (((), a), b) p q -> f a b p q) in
-
+    dir := RPC_directory.register !dir s (fun (((), a), b) p q -> f a b p q)
+  in
   (* Workers : Prevalidators *)
-
-  register0  Worker_services.Prevalidators.S.list begin fun () () ->
-    let workers = Prevalidator.running_workers () in
-    let statuses =
-      List.map
-        (fun (chain_id, _, t) -> (chain_id,
-                                  Prevalidator.status t,
-                                  Prevalidator.information t,
-                                  Prevalidator.pipeline_length t))
-        workers in
-    return statuses
-  end ;
-
-  register1 Worker_services.Prevalidators.S.state begin fun chain () () ->
-    Chain_directory.get_chain_id state chain >>= fun chain_id ->
-    let workers = Prevalidator.running_workers () in
-    let (_, _, t) =
-      (* NOTE: it is technically possible to use the Prevalidator interface to
-       * register multiple Prevalidator for a single chain (using distinct
-       * protocols). However, this is never done. *)
-      List.find (fun (c, _, _) -> Chain_id.equal c chain_id) workers in
-    let status = Prevalidator.status t in
-    let pending_requests = Prevalidator.pending_requests t in
-    let backlog = Prevalidator.last_events t in
-    let current_request = Prevalidator.current_request t in
-    return
-      { Worker_types.
-        status ;
-        pending_requests ;
-        backlog ;
-        current_request }
-  end ;
-
+  register0 Worker_services.Prevalidators.S.list (fun () () ->
+      let workers = Prevalidator.running_workers () in
+      let statuses =
+        List.map
+          (fun (chain_id, _, t) ->
+            ( chain_id,
+              Prevalidator.status t,
+              Prevalidator.information t,
+              Prevalidator.pipeline_length t ))
+          workers
+      in
+      return statuses) ;
+  register1 Worker_services.Prevalidators.S.state (fun chain () () ->
+      Chain_directory.get_chain_id state chain
+      >>= fun chain_id ->
+      let workers = Prevalidator.running_workers () in
+      let (_, _, t) =
+        (* NOTE: it is technically possible to use the Prevalidator interface to
+         * register multiple Prevalidator for a single chain (using distinct
+         * protocols). However, this is never done. *)
+        List.find (fun (c, _, _) -> Chain_id.equal c chain_id) workers
+      in
+      let status = Prevalidator.status t in
+      let pending_requests = Prevalidator.pending_requests t in
+      let backlog = Prevalidator.last_events t in
+      let current_request = Prevalidator.current_request t in
+      return {Worker_types.status; pending_requests; backlog; current_request}) ;
   (* Workers : Block_validator *)
-
-  register0 Worker_services.Block_validator.S.state begin fun () () ->
-    let w = Block_validator.running_worker () in
-    return
-      { Worker_types.status = Block_validator.status w ;
-        pending_requests = Block_validator.pending_requests w ;
-        backlog = Block_validator.last_events w ;
-        current_request = Block_validator.current_request w }
-  end ;
-
+  register0 Worker_services.Block_validator.S.state (fun () () ->
+      let w = Block_validator.running_worker () in
+      return
+        {
+          Worker_types.status = Block_validator.status w;
+          pending_requests = Block_validator.pending_requests w;
+          backlog = Block_validator.last_events w;
+          current_request = Block_validator.current_request w;
+        }) ;
   (* Workers : Peer validators *)
-
-  register1 Worker_services.Peer_validators.S.list begin fun chain () () ->
-    Chain_directory.get_chain_id state chain >>= fun chain_id ->
-    return
-      (List.filter_map
-         (fun ((id, peer_id), w) ->
-            if Chain_id.equal id chain_id then
-              Some (peer_id,
-                    Peer_validator.status w,
-                    Peer_validator.information w,
-                    Peer_validator.pipeline_length w)
-            else None)
-         (Peer_validator.running_workers ()))
-  end ;
-
-  register2 Worker_services.Peer_validators.S.state begin fun chain peer_id () () ->
-    Chain_directory.get_chain_id state chain >>= fun chain_id ->
-    let w = List.assoc (chain_id, peer_id)
-        (Peer_validator.running_workers ()) in
-    return
-      { Worker_types.status = Peer_validator.status w ;
-        pending_requests = [] ;
-        backlog = Peer_validator.last_events w ;
-        current_request = Peer_validator.current_request w }
-  end ;
-
+  register1 Worker_services.Peer_validators.S.list (fun chain () () ->
+      Chain_directory.get_chain_id state chain
+      >>= fun chain_id ->
+      return
+        (List.filter_map
+           (fun ((id, peer_id), w) ->
+             if Chain_id.equal id chain_id then
+               Some
+                 ( peer_id,
+                   Peer_validator.status w,
+                   Peer_validator.information w,
+                   Peer_validator.pipeline_length w )
+             else None)
+           (Peer_validator.running_workers ()))) ;
+  register2 Worker_services.Peer_validators.S.state (fun chain peer_id () () ->
+      Chain_directory.get_chain_id state chain
+      >>= fun chain_id ->
+      let w =
+        List.assoc (chain_id, peer_id) (Peer_validator.running_workers ())
+      in
+      return
+        {
+          Worker_types.status = Peer_validator.status w;
+          pending_requests = [];
+          backlog = Peer_validator.last_events w;
+          current_request = Peer_validator.current_request w;
+        }) ;
   (* Workers : Net validators *)
-
-  register0 Worker_services.Chain_validators.S.list begin fun () () ->
-    return
-      (List.map
-         (fun (id, w) ->
-            (id,
-             Chain_validator.status w,
-             Chain_validator.information w,
-             Chain_validator.pending_requests_length w))
-         (Chain_validator.running_workers ()))
-  end ;
-
-  register1 Worker_services.Chain_validators.S.state begin fun chain () () ->
-    Chain_directory.get_chain_id state chain >>= fun chain_id ->
-    let w = List.assoc chain_id (Chain_validator.running_workers ()) in
-    return
-      { Worker_types.status = Chain_validator.status w ;
-        pending_requests = Chain_validator.pending_requests w ;
-        backlog = Chain_validator.last_events w ;
-        current_request = Chain_validator.current_request w }
-  end ;
-
+  register0 Worker_services.Chain_validators.S.list (fun () () ->
+      return
+        (List.map
+           (fun (id, w) ->
+             ( id,
+               Chain_validator.status w,
+               Chain_validator.information w,
+               Chain_validator.pending_requests_length w ))
+           (Chain_validator.running_workers ()))) ;
+  register1 Worker_services.Chain_validators.S.state (fun chain () () ->
+      Chain_directory.get_chain_id state chain
+      >>= fun chain_id ->
+      let w = List.assoc chain_id (Chain_validator.running_workers ()) in
+      return
+        {
+          Worker_types.status = Chain_validator.status w;
+          pending_requests = Chain_validator.pending_requests w;
+          backlog = Chain_validator.last_events w;
+          current_request = Chain_validator.current_request w;
+        }) ;
   (* DistributedDB *)
-  register1 Worker_services.Chain_validators.S.ddb_state begin fun chain () () ->
-    Chain_directory.get_chain_id state chain >>= fun chain_id ->
-    let w = List.assoc chain_id (Chain_validator.running_workers ()) in
-    return (Chain_validator.ddb_information w) end ;
-
+  register1 Worker_services.Chain_validators.S.ddb_state (fun chain () () ->
+      Chain_directory.get_chain_id state chain
+      >>= fun chain_id ->
+      let w = List.assoc chain_id (Chain_validator.running_workers ()) in
+      return (Chain_validator.ddb_information w)) ;
   !dir

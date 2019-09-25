@@ -27,38 +27,39 @@ open Protocol
 open Alpha_context
 
 type block_info = {
-  hash: Block_hash.t ;
-  chain_id: Chain_id.t ;
-  predecessor: Block_hash.t ;
-  fitness: MBytes.t list ;
-  timestamp: Time.Protocol.t ;
-  protocol: Protocol_hash.t ;
-  next_protocol: Protocol_hash.t ;
-  proto_level: int ;
-  level: Raw_level.t ;
-  context : Context_hash.t ;
+  hash : Block_hash.t;
+  chain_id : Chain_id.t;
+  predecessor : Block_hash.t;
+  fitness : Bytes.t list;
+  timestamp : Time.Protocol.t;
+  protocol : Protocol_hash.t;
+  next_protocol : Protocol_hash.t;
+  proto_level : int;
+  level : Raw_level.t;
+  context : Context_hash.t;
 }
 
-val info:
+val info :
   #Protocol_client_context.rpc_context ->
   ?chain:Chain_services.chain ->
   Block_services.block ->
   block_info tzresult Lwt.t
 
-val monitor_valid_blocks:
+val monitor_valid_blocks :
   #Protocol_client_context.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
   next_protocols:Protocol_hash.t list option ->
-  unit -> block_info tzresult Lwt_stream.t tzresult Lwt.t
+  unit ->
+  block_info tzresult Lwt_stream.t tzresult Lwt.t
 
-val monitor_heads:
+val monitor_heads :
   #Protocol_client_context.rpc_context ->
   next_protocols:Protocol_hash.t list option ->
   Chain_services.chain ->
   block_info tzresult Lwt_stream.t tzresult Lwt.t
 
-val blocks_from_current_cycle:
+val blocks_from_current_cycle :
   #Protocol_client_context.rpc_context ->
   ?chain:Chain_services.chain ->
   Block_services.block ->

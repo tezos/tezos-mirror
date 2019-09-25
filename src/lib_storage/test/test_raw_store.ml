@@ -25,62 +25,76 @@
 
 open Raw_store
 
-let (>>=) = Lwt.bind
-let (>|=) = Lwt.(>|=)
-let (//) = Filename.concat
+let ( >>= ) = Lwt.bind
+
+let ( >|= ) = Lwt.( >|= )
+
+let ( // ) = Filename.concat
 
 let wrap_store_init f _ () =
-  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
-    let root = base_dir // "store" in
-    init ~mapsize:4_096_000L root >>= function
-    | Error _ -> Assert.fail_msg "wrap_store_init"
-    | Ok store -> f store
-  end
+  Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
+      let root = base_dir // "store" in
+      init ~mapsize:4_096_000L root
+      >>= function
+      | Error _ -> Assert.fail_msg "wrap_store_init" | Ok store -> f store)
 
-let entries s k = fold s k ~init:[] ~f:(fun e acc -> Lwt.return (e :: acc)) >|= List.rev
+let entries s k =
+  fold s k ~init:[] ~f:(fun e acc -> Lwt.return (e :: acc)) >|= List.rev
 
 let test_fold st =
-  store st ["a"; "b"] (MBytes.of_string "Novembre") >>= fun _ ->
-  store st ["a"; "c"] (MBytes.of_string "Juin") >>= fun _ ->
-  store st ["a"; "d"; "e"] (MBytes.of_string "Septembre") >>= fun _ ->
-  store st ["f";] (MBytes.of_string "Avril") >>= fun _ ->
+  store st ["a"; "b"] (Bytes.of_string "Novembre")
+  >>= fun _ ->
+  store st ["a"; "c"] (Bytes.of_string "Juin")
+  >>= fun _ ->
+  store st ["a"; "d"; "e"] (Bytes.of_string "Septembre")
+  >>= fun _ ->
+  store st ["f"] (Bytes.of_string "Avril")
+  >>= fun _ ->
   (* The code of '.' is just below the one of '/' ! *)
-  store st ["g";".12";"a"] (MBytes.of_string "Mai") >>= fun _ ->
-  store st ["g";".12";"b"] (MBytes.of_string "Février") >>= fun _ ->
-  store st ["g";"123";"456"] (MBytes.of_string "Mars") >>= fun _ ->
-  store st ["g";"1230"] (MBytes.of_string "Janvier") >>= fun _ ->
-
-  entries st [] >>= fun l ->
+  store st ["g"; ".12"; "a"] (Bytes.of_string "Mai")
+  >>= fun _ ->
+  store st ["g"; ".12"; "b"] (Bytes.of_string "Février")
+  >>= fun _ ->
+  store st ["g"; "123"; "456"] (Bytes.of_string "Mars")
+  >>= fun _ ->
+  store st ["g"; "1230"] (Bytes.of_string "Janvier")
+  >>= fun _ ->
+  entries st []
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [`Dir ["a"]; `Key ["f"]; `Dir ["g"]] l ;
-
-  entries st ["0"] >>= fun l ->
+  entries st ["0"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [] l ;
-
-  entries st ["0"; "1"] >>= fun l ->
+  entries st ["0"; "1"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [] l ;
-
-  entries st ["a"] >>= fun l ->
-  Assert.equal_key_dir_list ~msg:__LOC__ [`Key ["a"; "b"]; `Key ["a"; "c"]; `Dir ["a"; "d"]] l ;
-
-  entries st ["a"; "d"] >>= fun l ->
+  entries st ["a"]
+  >>= fun l ->
+  Assert.equal_key_dir_list
+    ~msg:__LOC__
+    [`Key ["a"; "b"]; `Key ["a"; "c"]; `Dir ["a"; "d"]]
+    l ;
+  entries st ["a"; "d"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [`Key ["a"; "d"; "e"]] l ;
-
-  entries st ["f"] >>= fun l ->
+  entries st ["f"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [] l ;
-
-  entries st ["f"; "z"] >>= fun l ->
+  entries st ["f"; "z"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [] l ;
-
-  entries st ["g"] >>= fun l ->
-  Assert.equal_key_dir_list ~msg:__LOC__ [`Dir ["g";".12"]; `Dir ["g";"123"]; `Key ["g";"1230"]] l ;
-
-  entries st ["g";"123"] >>= fun l ->
-  Assert.equal_key_dir_list ~msg:__LOC__ [`Key ["g";"123";"456"]] l ;
-
-  entries st ["z"] >>= fun l ->
+  entries st ["g"]
+  >>= fun l ->
+  Assert.equal_key_dir_list
+    ~msg:__LOC__
+    [`Dir ["g"; ".12"]; `Dir ["g"; "123"]; `Key ["g"; "1230"]]
+    l ;
+  entries st ["g"; "123"]
+  >>= fun l ->
+  Assert.equal_key_dir_list ~msg:__LOC__ [`Key ["g"; "123"; "456"]] l ;
+  entries st ["z"]
+  >>= fun l ->
   Assert.equal_key_dir_list ~msg:__LOC__ [] l ;
-
   Lwt.return_unit
 
-let tests =
-  [Alcotest_lwt.test_case "fold" `Quick (wrap_store_init test_fold)]
+let tests = [Alcotest_lwt.test_case "fold" `Quick (wrap_store_init test_fold)]

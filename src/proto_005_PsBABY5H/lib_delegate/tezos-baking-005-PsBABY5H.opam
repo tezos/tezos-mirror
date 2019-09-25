@@ -17,6 +17,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-client-005-PsBABY5H"
+  "tezos-version"
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]

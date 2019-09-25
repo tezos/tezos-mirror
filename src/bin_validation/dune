@@ -1,0 +1,46 @@
+(library
+ (name tezos_validator)
+ (public_name tezos-validator)
+ (libraries tezos-base
+            tezos-storage
+            tezos-stdlib-unix
+            tezos-protocol-environment
+            tezos-protocol-updater
+            tezos-shell
+            tezos-shell-context
+            tezos-validation)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_storage
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell
+                   -open Tezos_shell_services
+                   -open Tezos_validation
+                   -open Tezos_protocol_updater
+                   -open Tezos_shell_context
+                   -linkall))
+ (modules Validator))
+
+(executable
+ (name main_validator)
+ (public_name tezos-validator)
+ (libraries tezos_validator)
+ (flags (:standard -w -9+27-30-32-40@8
+                   -safe-string
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_storage
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell
+                   -open Tezos_shell_services
+                   -open Tezos_validation
+                   -open Tezos_protocol_updater
+                   -open Tezos_validator
+                   -linkall))
+ (modules Main_validator))
+
+(alias
+ (name runtest_indent)
+ (deps (glob_files *.ml{,i}))
+ (action
+  (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

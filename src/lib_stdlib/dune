@@ -1,15 +1,11 @@
 (library
  (name tezos_stdlib)
  (public_name tezos-stdlib)
- (libraries ocplib-endian.bigstring
-            bigstring
-            cstruct
-            hex
+ (libraries hex
             re
             zarith
-            lwt
-            )
- (flags (:standard -safe-string)))
+            lwt)
+ (flags (:standard)))
 
 (alias
  (name runtest_lint)
