@@ -77,8 +77,7 @@ class Node:
         node_run = [node,
                     'run',
                     '--data-dir', node_dir,
-                    '--no-bootstrap-peers',
-                    '--singleprocess']
+                    '--no-bootstrap-peers']
         if sandbox_file:
             node_run.append(f'--sandbox={sandbox_file}')
         node_run.extend(params)

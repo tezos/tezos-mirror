@@ -73,7 +73,7 @@ let run_command t ~config =
     t
     ~config
     ["run"]
-    ( flag "private-mode" @ flag "no-bootstrap-peers" @ flag "singleprocess"
+    ( flag "private-mode" @ flag "no-bootstrap-peers"
     @ peers
     @ optf "bootstrap-threshold" "0"
     @ optf "connections" "%d" t.expected_connections
