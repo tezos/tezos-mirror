@@ -145,6 +145,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       in
       return_some (p2p_config, config.p2p.limits) )
   >>=? fun p2p_config ->
+  let sandbox_parameters = sandbox_param in
   let sandbox_param =
     Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_param
   in
@@ -161,6 +162,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
+    ?sandbox_parameters
     ~singleprocess
     node_config
     config.shell.peer_validator_limits

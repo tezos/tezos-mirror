@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {context_root : string; protocol_root : string}
+type parameters = {
+  context_root : string;
+  protocol_root : string;
+  sandbox_parameters : Data_encoding.json option;
+}
 
 type request =
   | Init
@@ -51,9 +55,14 @@ let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun {context_root; protocol_root} -> (context_root, protocol_root))
-    (fun (context_root, protocol_root) -> {context_root; protocol_root})
-    (obj2 (req "context_root" string) (req "protocol_root" string))
+    (fun {context_root; protocol_root; sandbox_parameters} ->
+      (context_root, protocol_root, sandbox_parameters))
+    (fun (context_root, protocol_root, sandbox_parameters) ->
+      {context_root; protocol_root; sandbox_parameters})
+    (obj3
+       (req "context_root" string)
+       (req "protocol_root" string)
+       (opt "sandbox_parameters" json))
 
 let request_encoding =
   let open Data_encoding in

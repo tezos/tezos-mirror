@@ -290,7 +290,7 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let create ?(sandboxed = false) ~singleprocess
+let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     { genesis;
       store_root;
       context_root;
@@ -318,7 +318,12 @@ let create ?(sandboxed = false) ~singleprocess
   else
     init
       (External
-         {context_root; protocol_root; process_path = Sys.executable_name})
+         {
+           context_root;
+           protocol_root;
+           process_path = Sys.executable_name;
+           sandbox_parameters;
+         })
     >>=? fun validator_process ->
     let commit_genesis =
       Block_validator_process.commit_genesis

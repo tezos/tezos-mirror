@@ -72,6 +72,7 @@ val default_chain_validator_limits : chain_validator_limits
 
 val create :
   ?sandboxed:bool ->
+  ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   config ->
   peer_validator_limits ->

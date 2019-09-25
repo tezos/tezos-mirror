@@ -60,11 +60,23 @@ let run stdin stdout =
     (inconsistent_handshake "bad magic")
   >>=? fun () ->
   External_validation.recv stdin External_validation.parameters_encoding
-  >>= fun {context_root; protocol_root} ->
+  >>= fun {context_root; protocol_root; sandbox_parameters} ->
   let genesis_block = ref Block_hash.zero in
   let genesis_time = ref Time.Protocol.epoch in
   let genesis_protocol = ref Protocol_hash.zero in
+  let sandbox_param =
+    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_parameters
+  in
   let patch_context ctxt =
+    ( match sandbox_param with
+    | None ->
+        Lwt.return ctxt
+    | Some (key, json) ->
+        Tezos_storage.Context.set
+          ctxt
+          [key]
+          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+    >>= fun ctxt ->
     let module Proto = (val Registered_protocol.get_exn !genesis_protocol) in
     let ctxt = Shell_context.wrap_disk_context ctxt in
     Proto.init

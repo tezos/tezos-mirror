@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {context_root : string; protocol_root : string}
+type parameters = {
+  context_root : string;
+  protocol_root : string;
+  sandbox_parameters : Data_encoding.json option;
+}
 
 type request =
   | Init

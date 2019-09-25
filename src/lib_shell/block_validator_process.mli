@@ -30,6 +30,7 @@ type validator_kind =
       context_root : string;
       protocol_root : string;
       process_path : string;
+      sandbox_parameters : Data_encoding.json option;
     }
 
 type t

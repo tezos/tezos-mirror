@@ -75,11 +75,12 @@ module External_validator = struct
     process_path : string;
     mutable validator_process : Lwt_process.process_full option;
     lock : Lwt_mutex.t;
+    sandbox_parameters : Data_encoding.json option;
   }
 
   type t = validation_context
 
-  let init ~context_root ~protocol_root ~process_path =
+  let init ?sandbox_parameters ~context_root ~protocol_root ~process_path =
     lwt_log_notice (fun f -> f "Initialized")
     >>= fun () ->
     Lwt.return
@@ -89,6 +90,7 @@ module External_validator = struct
         process_path;
         validator_process = None;
         lock = Lwt_mutex.create ();
+        sandbox_parameters;
       }
 
   let check_process_status =
@@ -149,6 +151,7 @@ module External_validator = struct
         {
           External_validation.context_root = vp.context_root;
           protocol_root = vp.protocol_root;
+          sandbox_parameters = vp.sandbox_parameters;
         }
       in
       vp.validator_process <- Some process ;
@@ -212,6 +215,7 @@ type validator_kind =
       context_root : string;
       protocol_root : string;
       process_path : string;
+      sandbox_parameters : Data_encoding.json option;
     }
 
 type t = Sequential of Seq_validator.t | External of External_validator.t
@@ -219,8 +223,12 @@ type t = Sequential of Seq_validator.t | External of External_validator.t
 let init = function
   | Internal index ->
       Seq_validator.init index >>= fun v -> return (Sequential v)
-  | External {context_root; protocol_root; process_path} ->
-      External_validator.init ~context_root ~protocol_root ~process_path
+  | External {context_root; protocol_root; process_path; sandbox_parameters} ->
+      External_validator.init
+        ?sandbox_parameters
+        ~context_root
+        ~protocol_root
+        ~process_path
       >>= fun v ->
       External_validator.send_request
         v
