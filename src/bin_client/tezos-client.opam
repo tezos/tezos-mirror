@@ -12,19 +12,14 @@ depends: [
   "tezos-base"
   "tezos-client-base"
   "tezos-client-genesis"
-  "tezos-client-alpha"
   "tezos-client-005-PsBabyM1"
-  "tezos-client-alpha-commands"
   "tezos-client-005-PsBabyM1-commands"
-  "tezos-baking-alpha"
   "tezos-baking-005-PsBabyM1"
-  "tezos-baking-alpha-commands"
   "tezos-baking-005-PsBabyM1-commands"
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }
-  "tezos-protocol-alpha-parameters" { with-test }
   "tezos-protocol-005-PsBabyM1-parameters" { with-test }
 ]
 build: [
