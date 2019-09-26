@@ -824,9 +824,11 @@ publish:docker:
   only:
     - master@tezos/tezos
     - alphanet@tezos/tezos
+    - carthagenet@tezos/tezos
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
     - alphanet-staging@tezos/tezos
+    - carthagenet-staging@tezos/tezos
     - zeronet-staging@tezos/tezos
     - mainnet-staging@tezos/tezos
     - zeronet-snapshots@tezos/tezos
