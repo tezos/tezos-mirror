@@ -9,7 +9,7 @@
             tezos-client-base-unix
             tezos-clic
             tezos-signer-services
-            tezos-client-alpha
+            tezos-client-005-PsBabyM1
  )
  (flags (:standard -open Tezos_data_encoding
                    -open Tezos_base__TzPervasives

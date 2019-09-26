@@ -2,24 +2,24 @@
  (names bench_simple bench_tool)
  (libraries tezos-base
             tezos-shell
-            tezos-alpha-test-helpers)
+            tezos-005-PsBabyM1-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
-                   -open Tezos_protocol_alpha
-                   -open Tezos_protocol_alpha_parameters
-                   -open Tezos_alpha_test_helpers)))
+                   -open Tezos_protocol_005_PsBabyM1
+                   -open Tezos_protocol_005_PsBabyM1_parameters
+                   -open Tezos_005_PsBabyM1_test_helpers)))
 
 (alias
  (name buildtest)
  (deps bench_tool.exe bench_simple.exe))
 
 (alias
- (name runbench_alpha_simple)
+ (name runbench_005_PsBabyM1_simple)
  (deps bench_simple.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_simple.exe}))))
 
 (alias
- (name runbench_alpha)
+ (name runbench_005_PsBabyM1)
  (deps bench_tool.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 

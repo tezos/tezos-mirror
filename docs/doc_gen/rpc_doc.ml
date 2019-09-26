@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let protocols =
-  [("Alpha", "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")]
+  [("Alpha", "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS")]
 
 let pp_name ppf = function
   | [] | [""] ->

@@ -1,5 +1,5 @@
 (rule
- (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
+ (copy %{lib:tezos-protocol-005-PsBabyM1-parameters:test-parameters.json}
        protocol_parameters.json))
 
 (alias

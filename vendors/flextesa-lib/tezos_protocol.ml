@@ -89,8 +89,8 @@ let default () =
   ; dictator
     (* ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)] *)
   ; expected_pow= 1
-  ; name= "alpha"
-  ; hash= "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+  ; name= "005_PsBabyM1"
+  ; hash= "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
   ; time_between_blocks= [2; 3]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16
