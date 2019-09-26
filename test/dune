@@ -3,10 +3,10 @@
         test_generated
         bench_data_encoding
         )
- (libraries tezos_data_encoding
+ (libraries data_encoding
             alcotest
             crowbar)
- (flags (:standard -open Tezos_data_encoding)))
+ (flags (:standard -open Data_encoding)))
 
 (alias
  (name buildtest)
@@ -31,8 +31,3 @@
 (alias
  (name run_bench)
  (action (run %{exe:bench_data_encoding.exe})))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

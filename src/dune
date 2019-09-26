@@ -1,0 +1,9 @@
+(library
+ (name data_encoding)
+ (public_name data-encoding)
+ (libraries lwt
+            ocplib-json-typed
+            ocplib-json-typed-bson
+            zarith
+            ezjsonm)
+ (flags (:standard)))
