@@ -139,7 +139,7 @@ let all ?expected name write_encoding read_encoding value =
 let all_ranged_int minimum maximum =
   let encoding = ranged_int minimum maximum in
   let signed =
-    match Binary_size.range_to_size ~minimum ~maximum with
+    match Data_encoding__Binary_size.range_to_size ~minimum ~maximum with
     | `Int31 | `Int8 | `Int16 ->
         true
     | `Uint8 | `Uint16 | `Uint30 ->
@@ -185,7 +185,7 @@ let all_ranged_float minimum maximum =
 
 let test_bounded_string_list =
   let expected = function
-    | Binary_error.Read_error Size_limit_exceeded ->
+    | Data_encoding__Binary_error.Read_error Size_limit_exceeded ->
         true
     | _ ->
         false

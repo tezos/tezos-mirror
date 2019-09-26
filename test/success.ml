@@ -62,7 +62,8 @@ let stream ty encoding value () =
         match chunked_read sz encoding bytes with
         | Binary.Success {result; size; stream} ->
             if
-              size <> Bytes.length bytes || not (Binary_stream.is_empty stream)
+              size <> Bytes.length bytes
+              || not (Data_encoding__Binary_stream.is_empty stream)
             then Alcotest.failf "%s failed: remaining data" name ;
             Alcotest.check ty name value result
         | Binary.Await _ ->

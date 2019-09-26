@@ -1,8 +1,7 @@
 (executables
  (names test test_generated bench_data_encoding)
  (libraries data_encoding alcotest crowbar)
- (flags
-  (:standard -open Data_encoding)))
+ (flags :standard))
 
 (alias
  (name buildtest)
