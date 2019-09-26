@@ -707,6 +707,12 @@ case $(basename "$0") in
         docker_compose_base_name=localnet
         default_port=14732
         ;;
+    babylonnet.sh)
+        docker_base_dir="$HOME/.tezos-babylonnet"
+        docker_image=tezos/tezos:babylonnet
+        docker_compose_base_name=babylonnet
+        default_port=19732
+        ;;
     zeronet.sh)
         docker_base_dir="$HOME/.tezos-zeronet"
         docker_image=tezos/tezos:zeronet

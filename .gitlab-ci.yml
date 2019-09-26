@@ -814,9 +814,11 @@ publish:docker:
   only:
     - master@tezos/tezos
     - alphanet@tezos/tezos
+    - babylonnet@tezos/tezos
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
     - alphanet-staging@tezos/tezos
+    - babylonnet-staging@tezos/tezos
     - zeronet-staging@tezos/tezos
     - mainnet-staging@tezos/tezos
     - zeronet-snapshots@tezos/tezos
@@ -848,6 +850,7 @@ publish:doc:
   only:
     - master@tezos/tezos
     - alphanet@tezos/tezos
+    - babylonnet@tezos/tezos
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
   before_script:
