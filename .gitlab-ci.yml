@@ -25,9 +25,11 @@ stages:
   except:
     - master
     - alphanet
+    - babylonnet
     - zeronet
     - mainnet
     - alphanet-staging
+    - babylonnet-staging
     - zeronet-staging
     - mainnet-staging
     - zeronet-snapshots
