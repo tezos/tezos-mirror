@@ -1,33 +1,30 @@
 (executables
- (names test
-        test_generated
-        bench_data_encoding
-        )
- (libraries data_encoding
-            alcotest
-            crowbar)
- (flags (:standard -open Data_encoding)))
+ (names test test_generated bench_data_encoding)
+ (libraries data_encoding alcotest crowbar)
+ (flags
+  (:standard -open Data_encoding)))
 
 (alias
  (name buildtest)
- (deps test.exe
-       test_generated.exe
-       bench_data_encoding.exe
-       ))
+ (deps test.exe test_generated.exe bench_data_encoding.exe))
 
 (alias
  (name runtest_test)
- (action (run %{exe:test.exe})))
+ (action
+  (run %{exe:test.exe})))
 
 (alias
  (name runtest_test_generated)
- (action (run %{exe:test_generated.exe})))
+ (action
+  (run %{exe:test_generated.exe})))
 
 (alias
  (name runtest)
- (deps (alias runtest_test)
-       (alias runtest_test_generated)))
+ (deps
+  (alias runtest_test)
+  (alias runtest_test_generated)))
 
 (alias
  (name run_bench)
- (action (run %{exe:bench_data_encoding.exe})))
+ (action
+  (run %{exe:bench_data_encoding.exe})))
