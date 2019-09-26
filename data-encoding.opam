@@ -6,13 +6,13 @@ bug-reports: "https://gitlab.com/nomadic-labs/data-encoding/issues"
 dev-repo: "git+https://gitlab.com/nomadic-labs/data-encoding.git"
 license: "MIT"
 depends: [
-  "ocamlfind" { build }
+  "ocaml" { >= "4.06" }
   "dune" { >= "1.7" }
   "lwt"
   "ezjsonm"
   "zarith"
-  "ocplib-json-typed" { = "0.7.1" }
-  "ocplib-json-typed-bson" { = "0.7.1" }
+  "ocplib-json-typed" { >= "0.7" }
+  "ocplib-json-typed-bson" { >= "0.7" }
   "alcotest" { with-test }
   "crowbar" { with-test }
 ]
