@@ -15,6 +15,7 @@
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-demo-noops
             tezos-embedded-protocol-alpha
+            tezos-embedded-protocol-005-PsBabyM1
             cmdliner
             tls)
  (flags (:standard -open Tezos_base__TzPervasives
