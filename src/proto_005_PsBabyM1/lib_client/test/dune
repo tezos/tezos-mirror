@@ -1,0 +1,29 @@
+(executables
+ (names test_michelson_v1_macros)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-005-PsBabyM1
+            tezos-client-005-PsBabyM1
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_005_PsBabyM1
+                   -open Tezos_protocol_005_PsBabyM1)))
+
+
+(alias
+(name buildtest)
+(deps test_michelson_v1_macros.exe))
+
+(alias
+(name runtest_michelson_v1_macros)
+(action (run %{exe:test_michelson_v1_macros.exe})))
+
+(alias
+(name runtest)
+(deps (alias runtest_michelson_v1_macros)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
