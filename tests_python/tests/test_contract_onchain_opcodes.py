@@ -312,6 +312,17 @@ class TestContractOnchainOpcodes:
 
         assert client.get_delegate('set_delegate').delegate is None
 
+    @pytest.mark.parametrize('contract', [
+        'compare_big_type.tz',
+        'compare_big_type2.tz',
+    ])
+    def test_trace_origination(self, client_regtest_scrubbed, contract):
+        client = client_regtest_scrubbed
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH, contract),
+                           'Unit', 1000, 'bootstrap1')
+        bake(client)
+
     @pytest.mark.parametrize('contract,init_storage,parameters', [
         ('failwith_big_map', '{Elt 0 0}', [
             '{}',

@@ -18,7 +18,7 @@ This sequence of operations was run:
     Storage limit: 453 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.00055
-      fees(the baker who will include this operation,4) ... +ꜩ0.00055
+      fees(the baker who will include this operation,5) ... +ꜩ0.00055
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -85,7 +85,7 @@ with { Elt 1 1 }
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
-"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5336:8"
+"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5268:8"
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
