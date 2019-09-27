@@ -43,7 +43,7 @@ module Cost_of = struct
 
   (* For now, returns size in bytes, but this could get more complicated... *)
   let rec size_of_comparable :
-      type a b. (a, b) Script_typed_ir.comparable_struct -> a -> int =
+      type a. a Script_typed_ir.comparable_ty -> a -> int =
    fun wit v ->
     match wit with
     | Int_key _ ->
@@ -351,8 +351,8 @@ module Cost_of = struct
 
     let apply = alloc_cost 8 +@ step_cost 1
 
-    let rec compare :
-        type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost =
+    let rec compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost
+        =
      fun ty x y ->
       match ty with
       | Bool_key _ ->

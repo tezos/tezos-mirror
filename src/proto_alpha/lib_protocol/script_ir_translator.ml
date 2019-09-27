@@ -67,9 +67,9 @@ let add_dip ty annot prev =
 
 (* ---- Type size accounting ------------------------------------------------*)
 
-let rec comparable_type_size : type t a. (t, a) comparable_struct -> int =
+let rec comparable_type_size : type t. t comparable_ty -> int =
  fun ty ->
-  (* No wildcard to force the update when comparable_ty chages. *)
+  (* No wildcard to force the update when comparable_ty changes. *)
   match ty with
   | Int_key _ ->
       1
@@ -89,8 +89,8 @@ let rec comparable_type_size : type t a. (t, a) comparable_struct -> int =
       1
   | Address_key _ ->
       1
-  | Pair_key (_, (t, _), _) ->
-      1 + comparable_type_size t
+  | Pair_key ((t1, _), (t2, _), _) ->
+      1 + comparable_type_size t1 + comparable_type_size t2
 
 let rec type_size : type t. t ty -> int =
  fun ty ->
@@ -602,8 +602,7 @@ let wrap_compare compare a b =
   let res = compare a b in
   if Compare.Int.(res = 0) then 0 else if Compare.Int.(res > 0) then 1 else -1
 
-let rec compare_comparable :
-    type a s. (a, s) comparable_struct -> a -> a -> int =
+let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
  fun kind ->
   match kind with
   | String_key _ ->
@@ -755,8 +754,7 @@ let map_size : type key value. (key, value) map -> Script_int.n Script_int.num
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
-let rec ty_of_comparable_ty : type a s. (a, s) comparable_struct -> a ty =
-  function
+let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Int_key tname ->
       Int_t tname
   | Nat_key tname ->
@@ -803,33 +801,15 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
   | Address_t tname ->
       Some (Address_key tname)
   | Pair_t ((l, al, _), (r, ar, _), pname, _) -> (
-    match comparable_ty_of_ty_no_gas r with
+    match comparable_ty_of_ty_no_gas l with
     | None ->
         None
-    | Some rty -> (
-      match comparable_ty_of_ty_no_gas l with
+    | Some lty -> (
+      match comparable_ty_of_ty_no_gas r with
       | None ->
           None
-      | Some (Pair_key _) ->
-          None (* not a comb *)
-      | Some (Int_key tname) ->
-          Some (Pair_key ((Int_key tname, al), (rty, ar), pname))
-      | Some (Nat_key tname) ->
-          Some (Pair_key ((Nat_key tname, al), (rty, ar), pname))
-      | Some (String_key tname) ->
-          Some (Pair_key ((String_key tname, al), (rty, ar), pname))
-      | Some (Bytes_key tname) ->
-          Some (Pair_key ((Bytes_key tname, al), (rty, ar), pname))
-      | Some (Mutez_key tname) ->
-          Some (Pair_key ((Mutez_key tname, al), (rty, ar), pname))
-      | Some (Bool_key tname) ->
-          Some (Pair_key ((Bool_key tname, al), (rty, ar), pname))
-      | Some (Key_hash_key tname) ->
-          Some (Pair_key ((Key_hash_key tname, al), (rty, ar), pname))
-      | Some (Timestamp_key tname) ->
-          Some (Pair_key ((Timestamp_key tname, al), (rty, ar), pname))
-      | Some (Address_key tname) ->
-          Some (Pair_key ((Address_key tname, al), (rty, ar), pname)) ) )
+      | Some rty ->
+          Some (Pair_key ((lty, al), (rty, ar), pname)) ) )
   | _ ->
       None
 
@@ -843,8 +823,8 @@ let add_field_annot a var = function
   | expr ->
       expr
 
-let rec unparse_comparable_ty :
-    type a s. (a, s) comparable_struct -> Script.node = function
+let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
+  function
   | Int_key tname ->
       Prim (-1, T_int, [], unparse_type_annot tname)
   | Nat_key tname ->
@@ -1044,19 +1024,17 @@ let name_of_ty : type a. a ty -> type_annot option = function
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
 let rec comparable_ty_eq :
-    type ta tb s.
+    type ta tb.
     context ->
-    (ta, s) comparable_struct ->
-    (tb, s) comparable_struct ->
-    (((ta, s) comparable_struct, (tb, s) comparable_struct) eq * context)
-    tzresult =
+    ta comparable_ty ->
+    tb comparable_ty ->
+    ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
  fun ctxt ta tb ->
   Gas.consume ctxt Typecheck_costs.cycle
   >>? fun ctxt ->
   match (ta, tb) with
   | (Int_key _, Int_key _) ->
-      Ok
-        ((Eq : ((ta, s) comparable_struct, (tb, s) comparable_struct) eq), ctxt)
+      Ok ((Eq : (ta comparable_ty, tb comparable_ty) eq), ctxt)
   | (Nat_key _, Nat_key _) ->
       Ok (Eq, ctxt)
   | (String_key _, String_key _) ->
@@ -1079,8 +1057,7 @@ let rec comparable_ty_eq :
       >>? fun (Eq, ctxt) ->
       comparable_ty_eq ctxt righta rightb
       >>? fun (Eq, ctxt) ->
-      Ok
-        ((Eq : ((ta, s) comparable_struct, (tb, s) comparable_struct) eq), ctxt)
+      Ok ((Eq : (ta comparable_ty, tb comparable_ty) eq), ctxt)
   | (_, _) ->
       serialize_ty_for_error ctxt (ty_of_comparable_ty ta)
       >>? fun (ta, ctxt) ->
@@ -1211,11 +1188,11 @@ let rec stack_ty_eq :
       error Bad_stack_length
 
 let rec merge_comparable_types :
-    type ta s.
+    type ta.
     legacy:bool ->
-    (ta, s) comparable_struct ->
-    (ta, s) comparable_struct ->
-    (ta, s) comparable_struct tzresult =
+    ta comparable_ty ->
+    ta comparable_ty ->
+    ta comparable_ty tzresult =
  fun ~legacy ta tb ->
   match (ta, tb) with
   | (Int_key annot_a, Int_key annot_b) ->
@@ -1566,7 +1543,7 @@ let rec parse_comparable_ty :
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
-  | Prim (loc, T_pair, [left; right], annot) -> (
+  | Prim (loc, T_pair, [left; right], annot) ->
       parse_type_annot loc annot
       >>? fun pname ->
       extract_field_annot left
@@ -1576,56 +1553,10 @@ let rec parse_comparable_ty :
       parse_comparable_ty ctxt right
       >>? fun (Ex_comparable_ty right, ctxt) ->
       parse_comparable_ty ctxt left
-      >>? fun (Ex_comparable_ty left, ctxt) ->
-      let right = (right, right_annot) in
-      match left with
-      | Pair_key _ ->
-          error (Comparable_type_expected (loc, Micheline.strip_locations ty))
-      | Int_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Int_key tname, left_annot), right, pname)),
-              ctxt )
-      | Nat_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Nat_key tname, left_annot), right, pname)),
-              ctxt )
-      | String_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((String_key tname, left_annot), right, pname)),
-              ctxt )
-      | Bytes_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Bytes_key tname, left_annot), right, pname)),
-              ctxt )
-      | Mutez_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Mutez_key tname, left_annot), right, pname)),
-              ctxt )
-      | Bool_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Bool_key tname, left_annot), right, pname)),
-              ctxt )
-      | Key_hash_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Key_hash_key tname, left_annot), right, pname)),
-              ctxt )
-      | Timestamp_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Timestamp_key tname, left_annot), right, pname)),
-              ctxt )
-      | Address_key tname ->
-          ok
-            ( Ex_comparable_ty
-                (Pair_key ((Address_key tname, left_annot), right, pname)),
-              ctxt ) )
+      >|? fun (Ex_comparable_ty left, ctxt) ->
+      ( Ex_comparable_ty
+          (Pair_key ((left, left_annot), (right, right_annot), pname)),
+        ctxt )
   | Prim (loc, T_pair, l, _) ->
       error (Invalid_arity (loc, T_pair, 2, List.length l))
   | Prim
@@ -3351,10 +3282,10 @@ and parse_instr :
         ( v,
           Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest, set_annot), _),
           _ ) ) ->
-      check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
-      >>=? fun (Eq, _, ctxt) ->
       Lwt.return @@ parse_var_annot loc annot ~default:set_annot
       >>=? fun annot ->
+      check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
+      >>=? fun (Eq, _, ctxt) ->
       typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest, _)) ->
       Lwt.return @@ parse_var_annot loc annot
