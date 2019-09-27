@@ -610,20 +610,20 @@ opam:42:tezos-client-base-unix:
   variables:
     package: tezos-client-base-unix
 
-opam:43:tezos-protocol-alpha:
+opam:43:tezos-protocol-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-alpha
+    package: tezos-protocol-005-PsBabyM1
 
 opam:44:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:45:tezos-client-alpha:
+opam:45:tezos-client-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha
+    package: tezos-client-005-PsBabyM1
 
 opam:46:tezos-version:
   <<: *opam_definition
@@ -635,10 +635,10 @@ opam:47:tezos-validation:
   variables:
     package: tezos-validation
 
-opam:48:tezos-baking-alpha:
+opam:48:tezos-baking-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha
+    package: tezos-baking-005-PsBabyM1
 
 opam:49:tezos-protocol-genesis:
   <<: *opam_definition
@@ -665,15 +665,15 @@ opam:53:tezos-shell:
   variables:
     package: tezos-shell
 
-opam:54:tezos-baking-alpha-commands:
+opam:54:tezos-baking-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baking-alpha-commands
+    package: tezos-baking-005-PsBabyM1-commands
 
-opam:55:tezos-client-alpha-commands:
+opam:55:tezos-client-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha-commands
+    package: tezos-client-005-PsBabyM1-commands
 
 opam:56:tezos-client-genesis:
   <<: *opam_definition
@@ -685,55 +685,55 @@ opam:57:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:58:tezos-embedded-protocol-alpha:
+opam:58:tezos-embedded-protocol-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-protocol-alpha
+    package: tezos-embedded-protocol-005-PsBabyM1
 
-opam:59:tezos-protocol-alpha-parameters:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-alpha-parameters
-
-opam:60:tezos-rpc-http-server:
+opam:59:tezos-rpc-http-server:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http-server
 
-opam:61:tezos-embedded-protocol-demo-noops:
+opam:60:tezos-embedded-protocol-demo-noops:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo-noops
 
-opam:62:tezos-embedded-protocol-genesis:
+opam:61:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:63:tezos-validator:
+opam:62:tezos-validator:
   <<: *opam_definition
   variables:
     package: tezos-validator
 
-opam:64:tezos-endorser-alpha-commands:
+opam:63:tezos-protocol-005-PsBabyM1-parameters:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-alpha-commands
+    package: tezos-protocol-005-PsBabyM1-parameters
 
-opam:65:tezos-client:
+opam:64:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
+
+opam:65:tezos-accuser-005-PsBabyM1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-005-PsBabyM1-commands
 
 opam:66:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:67:tezos-accuser-alpha:
+opam:67:tezos-endorser-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-alpha
+    package: tezos-endorser-005-PsBabyM1-commands
 
 opam:68:tezos-codec:
   <<: *opam_definition
@@ -745,55 +745,55 @@ opam:69:ocplib-json-typed-browser:
   variables:
     package: ocplib-json-typed-browser
 
-opam:70:tezos-mempool-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-alpha
-
-opam:71:tezos-tooling:
+opam:70:tezos-tooling:
   <<: *opam_definition
   variables:
     package: tezos-tooling
 
-opam:72:flextesa:
+opam:71:flextesa:
   <<: *opam_definition
   variables:
     package: flextesa
 
-opam:73:tezos-protocol-alpha-tests:
+opam:72:tezos-endorser-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-alpha-tests
+    package: tezos-endorser-005-PsBabyM1
 
-opam:74:tezos-alpha-test-helpers:
+opam:73:tezos-mempool-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-alpha-test-helpers
+    package: tezos-mempool-005-PsBabyM1
 
-opam:75:tezos-endorser-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-alpha
-
-opam:76:tezos-accuser-alpha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-alpha-commands
-
-opam:77:tezos-baker-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-alpha
-
-opam:78:tezos-signer:
+opam:74:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:79:tezos-node:
+opam:75:tezos-baker-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-005-PsBabyM1
+
+opam:76:tezos-protocol-005-PsBabyM1-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-005-PsBabyM1-tests
+
+opam:77:tezos-accuser-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-005-PsBabyM1
+
+opam:78:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
+
+opam:79:tezos-005-PsBabyM1-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-005-PsBabyM1-test-helpers
 
 
 ##END_OPAM##
