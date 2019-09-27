@@ -785,6 +785,9 @@ class TestComparablePairs:
                               '(big_map (pair nat string) unit)')
         client.typecheck_data('{}',
                               '(big_map (pair nat (pair string bytes)) unit)')
+        client.typecheck_data('{}', '(set (pair (pair nat nat) nat))')
+        client.typecheck_data('{}', '(set (pair (pair int nat) \
+                                                (pair bool bytes)))')
 
     def test_order_of_pairs(self, client: Client):
         # tests that badly-ordered set literals are rejected
@@ -792,11 +795,6 @@ class TestComparablePairs:
             client, '{Pair 0 "foo"; Pair 0 "bar"}', '(set (pair nat string))')
         utils.assert_typecheck_data_failure(
             client, '{Pair 1 "bar"; Pair 0 "foo"}', '(set (pair nat string))')
-
-    def test_non_comparable_non_comb_pair(self, client: Client):
-        # tests that non-comb pairs are rejected by the typechecker
-        utils.assert_typecheck_data_failure(
-            client, '{}', '(set (pair (pair nat nat) nat))')
 
 
 @pytest.mark.contract
