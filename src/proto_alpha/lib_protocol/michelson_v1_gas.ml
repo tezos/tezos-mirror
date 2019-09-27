@@ -50,7 +50,7 @@ module Cost_of = struct
 
   (* For now, returns size in bytes, but this could get more complicated... *)
   let rec size_of_comparable :
-      type a b. (a, b) Script_typed_ir.comparable_struct -> a -> Z.t =
+      type a. a Script_typed_ir.comparable_ty -> a -> Z.t =
    fun wit v ->
     match wit with
     | Int_key _ ->
@@ -852,8 +852,8 @@ module Cost_of = struct
       let sz = Signature.Public_key_hash.size + Chain_id.size in
       atomic_step_cost (cost_N_Compare_address sz sz)
 
-    let rec compare :
-        type a s. (a, s) Script_typed_ir.comparable_struct -> a -> a -> cost =
+    let rec compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost
+        =
      fun ty x y ->
       match ty with
       | Bool_key _ ->
