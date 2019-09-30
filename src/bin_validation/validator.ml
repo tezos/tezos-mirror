@@ -114,31 +114,49 @@ let run stdin stdout =
                     predecessor_block_header.shell.context
                   in
                   Context.checkout context_index pred_context_hash
-                  >>= (function
-                        | Some context ->
-                            return context
-                        | None ->
-                            fail
-                              (Block_validator_errors
-                               .Failed_to_checkout_context
-                                 pred_context_hash))
-                  >>=? fun predecessor_context ->
-                  Context.get_protocol predecessor_context
-                  >>= fun protocol_hash ->
-                  load_protocol protocol_hash protocol_root
-                  >>=? fun () ->
-                  Block_validation.apply
-                    chain_id
-                    ~max_operations_ttl
-                    ~predecessor_block_header
-                    ~predecessor_context
-                    ~block_header
-                    operations)
-              >>= fun result ->
+                  >>= function
+                  | Some context ->
+                      return context
+                  | None ->
+                      fail
+                        (Block_validator_errors.Failed_to_checkout_context
+                           pred_context_hash))
+              >>=? (fun predecessor_context ->
+                     Context.get_protocol predecessor_context
+                     >>= fun protocol_hash ->
+                     load_protocol protocol_hash protocol_root
+                     >>=? fun () ->
+                     Block_validation.apply
+                       chain_id
+                       ~max_operations_ttl
+                       ~predecessor_block_header
+                       ~predecessor_context
+                       ~block_header
+                       operations
+                     >>= function
+                     | Error
+                         [ Block_validator_errors.Unavailable_protocol
+                             {protocol; _} ] as err -> (
+                         (* If `next_protocol` is missing, try to load it *)
+                         load_protocol protocol protocol_root
+                         >>= function
+                         | Error _ ->
+                             Lwt.return err
+                         | Ok () ->
+                             Block_validation.apply
+                               chain_id
+                               ~max_operations_ttl
+                               ~predecessor_block_header
+                               ~predecessor_context
+                               ~block_header
+                               operations )
+                     | result ->
+                         Lwt.return result)
+              >>= fun res ->
               External_validation.send
                 stdout
                 (Error_monad.result_encoding Block_validation.result_encoding)
-                result
+                res
           | External_validation.Commit_genesis
               {chain_id; time; genesis_hash; protocol} ->
               genesis_time := time ;
@@ -167,11 +185,20 @@ let run stdin stdout =
               >>= function
               | Some ctxt ->
                   Block_validation.init_test_chain ctxt forked_header
-                  >>= fun genesis_header ->
+                  >>= (function
+                        | Error
+                            [ Block_validator_errors.Missing_test_protocol
+                                protocol ] ->
+                            load_protocol protocol protocol_root
+                            >>=? fun () ->
+                            Block_validation.init_test_chain ctxt forked_header
+                        | result ->
+                            Lwt.return result)
+                  >>= fun result ->
                   External_validation.send
                     stdout
                     (Error_monad.result_encoding Block_header.encoding)
-                    genesis_header
+                    result
               | None ->
                   External_validation.send
                     stdout
