@@ -159,9 +159,7 @@ struct
         | None ->
             msg
         | Some watermark ->
-            Bytes.concat
-              (Bytes.of_string "")
-              [Signature.bytes_of_watermark watermark; msg]
+            Bytes.cat (Signature.bytes_of_watermark watermark) msg
       in
       get_signature base pkh msg
       >>=? fun signature ->

@@ -290,9 +290,7 @@ module Ledger_commands = struct
   let sign ?watermark ~version hid curve path (base_msg : Bytes.t) =
     let msg =
       Option.unopt_map watermark ~default:base_msg ~f:(fun watermark ->
-          Bytes.concat
-            (Bytes.of_string "")
-            [Signature.bytes_of_watermark watermark; base_msg])
+          Bytes.cat (Signature.bytes_of_watermark watermark) base_msg)
     in
     let path = Bip32_path.tezos_root @ path in
     wrap_ledger_cmd (fun pp ->
