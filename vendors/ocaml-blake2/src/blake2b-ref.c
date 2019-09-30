@@ -379,45 +379,44 @@ fail:
 #endif
 
 #include <caml/mlvalues.h>
-#include <caml/bigarray.h>
 
 CAMLprim value sizeof_blake2b_state(value unit) {
-    return Val_int(sizeof(blake2b_state));
+  return Val_int(sizeof(blake2b_state));
 }
 
 CAMLprim value blake2b_state_outlen(value S) {
-    blake2b_state *s = Caml_ba_data_val(S);
-    return Val_int(s->outlen);
+  blake2b_state *s = (blake2b_state *)Bytes_val(S);
+  return Val_int(s->outlen);
 }
 
 CAMLprim value ml_blake2b_init(value S, value outlen) {
-    return Val_int(blake2b_init(Caml_ba_data_val(S), Int_val(outlen)));
+  return Val_int(blake2b_init((blake2b_state *)Bytes_val(S), Int_val(outlen)));
 }
 
 CAMLprim value ml_blake2b_init_key(value S, value outlen, value key) {
-    return Val_int(blake2b_init_key(Caml_ba_data_val(S),
-                                    Int_val(outlen),
-                                    Caml_ba_data_val(key),
-                                    Caml_ba_array_val(key)->dim[0]));
+  return Val_int(blake2b_init_key((blake2b_state *)Bytes_val(S),
+                                  Int_val(outlen),
+                                  (void *)Bytes_val(key),
+                                  caml_string_length(key)));
 }
 
 CAMLprim value ml_blake2b_update(value S, value in) {
-    return Val_int(blake2b_update(Caml_ba_data_val(S),
-                                  Caml_ba_data_val(in),
-                                  Caml_ba_array_val(in)->dim[0]));
+  return Val_int(blake2b_update((blake2b_state *)Bytes_val(S),
+                                (void *)Bytes_val(in),
+                                caml_string_length(in)));
 }
 
 CAMLprim value ml_blake2b_final(value S, value out) {
-    return Val_int(blake2b_final(Caml_ba_data_val(S),
-                                 Caml_ba_data_val(out),
-                                 Caml_ba_array_val(out)->dim[0]));
+  return Val_int(blake2b_final((blake2b_state *)Bytes_val(S),
+                               (void *)Bytes_val(out),
+                               caml_string_length(out)));
 }
 
 CAMLprim value ml_blake2b(value out, value in, value key) {
-    return Val_int(blake2b(Caml_ba_data_val(out),
-                           Caml_ba_array_val(out)->dim[0],
-                           Caml_ba_data_val(in),
-                           Caml_ba_array_val(in)->dim[0],
-                           Caml_ba_data_val(key),
-                           Caml_ba_array_val(key)->dim[0]));
+  return Val_int(blake2b((void *)Bytes_val(out),
+                         caml_string_length(out),
+                         (void *)Bytes_val(in),
+                         caml_string_length(in),
+                         (void *)Bytes_val(key),
+                         caml_string_length(key)));
 }
