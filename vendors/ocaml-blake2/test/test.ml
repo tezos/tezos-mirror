@@ -2,13 +2,13 @@
 open Blake2
 
 type vector = {
-  data_in : Bigstring.t list ;
-  data_key : Bigstring.t option ;
-  data_out : Bigstring.t ;
+  data_in : Bytes.t list ;
+  data_key : Bytes.t option ;
+  data_out : Bytes.t ;
 }
 
 let hex s =
-  Cstruct.to_bigarray (Hex.to_cstruct (`Hex s))
+  (Hex.to_bytes (`Hex s))
 
 let vectors = [
   { data_in = [ hex "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f" ] ;
@@ -26,16 +26,16 @@ let vectors = [
 ]
 
 let test_update { data_in ; data_key ; data_out } =
-  let d = Blake2b.init ?key:data_key (Bigstring.length data_out) in
+  let d = Blake2b.init ?key:data_key (Bytes.length data_out) in
   List.iter (Blake2b.update d) data_in ;
   let Blake2b.Hash h = Blake2b.final d in
-  assert Bigstring.(equal data_out h)
+  assert Bytes.(equal data_out h)
 
 let test_direct { data_in ; data_key ; data_out } =
   let Blake2b.Hash h =
     Blake2b.direct ?key:data_key
-      (Bigstring.concat "" data_in) (Bigstring.length data_out) in
-  assert Bigstring.(equal data_out h)
+      (Bytes.concat Bytes.empty data_in) (Bytes.length data_out) in
+  assert Bytes.(equal data_out h)
 
 let update_tests =
   List.mapi
@@ -52,4 +52,3 @@ let () =
     "update", update_tests ;
     "direct", direct_tests ;
   ]
-
