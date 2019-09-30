@@ -60,7 +60,7 @@ type (_, _) comparable_struct =
   | Address_key : type_annot option -> (address, _) comparable_struct
   | Pair_key :
       (('a, leaf) comparable_struct * field_annot option)
-      * (('b, _) comparable_struct * field_annot option)
+      * (('b, comb) comparable_struct * field_annot option)
       * type_annot option
       -> (('a, 'b) pair, comb) comparable_struct
 

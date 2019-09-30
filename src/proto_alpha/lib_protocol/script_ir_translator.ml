@@ -1032,32 +1032,44 @@ let name_of_ty : type a. a ty -> type_annot option = function
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let comparable_ty_eq :
-    type ta tb.
+let rec comparable_ty_eq :
+    type ta tb s.
     context ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    (ta comparable_ty, tb comparable_ty) eq tzresult =
+    (ta, s) comparable_struct ->
+    (tb, s) comparable_struct ->
+    (((ta, s) comparable_struct, (tb, s) comparable_struct) eq * context)
+    tzresult =
  fun ctxt ta tb ->
+  Gas.consume ctxt Typecheck_costs.cycle
+  >>? fun ctxt ->
   match (ta, tb) with
   | (Int_key _, Int_key _) ->
-      Ok Eq
+      Ok
+        ((Eq : ((ta, s) comparable_struct, (tb, s) comparable_struct) eq), ctxt)
   | (Nat_key _, Nat_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (String_key _, String_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Bytes_key _, Bytes_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Mutez_key _, Mutez_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Bool_key _, Bool_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Key_hash_key _, Key_hash_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Timestamp_key _, Timestamp_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
   | (Address_key _, Address_key _) ->
-      Ok Eq
+      Ok (Eq, ctxt)
+  | ( Pair_key ((lefta, _), (righta, _), _),
+      Pair_key ((leftb, _), (rightb, _), _) ) ->
+      comparable_ty_eq ctxt lefta leftb
+      >>? fun (Eq, ctxt) ->
+      comparable_ty_eq ctxt righta rightb
+      >>? fun (Eq, ctxt) ->
+      Ok
+        ((Eq : ((ta, s) comparable_struct, (tb, s) comparable_struct) eq), ctxt)
   | (_, _) ->
       serialize_ty_for_error ctxt (ty_of_comparable_ty ta)
       >>? fun (ta, ctxt) ->
@@ -1120,15 +1132,17 @@ let rec ty_eq :
       ok Eq ctxt 0
   | (Map_t (tal, tar, _, _), Map_t (tbl, tbr, _, _)) ->
       comparable_ty_eq ctxt tal tbl
-      >>? (fun Eq -> ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
+      >>? (fun (Eq, ctxt) ->
+            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
       |> record_inconsistent ctxt ta tb
   | (Big_map_t (tal, tar, _), Big_map_t (tbl, tbr, _)) ->
       comparable_ty_eq ctxt tal tbl
-      >>? (fun Eq -> ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
+      >>? (fun (Eq, ctxt) ->
+            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
       |> record_inconsistent ctxt ta tb
   | (Set_t (ea, _), Set_t (eb, _)) ->
       comparable_ty_eq ctxt ea eb
-      >>? (fun Eq -> ok Eq ctxt 1)
+      >>? (fun (Eq, ctxt) -> ok Eq ctxt 1)
       |> record_inconsistent ctxt ta tb
   | ( Pair_t ((tal, _, _), (tar, _, _), _, _),
       Pair_t ((tbl, _, _), (tbr, _, _), _, _) ) ->
@@ -1185,12 +1199,12 @@ let rec stack_ty_eq :
   | (_, _) ->
       error Bad_stack_length
 
-let merge_comparable_types :
-    type ta.
+let rec merge_comparable_types :
+    type ta s.
     legacy:bool ->
-    ta comparable_ty ->
-    ta comparable_ty ->
-    ta comparable_ty tzresult =
+    (ta, s) comparable_struct ->
+    (ta, s) comparable_struct ->
+    (ta, s) comparable_struct tzresult =
  fun ~legacy ta tb ->
   match (ta, tb) with
   | (Int_key annot_a, Int_key annot_b) ->
@@ -1215,6 +1229,19 @@ let merge_comparable_types :
   | (Address_key annot_a, Address_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> Address_key annot
+  | ( Pair_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
+      Pair_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) ) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >>? fun annot ->
+      merge_field_annot ~legacy annot_left_a annot_left_b
+      >>? fun annot_left ->
+      merge_field_annot ~legacy annot_right_a annot_right_b
+      >>? fun annot_right ->
+      merge_comparable_types ~legacy left_a left_b
+      >>? fun left ->
+      merge_comparable_types ~legacy right_a right_b
+      >|? fun right ->
+      Pair_key ((left, annot_left), (right, annot_right), annot)
   | (_, _) ->
       assert false
 
@@ -1528,10 +1555,71 @@ let rec parse_comparable_ty :
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
+  | Prim (loc, T_pair, [left; right], annot) -> (
+      parse_type_annot loc annot
+      >>? fun pname ->
+      extract_field_annot left
+      >>? fun (left, left_annot) ->
+      extract_field_annot right
+      >>? fun (right, right_annot) ->
+      parse_comparable_ty ctxt right
+      >>? fun (Ex_comparable_ty right, ctxt) ->
+      parse_comparable_ty ctxt left
+      >>? fun (Ex_comparable_ty left, ctxt) ->
+      let right = (right, right_annot) in
+      match left with
+      | Pair_key _ ->
+          error (Comparable_type_expected (loc, Micheline.strip_locations ty))
+      | Int_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Int_key tname, left_annot), right, pname)),
+              ctxt )
+      | Nat_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Nat_key tname, left_annot), right, pname)),
+              ctxt )
+      | String_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((String_key tname, left_annot), right, pname)),
+              ctxt )
+      | Bytes_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Bytes_key tname, left_annot), right, pname)),
+              ctxt )
+      | Mutez_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Mutez_key tname, left_annot), right, pname)),
+              ctxt )
+      | Bool_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Bool_key tname, left_annot), right, pname)),
+              ctxt )
+      | Key_hash_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Key_hash_key tname, left_annot), right, pname)),
+              ctxt )
+      | Timestamp_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Timestamp_key tname, left_annot), right, pname)),
+              ctxt )
+      | Address_key tname ->
+          ok
+            ( Ex_comparable_ty
+                (Pair_key ((Address_key tname, left_annot), right, pname)),
+              ctxt ) )
+  | Prim (loc, T_pair, l, _) ->
+      error (Invalid_arity (loc, T_pair, 2, List.length l))
   | Prim
       ( loc,
-        ( T_pair
-        | T_or
+        ( T_or
         | T_set
         | T_map
         | T_list
@@ -2632,7 +2720,7 @@ let rec parse_data :
             parse_packable_ty ctxt ~legacy (Micheline.root btv)
             >>? fun (Ex_ty btv, ctxt) ->
             comparable_ty_eq ctxt tk btk
-            >>? fun Eq ->
+            >>? fun (Eq, ctxt) ->
             ty_eq ctxt tv btv
             >>? fun (Eq, ctxt) ->
             ok
@@ -2757,16 +2845,16 @@ and parse_instr :
   in
   let check_item_comparable_ty (type a b) (exp : a comparable_ty)
       (got : b comparable_ty) loc name n m :
-      ((a, b) eq * a comparable_ty) tzresult Lwt.t =
+      ((a, b) eq * a comparable_ty * context) tzresult Lwt.t =
     trace_eval (fun () ->
         serialize_stack_for_error ctxt stack_ty
         >>|? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
     @@ trace (Bad_stack_item n)
     @@ Lwt.return
          ( comparable_ty_eq ctxt exp got
-         >>? fun Eq ->
+         >>? fun (Eq, ctxt) ->
          merge_comparable_types ~legacy exp got
-         >>? fun ty -> ok ((Eq : (a, b) eq), (ty : a comparable_ty)) )
+         >>? fun ty -> ok ((Eq : (a, b) eq), (ty : a comparable_ty), ctxt) )
   in
   let log_stack ctxt loc stack_ty aft =
     match (type_logger, script_instr) with
@@ -3286,7 +3374,7 @@ and parse_instr :
         parse_var_annot loc annot ~default:set_annot
         >>=? fun annot ->
         check_item_comparable_ty elt v loc I_UPDATE 1 3
-        >>=? fun (Eq, elt) ->
+        >>=? fun (Eq, elt, ctxt) ->
         typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot)) )
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest, _)) ->
       parse_var_annot loc annot
