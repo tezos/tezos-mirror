@@ -3,6 +3,7 @@
  (public_name tezos-version))
 
 (rule
-    (targets generated_git_info.ml)
-    (deps (:script get-git-info.mlt))
-    (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
+ (targets generated_git_info.ml)
+ ; Ensures the hash update whenever a source file is modified ;
+ (deps (source_tree ..) (:script get-git-info.mlt))
+ (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
