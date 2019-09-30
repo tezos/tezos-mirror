@@ -25,8 +25,6 @@
 
 let ( // ) = Filename.concat
 
-type proto_status = Embeded | Dynlinked
-
 let load_protocol proto protocol_root =
   if Registered_protocol.mem proto then return_unit
   else
