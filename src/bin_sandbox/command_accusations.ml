@@ -165,8 +165,14 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state
   >>= fun () ->
   kill_nth 2
   >>= fun () ->
-  Loop.n_times number_of_lonely_bakes (fun _ ->
+  Loop.n_times (number_of_lonely_bakes - 1) (fun _ ->
       Tezos_client.Keyed.bake state baker_0 "Bake-on-0")
+  >>= fun () ->
+  (* Bake one block less and inject an operation to generate a different
+     block's hash *)
+  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
+  >>= fun () ->
+  Tezos_client.Keyed.bake state baker_0 "Bake-on-0"
   >>= fun () ->
   Tezos_client.get_block_header state ~client:client_0 `Head
   >>= fun baking_0_header ->
@@ -323,6 +329,9 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
   Helpers.kill_node state node_1
   >>= fun () ->
   Helpers.kill_node state node_2
+  >>= fun () ->
+  (* Inject an operation to generate a different block's hash *)
+  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_0 "baker-0 baking with node 0"
   >>= fun () ->

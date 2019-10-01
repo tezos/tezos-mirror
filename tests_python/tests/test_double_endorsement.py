@@ -17,9 +17,10 @@ class TestDoubleEndorsement:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=PARAMS)
         utils.activate_alpha(sandbox.client(0))
+        sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_level(self, sandbox):
-        level = 1
+        level = 2
         for client in sandbox.all_clients():
             assert utils.check_level(client, level)
 
@@ -28,7 +29,9 @@ class TestDoubleEndorsement:
         sandbox.node(2).terminate()
 
     def test_bake_node_0(self, sandbox):
-        """Client 0 bakes block A at level 2, not communicated to 1 and 2"""
+        """Client 0 bakes block A at level 3, not communicated to 1 and 2"""
+        """Inject an endorsement to ensure a different hash"""
+        sandbox.client(0).endorse('bootstrap1')
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_endorse_node_0(self, sandbox, session):
@@ -47,7 +50,7 @@ class TestDoubleEndorsement:
         time.sleep(1)
 
     def test_bake_node_2(self, sandbox):
-        """Client 2 bakes block B at level 2, not communicated to 0 and 1"""
+        """Client 2 bakes block B at level 3, not communicated to 0 and 1"""
         sandbox.client(2).bake('bootstrap1', BAKE_ARGS)
 
     def test_endorse_node_2(self, sandbox, session):
@@ -65,8 +68,8 @@ class TestDoubleEndorsement:
         time.sleep(1)
 
     def test_check_level(self, sandbox):
-        """All nodes are at level 2, head is either block A or B"""
-        level = 2
+        """All nodes are at level 3, head is either block A or B"""
+        level = 3
         for client in sandbox.all_clients():
             assert utils.check_level(client, level)
 
