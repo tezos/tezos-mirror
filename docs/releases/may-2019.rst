@@ -77,7 +77,7 @@ are two new commands.
 The node storage can be upgraded, before running the new node in
 archive mode, using::
 
-  ./mainnet.sh upgrade
+  ./mainnet.sh node upgrade
 
 Otherwise you can delete your storage altogether and import a fresh
 snapshot using::

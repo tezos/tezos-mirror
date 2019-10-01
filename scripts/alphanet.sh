@@ -673,7 +673,7 @@ usage() {
     echo "       Replace 'alphanet.sh' with the one found in the docker image."
     echo "  Advanced commands:"
     echo "    $0 node <start|stop|status|log>"
-    echo "    $0 upgrade"
+    echo "    $0 node upgrade"
     echo "    $0 snapshot import <snapshot_file>"
     echo "    $0 baker <start|stop|status|log>"
     echo "    $0 endorser <start|stop|status|log>"
