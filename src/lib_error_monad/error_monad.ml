@@ -849,6 +849,8 @@ let () =
     ~id:"canceled"
     ~title:"Canceled"
     ~description:"A promise was unexpectedly canceled"
+    ~pp:(fun f () ->
+      Format.pp_print_string f "The promise was unexpectedly canceled")
     Data_encoding.unit
     (function Canceled -> Some () | _ -> None)
     (fun () -> Canceled)
@@ -885,6 +887,7 @@ let () =
     ~id:"utils.Timeout"
     ~title:"Timeout"
     ~description:"Timeout"
+    ~pp:(fun f () -> Format.pp_print_string f "The request has timed out")
     Data_encoding.unit
     (function Timeout -> Some () | _ -> None)
     (fun () -> Timeout)
