@@ -41,32 +41,42 @@ module Cost_of = struct
     let z = Script_timestamp.to_zint t in
     z_bytes z
 
-  (* For now, returns size in bytes, but this could get more complicated... *)
+  (* Upper-bound on the time to compare the given value.
+     For now, returns size in bytes, but this could get more complicated... *)
   let rec size_of_comparable :
       type a. a Script_typed_ir.comparable_ty -> a -> int =
    fun wit v ->
-    match wit with
-    | Int_key _ ->
+    match (wit, v) with
+    | (Unit_key _, _) ->
+        1
+    | (Int_key _, _) ->
         int_bytes v
-    | Nat_key _ ->
+    | (Nat_key _, _) ->
         int_bytes v
-    | String_key _ ->
+    | (String_key _, _) ->
         String.length v
-    | Bytes_key _ ->
+    | (Bytes_key _, _) ->
         MBytes.length v
-    | Bool_key _ ->
-        8
-    | Key_hash_key _ ->
+    | (Bool_key _, _) ->
+        1
+    | (Key_hash_key _, _) ->
         Signature.Public_key_hash.size
-    | Timestamp_key _ ->
+    | (Timestamp_key _, _) ->
         timestamp_bytes v
-    | Address_key _ ->
+    | (Address_key _, _) ->
         Signature.Public_key_hash.size
-    | Mutez_key _ ->
+    | (Mutez_key _, _) ->
         8
-    | Pair_key ((l, _), (r, _), _) ->
-        let (lval, rval) = v in
+    | (Pair_key ((l, _), (r, _), _), (lval, rval)) ->
         size_of_comparable l lval + size_of_comparable r rval
+    | (Union_key ((t, _), _, _), L x) ->
+        1 + size_of_comparable t x
+    | (Union_key (_, (t, _), _), R x) ->
+        1 + size_of_comparable t x
+    | (Option_key _, None) ->
+        1
+    | (Option_key (t, _), Some x) ->
+        1 + size_of_comparable t x
 
   let string length = alloc_bytes_cost length
 
@@ -219,6 +229,8 @@ module Cost_of = struct
       let cost = indic_lt bytes2 bytes1 * (bytes1 - bytes2) * bytes2 in
       atomic_step_cost (51 + (cost / 3151))
 
+    let compare_unit = atomic_step_cost 10
+
     let shift_left _i _shift_bits = atomic_step_cost 30
 
     let shift_right _i _shift_bits = atomic_step_cost 30
@@ -239,7 +251,11 @@ module Cost_of = struct
 
     let exec = atomic_step_cost 10
 
-    let compare_bool _ _ = atomic_step_cost 30
+    let compare_bool = atomic_step_cost 30
+
+    let compare_option_tag = atomic_step_cost 35
+
+    let compare_union_tag = atomic_step_cost 40
 
     let compare_string s1 s2 =
       let bytes1 = String.length s1 in
@@ -337,8 +353,10 @@ module Cost_of = struct
         =
      fun ty x y ->
       match ty with
+      | Unit_key _ ->
+          compare_unit
       | Bool_key _ ->
-          compare_bool x y
+          compare_bool
       | String_key _ ->
           compare_string x y
       | Bytes_key _ ->
@@ -359,6 +377,30 @@ module Cost_of = struct
           (* Reasonable over-approximation of the cost of lexicographic comparison. *)
           let (xl, xr) = x and (yl, yr) = y in
           compare tl xl yl +@ compare tr xr yr
+      | Union_key ((tl, _), (tr, _), _) -> (
+          compare_union_tag
+          +@
+          match (x, y) with
+          | (L x, L y) ->
+              compare tl x y
+          | (L _, R _) ->
+              free
+          | (R _, L _) ->
+              free
+          | (R x, R y) ->
+              compare tr x y )
+      | Option_key (t, _) -> (
+          compare_option_tag
+          +@
+          match (x, y) with
+          | (None, None) ->
+              free
+          | (None, Some _) ->
+              free
+          | (Some _, None) ->
+              free
+          | (Some x, Some y) ->
+              compare t x y )
   end
 
   module Typechecking = struct

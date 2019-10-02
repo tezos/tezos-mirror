@@ -71,6 +71,8 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
  fun ty ->
   (* No wildcard to force the update when comparable_ty changes. *)
   match ty with
+  | Unit_key _ ->
+      1
   | Int_key _ ->
       1
   | Nat_key _ ->
@@ -91,6 +93,10 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
       1
   | Pair_key ((t1, _), (t2, _), _) ->
       1 + comparable_type_size t1 + comparable_type_size t2
+  | Union_key ((t1, _), (t2, _), _) ->
+      1 + comparable_type_size t1 + comparable_type_size t2
+  | Option_key (t, _) ->
+      1 + comparable_type_size t
 
 let rec type_size : type t. t ty -> int =
  fun ty ->
@@ -634,6 +640,8 @@ let wrap_compare compare a b =
 let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
  fun kind ->
   match kind with
+  | Unit_key _ ->
+      fun () () -> 0
   | String_key _ ->
       wrap_compare Compare.String.compare
   | Bool_key _ ->
@@ -659,6 +667,28 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       fun (lx, rx) (ly, ry) ->
         let lres = compare_comparable tl lx ly in
         if Compare.Int.(lres = 0) then compare_comparable tr rx ry else lres
+  | Union_key ((tl, _), (tr, _), _) -> (
+      fun x y ->
+        match (x, y) with
+        | (L x, L y) ->
+            compare_comparable tl x y
+        | (L _, R _) ->
+            -1
+        | (R _, L _) ->
+            1
+        | (R x, R y) ->
+            compare_comparable tr x y )
+  | Option_key (t, _) -> (
+      fun x y ->
+        match (x, y) with
+        | (None, None) ->
+            0
+        | (None, Some _) ->
+            -1
+        | (Some _, None) ->
+            1
+        | (Some x, Some y) ->
+            compare_comparable t x y )
 
 let empty_set : type a. a comparable_ty -> a set =
  fun ty ->
@@ -807,6 +837,8 @@ let map_size : type key value. (key, value) map -> Script_int.n Script_int.num
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
 let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
+  | Unit_key tname ->
+      Unit_t tname
   | Int_key tname ->
       Int_t tname
   | Nat_key tname ->
@@ -831,6 +863,11 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
           (ty_of_comparable_ty r, ar, None),
           tname,
           false )
+  | Union_key ((l, al), (r, ar), tname) ->
+      Union_t
+        ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname, false)
+  | Option_key (t, tname) ->
+      Option_t (ty_of_comparable_ty t, tname, false)
 
 let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
   function
@@ -862,6 +899,22 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
           None
       | Some rty ->
           Some (Pair_key ((lty, al), (rty, ar), pname)) ) )
+  | Union_t ((l, al), (r, ar), tname, _) -> (
+    match comparable_ty_of_ty_no_gas l with
+    | None ->
+        None
+    | Some lty -> (
+      match comparable_ty_of_ty_no_gas r with
+      | None ->
+          None
+      | Some rty ->
+          Some (Union_key ((lty, al), (rty, ar), tname)) ) )
+  | Option_t (tt, tname, _) -> (
+    match comparable_ty_of_ty_no_gas tt with
+    | None ->
+        None
+    | Some ty ->
+        Some (Option_key (ty, tname)) )
   | _ ->
       None
 
@@ -877,6 +930,8 @@ let add_field_annot a var = function
 
 let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
   function
+  | Unit_key tname ->
+      Prim (-1, T_unit, [], unparse_type_annot tname)
   | Int_key tname ->
       Prim (-1, T_int, [], unparse_type_annot tname)
   | Nat_key tname ->
@@ -899,6 +954,12 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       let tl = add_field_annot al None (unparse_comparable_ty l) in
       let tr = add_field_annot ar None (unparse_comparable_ty r) in
       Prim (-1, T_pair, [tl; tr], unparse_type_annot pname)
+  | Union_key ((l, al), (r, ar), tname) ->
+      let tl = add_field_annot al None (unparse_comparable_ty l) in
+      let tr = add_field_annot ar None (unparse_comparable_ty r) in
+      Prim (-1, T_or, [tl; tr], unparse_type_annot tname)
+  | Option_key (t, tname) ->
+      Prim (-1, T_option, [unparse_comparable_ty t], unparse_type_annot tname)
 
 let rec unparse_ty_no_lwt :
     type a. context -> a ty -> (Script.node * context) tzresult =
@@ -1101,12 +1162,15 @@ let rec merge_comparable_types :
   Gas.consume ctxt Typecheck_costs.cycle
   >>? fun ctxt ->
   match (ta, tb) with
-  | (Int_key annot_a, Int_key annot_b) ->
+  | (Unit_key annot_a, Unit_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot ->
       ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-        (Int_key annot : ta comparable_ty),
+        (Unit_key annot : ta comparable_ty),
         ctxt )
+  | (Int_key annot_a, Int_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Int_key annot, ctxt)
   | (Nat_key annot_a, Nat_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Nat_key annot, ctxt)
@@ -1145,6 +1209,30 @@ let rec merge_comparable_types :
       >|? fun (Eq, right, ctxt) ->
       ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
         Pair_key ((left, annot_left), (right, annot_right), annot),
+        ctxt )
+  | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
+      Union_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) )
+    ->
+      merge_type_annot ~legacy annot_a annot_b
+      >>? fun annot ->
+      merge_field_annot ~legacy annot_left_a annot_left_b
+      >>? fun annot_left ->
+      merge_field_annot ~legacy annot_right_a annot_right_b
+      >>? fun annot_right ->
+      merge_comparable_types ~legacy ctxt left_a left_b
+      >>? fun (Eq, left, ctxt) ->
+      merge_comparable_types ~legacy ctxt right_a right_b
+      >|? fun (Eq, right, ctxt) ->
+      ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+        Union_key ((left, annot_left), (right, annot_right), annot),
+        ctxt )
+  | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >>? fun annot ->
+      merge_comparable_types ~legacy ctxt ta tb
+      >|? fun (Eq, t, ctxt) ->
+      ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+        Option_key (t, annot),
         ctxt )
   | (_, _) ->
       serialize_ty_for_error ctxt (ty_of_comparable_ty ta)
@@ -1517,6 +1605,9 @@ let rec parse_comparable_ty :
   Gas.consume ctxt (Typecheck_costs.type_ 0)
   >>? fun ctxt ->
   match ty with
+  | Prim (loc, T_unit, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Unit_key tname), ctxt)
   | Prim (loc, T_int, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Int_key tname), ctxt)
@@ -1571,19 +1662,33 @@ let rec parse_comparable_ty :
       ( Ex_comparable_ty
           (Pair_key ((left, left_annot), (right, right_annot), pname)),
         ctxt )
-  | Prim (loc, T_pair, l, _) ->
-      error (Invalid_arity (loc, T_pair, 2, List.length l))
+  | Prim (loc, T_or, [left; right], annot) ->
+      parse_type_annot loc annot
+      >>? fun pname ->
+      extract_field_annot left
+      >>? fun (left, left_annot) ->
+      extract_field_annot right
+      >>? fun (right, right_annot) ->
+      parse_comparable_ty ctxt right
+      >>? fun (Ex_comparable_ty right, ctxt) ->
+      parse_comparable_ty ctxt left
+      >|? fun (Ex_comparable_ty left, ctxt) ->
+      ( Ex_comparable_ty
+          (Union_key ((left, left_annot), (right, right_annot), pname)),
+        ctxt )
+  | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
+      error (Invalid_arity (loc, prim, 2, List.length l))
+  | Prim (loc, T_option, [t], annot) ->
+      parse_type_annot loc annot
+      >>? fun tname ->
+      parse_comparable_ty ctxt t
+      >|? fun (Ex_comparable_ty t, ctxt) ->
+      (Ex_comparable_ty (Option_key (t, tname)), ctxt)
+  | Prim (loc, T_option, l, _) ->
+      error (Invalid_arity (loc, T_option, 1, List.length l))
   | Prim
       ( loc,
-        ( T_or
-        | T_set
-        | T_map
-        | T_list
-        | T_option
-        | T_lambda
-        | T_unit
-        | T_signature
-        | T_contract ),
+        (T_set | T_map | T_list | T_lambda | T_signature | T_contract),
         _,
         _ ) ->
       error (Comparable_type_expected (loc, Micheline.strip_locations ty))

@@ -43,6 +43,7 @@ type ('a, 'b) pair = 'a * 'b
 type ('a, 'b) union = L of 'a | R of 'b
 
 type _ comparable_ty =
+  | Unit_key : type_annot option -> unit comparable_ty
   | Int_key : type_annot option -> z num comparable_ty
   | Nat_key : type_annot option -> n num comparable_ty
   | String_key : type_annot option -> string comparable_ty
@@ -57,6 +58,14 @@ type _ comparable_ty =
       * ('b comparable_ty * field_annot option)
       * type_annot option
       -> ('a, 'b) pair comparable_ty
+  | Union_key :
+      ('a comparable_ty * field_annot option)
+      * ('b comparable_ty * field_annot option)
+      * type_annot option
+      -> ('a, 'b) union comparable_ty
+  | Option_key :
+      'v comparable_ty * type_annot option
+      -> 'v option comparable_ty
 
 module type Boxed_set = sig
   type elt
