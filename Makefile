@@ -127,8 +127,10 @@ clean:
 		tezos-client \
 		tezos-signer \
 		tezos-admin-client \
+		tezos-codec \
 		tezos-protocol-compiler \
-	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p))
+		tezos-sandbox \
+	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p) sandbox-parameters.json)
 	@-${MAKE} -C docs clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-005-PsBabyM1.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 
