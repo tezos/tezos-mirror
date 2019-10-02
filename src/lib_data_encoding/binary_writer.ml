@@ -379,7 +379,7 @@ let to_bytes_exn e v =
       (* Preallocate a minimal buffer and let's not hardcode a
          limit to its extension. *)
       let state =
-        {buffer = Bytes.create 4096; offset = 0; allowed_bytes = None}
+        {buffer = Bytes.create 128; offset = 0; allowed_bytes = None}
       in
       write_rec e state v ;
       Bytes.sub state.buffer 0 state.offset
