@@ -1218,57 +1218,48 @@ let rec ty_eq :
       serialize_ty_for_error ctxt tb
       >>? fun (tb, _ctxt) -> error (Inconsistent_types (ta, tb))
 
-let rec stack_ty_eq :
-    type ta tb.
-    context ->
-    int ->
-    ta stack_ty ->
-    tb stack_ty ->
-    ((ta stack_ty, tb stack_ty) eq * context) tzresult =
- fun ctxt lvl ta tb ->
-  match (ta, tb) with
-  | (Item_t (tva, ra, _), Item_t (tvb, rb, _)) ->
-      ty_eq ctxt tva tvb
-      |> record_trace (Bad_stack_item lvl)
-      >>? fun (Eq, ctxt) ->
-      stack_ty_eq ctxt (lvl + 1) ra rb
-      >>? fun (Eq, ctxt) ->
-      (Ok (Eq, ctxt) : ((ta stack_ty, tb stack_ty) eq * context) tzresult)
-  | (Empty_t, Empty_t) ->
-      Ok (Eq, ctxt)
-  | (_, _) ->
-      error Bad_stack_length
-
 let rec merge_comparable_types :
-    type ta.
+    type ta tb.
     legacy:bool ->
+    context ->
     ta comparable_ty ->
-    ta comparable_ty ->
-    ta comparable_ty tzresult =
- fun ~legacy ta tb ->
+    tb comparable_ty ->
+    ((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty * context)
+    tzresult =
+ fun ~legacy ctxt ta tb ->
+  Gas.consume ctxt Typecheck_costs.cycle
+  >>? fun ctxt ->
   match (ta, tb) with
   | (Int_key annot_a, Int_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b >|? fun annot -> Int_key annot
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot ->
+      ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+        (Int_key annot : ta comparable_ty),
+        ctxt )
   | (Nat_key annot_a, Nat_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b >|? fun annot -> Nat_key annot
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Nat_key annot, ctxt)
   | (String_key annot_a, String_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> String_key annot
+      >|? fun annot -> (Eq, String_key annot, ctxt)
   | (Bytes_key annot_a, Bytes_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b >|? fun annot -> Bytes_key annot
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Bytes_key annot, ctxt)
   | (Mutez_key annot_a, Mutez_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b >|? fun annot -> Mutez_key annot
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Mutez_key annot, ctxt)
   | (Bool_key annot_a, Bool_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b >|? fun annot -> Bool_key annot
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Bool_key annot, ctxt)
   | (Key_hash_key annot_a, Key_hash_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> Key_hash_key annot
+      >|? fun annot -> (Eq, Key_hash_key annot, ctxt)
   | (Timestamp_key annot_a, Timestamp_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> Timestamp_key annot
+      >|? fun annot -> (Eq, Timestamp_key annot, ctxt)
   | (Address_key annot_a, Address_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> Address_key annot
+      >|? fun annot -> (Eq, Address_key annot, ctxt)
   | ( Pair_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
       Pair_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) ) ->
       merge_type_annot ~legacy annot_a annot_b
@@ -1277,89 +1268,144 @@ let rec merge_comparable_types :
       >>? fun annot_left ->
       merge_field_annot ~legacy annot_right_a annot_right_b
       >>? fun annot_right ->
-      merge_comparable_types ~legacy left_a left_b
-      >>? fun left ->
-      merge_comparable_types ~legacy right_a right_b
-      >|? fun right ->
-      Pair_key ((left, annot_left), (right, annot_right), annot)
+      merge_comparable_types ~legacy ctxt left_a left_b
+      >>? fun (Eq, left, ctxt) ->
+      merge_comparable_types ~legacy ctxt right_a right_b
+      >|? fun (Eq, right, ctxt) ->
+      ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+        Pair_key ((left, annot_left), (right, annot_right), annot),
+        ctxt )
   | (_, _) ->
-      assert false
-
-(* FIXME: fix injectivity of some types *)
+      serialize_ty_for_error ctxt (ty_of_comparable_ty ta)
+      >>? fun (ta, ctxt) ->
+      serialize_ty_for_error ctxt (ty_of_comparable_ty tb)
+      >>? fun (tb, _ctxt) -> error (Inconsistent_types (ta, tb))
 
 let merge_types :
-    type b.
+    type a b.
     legacy:bool ->
     context ->
     Script.location ->
+    a ty ->
     b ty ->
-    b ty ->
-    (b ty * context) tzresult =
- fun ~legacy ->
-  let rec help : type a. context -> a ty -> a ty -> (a ty * context) tzresult =
+    ((a ty, b ty) eq * a ty * context) tzresult =
+ fun ~legacy ctxt loc ty1 ty2 ->
+  let merge_type_annot tn1 tn2 =
+    merge_type_annot ~legacy tn1 tn2
+    |> record_inconsistent_type_annotations ctxt loc ty1 ty2
+  in
+  let rec help :
+      type ta tb.
+      context ->
+      ta ty ->
+      tb ty ->
+      ((ta ty, tb ty) eq * ta ty * context) tzresult =
+   fun ctxt ty1 ty2 -> help0 ctxt ty1 ty2 |> record_inconsistent ctxt ty1 ty2
+  and help0 :
+      type ta tb.
+      context ->
+      ta ty ->
+      tb ty ->
+      ((ta ty, tb ty) eq * ta ty * context) tzresult =
    fun ctxt ty1 ty2 ->
+    let consume ctxt nb_args : context tzresult =
+      Gas.consume ctxt (Typecheck_costs.type_ (2 * nb_args))
+    in
+    Gas.consume ctxt Typecheck_costs.cycle
+    >>? fun ctxt ->
     match (ty1, ty2) with
     | (Unit_t tn1, Unit_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Unit_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
+        >|? fun tname ->
+        ((Eq : (ta ty, tb ty) eq), (Unit_t tname : ta ty), ctxt)
     | (Int_t tn1, Int_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Int_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Int_t tname, ctxt)
     | (Nat_t tn1, Nat_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Nat_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Nat_t tname, ctxt)
     | (Key_t tn1, Key_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Key_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_t tname, ctxt)
     | (Key_hash_t tn1, Key_hash_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Key_hash_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_hash_t tname, ctxt)
     | (String_t tn1, String_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (String_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, String_t tname, ctxt)
     | (Bytes_t tn1, Bytes_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Bytes_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Bytes_t tname, ctxt)
     | (Signature_t tn1, Signature_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Signature_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Signature_t tname, ctxt)
     | (Mutez_t tn1, Mutez_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Mutez_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Mutez_t tname, ctxt)
     | (Timestamp_t tn1, Timestamp_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Timestamp_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Timestamp_t tname, ctxt)
     | (Address_t tn1, Address_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Address_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Address_t tname, ctxt)
     | (Bool_t tn1, Bool_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2 >|? fun tname -> (Bool_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Bool_t tname, ctxt)
     | (Chain_id_t tn1, Chain_id_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Chain_id_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Chain_id_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
-        merge_type_annot ~legacy tn1 tn2
-        >|? fun tname -> (Operation_t tname, ctxt)
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
     | (Map_t (tal, tar, tn1, has_big_map), Map_t (tbl, tbr, tn2, _)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 2
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tar tbr
-        >>? fun (value, ctxt) ->
-        ty_eq ctxt tar value
-        >>? fun (Eq, ctxt) ->
-        merge_comparable_types ~legacy tal tbl
-        >|? fun tk -> (Map_t (tk, value, tname, has_big_map), ctxt)
+        >>? fun (Eq, value, ctxt) ->
+        merge_comparable_types ~legacy ctxt tal tbl
+        >|? fun (Eq, tk, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname, has_big_map), ctxt)
     | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 2
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tar tbr
-        >>? fun (value, ctxt) ->
-        ty_eq ctxt tar value
-        >>? fun (Eq, ctxt) ->
-        merge_comparable_types ~legacy tal tbl
-        >|? fun tk -> (Big_map_t (tk, value, tname), ctxt)
+        >>? fun (Eq, value, ctxt) ->
+        merge_comparable_types ~legacy ctxt tal tbl
+        >|? fun (Eq, tk, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname), ctxt)
     | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 1
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
-        merge_comparable_types ~legacy ea eb
-        >|? fun e -> (Set_t (e, tname), ctxt)
+        merge_comparable_types ~legacy ctxt ea eb
+        >|? fun (Eq, e, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Set_t (e, tname), ctxt)
     | ( Pair_t
           ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1, has_big_map),
         Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2, _) ) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 2
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         merge_field_annot ~legacy l_field1 l_field2
         >>? fun l_field ->
@@ -1368,10 +1414,11 @@ let merge_types :
         let l_var = merge_var_annot l_var1 l_var2 in
         let r_var = merge_var_annot r_var1 r_var2 in
         help ctxt tal tbl
-        >>? fun (left_ty, ctxt) ->
+        >>? fun (Eq, left_ty, ctxt) ->
         help ctxt tar tbr
-        >|? fun (right_ty, ctxt) ->
-        ( Pair_t
+        >|? fun (Eq, right_ty, ctxt) ->
+        ( (Eq : (ta ty, tb ty) eq),
+          Pair_t
             ( (left_ty, l_field, l_var),
               (right_ty, r_field, r_var),
               tname,
@@ -1379,69 +1426,95 @@ let merge_types :
           ctxt )
     | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1, has_big_map),
         Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2, _) ) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 2
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         merge_field_annot ~legacy tal_annot tbl_annot
         >>? fun left_annot ->
         merge_field_annot ~legacy tar_annot tbr_annot
         >>? fun right_annot ->
         help ctxt tal tbl
-        >>? fun (left_ty, ctxt) ->
+        >>? fun (Eq, left_ty, ctxt) ->
         help ctxt tar tbr
-        >|? fun (right_ty, ctxt) ->
-        ( Union_t
+        >|? fun (Eq, right_ty, ctxt) ->
+        ( (Eq : (ta ty, tb ty) eq),
+          Union_t
             ((left_ty, left_annot), (right_ty, right_annot), tname, has_big_map),
           ctxt )
     | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 2
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tal tbl
-        >>? fun (left_ty, ctxt) ->
+        >>? fun (Eq, left_ty, ctxt) ->
         help ctxt tar tbr
-        >|? fun (right_ty, ctxt) -> (Lambda_t (left_ty, right_ty, tname), ctxt)
+        >|? fun (Eq, right_ty, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, tname), ctxt)
     | (Contract_t (tal, tn1), Contract_t (tbl, tn2)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 1
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tal tbl
-        >|? fun (arg_ty, ctxt) -> (Contract_t (arg_ty, tname), ctxt)
+        >|? fun (Eq, arg_ty, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname), ctxt)
     | (Option_t (tva, tn1, has_big_map), Option_t (tvb, tn2, _)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 1
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
-        >|? fun (ty, ctxt) -> (Option_t (ty, tname, has_big_map), ctxt)
+        >|? fun (Eq, ty, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname, has_big_map), ctxt)
     | (List_t (tva, tn1, has_big_map), List_t (tvb, tn2, _)) ->
-        merge_type_annot ~legacy tn1 tn2
+        consume ctxt 1
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
-        >|? fun (ty, ctxt) -> (List_t (ty, tname, has_big_map), ctxt)
+        >|? fun (Eq, ty, ctxt) ->
+        ((Eq : (ta ty, tb ty) eq), List_t (ty, tname, has_big_map), ctxt)
     | (_, _) ->
-        assert false
+        serialize_ty_for_error ctxt ty1
+        >>? fun (ty1, ctxt) ->
+        serialize_ty_for_error ctxt ty2
+        >>? fun (ty2, _ctxt) -> error (Inconsistent_types (ty1, ty2))
   in
-  fun ctxt loc ty1 ty2 ->
-    record_inconsistent_type_annotations ctxt loc ty1 ty2 (help ctxt ty1 ty2)
+  help ctxt ty1 ty2
 
 let merge_stacks :
-    type ta.
+    type ta tb.
     legacy:bool ->
     Script.location ->
     context ->
+    int ->
     ta stack_ty ->
-    ta stack_ty ->
-    (ta stack_ty * context) tzresult =
+    tb stack_ty ->
+    ((ta stack_ty, tb stack_ty) eq * ta stack_ty * context) tzresult =
  fun ~legacy loc ->
   let rec help :
-      type a.
-      context -> a stack_ty -> a stack_ty -> (a stack_ty * context) tzresult =
-   fun ctxt stack1 stack2 ->
+      type a b.
+      context ->
+      int ->
+      a stack_ty ->
+      b stack_ty ->
+      ((a stack_ty, b stack_ty) eq * a stack_ty * context) tzresult =
+   fun ctxt lvl stack1 stack2 ->
     match (stack1, stack2) with
     | (Empty_t, Empty_t) ->
-        ok (Empty_t, ctxt)
+        ok (Eq, Empty_t, ctxt)
     | (Item_t (ty1, rest1, annot1), Item_t (ty2, rest2, annot2)) ->
-        let annot = merge_var_annot annot1 annot2 in
         merge_types ~legacy ctxt loc ty1 ty2
-        >>? fun (ty, ctxt) ->
-        help ctxt rest1 rest2
-        >|? fun (rest, ctxt) -> (Item_t (ty, rest, annot), ctxt)
+        |> record_trace (Bad_stack_item lvl)
+        >>? fun (Eq, ty, ctxt) ->
+        help ctxt (lvl + 1) rest1 rest2
+        >|? fun (Eq, rest, ctxt) ->
+        let annot = merge_var_annot annot1 annot2 in
+        ((Eq : (a stack_ty, b stack_ty) eq), Item_t (ty, rest, annot), ctxt)
+    | (_, _) ->
+        error Bad_stack_length
   in
   help
 
@@ -1529,10 +1602,8 @@ let merge_branches :
       in
       trace_eval
         unmatched_branches
-        ( Lwt.return (stack_ty_eq ctxt 1 aftbt aftbf)
-        >>=? fun (Eq, ctxt) ->
-        Lwt.return (merge_stacks ~legacy loc ctxt aftbt aftbf)
-        >>=? fun (merged_stack, ctxt) ->
+        ( Lwt.return (merge_stacks ~legacy loc ctxt 1 aftbt aftbf)
+        >>=? fun (Eq, merged_stack, ctxt) ->
         return
           ( Typed
               (branch
@@ -2124,8 +2195,8 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
         | _ ->
             error (No_such_entrypoint entrypoint) ) )
 
-let find_entrypoint_for_type (type full exp) ~(full : full ty)
-    ~(expected : exp ty) ~root_name entrypoint ctxt :
+let find_entrypoint_for_type (type full exp) ~legacy ~(full : full ty)
+    ~(expected : exp ty) ~root_name entrypoint ctxt loc :
     (context * string * exp ty) tzresult =
   match (entrypoint, root_name) with
   | ("default", Some "root") -> (
@@ -2133,17 +2204,17 @@ let find_entrypoint_for_type (type full exp) ~(full : full ty)
     | Error _ as err ->
         err
     | Ok (_, Ex_ty ty) -> (
-      match ty_eq ctxt expected ty with
-      | Ok (Eq, ctxt) ->
-          ok (ctxt, "default", (ty : exp ty))
+      match merge_types ~legacy ctxt loc ty expected with
+      | Ok (Eq, ty, ctxt) ->
+          ok (ctxt, "default", ty)
       | Error _ ->
-          ty_eq ctxt expected full
-          >>? fun (Eq, ctxt) -> ok (ctxt, "root", (full : exp ty)) ) )
+          merge_types ~legacy ctxt loc full expected
+          >>? fun (Eq, full, ctxt) -> ok (ctxt, "root", (full : exp ty)) ) )
   | _ ->
       find_entrypoint full ~root_name entrypoint
       >>? fun (_, Ex_ty ty) ->
-      ty_eq ctxt expected ty
-      >>? fun (Eq, ctxt) -> ok (ctxt, entrypoint, (ty : exp ty))
+      merge_types ~legacy ctxt loc ty expected
+      >>? fun (Eq, ty, ctxt) -> ok (ctxt, entrypoint, (ty : exp ty))
 
 module Entrypoints = Set.Make (String)
 
@@ -2754,10 +2825,8 @@ and parse_returning :
           >>=? fun (ret, ctxt) ->
           serialize_stack_for_error ctxt stack_ty
           >>|? fun (stack_ty, _ctxt) -> Bad_return (loc, stack_ty, ret))
-        ( Lwt.return (ty_eq ctxt ty ret)
-        >>=? fun (Eq, ctxt) ->
-        Lwt.return (merge_types ~legacy ctxt loc ty ret)
-        >>=? fun (_ret, ctxt) ->
+        ( Lwt.return (merge_types ~legacy ctxt loc ty ret)
+        >>=? fun (Eq, _ret, ctxt) ->
         return ((Lam (descr, script_instr) : (arg, ret) lambda), ctxt) )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
       Lwt.return (serialize_ty_for_error ctxt ret)
@@ -2807,10 +2876,8 @@ and parse_instr :
         >>|? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
     @@ trace (Bad_stack_item n)
     @@ Lwt.return
-         ( ty_eq ctxt exp got
-         >>? fun (Eq, ctxt) ->
-         merge_types ~legacy ctxt loc exp got
-         >>? fun (ty, ctxt) -> ok ((Eq : (a, b) eq), (ty : a ty), ctxt) )
+         ( merge_types ~legacy ctxt loc exp got
+         >>? fun (Eq, ty, ctxt) -> ok ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
   let log_stack ctxt loc stack_ty aft =
     match (type_logger, script_instr) with
@@ -3227,10 +3294,8 @@ and parse_instr :
           in
           trace_eval
             invalid_map_body
-            ( Lwt.return @@ stack_ty_eq ctxt 1 rest starting_rest
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt rest starting_rest
-            >>=? fun (rest, ctxt) ->
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            >>=? fun (Eq, rest, ctxt) ->
             typed
               ctxt
               loc
@@ -3268,10 +3333,9 @@ and parse_instr :
           in
           trace_eval
             invalid_iter_body
-            ( Lwt.return @@ stack_ty_eq ctxt 1 aft rest
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt aft rest
-            >>=? fun (rest, ctxt) -> typed ctxt loc (List_iter ibody) rest )
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 aft rest
+            >>=? fun (Eq, rest, ctxt) -> typed ctxt loc (List_iter ibody) rest
+            )
       | Failed {descr} ->
           typed ctxt loc (List_iter (descr rest)) rest )
   (* sets *)
@@ -3307,10 +3371,9 @@ and parse_instr :
           in
           trace_eval
             invalid_iter_body
-            ( Lwt.return @@ stack_ty_eq ctxt 1 aft rest
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt aft rest
-            >>=? fun (rest, ctxt) -> typed ctxt loc (Set_iter ibody) rest )
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 aft rest
+            >>=? fun (Eq, rest, ctxt) -> typed ctxt loc (Set_iter ibody) rest
+            )
       | Failed {descr} ->
           typed ctxt loc (Set_iter (descr rest)) rest )
   | ( Prim (loc, I_MEM, [], annot),
@@ -3377,10 +3440,8 @@ and parse_instr :
           in
           trace_eval
             invalid_map_body
-            ( Lwt.return @@ stack_ty_eq ctxt 1 rest starting_rest
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt rest starting_rest
-            >>=? fun (rest, ctxt) ->
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 rest starting_rest
+            >>=? fun (Eq, rest, ctxt) ->
             typed
               ctxt
               loc
@@ -3427,10 +3488,9 @@ and parse_instr :
           in
           trace_eval
             invalid_iter_body
-            ( Lwt.return @@ stack_ty_eq ctxt 1 aft rest
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt aft rest
-            >>=? fun (rest, ctxt) -> typed ctxt loc (Map_iter ibody) rest )
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 aft rest
+            >>=? fun (Eq, rest, ctxt) -> typed ctxt loc (Map_iter ibody) rest
+            )
       | Failed {descr} ->
           typed ctxt loc (Map_iter (descr rest)) rest )
   | ( Prim (loc, I_MEM, [], annot),
@@ -3602,10 +3662,8 @@ and parse_instr :
           in
           trace_eval
             unmatched_branches
-            ( Lwt.return @@ stack_ty_eq ctxt 1 ibody.aft stack
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt ibody.aft stack
-            >>=? fun (_stack, ctxt) -> typed ctxt loc (Loop ibody) rest )
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            >>=? fun (Eq, _stack, ctxt) -> typed ctxt loc (Loop ibody) rest )
       | Failed {descr} ->
           let ibody = descr stack in
           typed ctxt loc (Loop ibody) rest )
@@ -3637,10 +3695,8 @@ and parse_instr :
           in
           trace_eval
             unmatched_branches
-            ( Lwt.return @@ stack_ty_eq ctxt 1 ibody.aft stack
-            >>=? fun (Eq, ctxt) ->
-            Lwt.return @@ merge_stacks ~legacy loc ctxt ibody.aft stack
-            >>=? fun (_stack, ctxt) ->
+            ( Lwt.return @@ merge_stacks ~legacy loc ctxt 1 ibody.aft stack
+            >>=? fun (Eq, _stack, ctxt) ->
             typed ctxt loc (Loop_left ibody) (Item_t (tr, rest, annot)) )
       | Failed {descr} ->
           let ibody = descr stack in
@@ -4217,10 +4273,9 @@ and parse_instr :
       >>=? fun annot ->
       Lwt.return @@ parse_any_ty ctxt ~legacy cast_t
       >>=? fun (Ex_ty cast_t, ctxt) ->
-      Lwt.return @@ ty_eq ctxt cast_t t
-      >>=? fun (Eq, ctxt) ->
       Lwt.return @@ merge_types ~legacy ctxt loc cast_t t
-      >>=? fun (_, ctxt) -> typed ctxt loc Nop (Item_t (cast_t, stack, annot))
+      >>=? fun (Eq, _, ctxt) ->
+      typed ctxt loc Nop (Item_t (cast_t, stack, annot))
   | (Prim (loc, I_RENAME, [], annot), Item_t (t, stack, _)) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
@@ -4422,18 +4477,12 @@ and parse_instr :
                            _ },
                          _ ) as lambda ),
                    ctxt ) ->
-        Lwt.return @@ ty_eq ctxt arg arg_type_full
-        >>=? fun (Eq, ctxt) ->
         Lwt.return @@ merge_types ~legacy ctxt loc arg arg_type_full
-        >>=? fun (_, ctxt) ->
-        Lwt.return @@ ty_eq ctxt ret ret_type_full
-        >>=? fun (Eq, ctxt) ->
+        >>=? fun (Eq, _, ctxt) ->
         Lwt.return @@ merge_types ~legacy ctxt loc ret ret_type_full
-        >>=? fun (_, ctxt) ->
-        Lwt.return @@ ty_eq ctxt storage_type ginit
-        >>=? fun (Eq, ctxt) ->
+        >>=? fun (Eq, _, ctxt) ->
         Lwt.return @@ merge_types ~legacy ctxt loc storage_type ginit
-        >>=? fun (_, ctxt) ->
+        >>=? fun (Eq, _, ctxt) ->
         typed
           ctxt
           loc
@@ -4514,18 +4563,12 @@ and parse_instr :
                          _ },
                        _ ) as lambda ),
                  ctxt ) ->
-      Lwt.return @@ ty_eq ctxt arg arg_type_full
-      >>=? fun (Eq, ctxt) ->
       Lwt.return @@ merge_types ~legacy ctxt loc arg arg_type_full
-      >>=? fun (_, ctxt) ->
-      Lwt.return @@ ty_eq ctxt ret ret_type_full
-      >>=? fun (Eq, ctxt) ->
+      >>=? fun (Eq, _, ctxt) ->
       Lwt.return @@ merge_types ~legacy ctxt loc ret ret_type_full
-      >>=? fun (_, ctxt) ->
-      Lwt.return @@ ty_eq ctxt storage_type ginit
-      >>=? fun (Eq, ctxt) ->
+      >>=? fun (Eq, _, ctxt) ->
       Lwt.return @@ merge_types ~legacy ctxt loc storage_type ginit
-      >>=? fun (_, ctxt) ->
+      >>=? fun (Eq, _, ctxt) ->
       typed
         ctxt
         loc
@@ -4948,23 +4991,19 @@ and parse_contract :
             >>? fun (arg_type, _, _, root_name) ->
             parse_parameter_ty ctxt ~legacy:true arg_type
             >>? fun (Ex_ty targ, ctxt) ->
-            let return ctxt targ entrypoint =
-              merge_types ~legacy ctxt loc targ arg
-              >>? fun (arg, ctxt) ->
-              let contract : arg typed_contract =
-                (arg, (contract, entrypoint))
-              in
-              ok (ctxt, contract)
-            in
             find_entrypoint_for_type
+              ~legacy
               ~full:targ
               ~expected:arg
               ~root_name
               entrypoint
               ctxt
-            >>? fun (ctxt, entrypoint, targ) ->
-            merge_types ~legacy ctxt loc targ arg
-            >>? fun (targ, ctxt) -> return ctxt targ entrypoint ) )
+              loc
+            >>? fun (ctxt, entrypoint, arg) ->
+            let contract : arg typed_contract =
+              (arg, (contract, entrypoint))
+            in
+            ok (ctxt, contract) ) )
 
 (* Same as the one above, but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -5031,16 +5070,14 @@ and parse_contract_for_script :
                   | Ok (Ex_ty targ, ctxt) -> (
                     match
                       find_entrypoint_for_type
+                        ~legacy
                         ~full:targ
                         ~expected:arg
                         ~root_name
                         entrypoint
                         ctxt
-                      >>? fun (ctxt, entrypoint, targ) ->
-                      merge_types ~legacy ctxt loc targ arg
-                      >>? fun (targ, ctxt) ->
-                      merge_types ~legacy ctxt loc targ arg
-                      >>? fun (arg, ctxt) ->
+                        loc
+                      >>? fun (ctxt, entrypoint, arg) ->
                       let contract : arg typed_contract =
                         (arg, (contract, entrypoint))
                       in
@@ -5051,10 +5088,8 @@ and parse_contract_for_script :
                     | Error _ ->
                         (* overapproximation by checking if targ = targ,
                                                        can only fail because of gas *)
-                        ty_eq ctxt targ targ
-                        >>? fun (Eq, ctxt) ->
                         merge_types ~legacy ctxt loc targ targ
-                        >>? fun (_, ctxt) -> ok (ctxt, None) ) ) ) ) )
+                        >>? fun (Eq, _, ctxt) -> ok (ctxt, None) ) ) ) ) )
 
 and parse_toplevel :
     legacy:bool ->
