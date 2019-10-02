@@ -49,9 +49,13 @@ val create : int -> t
     greylisted. *)
 val banned_addr : t -> P2p_addr.t -> bool
 
+val unban_addr : t -> P2p_addr.t -> unit
+
 (** [banned_peer t peer_id] is [true] if peer with id [peer_id] is
     blacklisted or greylisted. *)
 val banned_peer : t -> P2p_peer.Id.t -> bool
+
+val unban_peer : t -> P2p_peer.Id.t -> unit
 
 (** [clear t] clears all four ACLs. *)
 val clear : t -> unit
@@ -72,15 +76,11 @@ end
 module IPBlacklist : sig
   val add : t -> P2p_addr.t -> unit
 
-  val remove : t -> P2p_addr.t -> unit
-
   val mem : t -> P2p_addr.t -> bool
 end
 
 module PeerBlacklist : sig
   val add : t -> P2p_peer.Id.t -> unit
-
-  val remove : t -> P2p_peer.Id.t -> unit
 
   val mem : t -> P2p_peer.Id.t -> bool
 end

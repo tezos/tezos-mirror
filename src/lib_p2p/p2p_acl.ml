@@ -163,11 +163,19 @@ let create size =
 let banned_addr acl addr =
   IpTable.mem acl.banned_ips addr || IpSet.mem addr acl.greylist_ips
 
+let unban_addr acl addr =
+  IpTable.remove acl.banned_ips addr ;
+  acl.greylist_ips <- IpSet.remove addr acl.greylist_ips
+
 (* Check is the peer_id is in the banned ring. It might be possible that
    a peer ID that is not banned, but its ip address is. *)
 let banned_peer acl peer_id =
   P2p_peer.Table.mem acl.banned_peers peer_id
   || PeerRing.mem acl.greylist_peers peer_id
+
+let unban_peer acl peer_id =
+  P2p_peer.Table.remove acl.banned_peers peer_id ;
+  PeerRing.remove acl.greylist_peers peer_id
 
 let clear acl =
   acl.greylist_ips <- IpSet.empty ;
@@ -194,15 +202,11 @@ end
 module IPBlacklist = struct
   let add acl addr = IpTable.add acl.banned_ips addr ()
 
-  let remove acl addr = IpTable.remove acl.banned_ips addr
-
   let mem acl addr = IpTable.mem acl.banned_ips addr
 end
 
 module PeerBlacklist = struct
   let add acl addr = P2p_peer.Table.add acl.banned_peers addr ()
-
-  let remove acl addr = P2p_peer.Table.remove acl.banned_peers addr
 
   let mem acl addr = P2p_peer.Table.mem acl.banned_peers addr
 end
