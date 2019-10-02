@@ -28,10 +28,6 @@
 module Path = Irmin.Path.String_list
 module Metadata = Irmin.Metadata.None
 
-exception TODO of string
-
-let todo fmt = Fmt.kstrf (fun s -> raise (TODO s)) fmt
-
 let reporter () =
   let report src level ~over k msgf =
     let k _ = over () ; k () in
@@ -99,8 +95,13 @@ end = struct
     match Context_hash.of_b58check x with
     | Ok x ->
         Ok (of_context_hash x)
-    | Error _ ->
-        todo "Hash.of_string"
+    | Error err ->
+        Error
+          (`Msg
+            (Format.asprintf
+               "Failed to read b58check_encoding data: %a"
+               Error_monad.pp_print_error
+               err))
 
   let short_hash t = Irmin.Type.(short_hash string (H.to_raw_string t))
 
