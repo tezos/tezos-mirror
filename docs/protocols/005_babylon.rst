@@ -507,7 +507,7 @@ Template ``add_set_delegate``
 The original script's parameter is wrapped in ``or`` type, with its left part
 being the newly added parameter of type:
 
-.. code:: tz
+.. code-block:: michelson
 
    or
      (key_hash %set_delegate)
