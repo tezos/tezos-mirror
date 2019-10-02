@@ -158,6 +158,7 @@ val big_map_update :
 
 val ty_eq :
   context ->
+  Script.location ->
   'ta Script_typed_ir.ty ->
   'tb Script_typed_ir.ty ->
   (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult

@@ -1075,47 +1075,6 @@ let name_of_ty : type a. a ty -> type_annot option = function
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let rec comparable_ty_eq :
-    type ta tb.
-    context ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
- fun ctxt ta tb ->
-  Gas.consume ctxt Typecheck_costs.cycle
-  >>? fun ctxt ->
-  match (ta, tb) with
-  | (Int_key _, Int_key _) ->
-      Ok ((Eq : (ta comparable_ty, tb comparable_ty) eq), ctxt)
-  | (Nat_key _, Nat_key _) ->
-      Ok (Eq, ctxt)
-  | (String_key _, String_key _) ->
-      Ok (Eq, ctxt)
-  | (Bytes_key _, Bytes_key _) ->
-      Ok (Eq, ctxt)
-  | (Mutez_key _, Mutez_key _) ->
-      Ok (Eq, ctxt)
-  | (Bool_key _, Bool_key _) ->
-      Ok (Eq, ctxt)
-  | (Key_hash_key _, Key_hash_key _) ->
-      Ok (Eq, ctxt)
-  | (Timestamp_key _, Timestamp_key _) ->
-      Ok (Eq, ctxt)
-  | (Address_key _, Address_key _) ->
-      Ok (Eq, ctxt)
-  | ( Pair_key ((lefta, _), (righta, _), _),
-      Pair_key ((leftb, _), (rightb, _), _) ) ->
-      comparable_ty_eq ctxt lefta leftb
-      >>? fun (Eq, ctxt) ->
-      comparable_ty_eq ctxt righta rightb
-      >>? fun (Eq, ctxt) ->
-      Ok ((Eq : (ta comparable_ty, tb comparable_ty) eq), ctxt)
-  | (_, _) ->
-      serialize_ty_for_error ctxt (ty_of_comparable_ty ta)
-      >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt (ty_of_comparable_ty tb)
-      >>? fun (tb, _ctxt) -> error (Inconsistent_types (ta, tb))
-
 let record_inconsistent ctxt ta tb =
   record_trace_eval (fun () ->
       serialize_ty_for_error ctxt ta
@@ -1129,94 +1088,6 @@ let record_inconsistent_type_annotations ctxt loc ta tb =
       >>? fun (ta, ctxt) ->
       serialize_ty_for_error ctxt tb
       >|? fun (tb, _ctxt) -> Inconsistent_type_annotations (loc, ta, tb))
-
-let rec ty_eq :
-    type ta tb.
-    context -> ta ty -> tb ty -> ((ta ty, tb ty) eq * context) tzresult =
- fun ctxt ta tb ->
-  let ok (eq : (ta ty, tb ty) eq) ctxt nb_args :
-      ((ta ty, tb ty) eq * context) tzresult =
-    Gas.consume ctxt (Typecheck_costs.type_ (2 * nb_args))
-    >>? fun ctxt -> Ok (eq, ctxt)
-  in
-  Gas.consume ctxt Typecheck_costs.cycle
-  >>? fun ctxt ->
-  match (ta, tb) with
-  | (Unit_t _, Unit_t _) ->
-      ok Eq ctxt 0
-  | (Int_t _, Int_t _) ->
-      ok Eq ctxt 0
-  | (Nat_t _, Nat_t _) ->
-      ok Eq ctxt 0
-  | (Key_t _, Key_t _) ->
-      ok Eq ctxt 0
-  | (Key_hash_t _, Key_hash_t _) ->
-      ok Eq ctxt 0
-  | (String_t _, String_t _) ->
-      ok Eq ctxt 0
-  | (Bytes_t _, Bytes_t _) ->
-      ok Eq ctxt 0
-  | (Signature_t _, Signature_t _) ->
-      ok Eq ctxt 0
-  | (Mutez_t _, Mutez_t _) ->
-      ok Eq ctxt 0
-  | (Timestamp_t _, Timestamp_t _) ->
-      ok Eq ctxt 0
-  | (Chain_id_t _, Chain_id_t _) ->
-      ok Eq ctxt 0
-  | (Address_t _, Address_t _) ->
-      ok Eq ctxt 0
-  | (Bool_t _, Bool_t _) ->
-      ok Eq ctxt 0
-  | (Operation_t _, Operation_t _) ->
-      ok Eq ctxt 0
-  | (Map_t (tal, tar, _, _), Map_t (tbl, tbr, _, _)) ->
-      comparable_ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) ->
-            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
-      |> record_inconsistent ctxt ta tb
-  | (Big_map_t (tal, tar, _), Big_map_t (tbl, tbr, _)) ->
-      comparable_ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) ->
-            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
-      |> record_inconsistent ctxt ta tb
-  | (Set_t (ea, _), Set_t (eb, _)) ->
-      comparable_ty_eq ctxt ea eb
-      >>? (fun (Eq, ctxt) -> ok Eq ctxt 1)
-      |> record_inconsistent ctxt ta tb
-  | ( Pair_t ((tal, _, _), (tar, _, _), _, _),
-      Pair_t ((tbl, _, _), (tbr, _, _), _, _) ) ->
-      ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) ->
-            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
-      |> record_inconsistent ctxt ta tb
-  | (Union_t ((tal, _), (tar, _), _, _), Union_t ((tbl, _), (tbr, _), _, _)) ->
-      ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) ->
-            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
-      |> record_inconsistent ctxt ta tb
-  | (Lambda_t (tal, tar, _), Lambda_t (tbl, tbr, _)) ->
-      ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) ->
-            ty_eq ctxt tar tbr >>? fun (Eq, ctxt) -> ok Eq ctxt 2)
-      |> record_inconsistent ctxt ta tb
-  | (Contract_t (tal, _), Contract_t (tbl, _)) ->
-      ty_eq ctxt tal tbl
-      >>? (fun (Eq, ctxt) -> ok Eq ctxt 1)
-      |> record_inconsistent ctxt ta tb
-  | (Option_t (tva, _, _), Option_t (tvb, _, _)) ->
-      ty_eq ctxt tva tvb
-      >>? (fun (Eq, ctxt) -> ok Eq ctxt 1)
-      |> record_inconsistent ctxt ta tb
-  | (List_t (tva, _, _), List_t (tvb, _, _)) ->
-      ty_eq ctxt tva tvb
-      >>? (fun (Eq, ctxt) -> ok Eq ctxt 1)
-      |> record_inconsistent ctxt ta tb
-  | (_, _) ->
-      serialize_ty_for_error ctxt ta
-      >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt tb
-      >>? fun (tb, _ctxt) -> error (Inconsistent_types (ta, tb))
 
 let rec merge_comparable_types :
     type ta tb.
@@ -1280,6 +1151,16 @@ let rec merge_comparable_types :
       >>? fun (ta, ctxt) ->
       serialize_ty_for_error ctxt (ty_of_comparable_ty tb)
       >>? fun (tb, _ctxt) -> error (Inconsistent_types (ta, tb))
+
+let comparable_ty_eq :
+    type ta tb.
+    context ->
+    ta comparable_ty ->
+    tb comparable_ty ->
+    ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
+ fun ctxt ta tb ->
+  merge_comparable_types ~legacy:true ctxt ta tb
+  >|? fun (eq, _ty, ctxt) -> (eq, ctxt)
 
 let merge_types :
     type a b.
@@ -1483,6 +1364,16 @@ let merge_types :
         >>? fun (ty2, _ctxt) -> error (Inconsistent_types (ty1, ty2))
   in
   help ctxt ty1 ty2
+
+let ty_eq :
+    type ta tb.
+    context ->
+    Script.location ->
+    ta ty ->
+    tb ty ->
+    ((ta ty, tb ty) eq * context) tzresult =
+ fun ctxt loc ta tb ->
+  merge_types ~legacy:true ctxt loc ta tb >|? fun (eq, _ty, ctxt) -> (eq, ctxt)
 
 let merge_stacks :
     type ta tb.
@@ -2769,7 +2660,7 @@ let rec parse_data :
             >>? fun (Ex_ty btv, ctxt) ->
             comparable_ty_eq ctxt tk btk
             >>? fun (Eq, ctxt) ->
-            ty_eq ctxt tv btv
+            ty_eq ctxt loc tv btv
             >>? fun (Eq, ctxt) ->
             ok
               ( {
@@ -4973,7 +4864,7 @@ and parse_contract :
       match code with
       | None ->
           Lwt.return
-            ( ty_eq ctxt arg (Unit_t None)
+            ( ty_eq ctxt loc arg (Unit_t None)
             >>? fun (Eq, ctxt) ->
             match entrypoint with
             | "default" ->
@@ -5025,7 +4916,7 @@ and parse_contract_for_script :
   | (Some _, "default") ->
       (* An implicit account on the "default" entrypoint always exists and has type unit. *)
       Lwt.return
-        ( match ty_eq ctxt arg (Unit_t None) with
+        ( match ty_eq ctxt loc arg (Unit_t None) with
         | Ok (Eq, ctxt) ->
             let contract : arg typed_contract =
               (arg, (contract, entrypoint))
