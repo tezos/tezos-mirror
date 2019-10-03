@@ -263,23 +263,22 @@ let baker_commands () =
            node_path
            delegates
            cctxt ->
-        Lwt_exit.wrap_promise
-          ( may_lock_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_list
-            cctxt
-            (List.map fst delegates)
-          >>=? fun () ->
-          Client_daemon.Baker.run
-            cctxt
-            ~chain:cctxt#chain
-            ~minimal_fees
-            ~minimal_nanotez_per_gas_unit
-            ~minimal_nanotez_per_byte
-            ?max_priority
-            ~await_endorsements:(not no_waiting_for_endorsements)
-            ~context_path:(Filename.concat node_path "context")
-            (List.map snd delegates) )) ]
+        may_lock_pidfile pidfile
+        >>=? fun () ->
+        Tezos_signer_backends.Encrypted.decrypt_list
+          cctxt
+          (List.map fst delegates)
+        >>=? fun () ->
+        Client_daemon.Baker.run
+          cctxt
+          ~chain:cctxt#chain
+          ~minimal_fees
+          ~minimal_nanotez_per_gas_unit
+          ~minimal_nanotez_per_byte
+          ?max_priority
+          ~await_endorsements:(not no_waiting_for_endorsements)
+          ~context_path:(Filename.concat node_path "context")
+          (List.map snd delegates)) ]
 
 let endorser_commands () =
   let open Clic in
@@ -295,28 +294,27 @@ let endorser_commands () =
       (args2 pidfile_arg endorsement_delay_arg)
       (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (pidfile, endorsement_delay) delegates cctxt ->
-        Lwt_exit.wrap_promise
-          ( may_lock_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_list
-            cctxt
-            (List.map fst delegates)
-          >>=? fun () ->
-          let delegates = List.map snd delegates in
-          let delegates_no_duplicates =
-            Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
-          in
-          ( if List.length delegates <> List.length delegates_no_duplicates then
-            cctxt#message
-              "Warning: the list of public key hash aliases contains \
-               duplicate hashes, which are ignored"
-          else Lwt.return () )
-          >>= fun () ->
-          Client_daemon.Endorser.run
-            cctxt
-            ~chain:cctxt#chain
-            ~delay:endorsement_delay
-            delegates_no_duplicates )) ]
+        may_lock_pidfile pidfile
+        >>=? fun () ->
+        Tezos_signer_backends.Encrypted.decrypt_list
+          cctxt
+          (List.map fst delegates)
+        >>=? fun () ->
+        let delegates = List.map snd delegates in
+        let delegates_no_duplicates =
+          Signature.Public_key_hash.Set.(delegates |> of_list |> elements)
+        in
+        ( if List.length delegates <> List.length delegates_no_duplicates then
+          cctxt#message
+            "Warning: the list of public key hash aliases contains duplicate \
+             hashes, which are ignored"
+        else Lwt.return () )
+        >>= fun () ->
+        Client_daemon.Endorser.run
+          cctxt
+          ~chain:cctxt#chain
+          ~delay:endorsement_delay
+          delegates_no_duplicates) ]
 
 let accuser_commands () =
   let open Clic in
@@ -332,8 +330,7 @@ let accuser_commands () =
       (args2 pidfile_arg preserved_levels_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels) cctxt ->
-        Lwt_exit.wrap_promise
-          ( may_lock_pidfile pidfile
-          >>=? fun () ->
-          Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt
-          )) ]
+        may_lock_pidfile pidfile
+        >>=? fun () ->
+        Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt)
+  ]

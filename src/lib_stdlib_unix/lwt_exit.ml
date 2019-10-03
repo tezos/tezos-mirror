@@ -84,7 +84,7 @@ let signals =
     (sigxcpu, "XCPU");
     (sigxfsz, "XFSZ") ]
 
-let set_exit_handler ?(log = fun _ -> ()) signal =
+let set_exit_handler ?(log = Format.eprintf "%s\n%!") signal =
   match List.assoc_opt signal signals with
   | None ->
       Format.kasprintf
@@ -116,9 +116,18 @@ let exit_on ?log signal =
     signals_to_exit_on := signal :: !signals_to_exit_on ;
     set_exit_handler ?log signal )
 
-type 'a outcome = Resolved of 'a Error_monad.tzresult | Exited of int
+type outcome = Resolved of int | Exited of int
 
-let wrap_promise (p : unit Error_monad.tzresult Lwt.t) =
+let retcode_of_unit_result_lwt p =
+  let open Lwt.Infix in
+  p
+  >>= function
+  | Error e ->
+      (* TODO: print *) ignore e ; Lwt.return 1
+  | Ok () ->
+      Lwt.return 0
+
+let wrap_promise (p : int Lwt.t) =
   let open Lwt.Infix in
   Lwt.choose
     [(p >|= fun v -> Resolved v); (termination_thread >|= fun s -> Exited s)]
@@ -130,8 +139,6 @@ let wrap_promise (p : unit Error_monad.tzresult Lwt.t) =
       if List.mem s !signals_to_exit_on then (
         (* Exit because of signal *)
         Lwt.cancel p ;
-        Error_monad.return_unit )
-      else (
-        (* Other exit *)
-        Lwt.cancel p ;
-        Error_monad.return_unit )
+        Lwt.return 2 )
+      else (* Other exit *)
+        Pervasives.exit 3
