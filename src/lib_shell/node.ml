@@ -120,27 +120,19 @@ let init_connection_metadata opt =
         private_node = c.P2p.private_mode;
       }
 
-let init_p2p ?(sandboxed = false) p2p_params =
+let init_p2p chain_name p2p_params =
+  let message_cfg = Distributed_db_message.cfg chain_name in
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None in
       Initialization_event.lwt_emit `P2p_layer_disabled
       >>= fun () ->
-      return
-        (P2p.faked_network Distributed_db_message.cfg peer_metadata_cfg c_meta)
+      return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
       Initialization_event.lwt_emit `Bootstrapping
       >>= fun () ->
-      let message_cfg =
-        if sandboxed then
-          {
-            Distributed_db_message.cfg with
-            chain_name = Distributed_db_version.sandboxed_chain_name;
-          }
-        else Distributed_db_message.cfg
-      in
       P2p.create
         ~config
         ~limits
@@ -153,6 +145,8 @@ let init_p2p ?(sandboxed = false) p2p_params =
 
 type config = {
   genesis : State.Chain.genesis;
+  chain_name : Distributed_db_version.name;
+  sandboxed_chain_name : Distributed_db_version.name;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -318,6 +312,8 @@ let check_and_fix_storage_consistency state =
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     { genesis;
+      chain_name;
+      sandboxed_chain_name;
       store_root;
       context_root;
       protocol_root;
@@ -332,7 +328,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     | None ->
         (true, true)
   in
-  init_p2p ~sandboxed p2p_params
+  init_p2p (if sandboxed then sandboxed_chain_name else chain_name) p2p_params
   >>=? fun p2p ->
   (let open Block_validator_process in
   if singleprocess then

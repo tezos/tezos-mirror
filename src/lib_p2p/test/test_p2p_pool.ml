@@ -42,7 +42,7 @@ let msg_config : message P2p_connect_handler.message_config =
             unwrap = (function Ping -> Some ());
             max_length = None;
           } ];
-    chain_name = Distributed_db_version.sandboxed_chain_name;
+    chain_name = Distributed_db_version.of_string "SANDBOXED_TEZOS";
     distributed_db_versions = [Distributed_db_version.zero];
   }
 

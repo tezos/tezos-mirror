@@ -222,7 +222,5 @@ val commit_protocol :
 module Raw : sig
   val encoding : Message.t P2p_message.t Data_encoding.t
 
-  val chain_name : Distributed_db_version.name
-
   val distributed_db_versions : Distributed_db_version.t list
 end

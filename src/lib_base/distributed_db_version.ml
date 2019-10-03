@@ -39,10 +39,6 @@ let name_encoding =
     ~description:"A name for the distributed DB protocol"
     string
 
-let chain_name = "TEZOS"
-
-let sandboxed_chain_name = "SANDBOXED_TEZOS"
-
 type t = int
 
 let pp = Format.pp_print_int

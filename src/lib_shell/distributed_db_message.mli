@@ -47,7 +47,11 @@ type t =
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
 
-val cfg : t P2p.message_config
+val encoding : t P2p_message.encoding list
+
+val distributed_db_versions : Distributed_db_version.t list
+
+val cfg : Distributed_db_version.name -> t P2p.message_config
 
 val pp_json : Format.formatter -> t -> unit
 

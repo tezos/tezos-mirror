@@ -40,6 +40,9 @@ let with_node f =
     let node_config : Node.config =
       {
         genesis;
+        chain_name = Distributed_db_version.of_string "TEZOS_DOCGEN";
+        sandboxed_chain_name =
+          Distributed_db_version.of_string "SANDBOXED_TEZOS_DOCGEN";
         patch_context = None;
         store_root = dir / "store";
         context_root = dir / "context";

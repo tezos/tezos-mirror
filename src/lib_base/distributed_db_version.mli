@@ -34,10 +34,6 @@ val pp_name : Format.formatter -> name -> unit
 
 val name_encoding : name Data_encoding.t
 
-val chain_name : name
-
-val sandboxed_chain_name : name
-
 (** An abstract version number for the high-level [Distributed_db] messages. *)
 type t = private int
 

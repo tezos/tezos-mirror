@@ -316,12 +316,10 @@ let encoding =
       (fun ((block, ofs), (path, ops)) ->
         Operations_for_block (block, ofs, ops, path)) ]
 
-let cfg : _ P2p.message_config =
-  {
-    encoding;
-    chain_name = Distributed_db_version.chain_name;
-    distributed_db_versions = [Distributed_db_version.zero];
-  }
+let distributed_db_versions = [Distributed_db_version.zero]
+
+let cfg chain_name : _ P2p.message_config =
+  {encoding; chain_name; distributed_db_versions}
 
 let raw_encoding = P2p_message.encoding encoding
 

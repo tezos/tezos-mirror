@@ -44,7 +44,8 @@ let id0 =
 
 let version =
   {
-    Network_version.chain_name = Distributed_db_version.sandboxed_chain_name;
+    Network_version.chain_name =
+      Distributed_db_version.of_string "SANDBOXED_TEZOS";
     distributed_db_version = Distributed_db_version.zero;
     p2p_version = P2p_version.zero;
   }
