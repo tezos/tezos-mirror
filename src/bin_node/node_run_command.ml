@@ -276,8 +276,9 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!"
   >>= fun () ->
-  Lwt_exit.wrap_promise (Lwt_utils.never_ending ())
-  >>= fun unit_or_error ->
+  Lwt_exit.(
+    wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
+  >>= fun retcode ->
   (* Clean-shutdown code *)
   Lwt_exit.termination_thread
   >>= fun x ->
@@ -290,8 +291,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   Lwt_list.iter_p RPC_server.shutdown rpc
   >>= fun () ->
   lwt_log_notice "BYE (%d)" x
-  >>= fun () ->
-  Internal_event_unix.close () >>= fun () -> Lwt.return unit_or_error
+  >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
 
 let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
@@ -344,8 +344,10 @@ let process sandbox verbosity checkpoint singleprocess args =
         failwith "Data directory is locked by another process"
   in
   match Lwt_main.run run with
-  | Ok () ->
+  | Ok 0 ->
       `Ok ()
+  | Ok _ ->
+      `Error (false, "")
   | Error err ->
       `Error (false, Format.asprintf "%a" pp_print_error err)
 

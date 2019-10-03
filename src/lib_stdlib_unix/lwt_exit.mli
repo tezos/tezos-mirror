@@ -37,8 +37,9 @@ val exit : int -> 'a
     the [exit] function above. *)
 val exit_on : ?log:(string -> unit) -> int -> unit
 
+val retcode_of_unit_result_lwt : (unit, 'a) Result.result Lwt.t -> int Lwt.t
+
 (** [wrap_promise p] is a promise [w] that resolves when either [p] resolves, or
     when [termination_thread] resolves. In the latter case, [p] is canceled,
     giving it a chance to clean up resources. *)
-val wrap_promise :
-  unit Error_monad.tzresult Lwt.t -> unit Error_monad.tzresult Lwt.t
+val wrap_promise : int Lwt.t -> int Lwt.t
