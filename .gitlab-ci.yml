@@ -376,6 +376,10 @@ documentation:build:
   <<: *test_definition
   script:
     - make doc-html
+  artifacts:
+    paths:
+    - docs
+    expire_in: 1 day
 
 documentation:linkcheck:
   <<: *test_definition
