@@ -344,7 +344,8 @@ let process sandbox verbosity checkpoint singleprocess args =
         failwith "Data directory is locked by another process"
   in
   match Lwt_main.run run with
-  | Ok 0 ->
+  | Ok (0 | 2) ->
+      (* 2 means that we exit by a signal that was handled *)
       `Ok ()
   | Ok _ ->
       `Error (false, "")
