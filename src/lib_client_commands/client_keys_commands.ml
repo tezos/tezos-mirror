@@ -159,7 +159,8 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                     "Tried %d keys without finding a match"
                     attempts
                 else Lwt.return_unit )
-                >>= fun () -> loop (attempts + 1)
+                >>= fun () ->
+                Lwt_unix.yield () >>= fun () -> loop (attempts + 1)
             in
             loop 1
             >>=? fun key_hash ->
