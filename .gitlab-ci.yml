@@ -628,15 +628,15 @@ opam:44:tezos-protocol-updater:
   variables:
     package: tezos-protocol-updater
 
-opam:45:tezos-client-alpha:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-alpha
-
-opam:46:tezos-version:
+opam:45:tezos-version:
   <<: *opam_definition
   variables:
     package: tezos-version
+
+opam:46:tezos-client-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha
 
 opam:47:tezos-validation:
   <<: *opam_definition
