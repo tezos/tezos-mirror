@@ -1,0 +1,21 @@
+(library
+ (name tezos_client_003_PsddFKi3)
+ (public_name tezos-client-003-PsddFKi3)
+ (libraries tezos-base
+            tezos-protocol-003-PsddFKi3
+            tezos-shell-services
+            tezos-client-base-unix
+            tezos-rpc
+            tezos-signer-backends
+            bip39)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_protocol_003_PsddFKi3
+                   -open Tezos_rpc)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

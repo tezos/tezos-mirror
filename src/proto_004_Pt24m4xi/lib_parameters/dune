@@ -1,0 +1,44 @@
+(library
+ (name tezos_protocol_004_Pt24m4xi_parameters)
+ (public_name tezos-protocol-004-Pt24m4xi-parameters)
+ (modules :standard \ gen)
+ (libraries tezos-base
+            tezos-protocol-environment
+            tezos-protocol-004-Pt24m4xi)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_004_Pt24m4xi
+                   -linkall))
+)
+
+(executable
+ (name gen)
+ (libraries tezos-base
+            tezos-protocol-004-Pt24m4xi-parameters)
+ (modules gen)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_004_Pt24m4xi_parameters
+                   -linkall)))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(install
+ (section lib)
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
