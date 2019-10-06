@@ -116,7 +116,7 @@ module Scheduler (IO : IO) = struct
     >>= fun () ->
     lwt_debug "scheduler.wait(%s)" IO.name
     >>= fun () ->
-    Lwt.pick [Lwt_canceler.cancelation st.canceler; wait_data st]
+    Lwt.pick [Lwt_canceler.cancellation st.canceler; wait_data st]
     >>= fun () ->
     if Lwt_canceler.canceled st.canceler then Lwt.return_unit
     else
@@ -513,12 +513,12 @@ let close ?timeout conn =
   Lwt_pipe.close conn.write_queue ;
   ( match timeout with
   | None ->
-      return (Lwt_canceler.cancelation conn.canceler)
+      return (Lwt_canceler.cancellation conn.canceler)
   | Some timeout ->
       with_timeout
         ~canceler:conn.canceler
         (Lwt_unix.sleep timeout)
-        (fun canceler -> return (Lwt_canceler.cancelation canceler)) )
+        (fun canceler -> return (Lwt_canceler.cancellation canceler)) )
   >>=? fun _ ->
   conn.write_conn.current_push
   >>= fun res -> lwt_log_info "<-- close (%d)" id >>= fun () -> Lwt.return res

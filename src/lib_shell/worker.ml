@@ -251,7 +251,7 @@ module type T = sig
     val push_request_now : infinite queue t -> 'a Request.t -> unit
   end
 
-  (** Detects cancelation from within the request handler to stop
+  (** Detects cancellation from within the request handler to stop
       asynchronous operations. *)
   val protect :
     _ t ->
@@ -259,7 +259,7 @@ module type T = sig
     (unit -> 'b tzresult Lwt.t) ->
     'b tzresult Lwt.t
 
-  (** Exports the canceler to allow cancelation of other tasks when this
+  (** Exports the canceler to allow cancellation of other tasks when this
       worker is shutdowned or when it dies. *)
   val canceler : _ t -> Lwt_canceler.t
 

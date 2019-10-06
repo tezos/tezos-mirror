@@ -104,7 +104,7 @@ module type DISTRIBUTED_DB = sig
 
   (** [resolve_pending t pids k v] resolves pending request (if any) in the
       local index for key k with [Found v]. It notifies the scheduler using
-      'notify_cancelation' for this key and wakes up the waiter on this
+      'notify_cancellation' for this key and wakes up the waiter on this
       request. *)
   val resolve_pending : t -> key -> value -> unit
 
@@ -163,7 +163,7 @@ module type SCHEDULER_EVENTS = sig
 
   val notify : t -> P2p_peer.Id.t -> key -> unit
 
-  val notify_cancelation : t -> key -> unit
+  val notify_cancellation : t -> key -> unit
 
   val notify_unrequested : t -> P2p_peer.Id.t -> key -> unit
 

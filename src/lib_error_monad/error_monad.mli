@@ -85,7 +85,7 @@ type error += Canceled
 
     More precisely, [protect ~on_error ~canceler f] runs [f ()]. An Lwt failure
     triggered by [f ()] is wrapped into an [Exn]. If a [canceler] is given and
-    [Lwt_canceler.cancelation canceler] is determined before [f ()],
+    [Lwt_canceler.cancellation canceler] is determined before [f ()],
     a [Canceled] error is returned.
 
     Errors are caught by [~on_error] (if given), otherwise the previous value

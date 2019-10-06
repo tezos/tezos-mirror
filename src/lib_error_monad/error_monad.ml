@@ -856,14 +856,14 @@ let () =
     (fun () -> Canceled)
 
 let protect ?on_error ?canceler t =
-  let cancelation =
+  let cancellation =
     match canceler with
     | None ->
         Lwt_utils.never_ending ()
     | Some canceler ->
-        Lwt_canceler.cancelation canceler >>= fun () -> fail Canceled
+        Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
   in
-  let res = Lwt.pick [cancelation; Lwt.catch t (fun exn -> fail (Exn exn))] in
+  let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
   res
   >>= function
   | Ok _ ->

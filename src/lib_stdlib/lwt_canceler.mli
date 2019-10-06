@@ -44,8 +44,8 @@ val create : unit -> t
     cancellation process. *)
 val cancel : t -> unit Lwt.t
 
-(** [cancelation t] is determined when [t] is in canceling or canceled state. *)
-val cancelation : t -> unit Lwt.t
+(** [cancellation t] is determined when [t] is in canceling or canceled state. *)
+val cancellation : t -> unit Lwt.t
 
 (** [on_cancel t hook] adds [hook] to the end of the current chain. *)
 val on_cancel : t -> (unit -> unit Lwt.t) -> unit
