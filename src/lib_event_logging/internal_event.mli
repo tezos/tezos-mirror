@@ -100,7 +100,7 @@ module type EVENT_DEFINITION = sig
 
   val encoding : t Data_encoding.t
 
-  (** Return the prefered {!level} for a given event instance. *)
+  (** Return the preferred {!level} for a given event instance. *)
   val level : t -> level
 end
 

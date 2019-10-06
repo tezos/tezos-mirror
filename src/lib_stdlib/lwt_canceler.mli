@@ -34,14 +34,14 @@ type t
 (** [create t] returns a canceler in waiting state. *)
 val create : unit -> t
 
-(** If [t] is in wait state, [cancel t] triggers the cancelation process:
+(** If [t] is in wait state, [cancel t] triggers the cancellation process:
     1. it switches to canceling state,
-    2. executes the hooks sequentially in separate Lwt threads,
-    3. waits for hooks execution to complete,
-    4. switches to cancel state.
+    2. it executes the hooks sequentially in separate Lwt threads,
+    3. it waits for hooks execution to complete,
+    4. it switches to cancel state.
     If [t] is in canceled state, [cancel t] is determined immediately.
     If [t] is in canceling state, [cancel t] is determined at the end of the
-    cancelation process. *)
+    cancellation process. *)
 val cancel : t -> unit Lwt.t
 
 (** [cancelation t] is determined when [t] is in canceling or canceled state. *)

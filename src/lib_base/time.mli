@@ -37,7 +37,7 @@
 
     The distinction between the two notions of time is important for multiple
     reasons:
-    - Protocol time and system time may evolve indepentently. E.g., if a
+    - Protocol time and system time may evolve independently. E.g., if a
     protocol update changes the notion of time.
     - Protocol time and system time have different levels of precision.
     - Protocol time and system time have different end-of-times. Respectively

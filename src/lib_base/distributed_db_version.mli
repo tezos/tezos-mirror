@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Distributed_db protocol version. *)
+(** [Distributed_db] protocol version. *)
 
 type name = private string
 
@@ -36,7 +36,7 @@ val chain_name : name
 
 val sandboxed_chain_name : name
 
-(** An abstract version number for the high-level distributed_db messages. *)
+(** An abstract version number for the high-level [Distributed_db] messages. *)
 type t = private int
 
 val pp : Format.formatter -> t -> unit

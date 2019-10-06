@@ -31,7 +31,7 @@
     [make_with_animation ppf ~make ~on_retry seed] behaves as follows:
     (a) if [make seed] is [Ok v] (completion of the task), then it returns [v]
     (b) if [make seed] is [Error r] (task is incomplete), then
-    (b.1) [on_retry t r] is evaluated where [t] is the time ellapsed during the
+    (b.1) [on_retry t r] is evaluated where [t] is the time elapsed during the
     call to [make], and then
     (b.2) the result is used to attempt the task again. *)
 val make_with_animation :

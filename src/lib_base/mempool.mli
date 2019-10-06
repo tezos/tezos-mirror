@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell Module - Mempool, a.k.a. the operations safe to be
-    broadcasted. *)
+(** Tezos Shell Module - Mempool, a.k.a. the operations safe to be broadcast. *)
 
 type t = {
   known_valid : Operation_hash.t list;

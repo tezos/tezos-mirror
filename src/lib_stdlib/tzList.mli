@@ -32,7 +32,7 @@ val repeat : int -> 'a -> 'a list
 (** [shift (hd :: tl)] computes [tl @ [hd]] *)
 val shift : 'a list -> 'a list
 
-(** [product a b] computes the cartesian product of two lists [a] and [b]. *)
+(** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
 val product : 'a list -> 'b list -> ('a * 'b) list
 
 (** [take_n n l] returns the [n] first elements of [l]. When [compare]

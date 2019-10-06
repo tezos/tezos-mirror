@@ -26,7 +26,7 @@
 
 (** P2p-layer protocol version. *)
 
-(** An abstract version number for the low-level p2p layer. *)
+(** An abstract version number for the low-level P2P layer. *)
 type t = private int
 
 val pp : Format.formatter -> t -> unit

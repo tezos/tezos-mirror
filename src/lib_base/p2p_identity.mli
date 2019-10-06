@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of an identity, comprising a peer_id, a crypto keypair, and a
+(** Type of an identity, comprising a [peer_id], a cryptographic key pair, and a
     proof of work stamp with enough difficulty so that the network
     accept this identity as genuine. *)
 type t = {

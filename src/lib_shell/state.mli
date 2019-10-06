@@ -82,7 +82,7 @@ module Chain : sig
   (** Returns all the known chains. *)
   val all : global_state -> chain_state list Lwt.t
 
-  (** Destroy a chain: this completly removes from the local storage all
+  (** Destroy a chain: this completely removes from the local storage all
       the data associated to the chain (this includes blocks and
       operations). *)
   val destroy : global_state -> chain_state -> unit Lwt.t
@@ -290,7 +290,7 @@ module Block : sig
       It either returns:
       - [Some (h, hist)] when we find a valid block, where [hist]
         is the unknown prefix, ending with the first valid block found.
-      - [Some (h, hist)] when we dont find any block known valid nor invalid
+      - [Some (h, hist)] when we don't find any block known valid nor invalid
         and the node runs in full or rolling mode. In this case
         [(h, hist)] is the given [locator].
       - [None] when the node runs in archive history mode and

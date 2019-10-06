@@ -94,14 +94,15 @@ type validity = Unknown | Known_valid | Known_invalid
 (** [unknown_prefix ~is_known t] either returns :
 
     - [(Known_valid, (h, hist))] when we find a known valid block in the
-      locator history (w.r.t [is_known]), where [h] is the given locator header
+      locator history (w.r.t. [is_known]), where [h] is the given locator header
       and [hist] is the unknown prefix ending with the known valid block.
 
     - [(Known_invalid, (h, hist))] when we find a known invalid block
-      (w.r.t [is_known]) in the locator history, where [h] is the given locator header
-      and [hist] is the unknown prefix ending with the known invalid block.
+      (w.r.t. [is_known]) in the locator history, where [h] is the given locator
+      header and [hist] is the unknown prefix ending with the known invalid
+      block.
 
-    - [(Unknown, (h, hist))] when no block is known valid nor invalid
-      (w.r.t [is_known]), where [(h, hist)] is the given [locator]. *)
+    - [(Unknown, (h, hist))] when no block is known valid nor invalid (w.r.t.
+      [is_known]), where [(h, hist)] is the given [locator]. *)
 val unknown_prefix :
   is_known:(Block_hash.t -> validity Lwt.t) -> t -> (validity * t) Lwt.t

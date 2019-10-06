@@ -48,7 +48,7 @@ module type ZN = sig
   (** Converts an integer to a ring element *)
   val of_int : int -> t
 
-  (** Converts a Zarith integer to a ring element *)
+  (** Converts a [Zarith] integer to a ring element *)
   val of_Z : Z.t -> t
 
   (** Provides an integer representation between 0 and n-1 of an element *)
