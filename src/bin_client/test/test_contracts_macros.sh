@@ -38,18 +38,18 @@ fi
 assert_storage $contract_macros_dir/build_list.tz '{}' 0 "{ 0 }"
 assert_storage $contract_macros_dir/build_list.tz '{}' 3 "{ 0 ; 1 ; 2 ; 3 }"
 assert_storage $contract_macros_dir/build_list.tz '{}' 10 \
-			  "{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }"
+               "{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }"
 
 # Find maximum int in list -- returns None if not found
 assert_storage $contract_macros_dir/max_in_list.tz None '{}' 'None'
 assert_storage $contract_macros_dir/max_in_list.tz None '{ 1 }' '(Some 1)'
 assert_storage $contract_macros_dir/max_in_list.tz None '{ -1 }' '(Some -1)'
 assert_storage $contract_macros_dir/max_in_list.tz None \
-			  '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
+               '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
 assert_storage $contract_macros_dir/max_in_list.tz None \
-			  '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
+               '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
 assert_storage $contract_macros_dir/max_in_list.tz None \
-			  '{ -10 ; -1 ; -20 ; -100 }' '(Some -1)'
+               '{ -10 ; -1 ; -20 ; -100 }' '(Some -1)'
 
 # Test comparisons on tez { EQ ; GT ; LT ; GE ; LE }
 assert_storage $contract_macros_dir/compare.tz '{}' '(Pair 1000000 2000000)' '{ False ; False ; True ; False ; True }'

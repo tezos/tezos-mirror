@@ -65,7 +65,7 @@ assert_balance create_contract "900 ꜩ"
 
 # Test IMPLICIT_ACCOUNT
 init_with_transfer $contract_scenarios_dir/default_account.tz \
-				   Unit 1,000 bootstrap1
+                   Unit 1,000 bootstrap1
 bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\"" --burn-cap 10
 assert_balance $BOOTSTRAP4_IDENTITY "4000100 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
@@ -74,7 +74,7 @@ assert_balance $account "100 ꜩ"
 
 # Test bytes, SHA256, CHECK_SIGNATURE
 init_with_transfer $contract_scenarios_dir/reveal_signed_preimage.tz \
-				   '(Pair 0x9995c2ef7bcc7ae3bd15bdd9b02dc6e877c27b26732340d641a4cbc6524813bb "p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz")' 1,000 bootstrap1
+                   '(Pair 0x9995c2ef7bcc7ae3bd15bdd9b02dc6e877c27b26732340d641a4cbc6524813bb "p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz")' 1,000 bootstrap1
 assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
              '(Pair 0x050100000027566f756c657a2d766f757320636f75636865722061766563206d6f692c20636520736f6972 "p2sigvgDSBnN1bUsfwyMvqpJA1cFhE5s5oi7SetJVQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8")'  --burn-cap 10
 assert_fails $client transfer 0 from bootstrap1 to reveal_signed_preimage -arg \
@@ -89,7 +89,7 @@ b3='tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU'
 b4='tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv'
 b5='tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv'
 init_with_transfer $contract_scenarios_dir/vote_for_delegate.tz \
-				   "(Pair (Pair \"$b3\" None) (Pair \"$b4\" None))" 1,000 bootstrap1
+                   "(Pair (Pair \"$b3\" None) (Pair \"$b4\" None))" 1,000 bootstrap1
 $client get delegate for vote_for_delegate | assert_in_output none
 
 assert_fails $client transfer 0 from bootstrap1 to vote_for_delegate -arg None --burn-cap 10

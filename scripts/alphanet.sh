@@ -813,9 +813,9 @@ case "$command" in
             log)
                 log_node
                 ;;
-	        upgrade)
-		        upgrade_node_storage
-		        ;;
+            upgrade)
+                upgrade_node_storage
+                ;;
             stop)
                 stop_node
                 ;;
