@@ -108,6 +108,21 @@ let blockchain_network_zeronet =
     ~chain_name:"TEZOS_ZERONET_2019-08-06T15:18:56Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
 
+let blockchain_network_babylonnet =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2019-09-27T07:43:32Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisd1f7bcGMoXy";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+      }
+    ~chain_name:"TEZOS_ALPHANET_BABYLON_2019-09-27T07:43:32Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+
 let blockchain_network_default =
   make_blockchain_network
     State.Chain.
@@ -183,7 +198,13 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
         ~title:"Mainnet"
         (constant "Mainnet")
         (fun _ -> None)
-        (fun () -> blockchain_network_mainnet) ]
+        (fun () -> blockchain_network_mainnet);
+      case
+        (Tag 4)
+        ~title:"Babylonnet"
+        (constant "Babylonnet")
+        (fun _ -> None)
+        (fun () -> blockchain_network_babylonnet) ]
 
 type t = {
   data_dir : string;
