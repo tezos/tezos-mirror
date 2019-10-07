@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Metastate AG <contact@metastate.ch>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,22 +25,18 @@
 (*****************************************************************************)
 
 (**
-
    Basic roll manipulation.
 
-   If storage related to roll (a.k.a. `Storage.Roll`) are not used
+   If storage related to roll (i.e. `Storage.Roll`) is not used
    outside of this module, this interface enforces the invariant that a
    roll is always either in the limbo list or in a contract list.
-
 *)
 
 type error +=
-  | Consume_roll_change
-  | No_roll_for_delegate
-  | No_roll_snapshot_for_cycle of Cycle_repr.t
-  | Unregistered_delegate of Signature.Public_key_hash.t
-
-(* `Permanent *)
+  | (* `Permanent *) Consume_roll_change
+  | (* `Permanent *) No_roll_for_delegate
+  | (* `Permanent *) No_roll_snapshot_for_cycle of Cycle_repr.t
+  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
