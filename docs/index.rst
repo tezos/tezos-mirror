@@ -157,6 +157,7 @@ in the :ref:`introduction <howtoget>`.
    releases/april-2019
    releases/may-2019
    releases/september-2019
+   releases/october-2019
 
 .. toctree::
    :maxdepth: 2
