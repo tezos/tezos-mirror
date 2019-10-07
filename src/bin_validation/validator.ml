@@ -75,26 +75,30 @@ let run stdin stdout =
           [key]
           (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
     >>= fun ctxt ->
-    let module Proto = (val Registered_protocol.get_exn !genesis_protocol) in
-    let ctxt = Shell_context.wrap_disk_context ctxt in
-    Proto.init
-      ctxt
-      {
-        level = 0l;
-        proto_level = 0;
-        predecessor = !genesis_block;
-        timestamp = !genesis_time;
-        validation_passes = 0;
-        operations_hash = Operation_list_list_hash.empty;
-        fitness = [];
-        context = Context_hash.zero;
-      }
-    >>= function
-    | Error _ ->
+    match Registered_protocol.get !genesis_protocol with
+    | None ->
         assert false (* FIXME error *)
-    | Ok {context; _} ->
-        let context = Shell_context.unwrap_disk_context context in
-        Lwt.return context
+    | Some proto -> (
+        let module Proto = (val proto) in
+        let ctxt = Shell_context.wrap_disk_context ctxt in
+        Proto.init
+          ctxt
+          {
+            level = 0l;
+            proto_level = 0;
+            predecessor = !genesis_block;
+            timestamp = !genesis_time;
+            validation_passes = 0;
+            operations_hash = Operation_list_list_hash.empty;
+            fitness = [];
+            context = Context_hash.zero;
+          }
+        >>= function
+        | Error _ ->
+            assert false (* FIXME error *)
+        | Ok {context; _} ->
+            let context = Shell_context.unwrap_disk_context context in
+            Lwt.return context )
   in
   Context.init ~patch_context context_root
   >>= fun context_index ->

@@ -32,5 +32,3 @@ val register : string -> (module PROTOCOL_V1) -> unit
 val mem : Protocol_hash.t -> bool
 
 val get : Protocol_hash.t -> (module PROTOCOL_V1) option
-
-val get_exn : Protocol_hash.t -> (module PROTOCOL_V1)

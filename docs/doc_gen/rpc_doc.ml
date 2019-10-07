@@ -352,7 +352,13 @@ let main node =
     List.map
       (fun (name, hash) ->
         let hash = Protocol_hash.of_b58check_exn hash in
-        let (module Proto) = Registered_protocol.get_exn hash in
+        let (module Proto) =
+          match Registered_protocol.get hash with
+          | None ->
+              assert false
+          | Some proto ->
+              proto
+        in
         ( "Protocol " ^ name,
           [".."; "<block_id>"],
           RPC_directory.map (fun () -> assert false)

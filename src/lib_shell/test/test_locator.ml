@@ -46,7 +46,14 @@ let state_genesis_block =
 
 let chain_id = Chain_id.of_block_hash genesis_hash
 
-module Proto = (val Registered_protocol.get_exn genesis_protocol)
+let proto =
+  match Registered_protocol.get genesis_protocol with
+  | None ->
+      assert false
+  | Some proto ->
+      proto
+
+module Proto = (val proto)
 
 let incr_timestamp timestamp =
   Time.Protocol.add timestamp (Int64.add 1L (Random.int64 10L))

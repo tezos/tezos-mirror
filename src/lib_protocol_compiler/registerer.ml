@@ -37,6 +37,5 @@ let register hash proto =
 
 let mem hash = VersionTable.mem versions hash
 
-let get_exn hash = VersionTable.find versions hash
-
-let get hash = try Some (get_exn hash) with Not_found -> None
+let get hash =
+  try Some (VersionTable.find versions hash) with Not_found -> None
