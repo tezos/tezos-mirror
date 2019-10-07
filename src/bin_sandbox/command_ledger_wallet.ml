@@ -626,14 +626,16 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
-    ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account ~bake () =
+    ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account ~manager_tz_kt1_account
+    ~bake () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
-  let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh () =
-    let amount = "15" in
+  let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh ?entrypoint ?(amount = 15) () =
     let command =
-      ["--wait"; "none"; "transfer"; amount; "from"; src; "to"; dst_name]
+      let opt = Option.value_map ~default:[] in
+      ["--wait"; "none"; "transfer"; (sprintf "%i" amount); "from"; src; "to"; dst_name]
       @ Option.value_map ~default:[] arguments ~f:(fun a -> ["--arg"; a])
+      @ opt entrypoint ~f:(fun e -> ["--entrypoint"; e])
       @ ["--burn-cap"; "100"; "--verbose-signing"]
     in
     with_ledger_test_reject_and_accept
@@ -653,7 +655,7 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
               | None ->
                   ledger_should_display
                     ppf
-                    [ ("Amount", const string amount);
+                    [ ("Amount", const int amount);
                       ("Fee", const string "0.00XXX");
                       ("Source", const string ledger_pkh);
                       ("Destination", const string dst_pkh);
@@ -692,6 +694,14 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
   let module Acc = Tezos_protocol.Account in
   let random_account = Acc.of_name "random-account-for-transaction-test" in
   test_transaction
+    ~name:"Self-transaction"
+    ~dst_pkh:ledger_pkh
+    ~dst_name:src
+    ()
+  >>= fun () ->
+  let module Acc = Tezos_protocol.Account in
+  let random_account = Acc.of_name "random-account-for-transaction-test" in
+  test_transaction
     ~name:"transaction-to-random-tz1"
     ~dst_pkh:(Acc.pubkey_hash random_account)
     ~dst_name:(Acc.pubkey_hash random_account)
@@ -712,11 +722,120 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ()
   >>= fun () ->
   test_transaction
-    ~name:"parameterfull-transaction-to-kt1"
+    ~name:"manager.tz-remove-delegate"
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:"Pair \"hello from the ledger\" 51"
-    ~dst_name:pair_string_nat_kt1_account
+    ~arguments:"{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+    ~dst_name:manager_tz_kt1_account
+    ~entrypoint:"do"
+    ~amount:0
     ()
+  >>= fun () ->
+  test_transaction
+    ~name:"manager.tz-set-delegate"
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; SET_DELEGATE ; CONS }" ledger_pkh)
+    ~dst_name:manager_tz_kt1_account
+    ~entrypoint:"do"
+    ~amount:0
+    ()
+  >>= fun () ->
+  test_transaction
+    ~name:"manager.tz-transfer-originated-to-implicit"
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; IMPLICIT_ACCOUNT ; PUSH mutez %s ; UNIT ; TRANSFER_TOKENS ; CONS }")
+    ~dst_name:manager_tz_kt1_account
+    ~entrypoint:"do"
+    ()
+  >>= fun () ->
+  test_transaction
+    ~name:"manager.tz-transfer-originated-to-originated"
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH address %s ; CONTRACT %%s %s ; ASSERT_SOME ; PUSH mutez %s ; %s ; TRANSFER_TOKENS ; CONS }" ledger_pkh )
+    ~dst_name:manager_tz_kt1_account
+    ~entrypoint:"do"
+    ()
+
+let prepare_origination_of_manager_tz_script ?(spendable = false)
+    ?(delegatable = false) ?delegate state
+    ~client ~name ~from ~protocol_kind ~ledger_account =
+  let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
+  let manager_tz_script =
+    "
+parameter
+\  (or
+\     (lambda %do unit (list operation))
+\     (unit %default));
+storage key_hash;
+code
+\  { UNPAIR ;
+\    IF_LEFT
+\      { # 'do' entrypoint
+\        # Assert no token was sent:
+\        # to send tokens, the default entry point should be used
+\        PUSH mutez 0 ;
+\        AMOUNT ;
+\        ASSERT_CMPEQ ;
+\        # Assert that the sender is the manager
+\        DUUP ;
+\        IMPLICIT_ACCOUNT ;
+\        ADDRESS ;
+\        SENDER ;
+\        ASSERT_CMPEQ ;
+\        # Execute the lambda argument
+\        UNIT ;
+\        EXEC ;
+\        PAIR ;
+\      }
+\      { # 'default' entrypoint
+\        DROP ;
+\        NIL operation ;
+\        PAIR ;
+\      }
+\  };"
+  in
+  let tmp = Filename.temp_file "manager" ".tz" in
+  System.write_file state tmp ~content:manager_tz_script
+  >>= fun () ->
+  let origination =
+    let opt = Option.value_map ~default:[] in
+    ["--wait"; "none"; "originate"; "contract"; name]
+    @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
+    @ [ "transferring";
+        "0";
+        "from";
+        from;
+        "running";
+        tmp;
+        "--init";
+        (sprintf "\"%s\"" ledger_pkh);
+        "--force";
+        "--burn-cap";
+        "300000000000";
+        (* ; "--fee-cap" ; "20000000000000" *)
+        "--gas-limit";
+        "1000000000000000";
+        "--storage-limit";
+        "20000000000000";
+        "--verbose-signing" ]
+    @ opt delegate ~f:(fun s -> (* Baby & Aths *) ["--delegate"; s])
+    @ (if delegatable then [(* Aths *) "--delegatable"] else [])
+    @ if spendable then [(* Aths *) "--spendable"] else []
+  in
+  return origination
+
+let originate_manager_tz_script state ~delegate ~client ~name ~from ~bake
+    ~protocol_kind ~ledger_account =
+  prepare_origination_of_manager_tz_script
+    state
+    ~delegate
+    ~client
+    ~name
+    ~from
+    ~protocol_kind
+    ~ledger_account
+  >>= fun origination ->
+  Tezos_client.successful_client_cmd state ~client origination
+  >>= fun _ -> Fmt.kstrf bake "baking `%s` in" name
 
 let prepare_origination_of_id_script ?(spendable = false)
     ?(delegatable = false) ?delegate ?(push_drops = 0) ?(amount = "2") state
@@ -1240,6 +1359,17 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~parameter:"(pair string nat)"
     ~init_storage:"Pair \"the answer is: \" 42"
   >>= fun () ->
+  let manager_tz_kt1_account = "manager-tz-kt1-of-the-baker" in
+  originate_manager_tz_script
+    state
+    ~delegate:baker_0.Tezos_client.Keyed.key_name
+    ~client:client_0
+    ~name:manager_tz_kt1_account
+    ~from:baker_0.Tezos_client.Keyed.key_name
+    ~bake
+    ~protocol_kind
+    ~ledger_account
+  >>= fun () ->
   let transactions_test ~with_rejections =
     transaction_tests
       state
@@ -1247,6 +1377,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ~ledger_account
       ~unit_kt1_account
       ~pair_string_nat_kt1_account
+      ~manager_tz_kt1_account
       ~src:signer.key_name
       ()
       ~bake
