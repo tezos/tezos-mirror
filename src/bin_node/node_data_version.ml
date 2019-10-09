@@ -27,7 +27,12 @@ let ( // ) = Filename.concat
 
 type t = string
 
-let data_version = "0.0.3"
+(* Data_version hitory:
+ *  - 0.0.1 : original storage
+ *  - 0.0.2 : never released
+ *  - 0.0.3 : store upgrade (introducing history mode)
+ *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2) *)
+let data_version = "0.0.4"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
