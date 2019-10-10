@@ -730,29 +730,41 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~amount:0
     ()
   >>= fun () ->
+  Tezos_client.client_cmd
+    state
+    ~client
+    [ "--wait";
+      "none";
+      "set";
+      "delegate";
+      "for";
+      src;
+      "to";
+      src;
+      "--verbose-signing" ]
+  >>= fun (_, _) ->
   test_transaction
     ~name:"manager.tz-set-delegate"
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; SET_DELEGATE ; CONS }" ledger_pkh)
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; SOME ; SET_DELEGATE ; CONS }" "0x01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00")
     ~dst_name:manager_tz_kt1_account
     ~entrypoint:"do"
     ~amount:0
     ()
   >>= fun () ->
   test_transaction
-    ~name:"manager.tz-transfer-originated-to-implicit"
+    ~name:"manager.tz-add-funds"
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; IMPLICIT_ACCOUNT ; PUSH mutez %s ; UNIT ; TRANSFER_TOKENS ; CONS }")
     ~dst_name:manager_tz_kt1_account
-    ~entrypoint:"do"
     ()
   >>= fun () ->
   test_transaction
-    ~name:"manager.tz-transfer-originated-to-originated"
+    ~name:"manager.tz-transfer-originated-to-implicit"
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH address %s ; CONTRACT %%s %s ; ASSERT_SOME ; PUSH mutez %s ; %s ; TRANSFER_TOKENS ; CONS }" ledger_pkh )
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; IMPLICIT_ACCOUNT ; PUSH mutez %i ; UNIT ; TRANSFER_TOKENS ; CONS }" "0x01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00" 15)
     ~dst_name:manager_tz_kt1_account
     ~entrypoint:"do"
+    ~amount:0
     ()
 
 let prepare_origination_of_manager_tz_script ?(spendable = false)
