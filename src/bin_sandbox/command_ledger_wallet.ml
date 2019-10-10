@@ -743,10 +743,22 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
       src;
       "--verbose-signing" ]
   >>= fun (_, _) ->
+  Tezos_client.client_cmd
+    state
+    ~client
+    [ "hash";
+      "data";
+      (sprintf "\"%s\"" ledger_pkh);
+      "of";
+      "type";
+      "key_hash"; ]
+  >>= fun (_, res) ->
+  let src_hex = List.hd_exn res#out |> String.split ~on:' ' |> (fun (s) -> List.nth_exn s 3)
+  in
   test_transaction
     ~name:"manager.tz-set-delegate"
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; SOME ; SET_DELEGATE ; CONS }" "0x01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00")
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH key_hash %s ; SOME ; SET_DELEGATE ; CONS }" src_hex)
     ~dst_name:manager_tz_kt1_account
     ~entrypoint:"do"
     ~amount:0
