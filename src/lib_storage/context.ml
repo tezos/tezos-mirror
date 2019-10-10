@@ -948,3 +948,33 @@ let restore_contexts idx ~filename k_store_pruned_block pipeline_validation =
       if current = total then return result
       else fail @@ Suspicious_file (total - current))
     (fun () -> Lwt_unix.close fd)
+
+let upgrade_0_0_3 ~context_dir =
+  Lwt_unix.file_exists (context_dir ^ "/" ^ "data.mdb")
+  (* We assume that the data.mdb file is representative of a lmdb context *)
+  >>= fun is_lmdb ->
+  Lwt_unix.file_exists (context_dir ^ "/" ^ "store.pack")
+  (* We assume that the store.pack file is representative of an irmin context *)
+  >>= fun is_irmin ->
+  match (is_lmdb, is_irmin) with
+  | (true, true) ->
+      Format.printf
+        "Your directory containts both the LMDB and Irmin2 chain's data. From \
+         now, the node only uses Irmin2. LMDB data can be safely removed. To \
+         do so, delete the following files: %s/data.mdb and %s/lock.mdb@."
+        context_dir
+        context_dir ;
+      return_unit
+  | (true, false) ->
+      failwith
+        "Your directory contains the lmdb database which cannot be handled \
+         with this version of the node. Please upgrade to the new irmin \
+         storage.@.A guide to upgrade toward the new storage can be found \
+         here: http://tezos.gitlab.io/releases/october-2019.html"
+  | (false, true) ->
+      return_unit
+  | (false, false) ->
+      failwith
+        "Cannot find any context data in the provided directory (located at: \
+         %s). Please make sure that the path to the storage is correct."
+        context_dir
