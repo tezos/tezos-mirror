@@ -15,9 +15,9 @@ module type Key = sig
 
   val encode : t -> string
 
-  val decode : string -> int -> t
-
   val encoded_size : int
+
+  val decode : string -> int -> t
 
   val pp : t Fmt.t
 end
@@ -27,9 +27,9 @@ module type Value = sig
 
   val encode : t -> string
 
-  val decode : string -> int -> t
-
   val encoded_size : int
+
+  val decode : string -> int -> t
 
   val pp : t Fmt.t
 end
@@ -59,11 +59,11 @@ module type S = sig
 
   val iter : (key -> value -> unit) -> t -> unit
 
+  val force_merge : t -> unit
+
   val flush : t -> unit
 
   val close : t -> unit
-
-  val force_merge : t -> key -> value -> unit
 end
 
 let may f = function None -> () | Some bf -> f bf
@@ -114,7 +114,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     mutable index : index option;
     log : IO.t;
     log_mem : entry Tbl.t;
-    mutable counter : int;
+    mutable open_instances : int;
     lock : IO.lock option;
   }
 
@@ -150,9 +150,9 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
       let remaining = Int64.sub max offset in
       if remaining <= 0L then ()
       else
-        let size = Stdlib.min remaining page_size in
-        let raw = Bytes.create (Int64.to_int size) in
-        let n = IO.read io ~off:offset raw in
+        let len = Int64.to_int (Stdlib.min remaining page_size) in
+        let raw = Bytes.create len in
+        let n = IO.read io ~off:offset ~len raw in
         let rec read_page page off =
           if off = n then ()
           else
@@ -224,9 +224,9 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
           Hashtbl.remove roots (root, false);
           raise Not_found );
         let t = Hashtbl.find roots (root, readonly) in
-        if t.counter <> 0 then (
+        if t.open_instances <> 0 then (
           Log.debug (fun l -> l "%s found in cache" root);
-          t.counter <- t.counter + 1;
+          t.open_instances <- t.open_instances + 1;
           if fresh then clear t;
           t )
         else (
@@ -262,7 +262,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
       else None
     in
     iter_io (fun e -> Tbl.replace log_mem e.key e) log;
-    { config; generation; log_mem; root; log; index; counter = 1; lock }
+    { config; generation; log_mem; root; log; index; open_instances = 1; lock }
 
   let (`Staged v) = with_cache ~v:v_no_cache ~clear
 
@@ -335,12 +335,12 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
       append_entry_fanout fan_out log.(log_i) dst_io
     done
 
-  (** Merge [log] with [t] into [dst_io].
-      [log] must be sorted by key hashes. *)
+  (* Merge [log] with [t] into [dst_io]. [log] must be sorted by key hashes. *)
   let merge_with log index dst_io =
     let entries = 10_000 in
-    let buf = Bytes.create (entries * entry_size) in
-    let refill off = ignore (IO.read index.io ~off buf) in
+    let len = entries * entry_size in
+    let buf = Bytes.create len in
+    let refill off = ignore (IO.read index.io ~off ~len buf) in
     let index_end = IO.offset index.io in
     let fan_out = index.fan_out in
     refill 0L;
@@ -422,9 +422,22 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
         IO.set_generation t.log generation;
         t.generation <- generation
 
-  let force_merge t key value =
+  let get_witness t =
+    let exception Found of entry in
+    match Tbl.iter (fun _ entry -> raise (Found entry)) t.log_mem with
+    | exception Found e -> Some e
+    | () -> (
+        match t.index with
+        | None -> None
+        | Some index ->
+            let buf = Bytes.create entry_size in
+            let n = IO.read index.io ~off:0L ~len:entry_size buf in
+            assert (n = entry_size);
+            Some (decode_entry buf 0) )
+
+  let force_merge t =
     Log.debug (fun l -> l "forced merge %S\n" t.root);
-    merge ~witness:{ key; key_hash = K.hash key; value } t
+    match get_witness t with None -> () | Some witness -> merge ~witness t
 
   let replace t key value =
     Log.debug (fun l -> l "add %a %a" K.pp key V.pp value);
@@ -435,7 +448,6 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     if Int64.compare (IO.offset t.log) (Int64.of_int t.config.log_size) > 0
     then merge ~witness:entry t
 
-  (* XXX: Perform a merge beforehands to ensure duplicates are not hit twice. *)
   let iter f t =
     Log.debug (fun l -> l "iter %S" t.root);
     if t.config.readonly then sync_log t;
@@ -445,8 +457,8 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
   let flush t = IO.sync t.log
 
   let close t =
-    t.counter <- t.counter - 1;
-    if t.counter = 0 then (
+    t.open_instances <- t.open_instances - 1;
+    if t.open_instances = 0 then (
       Log.debug (fun l -> l "close %S" t.root);
       if not t.config.readonly then flush t;
       IO.close t.log;

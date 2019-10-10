@@ -34,7 +34,7 @@ module Make (IO : Io.S) (Elt : ELT) :
 
   let get_entry_from_io io off =
     let buf = Bytes.create Elt.encoded_size in
-    let n = IO.read io ~off buf in
+    let n = IO.read io ~off ~len:Elt.encoded_size buf in
     assert (n = Elt.encoded_size);
     Elt.decode buf 0
 
@@ -60,12 +60,15 @@ module Make (IO : Io.S) (Elt : ELT) :
 
   let length t = Int64.(div (IO.offset t.io) Elt.encoded_sizeL)
 
+  let max_buffer_size = 4096
+
+  let buf = Bytes.create max_buffer_size
+
   let set_buffer t ~low ~high =
     let range = Elt.encoded_size * (1 + Int64.to_int (high -- low)) in
     let low_off = Int64.mul low Elt.encoded_sizeL in
     let high_off = Int64.mul high Elt.encoded_sizeL in
-    let buf = Bytes.create range in
-    let n = IO.read t.io ~off:low_off buf in
+    let n = IO.read t.io ~off:low_off ~len:range buf in
     assert (n = range);
     t.buffer <- Some { buf; low_off; high_off }
 
@@ -74,9 +77,10 @@ module Make (IO : Io.S) (Elt : ELT) :
     if Int64.compare low high > 0 then
       Log.warn (fun m ->
           m "Requested pre-fetch region is empty: [%Ld, %Ld]" low high)
-    else if range > 4096 then
+    else if range > max_buffer_size then
       Log.debug (fun m ->
-          m "Requested pre-fetch [%Ld, %Ld] is larger than 4096" low high)
+          m "Requested pre-fetch [%Ld, %Ld] is larger than %d" low high
+            max_buffer_size)
     else
       match t.buffer with
       | Some b ->
