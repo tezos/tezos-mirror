@@ -17,7 +17,7 @@ module type S = sig
 
   val readonly : t -> bool
 
-  val read : t -> off:int64 -> bytes -> int
+  val read : t -> off:int64 -> len:int -> bytes -> int
 
   val clear : t -> unit
 
