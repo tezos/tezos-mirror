@@ -84,4 +84,5 @@ let () =
            Command_prevalidation.cmd ();
            Command_ledger_baking.cmd ();
            Command_ledger_wallet.cmd ();
-           Flextesa.Interactive_mini_network.cmd () ] )
+           Flextesa.Interactive_mini_network.cmd ();
+           Command_node_synchronization.cmd () ] )

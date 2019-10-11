@@ -97,8 +97,77 @@
          --second-accuser %{bin:tezos-accuser-alpha}
          )))
 
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode archive
+         --secondary-history-mode full
+         --should-synch true
+ )))
 
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode archive
+         --secondary-history-mode rolling
+         --should-synch true
+ )))
 
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode full
+         --secondary-history-mode archive
+         --should-synch true
+ )))
+
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode full
+         --secondary-history-mode rolling
+         --should-synch true
+ )))
+
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode rolling
+         --secondary-history-mode archive
+         --should-synch false
+ )))
+
+(alias
+  (name runtest_sandbox_node_synchronization)
+  (locks /tcp-port/15000_range)
+  (action
+    (run %{exe:main.exe} node-synchronization
+         --tezos-client-binary %{bin:tezos-client}
+         --tezos-node-binary %{bin:tezos-node}
+         --primary-history-mode rolling
+         --secondary-history-mode full
+         --should-synch false
+ )))
 
 (alias
  (name runtest_flextesa)
@@ -108,4 +177,4 @@
   (alias runtest_sandbox_voting_demo_noops)
   (alias runtest_sandbox_user_activated_upgrade)
   (alias runtest_sandbox_daemons_upgrade)
-  ))
+  (alias runtest_sandbox_node_synchronization)))
