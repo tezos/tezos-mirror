@@ -141,8 +141,6 @@ would ensure that a minority fork progresses more slowly for a longer
 period of time than the majority fork. ``PRESERVED_CYCLES``
 gives the majority chain a "headstart".
 
-This does not affect voting rights for protocol changes.
-
 Rolls
 ~~~~~
 
