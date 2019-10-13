@@ -124,15 +124,10 @@ Active and passive delegates
 A delegate can be marked as either active or passive. A passive delegate
 cannot be selected for baking or endorsement.
 
-A delegate becomes passive for cycle ``n`` when they fail to create any
-of the blocks or endorsements in the past ``PRESERVED_CYCLES``
-= 5 cycles, or to change their security deposit. So, in this case, in
-cycles ``n-1``, ``n-3``, ..., ``n - PRESERVED_CYCLES``.
-
-A small delegate who is afraid they might be deactivated because they
-were not given the opportunity to create any block or endorsement can
-ensure they do not become deactivated by making small, meaningless
-transactions with their security deposits once every two cycles.
+A delegate becomes passive for cycle ``n`` when they fail to create
+any of the blocks or endorsements in the past ``PRESERVED_CYCLES`` = 5
+cycles, that is, in cycles ``n-1``, ``n-3``, ..., ``n -
+PRESERVED_CYCLES``.
 
 Discussion: giving ``PRESERVED_CYCLES`` a small value means
 the chain adapts more quickly to participants disappearing. It's not
