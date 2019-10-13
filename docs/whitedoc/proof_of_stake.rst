@@ -53,7 +53,7 @@ The shell header contains
 -  ``fitness``: a sequence of sequences of unsigned bytes, ordered by
    length and then lexicographically. It represents the claimed fitness
    of the chain ending in this block.
--  ``operations_hash`` The hash of a list of root hashes of merkle
+-  ``operations_hash``: The hash of a list of root hashes of Merkle
       trees of operations. There is one list of operations per
       validation pass
 -  ``context`` Hash of the state of the context after application of
@@ -143,7 +143,7 @@ In theory, it would be possible to give each token a serial number,
 and track the specific tokens assigned to specific delegates. However,
 it would be too demanding of nodes to track assignment at such a
 granular level. Instead we introduce the concept of rolls. A *roll*
-represents a set of coins delegated to a given key. A rolls hold
+represents a set of coins delegated to a given key. A roll holds
 ``TOKENS_PER_ROLL`` = 8,000 tokens. When tokens are moved, or a
 delegate for a contract is changed, the rolls change delegate
 according to the following algorithm.
