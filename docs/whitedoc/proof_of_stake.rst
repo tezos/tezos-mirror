@@ -89,6 +89,22 @@ expects).
 This ensure that consensus critical operations do not compete with
 transactions for block space.
 
+Cycles
+------
+
+Blocks in the Tezos.Alpha Blockchain are grouped into *cycles* of
+``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
+``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
+least* 2 days, 20 hours, and 16 minutes. In the following description,
+the current cycle is referred to as ``n``, it is the nth cycle from the
+beginning of the chain. Cycle ``(n-1)`` is the cycle that took place
+before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
+the one after, etc.
+
+At any point, the tezos shell will not implicitly accept a branch whose
+fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
+past (that is *at least* 14 days, 5 hours, and 20 minutes).
+
 Delegation
 ----------
 
@@ -179,22 +195,6 @@ consumption and economic efficiency. If roll snapshots are too frequent,
 they will consume a lot of memory. If they are too rare, strategic
 participants could purchase many tokens in anticipation of a snapshot
 and resell them right after.
-
-Cycles
-------
-
-Blocks in the Tezos.Alpha blockchain are grouped into *cycles* of
-``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
-``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
-least* 2 days, 20 hours, and 16 minutes. In the following description,
-the current cycle is referred to as ``n``, it is the nth cycle from the
-beginning of the chain. Cycle ``(n-1)`` is the cycle that took place
-before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
-the one after, etc.
-
-At any point, the Tezos shell will not implicitly accept a branch whose
-fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
-past (that is *at least* 14 days, 5 hours, and 20 minutes).
 
 Security deposits
 ~~~~~~~~~~~~~~~~~
