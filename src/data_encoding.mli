@@ -36,8 +36,8 @@
     This works by writing type descriptors by hand, using the provided
     combinators. These combinators can fine-tune the binary
     representation to be compact and efficient, but also provide
-    proper field names and meta information, so the API of Tezos can
-    be automatically introspected and documented.
+    proper field names and meta information. As a result, an API that uses
+    those descriptors can be automatically introspected and documented.
 
     Here is an example encoding for type [(int * string)].
 
@@ -549,7 +549,7 @@ module Encoding : sig
   module Bounded : sig
     (** Encoding of a string whose length does not exceed the specified length.
         The size field uses the smallest integer that can accommodate the
-        maximum size - e.g, [`Uint8] for very short strings, [`Uint16] for
+        maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
         longer strings, etc.
 
         Attempting to construct a string with a length that is too long causes
@@ -575,7 +575,7 @@ module Encoding : sig
 
   (** Recompute the encoding definition each time it is used.
       Useful for dynamically updating the encoding of values of an extensible
-      type via a global reference (e.g. exceptions). *)
+      type via a global reference (e.g., exceptions). *)
   val delayed : (unit -> 'a encoding) -> 'a encoding
 
   (** Define different encodings for JSON and binary serialization. *)
@@ -642,7 +642,7 @@ include module type of Encoding with type 'a t = 'a Encoding.t
 module Registration : sig
   type id = string
 
-  (** A encoding that has been {!register}ed. It can be retreived using either
+  (** A encoding that has been {!register}ed. It can be retrieved using either
       {!list} or {!find}. *)
   type t
 
