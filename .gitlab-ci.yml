@@ -57,6 +57,7 @@ check_linting:
   <<: *build_definition
   script:
     - src/tooling/lint.sh check.ci
+    - src/tooling/lint.sh check_scripts
 
 build:
   <<: *build_definition

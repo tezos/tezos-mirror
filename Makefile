@@ -98,6 +98,7 @@ test:
 test-lint:
 	@dune build @runtest_lint
 	make -C tests_python lint_all
+	@src/tooling/lint.sh check_scripts
 
 fmt:
 	@src/tooling/lint.sh format
