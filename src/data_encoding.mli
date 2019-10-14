@@ -880,7 +880,7 @@ module Binary : sig
       The function fails if the buffer is not fully read. *)
   val of_bytes : 'a Encoding.t -> Bytes.t -> 'a option
 
-  (** [of_bytes_exn enc buf] is equivalent to [to_bytes], except
+  (** [of_bytes_exn enc buf] is equivalent to [of_bytes], except
       @raise [Read_error] instead of returning [None] in case of error. *)
   val of_bytes_exn : 'a Encoding.t -> Bytes.t -> 'a
 
