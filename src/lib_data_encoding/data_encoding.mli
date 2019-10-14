@@ -734,11 +734,6 @@ module Json : sig
   (** Read a JSON document from a string. *)
   val from_string : string -> (json, string) result
 
-  (** Read a stream of JSON documents from a stream of strings.
-      A single JSON document may be represented in multiple consecutive
-      strings. But only the first document of a string is considered. *)
-  val from_stream : string Lwt_stream.t -> (json, string) result Lwt_stream.t
-
   (** Write a JSON document to a string. This goes via an intermediate
       buffer and so may be slow on large documents. *)
   val to_string : ?newline:bool -> ?minify:bool -> json -> string
