@@ -28,6 +28,6 @@
 
 val write : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
 
-val to_bytes_exn : 'a Encoding.t -> 'a -> Bytes.t
+val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
 
-val to_bytes : 'a Encoding.t -> 'a -> Bytes.t option
+val to_bytes : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option

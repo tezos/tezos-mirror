@@ -367,7 +367,7 @@ let write e v buffer offset len =
   let state = {buffer; offset; allowed_bytes = Some len} in
   try write_rec e state v ; Some state.offset with Write_error _ -> None
 
-let to_bytes_exn e v =
+let to_bytes_exn ?(buffer_size = 128) e v =
   match Encoding.classify e with
   | `Fixed n ->
       (* Preallocate the complete buffer *)
@@ -379,9 +379,10 @@ let to_bytes_exn e v =
       (* Preallocate a minimal buffer and let's not hardcode a
          limit to its extension. *)
       let state =
-        {buffer = Bytes.create 128; offset = 0; allowed_bytes = None}
+        {buffer = Bytes.create buffer_size; offset = 0; allowed_bytes = None}
       in
       write_rec e state v ;
       Bytes.sub state.buffer 0 state.offset
 
-let to_bytes e v = try Some (to_bytes_exn e v) with Write_error _ -> None
+let to_bytes ?buffer_size e v =
+  try Some (to_bytes_exn ?buffer_size e v) with Write_error _ -> None

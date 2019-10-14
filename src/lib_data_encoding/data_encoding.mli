@@ -886,12 +886,13 @@ module Binary : sig
 
   (** [to_bytes enc v] is the equivalent of [write env buf 0 len]
       where [buf] is a newly allocated buffer of the expected
-      length [len] (see [length env v]). *)
-  val to_bytes : 'a Encoding.t -> 'a -> Bytes.t option
+      length [len] (see [length env v]).
+      The parameter [buffer_size] controls the initial size of [buf]. *)
+  val to_bytes : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
       @raise [Write_error] instead of returning [None] in case of error. *)
-  val to_bytes_exn : 'a Encoding.t -> 'a -> Bytes.t
+  val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
 
   val describe : 'a Encoding.t -> Binary_schema.t
 end
