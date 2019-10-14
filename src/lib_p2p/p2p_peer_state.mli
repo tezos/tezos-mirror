@@ -28,12 +28,12 @@ open P2p_peer
 type ('conn, 'conn_meta) t =
   | Accepted of {current_point : P2p_connection.Id.t; cancel : Lwt_canceler.t}
       (** We accepted a incoming connection, we greeted back and
-      we are waiting for an acknowledgement. *)
+      we are waiting for an acknowledgment. *)
   | Running of {
       data : 'conn;
       conn_metadata : 'conn_meta;
       current_point : P2p_connection.Id.t;
-    }  (** Successfully authentificated connection, normal business. *)
+    }  (** Successfully authenticated connection, normal business. *)
   | Disconnected  (** No connection established currently. *)
 
 type ('conn, 'conn_meta) state = ('conn, 'conn_meta) t

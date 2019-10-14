@@ -23,22 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Generic IO scheduling between file descriptors.
+(** Scheduling of I/O operations over file descriptors.
 
-    In order to use IO scheduling, the [register] function must be
-    used to make a file descriptor managed by a [scheduler].. It will
-    return a value of type [connection] that must be used to perform IO
-    on the managed file descriptor using this module's dedicated IO
-    functions (read, write, etc.).
+    This module defines the scheduler type [t], and connection type
+    [connection]. A [connection] is a wrapper over a [P2p_fd.t]. R/W
+    functions over [connection]s behave like regular R/W over file
+    descriptors, but the scheduler ensures of fair allocation of bandwidth
+    between them.
 
-    Each connection is allowed a read (resp. write) quota, which is
-    for now fairly distributed among connections.
-
-    To each connection is associated a read (resp. write) queue where
-    data is copied to (resp. read from), at a rate of
-    max_download_speed / num_connections (resp. max_upload_speed /
-    num_connections).
-*)
+    To each connection is associated a read (resp. write) queue where data is
+    copied to (resp. read from), at a rate of [max_download_speed /
+    num_connections] (resp. [max_upload_speed / num_connections]). *)
 
 (** Type of a connection. *)
 type connection
@@ -117,4 +112,6 @@ val close : ?timeout:float -> connection -> unit tzresult Lwt.t
     canceled. *)
 val shutdown : ?timeout:float -> t -> unit Lwt.t
 
+(** [id connection] returns the identifier of the underlying [P2p_fd.t]
+    file descriptor. This uniquely identifies a connection. *)
 val id : connection -> int

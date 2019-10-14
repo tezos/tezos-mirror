@@ -39,11 +39,11 @@
     Otherwise B picks a peer [peer'] at point [point'] and connect to [peer]. If
     successful, it sends a response [Swap_ack (point', peer')] to A. Upon
     reception of [Swap_ack]. B tries to connected to [peer']. If successful,
-    it disconnect from [peer].
+    it disconnect from [peer]. *)
 
-    TODO: It would be interesting to measure the effect of the swap request
-          mechanism on an actual network. Is it the added complexity
-          worth it, wouldn't it  be enough to rely on [Advertise]? *)
+(* TODO: It would be interesting to measure the effect of the swap request
+         mechanism on an actual network. Is it the added complexity
+         worth it, wouldn't it  be enough to rely on [Advertise]? *)
 
 type 'msg encoding =
   | Encoding : {
