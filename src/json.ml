@@ -416,18 +416,6 @@ let from_string s =
   | _ ->
       Error "Malformed value"
 
-let from_stream (stream : string Lwt_stream.t) =
-  let buffer = ref "" in
-  Lwt_stream.filter_map
-    (fun str ->
-      buffer := !buffer ^ str ;
-      try
-        let json = Ezjsonm.from_string !buffer in
-        buffer := "" ;
-        Some (Ok json)
-      with Ezjsonm.Parse_error _ -> None)
-    stream
-
 let encoding =
   let binary : Json_repr.ezjsonm Encoding.t =
     Encoding.conv

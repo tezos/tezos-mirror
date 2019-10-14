@@ -8,7 +8,6 @@ license: "MIT"
 depends: [
   "ocaml" { >= "4.06" }
   "dune" { >= "1.7" }
-  "lwt"
   "ezjsonm"
   "zarith"
   "ocplib-json-typed" { >= "0.7" }
