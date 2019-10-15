@@ -55,8 +55,6 @@ let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 let version_file_name = "version.json"
 
-let pp ppf version = Format.pp_print_string ppf version
-
 type error += Invalid_data_dir_version of t * t
 
 type error += Invalid_data_dir of string
@@ -187,10 +185,11 @@ let ensure_data_dir bare data_dir =
       | [|single|] when single = default_identity_file_name ->
           write_version ()
       | [|file_a; file_b|]
-        when bare && file_a = version_file_name
-             && file_b = default_identity_file_name
-             || file_b = version_file_name
-                && file_a = default_identity_file_name ->
+        when bare
+             && ( file_a = version_file_name
+                  && file_b = default_identity_file_name
+                || file_b = version_file_name
+                   && file_a = default_identity_file_name ) ->
           write_version ()
       | files when bare ->
           let files =
