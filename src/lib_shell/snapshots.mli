@@ -39,6 +39,8 @@ val import :
   ?reconstruct:bool ->
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
   data_dir:string ->
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   dir_cleaner:(string -> unit Lwt.t) ->
   genesis:State.Chain.genesis ->
   string ->
@@ -47,6 +49,8 @@ val import :
 
 val reconstruct :
   Chain_id.t ->
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   Store.t ->
   State.Chain.t ->
   Context.index ->

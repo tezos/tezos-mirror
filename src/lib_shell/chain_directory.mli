@@ -32,6 +32,13 @@ val get_chain : State.t -> Chain_services.chain -> State.Chain.t Lwt.t
 
 val get_checkpoint : State.t -> Chain_services.chain -> Block_hash.t Lwt.t
 
-val rpc_directory : State.Chain.t RPC_directory.t
+val rpc_directory :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  State.Chain.t RPC_directory.t
 
-val build_rpc_directory : Validator.t -> unit RPC_directory.t
+val build_rpc_directory :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  Validator.t ->
+  unit RPC_directory.t

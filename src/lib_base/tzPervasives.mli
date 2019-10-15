@@ -67,6 +67,7 @@ end
 
 module Time = Time
 module Fitness = Fitness
+module User_activated = User_activated
 module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol

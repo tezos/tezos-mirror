@@ -111,6 +111,10 @@ module Term = struct
             ~data_dir
             ~dir_cleaner
             ~genesis
+            ~user_activated_upgrades:
+              node_config.blockchain_network.user_activated_upgrades
+            ~user_activated_protocol_overrides:
+              node_config.blockchain_network.user_activated_protocol_overrides
             snapshot_file
             block
     in

@@ -159,32 +159,24 @@ let hash block = Block_hash.hash_bytes [to_bytes block]
 
 let hash_raw bytes = Block_hash.hash_bytes [bytes]
 
-let forced_protocol_upgrades : (Int32.t * Protocol_hash.t) list =
-  [ (* nothing *) ]
-
-let voted_protocol_overrides : (Protocol_hash.t * Protocol_hash.t) list =
-  List.map
-    (fun (a, b) ->
-      (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
-    [ (* nothing *) ]
-
 module LevelMap = Map.Make (struct
   type t = Int32.t
 
   let compare = Int32.compare
 end)
 
-let get_forced_protocol_upgrade =
+let get_forced_protocol_upgrade ~user_activated_upgrades =
   let table =
     List.fold_left
       (fun map (level, hash) -> LevelMap.add level hash map)
       LevelMap.empty
-      forced_protocol_upgrades
+      user_activated_upgrades
   in
   fun ~level -> LevelMap.find_opt level table
 
-let get_voted_protocol_overrides proto_hash =
-  List.assoc_opt proto_hash voted_protocol_overrides
+let get_voted_protocol_overrides ~user_activated_protocol_overrides proto_hash
+    =
+  List.assoc_opt proto_hash user_activated_protocol_overrides
 
 let () =
   Data_encoding.Registration.register shell_header_encoding ;

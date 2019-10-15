@@ -58,7 +58,11 @@ let run stdin stdout =
     (inconsistent_handshake "bad magic")
   >>=? fun () ->
   External_validation.recv stdin External_validation.parameters_encoding
-  >>= fun {context_root; protocol_root; sandbox_parameters} ->
+  >>= fun { context_root;
+            protocol_root;
+            sandbox_parameters;
+            user_activated_upgrades;
+            user_activated_protocol_overrides } ->
   let genesis_block = ref Block_hash.zero in
   let genesis_time = ref Time.Protocol.epoch in
   let genesis_protocol = ref Protocol_hash.zero in
@@ -130,6 +134,8 @@ let run stdin stdout =
                      >>=? fun () ->
                      Block_validation.apply
                        chain_id
+                       ~user_activated_upgrades
+                       ~user_activated_protocol_overrides
                        ~max_operations_ttl
                        ~predecessor_block_header
                        ~predecessor_context
@@ -147,6 +153,8 @@ let run stdin stdout =
                          | Ok () ->
                              Block_validation.apply
                                chain_id
+                               ~user_activated_upgrades
+                               ~user_activated_protocol_overrides
                                ~max_operations_ttl
                                ~predecessor_block_header
                                ~predecessor_context

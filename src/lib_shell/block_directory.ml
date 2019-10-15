@@ -108,7 +108,8 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
             }) ;
   !dir
 
-let build_raw_rpc_directory (module Proto : Block_services.PROTO)
+let build_raw_rpc_directory ~user_activated_upgrades
+    ~user_activated_protocol_overrides (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
   let dir : State.Block.block RPC_directory.t ref = ref RPC_directory.empty in
   let merge d = dir := RPC_directory.merge d !dir in
@@ -283,6 +284,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           p.operations
       in
       Prevalidation.preapply
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
         ~predecessor:block
         ~timestamp
         ~protocol_data
@@ -349,7 +352,8 @@ let get_protocol hash =
   | Some protocol ->
       protocol
 
-let get_directory chain_state block =
+let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
+    chain_state block =
   State.Block.get_rpc_directory block
   >>= function
   | Some dir ->
@@ -363,6 +367,8 @@ let get_directory chain_state block =
       | None ->
           Lwt.return
             (build_raw_rpc_directory
+               ~user_activated_upgrades
+               ~user_activated_protocol_overrides
                (module Block_services.Fake_protocol)
                next_protocol)
       | Some pred -> (
@@ -380,7 +386,13 @@ let get_directory chain_state block =
           | Some dir ->
               Lwt.return dir
           | None ->
-              let dir = build_raw_rpc_directory (module Proto) next_protocol in
+              let dir =
+                build_raw_rpc_directory
+                  ~user_activated_upgrades
+                  ~user_activated_protocol_overrides
+                  (module Proto)
+                  next_protocol
+              in
               State.Block.set_rpc_directory block dir
               >>= fun () -> Lwt.return dir ) )
 
@@ -478,7 +490,8 @@ let get_block chain_state = function
           ~below_save_point:true
           (State.Block.hash head)
 
-let build_rpc_directory chain_state block =
+let build_rpc_directory ~user_activated_upgrades
+    ~user_activated_protocol_overrides chain_state block =
   get_block chain_state block
   >>= function
   | None ->
@@ -493,7 +506,11 @@ let build_rpc_directory chain_state block =
         block_level >= save_point_level
         || Block_hash.equal block_hash genesis.block
       then
-        get_directory chain_state b
+        get_directory
+          ~user_activated_upgrades
+          ~user_activated_protocol_overrides
+          chain_state
+          b
         >>= fun dir ->
         Lwt.return (RPC_directory.map (fun _ -> Lwt.return b) dir)
       else

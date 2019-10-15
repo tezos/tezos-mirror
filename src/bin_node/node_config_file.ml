@@ -46,10 +46,14 @@ type blockchain_network = {
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;
   sandboxed_chain_name : chain_name;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
 }
 
 let make_blockchain_network ~chain_name ?old_chain_name
-    ?incompatible_chain_name ~sandboxed_chain_name genesis =
+    ?incompatible_chain_name ~sandboxed_chain_name
+    ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
+    genesis =
   let of_string = Distributed_db_version.of_string in
   {
     genesis;
@@ -57,6 +61,15 @@ let make_blockchain_network ~chain_name ?old_chain_name
     old_chain_name = Option.map old_chain_name ~f:of_string;
     incompatible_chain_name = Option.map incompatible_chain_name ~f:of_string;
     sandboxed_chain_name = of_string sandboxed_chain_name;
+    user_activated_upgrades =
+      List.map
+        (fun (l, h) -> (l, Protocol_hash.of_b58check_exn h))
+        user_activated_upgrades;
+    user_activated_protocol_overrides =
+      List.map
+        (fun (a, b) ->
+          (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
+        user_activated_protocol_overrides;
   }
 
 let blockchain_network_mainnet =
@@ -75,6 +88,12 @@ let blockchain_network_mainnet =
     ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
+    ~user_activated_upgrades:
+      [ (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
+        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP") ]
+    ~user_activated_protocol_overrides:
+      [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
+          "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
 
 let blockchain_network_alphanet =
   make_blockchain_network
@@ -145,31 +164,43 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            chain_name;
            old_chain_name;
            incompatible_chain_name;
-           sandboxed_chain_name } ->
+           sandboxed_chain_name;
+           user_activated_upgrades;
+           user_activated_protocol_overrides } ->
       ( genesis,
         chain_name,
         old_chain_name,
         incompatible_chain_name,
-        sandboxed_chain_name ))
+        sandboxed_chain_name,
+        user_activated_upgrades,
+        user_activated_protocol_overrides ))
     (fun ( genesis,
            chain_name,
            old_chain_name,
            incompatible_chain_name,
-           sandboxed_chain_name ) ->
+           sandboxed_chain_name,
+           user_activated_upgrades,
+           user_activated_protocol_overrides ) ->
       {
         genesis;
         chain_name;
         old_chain_name;
         incompatible_chain_name;
         sandboxed_chain_name;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
       })
     (let chain = Distributed_db_version.name_encoding in
-     obj5
+     obj7
        (req "genesis" State.Chain.genesis_encoding)
        (req "chain_name" chain)
        (opt "old_chain_name" chain)
        (opt "incompatible_chain_name" chain)
-       (req "sandboxed_chain_name" chain))
+       (req "sandboxed_chain_name" chain)
+       (req "user_activated_upgrades" User_activated.upgrades_encoding)
+       (req
+          "user_activated_protocol_overrides"
+          User_activated.protocol_overrides_encoding))
 
 let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in

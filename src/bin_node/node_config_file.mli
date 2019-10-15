@@ -34,6 +34,8 @@ type blockchain_network = {
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;
   sandboxed_chain_name : chain_name;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
 }
 
 val blockchain_network_mainnet : blockchain_network

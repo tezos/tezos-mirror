@@ -95,6 +95,7 @@ val forge_block :
 
 val create :
   #Alpha_client_context.full ->
+  user_activated_upgrades:User_activated.upgrades ->
   ?minimal_fees:Tez.t ->
   ?minimal_nanotez_per_gas_unit:Z.t ->
   ?minimal_nanotez_per_byte:Z.t ->

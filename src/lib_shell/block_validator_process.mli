@@ -35,7 +35,11 @@ type validator_kind =
 
 type t
 
-val init : validator_kind -> t tzresult Lwt.t
+val init :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  validator_kind ->
+  t tzresult Lwt.t
 
 val close : t -> unit Lwt.t
 

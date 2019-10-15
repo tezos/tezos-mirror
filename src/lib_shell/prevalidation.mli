@@ -78,6 +78,8 @@ module Make (Proto : Registered_protocol.T) : T with module Proto = Proto
 
 (** Pre-apply creates a new block and returns it. *)
 val preapply :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   predecessor:State.Block.t ->
   timestamp:Time.Protocol.t ->
   protocol_data:Bytes.t ->

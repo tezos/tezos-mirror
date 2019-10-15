@@ -43,6 +43,8 @@ let with_node f =
         chain_name = Distributed_db_version.of_string "TEZOS_DOCGEN";
         sandboxed_chain_name =
           Distributed_db_version.of_string "SANDBOXED_TEZOS_DOCGEN";
+        user_activated_upgrades = [];
+        user_activated_protocol_overrides = [];
         patch_context = None;
         store_root = dir / "store";
         context_root = dir / "context";

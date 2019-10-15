@@ -91,6 +91,8 @@ type t = {
   validator : Validator.t;
   mainchain_validator : Chain_validator.t;
   p2p : Distributed_db.p2p;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
 }
@@ -147,6 +149,8 @@ type config = {
   genesis : State.Chain.genesis;
   chain_name : Distributed_db_version.name;
   sandboxed_chain_name : Distributed_db_version.name;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
   store_root : string;
   context_root : string;
   protocol_root : string;
@@ -314,6 +318,8 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     { genesis;
       chain_name;
       sandboxed_chain_name;
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
       store_root;
       context_root;
       protocol_root;
@@ -334,11 +340,16 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
   if singleprocess then
     State.init ~store_root ~context_root ?history_mode ?patch_context genesis
     >>=? fun (state, mainchain_state, context_index, history_mode) ->
-    init (Internal context_index)
+    init
+      ~user_activated_upgrades
+      ~user_activated_protocol_overrides
+      (Internal context_index)
     >>=? fun validator_process ->
     return (validator_process, state, mainchain_state, history_mode)
   else
     init
+      ~user_activated_upgrades
+      ~user_activated_protocol_overrides
       (External
          {
            context_root;
@@ -411,7 +422,17 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       Tag.DSL.(fun f -> f "Closing down the state..." -% t event "shutdown")
     >>= fun () -> State.close state
   in
-  return {state; distributed_db; validator; mainchain_validator; p2p; shutdown}
+  return
+    {
+      state;
+      distributed_db;
+      validator;
+      mainchain_validator;
+      p2p;
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
+      shutdown;
+    }
 
 let shutdown node = node.shutdown ()
 
@@ -430,10 +451,20 @@ let build_rpc_directory node =
        node.validator
        node.mainchain_validator) ;
   merge (Injection_directory.build_rpc_directory node.validator) ;
-  merge (Chain_directory.build_rpc_directory node.validator) ;
+  merge
+    (Chain_directory.build_rpc_directory
+       ~user_activated_upgrades:node.user_activated_upgrades
+       ~user_activated_protocol_overrides:
+         node.user_activated_protocol_overrides
+       node.validator) ;
   merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.state) ;
   merge (Stat_directory.rpc_directory ()) ;
+  merge
+    (Config_directory.build_rpc_directory
+       ~user_activated_upgrades:node.user_activated_upgrades
+       ~user_activated_protocol_overrides:
+         node.user_activated_protocol_overrides) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   RPC_directory.register_describe_directory_service

@@ -160,6 +160,10 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       genesis;
       chain_name = config.blockchain_network.chain_name;
       sandboxed_chain_name = config.blockchain_network.sandboxed_chain_name;
+      user_activated_upgrades =
+        config.blockchain_network.user_activated_upgrades;
+      user_activated_protocol_overrides =
+        config.blockchain_network.user_activated_protocol_overrides;
       patch_context;
       store_root = Node_data_version.store_dir config.data_dir;
       context_root = Node_data_version.context_dir config.data_dir;

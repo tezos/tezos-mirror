@@ -363,6 +363,8 @@ let main node =
           [".."; "<block_id>"],
           RPC_directory.map (fun () -> assert false)
           @@ Block_directory.build_raw_rpc_directory
+               ~user_activated_upgrades:[]
+               ~user_activated_protocol_overrides:[]
                (module Proto)
                (module Proto) ))
       protocols

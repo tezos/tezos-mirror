@@ -31,6 +31,8 @@ type config = {
   genesis : State.Chain.genesis;
   chain_name : Distributed_db_version.name;
   sandboxed_chain_name : Distributed_db_version.name;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
   store_root : string;
   context_root : string;
   protocol_root : string;

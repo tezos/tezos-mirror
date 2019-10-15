@@ -229,7 +229,8 @@ struct
         pp_print_string ppf "outdated"
 end
 
-let preapply ~predecessor ~timestamp ~protocol_data operations =
+let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
+    ~predecessor ~timestamp ~protocol_data operations =
   State.Block.context predecessor
   >>=? fun predecessor_context ->
   Context.get_protocol predecessor_context
@@ -312,7 +313,11 @@ let preapply ~predecessor ~timestamp ~protocol_data operations =
   >>=? fun {block_result; _} ->
   let pred_shell_header = State.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
-  Block_validation.may_patch_protocol ~level block_result
+  Block_validation.may_patch_protocol
+    ~user_activated_upgrades
+    ~user_activated_protocol_overrides
+    ~level
+    block_result
   >>= fun {fitness; context; message; _} ->
   State.Block.protocol_hash predecessor
   >>=? fun pred_protocol ->

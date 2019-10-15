@@ -1077,7 +1077,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
 (** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
     validation *)
-let build_block cctxt state seed_nonce_hash
+let build_block ~user_activated_upgrades cctxt state seed_nonce_hash
     ((slot_timestamp, (bi, priority, delegate)) as slot) =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
@@ -1126,6 +1126,7 @@ let build_block cctxt state seed_nonce_hash
       let next_version =
         match
           Tezos_base.Block_header.get_forced_protocol_upgrade
+            ~user_activated_upgrades
             ~level:(Raw_level.to_int32 next_level.Level.level)
         with
         | None ->
@@ -1269,7 +1270,8 @@ let build_block cctxt state seed_nonce_hash
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Protocol_client_context.full) ~chain state =
+let bake ~user_activated_upgrades (cctxt : #Protocol_client_context.full)
+    ~chain state =
   ( match state.best_slot with
   | None ->
       assert false (* unreachable *)
@@ -1278,7 +1280,7 @@ let bake (cctxt : #Protocol_client_context.full) ~chain state =
   >>=? fun slot ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  build_block cctxt state seed_nonce_hash slot
+  build_block ~user_activated_upgrades cctxt state seed_nonce_hash slot
   >>=? function
   | Some (head, priority, shell_header, operations, delegate, seed_nonce_hash)
     -> (
@@ -1500,9 +1502,9 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
 (** [create] starts the main loop of the baker. The loop monitors new blocks and
     starts individual baking operations when baking-slots are available to any of
     the [delegates] *)
-let create (cctxt : #Protocol_client_context.full) ?minimal_fees
-    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-    ~chain ~context_path delegates block_stream =
+let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
+    ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+    ?max_priority ~chain ~context_path delegates block_stream =
   let state_maker bi =
     Alpha_services.Constants.all cctxt (chain, `Head 0)
     >>=? fun constants ->
@@ -1552,7 +1554,7 @@ let create (cctxt : #Protocol_client_context.full) ?minimal_fees
           timeout )
   in
   let timeout_k cctxt state () =
-    bake cctxt ~chain state
+    bake cctxt ~user_activated_upgrades ~chain state
     >>=? fun () ->
     (* Stopping the timeout and waiting for the next block *)
     state.best_slot <- None ;

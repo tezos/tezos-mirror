@@ -712,8 +712,9 @@ let block_validation succ_header_opt header_hash
   >>=? fun () -> return_unit
 
 (* Reconstruct the storage (without checking if the context/store is already populated) *)
-let reconstruct_storage store context_index chain_id block_store chain_state
-    chain_store (history_list : Block_hash.t list) =
+let reconstruct_storage store context_index chain_id ~user_activated_upgrades
+    ~user_activated_protocol_overrides block_store chain_state chain_store
+    (history_list : Block_hash.t list) =
   let history = Array.of_list history_list in
   let limit = Array.length history in
   let rec reconstruct_chunks level =
@@ -742,6 +743,8 @@ let reconstruct_storage store context_index chain_id block_store chain_state
             >>= fun pred_context ->
             Tezos_validation.Block_validation.apply
               chain_id
+              ~user_activated_upgrades
+              ~user_activated_protocol_overrides
               ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
               ~predecessor_block_header:pred_block_header
               ~predecessor_context:pred_context
@@ -810,7 +813,8 @@ let reconstruct_storage store context_index chain_id block_store chain_state
   Store.Chain_data.Caboose.store chain_data (0l, genesis_hash)
   >>= fun () -> return_unit
 
-let reconstruct chain_id store chain_state context_index =
+let reconstruct chain_id ~user_activated_upgrades
+    ~user_activated_protocol_overrides store chain_state context_index =
   let chain_store = Store.Chain.get store chain_id in
   let block_store = Store.Block.get chain_store in
   let chain_data_store = Store.Chain_data.get chain_store in
@@ -855,13 +859,16 @@ let reconstruct chain_id store chain_state context_index =
     store
     context_index
     chain_id
+    ~user_activated_upgrades
+    ~user_activated_protocol_overrides
     block_store
     chain_state
     chain_store
     hash_history
   >>=? fun () -> lwt_emit Reconstruct_success >>= fun () -> return_unit
 
-let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
+let import ?(reconstruct = false) ?patch_context ~data_dir
+    ~user_activated_upgrades ~user_activated_protocol_overrides ~dir_cleaner
     ~genesis filename block =
   lwt_emit (Import_info filename)
   >>= fun () ->
@@ -994,6 +1001,8 @@ let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
       (* ... we can now call apply ... *)
       Tezos_validation.Block_validation.apply
         chain_id
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
         ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
         ~predecessor_block_header
         ~predecessor_context
@@ -1046,6 +1055,8 @@ let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
               store
               context_index
               chain_id
+              ~user_activated_upgrades
+              ~user_activated_protocol_overrides
               block_store
               chain_state
               chain_store

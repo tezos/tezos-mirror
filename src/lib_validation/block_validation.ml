@@ -113,9 +113,11 @@ let result_encoding =
        (req "ops_metadata" (list @@ list @@ bytes))
        (req "forking_testchain" bool))
 
-let may_force_protocol_upgrade ~level
+let may_force_protocol_upgrade ~user_activated_upgrades ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
-  match Block_header.get_forced_protocol_upgrade ~level with
+  match
+    Block_header.get_forced_protocol_upgrade ~user_activated_upgrades ~level
+  with
   | None ->
       Lwt.return validation_result
   | Some hash ->
@@ -129,14 +131,22 @@ let may_force_protocol_upgrade ~level
 
 (** Applies user activated updates based either on block level or on
     voted protocols *)
-let may_patch_protocol ~level
+let may_patch_protocol ~user_activated_upgrades
+    ~user_activated_protocol_overrides ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
   let context = Shell_context.unwrap_disk_context validation_result.context in
   Context.get_protocol context
   >>= fun protocol ->
-  match Block_header.get_voted_protocol_overrides protocol with
+  match
+    Block_header.get_voted_protocol_overrides
+      ~user_activated_protocol_overrides
+      protocol
+  with
   | None ->
-      may_force_protocol_upgrade ~level validation_result
+      may_force_protocol_upgrade
+        ~user_activated_upgrades
+        ~level
+        validation_result
   | Some replacement_protocol ->
       Context.set_protocol context replacement_protocol
       >>= fun context ->
@@ -240,7 +250,8 @@ module Make (Proto : Registered_protocol.T) = struct
                 >>=? fun () -> return op))
       operations
 
-  let apply chain_id ~max_operations_ttl
+  let apply chain_id ~user_activated_upgrades
+      ~user_activated_protocol_overrides ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t) ~predecessor_context
       ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
@@ -299,7 +310,11 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     is_testchain_forking context
     >>= fun forking_testchain ->
-    may_patch_protocol ~level:block_header.shell.level validation_result
+    may_patch_protocol
+      ~user_activated_upgrades
+      ~user_activated_protocol_overrides
+      ~level:block_header.shell.level
+      validation_result
     >>= fun validation_result ->
     let context =
       Shell_context.unwrap_disk_context validation_result.context
@@ -404,9 +419,9 @@ let check_liveness ~live_blocks ~live_operations block_hash operations =
   assert_operation_liveness block_hash live_blocks operations
   >>=? fun () -> return_unit
 
-let apply chain_id ~max_operations_ttl
-    ~(predecessor_block_header : Block_header.t) ~predecessor_context
-    ~(block_header : Block_header.t) operations =
+let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
+    ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
+    ~predecessor_context ~(block_header : Block_header.t) operations =
   let block_hash = Block_header.hash block_header in
   Context.get_protocol predecessor_context
   >>= fun pred_protocol_hash ->
@@ -421,6 +436,8 @@ let apply chain_id ~max_operations_ttl
   let module Block_validation = Make (Proto) in
   Block_validation.apply
     chain_id
+    ~user_activated_upgrades
+    ~user_activated_protocol_overrides
     ~max_operations_ttl
     ~predecessor_block_header
     ~predecessor_context

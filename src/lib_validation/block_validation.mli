@@ -32,6 +32,8 @@ type validation_store = {
 }
 
 val may_patch_protocol :
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   level:Int32.t ->
   Tezos_protocol_environment.validation_result ->
   Tezos_protocol_environment.validation_result Lwt.t
@@ -61,6 +63,8 @@ val result_encoding : result Data_encoding.t
 
 val apply :
   Chain_id.t ->
+  user_activated_upgrades:User_activated.upgrades ->
+  user_activated_protocol_overrides:User_activated.protocol_overrides ->
   max_operations_ttl:int ->
   predecessor_block_header:Block_header.t ->
   predecessor_context:Context.t ->

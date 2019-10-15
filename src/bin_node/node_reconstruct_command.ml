@@ -50,7 +50,7 @@ module Term = struct
       Internal_event_unix.init ()
       >>= fun () ->
       Node_shared_arg.read_and_patch_config_file
-        ~ignore_bootstrap_peers: true
+        ~ignore_bootstrap_peers:true
         args
       >>=? fun config ->
       let data_dir = config.data_dir in
@@ -72,7 +72,15 @@ module Term = struct
         (history_mode = History_mode.Full)
         (Snapshots.Cannot_reconstruct history_mode)
       >>=? fun () ->
-      Snapshots.reconstruct chain_id store chain_state context_index
+      Snapshots.reconstruct
+        chain_id
+        ~user_activated_upgrades:
+          config.blockchain_network.user_activated_upgrades
+        ~user_activated_protocol_overrides:
+          config.blockchain_network.user_activated_protocol_overrides
+        store
+        chain_state
+        context_index
       >>=? fun () ->
       Store.close store ;
       State.close state >>= fun () -> return_unit

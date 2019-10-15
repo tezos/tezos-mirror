@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,43 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib
-module Error_monad = Tezos_error_monad.Error_monad
-include Tezos_rpc
-include Tezos_clic
-include Tezos_crypto
-include Tezos_micheline
-module Data_encoding = Tezos_data_encoding.Data_encoding
+type upgrades = (Int32.t * Protocol_hash.t) list
 
-module List = struct
-  include List
-  include Tezos_stdlib.TzList
-end
+let upgrades_encoding =
+  let open Data_encoding in
+  def
+    "user_activated.upgrades"
+    ~title:"User activated upgrades"
+    ~description:
+      "User activated upgrades: at given level, switch to given protocol."
+    (list
+       (obj2
+          (req "level" int32)
+          (req "replacement_protocol" Protocol_hash.encoding)))
 
-module String = struct
-  include String
-  include Tezos_stdlib.TzString
-end
+type protocol_overrides = (Protocol_hash.t * Protocol_hash.t) list
 
-module Time = Time
-module Fitness = Fitness
-module User_activated = User_activated
-module Block_header = Block_header
-module Operation = Operation
-module Protocol = Protocol
-module Test_chain_status = Test_chain_status
-module Preapply_result = Preapply_result
-module Block_locator = Block_locator
-module Mempool = Mempool
-module P2p_addr = P2p_addr
-module P2p_identity = P2p_identity
-module P2p_peer = P2p_peer
-module P2p_point = P2p_point
-module P2p_connection = P2p_connection
-module P2p_stat = P2p_stat
-module P2p_version = P2p_version
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
-include Utils.Infix
-include Error_monad
-module Internal_event = Internal_event
+let protocol_overrides_encoding =
+  let open Data_encoding in
+  def
+    "user_activated.protocol_overrides"
+    ~title:"User activated protocol overrides"
+    ~description:
+      "User activated protocol overrides: activate a protocol instead of \
+       another."
+  @@ list
+       (obj2
+          (req "replaced_protocol" Protocol_hash.encoding)
+          (req "replacement_protocol" Protocol_hash.encoding))
+
+let () =
+  Data_encoding.Registration.register upgrades_encoding ;
+  Data_encoding.Registration.register protocol_overrides_encoding

@@ -38,12 +38,24 @@ module Seq_validator = struct
     let name = "validation_process.sequential"
   end)
 
-  type validation_context = {context_index : Context.index}
+  type validation_context = {
+    context_index : Context.index;
+    user_activated_upgrades : User_activated.upgrades;
+    user_activated_protocol_overrides : User_activated.protocol_overrides;
+  }
 
   type t = validation_context
 
-  let init context_index =
-    lwt_log_notice "Initialized" >>= fun () -> Lwt.return {context_index}
+  let init ~user_activated_upgrades ~user_activated_protocol_overrides
+      context_index =
+    lwt_log_notice "Initialized"
+    >>= fun () ->
+    Lwt.return
+      {
+        context_index;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+      }
 
   let close _ = lwt_log_notice "Shutting down..."
 
@@ -56,6 +68,9 @@ module Seq_validator = struct
     >>=? fun predecessor_context ->
     Block_validation.apply
       chain_id
+      ~user_activated_upgrades:validator_process.user_activated_upgrades
+      ~user_activated_protocol_overrides:
+        validator_process.user_activated_protocol_overrides
       ~max_operations_ttl
       ~predecessor_block_header
       ~predecessor_context
@@ -72,6 +87,8 @@ module External_validator = struct
   type validation_context = {
     context_root : string;
     protocol_root : string;
+    user_activated_upgrades : User_activated.upgrades;
+    user_activated_protocol_overrides : User_activated.protocol_overrides;
     process_path : string;
     mutable validator_process : Lwt_process.process_full option;
     lock : Lwt_mutex.t;
@@ -80,13 +97,17 @@ module External_validator = struct
 
   type t = validation_context
 
-  let init ?sandbox_parameters ~context_root ~protocol_root ~process_path =
+  let init ?sandbox_parameters ~context_root ~protocol_root
+      ~user_activated_upgrades ~user_activated_protocol_overrides ~process_path
+      =
     lwt_log_notice (fun f -> f "Initialized")
     >>= fun () ->
     Lwt.return
       {
         context_root;
         protocol_root;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
         process_path;
         validator_process = None;
         lock = Lwt_mutex.create ();
@@ -152,6 +173,9 @@ module External_validator = struct
           External_validation.context_root = vp.context_root;
           protocol_root = vp.protocol_root;
           sandbox_parameters = vp.sandbox_parameters;
+          user_activated_upgrades = vp.user_activated_upgrades;
+          user_activated_protocol_overrides =
+            vp.user_activated_protocol_overrides;
         }
       in
       vp.validator_process <- Some process ;
@@ -220,14 +244,21 @@ type validator_kind =
 
 type t = Sequential of Seq_validator.t | External of External_validator.t
 
-let init = function
+let init ~user_activated_upgrades ~user_activated_protocol_overrides kind =
+  match kind with
   | Internal index ->
-      Seq_validator.init index >>= fun v -> return (Sequential v)
+      Seq_validator.init
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
+        index
+      >>= fun v -> return (Sequential v)
   | External {context_root; protocol_root; process_path; sandbox_parameters} ->
       External_validator.init
         ?sandbox_parameters
         ~context_root
         ~protocol_root
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
         ~process_path
       >>= fun v ->
       External_validator.send_request
@@ -288,7 +319,7 @@ let apply_block bvp ~predecessor block_header operations =
 
 let commit_genesis bvp ~genesis_hash ~chain_id ~time ~protocol =
   match bvp with
-  | Sequential {context_index} ->
+  | Sequential {context_index; _} ->
       Context.commit_genesis context_index ~chain_id ~time ~protocol
       >>= fun res -> return res
   | External vp ->

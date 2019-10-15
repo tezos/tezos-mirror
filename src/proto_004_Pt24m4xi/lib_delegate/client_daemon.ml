@@ -130,6 +130,8 @@ module Baker = struct
   let run (cctxt : #Alpha_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?await_endorsements ?max_priority ~chain ~context_path delegates =
+    Config_services.user_activated_upgrades cctxt
+    >>=? fun user_activated_upgrades ->
     await_bootstrapped_node cctxt
     >>=? fun _ ->
     ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
@@ -144,6 +146,7 @@ module Baker = struct
     >>= fun () ->
     Client_baking_forge.create
       cctxt
+      ~user_activated_upgrades
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
