@@ -49,14 +49,7 @@ let data_version = "0.0.4"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version =
-  [ ( "0.0.1",
-      fun ~data_dir ->
-        State.upgrade_0_0_1
-          ~store_root:(store_dir data_dir)
-          ~context_root:(context_dir data_dir)
-          ~protocol_root:(protocol_dir data_dir)
-          () );
-    ( "0.0.3",
+  [ ( "0.0.3",
       fun ~data_dir ->
         Context.upgrade_0_0_3 ~context_dir:(context_dir data_dir) ) ]
 
@@ -91,7 +84,8 @@ let () =
     ~pp:(fun ppf (exp, got) ->
       Format.fprintf
         ppf
-        "Invalid data directory version '%s' (expected '%s')."
+        "Invalid data directory version '%s' (expected '%s').@,\
+         Your data directory is outdated and cannot be automatically upgraded."
         got
         exp)
     Data_encoding.(
