@@ -48,7 +48,7 @@ let run root =
   let context = Filename.concat root "context" in
   let fd = Index.v ~fresh:false ~log_size:100_000 context in
   Fmt.epr "Reseting fanout of index %s ...\n%!" root;
-  Index.force_merge fd (Blake2B.digest_string "") (0L, 0, ' ')
+  Index.force_merge fd
 
 let () =
   if Array.length Sys.argv <> 2 then (
