@@ -1226,6 +1226,8 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
   Interactive_test.Pauser.generic
     state
     EF.[af "Ready to start"; af "Root path deleted."]
+
+(***********************************************************************************)
   >>= fun () ->
   let ledger_client = Tezos_client.no_node_client ~exec:client_exec in
   Tezos_client.Ledger.show_ledger state ~client:ledger_client ~uri
@@ -1336,6 +1338,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
               `Success
           | `Reject ->
               `Ledger_reject_or_timeout ))
+(***********************************************************************************)
   >>= fun () ->
   let skipping s = Console.say state EF.(haf "Skipping %s tests" s) in
   let voting_test ~with_rejections =
@@ -1415,65 +1418,6 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
                 `Ledger_reject_or_timeout ))
   in
 
-(**************************************************************************************)
-  (*
-  >>= fun () ->
-  Tezos_client.client_cmd
-    state
-    ~client
-    ["show"; "known"; "contract"; unit_kt1_account]
-  >>= fun (_, proc_result) ->
-  let contract_address = proc_result#out |> String.concat ~sep:"" in
-  test_transaction
-    ~name:"manager.tz-transfer-originated-to-originated"
-    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; ASSERT_SOME ; PUSH mutez %i ; UNIT ; TRANSFER_TOKENS ; CONS }" contract_address 5)
-    ~dst_name:manager_tz_kt1_account
-    ~entrypoint:"do"
-    ~amount:0
-    ()
-    *)
-
-(*  Tezos_client.client_cmd state ~client ["show"; "address"; delegate]
-    >>= fun (_, proc_result) ->
-    let delegate_address =
-      List.hd_exn proc_result#out
-      |> String.split ~on:' ' |> List.last
-      |> Option.value ~default:delegate
-    in
-    *
-    let signer = Tezos_client.Keyed.make (client 0) ~key_name:"ledgered" ~secret_key:uri
-*)
-
-(**************************************************************************************)
-  let manager_tz_kt1_account = "manager-tz-kt1-of-the-baker" in
-  originate_manager_tz_script
-    state
-    ~client:client_0
-    ~name:manager_tz_kt1_account
-    ~from:signer.key_name
-    ~delegate:baker_0.Tezos_client.Keyed.key_name
-    ~bake
-    ~protocol_kind
-    ~ledger_account
-    (*~delegate:Tezos_protocol.Account.pubkey_hash baker_0_account *)
-  >>= fun () ->
-  let manager_tz_delegation_tests ~with_rejections =
-    manager_tz_delegation_tests
-      state
-      ~client:client_0
-      ~src:signer.key_name
-      ~contract_addr:manager_tz_kt1_account
-      ~ledger_account
-      ~delegate_pkh:(Tezos_protocol.Account.pubkey_hash baker_0_account)
-      (* ~delegate_pkh:baker_0.Tezos_client.Keyed.key_name *)
-      ()
-      ~bake
-      ~with_rejections
-      ~protocol_kind
-  in
-
-(**************************************************************************************)
   let delegation_tests ~with_rejections =
     delegation_tests
       state
@@ -1522,7 +1466,68 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ~with_rejections
       ~protocol_kind
   in
-  let contracts_test ~with_rejections =
+  (**************************************************************************************)
+  (*
+  >>= fun () ->
+  Tezos_client.client_cmd
+    state
+    ~client
+    ["show"; "known"; "contract"; unit_kt1_account]
+  >>= fun (_, proc_result) ->
+  let contract_address = proc_result#out |> String.concat ~sep:"" in
+  test_transaction
+    ~name:"manager.tz-transfer-originated-to-originated"
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ~arguments:(sprintf "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; ASSERT_SOME ; PUSH mutez %i ; UNIT ; TRANSFER_TOKENS ; CONS }" contract_address 5)
+    ~dst_name:manager_tz_kt1_account
+    ~entrypoint:"do"
+    ~amount:0
+    ()
+    *)
+
+(*  Tezos_client.client_cmd state ~client ["show"; "address"; delegate]
+    >>= fun (_, proc_result) ->
+    let delegate_address =
+      List.hd_exn proc_result#out
+      |> String.split ~on:' ' |> List.last
+      |> Option.value ~default:delegate
+    in
+    *
+    let signer = Tezos_client.Keyed.make (client 0) ~key_name:"ledgered" ~secret_key:uri
+*)
+
+(**************************************************************************************)
+  let manager_tz_kt1_account = "manager-tz-kt1-of-the-baker" in
+  (*let random_mgr_account = Tezos_protocol.Account.of_name "random-account-for-manager-test" in
+  let manager = Tezos_client.Keyed.make (client 0) ~key_name:"manager_acct" ~secret_key:(Tezos_protocol.Account.private_key random_mgr_account) in *)
+  originate_manager_tz_script
+    state
+    ~client:client_0
+    ~name:manager_tz_kt1_account
+    ~from:(signer.key_name)
+    ~delegate:baker_0.Tezos_client.Keyed.key_name
+    ~bake
+    ~protocol_kind
+    ~ledger_account
+    (*~delegate:Tezos_protocol.Account.pubkey_hash baker_0_account *)
+  >>= fun () ->
+  let manager_tz_delegation_tests ~with_rejections =
+    manager_tz_delegation_tests
+      state
+      ~client:client_0
+      ~src:(signer.key_name)
+      ~contract_addr:manager_tz_kt1_account
+      ~ledger_account
+      ~delegate_pkh:(Tezos_protocol.Account.pubkey_hash baker_0_account)
+      (* ~delegate_pkh:baker_0.Tezos_client.Keyed.key_name *)
+      ()
+      ~bake
+      ~with_rejections
+      ~protocol_kind
+  in
+
+(**************************************************************************************)
+let contracts_test ~with_rejections =
     basic_contract_operations_tests
       state
       ~client:client_0
