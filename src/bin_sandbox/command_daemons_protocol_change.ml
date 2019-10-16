@@ -47,7 +47,7 @@ let wait_for_voting_period ?level_within_period state ~client ~attempts period
       | `String p when p = period_name && (lvl_ok = None || lvl_ok = Some true)
         ->
           return (`Done (nth - 1))
-      | other ->
+      | _ ->
           Tezos_client.successful_client_cmd
             state
             ~client
@@ -115,7 +115,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   in
   List_sequential.iter accusers ~f:(fun acc ->
       Running_processes.start state (Tezos_daemon.process acc ~state)
-      >>= fun {process; lwt} -> return ())
+      >>= fun _ -> return ())
   >>= fun () ->
   let keys_and_daemons =
     let pick_a_node_and_client idx =
@@ -185,7 +185,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
           Running_processes.start state (Tezos_daemon.process daemon ~state)
-          >>= fun {process; lwt} -> return ()))
+          >>= fun _ -> return ()))
   >>= fun () ->
   let client_0 =
     Tezos_client.of_node (List.nth_exn nodes 0) ~exec:client_exec

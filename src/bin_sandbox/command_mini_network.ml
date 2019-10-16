@@ -56,7 +56,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   in
   List_sequential.iter accusers ~f:(fun acc ->
       Running_processes.start state (Tezos_daemon.process acc ~state)
-      >>= fun {process; lwt} -> return ())
+      >>= fun _ -> return ())
   >>= fun () ->
   let keys_and_daemons =
     let pick_a_node_and_client idx =
@@ -108,7 +108,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
           Running_processes.start state (Tezos_daemon.process daemon ~state)
-          >>= fun {process; lwt} -> return ()))
+          >>= fun _ -> return ()))
   >>= fun () ->
   Prompt.(
     command

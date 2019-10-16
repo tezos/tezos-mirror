@@ -96,7 +96,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
         ~client_exec
       >>= fun () ->
       return EF.(wf "Kiln was configured at `%s`" kiln_config.path))
-  >>= fun kiln_info_opt ->
+  >>= fun _ ->
   let bake msg baker = Tezos_client.Keyed.bake state baker msg in
   List.fold
     (List.init (starting_level - 1) ~f:(fun n -> n))
@@ -554,7 +554,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
         af "Node 0 baked %d times." (starting_level - 1);
         af "All nodes should be at level %d." starting_level ]
   >>= fun () ->
-  let transfer msg client =
+  let transfer _msg client =
     let dest =
       List.random_element_exn protocol.Tezos_protocol.bootstrap_accounts
       |> fst |> Tezos_protocol.Account.pubkey_hash
@@ -618,7 +618,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
       Tezos_client.Keyed.bake state baker_0 (sprintf "n0 only alive: %d" n))
   >>= fun () ->
   get_block_header ~client:client_0 `Head
-  >>= fun baking_0_header ->
+  >>= fun _baking_0_header ->
   Tezos_client.Keyed.endorse state baker_0 "self-endorsing"
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_0 "baking self-endorsement"
@@ -633,7 +633,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
       Tezos_client.Keyed.bake state baker_1 "after transfer")
   >>= fun () ->
   get_block_header ~client:client_1 `Head
-  >>= fun baking_1_header ->
+  >>= fun _baking_1_header ->
   kill_nth_node mesh_nodes 1
   >>= fun () ->
   pause

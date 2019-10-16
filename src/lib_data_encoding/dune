@@ -6,7 +6,7 @@
             ocplib-json-typed-bson
             zarith
             ezjsonm)
- (flags (:standard)))
+ (flags :standard))
 
 (alias
  (name runtest_lint)

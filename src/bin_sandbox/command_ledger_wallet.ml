@@ -85,7 +85,7 @@ let ledger_prompt_notice_expectation state message expectation =
 let run_with_status f =
   Asynchronous_result.bind_on_error
     (f () >>= fun x -> return (`Worked x))
-    ~f:(fun ~result x -> return (`Didn'tWork x))
+    ~f:(fun ~result:_ x -> return (`Didn'tWork x))
 
 let assert_failure state msg f () =
   Console.say state EF.(wf "Asserting %s" msg)
@@ -146,7 +146,7 @@ let get_head_block_hash state ~client () =
   | _ ->
       failf "Failed to parse block hash JSON from node"
 
-let forge_batch_transactions state ~client ~src ~dest ~n ?(fee = 0.00126) () =
+let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126) () =
   get_head_block_hash state ~client ()
   >>= fun branch ->
   let json =
@@ -196,7 +196,7 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri () =
   >>= fun () ->
   let ledger_client = Tezos_client.no_node_client ~exec:client_exec in
   Tezos_client.Ledger.show_ledger state ~client:ledger_client ~uri
-  >>= fun ledger_account ->
+  >>= fun _ledger_account ->
   Test_scenario.network_with_protocol
     ~protocol:(Tezos_protocol.default ())
     ~size

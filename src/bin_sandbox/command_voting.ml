@@ -103,9 +103,9 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       >>= function
       | `String p when p = period_name ->
           return (`Done (nth - 1))
-      | other ->
+      | _ ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              register state ~client ~dst >>= fun res -> return ())
+              register state ~client ~dst)
           >>= fun _ ->
           ksprintf
             (Tezos_client.Keyed.bake state baker)
@@ -130,7 +130,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
           List.find client_protocols_result#out ~f:(fun prefix ->
               String.is_prefix protocol_hash ~prefix)
         with
-        | Some p ->
+        | Some _ ->
             return `Proper_understanding
         | None when expect_clueless_client ->
             return `Expected_misunderstanding
@@ -454,7 +454,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     state
     ~client:baker_0.client
     ["submit"; "proposals"; "for"; baker_0.key_name; winner_hash]
-  >>= fun res ->
+  >>= fun _ ->
   bake_until_voting_period
     state
     ~baker:baker_0
@@ -473,7 +473,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  Helpers.wait_for state ~attempts:default_attempts ~seconds:2. (fun nth ->
+  Helpers.wait_for state ~attempts:default_attempts ~seconds:2. (fun _ ->
       Tezos_client.rpc
         state
         ~client:(client 1)
@@ -579,7 +579,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
         | `Failure_to_understand ->
             failf "Winner-Client cannot bake on test chain!")
   >>= fun () ->
-  Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun nth ->
+  Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun _ ->
       Tezos_client.rpc
         state
         ~client:(client 1)
