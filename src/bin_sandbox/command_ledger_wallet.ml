@@ -442,6 +442,42 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
   Tezos_client.successful_client_cmd state ~client origination
   >>= fun _ -> Fmt.kstrf bake "baking `%s` in" name
 
+  (******
+with_ledger_test_reject_and_accept
+    ~only_success:(Wallet_scenario.with_rejections wallet_scenario |> not)
+    state
+    ~messages:
+      MFmt.
+        [ (fun ppf () ->
+            wf ppf "Importing %S in client `%s`." uri client_0.Tezos_client.id);
+          (fun ppf () ->
+            wf
+              ppf
+              "The ledger should be prompting for acknowledgment to provide \
+               the public key of `%s`."
+              (Tezos_protocol.Account.pubkey_hash ledger_account)) ]
+    (fun ~user_answer ->
+      Tezos_client.client_cmd
+        state
+        ~client:client_0
+        [ "import";
+          "secret";
+          "key";
+          signer.key_name;
+          signer.secret_key;
+          "--force" ]
+      >>= fun (_, proc) ->
+      expect_from_output
+        ~message:"importing key"
+        proc
+        ~expectation:
+          ( match user_answer with
+          | `Accept ->
+              `Success
+          | `Reject ->
+              `Ledger_reject_or_timeout ))
+
+  ******)
 
 let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_rejections ~protocol_kind
     ~delegate_key ~(delegate_pkh:string) ~bake () =
@@ -455,6 +491,33 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
     ~protocol_kind
     ~ledger_account
   >>= fun () ->
+(*
+  with_ledger_test_reject_and_accept
+    ~only_success:true
+    state
+    ~messages: MFmt.[]
+     (fun ~user_answer ->
+          client_async_cmd
+            state
+            ~client
+            ~f:(fun _ proc ->
+              find_and_print_signature_hash
+                ~display_expectation:(protocol_kind = `Babylon)
+                state
+                proc)
+            []
+          >>= fun res ->
+          expect_from_output
+            ~message:"self-delegation"
+            res
+            ~expectation:
+              ( match user_answer with
+              | `Reject ->
+                  `Ledger_reject_or_timeout
+              | `Accept ->
+                  `Success ))
+  >>= fun _ ->
+*)
   Tezos_client.client_cmd
     state
     ~client
@@ -496,7 +559,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
               (fun ppf () ->
                 ledger_should_display
                   ppf
-                  [ ("Delegation manager.tz", const string "");
+                  [ ("Manager.tz Delegation", const string "");
                     ("Fee", const string "0.00XXX");
                     ("Source", const string contract_address);
                     ("Delegate", const string delegate_pkh);
@@ -522,7 +585,73 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
               | `Accept ->
                   `Success ))
     >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
-  in set_delegation ()
+  in 
+  let remove_delegate () =
+      let arg = "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }" 
+     in
+      let command =
+        [ "--wait";
+          "none";
+          "transfer";
+          "0";
+          "from";
+          ledger_key;
+          "to";
+          manager_tz_kt1_account;
+          "--entrypoint";
+          "do";
+          "--arg";
+          arg;
+          "--verbose-signing" ]
+      in
+      with_ledger_test_reject_and_accept
+        state
+        ~only_success
+        ~messages:
+          MFmt.
+            [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
+              show_command_message command;
+              (fun ppf () ->
+                wf
+                  ppf
+                  "Note that X is a placeholder for some value that will vary \
+                   between runs");
+              (fun ppf () ->
+                ledger_should_display
+                  ppf
+                  [ ("Manager.tz Delegation", const string "");
+                    ("Fee", const string "0.00XXX");
+                    ("Source", const string contract_address);
+                    ("Delegate", const string "none");
+                    ("Storage", const int 0) ]) ]
+        (fun ~user_answer ->
+          client_async_cmd
+            state
+            ~client
+            ~f:(fun _ proc ->
+              find_and_print_signature_hash
+                ~display_expectation:(protocol_kind = `Babylon)
+                state
+                proc)
+            command
+          >>= fun res ->
+          expect_from_output
+            ~message:"self-delegation"
+            res
+            ~expectation:
+              ( match user_answer with
+              | `Reject ->
+                  `Ledger_reject_or_timeout
+              | `Accept ->
+                  `Success ))
+    >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
+  in 
+    let manager_tz_to_implicit () = return ()
+  in 
+  return ()
+  >>= fun () -> set_delegation () 
+  >>= fun () -> remove_delegate () 
+  >>= fun () -> manager_tz_to_implicit ()
 
 let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~delegate ~bake () =
