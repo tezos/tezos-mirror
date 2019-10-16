@@ -1,7 +1,8 @@
 (library
  (name tezos_shell)
  (public_name tezos-shell)
- (libraries tezos-base
+ (libraries lwt-watcher
+            tezos-base
             tezos-version
             tezos-storage
             tezos-shell-context

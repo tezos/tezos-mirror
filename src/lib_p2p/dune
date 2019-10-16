@@ -1,7 +1,8 @@
 (library
  (name tezos_p2p)
  (public_name tezos-p2p)
- (libraries tezos-base
+ (libraries lwt-watcher
+            tezos-base
             tezos-stdlib
             tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives

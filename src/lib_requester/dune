@@ -2,7 +2,8 @@
  (name tezos_requester)
  (public_name tezos-requester)
  (libraries tezos-base
-            tezos-stdlib-unix)
+            tezos-stdlib-unix
+            lwt-watcher)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix)))
 
