@@ -361,113 +361,44 @@ let sign state ~client ~bytes =
     ~client:client.Tezos_client.Keyed.client
     ["sign"; "bytes"; "0x" ^ bytes; "for"; client.Tezos_client.Keyed.key_name]
 
-let prepare_origination_of_manager_tz_script ?(spendable = false)
-    ?(delegatable = false) ?delegate state
-    ~client ~name ~from ~protocol_kind ~ledger_account =
-  let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
-  let manager_tz_script =
-    "
-parameter
-\  (or
-\     (lambda %do unit (list operation))
-\     (unit %default));
-storage key_hash;
-code
-\  { UNPAIR ;
-\    IF_LEFT
-\      { # 'do' entrypoint
-\        # Assert no token was sent:
-\        # to send tokens, the default entry point should be used
-\        PUSH mutez 0 ;
-\        AMOUNT ;
-\        ASSERT_CMPEQ ;
-\        # Assert that the sender is the manager
-\        DUUP ;
-\        IMPLICIT_ACCOUNT ;
-\        ADDRESS ;
-\        SENDER ;
-\        ASSERT_CMPEQ ;
-\        # Execute the lambda argument
-\        UNIT ;
-\        EXEC ;
-\        PAIR ;
-\      }
-\      { # 'default' entrypoint
-\        DROP ;
-\        NIL operation ;
-\        PAIR ;
-\      }
-\  };"
-  in
-  let tmp = Filename.temp_file "manager" ".tz" in
-  System.write_file state tmp ~content:manager_tz_script
-  >>= fun () ->
-  let origination =
-    let opt = Option.value_map ~default:[] in
-    ["--wait"; "none"; "originate"; "contract"; name]
-    @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
-    @ [ "transferring";
-        "20";
-        "from";
-        from;
-        "running";
-        tmp;
-        "--init";
-        (sprintf "\"%s\"" ledger_pkh);
-        "--force";
-        "--burn-cap";
-        "300000000000";
-        (* ; "--fee-cap" ; "20000000000000" *)
-        "--gas-limit";
-        "1000000000000000";
-        "--storage-limit";
-        "20000000000000";
-        "--verbose-signing" ]
-    @ opt delegate ~f:(fun s -> (* Baby & Aths *) ["--delegate"; s])
-    @ (if delegatable then [(* Aths *) "--delegatable"] else [])
-    @ if spendable then [(* Aths *) "--spendable"] else []
-  in
-  return origination
-
 let originate_manager_tz_script state ~client ~name ~from ~bake
     ~protocol_kind ~ledger_account =
-  let prepare_origination_of_manager_tz_script ?(spendable = false)
-      ?(delegatable = false) ?delegate state
+  let prepare_origination_of_manager_tz_script ?(spendable = false) ?(delegatable = false) ?delegate state
       ~client ~name ~from ~protocol_kind ~ledger_account =
     let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
     let manager_tz_script =
       "
-  parameter
-  \  (or
-  \     (lambda %do unit (list operation))
-  \     (unit %default));
-  storage key_hash;
-  code
-  \  { UNPAIR ;
-  \    IF_LEFT
-  \      { # 'do' entrypoint
-  \        # Assert no token was sent:
-  \        # to send tokens, the default entry point should be used
-  \        PUSH mutez 0 ;
-  \        AMOUNT ;
-  \        ASSERT_CMPEQ ;
-  \        # Assert that the sender is the manager
-  \        DUUP ;
-  \        IMPLICIT_ACCOUNT ;
-  \        ADDRESS ;
-  \        SENDER ;
-  \        ASSERT_CMPEQ ;
-  \        # Execute the lambda argument
-  \        UNIT ;
-  \        EXEC ;
-  \        PAIR ;
-  \      }
-  \      { # 'default' entrypoint
-  \        DROP ;
-  \        NIL operation ;
-  \        PAIR ;
-  \      }
-  \  };"
+      parameter
+      \  (or
+      \     (lambda %do unit (list operation))
+      \     (unit %default));
+      storage key_hash;
+      code
+      \  { UNPAIR ;
+      \    IF_LEFT
+      \      { # 'do' entrypoint
+      \        # Assert no token was sent:
+      \        # to send tokens, the default entry point should be used
+      \        PUSH mutez 0 ;
+      \        AMOUNT ;
+      \        ASSERT_CMPEQ ;
+      \        # Assert that the sender is the manager
+      \        DUUP ;
+      \        IMPLICIT_ACCOUNT ;
+      \        ADDRESS ;
+      \        SENDER ;
+      \        ASSERT_CMPEQ ;
+      \        # Execute the lambda argument
+      \        UNIT ;
+      \        EXEC ;
+      \        PAIR ;
+      \      }
+      \      { # 'default' entrypoint
+      \        DROP ;
+      \        NIL operation ;
+      \        PAIR ;
+      \      }
+      \  };"
     in
     let tmp = Filename.temp_file "manager" ".tz" in
     System.write_file state tmp ~content:manager_tz_script
@@ -509,13 +440,12 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
   >>= fun origination ->
   Tezos_client.successful_client_cmd state ~client origination
   >>= fun _ -> Fmt.kstrf bake "baking `%s` in" name
-
   
 let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_rejections ~protocol_kind
-    ~delegate_key ~delegate_pkh ~bake () =
+    ~delegate_key ~delegate_pkh ~random_contract_pkh ~bake () =
   let manager_tz_kt1_account = "manager-tz" in
   with_ledger_test_reject_and_accept
-     ~only_success:true (* (Wallet_scenario.with_rejections wallet_scenario |> not) *)
+     ~only_success:true
      state
      ~messages:
        MFmt.
@@ -535,45 +465,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
          ~bake
          ~protocol_kind
          ~ledger_account)
-     (*  >>= fun (_, proc) ->
-       expect_from_output
-         ~message:"importing key"
-         proc
-         ~expectation:
-           ( match user_answer with
-           | `Accept ->
-               `Success
-           | `Reject ->
-               `Ledger_reject_or_timeout ))
-*)
-    >>= fun () ->
-(*
-  with_ledger_test_reject_and_accept
-    ~only_success:true
-    state
-    ~messages: MFmt.[]
-     (fun ~user_answer ->
-          client_async_cmd
-            state
-            ~client
-            ~f:(fun _ proc ->
-              find_and_print_signature_hash
-                ~display_expectation:(protocol_kind = `Babylon)
-                state
-                proc)
-            []
-          >>= fun res ->
-          expect_from_output
-            ~message:"self-delegation"
-            res
-            ~expectation:
-              ( match user_answer with
-              | `Reject ->
-                  `Ledger_reject_or_timeout
-              | `Accept ->
-                  `Success ))
-  >>= fun _ ->
-*)
+  >>= fun () ->
   Tezos_client.client_cmd
     state
     ~client
@@ -581,260 +473,122 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
   >>= fun (_, proc_result) ->
   let contract_address = proc_result#out |> String.concat ~sep:"" in
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
+  let random_implicit_account = Tezos_protocol.Account.of_name "random-account-for-manager-test" in
+  let random_acc_pkh = Tezos_protocol.Account.pubkey_hash random_implicit_account in
   let only_success = not with_rejections in
+
+  let manager_tz_test ~contract_arg ~expected ~output_msg = 
+    let command =
+      [ "--wait";
+        "none";
+        "transfer";
+        "0";
+        "from";
+        ledger_key;
+        "to";
+        manager_tz_kt1_account;
+        "--entrypoint";
+        "do";
+        "--arg";
+        contract_arg;
+        "--burn-cap";
+        "1";
+        "--verbose-signing" ]
+    in
+    with_ledger_test_reject_and_accept
+      state
+      ~only_success
+      ~messages:
+        MFmt.
+          [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
+            show_command_message command;
+            (fun ppf () ->
+              wf
+                ppf
+                "Note that X is a placeholder for some value that will vary \
+                 between runs");
+            (fun ppf () -> ledger_should_display ppf expected)
+          ]
+      (fun ~user_answer ->
+        client_async_cmd
+          state
+          ~client
+          ~f:(fun _ proc ->
+            find_and_print_signature_hash
+              ~display_expectation:(protocol_kind = `Babylon)
+              state
+              proc)
+          command
+        >>= fun res ->
+        expect_from_output
+          ~message:output_msg
+          res
+          ~expectation:
+            ( match user_answer with
+            | `Reject ->
+                `Ledger_reject_or_timeout
+            | `Accept ->
+                `Success ))
+  in 
   let set_delegation () = 
-      let arg = (sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; SET_DELEGATE ; CONS }" delegate_pkh)
-     in
-      let command =
-        [ "--wait";
-          "none";
-          "transfer";
-          "0";
-          "from";
-          ledger_key;
-          "to";
-          manager_tz_kt1_account;
-          "--entrypoint";
-          "do";
-          "--arg";
-          arg;
-          "--verbose-signing" ]
-      in
-      with_ledger_test_reject_and_accept
-        state
-        ~only_success
-        ~messages:
-          MFmt.
-            [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
-              show_command_message command;
-              (fun ppf () ->
-                wf
-                  ppf
-                  "Note that X is a placeholder for some value that will vary \
-                   between runs");
-              (fun ppf () ->
-                ledger_should_display
-                  ppf
-                  [ ("Manager.tz Delegation", const string "");
-                    ("Fee", const string "0.00XXX");
-                    ("Source", const string contract_address);
-                    ("Delegate", const string delegate_pkh);
-                    ("Storage", const int 0) ]) ]
-        (fun ~user_answer ->
-          client_async_cmd
-            state
-            ~client
-            ~f:(fun _ proc ->
-              find_and_print_signature_hash
-                ~display_expectation:(protocol_kind = `Babylon)
-                state
-                proc)
-            command
-          >>= fun res ->
-          expect_from_output
-            ~message:"self-delegation"
-            res
-            ~expectation:
-              ( match user_answer with
-              | `Reject ->
-                  `Ledger_reject_or_timeout
-              | `Accept ->
-                  `Success ))
-    >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
-  in 
-  let remove_delegate () =
-      let arg = "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }" 
-     in
-      let command =
-        [ "--wait";
-          "none";
-          "transfer";
-          "0";
-          "from";
-          ledger_key;
-          "to";
-          manager_tz_kt1_account;
-          "--entrypoint";
-          "do";
-          "--arg";
-          arg;
-          "--verbose-signing" ]
-      in
-      with_ledger_test_reject_and_accept
-        state
-        ~only_success
-        ~messages:
-          MFmt.
-            [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
-              show_command_message command;
-              (fun ppf () ->
-                wf
-                  ppf
-                  "Note that X is a placeholder for some value that will vary \
-                   between runs");
-              (fun ppf () ->
-                ledger_should_display
-                  ppf
-                  [ ("Manager.tz Delegation", const string "");
-                    ("Fee", const string "0.00XXX");
-                    ("Source", const string contract_address);
-                    ("Delegate", const string "none");
-                    ("Storage", const int 0) ]) ]
-        (fun ~user_answer ->
-          client_async_cmd
-            state
-            ~client
-            ~f:(fun _ proc ->
-              find_and_print_signature_hash
-                ~display_expectation:(protocol_kind = `Babylon)
-                state
-                proc)
-            command
-          >>= fun res ->
-          expect_from_output
-            ~message:"self-delegation"
-            res
-            ~expectation:
-              ( match user_answer with
-              | `Reject ->
-                  `Ledger_reject_or_timeout
-              | `Accept ->
-                  `Success ))
-    >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
-  in 
-    let manager_tz_to_implicit () =
-      let random_implicit_account = Tezos_protocol.Account.of_name "random-account-for-manager-test" in
-      let random_acc_pkh = Tezos_protocol.Account.pubkey_hash random_implicit_account in
-      let arg = sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; IMPLICIT_ACCOUNT ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_acc_pkh 10000000
-      in
-      let command =
-        [ "--wait";
-          "none";
-          "transfer";
-          "0";
-          "from";
-          ledger_key;
-          "to";
-          manager_tz_kt1_account;
-          "--burn-cap";
-          "1";
-          "--entrypoint";
-          "do";
-          "--arg";
-          arg;
-          "--verbose-signing" ]
-      in
-      with_ledger_test_reject_and_accept
-        state
-        ~only_success
-        ~messages:
-          MFmt.
-            [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
-              show_command_message command;
-              (fun ppf () ->
-                wf
-                  ppf
-                  "Note that X is a placeholder for some value that will vary \
-                   between runs");
-              (fun ppf () ->
-                ledger_should_display
-                  ppf
-                  [ ("Manager.tz Delegation", const string "");
-                    ("Fee", const string "0.00XXX");
-                    ("Source", const string contract_address);
-                    ("Delegate", const string "none");
-                    ("Storage", const int 0) ]) ]
-        (fun ~user_answer ->
-          client_async_cmd
-            state
-            ~client
-            ~f:(fun _ proc ->
-              find_and_print_signature_hash
-                ~display_expectation:(protocol_kind = `Babylon)
-                state
-                proc)
-            command
-          >>= fun res ->
-          expect_from_output
-            ~message:"self-delegation"
-            res
-            ~expectation:
-              ( match user_answer with
-              | `Reject ->
-                  `Ledger_reject_or_timeout
-              | `Accept ->
-                  `Success ))
-    >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
-  in 
-    let manager_tz_to_originated () =
-      let random_implicit_account = Tezos_protocol.Account.of_name "random-account-for-manager-test" in
-      let random_acc_pkh = Tezos_protocol.Account.pubkey_hash random_implicit_account in
-      let arg = sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; IMPLICIT_ACCOUNT ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_acc_pkh 10000000
-      in
-      let command =
-        [ "--wait";
-          "none";
-          "transfer";
-          "0";
-          "from";
-          ledger_key;
-          "to";
-          manager_tz_kt1_account;
-          "--burn-cap";
-          "1";
-          "--entrypoint";
-          "do";
-          "--arg";
-          arg;
-          "--verbose-signing" ]
-      in
-      with_ledger_test_reject_and_accept
-        state
-        ~only_success
-        ~messages:
-          MFmt.
-            [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
-              show_command_message command;
-              (fun ppf () ->
-                wf
-                  ppf
-                  "Note that X is a placeholder for some value that will vary \
-                   between runs");
-              (fun ppf () ->
-                ledger_should_display
-                  ppf
-                  [ ("Manager.tz Delegation", const string "");
-                    ("Fee", const string "0.00XXX");
-                    ("Source", const string contract_address);
-                    ("Delegate", const string "none");
-                    ("Storage", const int 0) ]) ]
-        (fun ~user_answer ->
-          client_async_cmd
-            state
-            ~client
-            ~f:(fun _ proc ->
-              find_and_print_signature_hash
-                ~display_expectation:(protocol_kind = `Babylon)
-                state
-                proc)
-            command
-          >>= fun res ->
-          expect_from_output
-            ~message:"self-delegation"
-            res
-            ~expectation:
-              ( match user_answer with
-              | `Reject ->
-                  `Ledger_reject_or_timeout
-              | `Accept ->
-                  `Success ))
-    >>= fun _ -> ksprintf bake "setting self-delegate of %s" "SRC"
+    manager_tz_test 
+      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; SET_DELEGATE ; CONS }" delegate_pkh)
+      ~expected: 
+        MFmt.[ 
+              ("Manager.tz Delegation", const string "");
+              ("Fee", const string "0.00XXX");
+              ("Source", const string contract_address);
+              ("Delegate", const string delegate_pkh);
+              ("Storage", const int 0) 
+             ]
+      ~output_msg:"delegation"
+  in
+  let remove_delegation () = 
+    manager_tz_test 
+      ~contract_arg:"{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+      ~expected: 
+        MFmt.[ 
+              ("Withdraw Manager.tz Delegation", const string "");
+              ("Fee", const string "0.00XXX");
+              ("Source", const string contract_address);
+              ("Delegate", const string "None");
+              ("Storage", const int 0) 
+             ]
+      ~output_msg:"delegate-removal"
+  in
+  let manager_tz_to_implicit () =
+    manager_tz_test 
+      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; IMPLICIT_ACCOUNT ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_acc_pkh 10000000)
+      ~expected: 
+        MFmt.[ 
+              ("Confirm Manager.tz Transaction", const string "");
+              ("Amount", const int 10);
+              ("Fee", const string "0.00XXX");
+              ("Source", const string contract_address);
+              ("Destination", const string random_acc_pkh);
+              ("Storage", const int 149)
+             ]
+      ~output_msg:"transfer-from-manager-tz-to-implicit"
+  in
+  let manager_tz_to_originated () =
+    manager_tz_test 
+      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_contract_pkh 10000000)
+      ~expected: 
+        MFmt.[ 
+              ("Confirm Manager.tz Transaction", const string "");
+              ("Amount", const int 10);
+              ("Fee", const string "0.00XXX");
+              ("Source", const string contract_address);
+              ("Destination", const string random_contract_pkh);
+              ("Storage", const int 0)
+             ]
+      ~output_msg:"transfer-from-manager-tz-to-originated"
   in 
   return ()
-  >>= fun () -> set_delegation () 
-  >>= fun () -> remove_delegate () 
-  >>= fun () -> manager_tz_to_implicit ()
-  >>= fun () -> manager_tz_to_originated ()
+  >>= fun () -> set_delegation () >>= fun _ -> ksprintf bake "setting delegate of %s" contract_address
+  >>= fun () -> remove_delegation () >>= fun _ -> ksprintf bake "removing delegate of %s" contract_address
+  >>= fun () -> manager_tz_to_implicit () >>= fun _ -> ksprintf bake "transferring from %s to %s" contract_address random_acc_pkh
+  >>= fun () -> manager_tz_to_originated () >>= fun _ -> ksprintf bake "transfering from %s to %s" contract_address random_contract_pkh
 
 let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~delegate ~bake () =
@@ -1101,8 +855,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
-    ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account
-    ~bake () =
+    ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account ~bake () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
   let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh ?entrypoint ?(amount = 15) () =
@@ -1187,6 +940,14 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     ~dst_name:unit_kt1_account
     ()
+  >>= fun () ->
+  test_transaction
+    ~name:"parameterfull-transaction-to-kt1"
+    ~dst_pkh:"KT1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ~arguments:"Pair \"hello from the ledger\" 51"
+    ~dst_name:pair_string_nat_kt1_account
+    ()
+
 
 let prepare_origination_of_id_script ?(spendable = false)
     ?(delegatable = false) ?delegate ?(push_drops = 0) ?(amount = "2") state
@@ -1702,6 +1463,12 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~parameter:"unit"
     ~init_storage:"Unit"
   >>= fun () ->
+  Tezos_client.client_cmd
+    state
+    ~client:client_0
+    ["show"; "known"; "contract"; unit_kt1_account]
+  >>= fun (_, proc_result) ->
+  let unit_kt1_contract_address = proc_result#out |> String.concat ~sep:"" in
   let pair_string_nat_kt1_account = "pair-string-nat-kt1-of-the-baker" in
   originate_id_script
     state
@@ -1714,7 +1481,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~parameter:"(pair string nat)"
     ~init_storage:"Pair \"the answer is: \" 42"
   >>= fun () ->
-    let transactions_test ~with_rejections =
+  let transactions_test ~with_rejections =
     transaction_tests
       state
       ~client:client_0
@@ -1737,6 +1504,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ~delegate_pkh:(Tezos_protocol.Account.pubkey_hash baker_0_account)
       ()
       ~bake
+      ~random_contract_pkh:unit_kt1_contract_address
       ~with_rejections
       ~protocol_kind
   in
