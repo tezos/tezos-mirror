@@ -36,10 +36,14 @@ type error += Could_not_read_data_dir_version of string
 
 val data_version : t
 
-(** Default file name to store the information about the node's network
-    identity. *)
+(** Default file names to store the informations about the node's network
+    identity, peers and configuration. *)
 
 val default_identity_file_name : string
+
+val default_config_file_name : string
+
+val default_peers_file_name : string
 
 (** [ensure_data_dir ~bare dir] performs a sanity check on [dir]. This check
     returns successfully if either:

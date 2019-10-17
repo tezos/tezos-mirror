@@ -133,7 +133,8 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           discovery_addr;
           discovery_port;
           trusted_points;
-          peers_file = config.data_dir // "peers.json";
+          peers_file =
+            config.data_dir // Node_data_version.default_peers_file_name;
           private_mode = config.p2p.private_mode;
           greylisting_config = config.p2p.greylisting_config;
           identity;

@@ -51,9 +51,13 @@ let lock_file data_dir = data_dir // "lock"
 
 let default_identity_file_name = "identity.json"
 
-let version_encoding = Data_encoding.(obj1 (req "version" string))
+let default_peers_file_name = "peers.json"
+
+let default_config_file_name = "config.json"
 
 let version_file_name = "version.json"
+
+let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 type error += Invalid_data_dir_version of t * t
 
