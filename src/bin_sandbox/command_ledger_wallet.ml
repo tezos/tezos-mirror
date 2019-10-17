@@ -510,55 +510,43 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
   Tezos_client.successful_client_cmd state ~client origination
   >>= fun _ -> Fmt.kstrf bake "baking `%s` in" name
 
-  (******
-with_ledger_test_reject_and_accept
-    ~only_success:(Wallet_scenario.with_rejections wallet_scenario |> not)
-    state
-    ~messages:
-      MFmt.
-        [ (fun ppf () ->
-            wf ppf "Importing %S in client `%s`." uri client_0.Tezos_client.id);
-          (fun ppf () ->
-            wf
-              ppf
-              "The ledger should be prompting for acknowledgment to provide \
-               the public key of `%s`."
-              (Tezos_protocol.Account.pubkey_hash ledger_account)) ]
-    (fun ~user_answer ->
-      Tezos_client.client_cmd
-        state
-        ~client:client_0
-        [ "import";
-          "secret";
-          "key";
-          signer.key_name;
-          signer.secret_key;
-          "--force" ]
-      >>= fun (_, proc) ->
-      expect_from_output
-        ~message:"importing key"
-        proc
-        ~expectation:
-          ( match user_answer with
-          | `Accept ->
-              `Success
-          | `Reject ->
-              `Ledger_reject_or_timeout ))
-
-  ******)
-
+  
 let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_rejections ~protocol_kind
-    ~delegate_key ~(delegate_pkh:string) ~bake () =
+    ~delegate_key ~delegate_pkh ~bake () =
   let manager_tz_kt1_account = "manager-tz" in
-  originate_manager_tz_script
-    state
-    ~client
-    ~name:manager_tz_kt1_account
-    ~from:ledger_key
-    ~bake
-    ~protocol_kind
-    ~ledger_account
-  >>= fun () ->
+  with_ledger_test_reject_and_accept
+     ~only_success:true (* (Wallet_scenario.with_rejections wallet_scenario |> not) *)
+     state
+     ~messages:
+       MFmt.
+         [ (fun ppf () ->
+           wf ppf "Originating manager.tz contract ");
+           (fun ppf () ->
+             wf
+               ppf
+               "The ledger should be prompting for acknowledgment to provide \
+                a signature of an unknown operation." ) ]
+     (fun ~user_answer ->
+       originate_manager_tz_script
+         state
+         ~client
+         ~name:manager_tz_kt1_account
+         ~from:ledger_key
+         ~bake
+         ~protocol_kind
+         ~ledger_account)
+     (*  >>= fun (_, proc) ->
+       expect_from_output
+         ~message:"importing key"
+         proc
+         ~expectation:
+           ( match user_answer with
+           | `Accept ->
+               `Success
+           | `Reject ->
+               `Ledger_reject_or_timeout ))
+*)
+    >>= fun () ->
 (*
   with_ledger_test_reject_and_accept
     ~only_success:true
