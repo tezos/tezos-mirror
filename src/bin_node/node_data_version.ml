@@ -195,21 +195,15 @@ let ensure_data_dir bare data_dir =
       >>= function
       | true -> (
           Lwt_stream.to_list (Lwt_unix.files_of_directory data_dir)
-          >|= List.filter (fun s -> s <> "." && s <> "..")
+          >|= List.filter (fun s ->
+                  s <> "." && s <> ".." && s <> version_file_name
+                  && s <> default_identity_file_name
+                  && s <> default_config_file_name
+                  && s <> default_peers_file_name)
           >>= function
           | [] ->
               write_version ()
-          | [single] when single = default_identity_file_name ->
-              write_version ()
-          | [_; _] as files
-            when bare
-                 && List.mem version_file_name files
-                 && List.mem default_identity_file_name files ->
-              write_version ()
           | files when bare ->
-              let files =
-                List.filter (fun e -> e <> default_identity_file_name) files
-              in
               let to_delete =
                 Format.asprintf
                   "@[<v>%a@]"
@@ -221,9 +215,7 @@ let ensure_data_dir bare data_dir =
               fail
                 (Invalid_data_dir
                    (Format.asprintf
-                      "Please provide a clean directory (only %s is allowed) \
-                       by deleting :@ %s"
-                      default_identity_file_name
+                      "Please provide a clean directory by deleting:@ %s"
                       to_delete))
           | _ ->
               check_data_dir_version data_dir )
