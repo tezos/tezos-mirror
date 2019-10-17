@@ -26,8 +26,24 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
-val write : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
+val write :
+  'a Encoding.t ->
+  'a ->
+  Bytes.t ->
+  int ->
+  int ->
+  (int, Binary_error.write_error) result
+
+val write_opt : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
+
+val write_exn : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int
+
+val to_bytes :
+  ?buffer_size:int ->
+  'a Encoding.t ->
+  'a ->
+  (Bytes.t, Binary_error.write_error) result
+
+val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
 
 val to_bytes_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t
-
-val to_bytes : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option

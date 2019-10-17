@@ -376,15 +376,18 @@ and read_list : type a. read_error -> int -> a Encoding.t -> state -> a list =
 
 (** Various entry points *)
 
-let read encoding buffer ofs len =
+let read_exn encoding buffer ofs len =
   let state =
     {buffer; offset = ofs; remaining_bytes = len; allowed_bytes = None}
   in
-  match read_rec encoding state with
-  | exception Read_error _ ->
-      None
-  | v ->
-      Some (state.offset, v)
+  let v = read_rec encoding state in
+  (state.offset, v)
+
+let read encoding buffer ofs len =
+  try Ok (read_exn encoding buffer ofs len) with Read_error err -> Error err
+
+let read_opt encoding buffer ofs len =
+  try Some (read_exn encoding buffer ofs len) with Read_error _ -> None
 
 let of_bytes_exn encoding buffer =
   let len = Bytes.length buffer in
@@ -396,4 +399,7 @@ let of_bytes_exn encoding buffer =
   v
 
 let of_bytes encoding buffer =
+  try Ok (of_bytes_exn encoding buffer) with Read_error err -> Error err
+
+let of_bytes_opt encoding buffer =
   try Some (of_bytes_exn encoding buffer) with Read_error _ -> None

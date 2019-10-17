@@ -100,10 +100,10 @@ let list () = EncodingTable.bindings !table
 
 let bytes_of_json (Record {encoding; _}) json =
   let data = Json.destruct encoding json in
-  Binary_writer.to_bytes encoding data
+  Binary_writer.to_bytes_opt encoding data
 
 let json_of_bytes (Record {encoding; _}) bytes =
-  match Binary_reader.of_bytes encoding bytes with
+  match Binary_reader.of_bytes_opt encoding bytes with
   | Some v ->
       Some (Json.construct encoding v)
   | None ->

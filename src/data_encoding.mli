@@ -849,7 +849,12 @@ module Binary : sig
       bytes in [buf] starting at offset [ofs] and reading at most
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf]. *)
-  val read : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
+  val read :
+    'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a, read_error) result
+
+  val read_opt : 'a Encoding.t -> Bytes.t -> int -> int -> (int * 'a) option
+
+  val read_exn : 'a Encoding.t -> Bytes.t -> int -> int -> int * 'a
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
@@ -869,11 +874,18 @@ module Binary : sig
       and writing at most [len] bytes. The function returns the offset
       of first unwritten bytes, or returns [None] in case of failure.
       In the latter case, some data might have been written on the buffer. *)
-  val write : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
+  val write :
+    'a Encoding.t -> 'a -> Bytes.t -> int -> int -> (int, write_error) result
+
+  val write_opt : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int option
+
+  val write_exn : 'a Encoding.t -> 'a -> Bytes.t -> int -> int -> int
 
   (** [of_bytes enc buf] is equivalent to [read enc buf 0 (length buf)].
       The function fails if the buffer is not fully read. *)
-  val of_bytes : 'a Encoding.t -> Bytes.t -> 'a option
+  val of_bytes : 'a Encoding.t -> Bytes.t -> ('a, read_error) result
+
+  val of_bytes_opt : 'a Encoding.t -> Bytes.t -> 'a option
 
   (** [of_bytes_exn enc buf] is equivalent to [of_bytes], except
       @raise [Read_error] instead of returning [None] in case of error. *)
@@ -883,7 +895,10 @@ module Binary : sig
       where [buf] is a newly allocated buffer of the expected
       length [len] (see [length env v]).
       The parameter [buffer_size] controls the initial size of [buf]. *)
-  val to_bytes : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
+  val to_bytes :
+    ?buffer_size:int -> 'a Encoding.t -> 'a -> (Bytes.t, write_error) result
+
+  val to_bytes_opt : ?buffer_size:int -> 'a Encoding.t -> 'a -> Bytes.t option
 
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
       @raise [Write_error] instead of returning [None] in case of error. *)
