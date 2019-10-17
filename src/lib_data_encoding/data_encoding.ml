@@ -84,7 +84,7 @@ module Encoding = struct
     | Both (_, value) ->
         Some value
     | Bytes bytes -> (
-      match Binary_reader.of_bytes le.encoding bytes with
+      match Binary_reader.of_bytes_opt le.encoding bytes with
       | Some expr ->
           le.state <- Both (bytes, expr) ;
           Some expr
