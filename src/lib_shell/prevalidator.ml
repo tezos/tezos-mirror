@@ -312,12 +312,17 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
 
   let pre_filter w pv op =
     let protocol_data =
-      Data_encoding.Binary.of_bytes_exn
+      Data_encoding.Binary.of_bytes
         Proto.operation_data_encoding
         op.Operation.proto in
-    let op = { Filter.Proto.shell = op.shell ; protocol_data } in
-    let config = filter_config w pv in
-    Filter.pre_filter config op.Filter.Proto.protocol_data
+    match protocol_data with
+    | None ->
+        debug w "unparsable operation %a" Operation_hash.pp (Operation.hash op) ;
+        false
+    | Some protocol_data ->
+        let op = {Filter.Proto.shell = op.shell; protocol_data} in
+        let config = filter_config w pv in
+        Filter.pre_filter config op.Filter.Proto.protocol_data
 
   let post_filter w pv op receipt =
     let config = filter_config w pv in
@@ -538,13 +543,17 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
           (* Convert ops *)
           let map_op op =
             let protocol_data =
-              Data_encoding.Binary.of_bytes_exn
+              Data_encoding.Binary.of_bytes
                 Proto.operation_data_encoding
                 op.Operation.proto in
-            Proto.{ shell = op.shell ; protocol_data } in
-          let fold_op _k (op, _error) acc = map_op op :: acc in
+            match protocol_data with
+            | None -> None
+            | Some protocol_data ->
+                Some Proto.{ shell = op.shell ; protocol_data } in
+          let fold_op _k (op, _error) acc =
+            match map_op op with | None -> acc | Some op -> op :: acc in
           (* First call : retrieve the current set of op from the mempool *)
-          let applied = if params#applied then List.map map_op (List.map snd applied) else [] in
+          let applied = if params#applied then List.filter_map map_op (List.map snd applied) else [] in
           let refused = if params#refused then
               Operation_hash.Map.fold fold_op refused [] else [] in
           let branch_refused = if params#branch_refused then
@@ -570,13 +579,19 @@ module Make(Filter: Prevalidator_filters.FILTER)(Arg: ARG): T = struct
                 | Some (kind, shell, protocol_data) when filter_result kind ->
                     (* NOTE: Should the protocol change, a new Prevalidation
                      * context would be created. Thus, we use the same Proto. *)
-                    let bytes = Data_encoding.Binary.to_bytes_exn
+                    let bytes = Data_encoding.Binary.to_bytes
                         Proto.operation_data_encoding
                         protocol_data in
-                    let protocol_data = Data_encoding.Binary.of_bytes_exn
-                        Proto.operation_data_encoding
-                        bytes in
-                    Lwt.return_some [ { Proto.shell ; protocol_data } ]
+                    ( match bytes with
+                      | None -> Lwt.return_none
+                      | Some bytes ->
+                          let protocol_data = Data_encoding.Binary.of_bytes
+                              Proto.operation_data_encoding
+                              bytes in
+                          ( match protocol_data with
+                            | None -> Lwt.return_none
+                            | Some protocol_data ->
+                                Lwt.return_some [ { Proto.shell ; protocol_data } ]))
                 | Some _ -> next ()
                 | None -> Lwt.return_none
               end
