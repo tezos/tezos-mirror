@@ -361,44 +361,45 @@ let sign state ~client ~bytes =
     ~client:client.Tezos_client.Keyed.client
     ["sign"; "bytes"; "0x" ^ bytes; "for"; client.Tezos_client.Keyed.key_name]
 
-let originate_manager_tz_script state ~client ~name ~from ~bake
-    ~protocol_kind ~ledger_account =
-  let prepare_origination_of_manager_tz_script ?(spendable = false) ?(delegatable = false) ?delegate state
-      ~client ~name ~from ~protocol_kind ~ledger_account =
+let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
+    ~ledger_account =
+  let prepare_origination_of_manager_tz_script ?(spendable = false)
+      ?(delegatable = false) ?delegate state ~name ~from ~protocol_kind
+      ~ledger_account =
     let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
     let manager_tz_script =
-      "
-      parameter
-      \  (or
-      \     (lambda %do unit (list operation))
-      \     (unit %default));
-      storage key_hash;
-      code
-      \  { UNPAIR ;
-      \    IF_LEFT
-      \      { # 'do' entrypoint
-      \        # Assert no token was sent:
-      \        # to send tokens, the default entry point should be used
-      \        PUSH mutez 0 ;
-      \        AMOUNT ;
-      \        ASSERT_CMPEQ ;
-      \        # Assert that the sender is the manager
-      \        DUUP ;
-      \        IMPLICIT_ACCOUNT ;
-      \        ADDRESS ;
-      \        SENDER ;
-      \        ASSERT_CMPEQ ;
-      \        # Execute the lambda argument
-      \        UNIT ;
-      \        EXEC ;
-      \        PAIR ;
-      \      }
-      \      { # 'default' entrypoint
-      \        DROP ;
-      \        NIL operation ;
-      \        PAIR ;
-      \      }
-      \  };"
+      "\n\
+      \      parameter\n\
+      \        (or\n\
+      \           (lambda %do unit (list operation))\n\
+      \           (unit %default));\n\
+      \      storage key_hash;\n\
+      \      code\n\
+      \        { UNPAIR ;\n\
+      \          IF_LEFT\n\
+      \            { # 'do' entrypoint\n\
+      \              # Assert no token was sent:\n\
+      \              # to send tokens, the default entry point should be used\n\
+      \              PUSH mutez 0 ;\n\
+      \              AMOUNT ;\n\
+      \              ASSERT_CMPEQ ;\n\
+      \              # Assert that the sender is the manager\n\
+      \              DUUP ;\n\
+      \              IMPLICIT_ACCOUNT ;\n\
+      \              ADDRESS ;\n\
+      \              SENDER ;\n\
+      \              ASSERT_CMPEQ ;\n\
+      \              # Execute the lambda argument\n\
+      \              UNIT ;\n\
+      \              EXEC ;\n\
+      \              PAIR ;\n\
+      \            }\n\
+      \            { # 'default' entrypoint\n\
+      \              DROP ;\n\
+      \              NIL operation ;\n\
+      \              PAIR ;\n\
+      \            }\n\
+      \        };"
     in
     let tmp = Filename.temp_file "manager" ".tz" in
     System.write_file state tmp ~content:manager_tz_script
@@ -414,7 +415,7 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
           "running";
           tmp;
           "--init";
-          (sprintf "\"%s\"" ledger_pkh);
+          sprintf "\"%s\"" ledger_pkh;
           "--force";
           "--burn-cap";
           "300000000000";
@@ -432,7 +433,6 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
   in
   prepare_origination_of_manager_tz_script
     state
-    ~client
     ~name
     ~from
     ~protocol_kind
@@ -440,31 +440,31 @@ let originate_manager_tz_script state ~client ~name ~from ~bake
   >>= fun origination ->
   Tezos_client.successful_client_cmd state ~client origination
   >>= fun _ -> Fmt.kstrf bake "baking `%s` in" name
-  
-let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_rejections ~protocol_kind
-    ~delegate_key ~delegate_pkh ~random_contract_pkh ~bake () =
+
+let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
+    ~with_rejections ~protocol_kind ~delegate_pkh ~random_contract_pkh ~bake ()
+    =
   let manager_tz_kt1_account = "manager-tz" in
   with_ledger_test_reject_and_accept
-     ~only_success:true
-     state
-     ~messages:
-       MFmt.
-         [ (fun ppf () ->
-           wf ppf "Originating manager.tz contract ");
-           (fun ppf () ->
-             wf
-               ppf
-               "The ledger should be prompting for acknowledgment to provide \
-                a signature of an unknown operation." ) ]
-     (fun ~user_answer ->
-       originate_manager_tz_script
-         state
-         ~client
-         ~name:manager_tz_kt1_account
-         ~from:ledger_key
-         ~bake
-         ~protocol_kind
-         ~ledger_account)
+    ~only_success:true
+    state
+    ~messages:
+      MFmt.
+        [ (fun ppf () -> wf ppf "Originating manager.tz contract ");
+          (fun ppf () ->
+            wf
+              ppf
+              "The ledger should be prompting for acknowledgment to provide a \
+               signature of an unknown operation.") ]
+    (fun ~user_answer:_ ->
+      originate_manager_tz_script
+        state
+        ~client
+        ~name:manager_tz_kt1_account
+        ~from:ledger_key
+        ~bake
+        ~protocol_kind
+        ~ledger_account)
   >>= fun () ->
   Tezos_client.client_cmd
     state
@@ -473,11 +473,14 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
   >>= fun (_, proc_result) ->
   let contract_address = proc_result#out |> String.concat ~sep:"" in
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
-  let random_implicit_account = Tezos_protocol.Account.of_name "random-account-for-manager-test" in
-  let random_acc_pkh = Tezos_protocol.Account.pubkey_hash random_implicit_account in
+  let random_implicit_account =
+    Tezos_protocol.Account.of_name "random-account-for-manager-test"
+  in
+  let random_acc_pkh =
+    Tezos_protocol.Account.pubkey_hash random_implicit_account
+  in
   let only_success = not with_rejections in
-
-  let manager_tz_test ~contract_arg ~expected ~output_msg = 
+  let manager_tz_test ~contract_arg ~expected ~output_msg =
     let command =
       [ "--wait";
         "none";
@@ -493,6 +496,8 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
         contract_arg;
         "--burn-cap";
         "1";
+        "--storage-limit";
+        "500";
         "--verbose-signing" ]
     in
     with_ledger_test_reject_and_accept
@@ -500,15 +505,15 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
       ~only_success
       ~messages:
         MFmt.
-          [ (fun ppf () -> wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
+          [ (fun ppf () ->
+              wf ppf "Managing account of manager.tz contract `%s`" ledger_pkh);
             show_command_message command;
             (fun ppf () ->
               wf
                 ppf
                 "Note that X is a placeholder for some value that will vary \
                  between runs");
-            (fun ppf () -> ledger_should_display ppf expected)
-          ]
+            (fun ppf () -> ledger_should_display ppf expected) ]
       (fun ~user_answer ->
         client_async_cmd
           state
@@ -529,66 +534,93 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account ~with_
                 `Ledger_reject_or_timeout
             | `Accept ->
                 `Success ))
-  in 
-  let set_delegation () = 
-    manager_tz_test 
-      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; SET_DELEGATE ; CONS }" delegate_pkh)
-      ~expected: 
-        MFmt.[ 
-              ("Manager.tz Delegation", const string "");
-              ("Fee", const string "0.00XXX");
-              ("Source", const string contract_address);
-              ("Delegate", const string delegate_pkh);
-              ("Storage", const int 0) 
-             ]
+  in
+  let set_delegation () =
+    manager_tz_test
+      ~contract_arg:
+        (sprintf
+           "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; SOME ; \
+            SET_DELEGATE ; CONS }"
+           delegate_pkh)
+      ~expected:
+        MFmt.
+          [ ("Manager.tz Delegation", const string "");
+            ("Fee", const string "0.00XXX");
+            ("Source", const string contract_address);
+            ("Delegate", const string delegate_pkh);
+            ("Storage Limit", const int 500) ]
       ~output_msg:"delegation"
   in
-  let remove_delegation () = 
-    manager_tz_test 
-      ~contract_arg:"{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
-      ~expected: 
-        MFmt.[ 
-              ("Withdraw Manager.tz Delegation", const string "");
-              ("Fee", const string "0.00XXX");
-              ("Source", const string contract_address);
-              ("Delegate", const string "None");
-              ("Storage", const int 0) 
-             ]
+  let remove_delegation () =
+    manager_tz_test
+      ~contract_arg:
+        "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+      ~expected:
+        MFmt.
+          [ ("Withdraw Manager.tz Delegation", const string "");
+            ("Fee", const string "0.00XXX");
+            ("Source", const string contract_address);
+            ("Delegate", const string "None");
+            ("Storage Limit", const int 500) ]
       ~output_msg:"delegate-removal"
   in
   let manager_tz_to_implicit () =
-    manager_tz_test 
-      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; IMPLICIT_ACCOUNT ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_acc_pkh 10000000)
-      ~expected: 
-        MFmt.[ 
-              ("Confirm Manager.tz Transaction", const string "");
-              ("Amount", const int 10);
-              ("Fee", const string "0.00XXX");
-              ("Source", const string contract_address);
-              ("Destination", const string random_acc_pkh);
-              ("Storage", const int 149)
-             ]
+    manager_tz_test
+      ~contract_arg:
+        (sprintf
+           "{ DROP ; NIL operation ; PUSH key_hash \"%s\" ; IMPLICIT_ACCOUNT \
+            ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }"
+           random_acc_pkh
+           10000000)
+      ~expected:
+        MFmt.
+          [ ("Confirm Manager.tz Transaction", const string "");
+            ("Amount", const int 10);
+            ("Fee", const string "0.00XXX");
+            ("Source", const string contract_address);
+            ("Destination", const string random_acc_pkh);
+            ("Storage Limit", const int 500) ]
       ~output_msg:"transfer-from-manager-tz-to-implicit"
   in
   let manager_tz_to_originated () =
-    manager_tz_test 
-      ~contract_arg:(sprintf "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }" random_contract_pkh 10000000)
-      ~expected: 
-        MFmt.[ 
-              ("Confirm Manager.tz Transaction", const string "");
-              ("Amount", const int 10);
-              ("Fee", const string "0.00XXX");
-              ("Source", const string contract_address);
-              ("Destination", const string random_contract_pkh);
-              ("Storage", const int 0)
-             ]
+    manager_tz_test
+      ~contract_arg:
+        (sprintf
+           "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; \
+            ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }"
+           random_contract_pkh
+           10000000)
+      ~expected:
+        MFmt.
+          [ ("Confirm Manager.tz Transaction", const string "");
+            ("Amount", const int 10);
+            ("Fee", const string "0.00XXX");
+            ("Source", const string contract_address);
+            ("Destination", const string random_contract_pkh);
+            ("Storage Limit", const int 500) ]
       ~output_msg:"transfer-from-manager-tz-to-originated"
-  in 
+  in
   return ()
-  >>= fun () -> set_delegation () >>= fun _ -> ksprintf bake "setting delegate of %s" contract_address
-  >>= fun () -> remove_delegation () >>= fun _ -> ksprintf bake "removing delegate of %s" contract_address
-  >>= fun () -> manager_tz_to_implicit () >>= fun _ -> ksprintf bake "transferring from %s to %s" contract_address random_acc_pkh
-  >>= fun () -> manager_tz_to_originated () >>= fun _ -> ksprintf bake "transfering from %s to %s" contract_address random_contract_pkh
+  >>= fun () ->
+  set_delegation ()
+  >>= fun _ ->
+  ksprintf bake "setting delegate of %s" contract_address
+  >>= fun () ->
+  remove_delegation ()
+  >>= fun _ ->
+  ksprintf bake "removing delegate of %s" contract_address
+  >>= fun () ->
+  manager_tz_to_implicit ()
+  >>= fun _ ->
+  ksprintf bake "transferring from %s to %s" contract_address random_acc_pkh
+  >>= fun () ->
+  manager_tz_to_originated ()
+  >>= fun _ ->
+  ksprintf
+    bake
+    "transfering from %s to %s"
+    contract_address
+    random_contract_pkh
 
 let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~delegate ~bake () =
@@ -858,10 +890,18 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account ~bake () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
-  let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh ?entrypoint ?(amount = 15) () =
+  let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh
+      ?entrypoint ?(amount = 15) () =
     let command =
       let opt = Option.value_map ~default:[] in
-      ["--wait"; "none"; "transfer"; (sprintf "%i" amount); "from"; src; "to"; dst_name]
+      [ "--wait";
+        "none";
+        "transfer";
+        sprintf "%i" amount;
+        "from";
+        src;
+        "to";
+        dst_name ]
       @ Option.value_map ~default:[] arguments ~f:(fun a -> ["--arg"; a])
       @ opt entrypoint ~f:(fun e -> ["--entrypoint"; e])
       @ ["--burn-cap"; "100"; "--verbose-signing"]
@@ -947,7 +987,6 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~arguments:"Pair \"hello from the ledger\" 51"
     ~dst_name:pair_string_nat_kt1_account
     ()
-
 
 let prepare_origination_of_id_script ?(spendable = false)
     ?(delegatable = false) ?delegate ?(push_drops = 0) ?(amount = "2") state
@@ -1498,9 +1537,8 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     manager_tz_delegation_tests
       state
       ~client:client_0
-      ~ledger_key:(signer.key_name)
+      ~ledger_key:signer.key_name
       ~ledger_account
-      ~delegate_key:(baker_0)
       ~delegate_pkh:(Tezos_protocol.Account.pubkey_hash baker_0_account)
       ()
       ~bake
