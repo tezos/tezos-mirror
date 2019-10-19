@@ -6,6 +6,7 @@
                    ))
  (libraries tezos-stdlib
             tezos-data-encoding
+            lwt-canceler
             lwt))
 
 (alias

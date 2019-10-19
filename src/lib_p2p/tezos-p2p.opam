@@ -13,6 +13,7 @@ depends: [
   "alcotest-lwt" { with-test }
   "lwt" { < "4.3" }
   "lwt-watcher" { = "0.1" }
+  "lwt-canceler" { = "0.2" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

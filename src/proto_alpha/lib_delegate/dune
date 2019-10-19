@@ -13,7 +13,8 @@
             tezos-stdlib-unix
             tezos-storage
             tezos-rpc-http
-            tezos-rpc)
+            tezos-rpc
+            lwt-canceler)
  (library_flags (:standard -linkall))
  (modules (:standard \
                      delegate_commands

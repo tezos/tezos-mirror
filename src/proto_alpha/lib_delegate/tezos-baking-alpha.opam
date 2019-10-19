@@ -17,6 +17,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-client-alpha"
+  "lwt-canceler" { = "0.2" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

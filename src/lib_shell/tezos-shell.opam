@@ -17,6 +17,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-requester"
   "lwt-watcher" { = "0.1" }
+  "lwt-canceler" { = "0.2" }
   "alcotest-lwt" { with-test }
   "tezos-workers"
   "tezos-embedded-protocol-demo-noops" { with-test }

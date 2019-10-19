@@ -11,6 +11,7 @@ depends: [
   "tezos-stdlib"
   "tezos-data-encoding"
   "lwt"
+  "lwt-canceler" { = "0.2" }
   "alcotest-lwt" { with-test }
 ]
 build: [

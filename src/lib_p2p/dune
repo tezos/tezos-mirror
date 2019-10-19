@@ -2,6 +2,7 @@
  (name tezos_p2p)
  (public_name tezos-p2p)
  (libraries lwt-watcher
+            lwt-canceler
             tezos-base
             tezos-stdlib
             tezos-stdlib-unix)
