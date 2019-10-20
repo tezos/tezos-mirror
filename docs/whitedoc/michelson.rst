@@ -1944,8 +1944,8 @@ operations.
 ::
 
     > PA(\right)R / S => DIP ((\right)R) ; PAIR / S
-    > P(\left)IR / S => PAIR ; (\left)R / S
-    > P(\left)(\right)R => (\right)R ; (\left)R ; PAIR / S
+    > P(\left)IR / S => (\left)R ; PAIR / S
+    > P(\left)(\right)R =>  (\left)R ; DIP ((\right)R) ; PAIR / S
 
 A good way to quickly figure which macro to use is to mentally parse the
 macro as ``P`` for pair constructor, ``A`` for left leaf and ``I`` for
@@ -1975,7 +1975,7 @@ A typing rule can be inferred:
     > UNPAIR / S => DUP ; CAR ; DIP { CDR } / S
     > UNPA(\right)R / S => UNPAIR ; DIP (UN(\right)R) / S
     > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
-    > UNP(\left)(\right)R => UNPAIR ; UN(\left)R ; UN(\right)R / S
+    > UNP(\left)(\right)R => UNPAIR ; DIP (UN(\right)R) ; UN(\left)R / S
 
 -  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
 
