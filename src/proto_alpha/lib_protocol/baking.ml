@@ -210,28 +210,27 @@ let () =
 let baking_reward ctxt ~block_priority:prio ~included_endorsements:num_endo =
   fail_unless Compare.Int.(prio >= 0) Incorrect_priority
   >>=? fun () ->
-  let max_endorsements = Constants.endorsers_per_block ctxt in
+  let max_endo = Constants.endorsers_per_block ctxt in
   fail_unless
-    Compare.Int.(num_endo >= 0 && num_endo <= max_endorsements)
+    Compare.Int.(num_endo >= 0 && num_endo <= max_endo)
     Incorrect_number_of_endorsements
   >>=? fun () ->
-  let prio_factor_denominator = Int64.(succ (of_int prio)) in
-  let endo_factor_numerator =
-    Int64.of_int (8 + (2 * num_endo / max_endorsements))
+  let block_reward = Tez.to_mutez (Constants.block_reward ctxt) in
+  let numerator =
+    Int64.mul block_reward (Int64.of_int ((80 * max_endo) + (20 * num_endo)))
   in
-  let endo_factor_denominator = 10L in
-  Lwt.return
-    Tez.(
-      Constants.block_reward ctxt *? endo_factor_numerator
-      >>? fun val1 ->
-      val1 /? endo_factor_denominator
-      >>? fun val2 -> val2 /? prio_factor_denominator)
+  let denominator =
+    Int64.mul Int64.(succ (of_int prio)) (Int64.of_int (100 * max_endo))
+  in
+  let result = Int64.div numerator denominator in
+  Lwt.return Tez.(one_mutez *? result)
 
-let endorsing_reward ctxt ~block_priority:prio n =
+let endorsing_reward ctxt ~block_priority:prio num_slots =
   if Compare.Int.(prio >= 0) then
-    Lwt.return
-      Tez.(Constants.endorsement_reward ctxt /? Int64.(succ (of_int prio)))
-    >>=? fun tez -> Lwt.return Tez.(tez *? Int64.of_int n)
+    let endorsement_reward = Constants.endorsement_reward ctxt in
+    let denominator = Int64.(succ (of_int prio)) in
+    Lwt.return Tez.(endorsement_reward *? Int64.of_int num_slots)
+    >>=? fun numerator -> Lwt.return Tez.(numerator /? denominator)
   else fail Incorrect_priority
 
 let baking_priorities c level =
@@ -241,10 +240,10 @@ let baking_priorities c level =
   in
   f 0
 
-let endorsement_rights c level =
+let endorsement_rights ctxt level =
   fold_left_s
     (fun acc slot ->
-      Roll.endorsement_rights_owner c level ~slot
+      Roll.endorsement_rights_owner ctxt level ~slot
       >>=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
@@ -256,7 +255,7 @@ let endorsement_rights c level =
       in
       return (Signature.Public_key_hash.Map.add pkh right acc))
     Signature.Public_key_hash.Map.empty
-    (0 --> (Constants.endorsers_per_block c - 1))
+    (0 --> (Constants.endorsers_per_block ctxt - 1))
 
 let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t)
     =
