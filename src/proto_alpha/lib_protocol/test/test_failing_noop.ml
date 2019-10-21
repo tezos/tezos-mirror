@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,37 +26,48 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
-    Subject:      Entrypoint
-*)
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe\
+                  -- test "^failing_noop$"
+    Subject:      The Failing_noop operation was added bearing in mind the
+                  possibility for the end user to sign arbitrary bytes,
+                  encapsulate in the operation, with the absolute garanty that
+                  the signed bytes can't be used for something against the
+                  user's will. The Failing_noop operation always fails when
+                  applied.
+ *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha"
-    [ ("transfer", Test_transfer.tests);
-      ("origination", Test_origination.tests);
-      ("activation", Test_activation.tests);
-      ("revelation", Test_reveal.tests);
-      ("endorsement", Test_endorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("rolls", Test_rolls.tests);
-      ("combined", Test_combined_operations.tests);
-      ("qty", Test_qty.tests);
-      ("voting", Test_voting.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("gas properties", Test_gas_properties.tests);
-      ("fixed point computation", Test_fixed_point.tests);
-      ("gas levels", Test_gas_levels.tests);
-      ("saturation arithmetic", Test_saturation.tests);
-      ("gas cost functions", Test_gas_costs.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("script deserialize gas", Test_script_gas.tests);
-      ("failing_noop operation", Test_failing_noop.tests) ]
-  |> Lwt_main.run
+open Protocol
+open Alpha_context
+
+let register_one_contract () =
+  Context.init 1
+  >>=? fun (b, contracts) ->
+  let contract =
+    List.nth contracts 0 |> WithExceptions.Option.get ~loc:__LOC__
+  in
+  return (b, contract)
+
+(** try to apply a failing_noop and assert that the operation fails *)
+let failing_noop_must_fail_when_injected () =
+  register_one_contract ()
+  >>=? fun (blk, contract) ->
+  Contract.is_implicit contract
+  |> function
+  | None ->
+      Alcotest.fail "only implicit accounts can sign"
+  | Some source ->
+      Op.failing_noop (B blk) source "tezos"
+      >>=? fun operation ->
+      Block.bake ~operation blk
+      >>= fun res ->
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Apply.Failing_noop_error ->
+              true
+          | _ ->
+              false)
+
+let tests =
+  [ Test_services.tztest
+      "injection fails"
+      `Quick
+      failing_noop_must_fail_when_injected ]

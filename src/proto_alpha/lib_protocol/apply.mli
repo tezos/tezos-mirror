@@ -99,6 +99,8 @@ type error +=
       timestamp : Time.t;
     }
 
+type error += (* `Permanent *) Failing_noop_error
+
 val begin_partial_construction : t -> (t, error trace) result Lwt.t
 
 val begin_full_construction :
