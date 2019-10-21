@@ -133,9 +133,120 @@ end
 
 (* Block validation using an external processes *)
 module External_validator = struct
-  include Internal_event.Legacy_logging.Make_semantic (struct
-    let name = "shell.validation_process.external"
-  end)
+  type status =
+    | Init
+    | Close
+    | Process_status of Unix.process_status
+    | Validation_started of int
+
+  let status_pp ppf = function
+    | Init ->
+        Format.fprintf ppf "Initialized"
+    | Close ->
+        Format.fprintf ppf "Shutting down"
+    | Process_status s -> (
+      match s with
+      | WEXITED 0 ->
+          Format.fprintf ppf "The process terminated normally"
+      | WEXITED i ->
+          Format.fprintf
+            ppf
+            "The process terminated abnormally with value %i"
+            i
+      | WSIGNALED i ->
+          Format.fprintf ppf "The process was killed by signal %i" i
+      | WSTOPPED i ->
+          Format.fprintf ppf "The process was stopped by signal %i" i )
+    | Validation_started pid ->
+        Format.fprintf ppf "Block validation started on pid %i " pid
+
+  type s = status Time.System.stamped
+
+  module Definition = struct
+    let name = "block_validator_process_external"
+
+    type nonrec t = s
+
+    let process_status_encoding =
+      let open Data_encoding in
+      union
+        Unix.
+          [ case
+              (Tag 0)
+              ~title:"wexited"
+              int31
+              (function WEXITED i -> Some i | _ -> None)
+              (fun i -> WEXITED i);
+            case
+              (Tag 1)
+              ~title:"wsignaled"
+              int31
+              (function WSIGNALED i -> Some i | _ -> None)
+              (fun i -> WSIGNALED i);
+            case
+              (Tag 2)
+              ~title:"wstopped"
+              int31
+              (function WSTOPPED i -> Some i | _ -> None)
+              (fun i -> WSTOPPED i) ]
+
+    let encoding =
+      let open Data_encoding in
+      Time.System.stamped_encoding
+      @@ union
+           [ case
+               (Tag 0)
+               ~title:"Init"
+               empty
+               (function Init -> Some () | _ -> None)
+               (fun () -> Init);
+             case
+               (Tag 1)
+               ~title:"Close"
+               empty
+               (function Close -> Some () | _ -> None)
+               (fun () -> Close);
+             case
+               (Tag 2)
+               ~title:"Process_status"
+               process_status_encoding
+               (function Process_status s -> Some s | _ -> None)
+               (fun s -> Process_status s);
+             case
+               (Tag 3)
+               ~title:"Validation_started"
+               int31
+               (function Validation_started pid -> Some pid | _ -> None)
+               (fun pid -> Validation_started pid) ]
+
+    let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+
+    let doc = "Block_validator_process_external status."
+
+    let level (status : t) =
+      match status.data with
+      | Init | Close | Process_status (WEXITED 0) | Validation_started _ ->
+          Internal_event.Notice
+      | Process_status _ ->
+          Internal_event.Fatal
+  end
+
+  module Event_block_validator_process = Internal_event.Make (Definition)
+
+  let lwt_emit (status : status) =
+    let time = Systime_os.now () in
+    Event_block_validator_process.emit
+      ~section:(Internal_event.Section.make_sanitized [Definition.name])
+      (fun () -> Time.System.stamp ~time status)
+    >>= function
+    | Ok () ->
+        Lwt.return_unit
+    | Error el ->
+        Format.kasprintf
+          Lwt.fail_with
+          "Block_validator_process_external_event.emit: %a"
+          pp_print_error
+          el
 
   type validation_context = {
     context_root : string;
@@ -153,7 +264,7 @@ module External_validator = struct
   let init ?sandbox_parameters ~context_root ~protocol_root
       ~user_activated_upgrades ~user_activated_protocol_overrides ~process_path
       =
-    lwt_log_notice (fun f -> f "Initialized")
+    lwt_emit Init
     >>= fun () ->
     Lwt.return
       {
@@ -167,29 +278,8 @@ module External_validator = struct
         sandbox_parameters;
       }
 
-  let check_process_status =
-    let open Unix in
-    let int_tag = Tag.def "int" Format.pp_print_int in
-    function
-    | WEXITED 0 ->
-        lwt_log_notice (fun f -> f "The process terminated normally")
-    | WEXITED i ->
-        lwt_fatal_error
-          Tag.DSL.(
-            fun f ->
-              f "The process terminated abnormally with value %a"
-              -% a int_tag i)
-    | WSIGNALED i ->
-        lwt_fatal_error
-          Tag.DSL.(
-            fun f -> f "The process was killed by signal %a" -% a int_tag i)
-    | WSTOPPED i ->
-        lwt_fatal_error
-          Tag.DSL.(
-            fun f -> f "The process was stopped by signal %a" -% a int_tag i)
-
   let close vp =
-    lwt_log_notice (fun f -> f "Shutting down ...")
+    lwt_emit Close
     >>= fun () ->
     match vp.validator_process with
     | Some process ->
@@ -215,11 +305,7 @@ module External_validator = struct
       let process =
         Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
       in
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Block validation started on pid %a"
-            -% a (Tag.def "int" Format.pp_print_int) process#pid)
+      lwt_emit (Validation_started process#pid)
       >>= fun () ->
       let parameters =
         {
@@ -250,11 +336,7 @@ module External_validator = struct
           Lwt.return process
       | Exited status ->
           vp.validator_process <- None ;
-          check_process_status status
-          >>= fun () ->
-          vp.validator_process <- None ;
-          lwt_log_notice (fun f -> f "restarting validation process...")
-          >>= fun () -> start_process () )
+          lwt_emit (Process_status status) >>= fun () -> start_process () )
     | None ->
         start_process () )
     >>= fun process ->
@@ -275,12 +357,12 @@ module External_validator = struct
             return res
         | Exited status ->
             vp.validator_process <- None ;
-            check_process_status status >>= fun () -> return res)
+            lwt_emit (Process_status status) >>= fun () -> return res)
       (function
         | errors ->
             process#status
             >>= fun status ->
-            check_process_status status
+            lwt_emit (Process_status status)
             >>= fun () ->
             vp.validator_process <- None ;
             Lwt.return (error_exn errors))
