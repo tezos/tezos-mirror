@@ -34,9 +34,62 @@ let get_context index hash =
 
 (** The standard block validation method *)
 module Seq_validator = struct
-  include Internal_event.Legacy_logging.Make (struct
-    let name = "validation_process.sequential"
-  end)
+  type status = Init | Close
+
+  let status_pp ppf = function
+    | Init ->
+        Format.fprintf ppf "Initialized"
+    | Close ->
+        Format.fprintf ppf "Shutting down"
+
+  type s = status Time.System.stamped
+
+  module Definition = struct
+    let name = "block_validator_process_sequential"
+
+    type nonrec t = s
+
+    let encoding =
+      let open Data_encoding in
+      Time.System.stamped_encoding
+      @@ union
+           [ case
+               (Tag 0)
+               ~title:"Init"
+               empty
+               (function Init -> Some () | _ -> None)
+               (fun () -> Init);
+             case
+               (Tag 1)
+               ~title:"Close"
+               empty
+               (function Close -> Some () | _ -> None)
+               (fun () -> Close) ]
+
+    let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+
+    let doc = "Block_validator_process_sequential status."
+
+    let level (status : t) =
+      match status.data with Init | Close -> Internal_event.Notice
+  end
+
+  module Event_block_validator_process = Internal_event.Make (Definition)
+
+  let lwt_emit (status : status) =
+    let time = Systime_os.now () in
+    Event_block_validator_process.emit
+      ~section:(Internal_event.Section.make_sanitized [Definition.name])
+      (fun () -> Time.System.stamp ~time status)
+    >>= function
+    | Ok () ->
+        Lwt.return_unit
+    | Error el ->
+        Format.kasprintf
+          Lwt.fail_with
+          "Block_validator_process_sequential_event.emit: %a"
+          pp_print_error
+          el
 
   type validation_context = {
     context_index : Context.index;
@@ -48,7 +101,7 @@ module Seq_validator = struct
 
   let init ~user_activated_upgrades ~user_activated_protocol_overrides
       context_index =
-    lwt_log_notice "Initialized"
+    lwt_emit Init
     >>= fun () ->
     Lwt.return
       {
@@ -57,7 +110,7 @@ module Seq_validator = struct
         user_activated_protocol_overrides;
       }
 
-  let close _ = lwt_log_notice "Shutting down..."
+  let close _ = lwt_emit Close
 
   let apply_block validator_process chain_state ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t) ~block_header operations =
