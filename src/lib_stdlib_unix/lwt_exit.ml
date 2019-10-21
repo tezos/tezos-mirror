@@ -55,8 +55,7 @@ let () =
 
 let signals =
   let open Sys in
-  [
-    (sigabrt, "ABRT");
+  [ (sigabrt, "ABRT");
     (sigalrm, "ALRM");
     (sigfpe, "FPE");
     (sighup, "HUP");
@@ -83,8 +82,7 @@ let signals =
     (sigtrap, "TRAP");
     (sigurg, "URG");
     (sigxcpu, "XCPU");
-    (sigxfsz, "XFSZ");
-  ]
+    (sigxfsz, "XFSZ") ]
 
 let set_exit_handler ?(log = Format.eprintf "%s\n%!") signal =
   match List.assoc_opt signal signals with

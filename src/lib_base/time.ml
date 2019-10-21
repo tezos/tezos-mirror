@@ -94,8 +94,7 @@ module Protocol = struct
          ~binary:int64
          ~json:
            (union
-              [
-                case
+              [ case
                   Json_only
                   ~title:"RFC encoding"
                   rfc_encoding
@@ -106,8 +105,7 @@ module Protocol = struct
                   ~title:"Second since epoch"
                   int64
                   (fun _ -> None)
-                  (fun i -> i);
-              ])
+                  (fun i -> i) ])
 
   let rpc_arg =
     RPC_arg.make
@@ -237,8 +235,7 @@ module System = struct
     let binary = conv to_seconds of_seconds_exn int64 in
     let json =
       union
-        [
-          case
+        [ case
             Json_only
             ~title:"RFC encoding"
             rfc_encoding
@@ -249,8 +246,7 @@ module System = struct
             ~title:"Second since epoch"
             int64
             (fun _ -> None)
-            (fun i -> of_seconds_exn i);
-        ]
+            (fun i -> of_seconds_exn i) ]
     in
     def
       "timestamp.system"

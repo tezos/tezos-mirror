@@ -160,11 +160,9 @@ let compute_endorsing_power cctxt ~chain ~block operations =
   >>=? fun chain_id ->
   fold_left_s
     (fun sum -> function
-      | {
-          Alpha_context.protocol_data =
+      | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement _); _};
-          _;
-        } as op ->
+          _ } as op ->
           Delegate_services.Endorsing_power.get
             cctxt
             (chain, block)
@@ -761,10 +759,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_services.Constants.all cctxt (chain, block)
   >>=? fun Constants.
-             {
-               parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
-               _;
-             } ->
+             { parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
+               _ } ->
   classify_operations
     cctxt
     ~chain
@@ -984,11 +980,9 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
 let filter_outdated_endorsements expected_level ops =
   List.filter
     (function
-      | {
-          Alpha_context.protocol_data =
+      | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement {level; _}); _};
-          _;
-        } ->
+          _ } ->
           Raw_level.equal expected_level level
       | _ ->
           true)
@@ -1052,10 +1046,8 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
       in
       let rec loop () =
         Lwt.choose
-          [
-            (compute_timeout () >|= fun _ -> `Timeout);
-            (get_event () >|= fun e -> `Event e);
-          ]
+          [ (compute_timeout () >|= fun _ -> `Timeout);
+            (get_event () >|= fun e -> `Event e) ]
         >>= function
         | `Event (Some op_list) ->
             last_get_event := None ;

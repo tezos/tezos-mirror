@@ -54,8 +54,7 @@ type error +=
 let rpc_error_encoding =
   let open Data_encoding in
   union
-    [
-      case
+    [ case
         (Tag 0)
         ~title:"Empty_answer"
         (obj1 (req "kind" (constant "empty_answer")))
@@ -159,8 +158,7 @@ let rpc_error_encoding =
         ~title:"OCaml_exception"
         (obj2 (req "kind" (constant "ocaml_exception")) (req "content" string))
         (function OCaml_exception msg -> Some ((), msg) | _ -> None)
-        (function ((), msg) -> OCaml_exception msg);
-    ]
+        (function ((), msg) -> OCaml_exception msg) ]
 
 let pp_rpc_error ppf err =
   match err with

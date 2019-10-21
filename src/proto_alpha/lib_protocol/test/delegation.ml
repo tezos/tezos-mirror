@@ -354,8 +354,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance total_fee
 
 let tests_bootstrap_contracts =
-  [
-    Test.tztest
+  [ Test.tztest
       "bootstrap contracts delegate to themselves"
       `Quick
       bootstrap_manager_is_bootstrap_delegate;
@@ -408,17 +407,16 @@ let tests_bootstrap_contracts =
       `Quick
       (delegate_to_bootstrap_by_origination ~fee:Tez.one_mutez);
     (* balance enough for fee but not for fee + origination burn + dummy script storage cost *)
-      Test.tztest
-        "bootstrap manager can be delegate (init origination, edge case)"
-        `Quick
-        (delegate_to_bootstrap_by_origination
-           ~fee:(Tez.of_mutez_exn 3_999_999_705_000L));
+    Test.tztest
+      "bootstrap manager can be delegate (init origination, edge case)"
+      `Quick
+      (delegate_to_bootstrap_by_origination
+         ~fee:(Tez.of_mutez_exn 3_999_999_705_000L));
     (* fee bigger than bootstrap's initial balance*)
-      Test.tztest
-        "bootstrap manager can be delegate (init origination, large fee)"
-        `Quick
-        (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000));
-  ]
+    Test.tztest
+      "bootstrap manager can be delegate (init origination, large fee)"
+      `Quick
+      (delegate_to_bootstrap_by_origination ~fee:(Tez.of_int 10_000_000)) ]
 
 (**************************************************************************)
 (* delegate registration *)
@@ -1554,13 +1552,12 @@ let registered_self_delegate_key_init_delegation () =
   >>=? fun () -> return_unit
 
 let tests_delegate_registration =
-  [
-    (*** unregistered delegate key: no self-delegation ***)
+  [ (*** unregistered delegate key: no self-delegation ***)
     (* no token transfer, no self-delegation *)
-      Test.tztest
-        "unregistered delegate key (origination, small fee)"
-        `Quick
-        (unregistered_delegate_key_init_origination ~fee:Tez.one_mutez);
+    Test.tztest
+      "unregistered delegate key (origination, small fee)"
+      `Quick
+      (unregistered_delegate_key_init_origination ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key (origination, edge case fee)"
       `Quick
@@ -1586,13 +1583,12 @@ let tests_delegate_registration =
       `Quick
       (unregistered_delegate_key_switch_delegation ~fee:Tez.max_tez);
     (* credit/debit 1μꜩ, no self-delegation *)
-      Test.tztest
-        "unregistered delegate key - credit/debit 1μꜩ (origination, small \
-         fee)"
-        `Quick
-        (unregistered_delegate_key_init_origination_credit_debit
-           ~fee:Tez.one_mutez
-           ~amount:Tez.one_mutez);
+    Test.tztest
+      "unregistered delegate key - credit/debit 1μꜩ (origination, small fee)"
+      `Quick
+      (unregistered_delegate_key_init_origination_credit_debit
+         ~fee:Tez.one_mutez
+         ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit/debit 1μꜩ (origination, large fee)"
       `Quick
@@ -1628,12 +1624,12 @@ let tests_delegate_registration =
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     (* credit 1μꜩ, no self-delegation *)
-      Test.tztest
-        "unregistered delegate key - credit 1μꜩ (origination, small fee)"
-        `Quick
-        (unregistered_delegate_key_init_origination_credit
-           ~fee:Tez.one_mutez
-           ~amount:Tez.one_mutez);
+    Test.tztest
+      "unregistered delegate key - credit 1μꜩ (origination, small fee)"
+      `Quick
+      (unregistered_delegate_key_init_origination_credit
+         ~fee:Tez.one_mutez
+         ~amount:Tez.one_mutez);
     Test.tztest
       "unregistered delegate key - credit 1μꜩ (origination, edge case fee)"
       `Quick
@@ -1675,68 +1671,68 @@ let tests_delegate_registration =
          ~amount:Tez.one_mutez
          ~fee:Tez.max_tez);
     (* self delegation on unrevealed and unregistered contract *)
-      Test.tztest
-        "unregistered and unrevealed self-delegation (small fee)"
-        `Quick
-        (unregistered_and_unrevealed_self_delegate_key_init_delegation
-           ~fee:Tez.one_mutez);
+    Test.tztest
+      "unregistered and unrevealed self-delegation (small fee)"
+      `Quick
+      (unregistered_and_unrevealed_self_delegate_key_init_delegation
+         ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered and unrevealed self-delegation (large fee)"
       `Quick
       (unregistered_and_unrevealed_self_delegate_key_init_delegation
          ~fee:Tez.max_tez);
     (* self delegation on unregistered contract *)
-      Test.tztest
-        "unregistered and revealed self-delegation (small fee)"
-        `Quick
-        (unregistered_and_revealed_self_delegate_key_init_delegation
-           ~fee:Tez.one_mutez);
+    Test.tztest
+      "unregistered and revealed self-delegation (small fee)"
+      `Quick
+      (unregistered_and_revealed_self_delegate_key_init_delegation
+         ~fee:Tez.one_mutez);
     Test.tztest
       "unregistered and revealed self-delegation  large fee)"
       `Quick
       (unregistered_and_revealed_self_delegate_key_init_delegation
          ~fee:Tez.max_tez);
     (* self delegation on registered contract *)
-      Test.tztest
-        "registered and revelead self-delegation"
-        `Quick
-        registered_self_delegate_key_init_delegation;
+    Test.tztest
+      "registered and revelead self-delegation"
+      `Quick
+      registered_self_delegate_key_init_delegation;
     (*** unregistered delegate key: failed self-delegation ***)
     (* no token transfer, self-delegation *)
-      Test.tztest
-        "failed self-delegation: no transaction"
-        `Quick
-        failed_self_delegation_no_transaction;
+    Test.tztest
+      "failed self-delegation: no transaction"
+      `Quick
+      failed_self_delegation_no_transaction;
     (* credit 1μtz, debit 1μtz, self-delegation *)
-      Test.tztest
-        "failed self-delegation: credit & debit 1μꜩ"
-        `Quick
-        (failed_self_delegation_emptied_implicit_contract Tez.one_mutez);
+    Test.tztest
+      "failed self-delegation: credit & debit 1μꜩ"
+      `Quick
+      (failed_self_delegation_emptied_implicit_contract Tez.one_mutez);
     (*** valid registration ***)
     (* valid registration: credit 1 μꜩ, self delegation *)
-      Test.tztest
-        "valid delegate registration: credit 1μꜩ, self delegation (init \
-         with delegation)"
-        `Quick
-        (valid_delegate_registration_init_delegation_credit Tez.one_mutez);
+    Test.tztest
+      "valid delegate registration: credit 1μꜩ, self delegation (init with \
+       delegation)"
+      `Quick
+      (valid_delegate_registration_init_delegation_credit Tez.one_mutez);
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation (switch \
        with delegation)"
       `Quick
       (valid_delegate_registration_switch_delegation_credit Tez.one_mutez);
     (* valid registration: credit 1 μꜩ, self delegation, debit 1μꜩ *)
-      Test.tztest
-        "valid delegate registration: credit 1μꜩ, self delegation, debit \
-         1μꜩ (init with delegation)"
-        `Quick
-        (valid_delegate_registration_init_delegation_credit_debit Tez.one_mutez);
+    Test.tztest
+      "valid delegate registration: credit 1μꜩ, self delegation, debit \
+       1μꜩ (init with delegation)"
+      `Quick
+      (valid_delegate_registration_init_delegation_credit_debit Tez.one_mutez);
     Test.tztest
       "valid delegate registration: credit 1μꜩ, self delegation, debit \
        1μꜩ (switch with delegation)"
       `Quick
       (valid_delegate_registration_switch_delegation_credit_debit Tez.one_mutez);
     (*** double registration ***)
-      Test.tztest "double registration" `Quick double_registration;
+    Test.tztest "double registration" `Quick double_registration;
     Test.tztest
       "double registration when delegate account is emptied"
       `Quick
@@ -1744,8 +1740,7 @@ let tests_delegate_registration =
     Test.tztest
       "double registration when delegate account is emptied and then recredited"
       `Quick
-      double_registration_when_recredited;
-  ]
+      double_registration_when_recredited ]
 
 (******************************************************************************)
 (* Main                                                                       *)

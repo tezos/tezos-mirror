@@ -59,8 +59,7 @@ type block_error =
 let errno : Unix.error Data_encoding.t =
   let open Data_encoding in
   union
-    [
-      case
+    [ case
         ~title:"unknown_unix_error"
         (Tag 0)
         int8
@@ -71,8 +70,7 @@ let errno : Unix.error Data_encoding.t =
         (Tag 1)
         (string_enum
            Unix.
-             [
-               ("2big", E2BIG);
+             [ ("2big", E2BIG);
                ("acces", EACCES);
                ("again", EAGAIN);
                ("badf", EBADF);
@@ -139,17 +137,14 @@ let errno : Unix.error Data_encoding.t =
                ("hostdown", EHOSTDOWN);
                ("hostunreach", EHOSTUNREACH);
                ("loop", ELOOP);
-               ("overflow", EOVERFLOW);
-             ])
+               ("overflow", EOVERFLOW) ])
         (fun x -> Some x)
-        (fun x -> x);
-    ]
+        (fun x -> x) ]
 
 let block_error_encoding =
   let open Data_encoding in
   union
-    [
-      case
+    [ case
         (Tag 0)
         ~title:"Cannot_parse_operation"
         (obj2
@@ -311,8 +306,7 @@ let block_error_encoding =
         ~title:"Cannot_parse_block_header"
         (obj1 (req "error" (constant "cannot_parse_bock_header")))
         (function Cannot_parse_block_header -> Some () | _ -> None)
-        (fun () -> Cannot_parse_block_header);
-    ]
+        (fun () -> Cannot_parse_block_header) ]
 
 let pp_block_error ppf = function
   | Cannot_parse_operation oph ->

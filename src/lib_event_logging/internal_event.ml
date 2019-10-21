@@ -225,8 +225,7 @@ module All_sinks = struct
             Format.fprintf ppf "%s: URI scheme not registered %S" title uri)
       Data_encoding.(
         union
-          [
-            case
+          [ case
               ~title:"missing-uri-scheme"
               (Tag 0)
               (obj1 (req "missing-uri-scheme" (obj1 (req "uri" string))))
@@ -238,8 +237,7 @@ module All_sinks = struct
               (obj1 (req "non-registered-uri-scheme" (obj1 (req "uri" string))))
               (function
                 | Uri_scheme_not_registered uri -> Some uri | _ -> None)
-              (fun uri -> Uri_scheme_not_registered uri);
-          ])
+              (fun uri -> Uri_scheme_not_registered uri) ])
       (function Activation_error reason -> Some reason | _ -> None)
       (fun reason -> Activation_error reason)
 
@@ -734,8 +732,7 @@ module Lwt_worker_event = struct
          (req
             "event"
             (union
-               [
-                 case
+               [ case
                    ~title:"started"
                    (Tag 0)
                    (obj1 (req "kind" (constant "started")))
@@ -754,8 +751,7 @@ module Lwt_worker_event = struct
                       (req "kind" (constant "failed"))
                       (req "exception" string))
                    (function `Failed s -> Some ((), s) | _ -> None)
-                   (fun ((), s) -> `Failed s);
-               ])))
+                   (fun ((), s) -> `Failed s) ])))
 
   module Definition = struct
     let name = "lwt-worker-event"

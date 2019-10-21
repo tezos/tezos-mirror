@@ -137,8 +137,7 @@ module Manpage = struct
      $(i,run) command ones."
 
   let description =
-    [
-      `S "DESCRIPTION";
+    [ `S "DESCRIPTION";
       `P (command_description ^ " Several operations are possible: ");
       `P
         "$(b,show) reads, parses and displays Tezos current config file. Use \
@@ -157,8 +156,7 @@ module Manpage = struct
       `P
         "$(b,update) is the main option to edit the configuration file of \
          Tezos. It will parse command line arguments and add or replace \
-         corresponding entries in the Tezos configuration file.";
-    ]
+         corresponding entries in the Tezos configuration file." ]
 
   let options =
     let schema = Data_encoding.Json.schema Node_config_file.encoding in

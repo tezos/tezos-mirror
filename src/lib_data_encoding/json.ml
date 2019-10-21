@@ -148,14 +148,12 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
                cases =
                  List.map
                    (fun (Case
-                          {
-                            title;
+                          { title;
                             description;
                             encoding;
                             proj = proj';
                             inj = inj';
-                            tag;
-                          }) ->
+                            tag }) ->
                      Case
                        {
                          encoding;

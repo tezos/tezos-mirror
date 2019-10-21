@@ -92,8 +92,7 @@ let read_args () =
     |> Lwt_main.run
   in
   let specific =
-    [
-      ( "--length",
+    [ ( "--length",
         Arg.Int (fun n -> args.length <- n),
         "Length of the chain (nb of blocks)" );
       ("--seed", Arg.Int (fun n -> args.seed <- n), "Used seed (default 0)");
@@ -108,8 +107,7 @@ let read_args () =
       ( "--parameters",
         Arg.String (fun s -> args.params <- parse_param s),
         "JSON protocol parameters file" );
-      ("--debug", Arg.Set debug, "Print more info");
-    ]
+      ("--debug", Arg.Set debug, "Print more info") ]
   in
   let usage =
     "Usage: [--length n] [--seed n] [--accounts n] [--parameters json_file]"
@@ -357,14 +355,12 @@ let init () =
         (commitments, {parameters with commitments = List.map snd commitments})
   )
   >>=? fun ( remaining_activations,
-             {
-               bootstrap_accounts = _;
+             { bootstrap_accounts = _;
                commitments;
                constants;
                security_deposit_ramp_up_cycles;
                no_reward_cycles;
-               _;
-             } ) ->
+               _ } ) ->
   let gen_state =
     {
       possible_transfers;

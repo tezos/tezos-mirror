@@ -165,13 +165,9 @@ let () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [
-      ( "p2p.ipv6set",
-        [
-          ("empty", `Quick, test_empty);
+    [ ( "p2p.ipv6set",
+        [ ("empty", `Quick, test_empty);
           ("inclusion", `Quick, test_inclusion);
           ("contiguous", `Quick, test_contiguous);
           ("test_fold", `Quick, test_fold);
-          ("to_list", `Quick, test_to_list);
-        ] );
-    ]
+          ("to_list", `Quick, test_to_list) ] ) ]

@@ -269,8 +269,7 @@ let revelation_missing_and_late () =
           false)
 
 let tests =
-  [
-    Test.tztest "no commitment" `Quick no_commitment;
+  [ Test.tztest "no commitment" `Quick no_commitment;
     Test.tztest
       "revelation_early_wrong_right_twice"
       `Quick
@@ -278,5 +277,4 @@ let tests =
     Test.tztest
       "revelation_missing_and_late"
       `Quick
-      revelation_missing_and_late;
-  ]
+      revelation_missing_and_late ]

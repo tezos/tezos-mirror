@@ -140,19 +140,15 @@ module Documented_example = struct
     in
     let expected_json_v0 =
       `O
-        [
-          ( name ^ ".v0",
+        [ ( name ^ ".v0",
             (* -> here we see how the [~name] is used. *)
             `O
-              [
-                ("message", `String v0_thing.V0.message);
+              [ ("message", `String v0_thing.V0.message);
                 ( "attach",
                   `A
                     (List.map
                        (fun (k, v) -> `A [`String k; `String v])
-                       v0_thing.V0.attachment) );
-              ] );
-        ]
+                       v0_thing.V0.attachment) ) ] ) ]
     in
     if json_v0 <> expected_json_v0 then
       Alcotest.failf
@@ -174,14 +170,10 @@ module Documented_example = struct
     in
     let expected_json_v1 =
       `O
-        [
-          ( name ^ ".v1",
+        [ ( name ^ ".v1",
             `O
-              [
-                ("message", `String v1_thing.V1.message);
-                ("attachment", v1_thing.V1.attachment);
-              ] );
-        ]
+              [ ("message", `String v1_thing.V1.message);
+                ("attachment", v1_thing.V1.attachment) ] ) ]
     in
     if json_v1 <> expected_json_v1 then
       Alcotest.failf
@@ -278,7 +270,5 @@ let test_n_encapsulated_versions () =
   ()
 
 let tests =
-  [
-    ("example-test", `Quick, Documented_example.actual_test);
-    ("test-encapsulated-versions", `Quick, test_n_encapsulated_versions);
-  ]
+  [ ("example-test", `Quick, Documented_example.actual_test);
+    ("test-encapsulated-versions", `Quick, test_n_encapsulated_versions) ]

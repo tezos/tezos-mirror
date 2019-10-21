@@ -142,8 +142,7 @@ let default_config =
 let limit : P2p.limits Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {
-           P2p.connection_timeout;
+    (fun { P2p.connection_timeout;
            authentication_timeout;
            greylist_timeout;
            maintenance_idle_time;
@@ -165,8 +164,7 @@ let limit : P2p.limits Data_encoding.t =
            max_known_points;
            max_known_peer_ids;
            swap_linger;
-           binary_chunks_size;
-         } ->
+           binary_chunks_size } ->
       ( ( ( connection_timeout,
             authentication_timeout,
             min_connections,
@@ -337,8 +335,7 @@ let limit : P2p.limits Data_encoding.t =
 let p2p =
   let open Data_encoding in
   conv
-    (fun {
-           expected_pow;
+    (fun { expected_pow;
            bootstrap_peers;
            listen_addr;
            discovery_addr;
@@ -346,8 +343,7 @@ let p2p =
            limits;
            disable_mempool;
            disable_testchain;
-           greylisting_config;
-         } ->
+           greylisting_config } ->
       ( expected_pow,
         bootstrap_peers,
         listen_addr,
@@ -541,12 +537,10 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {
-           Node.operation_timeout;
+    (fun { Node.operation_timeout;
            max_refused_operations;
            operations_batch_size;
-           worker_limits;
-         } ->
+           worker_limits } ->
       ( (operation_timeout, max_refused_operations, operations_batch_size),
         worker_limits ))
     (fun ( (operation_timeout, max_refused_operations, operations_batch_size),
@@ -579,13 +573,11 @@ let peer_validator_limits_encoding =
   let open Data_encoding in
   let default_limits = default_shell.peer_validator_limits in
   conv
-    (fun {
-           Node.block_header_timeout;
+    (fun { Node.block_header_timeout;
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
-           worker_limits;
-         } ->
+           worker_limits } ->
       ( ( block_header_timeout,
           block_operations_timeout,
           protocol_timeout,
@@ -648,13 +640,11 @@ let chain_validator_limits_encoding =
 let shell =
   let open Data_encoding in
   conv
-    (fun {
-           peer_validator_limits;
+    (fun { peer_validator_limits;
            block_validator_limits;
            prevalidator_limits;
            chain_validator_limits;
-           history_mode;
-         } ->
+           history_mode } ->
       ( peer_validator_limits,
         block_validator_limits,
         prevalidator_limits,

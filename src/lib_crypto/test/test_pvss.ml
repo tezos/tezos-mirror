@@ -191,10 +191,8 @@ let test_reconstruct () =
          Setup.public_secret) )
 
 let tests =
-  [
-    ("dealer_proof", `Quick, test_dealer_proof);
+  [ ("dealer_proof", `Quick, test_dealer_proof);
     ("reveal", `Quick, test_share_reveal);
-    ("recontruct", `Quick, test_reconstruct);
-  ]
+    ("recontruct", `Quick, test_reconstruct) ]
 
 let () = Alcotest.run "test-pvss" [("pvss", tests)]

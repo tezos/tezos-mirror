@@ -39,8 +39,7 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [
-        case
+      [ case
           (Tag 0)
           ~title:"Flush"
           (obj2
@@ -84,8 +83,7 @@ module Request = struct
           ~title:"Advertise"
           (obj1 (req "request" (constant "advertise")))
           (function View Advertise -> Some () | _ -> None)
-          (fun () -> View Advertise);
-      ]
+          (fun () -> View Advertise) ]
 
   let pp ppf (View r) =
     match r with
@@ -147,8 +145,7 @@ module Event = struct
   let encoding =
     let open Data_encoding in
     union
-      [
-        case
+      [ case
           (Tag 0)
           ~title:"Debug"
           (obj1 (req "message" string))
@@ -171,8 +168,7 @@ module Event = struct
              (req "status" Worker_types.request_status_encoding))
           (function
             | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-          (fun (errs, req, t) -> Request (req, t, Some errs));
-      ]
+          (fun (errs, req, t) -> Request (req, t, Some errs)) ]
 
   let pp ppf = function
     | Debug msg ->

@@ -46,25 +46,21 @@ let test_roundtrip_string input =
   test_hashed_roundtrip "String" Blake2B.to_string Blake2B.of_string_opt input
 
 let inputs =
-  [
-    "abc";
+  [ "abc";
     string_of_int max_int;
     "0";
     "00";
     String.make 64 '0';
     (*loads of ascii characters: codes between 32 and 126 *)
-      String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
-    "";
-  ]
+    String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
+    "" ]
 
 let test_roundtrip_hexs () = List.iter test_roundtrip_hex inputs
 
 let test_roundtrip_strings () = List.iter test_roundtrip_string inputs
 
 let tests =
-  [
-    ("hash hex/dehex", `Quick, test_roundtrip_hexs);
-    ("hash print/parse", `Quick, test_roundtrip_strings);
-  ]
+  [ ("hash hex/dehex", `Quick, test_roundtrip_hexs);
+    ("hash print/parse", `Quick, test_roundtrip_strings) ]
 
 let () = Alcotest.run "tezos-crypto" [("blake2b", tests)]

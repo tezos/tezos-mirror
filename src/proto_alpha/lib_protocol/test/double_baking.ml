@@ -219,13 +219,12 @@ let wrong_signer () =
           false)
 
 let tests =
-  [
-    Test.tztest
+  [ Test.tztest
       "valid double baking evidence"
       `Quick
       valid_double_baking_evidence;
     (* Should fail*)
-      Test.tztest "same blocks" `Quick same_blocks;
+    Test.tztest "same blocks" `Quick same_blocks;
     Test.tztest "different levels" `Quick different_levels;
     Test.tztest
       "too early double baking evidence"
@@ -236,5 +235,4 @@ let tests =
       `Quick
       too_late_double_baking_evidence;
     Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_signer;
-  ]
+    Test.tztest "wrong delegate" `Quick wrong_signer ]

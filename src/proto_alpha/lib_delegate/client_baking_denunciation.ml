@@ -81,14 +81,8 @@ let get_block_offset level =
 let process_endorsements (cctxt : #Protocol_client_context.full) state
     (endorsements : Alpha_block_services.operation list) level =
   iter_s
-    (fun {
-           Alpha_block_services.shell;
-           chain_id;
-           receipt;
-           hash;
-           protocol_data;
-           _;
-         } ->
+    (fun {Alpha_block_services.shell; chain_id; receipt; hash; protocol_data; _}
+         ->
       let chain = `Hash chain_id in
       match (protocol_data, receipt) with
       | ( Operation_data
@@ -177,12 +171,10 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
 
 let process_block (cctxt : #Protocol_client_context.full) state
     (header : Alpha_block_services.block_info) =
-  let {
-    Alpha_block_services.chain_id;
-    hash;
-    metadata = {protocol_data = {baker; level = {level; _}; _}; _};
-    _;
-  } =
+  let { Alpha_block_services.chain_id;
+        hash;
+        metadata = {protocol_data = {baker; level = {level; _}; _}; _};
+        _ } =
     header
   in
   let chain = `Hash chain_id in

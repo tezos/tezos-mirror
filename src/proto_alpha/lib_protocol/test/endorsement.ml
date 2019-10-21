@@ -51,11 +51,9 @@ let get_expected_reward ctxt ~priority ~baker ~endorsing_power =
 let get_expected_deposit ctxt ~baker ~endorsing_power =
   Context.get_constants ctxt
   >>=? fun Constants.
-             {
-               parametric =
+             { parametric =
                  {endorsement_security_deposit; block_security_deposit; _};
-               _;
-             } ->
+               _ } ->
   let open Environment in
   let open Tez in
   let baking_deposit = if baker then block_security_deposit else of_int 0 in
@@ -266,16 +264,12 @@ let reward_retrieval_two_endorsers () =
   >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
-             {
-               parametric =
-                 {
-                   preserved_cycles;
+             { parametric =
+                 { preserved_cycles;
                    endorsement_reward;
                    endorsement_security_deposit;
-                   _;
-                 };
-               _;
-             } ->
+                   _ };
+               _ } ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   let endorser1 = List.hd endorsers in
@@ -631,8 +625,7 @@ let test_fitness_gap () =
   Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
 
 let tests =
-  [
-    Test.tztest "Simple endorsement" `Quick simple_endorsement;
+  [ Test.tztest "Simple endorsement" `Quick simple_endorsement;
     Test.tztest "Maximum endorsement" `Quick max_endorsement;
     Test.tztest "Consistent priorities" `Quick consistent_priorities;
     Test.tztest "Reward retrieval" `Quick reward_retrieval;
@@ -643,11 +636,10 @@ let tests =
     Test.tztest "Endorsement threshold" `Quick endorsement_threshold;
     Test.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
-      Test.tztest
-        "Wrong endorsement predecessor"
-        `Quick
-        wrong_endorsement_predecessor;
+    Test.tztest
+      "Wrong endorsement predecessor"
+      `Quick
+      wrong_endorsement_predecessor;
     Test.tztest "Invalid endorsement level" `Quick invalid_endorsement_level;
     Test.tztest "Duplicate endorsement" `Quick duplicate_endorsement;
-    Test.tztest "Not enough for deposit" `Quick not_enough_for_deposit;
-  ]
+    Test.tztest "Not enough for deposit" `Quick not_enough_for_deposit ]

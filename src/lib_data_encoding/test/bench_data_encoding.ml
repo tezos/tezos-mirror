@@ -92,8 +92,7 @@ let cases_encoding : t Data_encoding.t =
   let open Data_encoding in
   mu "recursive" (fun recursive ->
       union
-        [
-          case
+        [ case
             (Tag 0)
             ~title:"A"
             string
@@ -122,8 +121,7 @@ let cases_encoding : t Data_encoding.t =
             ~title:"R"
             (obj2 (req "field1" recursive) (req "field2" recursive))
             (function R (a, b) -> Some (a, b) | _ -> None)
-            (fun (a, b) -> R (a, b));
-        ])
+            (fun (a, b) -> R (a, b)) ])
 
 let () =
   bench_all

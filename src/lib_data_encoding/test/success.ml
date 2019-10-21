@@ -83,12 +83,10 @@ let all name ty encoding value =
     | `Dynamic | `Fixed _ ->
         encoding
   in
-  [
-    (name ^ ".json", `Quick, json ty encoding value);
+  [ (name ^ ".json", `Quick, json ty encoding value);
     (name ^ ".bson", `Quick, bson ty encoding value);
     (name ^ ".binary", `Quick, binary ty encoding value);
-    (name ^ ".binary_stream", `Quick, stream ty stream_encoding value);
-  ]
+    (name ^ ".binary_stream", `Quick, stream ty stream_encoding value) ]
 
 let all_int encoding size =
   let name = Format.asprintf "int%d" size in
@@ -162,13 +160,11 @@ let test_bounded_string_list =
       `Quick,
       binary Alcotest.(list string) (bounded_list ~total ~elements string) v )
   in
-  [
-    test "a" ~total:0 ~elements:0 [];
+  [ test "a" ~total:0 ~elements:0 [];
     test "b" ~total:4 ~elements:4 [""];
     test "c" ~total:20 ~elements:4 [""; ""; ""; ""; ""];
     test "d" ~total:21 ~elements:5 [""; ""; ""; ""; "a"];
-    test "e" ~total:31 ~elements:10 ["ab"; "c"; "def"; "gh"; "ijk"];
-  ]
+    test "e" ~total:31 ~elements:10 ["ab"; "c"; "def"; "gh"; "ijk"] ]
 
 let tests =
   all "null" Alcotest.pass null ()

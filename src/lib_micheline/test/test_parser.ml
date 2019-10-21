@@ -200,10 +200,7 @@ let test_tokenize_basic () =
   (* Comment *)
   assert_tokenize ~loc:__LOC__ "/*\"/**/\"*/" [Comment "/*\"/**/\"*/"]
   >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "/* /* /* */ */ */"
-    [Comment "/* /* /* */ */ */"]
+  assert_tokenize ~loc:__LOC__ "/* /* /* */ */ */" [Comment "/* /* /* */ */ */"]
   >>=? fun () ->
   assert_tokenize_error ~loc:__LOC__ "/*parse 1" [Comment "/*parse 1"]
   >>=? fun () ->
@@ -268,10 +265,7 @@ let test_one_line_contract () =
   assert_tokenize ~loc:__LOC__ "DROP; SWAP" [Ident "DROP"; Semi; Ident "SWAP"]
   >>=? fun () ->
   (* NOTE: the cases below do not fail because we only do tokenization. *)
-  assert_tokenize
-    ~loc:__LOC__
-    "DIP {ADD"
-    [Ident "DIP"; Open_brace; Ident "ADD"]
+  assert_tokenize ~loc:__LOC__ "DIP {ADD" [Ident "DIP"; Open_brace; Ident "ADD"]
   >>=? fun () ->
   assert_tokenize
     ~loc:__LOC__
@@ -297,8 +291,7 @@ let test_condition_contract () =
     "parameter (or string (option int));storage unit;return string;code \
      {CAR;IF_LEFT{}{IF_NONE {FAIL}{PUSH int 0; CMPGT; IF {FAIL}{PUSH string \
      \"\"}}};UNIT; SWAP; PAIR}"
-    [
-      Ident "parameter";
+    [ Ident "parameter";
       Open_paren;
       Ident "or";
       Ident "string";
@@ -350,15 +343,13 @@ let test_condition_contract () =
       Ident "SWAP";
       Semi;
       Ident "PAIR";
-      Close_brace;
-    ]
+      Close_brace ]
   >>=? fun () ->
   (* NOTE: the cases below do not fail because we only do tokenization. *)
   assert_tokenize
     ~loc:__LOC__
     "parameter (or string (option int);"
-    [
-      Ident "parameter";
+    [ Ident "parameter";
       Open_paren;
       Ident "or";
       Ident "string";
@@ -366,8 +357,7 @@ let test_condition_contract () =
       Ident "option";
       Ident "int";
       Close_paren;
-      Semi;
-    ]
+      Semi ]
   >>=? fun () ->
   assert_tokenize
     ~loc:__LOC__
@@ -434,43 +424,36 @@ let test_basic_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
     "PUSH string 100"
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+    [ Prim
+        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], [])
     ]
   >>=? fun () ->
   assert_toplevel_parsing_error
     ~loc:__LOC__
     "PUSH int 100_000"
-    [
-      Prim
+    [ Prim
         ( (),
           "PUSH",
           [Prim ((), "string", [], []); Int ((), Z.of_int 100_000)],
-          [] );
-    ]
+          [] ) ]
   >>=? fun () ->
   assert_toplevel_parsing_error
     ~loc:__LOC__
     "PUSH int 100"
-    [
-      Prim ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 1000)], []);
-    ]
+    [Prim ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 1000)], [])]
   >>=? fun () ->
   assert_toplevel_parsing_error
     ~loc:__LOC__
     "PUSH int 100"
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+    [ Prim
+        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], [])
     ]
   >>=? fun () ->
   assert_toplevel_parsing_error
     ~loc:__LOC__
     "PUSH int \"100\""
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+    [ Prim
+        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], [])
     ]
   >>=? fun () ->
   (* String *)
@@ -503,23 +486,19 @@ let test_basic_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
     "IF_NONE {FAIL} {}"
-    [
-      Prim
+    [ Prim
         ( (),
           "IF_NONE",
           [Seq ((), [Prim ((), "FAIL", [], [])]); Seq ((), [])],
-          [] );
-    ]
+          [] ) ]
   >>=? fun () ->
   assert_toplevel_parsing
     ~loc:__LOC__
     "PUSH (map int bool) (Map (Item 100 False))"
-    [
-      Prim
+    [ Prim
         ( (),
           "PUSH",
-          [
-            Prim
+          [ Prim
               ( (),
                 "map",
                 [Prim ((), "int", [], []); Prim ((), "bool", [], [])],
@@ -527,68 +506,54 @@ let test_basic_parsing () =
             Prim
               ( (),
                 "Map",
-                [
-                  Prim
+                [ Prim
                     ( (),
                       "Item",
                       [Int ((), Z.of_int 100); Prim ((), "False", [], [])],
-                      [] );
-                ],
-                [] );
-          ],
-          [] );
-    ]
+                      [] ) ],
+                [] ) ],
+          [] ) ]
   >>=? fun () ->
   assert_toplevel_parsing
     ~loc:__LOC__
     "LAMDA @name int int {}"
-    [
-      Prim
+    [ Prim
         ( (),
           "LAMDA",
           [Prim ((), "int", [], []); Prim ((), "int", [], []); Seq ((), [])],
-          ["@name"] );
-    ]
+          ["@name"] ) ]
   >>=? fun () ->
   assert_toplevel_parsing
     ~loc:__LOC__
     "code {DUP @test; DROP}"
-    [
-      Prim
+    [ Prim
         ( (),
           "code",
-          [
-            Seq
-              ((), [Prim ((), "DUP", [], ["@test"]); Prim ((), "DROP", [], [])]);
+          [ Seq
+              ((), [Prim ((), "DUP", [], ["@test"]); Prim ((), "DROP", [], [])])
           ],
-          [] );
-    ]
+          [] ) ]
 
 let test_condition_contract_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
     "parameter unit;return unit;storage tez; #How much you have to send me \n\
      code {CDR; DUP;AMOUNT; CMPLT;IF {FAIL}}"
-    [
-      Prim ((), "parameter", [Prim ((), "unit", [], [])], []);
+    [ Prim ((), "parameter", [Prim ((), "unit", [], [])], []);
       Prim ((), "return", [Prim ((), "unit", [], [])], []);
       Prim ((), "storage", [Prim ((), "tez", [], [])], []);
       Prim
         ( (),
           "code",
-          [
-            Seq
+          [ Seq
               ( (),
-                [
-                  Prim ((), "CDR", [], []);
+                [ Prim ((), "CDR", [], []);
                   Prim ((), "DUP", [], []);
                   Prim ((), "AMOUNT", [], []);
                   Prim ((), "CMPLT", [], []);
-                  Prim ((), "IF", [Seq ((), [Prim ((), "FAIL", [], [])])], []);
-                ] );
-          ],
-          [] );
-    ]
+                  Prim ((), "IF", [Seq ((), [Prim ((), "FAIL", [], [])])], [])
+                ] ) ],
+          [] ) ]
 
 let test_list_append_parsing () =
   assert_toplevel_parsing
@@ -597,20 +562,15 @@ let test_list_append_parsing () =
      unit;code { CAR; DUP; DIP{CDR}; CAR;NIL int; SWAP;LAMDA (pair int (list \
      int))(list int){DUP; CAR; DIP {CDR}; CONS};REDUCE;LAMDA (pair int (list \
      int))(list int){DUP; CAR; DIP{CDR}; CONS};UNIT; SWAP; PAIR}"
-    [
-      Prim
+    [ Prim
         ( (),
           "parameter",
-          [
-            Prim
+          [ Prim
               ( (),
                 "pair",
-                [
-                  Prim ((), "list", [Prim ((), "int", [], [])], []);
-                  Prim ((), "list", [Prim ((), "int", [], [])], []);
-                ],
-                [] );
-          ],
+                [ Prim ((), "list", [Prim ((), "int", [], [])], []);
+                  Prim ((), "list", [Prim ((), "int", [], [])], []) ],
+                [] ) ],
           [] );
       Prim
         ((), "return", [Prim ((), "list", [Prim ((), "int", [], [])], [])], []);
@@ -618,11 +578,9 @@ let test_list_append_parsing () =
       Prim
         ( (),
           "code",
-          [
-            Seq
+          [ Seq
               ( (),
-                [
-                  Prim ((), "CAR", [], []);
+                [ Prim ((), "CAR", [], []);
                   Prim ((), "DUP", [], []);
                   Prim ((), "DIP", [Seq ((), [Prim ((), "CDR", [], [])])], []);
                   Prim ((), "CAR", [], []);
@@ -631,65 +589,52 @@ let test_list_append_parsing () =
                   Prim
                     ( (),
                       "LAMDA",
-                      [
-                        Prim
+                      [ Prim
                           ( (),
                             "pair",
-                            [
-                              Prim ((), "int", [], []);
-                              Prim ((), "list", [Prim ((), "int", [], [])], []);
+                            [ Prim ((), "int", [], []);
+                              Prim ((), "list", [Prim ((), "int", [], [])], [])
                             ],
                             [] );
                         Prim ((), "list", [Prim ((), "int", [], [])], []);
                         Seq
                           ( (),
-                            [
-                              Prim ((), "DUP", [], []);
+                            [ Prim ((), "DUP", [], []);
                               Prim ((), "CAR", [], []);
                               Prim
                                 ( (),
                                   "DIP",
                                   [Seq ((), [Prim ((), "CDR", [], [])])],
                                   [] );
-                              Prim ((), "CONS", [], []);
-                            ] );
-                      ],
+                              Prim ((), "CONS", [], []) ] ) ],
                       [] );
                   Prim ((), "REDUCE", [], []);
                   Prim
                     ( (),
                       "LAMDA",
-                      [
-                        Prim
+                      [ Prim
                           ( (),
                             "pair",
-                            [
-                              Prim ((), "int", [], []);
-                              Prim ((), "list", [Prim ((), "int", [], [])], []);
+                            [ Prim ((), "int", [], []);
+                              Prim ((), "list", [Prim ((), "int", [], [])], [])
                             ],
                             [] );
                         Prim ((), "list", [Prim ((), "int", [], [])], []);
                         Seq
                           ( (),
-                            [
-                              Prim ((), "DUP", [], []);
+                            [ Prim ((), "DUP", [], []);
                               Prim ((), "CAR", [], []);
                               Prim
                                 ( (),
                                   "DIP",
                                   [Seq ((), [Prim ((), "CDR", [], [])])],
                                   [] );
-                              Prim ((), "CONS", [], []);
-                            ] );
-                      ],
+                              Prim ((), "CONS", [], []) ] ) ],
                       [] );
                   Prim ((), "UNIT", [], []);
                   Prim ((), "SWAP", [], []);
-                  Prim ((), "PAIR", [], []);
-                ] );
-          ],
-          [] );
-    ]
+                  Prim ((), "PAIR", [], []) ] ) ],
+          [] ) ]
 
 (****************************************************************************)
 (* Expression parsing tests *)
@@ -727,16 +672,14 @@ let test_parses_expression () =
 (****************************************************************************)
 
 let tests =
-  [
-    ("tokenize", fun _ -> test_tokenize_basic ());
+  [ ("tokenize", fun _ -> test_tokenize_basic ());
     ("test one line contract", fun _ -> test_one_line_contract ());
     ("test_condition_contract", fun _ -> test_condition_contract ());
     ("test_basic_parsing", fun _ -> test_basic_parsing ());
     ( "test_condition_contract_parsing",
       fun _ -> test_condition_contract_parsing () );
     ("test_list_append_parsing", fun _ -> test_list_append_parsing ());
-    ("test_parses_expression", fun _ -> test_parses_expression ());
-  ]
+    ("test_parses_expression", fun _ -> test_parses_expression ()) ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

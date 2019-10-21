@@ -38,8 +38,7 @@ let commands () =
       title = "Commands to perform privileged operations on the node";
     }
   in
-  [
-    command
+  [ command
       ~group
       ~desc:"Make the node forget its decision of rejecting blocks."
       no_options
@@ -99,5 +98,4 @@ let commands () =
           history_mode
           save_point
           caboose
-        >>= fun () -> return ());
-  ]
+        >>= fun () -> return ()) ]

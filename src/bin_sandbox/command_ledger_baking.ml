@@ -57,16 +57,14 @@ let with_ledger_prompt state message expectation ~f =
     ~ef:
       EF.(
         list
-          [
-            message;
+          [ message;
             wf "\n\n";
             wf
               ( match expectation with
               | `Succeeds ->
                   ">> ACCEPT THIS <<"
               | `Fails ->
-                  ">> REJECT THIS <<" );
-          ])
+                  ">> REJECT THIS <<" ) ])
   >>= fun () ->
   match expectation with
   | `Succeeds ->
@@ -112,18 +110,12 @@ let forge_endorsement state ~client ~chain_id ~level () =
   >>= fun branch ->
   let json =
     `O
-      [
-        ("branch", `String branch);
+      [ ("branch", `String branch);
         ( "contents",
           `A
-            [
-              `O
-                [
-                  ("kind", `String "endorsement");
-                  ("level", `Float (float_of_int level));
-                ];
-            ] );
-      ]
+            [ `O
+                [ ("kind", `String "endorsement");
+                  ("level", `Float (float_of_int level)) ] ] ) ]
   in
   Tezos_client.rpc
     state
@@ -145,24 +137,18 @@ let forge_delegation state ~client ~src ~dest ?(fee = 0.00126) () =
   >>= fun branch ->
   let json =
     `O
-      [
-        ("branch", `String branch);
+      [ ("branch", `String branch);
         ( "contents",
           `A
-            [
-              `O
-                [
-                  ("kind", `String "delegation");
+            [ `O
+                [ ("kind", `String "delegation");
                   ("source", `String src);
                   ( "fee",
                     `String (string_of_int (int_of_float (fee *. 1000000.))) );
                   ("counter", `String (string_of_int 30713));
                   ("gas_limit", `String (string_of_int 10100));
                   ("delegate", `String dest);
-                  ("storage_limit", `String (string_of_int 277));
-                ];
-            ] );
-      ]
+                  ("storage_limit", `String (string_of_int 277)) ] ] ) ]
   in
   Tezos_client.rpc
     state
@@ -190,8 +176,7 @@ let originate_account_from state ~client ~account =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [
-      "originate";
+    [ "originate";
       "account";
       orig_account_name;
       "for";
@@ -201,8 +186,7 @@ let originate_account_from state ~client ~account =
       "from";
       Tezos_protocol.Account.name account;
       "--burn-cap";
-      string_of_float 0.257;
-    ]
+      string_of_float 0.257 ]
   >>= fun _ -> return orig_account_name
 
 let setup_baking_ledger state uri ~client ~protocol =
@@ -248,11 +232,9 @@ let setup_baking_ledger state uri ~client ~protocol =
         (fst (List.last_exn protocol.Tezos_protocol.bootstrap_accounts))
     in
     let cases =
-      [
-        (ledger_pkh, other_pkh, "ledger to another account");
+      [ (ledger_pkh, other_pkh, "ledger to another account");
         (other_pkh, ledger_pkh, "another account to ledger");
-        (other_pkh, other_pkh, "another account to another account");
-      ]
+        (other_pkh, other_pkh, "another account to another account") ]
     in
     List_sequential.iter cases ~f:(fun (src, dest, msg) ->
         forge_delegation state ~client ~src ~dest ()
@@ -284,8 +266,7 @@ let setup_baking_ledger state uri ~client ~protocol =
       Tezos_client.successful_client_cmd
         state
         ~client
-        [
-          "setup";
+        [ "setup";
           "ledger";
           "to";
           "bake";
@@ -294,8 +275,7 @@ let setup_baking_ledger state uri ~client ~protocol =
           "--main-hwm";
           "0";
           "--test-hwm";
-          "0";
-        ])
+          "0" ])
   >>= assert_failure
         state
         "signing a 'Withdraw delegate' operation in Baking App should fail"
@@ -303,14 +283,12 @@ let setup_baking_ledger state uri ~client ~protocol =
           Tezos_client.successful_client_cmd
             state
             ~client
-            [
-              "--wait";
+            [ "--wait";
               "none";
               "withdraw";
               "delegate";
               "from";
-              Tezos_protocol.Account.pubkey_hash account;
-            ])
+              Tezos_protocol.Account.pubkey_hash account ])
   >>= assert_baking_key (Some uri)
   >>= test_invalid_delegations
   >>= fun () -> return (baker, account)
@@ -398,8 +376,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
           state
           ~command_names:["baker"]
           ~make_admin
-          ~clients:[baker.Tezos_client.Keyed.client];
-      ] ;
+          ~clients:[baker.Tezos_client.Keyed.client] ] ;
   let bake () = Tezos_client.Keyed.bake state baker "Baked by ledger" in
   let endorse () =
     Tezos_client.Keyed.endorse state baker "Endorsed by ledger"

@@ -560,8 +560,7 @@ let log_config = ref None
 
 let spec =
   Arg.
-    [
-      ( "--addr",
+    [ ( "--addr",
         String (fun p -> addr := Ipaddr.V6.of_string_exn p),
         " Listening addr" );
       ( "-v",
@@ -582,8 +581,7 @@ let spec =
                    ~rules:
                      "test.p2p.connection -> debug; p2p.connection -> debug"
                    ())),
-        " Log up to debug msgs" );
-    ]
+        " Log up to debug msgs" ) ]
 
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
@@ -605,10 +603,8 @@ let main () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [
-      ( "p2p-connection.",
-        [
-          wrap "low-level" Low_level.run;
+    [ ( "p2p-connection.",
+        [ wrap "low-level" Low_level.run;
           wrap "kick" Kick.run;
           wrap "kicked" Kicked.run;
           wrap "simple-message" Simple_message.run;

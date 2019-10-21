@@ -731,8 +731,7 @@ let test_new_blocks s =
 (****************************************************************************)
 
 let tests : (string * (state -> unit tzresult Lwt.t)) list =
-  [
-    ("init", test_init);
+  [ ("init", test_init);
     ("read_block", test_read_block);
     ("path", test_path);
     ("ancestor", test_ancestor);
@@ -743,8 +742,7 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list =
     ("new_blocks", test_new_blocks);
     ( "set_checkpoint_then_purge_rolling",
       test_set_checkpoint_then_purge_rolling );
-    ("set_checkpoint_then_purge_full", test_set_checkpoint_then_purge_full);
-  ]
+    ("set_checkpoint_then_purge_full", test_set_checkpoint_then_purge_full) ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

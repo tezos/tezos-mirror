@@ -239,97 +239,89 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
           ~json:
             (union
                ~tag_size:`Uint8
-               [
-                 int_encoding Json_only;
+               [ int_encoding Json_only;
                  string_encoding Json_only;
                  bytes_encoding Json_only;
                  seq_encoding Json_only expr_encoding;
-                 application_encoding Json_only expr_encoding;
-               ])
+                 application_encoding Json_only expr_encoding ])
           ~binary:
             (union
                ~tag_size:`Uint8
-               [
-                 int_encoding (Tag 0);
+               [ int_encoding (Tag 0);
                  string_encoding (Tag 1);
                  seq_encoding (Tag 2) expr_encoding;
                  (* No args, no annot *)
-                   case
-                     (Tag 3)
-                     ~title:"Prim (no args, annot)"
-                     (obj1 (req "prim" prim_encoding))
-                     (function Prim (_, v, [], []) -> Some v | _ -> None)
-                     (fun v -> Prim (0, v, [], []));
+                 case
+                   (Tag 3)
+                   ~title:"Prim (no args, annot)"
+                   (obj1 (req "prim" prim_encoding))
+                   (function Prim (_, v, [], []) -> Some v | _ -> None)
+                   (fun v -> Prim (0, v, [], []));
                  (* No args, with annots *)
-                   case
-                     (Tag 4)
-                     ~title:"Prim (no args + annot)"
-                     (obj2
-                        (req "prim" prim_encoding)
-                        (req "annots" annots_encoding))
-                     (function
-                       | Prim (_, v, [], annots) ->
-                           Some (v, annots)
-                       | _ ->
-                           None)
-                     (function (prim, annots) -> Prim (0, prim, [], annots));
+                 case
+                   (Tag 4)
+                   ~title:"Prim (no args + annot)"
+                   (obj2
+                      (req "prim" prim_encoding)
+                      (req "annots" annots_encoding))
+                   (function
+                     | Prim (_, v, [], annots) -> Some (v, annots) | _ -> None)
+                   (function (prim, annots) -> Prim (0, prim, [], annots));
                  (* Single arg, no annot *)
-                   case
-                     (Tag 5)
-                     ~title:"Prim (1 arg, no annot)"
-                     (obj2 (req "prim" prim_encoding) (req "arg" expr_encoding))
-                     (function
-                       | Prim (_, v, [arg], []) -> Some (v, arg) | _ -> None)
-                     (function (prim, arg) -> Prim (0, prim, [arg], []));
+                 case
+                   (Tag 5)
+                   ~title:"Prim (1 arg, no annot)"
+                   (obj2 (req "prim" prim_encoding) (req "arg" expr_encoding))
+                   (function
+                     | Prim (_, v, [arg], []) -> Some (v, arg) | _ -> None)
+                   (function (prim, arg) -> Prim (0, prim, [arg], []));
                  (* Single arg, with annot *)
-                   case
-                     (Tag 6)
-                     ~title:"Prim (1 arg + annot)"
-                     (obj3
-                        (req "prim" prim_encoding)
-                        (req "arg" expr_encoding)
-                        (req "annots" annots_encoding))
-                     (function
-                       | Prim (_, prim, [arg], annots) ->
-                           Some (prim, arg, annots)
-                       | _ ->
-                           None)
-                     (fun (prim, arg, annots) -> Prim (0, prim, [arg], annots));
+                 case
+                   (Tag 6)
+                   ~title:"Prim (1 arg + annot)"
+                   (obj3
+                      (req "prim" prim_encoding)
+                      (req "arg" expr_encoding)
+                      (req "annots" annots_encoding))
+                   (function
+                     | Prim (_, prim, [arg], annots) ->
+                         Some (prim, arg, annots)
+                     | _ ->
+                         None)
+                   (fun (prim, arg, annots) -> Prim (0, prim, [arg], annots));
                  (* Two args, no annot *)
-                   case
-                     (Tag 7)
-                     ~title:"Prim (2 args, no annot)"
-                     (obj3
-                        (req "prim" prim_encoding)
-                        (req "arg1" expr_encoding)
-                        (req "arg2" expr_encoding))
-                     (function
-                       | Prim (_, prim, [arg1; arg2], []) ->
-                           Some (prim, arg1, arg2)
-                       | _ ->
-                           None)
-                     (fun (prim, arg1, arg2) ->
-                       Prim (0, prim, [arg1; arg2], []));
+                 case
+                   (Tag 7)
+                   ~title:"Prim (2 args, no annot)"
+                   (obj3
+                      (req "prim" prim_encoding)
+                      (req "arg1" expr_encoding)
+                      (req "arg2" expr_encoding))
+                   (function
+                     | Prim (_, prim, [arg1; arg2], []) ->
+                         Some (prim, arg1, arg2)
+                     | _ ->
+                         None)
+                   (fun (prim, arg1, arg2) -> Prim (0, prim, [arg1; arg2], []));
                  (* Two args, with annots *)
-                   case
-                     (Tag 8)
-                     ~title:"Prim (2 args + annot)"
-                     (obj4
-                        (req "prim" prim_encoding)
-                        (req "arg1" expr_encoding)
-                        (req "arg2" expr_encoding)
-                        (req "annots" annots_encoding))
-                     (function
-                       | Prim (_, prim, [arg1; arg2], annots) ->
-                           Some (prim, arg1, arg2, annots)
-                       | _ ->
-                           None)
-                     (fun (prim, arg1, arg2, annots) ->
-                       Prim (0, prim, [arg1; arg2], annots));
+                 case
+                   (Tag 8)
+                   ~title:"Prim (2 args + annot)"
+                   (obj4
+                      (req "prim" prim_encoding)
+                      (req "arg1" expr_encoding)
+                      (req "arg2" expr_encoding)
+                      (req "annots" annots_encoding))
+                   (function
+                     | Prim (_, prim, [arg1; arg2], annots) ->
+                         Some (prim, arg1, arg2, annots)
+                     | _ ->
+                         None)
+                   (fun (prim, arg1, arg2, annots) ->
+                     Prim (0, prim, [arg1; arg2], annots));
                  (* General case *)
-                   application_encoding (Tag 9) expr_encoding;
-                 bytes_encoding (Tag 10);
-               ]))
+                 application_encoding (Tag 9) expr_encoding;
+                 bytes_encoding (Tag 10) ]))
   in
   conv
     (function Canonical node -> node)

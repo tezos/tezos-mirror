@@ -31,169 +31,123 @@ let manager_script_code : Script_repr.lazy_expr =
   Script_repr.lazy_expr @@ strip_locations
   @@ Seq
        ( 0,
-         [
-           Prim
+         [ Prim
              ( 0,
                K_parameter,
-               [
-                 Prim
+               [ Prim
                    ( 0,
                      T_or,
-                     [
-                       Prim
+                     [ Prim
                          ( 0,
                            T_lambda,
-                           [
-                             Prim (0, T_unit, [], []);
+                           [ Prim (0, T_unit, [], []);
                              Prim
-                               (0, T_list, [Prim (0, T_operation, [], [])], []);
+                               (0, T_list, [Prim (0, T_operation, [], [])], [])
                            ],
                            ["%do"] );
-                       Prim (0, T_unit, [], ["%default"]);
-                     ],
-                     [] );
-               ],
+                       Prim (0, T_unit, [], ["%default"]) ],
+                     [] ) ],
                [] );
            Prim (0, K_storage, [Prim (0, T_key_hash, [], [])], []);
            Prim
              ( 0,
                K_code,
-               [
-                 Seq
+               [ Seq
                    ( 0,
-                     [
-                       Seq
+                     [ Seq
                          ( 0,
-                           [
-                             Seq
+                           [ Seq
                                ( 0,
-                                 [
-                                   Prim (0, I_DUP, [], []);
+                                 [ Prim (0, I_DUP, [], []);
                                    Prim (0, I_CAR, [], []);
                                    Prim
                                      ( 0,
                                        I_DIP,
                                        [Seq (0, [Prim (0, I_CDR, [], [])])],
-                                       [] );
-                                 ] );
-                           ] );
+                                       [] ) ] ) ] );
                        Prim
                          ( 0,
                            I_IF_LEFT,
-                           [
-                             Seq
+                           [ Seq
                                ( 0,
-                                 [
-                                   Prim
+                                 [ Prim
                                      ( 0,
                                        I_PUSH,
-                                       [
-                                         Prim (0, T_mutez, [], []);
-                                         Int (0, Z.zero);
-                                       ],
+                                       [ Prim (0, T_mutez, [], []);
+                                         Int (0, Z.zero) ],
                                        [] );
                                    Prim (0, I_AMOUNT, [], []);
                                    Seq
                                      ( 0,
-                                       [
-                                         Seq
+                                       [ Seq
                                            ( 0,
-                                             [
-                                               Prim (0, I_COMPARE, [], []);
-                                               Prim (0, I_EQ, [], []);
-                                             ] );
+                                             [ Prim (0, I_COMPARE, [], []);
+                                               Prim (0, I_EQ, [], []) ] );
                                          Prim
                                            ( 0,
                                              I_IF,
-                                             [
-                                               Seq (0, []);
+                                             [ Seq (0, []);
                                                Seq
                                                  ( 0,
-                                                   [
-                                                     Seq
+                                                   [ Seq
                                                        ( 0,
-                                                         [
-                                                           Prim
+                                                         [ Prim
                                                              (0, I_UNIT, [], []);
                                                            Prim
                                                              ( 0,
                                                                I_FAILWITH,
                                                                [],
-                                                               [] );
-                                                         ] );
-                                                   ] );
-                                             ],
-                                             [] );
-                                       ] );
+                                                               [] ) ] ) ] ) ],
+                                             [] ) ] );
                                    Seq
                                      ( 0,
-                                       [
-                                         Prim
+                                       [ Prim
                                            ( 0,
                                              I_DIP,
-                                             [
-                                               Seq
-                                                 (0, [Prim (0, I_DUP, [], [])]);
+                                             [ Seq
+                                                 (0, [Prim (0, I_DUP, [], [])])
                                              ],
                                              [] );
-                                         Prim (0, I_SWAP, [], []);
-                                       ] );
+                                         Prim (0, I_SWAP, [], []) ] );
                                    Prim (0, I_IMPLICIT_ACCOUNT, [], []);
                                    Prim (0, I_ADDRESS, [], []);
                                    Prim (0, I_SENDER, [], []);
                                    Seq
                                      ( 0,
-                                       [
-                                         Seq
+                                       [ Seq
                                            ( 0,
-                                             [
-                                               Prim (0, I_COMPARE, [], []);
-                                               Prim (0, I_EQ, [], []);
-                                             ] );
+                                             [ Prim (0, I_COMPARE, [], []);
+                                               Prim (0, I_EQ, [], []) ] );
                                          Prim
                                            ( 0,
                                              I_IF,
-                                             [
-                                               Seq (0, []);
+                                             [ Seq (0, []);
                                                Seq
                                                  ( 0,
-                                                   [
-                                                     Seq
+                                                   [ Seq
                                                        ( 0,
-                                                         [
-                                                           Prim
+                                                         [ Prim
                                                              (0, I_UNIT, [], []);
                                                            Prim
                                                              ( 0,
                                                                I_FAILWITH,
                                                                [],
-                                                               [] );
-                                                         ] );
-                                                   ] );
-                                             ],
-                                             [] );
-                                       ] );
+                                                               [] ) ] ) ] ) ],
+                                             [] ) ] );
                                    Prim (0, I_UNIT, [], []);
                                    Prim (0, I_EXEC, [], []);
-                                   Prim (0, I_PAIR, [], []);
-                                 ] );
+                                   Prim (0, I_PAIR, [], []) ] );
                              Seq
                                ( 0,
-                                 [
-                                   Prim (0, I_DROP, [], []);
+                                 [ Prim (0, I_DROP, [], []);
                                    Prim
                                      ( 0,
                                        I_NIL,
                                        [Prim (0, T_operation, [], [])],
                                        [] );
-                                   Prim (0, I_PAIR, [], []);
-                                 ] );
-                           ],
-                           [] );
-                     ] );
-               ],
-               [] );
-         ] )
+                                   Prim (0, I_PAIR, [], []) ] ) ],
+                           [] ) ] ) ],
+               [] ) ] )
 
 (* Find the toplevel expression with a given prim type from list,
    because they can be in arbitrary order. *)
@@ -241,9 +195,8 @@ let add_do :
           (Prim
             ( _,
               K_storage,
-              [
-                Prim
-                  (_, code_storage_type, code_storage_expr, code_storage_annot);
+              [ Prim
+                  (_, code_storage_type, code_storage_expr, code_storage_annot)
               ],
               k_storage_annot )),
         Some (Prim (_, K_code, [code_expr], code_annot)) ) ->
@@ -251,100 +204,77 @@ let add_do :
         let migrated_code =
           Seq
             ( 0,
-              [
-                Prim
+              [ Prim
                   ( 0,
                     K_parameter,
-                    [
-                      Prim
+                    [ Prim
                         ( 0,
                           T_or,
-                          [
-                            Prim
+                          [ Prim
                               ( 0,
                                 T_lambda,
-                                [
-                                  Prim (0, T_unit, [], []);
+                                [ Prim (0, T_unit, [], []);
                                   Prim
                                     ( 0,
                                       T_list,
                                       [Prim (0, T_operation, [], [])],
-                                      [] );
-                                ],
+                                      [] ) ],
                                 ["%do"] );
                             Prim
                               ( 0,
                                 parameter_type,
                                 parameter_expr,
-                                "%default" :: parameter_annot );
-                          ],
-                          [] );
-                    ],
+                                "%default" :: parameter_annot ) ],
+                          [] ) ],
                     prim_param_annot );
                 Prim
                   ( 0,
                     K_storage,
-                    [
-                      Prim
+                    [ Prim
                         ( 0,
                           T_pair,
-                          [
-                            Prim (0, T_key_hash, [], []);
+                          [ Prim (0, T_key_hash, [], []);
                             Prim
                               ( 0,
                                 code_storage_type,
                                 code_storage_expr,
-                                code_storage_annot );
-                          ],
-                          [] );
-                    ],
+                                code_storage_annot ) ],
+                          [] ) ],
                     k_storage_annot );
                 Prim
                   ( 0,
                     K_code,
-                    [
-                      Seq
+                    [ Seq
                         ( 0,
-                          [
-                            Prim (0, I_DUP, [], []);
+                          [ Prim (0, I_DUP, [], []);
                             Prim (0, I_CAR, [], []);
                             Prim
                               ( 0,
                                 I_IF_LEFT,
-                                [
-                                  Seq
+                                [ Seq
                                     ( 0,
-                                      [
-                                        Prim
+                                      [ Prim
                                           ( 0,
                                             I_PUSH,
-                                            [
-                                              Prim (0, T_mutez, [], []);
-                                              Int (0, Z.zero);
-                                            ],
+                                            [ Prim (0, T_mutez, [], []);
+                                              Int (0, Z.zero) ],
                                             [] );
                                         Prim (0, I_AMOUNT, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_COMPARE, [], []);
-                                                    Prim (0, I_EQ, [], []);
-                                                  ] );
+                                                  [ Prim (0, I_COMPARE, [], []);
+                                                    Prim (0, I_EQ, [], []) ] );
                                               Prim
                                                 ( 0,
                                                   I_IF,
-                                                  [
-                                                    Seq (0, []);
+                                                  [ Seq (0, []);
                                                     Seq
                                                       ( 0,
-                                                        [
-                                                          Seq
+                                                        [ Seq
                                                             ( 0,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     I_UNIT,
                                                                     [],
@@ -353,29 +283,21 @@ let add_do :
                                                                   ( 0,
                                                                     I_FAILWITH,
                                                                     [],
-                                                                    [] );
-                                                              ] );
-                                                        ] );
-                                                  ],
-                                                  [] );
-                                            ] );
+                                                                    [] ) ] ) ]
+                                                      ) ],
+                                                  [] ) ] );
                                         Seq
                                           ( 0,
-                                            [
-                                              Prim
+                                            [ Prim
                                                 ( 0,
                                                   I_DIP,
-                                                  [
-                                                    Seq
+                                                  [ Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
-                                                            (0, I_DUP, [], []);
-                                                        ] );
-                                                  ],
+                                                        [ Prim
+                                                            (0, I_DUP, [], [])
+                                                        ] ) ],
                                                   [] );
-                                              Prim (0, I_SWAP, [], []);
-                                            ] );
+                                              Prim (0, I_SWAP, [], []) ] );
                                         Prim (0, I_CDR, [], []);
                                         Prim (0, I_CAR, [], []);
                                         Prim (0, I_IMPLICIT_ACCOUNT, [], []);
@@ -383,17 +305,14 @@ let add_do :
                                         Prim (0, I_SENDER, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Prim (0, I_COMPARE, [], []);
+                                            [ Prim (0, I_COMPARE, [], []);
                                               Prim (0, I_NEQ, [], []);
                                               Prim
                                                 ( 0,
                                                   I_IF,
-                                                  [
-                                                    Seq
+                                                  [ Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
+                                                        [ Prim
                                                             ( 0,
                                                               I_SENDER,
                                                               [],
@@ -401,8 +320,7 @@ let add_do :
                                                           Prim
                                                             ( 0,
                                                               I_PUSH,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     T_string,
                                                                     [],
@@ -413,8 +331,7 @@ let add_do :
                                                                      owner \
                                                                      can \
                                                                      operate."
-                                                                  );
-                                                              ],
+                                                                  ) ],
                                                               [] );
                                                           Prim
                                                             (0, I_PAIR, [], []);
@@ -422,52 +339,40 @@ let add_do :
                                                             ( 0,
                                                               I_FAILWITH,
                                                               [],
-                                                              [] );
-                                                        ] );
+                                                              [] ) ] );
                                                     Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
+                                                        [ Prim
                                                             (0, I_UNIT, [], []);
                                                           Prim
                                                             (0, I_EXEC, [], []);
                                                           Prim
                                                             ( 0,
                                                               I_DIP,
-                                                              [
-                                                                Seq
+                                                              [ Seq
                                                                   ( 0,
-                                                                    [
-                                                                      Prim
+                                                                    [ Prim
                                                                         ( 0,
                                                                           I_CDR,
                                                                           [],
-                                                                          [] );
-                                                                    ] );
-                                                              ],
+                                                                          [] )
+                                                                    ] ) ],
                                                               [] );
                                                           Prim
-                                                            (0, I_PAIR, [], []);
-                                                        ] );
-                                                  ],
-                                                  [] );
-                                            ] );
-                                      ] );
+                                                            (0, I_PAIR, [], [])
+                                                        ] ) ],
+                                                  [] ) ] ) ] );
                                   Seq
                                     ( 0,
-                                      [
-                                        Prim
+                                      [ Prim
                                           ( 0,
                                             I_DIP,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_CDR, [], []);
+                                                  [ Prim (0, I_CDR, [], []);
                                                     Prim (0, I_DUP, [], []);
-                                                    Prim (0, I_CDR, [], []);
-                                                  ] );
-                                            ],
+                                                    Prim (0, I_CDR, [], []) ]
+                                                ) ],
                                             [] );
                                         Prim (0, I_PAIR, [], []);
                                         code_expr;
@@ -476,65 +381,47 @@ let add_do :
                                         Prim (0, I_SWAP, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_DUP, [], []);
+                                                  [ Prim (0, I_DUP, [], []);
                                                     Prim (0, I_CAR, [], []);
                                                     Prim
                                                       ( 0,
                                                         I_DIP,
-                                                        [
-                                                          Seq
+                                                        [ Seq
                                                             ( 0,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     I_CDR,
                                                                     [],
-                                                                    [] );
-                                                              ] );
-                                                        ],
-                                                        [] );
-                                                  ] );
-                                            ] );
+                                                                    [] ) ] ) ],
+                                                        [] ) ] ) ] );
                                         Prim
                                           ( 0,
                                             I_DIP,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_SWAP, [], []);
-                                                    Prim (0, I_PAIR, [], []);
-                                                  ] );
-                                            ],
+                                                  [ Prim (0, I_SWAP, [], []);
+                                                    Prim (0, I_PAIR, [], []) ]
+                                                ) ],
                                             [] );
-                                        Prim (0, I_PAIR, [], []);
-                                      ] );
-                                ],
-                                [] );
-                          ] );
-                    ],
-                    code_annot );
-              ] )
+                                        Prim (0, I_PAIR, [], []) ] ) ],
+                                [] ) ] ) ],
+                    code_annot ) ] )
         in
         let migrated_storage =
           Prim
             ( 0,
               D_Pair,
-              [
-                (* Instead of
+              [ (* Instead of
                    `String (0, Signature.Public_key_hash.to_b58check manager_pkh)`
                    the storage is written as unparsed with [Optimized] *)
-                  Bytes
-                    ( 0,
-                      Data_encoding.Binary.to_bytes_exn
-                        Signature.Public_key_hash.encoding
-                        manager_pkh );
-                storage_expr;
-              ],
+                Bytes
+                  ( 0,
+                    Data_encoding.Binary.to_bytes_exn
+                      Signature.Public_key_hash.encoding
+                      manager_pkh );
+                storage_expr ],
               [] )
         in
         ( Script_repr.lazy_expr @@ strip_locations migrated_code,
@@ -574,9 +461,8 @@ let add_set_delegate :
           (Prim
             ( _,
               K_storage,
-              [
-                Prim
-                  (_, code_storage_type, code_storage_expr, code_storage_annot);
+              [ Prim
+                  (_, code_storage_type, code_storage_expr, code_storage_annot)
               ],
               k_storage_annot )),
         Some (Prim (_, K_code, [code_expr], code_annot)) ) ->
@@ -584,96 +470,73 @@ let add_set_delegate :
         let migrated_code =
           Seq
             ( 0,
-              [
-                Prim
+              [ Prim
                   ( 0,
                     K_parameter,
-                    [
-                      Prim
+                    [ Prim
                         ( 0,
                           T_or,
-                          [
-                            Prim
+                          [ Prim
                               ( 0,
                                 T_or,
-                                [
-                                  Prim (0, T_key_hash, [], ["%set_delegate"]);
-                                  Prim (0, T_unit, [], ["%remove_delegate"]);
-                                ],
+                                [ Prim (0, T_key_hash, [], ["%set_delegate"]);
+                                  Prim (0, T_unit, [], ["%remove_delegate"]) ],
                                 [] );
                             Prim
                               ( 0,
                                 parameter_type,
                                 parameter_expr,
-                                "%default" :: parameter_annot );
-                          ],
-                          [] );
-                    ],
+                                "%default" :: parameter_annot ) ],
+                          [] ) ],
                     prim_param_annot );
                 Prim
                   ( 0,
                     K_storage,
-                    [
-                      Prim
+                    [ Prim
                         ( 0,
                           T_pair,
-                          [
-                            Prim (0, T_key_hash, [], []);
+                          [ Prim (0, T_key_hash, [], []);
                             Prim
                               ( 0,
                                 code_storage_type,
                                 code_storage_expr,
-                                code_storage_annot );
-                          ],
-                          [] );
-                    ],
+                                code_storage_annot ) ],
+                          [] ) ],
                     k_storage_annot );
                 Prim
                   ( 0,
                     K_code,
-                    [
-                      Seq
+                    [ Seq
                         ( 0,
-                          [
-                            Prim (0, I_DUP, [], []);
+                          [ Prim (0, I_DUP, [], []);
                             Prim (0, I_CAR, [], []);
                             Prim
                               ( 0,
                                 I_IF_LEFT,
-                                [
-                                  Seq
+                                [ Seq
                                     ( 0,
-                                      [
-                                        Prim
+                                      [ Prim
                                           ( 0,
                                             I_PUSH,
-                                            [
-                                              Prim (0, T_mutez, [], []);
-                                              Int (0, Z.zero);
-                                            ],
+                                            [ Prim (0, T_mutez, [], []);
+                                              Int (0, Z.zero) ],
                                             [] );
                                         Prim (0, I_AMOUNT, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_COMPARE, [], []);
-                                                    Prim (0, I_EQ, [], []);
-                                                  ] );
+                                                  [ Prim (0, I_COMPARE, [], []);
+                                                    Prim (0, I_EQ, [], []) ] );
                                               Prim
                                                 ( 0,
                                                   I_IF,
-                                                  [
-                                                    Seq (0, []);
+                                                  [ Seq (0, []);
                                                     Seq
                                                       ( 0,
-                                                        [
-                                                          Seq
+                                                        [ Seq
                                                             ( 0,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     I_UNIT,
                                                                     [],
@@ -682,29 +545,21 @@ let add_set_delegate :
                                                                   ( 0,
                                                                     I_FAILWITH,
                                                                     [],
-                                                                    [] );
-                                                              ] );
-                                                        ] );
-                                                  ],
-                                                  [] );
-                                            ] );
+                                                                    [] ) ] ) ]
+                                                      ) ],
+                                                  [] ) ] );
                                         Seq
                                           ( 0,
-                                            [
-                                              Prim
+                                            [ Prim
                                                 ( 0,
                                                   I_DIP,
-                                                  [
-                                                    Seq
+                                                  [ Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
-                                                            (0, I_DUP, [], []);
-                                                        ] );
-                                                  ],
+                                                        [ Prim
+                                                            (0, I_DUP, [], [])
+                                                        ] ) ],
                                                   [] );
-                                              Prim (0, I_SWAP, [], []);
-                                            ] );
+                                              Prim (0, I_SWAP, [], []) ] );
                                         Prim (0, I_CDR, [], []);
                                         Prim (0, I_CAR, [], []);
                                         Prim (0, I_IMPLICIT_ACCOUNT, [], []);
@@ -712,17 +567,14 @@ let add_set_delegate :
                                         Prim (0, I_SENDER, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Prim (0, I_COMPARE, [], []);
+                                            [ Prim (0, I_COMPARE, [], []);
                                               Prim (0, I_NEQ, [], []);
                                               Prim
                                                 ( 0,
                                                   I_IF,
-                                                  [
-                                                    Seq
+                                                  [ Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
+                                                        [ Prim
                                                             ( 0,
                                                               I_SENDER,
                                                               [],
@@ -730,8 +582,7 @@ let add_set_delegate :
                                                           Prim
                                                             ( 0,
                                                               I_PUSH,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     T_string,
                                                                     [],
@@ -742,8 +593,7 @@ let add_set_delegate :
                                                                      owner \
                                                                      can \
                                                                      operate."
-                                                                  );
-                                                              ],
+                                                                  ) ],
                                                               [] );
                                                           Prim
                                                             (0, I_PAIR, [], []);
@@ -751,19 +601,15 @@ let add_set_delegate :
                                                             ( 0,
                                                               I_FAILWITH,
                                                               [],
-                                                              [] );
-                                                        ] );
+                                                              [] ) ] );
                                                     Seq
                                                       ( 0,
-                                                        [
-                                                          Prim
+                                                        [ Prim
                                                             ( 0,
                                                               I_DIP,
-                                                              [
-                                                                Seq
+                                                              [ Seq
                                                                   ( 0,
-                                                                    [
-                                                                      Prim
+                                                                    [ Prim
                                                                         ( 0,
                                                                           I_CDR,
                                                                           [],
@@ -771,27 +617,23 @@ let add_set_delegate :
                                                                       Prim
                                                                         ( 0,
                                                                           I_NIL,
-                                                                          [
-                                                                            Prim
+                                                                          [ Prim
                                                                               ( 
                                                                               0,
                                                                                T_operation,
                                                                                [],
                                                                                []
-                                                                              );
+                                                                              )
                                                                           ],
-                                                                          [] );
-                                                                    ] );
-                                                              ],
+                                                                          [] )
+                                                                    ] ) ],
                                                               [] );
                                                           Prim
                                                             ( 0,
                                                               I_IF_LEFT,
-                                                              [
-                                                                Seq
+                                                              [ Seq
                                                                   ( 0,
-                                                                    [
-                                                                      Prim
+                                                                    [ Prim
                                                                         ( 0,
                                                                           I_SOME,
                                                                           [],
@@ -810,12 +652,11 @@ let add_set_delegate :
                                                                         ( 0,
                                                                           I_PAIR,
                                                                           [],
-                                                                          [] );
+                                                                          [] )
                                                                     ] );
                                                                 Seq
                                                                   ( 0,
-                                                                    [
-                                                                      Prim
+                                                                    [ Prim
                                                                         ( 0,
                                                                           I_DROP,
                                                                           [],
@@ -823,14 +664,13 @@ let add_set_delegate :
                                                                       Prim
                                                                         ( 0,
                                                                           I_NONE,
-                                                                          [
-                                                                            Prim
+                                                                          [ Prim
                                                                               ( 
                                                                               0,
                                                                                T_key_hash,
                                                                                [],
                                                                                []
-                                                                              );
+                                                                              )
                                                                           ],
                                                                           [] );
                                                                       Prim
@@ -847,30 +687,21 @@ let add_set_delegate :
                                                                         ( 0,
                                                                           I_PAIR,
                                                                           [],
-                                                                          [] );
-                                                                    ] );
-                                                              ],
-                                                              [] );
-                                                        ] );
-                                                  ],
-                                                  [] );
-                                            ] );
-                                      ] );
+                                                                          [] )
+                                                                    ] ) ],
+                                                              [] ) ] ) ],
+                                                  [] ) ] ) ] );
                                   Seq
                                     ( 0,
-                                      [
-                                        Prim
+                                      [ Prim
                                           ( 0,
                                             I_DIP,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_CDR, [], []);
+                                                  [ Prim (0, I_CDR, [], []);
                                                     Prim (0, I_DUP, [], []);
-                                                    Prim (0, I_CDR, [], []);
-                                                  ] );
-                                            ],
+                                                    Prim (0, I_CDR, [], []) ]
+                                                ) ],
                                             [] );
                                         Prim (0, I_PAIR, [], []);
                                         code_expr;
@@ -879,65 +710,47 @@ let add_set_delegate :
                                         Prim (0, I_SWAP, [], []);
                                         Seq
                                           ( 0,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_DUP, [], []);
+                                                  [ Prim (0, I_DUP, [], []);
                                                     Prim (0, I_CAR, [], []);
                                                     Prim
                                                       ( 0,
                                                         I_DIP,
-                                                        [
-                                                          Seq
+                                                        [ Seq
                                                             ( 0,
-                                                              [
-                                                                Prim
+                                                              [ Prim
                                                                   ( 0,
                                                                     I_CDR,
                                                                     [],
-                                                                    [] );
-                                                              ] );
-                                                        ],
-                                                        [] );
-                                                  ] );
-                                            ] );
+                                                                    [] ) ] ) ],
+                                                        [] ) ] ) ] );
                                         Prim
                                           ( 0,
                                             I_DIP,
-                                            [
-                                              Seq
+                                            [ Seq
                                                 ( 0,
-                                                  [
-                                                    Prim (0, I_SWAP, [], []);
-                                                    Prim (0, I_PAIR, [], []);
-                                                  ] );
-                                            ],
+                                                  [ Prim (0, I_SWAP, [], []);
+                                                    Prim (0, I_PAIR, [], []) ]
+                                                ) ],
                                             [] );
-                                        Prim (0, I_PAIR, [], []);
-                                      ] );
-                                ],
-                                [] );
-                          ] );
-                    ],
-                    code_annot );
-              ] )
+                                        Prim (0, I_PAIR, [], []) ] ) ],
+                                [] ) ] ) ],
+                    code_annot ) ] )
         in
         let migrated_storage =
           Prim
             ( 0,
               D_Pair,
-              [
-                (* Instead of
+              [ (* Instead of
                    `String (0, Signature.Public_key_hash.to_b58check manager_pkh)`
                    the storage is written as unparsed with [Optimized] *)
-                  Bytes
-                    ( 0,
-                      Data_encoding.Binary.to_bytes_exn
-                        Signature.Public_key_hash.encoding
-                        manager_pkh );
-                storage_expr;
-              ],
+                Bytes
+                  ( 0,
+                    Data_encoding.Binary.to_bytes_exn
+                      Signature.Public_key_hash.encoding
+                      manager_pkh );
+                storage_expr ],
               [] )
         in
         ( Script_repr.lazy_expr @@ strip_locations migrated_code,

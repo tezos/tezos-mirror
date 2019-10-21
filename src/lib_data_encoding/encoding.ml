@@ -859,15 +859,13 @@ let option ty =
   (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
-    [
-      case (Tag 1) ty ~title:"Some" (fun x -> x) (fun x -> Some x);
+    [ case (Tag 1) ty ~title:"Some" (fun x -> x) (fun x -> Some x);
       case
         (Tag 0)
         null
         ~title:"None"
         (function None -> Some () | Some _ -> None)
-        (fun () -> None);
-    ]
+        (fun () -> None) ]
 
 let mu name ?title ?description fix =
   let kind =
@@ -892,8 +890,7 @@ let mu name ?title ?description fix =
 let result ok_enc error_enc =
   union
     ~tag_size:`Uint8
-    [
-      case
+    [ case
         (Tag 1)
         ok_enc
         ~title:"Ok"
@@ -904,5 +901,4 @@ let result ok_enc error_enc =
         error_enc
         ~title:"Result"
         (function Ok _ -> None | Error x -> Some x)
-        (fun x -> Error x);
-    ]
+        (fun x -> Error x) ]

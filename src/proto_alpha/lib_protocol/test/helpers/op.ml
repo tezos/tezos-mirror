@@ -348,27 +348,21 @@ let dummy_script =
           (strip_locations
              (Seq
                 ( 0,
-                  [
-                    Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []);
+                  [ Prim (0, K_parameter, [Prim (0, T_unit, [], [])], []);
                     Prim (0, K_storage, [Prim (0, T_unit, [], [])], []);
                     Prim
                       ( 0,
                         K_code,
-                        [
-                          Seq
+                        [ Seq
                             ( 0,
-                              [
-                                Prim (0, I_CDR, [], []);
+                              [ Prim (0, I_CDR, [], []);
                                 Prim
                                   ( 0,
                                     I_NIL,
                                     [Prim (0, T_operation, [], [])],
                                     [] );
-                                Prim (0, I_PAIR, [], []);
-                              ] );
-                        ],
-                        [] );
-                  ] )));
+                                Prim (0, I_PAIR, [], []) ] ) ],
+                        [] ) ] )));
       storage = lazy_expr (strip_locations (Prim (0, D_Unit, [], [])));
     }
 

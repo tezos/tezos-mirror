@@ -142,16 +142,14 @@ module Cfg_file = struct
 
   let encoding =
     conv
-      (fun {
-             base_dir;
+      (fun { base_dir;
              node_addr;
              node_port;
              tls;
              web_port;
              remote_signer;
              confirmations;
-             password_filename;
-           } ->
+             password_filename } ->
         ( base_dir,
           Some node_addr,
           Some node_port,
@@ -391,8 +389,7 @@ let commands config_file cfg =
       title = "Commands for editing and viewing the client's config file";
     }
   in
-  [
-    command
+  [ command
       ~group
       ~desc:"Show the config file."
       no_options
@@ -455,8 +452,7 @@ let commands config_file cfg =
         if not (Sys.file_exists config_file) then
           Cfg_file.(write config_file cfg)
           (* Should be default or command would have failed *)
-        else failwith "Config file already exists at location");
-  ]
+        else failwith "Config file already exists at location") ]
 
 let global_options () =
   args13

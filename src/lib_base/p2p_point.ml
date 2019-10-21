@@ -227,8 +227,7 @@ module State = struct
          (connection already established), disconnected (no connection)."
     @@ union
          ~tag_size:`Uint8
-         [
-           case
+         [ case
              (Tag 0)
              ~title:"Requested"
              (branch_encoding "requested" empty)
@@ -255,8 +254,7 @@ module State = struct
              ~title:"Disconnected"
              (branch_encoding "disconnected" empty)
              (function Disconnected -> Some () | _ -> None)
-             (fun () -> Disconnected);
-         ]
+             (fun () -> Disconnected) ]
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
@@ -301,8 +299,7 @@ module Info = struct
         "Information about a peer point. Includes flags, state, and records \
          about past events."
     @@ conv
-         (fun {
-                trusted;
+         (fun { trusted;
                 greylisted_until;
                 state;
                 last_failed_connection;
@@ -310,8 +307,7 @@ module Info = struct
                 last_established_connection;
                 last_disconnection;
                 last_seen;
-                last_miss;
-              } ->
+                last_miss } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
            ( trusted,
              greylisted_until,
@@ -384,8 +380,7 @@ module Pool_event = struct
     in
     union
       ~tag_size:`Uint8
-      [
-        case
+      [ case
           (Tag 0)
           ~title:"Outgoing_request"
           (branch_encoding "outgoing_request" empty)
@@ -450,8 +445,7 @@ module Pool_event = struct
                 Some p2p_peer_id
             | _ ->
                 None)
-          (fun p2p_peer_id -> External_disconnection p2p_peer_id);
-      ]
+          (fun p2p_peer_id -> External_disconnection p2p_peer_id) ]
 
   type t = kind Time.System.stamped
 

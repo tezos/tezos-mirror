@@ -71,8 +71,7 @@ module Public_key_hash = struct
     let open Data_encoding in
     def "public_key_hash" ~description:title
     @@ union
-         [
-           case
+         [ case
              (Tag 0)
              Ed25519.Public_key_hash.encoding
              ~title:"Ed25519"
@@ -89,8 +88,7 @@ module Public_key_hash = struct
              ~title:"P256"
              P256.Public_key_hash.encoding
              (function P256 x -> Some x | _ -> None)
-             (function x -> P256 x);
-         ]
+             (function x -> P256 x) ]
 
   let to_bytes s = Data_encoding.Binary.to_bytes_exn raw_encoding s
 
@@ -369,8 +367,7 @@ module Public_key = struct
       let open Data_encoding in
       def "public_key" ~description:title
       @@ union
-           [
-             case
+           [ case
                (Tag 0)
                Ed25519.Public_key.encoding
                ~title:"Ed25519"
@@ -387,8 +384,7 @@ module Public_key = struct
                (Tag 2)
                P256.Public_key.encoding
                (function P256 x -> Some x | _ -> None)
-               (function x -> P256 x);
-           ]
+               (function x -> P256 x) ]
 
     let of_b58check = of_b58check
 
@@ -500,8 +496,7 @@ module Secret_key = struct
       let open Data_encoding in
       def "secret_key" ~description:title
       @@ union
-           [
-             case
+           [ case
                (Tag 0)
                Ed25519.Secret_key.encoding
                ~title:"Ed25519"
@@ -518,8 +513,7 @@ module Secret_key = struct
                ~title:"P256"
                P256.Secret_key.encoding
                (function P256 x -> Some x | _ -> None)
-               (function x -> P256 x);
-           ]
+               (function x -> P256 x) ]
 
     let of_b58check = of_b58check
 

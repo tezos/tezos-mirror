@@ -30,8 +30,7 @@ open Client_context_unix
 
 let builtin_commands =
   let open Clic in
-  [
-    command
+  [ command
       ~desc:"List the protocol versions that this client understands."
       no_options
       (fixed ["list"; "understood"; "protocols"])
@@ -39,8 +38,7 @@ let builtin_commands =
         Lwt_list.iter_s
           (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
           (Client_commands.get_versions ())
-        >>= fun () -> return_unit);
-  ]
+        >>= fun () -> return_unit) ]
 
 module type M = sig
   type t

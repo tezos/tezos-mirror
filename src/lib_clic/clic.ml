@@ -1519,13 +1519,11 @@ let search_command keyword (Command {params; _}) =
 (* Command execution *)
 let exec (type ctx)
     ( Command
-        {
-          options = Argument {converter; spec = options_spec};
+        { options = Argument {converter; spec = options_spec};
           params = spec;
           handler;
           conv;
-          _;
-        } as command ) (ctx : ctx) params args_dict =
+          _ } as command ) (ctx : ctx) params args_dict =
   let rec exec :
       type ctx a.
       int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t
@@ -1942,8 +1940,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
   let rec with_manual =
     lazy
       ( commands
-      @ [
-          command
+      @ [ command
             ~group:manual_group
             ~desc:
               "Print documentation of commands.\n\
@@ -2040,8 +2037,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                     ~highlights:keywords
                     commands ;
                   restore_formatter ppf state ;
-                  return_unit);
-        ] )
+                  return_unit) ] )
   in
   Lazy.force with_manual
 

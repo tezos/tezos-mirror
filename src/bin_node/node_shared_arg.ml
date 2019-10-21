@@ -138,10 +138,8 @@ module Manpage = struct
   let args = [`S p2p_section; `S rpc_section; `S misc_section]
 
   let bugs =
-    [
-      `S "BUGS";
-      `P "Check bug reports at https://gitlab.com/tezos/tezos/issues.";
-    ]
+    [ `S "BUGS";
+      `P "Check bug reports at https://gitlab.com/tezos/tezos/issues." ]
 end
 
 module Term = struct
@@ -336,8 +334,7 @@ module Term = struct
       "The TCP socket address at which this RPC server instance can be reached."
     in
     Arg.(
-      value & opt_all string []
-      & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
+      value & opt_all string [] & info ~docs ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let rpc_tls =
     let doc =
@@ -354,8 +351,7 @@ module Term = struct
        may be used multiple times"
     in
     Arg.(
-      value & opt_all string []
-      & info ~docs ~doc ~docv:"ORIGIN" ["cors-origin"])
+      value & opt_all string [] & info ~docs ~doc ~docv:"ORIGIN" ["cors-origin"])
 
   let cors_headers =
     let doc =
@@ -363,8 +359,7 @@ module Term = struct
        preflighting; may be used multiple times"
     in
     Arg.(
-      value & opt_all string []
-      & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
+      value & opt_all string [] & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
   (* Args. *)
 
@@ -393,32 +388,30 @@ let read_data_dir args =
 let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
   read_config_file args
   >>=? fun cfg ->
-  let {
-    data_dir;
-    min_connections;
-    expected_connections;
-    max_connections;
-    max_download_speed;
-    max_upload_speed;
-    binary_chunks_size;
-    peer_table_size;
-    expected_pow;
-    peers;
-    no_bootstrap_peers;
-    listen_addr;
-    private_mode;
-    discovery_addr;
-    disable_mempool;
-    disable_testchain;
-    rpc_listen_addrs;
-    rpc_tls;
-    cors_origins;
-    cors_headers;
-    log_output;
-    bootstrap_threshold;
-    history_mode;
-    config_file = _;
-  } =
+  let { data_dir;
+        min_connections;
+        expected_connections;
+        max_connections;
+        max_download_speed;
+        max_upload_speed;
+        binary_chunks_size;
+        peer_table_size;
+        expected_pow;
+        peers;
+        no_bootstrap_peers;
+        listen_addr;
+        private_mode;
+        discovery_addr;
+        disable_mempool;
+        disable_testchain;
+        rpc_listen_addrs;
+        rpc_tls;
+        cors_origins;
+        cors_headers;
+        log_output;
+        bootstrap_threshold;
+        history_mode;
+        config_file = _ } =
     args
   in
   let bootstrap_peers =

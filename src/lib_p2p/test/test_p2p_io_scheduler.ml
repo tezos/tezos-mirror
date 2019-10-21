@@ -207,8 +207,7 @@ let display_client_stat = ref None
 
 let spec =
   Arg.
-    [
-      ("--port", Int (fun p -> port := Some p), " Listening port");
+    [ ("--port", Int (fun p -> port := Some p), " Listening port");
       ( "--addr",
         String (fun p -> addr := Ipaddr.V6.of_string_exn p),
         " Listening addr" );
@@ -234,8 +233,7 @@ let spec =
         " Hide the client bandwidth statistic." );
       ( "--display_clients_stat",
         Unit (fun () -> display_client_stat := Some true),
-        " Display the client bandwidth statistic." );
-    ]
+        " Display the client bandwidth statistic." ) ]
 
 let () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
@@ -259,10 +257,8 @@ let () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [
-      ( "p2p.io-scheduler",
-        [
-          wrap "trivial-quota" (fun () ->
+    [ ( "p2p.io-scheduler",
+        [ wrap "trivial-quota" (fun () ->
               run
                 ?display_client_stat:!display_client_stat
                 ?max_download_speed:!max_download_speed
@@ -273,6 +269,4 @@ let () =
                 !addr
                 !port
                 !delay
-                !clients);
-        ] );
-    ]
+                !clients) ] ) ]

@@ -112,9 +112,7 @@ let test_block_reward priority () =
   Assert.equal_tez ~loc:__LOC__ baking_reward expected_reward_min_endo
 
 let tests =
-  [
-    Test.tztest "cycle" `Quick test_cycle;
+  [ Test.tztest "cycle" `Quick test_cycle;
     Test.tztest "block_reward for priority 0" `Quick (test_block_reward 0);
     Test.tztest "block_reward for priority 1" `Quick (test_block_reward 1);
-    Test.tztest "block_reward for priority 3" `Quick (test_block_reward 3);
-  ]
+    Test.tztest "block_reward for priority 3" `Quick (test_block_reward 3) ]

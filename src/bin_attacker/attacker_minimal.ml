@@ -350,8 +350,7 @@ let main () =
               >>= fun () -> Lwt.return_unit ))
   in
   let cmds =
-    [
-      ( "-1",
+    [ ( "-1",
         run_cmd_int_suffix
           (run_action << request_block_times genesis_block_hashed),
         "[N {,K,M,G}] Attempt to request to download N {,kilo,mega,giga}blocks."
@@ -387,7 +386,6 @@ let main () =
         "[N {,K,M,G}] Attempt to send a chain of N {,kilo,mega,giga}blocks" );
       ( "-10",
         run_cmd_int_suffix (run_action << lots_transactions 0L 0L),
-        "[N {,K,M,G}] Attempt to send N {,kilo,mega,giga}ops" );
-    ]
+        "[N {,K,M,G}] Attempt to send N {,kilo,mega,giga}ops" ) ]
   in
   Arg.parse cmds print_endline "Tezos Evil Client"

@@ -59,12 +59,11 @@ sig
     option
 
   val clic_commands :
-    base_dir:
-      (* This function defines how you put together different types of
+    base_dir:(* This function defines how you put together different types of
        commands. Default (in [Client_config]) is to simply append the lists
        together. Arguments [base_dir] and [require_auth] are to be used
        if you need them, default (in [Client_config]) is to ignore them. *)
-      string ->
+             string ->
     config_commands:Tezos_client_base.Client_context.full Clic.command list ->
     builtin_commands:Tezos_client_base.Client_context.full Clic.command list ->
     other_commands:Tezos_client_base.Client_context.full Clic.command list ->
@@ -81,8 +80,7 @@ end
 val run :
   ?log:(string -> unit) ->
   (module M) ->
-  select_commands:
-    (RPC_client_unix.http_ctxt ->
-    Client_config.cli_args ->
-    Client_context.full Clic.command list tzresult Lwt.t) ->
+  select_commands:(RPC_client_unix.http_ctxt ->
+                  Client_config.cli_args ->
+                  Client_context.full Clic.command list tzresult Lwt.t) ->
   unit

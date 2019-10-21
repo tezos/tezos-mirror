@@ -69,10 +69,8 @@ let assert_compare_macro prim_name compare_name =
     (Prim (zero_loc, prim_name, [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "COMPARE", [], []);
-           Prim (zero_loc, compare_name, [], []);
-         ] ))
+         [ Prim (zero_loc, "COMPARE", [], []);
+           Prim (zero_loc, compare_name, [], []) ] ))
 
 let test_compare_marco_expansion () =
   assert_compare_macro "CMPEQ" "EQ"
@@ -91,10 +89,8 @@ let assert_if_macro prim_name compare_name =
     (Prim (zero_loc, prim_name, [left_branch; right_branch], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, compare_name, [], []);
-           Prim (zero_loc, "IF", [left_branch; right_branch], []);
-         ] ))
+         [ Prim (zero_loc, compare_name, [], []);
+           Prim (zero_loc, "IF", [left_branch; right_branch], []) ] ))
 
 let test_if_compare_macros_expansion () =
   assert_if_macro "IFEQ" "EQ"
@@ -112,11 +108,9 @@ let assert_if_cmp_macros prim_name compare_name =
     (Prim (zero_loc, prim_name, [left_branch; right_branch], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "COMPARE", [], []);
+         [ Prim (zero_loc, "COMPARE", [], []);
            Prim (zero_loc, compare_name, [], []);
-           Prim (zero_loc, "IF", [left_branch; right_branch], []);
-         ] ))
+           Prim (zero_loc, "IF", [left_branch; right_branch], []) ] ))
 
 let test_if_cmp_macros_expansion () =
   assert_if_cmp_macros "IFCMPEQ" "EQ"
@@ -165,10 +159,8 @@ let assert_assert_if_compare prim_name compare_name =
     (Prim (zero_loc, prim_name, [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, compare_name, [], []);
-           Prim (zero_loc, "IF", fail_false, []);
-         ] ))
+         [ Prim (zero_loc, compare_name, [], []);
+           Prim (zero_loc, "IF", fail_false, []) ] ))
 
 let test_assert_if () =
   assert_assert_if_compare "ASSERT_EQ" "EQ"
@@ -187,15 +179,11 @@ let assert_cmp_if prim_name compare_name =
     (Prim (zero_loc, prim_name, [], []))
     (Seq
        ( zero_loc,
-         [
-           Seq
+         [ Seq
              ( zero_loc,
-               [
-                 Prim (zero_loc, "COMPARE", [], []);
-                 Prim (zero_loc, compare_name, [], []);
-               ] );
-           Prim (zero_loc, "IF", fail_false, []);
-         ] ))
+               [ Prim (zero_loc, "COMPARE", [], []);
+                 Prim (zero_loc, compare_name, [], []) ] );
+           Prim (zero_loc, "IF", fail_false, []) ] ))
 
 let test_assert_cmp_if () =
   assert_cmp_if "ASSERT_CMPEQ" "EQ"
@@ -218,34 +206,22 @@ let test_assert_cmp_if () =
 let may_rename annot = Seq (zero_loc, [Prim (zero_loc, "RENAME", [], annot)])
 
 let fail_false_may_rename =
-  [
-    may_rename ["@annot"];
+  [ may_rename ["@annot"];
     Seq
       ( zero_loc,
-        [
-          Seq
+        [ Seq
             ( zero_loc,
-              [
-                Prim (zero_loc, "UNIT", [], []);
-                Prim (zero_loc, "FAILWITH", [], []);
-              ] );
-        ] );
-  ]
+              [ Prim (zero_loc, "UNIT", [], []);
+                Prim (zero_loc, "FAILWITH", [], []) ] ) ] ) ]
 
 let fail_true_may_rename =
-  [
-    Seq
+  [ Seq
       ( zero_loc,
-        [
-          Seq
+        [ Seq
             ( zero_loc,
-              [
-                Prim (zero_loc, "UNIT", [], []);
-                Prim (zero_loc, "FAILWITH", [], []);
-              ] );
-        ] );
-    may_rename ["@annot"];
-  ]
+              [ Prim (zero_loc, "UNIT", [], []);
+                Prim (zero_loc, "FAILWITH", [], []) ] ) ] );
+    may_rename ["@annot"] ]
 
 let test_assert_some_annot () =
   assert_expands
@@ -314,11 +290,9 @@ let test_pappaiir () =
     (Prim (zero_loc, "PAPPAIIR", [], []))
     (Seq
        ( zero_loc,
-         [
+         [ Prim (zero_loc, "DIP", [Seq (zero_loc, [pair])], []);
            Prim (zero_loc, "DIP", [Seq (zero_loc, [pair])], []);
-           Prim (zero_loc, "DIP", [Seq (zero_loc, [pair])], []);
-           pair;
-         ] ))
+           pair ] ))
 
 (* unpair *)
 
@@ -327,19 +301,15 @@ let test_unpair () =
     (Prim (zero_loc, "UNPAIR", [], []))
     (Seq
        ( zero_loc,
-         [
-           Seq
+         [ Seq
              ( zero_loc,
-               [
-                 Prim (zero_loc, "DUP", [], []);
+               [ Prim (zero_loc, "DUP", [], []);
                  Prim (zero_loc, "CAR", [], []);
                  Prim
                    ( zero_loc,
                      "DIP",
                      [Seq (zero_loc, [Prim (zero_loc, "CDR", [], [])])],
-                     [] );
-               ] );
-         ] ))
+                     [] ) ] ) ] ))
 
 (* duup *)
 
@@ -349,10 +319,8 @@ let test_duup () =
     (Prim (zero_loc, "DUUP", [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DIP", [Seq (zero_loc, [dup])], []);
-           Prim (zero_loc, "SWAP", [], []);
-         ] ))
+         [ Prim (zero_loc, "DIP", [Seq (zero_loc, [dup])], []);
+           Prim (zero_loc, "SWAP", [], []) ] ))
 
 (* car/cdr *)
 
@@ -382,37 +350,30 @@ let test_set_car_expansion () =
     (Prim (zero_loc, "SET_CAR", [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "CDR", [], ["@%%"]);
+         [ Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] ))
 
 let test_set_cdr_expansion () =
   assert_expands
     (Prim (zero_loc, "SET_CDR", [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-         ] ))
+         [ Prim (zero_loc, "CAR", [], ["@%%"]);
+           Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] ))
 
 let test_set_cadr_expansion () =
   let set_car =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "CAR", [], ["@%%"]);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-        ] )
+        [ Prim (zero_loc, "CAR", [], ["@%%"]);
+          Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] )
   in
   assert_expands
     (Prim (zero_loc, "SET_CADR", [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
@@ -420,33 +381,28 @@ let test_set_cadr_expansion () =
                [] );
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
 let test_set_cdar_expansion () =
   let set_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "CDR", [], ["@%%"]);
+        [ Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] )
   in
   assert_expands
     (Prim (zero_loc, "SET_CDAR", [], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "CDR", [], ["@%%"]); set_cdr])],
                [] );
            Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
 (* TO BE CHANGE IN THE DOCUMENTATION: @MR!791
    FROM:
@@ -462,8 +418,7 @@ let test_map_car () =
     (Prim (zero_loc, "MAP_CAR", [code], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim
              ( zero_loc,
@@ -471,8 +426,7 @@ let test_map_car () =
                [Seq (zero_loc, [Prim (zero_loc, "CAR", [], []); code])],
                [] );
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] ))
 
 let test_map_cdr () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
@@ -480,34 +434,29 @@ let test_map_cdr () =
     (Prim (zero_loc, "MAP_CDR", [code], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CDR", [], []);
            code;
            Prim (zero_loc, "SWAP", [], []);
            Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] ))
 
 let test_map_caadr () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
   let map_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim (zero_loc, "CDR", [], []);
           code;
           Prim (zero_loc, "SWAP", [], []);
           Prim (zero_loc, "CAR", [], ["@%%"]);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] )
   in
   let map_cadr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim
             ( zero_loc,
               "DIP",
@@ -515,46 +464,38 @@ let test_map_caadr () =
               [] );
           Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] )
   in
   assert_expands
     (Prim (zero_loc, "MAP_CAADR", [code], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
-               [
-                 Seq (zero_loc, [Prim (zero_loc, "CAR", [], ["@%%"]); map_cadr]);
-               ],
+               [Seq (zero_loc, [Prim (zero_loc, "CAR", [], ["@%%"]); map_cadr])],
                [] );
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
 let test_map_cdadr () =
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
   let map_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim (zero_loc, "CDR", [], []);
           code;
           Prim (zero_loc, "SWAP", [], []);
           Prim (zero_loc, "CAR", [], ["@%%"]);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] )
   in
   let map_cadr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim
             ( zero_loc,
               "DIP",
@@ -562,25 +503,20 @@ let test_map_cdadr () =
               [] );
           Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] )
   in
   assert_expands
     (Prim (zero_loc, "MAP_CDADR", [code], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
-               [
-                 Seq (zero_loc, [Prim (zero_loc, "CDR", [], ["@%%"]); map_cadr]);
-               ],
+               [Seq (zero_loc, [Prim (zero_loc, "CDR", [], ["@%%"]); map_cadr])],
                [] );
            Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
 (****************************************************************************)
 (* Unexpand tests *)
@@ -648,10 +584,8 @@ let assert_unexpansion_assert_if_compare compare_name prim_name =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, compare_name, [], []);
-           Prim (zero_loc, "IF", fail_false, []);
-         ] ))
+         [ Prim (zero_loc, compare_name, [], []);
+           Prim (zero_loc, "IF", fail_false, []) ] ))
     (Prim (zero_loc, prim_name, [], []))
 
 let test_unexpand_assert_if () =
@@ -670,15 +604,11 @@ let assert_unexpansion_assert_cmp_if_compare compare_name prim_name =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Seq
+         [ Seq
              ( zero_loc,
-               [
-                 Prim (zero_loc, "COMPARE", [], []);
-                 Prim (zero_loc, compare_name, [], []);
-               ] );
-           Prim (zero_loc, "IF", fail_false, []);
-         ] ))
+               [ Prim (zero_loc, "COMPARE", [], []);
+                 Prim (zero_loc, compare_name, [], []) ] );
+           Prim (zero_loc, "IF", fail_false, []) ] ))
     (Prim (zero_loc, prim_name, [], []))
 
 let test_unexpansion_assert_cmp_if () =
@@ -732,19 +662,15 @@ let test_unexpand_unpair () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Seq
+         [ Seq
              ( zero_loc,
-               [
-                 Prim (zero_loc, "DUP", [], []);
+               [ Prim (zero_loc, "DUP", [], []);
                  Prim (zero_loc, "CAR", [], []);
                  Prim
                    ( zero_loc,
                      "DIP",
                      [Seq (zero_loc, [Prim (zero_loc, "CDR", [], [])])],
-                     [] );
-               ] );
-         ] ))
+                     [] ) ] ) ] ))
     (Prim (zero_loc, "UNPAIR", [], []))
 
 let test_unexpand_pair () =
@@ -756,8 +682,7 @@ let test_unexpand_pappaiir () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim
+         [ Prim
              ( zero_loc,
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "PAIR", [], [])])],
@@ -767,22 +692,19 @@ let test_unexpand_pappaiir () =
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "PAIR", [], [])])],
                [] );
-           Prim (zero_loc, "PAIR", [], []);
-         ] ))
+           Prim (zero_loc, "PAIR", [], []) ] ))
     (Prim (zero_loc, "PAPPAIIR", [], []))
 
 let test_unexpand_duup () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim
+         [ Prim
              ( zero_loc,
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "DUP", [], [])])],
                [] );
-           Prim (zero_loc, "SWAP", [], []);
-         ] ))
+           Prim (zero_loc, "SWAP", [], []) ] ))
     (Prim (zero_loc, "DUP", [Int (zero_loc, Z.of_int 2)], []))
 
 let test_unexpand_caddadr () =
@@ -804,64 +726,53 @@ let test_unexpand_set_car () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "CDR", [], ["@%%"]);
+         [ Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] ))
     (Prim (zero_loc, "SET_CAR", [], []))
 
 let test_unexpand_set_cdr () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-         ] ))
+         [ Prim (zero_loc, "CAR", [], ["@%%"]);
+           Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] ))
     (Prim (zero_loc, "SET_CDR", [], []))
 
 let test_unexpand_set_car_annot () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CAR", [], ["%@"]);
            Prim (zero_loc, "DROP", [], []);
            Prim (zero_loc, "CDR", [], []);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], []);
-         ] ))
+           Prim (zero_loc, "PAIR", [], []) ] ))
     (Prim (zero_loc, "SET_CAR", [], ["%@"]))
 
 let test_unexpand_set_cdr_annot () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CDR", [], ["%@"]);
            Prim (zero_loc, "DROP", [], []);
            Prim (zero_loc, "CAR", [], []);
-           Prim (zero_loc, "PAIR", [], []);
-         ] ))
+           Prim (zero_loc, "PAIR", [], []) ] ))
     (Prim (zero_loc, "SET_CDR", [], ["%@"]))
 
 let test_unexpand_set_cadr () =
   let set_car =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "CAR", [], ["@%%"]);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-        ] )
+        [ Prim (zero_loc, "CAR", [], ["@%%"]);
+          Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] )
   in
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
@@ -869,33 +780,28 @@ let test_unexpand_set_cadr () =
                [] );
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
     (Prim (zero_loc, "SET_CADR", [], []))
 
 let test_unexpand_set_cdar () =
   let set_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "CDR", [], ["@%%"]);
+        [ Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] )
   in
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "CDR", [], ["@%%"]); set_cdr])],
                [] );
            Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
     (Prim (zero_loc, "SET_CDAR", [], []))
 
 (* FIXME: Seq()(Prim): does not parse, raise an error unparse *)
@@ -905,24 +811,18 @@ let test_unexpand_map_car () =
     (Prim (zero_loc, "MAP_CAR", [code], []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim
              ( zero_loc,
                "DIP",
-               [
-                 Seq
+               [ Seq
                    ( zero_loc,
-                     [
-                       Prim (zero_loc, "CAR", [], []);
-                       Prim (zero_loc, "CAR", [], []);
-                     ] );
-               ],
+                     [ Prim (zero_loc, "CAR", [], []);
+                       Prim (zero_loc, "CAR", [], []) ] ) ],
                [] );
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%"; "%@"]) ] ))
 
 (***********************************************************************)
 (*BUG: DIIP and the test with MAP_CDR: or any map with "D" inside fail *)
@@ -938,14 +838,12 @@ let test_unexpand_map_cdr () =
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim (zero_loc, "CDR", [], []);
            code;
            Prim (zero_loc, "SWAP", [], []);
            Prim (zero_loc, "CAR", [], []);
-           Prim (zero_loc, "PAIR", [], []);
-         ] ))
+           Prim (zero_loc, "PAIR", [], []) ] ))
     (Prim (zero_loc, "MAP_CDR", [code], []))
 
 let test_unexpand_map_caadr () =
@@ -953,40 +851,31 @@ let test_unexpand_map_caadr () =
   let map_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim
             ( zero_loc,
               "DIP",
-              [
-                Seq
+              [ Seq
                   ( zero_loc,
-                    [
-                      Prim (zero_loc, "CAR", [], ["@%%"]);
+                    [ Prim (zero_loc, "CAR", [], ["@%%"]);
                       Seq
                         ( zero_loc,
-                          [
-                            Prim (zero_loc, "DUP", [], []);
+                          [ Prim (zero_loc, "DUP", [], []);
                             Prim (zero_loc, "CDR", [], []);
                             Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]);
                             Prim (zero_loc, "SWAP", [], []);
                             Prim (zero_loc, "CAR", [], ["@%%"]);
-                            Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-                          ] );
-                    ] );
-              ],
+                            Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] ) ] ) ],
               [] );
           Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] )
   in
   assert_unexpansion
     (Prim (zero_loc, "MAP_CAAR", code, []))
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
@@ -994,55 +883,44 @@ let test_unexpand_map_caadr () =
                [] );
            Prim (zero_loc, "CDR", [], ["@%%"]);
            Prim (zero_loc, "SWAP", [], []);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
 
 let test_unexpand_map_cdadr () =
   let code = [Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])])] in
   let map_cdr =
     Seq
       ( zero_loc,
-        [
-          Prim (zero_loc, "DUP", [], []);
+        [ Prim (zero_loc, "DUP", [], []);
           Prim
             ( zero_loc,
               "DIP",
-              [
-                Seq
+              [ Seq
                   ( zero_loc,
-                    [
-                      Prim (zero_loc, "CAR", [], ["@%%"]);
+                    [ Prim (zero_loc, "CAR", [], ["@%%"]);
                       Seq
                         ( zero_loc,
-                          [
-                            Prim (zero_loc, "DUP", [], []);
+                          [ Prim (zero_loc, "DUP", [], []);
                             Prim (zero_loc, "CDR", [], []);
                             Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]);
                             Prim (zero_loc, "SWAP", [], []);
                             Prim (zero_loc, "CAR", [], ["@%%"]);
-                            Prim (zero_loc, "PAIR", [], ["%@"; "%"]);
-                          ] );
-                    ] );
-              ],
+                            Prim (zero_loc, "PAIR", [], ["%@"; "%"]) ] ) ] ) ],
               [] );
           Prim (zero_loc, "CDR", [], ["@%%"]);
           Prim (zero_loc, "SWAP", [], []);
-          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-        ] )
+          Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] )
   in
   assert_unexpansion
     (Seq
        ( zero_loc,
-         [
-           Prim (zero_loc, "DUP", [], []);
+         [ Prim (zero_loc, "DUP", [], []);
            Prim
              ( zero_loc,
                "DIP",
                [Seq (zero_loc, [Prim (zero_loc, "CDR", [], ["@%%"]); map_cdr])],
                [] );
            Prim (zero_loc, "CAR", [], ["@%%"]);
-           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]);
-         ] ))
+           Prim (zero_loc, "PAIR", [], ["%@"; "%@"]) ] ))
     (Prim (zero_loc, "MAP_CDADR", code, []))
 
 let test_unexpand_diip_duup1 () =
@@ -1085,18 +963,16 @@ let test_unexpand_diip_duup2 () =
 (*****************************************************************************)
 
 let tests =
-  [
-    (*compare*)
-      ( "compare expansion",
-        fun _ -> Lwt.return (test_compare_marco_expansion ()) );
+  [ (*compare*)
+    ("compare expansion", fun _ -> Lwt.return (test_compare_marco_expansion ()));
     ( "if compare expansion",
       fun _ -> Lwt.return (test_if_compare_macros_expansion ()) );
     ( "if compare expansion: IFCMP",
       fun _ -> Lwt.return (test_if_cmp_macros_expansion ()) );
     (*fail*)
-      ("fail expansion", fun _ -> Lwt.return (test_fail_expansion ()));
+    ("fail expansion", fun _ -> Lwt.return (test_fail_expansion ()));
     (*assertion*)
-      ("assert expansion", fun _ -> Lwt.return (test_assert_expansion ()));
+    ("assert expansion", fun _ -> Lwt.return (test_assert_expansion ()));
     ("assert if expansion", fun _ -> Lwt.return (test_assert_if ()));
     ("assert cmpif expansion", fun _ -> Lwt.return (test_assert_cmp_if ()));
     ("assert none expansion", fun _ -> Lwt.return (test_assert_none ()));
@@ -1110,7 +986,7 @@ let tests =
     ( "assert right annot expansion",
       fun _ -> Lwt.return (test_assert_right_annot ()) );
     (*syntactic conveniences*)
-      ("diip expansion", fun _ -> Lwt.return (test_diip ()));
+    ("diip expansion", fun _ -> Lwt.return (test_diip ()));
     ("duup expansion", fun _ -> Lwt.return (test_duup ()));
     ("pair expansion", fun _ -> Lwt.return (test_pair ()));
     ("pappaiir expansion", fun _ -> Lwt.return (test_pappaiir ()));
@@ -1126,7 +1002,7 @@ let tests =
     ("map_caadr expansion", fun _ -> Lwt.return (test_map_caadr ()));
     ("map_cdadr expansion", fun _ -> Lwt.return (test_map_cdadr ()));
     (*Unexpand*)
-      ("fail unexpansion", fun _ -> Lwt.return (test_unexpand_fail ()));
+    ("fail unexpansion", fun _ -> Lwt.return (test_unexpand_fail ()));
     ("if_right unexpansion", fun _ -> Lwt.return (test_unexpand_if_right ()));
     ("if_some unexpansion", fun _ -> Lwt.return (test_unexpand_if_some ()));
     ("assert unexpansion", fun _ -> Lwt.return (test_unexpand_assert ()));
@@ -1163,18 +1039,17 @@ let tests =
     ( "diip_duup1 unexpansion",
       fun _ -> Lwt.return (test_unexpand_diip_duup1 ()) );
     ( "diip_duup2 unexpansion",
-      fun _ -> Lwt.return (test_unexpand_diip_duup2 ()) );
-      (***********************************************************************)
-      (*BUG
+      fun _ -> Lwt.return (test_unexpand_diip_duup2 ()) )
+    (***********************************************************************)
+    (*BUG
       the function in Michelson_v1_macros.unexpand_map_caddadr
       failed to test the case with the character "D".
       It returns an empty {} for the expand *)
-      (*"diip unexpansion",  (fun _ -> Lwt.return (test_unexpand_diip ())) ;*)
-      (*"map_cdr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdr ())) ;*)
-      (*"map_caadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_caadr ())) ;*)
-      (*"map_cdadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdadr ())) ;*)
-    
-  ]
+    (*"diip unexpansion",  (fun _ -> Lwt.return (test_unexpand_diip ())) ;*)
+    (*"map_cdr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdr ())) ;*)
+    (*"map_caadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_caadr ())) ;*)
+    (*"map_cdadr unexpansion",  (fun _ -> Lwt.return (test_unexpand_map_cdadr ())) ;*)
+   ]
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

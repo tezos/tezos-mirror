@@ -41,10 +41,8 @@ let set_accounts cf accounts = cf := {!cf with accounts}
 let read_args () =
   let args = ref default_args in
   let specific =
-    [
-      ("--blocks", Arg.Int (set_blocks args), "number of blocks");
-      ("--accounts", Arg.Int (set_accounts args), "number of acount");
-    ]
+    [ ("--blocks", Arg.Int (set_blocks args), "number of blocks");
+      ("--accounts", Arg.Int (set_accounts args), "number of acount") ]
   in
   let usage = "Usage: [--blocks n] [--accounts n] " in
   Arg.parse specific (fun _ -> ()) usage ;

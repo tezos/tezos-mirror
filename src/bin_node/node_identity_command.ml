@@ -172,8 +172,7 @@ module Manpage = struct
      is necessary to launch Tezos the first time."
 
   let description =
-    [
-      `S "DESCRIPTION";
+    [ `S "DESCRIPTION";
       `P (command_description ^ " Several options are possible:");
       `P
         "$(b,show) reads, parses and displays the current identity of the \
@@ -190,8 +189,7 @@ module Manpage = struct
       `P
         "$(b,check [difficulty]) checks that an identity is valid and that \
          its proof of work stamp difficulty is at least equal to \
-         $(i,difficulty).";
-    ]
+         $(i,difficulty)." ]
 
   let man = description @ (* [ `S misc_docs ] @ *)
                           Node_shared_arg.Manpage.bugs

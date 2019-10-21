@@ -72,16 +72,14 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     `Or_fail
     ~protocol_paths:[new_protocol_path]
     ~executables:
-      [
-        node_exec;
+      [ node_exec;
         client_exec;
         first_baker_exec;
         first_endorser_exec;
         first_accuser_exec;
         second_baker_exec;
         second_endorser_exec;
-        second_accuser_exec;
-      ]
+        second_accuser_exec ]
   >>= fun () ->
   Test_scenario.network_with_protocol
     ?external_peer_ports
@@ -104,8 +102,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   let accusers =
     List.concat_map nodes ~f:(fun node ->
         let client = Tezos_client.of_node node ~exec:client_exec in
-        [
-          Tezos_daemon.accuser_of_node
+        [ Tezos_daemon.accuser_of_node
             ~exec:first_accuser_exec
             ~client
             node
@@ -114,8 +111,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             ~exec:second_accuser_exec
             ~client
             node
-            ~name_tag:"second";
-        ])
+            ~name_tag:"second" ])
   in
   List_sequential.iter accusers ~f:(fun acc ->
       Running_processes.start state (Tezos_daemon.process acc ~state)
@@ -138,8 +134,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
              Some
                ( acc,
                  client,
-                 [
-                   Tezos_daemon.baker_of_node
+                 [ Tezos_daemon.baker_of_node
                      ~exec:first_baker_exec
                      ~client
                      node
@@ -162,8 +157,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
                      ~name_tag:"second"
                      ~client
                      node
-                     ~key;
-                 ] ))
+                     ~key ] ))
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -176,10 +170,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         EF.(
           desc_list
             (haf "Registration-as-delegate:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
+            [ desc (af "Client:") (af "%S" client.Tezos_client.id);
+              desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
       Tezos_client.register_as_delegate ~state client key
       >>= fun () ->
@@ -188,10 +180,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         EF.(
           desc_list
             (haf "Starting daemons:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
+            [ desc (af "Client:") (af "%S" client.Tezos_client.id);
+              desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
           Running_processes.start state (Tezos_daemon.process daemon ~state)
@@ -287,12 +277,10 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         ~node_exec
         ~client_exec
         ~protocol_execs:
-          [
-            ( protocol.Tezos_protocol.hash,
+          [ ( protocol.Tezos_protocol.hash,
               first_baker_exec,
               first_endorser_exec );
-            (new_protocol_hash, second_baker_exec, second_endorser_exec);
-          ]
+            (new_protocol_hash, second_baker_exec, second_endorser_exec) ]
       >>= fun () ->
       let msg =
         EF.(
@@ -314,11 +302,9 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   Interactive_test.Pauser.generic
     state
     EF.
-      [
-        wf "Test becomes interactive.";
+      [ wf "Test becomes interactive.";
         Option.value kiln_info_opt ~default:(wf "");
-        wf "Please type `q` to start a voting/protocol-change period.";
-      ]
+        wf "Please type `q` to start a voting/protocol-change period." ]
     ~force:true
   >>= fun () ->
   wait_for_voting_period
@@ -332,14 +318,12 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     Tezos_client.successful_client_cmd
       state
       ~client
-      [
-        "submit";
+      [ "submit";
         "proposals";
         "for";
         Tezos_protocol.Account.name acc;
         hash;
-        "--force";
-      ]
+        "--force" ]
     >>= fun _ ->
     Console.sayf
       state
@@ -393,14 +377,12 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       Tezos_client.successful_client_cmd
         state
         ~client
-        [
-          "submit";
+        [ "submit";
           "ballot";
           "for";
           Tezos_protocol.Account.name acc;
           new_protocol_hash;
-          "yea";
-        ]
+          "yea" ]
       >>= fun _ ->
       Console.sayf
         state
@@ -429,14 +411,12 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       Tezos_client.successful_client_cmd
         state
         ~client
-        [
-          "submit";
+        [ "submit";
           "ballot";
           "for";
           Tezos_protocol.Account.name acc;
           new_protocol_hash;
-          (if protocol_switch_will_happen then "yea" else "nay");
-        ]
+          (if protocol_switch_will_happen then "yea" else "nay") ]
       >>= fun _ ->
       Console.sayf
         state
@@ -487,27 +467,23 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   Interactive_test.Pauser.generic
     state
     EF.
-      [
-        wf
+      [ wf
           "Test finished, protocol is now %s, things should keep baking."
           protocol_to_wait_for;
-        markdown_verbatim (String.concat ~sep:"\n" res#out);
-      ]
+        markdown_verbatim (String.concat ~sep:"\n" res#out) ]
     ~force:true
 
 let cmd ~pp_error () =
   let open Cmdliner in
   let open Term in
   let variants =
-    [
-      ( "full-upgrade",
+    [ ( "full-upgrade",
         `Full_upgrade,
         "Go through the whole voting process and do the protocol change." );
       ( "nay-for-promotion",
         `Nay_for_promotion,
         "Go through the whole voting process but vote Nay at the last period \
-         and hence stay on the same protocol." );
-    ]
+         and hence stay on the same protocol." ) ]
   in
   Test_command_line.Run_command.make
     ~pp_error
@@ -658,8 +634,7 @@ let cmd ~pp_error () =
        "Vote and Protocol-upgrade with bakers, endorsers, and accusers."
      in
      let man : Manpage.block list =
-       [
-         `S "DAEMONS-UPGRADE TEST";
+       [ `S "DAEMONS-UPGRADE TEST";
          `P
            "This test builds and runs a sandbox network to do a full voting \
             round followed by a protocol change while all the daemons.";
@@ -674,8 +649,7 @@ let cmd ~pp_error () =
          `Blocks
            (List.concat_mapi
               ~f:(fun i s -> [`Noblank; `P (sprintf "%d) %s" (i + 1) s)])
-              [
-                "It starts a sandbox assuming the protocol of the `--first-*` \
+              [ "It starts a sandbox assuming the protocol of the `--first-*` \
                  executables (use the `--protocol-hash` option to make sure \
                  it matches).";
                 "An interactive pause is done to let the user play with the \
@@ -687,8 +661,6 @@ let cmd ~pp_error () =
                 "Once the potential protocol switch has happened (and been \
                  verified), the test re-enters an interactive prompt to let \
                  the user play with the protocol (the first or second one, \
-                 depending on the `--test-variant` option).";
-              ]);
-       ]
+                 depending on the `--test-variant` option)." ]) ]
      in
      info "daemons-upgrade" ~man ~doc)

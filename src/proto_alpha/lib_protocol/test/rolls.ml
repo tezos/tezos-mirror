@@ -301,8 +301,7 @@ let delegation () =
   >>=? fun () -> check_rolls b m3 >>=? fun () -> check_rolls b m1
 
 let tests =
-  [
-    Test.tztest "simple staking rights" `Quick simple_staking_rights;
+  [ Test.tztest "simple staking rights" `Quick simple_staking_rights;
     Test.tztest
       "simple staking rights after baking"
       `Quick
@@ -320,5 +319,4 @@ let tests =
       "deactivation then empty then self delegation then recredit"
       `Quick
       deactivation_then_empty_then_self_delegation_then_recredit;
-    Test.tztest "delegation" `Quick delegation;
-  ]
+    Test.tztest "delegation" `Quick delegation ]

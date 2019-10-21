@@ -120,16 +120,12 @@ struct
   let create ?protocol_data ~predecessor ~timestamp () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
-    let {
-      Block_header.shell =
-        {
-          fitness = predecessor_fitness;
-          timestamp = predecessor_timestamp;
-          level = predecessor_level;
-          _;
-        };
-      _;
-    } =
+    let { Block_header.shell =
+            { fitness = predecessor_fitness;
+              timestamp = predecessor_timestamp;
+              level = predecessor_level;
+              _ };
+          _ } =
       State.Block.header predecessor
     in
     State.Block.context predecessor

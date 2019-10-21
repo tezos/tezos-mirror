@@ -146,8 +146,7 @@ module Public_key = Client_aliases.Alias (struct
   let encoding =
     let open Data_encoding in
     union
-      [
-        case
+      [ case
           Json_only
           ~title:"Locator_only"
           uri_encoding
@@ -160,8 +159,7 @@ module Public_key = Client_aliases.Alias (struct
              (req "locator" uri_encoding)
              (req "key" Signature.Public_key.encoding))
           (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
-          (fun (uri, key) -> (uri, Some key));
-      ]
+          (fun (uri, key) -> (uri, Some key)) ]
 end)
 
 module type SIGNER = sig

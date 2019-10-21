@@ -238,8 +238,7 @@ type error +=
 let protocol_error_encoding =
   let open Data_encoding in
   union
-    [
-      case
+    [ case
         (Tag 0)
         ~title:"Compilation failed"
         (obj1 (req "error" (constant "compilation_failed")))
@@ -250,8 +249,7 @@ let protocol_error_encoding =
         ~title:"Dynlinking failed"
         (obj1 (req "error" (constant "dynlinking_failed")))
         (function Dynlinking_failed -> Some () | _ -> None)
-        (fun () -> Dynlinking_failed);
-    ]
+        (fun () -> Dynlinking_failed) ]
 
 let pp_protocol_error ppf = function
   | Compilation_failed ->

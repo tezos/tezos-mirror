@@ -79,29 +79,27 @@ let expected_qr_num =
 let protos =
   Array.map
     (fun s -> Protocol_hash.of_b58check_exn s)
-    [|
-      "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha84efbeiF6cm";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha91249Z65tWS";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha537f5h25LnN";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha5c8fefgDYkr";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3f31feSSarC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabe31ahnkxSC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabab3bgRb7zQ";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaf8d39cctbpk";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3b981byuYxD";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaa116bccYowi";
-      "ProtoALphaALphaALphaALphaALphaALphaALphacce68eHqboj";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha225c7YrWwR7";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha58743cJL6FG";
-      "ProtoALphaALphaALphaALphaALphaALphaALphac91bcdvmJFR";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha1faaadhV7oW";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha98232gD94QJ";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha9d1d8cijvAh";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaeec52dKF6Gx";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX";
-    |]
+    [| "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
+       "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha84efbeiF6cm";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha91249Z65tWS";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha537f5h25LnN";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha5c8fefgDYkr";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha3f31feSSarC";
+       "ProtoALphaALphaALphaALphaALphaALphaALphabe31ahnkxSC";
+       "ProtoALphaALphaALphaALphaALphaALphaALphabab3bgRb7zQ";
+       "ProtoALphaALphaALphaALphaALphaALphaALphaf8d39cctbpk";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha3b981byuYxD";
+       "ProtoALphaALphaALphaALphaALphaALphaALphaa116bccYowi";
+       "ProtoALphaALphaALphaALphaALphaALphaALphacce68eHqboj";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha225c7YrWwR7";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha58743cJL6FG";
+       "ProtoALphaALphaALphaALphaALphaALphaALphac91bcdvmJFR";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha1faaadhV7oW";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha98232gD94QJ";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha9d1d8cijvAh";
+       "ProtoALphaALphaALphaALphaALphaALphaALphaeec52dKF6Gx";
+       "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX" |]
 
 (** helper functions *)
 let mk_contracts_from_pkh pkh_list =
@@ -765,11 +763,9 @@ let test_supermajority_in_proposal there_is_a_winner () =
   Context.init ~min_proposal_quorum ~initial_balances:[1L; 1L; 1L] 10
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
-  >>=? fun {
-             parametric =
+  >>=? fun { parametric =
                {blocks_per_cycle; blocks_per_voting_period; tokens_per_roll; _};
-             _;
-           } ->
+             _ } ->
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
   let del3 = List.nth delegates 2 in
@@ -840,16 +836,12 @@ let test_quorum_in_proposal has_quorum () =
   Context.init ~initial_balances:[1L; half_tokens; half_tokens] 3
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
-  >>=? fun {
-             parametric =
-               {
-                 blocks_per_cycle;
+  >>=? fun { parametric =
+               { blocks_per_cycle;
                  blocks_per_voting_period;
                  min_proposal_quorum;
-                 _;
-               };
-             _;
-           } ->
+                 _ };
+             _ } ->
   let del1 = List.nth delegates 0 in
   let del2 = List.nth delegates 1 in
   map_s (fun del -> Context.Contract.pkh del) [del1; del2]
@@ -1144,8 +1136,7 @@ let test_quorum_capped_minimum num_delegates () =
       failwith "%s - Unexpected period kind" __LOC__
 
 let tests =
-  [
-    Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
+  [ Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
     Test.tztest
       "voting testing vote, not enough quorum"
       `Quick
@@ -1193,5 +1184,4 @@ let tests =
     Test.tztest
       "voting quorum, quorum capped minimum"
       `Quick
-      (test_quorum_capped_minimum 401);
-  ]
+      (test_quorum_capped_minimum 401) ]

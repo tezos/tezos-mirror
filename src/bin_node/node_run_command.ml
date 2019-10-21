@@ -432,8 +432,7 @@ module Manpage = struct
     let log_sections =
       String.concat " " (List.rev !Internal_event.Legacy_logging.sections)
     in
-    [
-      `S "DEBUG";
+    [ `S "DEBUG";
       `P
         ( "The environment variable $(b,TEZOS_LOG) is used to fine-tune what \
            is going to be logged. The syntax is \
@@ -443,18 +442,16 @@ module Manpage = struct
            $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
            wildcard in sections, i.e. $(b, client* -> debug). The rules are \
            matched left to right, therefore the leftmost rule is highest \
-           priority ." );
-    ]
+           priority ." ) ]
 
   let examples =
-    [
-      `S "EXAMPLES";
+    [ `S "EXAMPLES";
       `I
         ( "$(b,Run in sandbox mode listening to RPC commands at localhost \
            port 8732)",
           "$(mname) run --sandbox --data-dir /custom/data/dir --rpc-addr \
            localhost:8732" );
-      `I ("$(b,Run a node that accepts network connections)", "$(mname) run");
+      `I ("$(b,Run a node that accepts network connections)", "$(mname) run")
     ]
 
   let man =

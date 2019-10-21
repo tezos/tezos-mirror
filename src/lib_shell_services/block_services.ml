@@ -212,8 +212,7 @@ let rec pp_raw_context ppf = function
 let raw_context_encoding =
   mu "raw_context" (fun encoding ->
       union
-        [
-          case
+        [ case
             (Tag 0)
             bytes
             ~title:"Key"
@@ -230,8 +229,7 @@ let raw_context_encoding =
             null
             ~title:"Cut"
             (function Cut -> Some () | _ -> None)
-            (fun () -> Cut);
-        ])
+            (fun () -> Cut) ])
 
 type error += Invalid_depth_arg of int
 
@@ -345,14 +343,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let block_metadata_encoding =
     def "block_header_metadata"
     @@ conv
-         (fun {
-                protocol_data;
+         (fun { protocol_data;
                 test_chain_status;
                 max_operations_ttl;
                 max_operation_data_length;
                 max_block_header_length;
-                operation_list_quota;
-              } ->
+                operation_list_quota } ->
            ( ( (),
                (),
                test_chain_status,

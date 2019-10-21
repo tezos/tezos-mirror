@@ -50,14 +50,12 @@ let build_rpc_directory validator mainchain_validator =
           Lwt.return_some (head_hash, head_header.shell.timestamp) )
         else
           Lwt.pick
-            [
-              Lwt_stream.get block_stream
+            [ Lwt_stream.get block_stream
               >|= Option.map ~f:(fun b ->
                       ( State.Block.hash b,
                         (State.Block.header b).shell.timestamp ));
               ( Chain_validator.bootstrapped mainchain_validator
-              >|= fun () -> None );
-            ]
+              >|= fun () -> None ) ]
       in
       let shutdown () = Lwt_watcher.shutdown stopper in
       RPC_answer.return_stream {next; shutdown}) ;

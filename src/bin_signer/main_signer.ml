@@ -123,8 +123,7 @@ let may_setup_pidfile = function
 let commands base_dir require_auth : Client_context.full command list =
   Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands None
-  @ [
-      command
+  @ [ command
         ~group
         ~desc:"Launch a signer daemon over a TCP socket."
         (args5
@@ -303,8 +302,7 @@ let commands base_dir require_auth : Client_context.full command list =
             | None ->
                 Signature.Public_key_hash.to_b58check pkh
           in
-          Handler.Authorized_key.add ~force:false cctxt name key);
-    ]
+          Handler.Authorized_key.add ~force:false cctxt name key) ]
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 

@@ -339,14 +339,12 @@ let test_dump {idx; block3b; _} =
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
-  [
-    ("simple", test_simple);
+  [ ("simple", test_simple);
     ("continuation", test_continuation);
     ("fork", test_fork);
     ("replay", test_replay);
     ("fold", test_fold);
-    ("dump", test_dump);
-  ]
+    ("dump", test_dump) ]
 
 let tests =
   List.map

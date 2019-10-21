@@ -47,11 +47,9 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   >>=? fun b ->
   (* fee + credit + block security deposit were debited from source *)
   Context.get_constants (B b)
-  >>=? fun {
-             parametric =
+  >>=? fun { parametric =
                {origination_size; cost_per_byte; block_security_deposit; _};
-             _;
-           } ->
+             _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
   Lwt.return
@@ -98,11 +96,9 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
      is not related to origination but to the baking done in the
      tests.*)
   Context.get_constants (B b)
-  >>=? fun {
-             parametric =
+  >>=? fun { parametric =
                {origination_size; cost_per_byte; block_security_deposit; _};
-             _;
-           } ->
+             _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
   Lwt.return
@@ -267,8 +263,7 @@ let counter () =
 (******************************************************)
 
 let tests =
-  [
-    Test.tztest "balances_simple" `Quick balances_simple;
+  [ Test.tztest "balances_simple" `Quick balances_simple;
     Test.tztest "balances_credit" `Quick balances_credit;
     Test.tztest "balances_credit_fee" `Quick balances_credit_fee;
     Test.tztest "balances_undelegatable" `Quick balances_undelegatable;
@@ -278,5 +273,4 @@ let tests =
       `Quick
       not_tez_in_contract_to_pay_fee;
     Test.tztest "multiple originations" `Quick multiple_originations;
-    Test.tztest "counter" `Quick counter;
-  ]
+    Test.tztest "counter" `Quick counter ]

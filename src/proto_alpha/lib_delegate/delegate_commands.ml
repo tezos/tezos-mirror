@@ -79,8 +79,7 @@ let block_param t =
 
 let delegate_commands () =
   let open Clic in
-  [
-    command
+  [ command
       ~group
       ~desc:"Forge and inject block using the delegate rights."
       (args8
@@ -226,8 +225,7 @@ let delegate_commands () =
               (Block_hash.Map.cardinal orphan_nonces)
               (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
               block_hashes
-            >>= fun () -> return_unit));
-  ]
+            >>= fun () -> return_unit)) ]
 
 let baker_commands () =
   let open Clic in
@@ -237,8 +235,7 @@ let baker_commands () =
       title = "Commands related to the baker daemon.";
     }
   in
-  [
-    command
+  [ command
       ~group
       ~desc:"Launch the baker daemon."
       (args5
@@ -275,8 +272,7 @@ let baker_commands () =
           ~minimal_nanotez_per_byte
           ?max_priority
           ~context_path:(Filename.concat node_path "context")
-          (List.map snd delegates));
-  ]
+          (List.map snd delegates)) ]
 
 let endorser_commands () =
   let open Clic in
@@ -286,8 +282,7 @@ let endorser_commands () =
       title = "Commands related to endorser daemon.";
     }
   in
-  [
-    command
+  [ command
       ~group
       ~desc:"Launch the endorser daemon"
       (args2 pidfile_arg endorsement_delay_arg)
@@ -323,8 +318,7 @@ let accuser_commands () =
       title = "Commands related to the accuser daemon.";
     }
   in
-  [
-    command
+  [ command
       ~group
       ~desc:"Launch the accuser daemon"
       (args2 pidfile_arg preserved_levels_arg)

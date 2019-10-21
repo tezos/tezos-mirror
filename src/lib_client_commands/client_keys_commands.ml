@@ -239,8 +239,7 @@ let commands version : Client_context.full Clic.command list =
   let show_private_switch =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
   in
-  [
-    command
+  [ command
       ~group
       ~desc:
         "List supported signing schemes.\n\
@@ -417,12 +416,10 @@ let commands version : Client_context.full Clic.command list =
           Signature.Public_key_hash.pp
           pkh
         >>= fun () ->
-        register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name);
-  ]
+        register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name) ]
   @ ( if version <> Some `Mainnet then []
     else
-      [
-        command
+      [ command
           ~group
           ~desc:"Add a fundraiser secret key to the wallet."
           (args1 (Secret_key.force_switch ()))
@@ -452,10 +449,8 @@ let commands version : Client_context.full Clic.command list =
             >>=? fun () ->
             Client_keys.public_key_hash pk_uri
             >>=? fun (pkh, _public_key) ->
-            register_key cctxt ~force (pkh, pk_uri, sk_uri) name);
-      ] )
-  @ [
-      command
+            register_key cctxt ~force (pkh, pk_uri, sk_uri) name) ] )
+  @ [ command
         ~group
         ~desc:"Add a public key to the wallet."
         (args1 (Public_key.force_switch ()))

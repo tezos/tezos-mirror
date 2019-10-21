@@ -390,9 +390,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
            Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | [
-     Environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c);
-    ] ->
+    | [Environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c)]
+      ->
         Format.fprintf
           ppf
           "@[<v 0>Account %a is not a smart contract, it does not take \

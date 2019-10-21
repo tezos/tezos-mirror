@@ -176,13 +176,11 @@ let ask_for_more_contacts t =
   Option.iter ~f:P2p_discovery.wakeup t.discovery ;
   protect ~canceler:t.canceler (fun () ->
       Lwt.pick
-        [
-          P2p_pool.Pool_event.wait_new_peer t.pool;
+        [ P2p_pool.Pool_event.wait_new_peer t.pool;
           P2p_pool.Pool_event.wait_new_point t.pool;
           (* TODO exponential back-off, or wait for the existence
          of a non grey-listed peer? *)
-            Lwt_unix.sleep time_between_looking_for_peers;
-        ]
+          Lwt_unix.sleep time_between_looking_for_peers ]
       >>= fun () -> return_unit)
 
 (** Selects [n] random connections. Ignore connections to
@@ -253,15 +251,13 @@ let rec worker_loop t =
      >>=? fun () ->
      protect ~canceler:t.canceler (fun () ->
          Lwt.pick
-           [
-             (* default: every two minutes *)
-               Systime_os.sleep t.config.maintenance_idle_time;
+           [ (* default: every two minutes *)
+             Systime_os.sleep t.config.maintenance_idle_time;
              Lwt_condition.wait t.please_maintain;
              (* when asked *)
-               P2p_pool.Pool_event.wait_too_few_connections t.pool;
+             P2p_pool.Pool_event.wait_too_few_connections t.pool;
              (* limits *)
-               P2p_pool.Pool_event.wait_too_many_connections t.pool;
-           ]
+             P2p_pool.Pool_event.wait_too_many_connections t.pool ]
          >>= fun () -> return_unit))
   >>= function
   | Ok () ->

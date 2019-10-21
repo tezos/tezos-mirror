@@ -249,10 +249,8 @@ let describe (type x) (encoding : x Encoding.t) =
         let (layout, references) =
           layout None recursives references encoding
         in
-        ( [
-            Binary_schema.Optional_field name;
-            Named_field (name, classify_desc encoding, layout);
-          ],
+        ( [ Binary_schema.Optional_field name;
+            Named_field (name, classify_desc encoding, layout) ],
           references )
   and obj fields = Binary_schema.Obj {fields}
   and union :

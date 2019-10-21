@@ -179,12 +179,10 @@ let test_order _ _ =
         "world"
 
 let tests =
-  [
-    Alcotest_lwt.test_case "add_remove" `Quick test_add_remove;
+  [ Alcotest_lwt.test_case "add_remove" `Quick test_add_remove;
     Alcotest_lwt.test_case "add_add" `Quick test_add_add;
     Alcotest_lwt.test_case "length" `Quick test_length;
     Alcotest_lwt.test_case "self_clean" `Quick test_length;
-    Alcotest_lwt.test_case "order" `Quick test_order;
-  ]
+    Alcotest_lwt.test_case "order" `Quick test_order ]
 
 let () = Alcotest.run "error_tables" [("error_tables", tests)]

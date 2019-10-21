@@ -178,44 +178,34 @@ module Printer_ast = struct
     | Named_field (name, kind, desc) ->
         [name; Format.asprintf "%a" pp_size kind; string_of_layout desc]
     | Dynamic_size_field (Some name, 1, size) ->
-        [
-          Format.asprintf "# bytes in field \"%s\"" name;
+        [ Format.asprintf "# bytes in field \"%s\"" name;
           Format.asprintf
             "%a"
             pp_size
             (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+          string_of_layout (Int (size :> integer_extended)) ]
     | Dynamic_size_field (None, 1, size) ->
-        [
-          Format.asprintf "# bytes in next field";
+        [ Format.asprintf "# bytes in next field";
           Format.asprintf
             "%a"
             pp_size
             (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+          string_of_layout (Int (size :> integer_extended)) ]
     | Dynamic_size_field (_, i, size) ->
-        [
-          Format.asprintf "# bytes in next %d fields" i;
+        [ Format.asprintf "# bytes in next %d fields" i;
           Format.asprintf
             "%a"
             pp_size
             (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+          string_of_layout (Int (size :> integer_extended)) ]
     | Anonymous_field (kind, desc) ->
-        [
-          "Unnamed field " ^ anon_num ();
+        [ "Unnamed field " ^ anon_num ();
           Format.asprintf "%a" pp_size kind;
-          string_of_layout desc;
-        ]
+          string_of_layout desc ]
     | Optional_field name ->
-        [
-          Format.asprintf "? presence of field \"%s\"" name;
+        [ Format.asprintf "? presence of field \"%s\"" name;
           Format.asprintf "%a" pp_size (`Fixed 1);
-          string_of_layout Bool;
-        ]
+          string_of_layout Bool ]
 
   let binary_table_headers = ["Name"; "Size"; "Contents"]
 
@@ -392,12 +382,7 @@ module Encoding = struct
       (obj2 (req "title" string) (opt "description" string))
 
   let integer_cases =
-    [
-      ("Int16", `Int16);
-      ("Int8", `Int8);
-      ("Uint16", `Uint16);
-      ("Uint8", `Uint8);
-    ]
+    [("Int16", `Int16); ("Int8", `Int8); ("Uint16", `Uint16); ("Uint8", `Uint8)]
 
   let integer_encoding : Binary_size.integer encoding =
     string_enum integer_cases
@@ -408,8 +393,7 @@ module Encoding = struct
   let layout_encoding =
     mu "layout" (fun layout ->
         union
-          [
-            case
+          [ case
               ~title:"Zero_width"
               (Tag 0)
               (obj1 (req "kind" (constant "Zero_width")))
@@ -498,12 +482,10 @@ module Encoding = struct
               (Tag 11)
               (obj1 (req "kind" (constant "Padding")))
               (function Padding -> Some () | _ -> None)
-              (fun () -> Padding);
-          ])
+              (fun () -> Padding) ])
 
   let kind_enum_cases () =
-    [
-      case
+    [ case
         ~title:"Dynamic"
         (Tag 0)
         (obj1 (req "kind" (constant "Dynamic")))
@@ -514,8 +496,7 @@ module Encoding = struct
         (Tag 1)
         (obj1 (req "kind" (constant "Variable")))
         (function `Variable -> Some () | _ -> None)
-        (fun () -> `Variable);
-    ]
+        (fun () -> `Variable) ]
 
   let kind_t_encoding =
     def "schema.kind"
@@ -535,8 +516,7 @@ module Encoding = struct
     let dynamic_layout_encoding = dynamic_size layout_encoding in
     def "schema.field"
     @@ union
-         [
-           case
+         [ case
              ~title:"Named_field"
              (Tag 0)
              (obj4
@@ -584,15 +564,13 @@ module Encoding = struct
                 (req "kind" (constant "option_indicator"))
                 (req "name" string))
              (function Optional_field s -> Some ((), s) | _ -> None)
-             (fun ((), s) -> Optional_field s);
-         ]
+             (fun ((), s) -> Optional_field s) ]
 
   let tag_size_encoding = string_enum [("Uint16", `Uint16); ("Uint8", `Uint8)]
 
   let binary_description_encoding =
     union
-      [
-        case
+      [ case
           ~title:"Obj"
           (Tag 0)
           (obj1 (req "fields" (list (dynamic_size field_descr_encoding))))
@@ -630,8 +608,7 @@ module Encoding = struct
              (req "size" integer_encoding)
              (req "cases" (list (tup2 int31 string))))
           (function Int_enum {size; cases} -> Some (size, cases) | _ -> None)
-          (fun (size, cases) -> Int_enum {size; cases});
-      ]
+          (fun (size, cases) -> Int_enum {size; cases}) ]
 
   let encoding =
     conv

@@ -194,15 +194,13 @@ module Sender = struct
     >>=? (fun () ->
            protect ~canceler:st.canceler (fun () ->
                Lwt.pick
-                 [
-                   ( Lwt_condition.wait st.restart_discovery
+                 [ ( Lwt_condition.wait st.restart_discovery
                    >>= fun () -> return Config.initial );
                    ( Lwt_unix.sleep sender_config.Config.delay
                    >>= fun () ->
                    return
                      {sender_config with Config.loop = succ sender_config.loop}
-                   );
-                 ]))
+                   ) ]))
     >>= function
     | Ok config when config.Config.loop = Config.max_loop ->
         let new_sender_config = {config with Config.loop = pred config.loop} in
@@ -265,7 +263,5 @@ let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
 
 let shutdown t =
   Lwt.join
-    [
-      Lwt_canceler.cancel t.answer.canceler;
-      Lwt_canceler.cancel t.sender.canceler;
-    ]
+    [ Lwt_canceler.cancel t.answer.canceler;
+      Lwt_canceler.cancel t.sender.canceler ]

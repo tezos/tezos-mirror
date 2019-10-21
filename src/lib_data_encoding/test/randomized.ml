@@ -64,8 +64,6 @@ let test_randomized_variant_list () =
         (make_int_list [] 20 ()))
 
 let tests =
-  [
-    ("int_list", `Quick, test_randomized_int_list);
+  [ ("int_list", `Quick, test_randomized_int_list);
     ("string_list", `Quick, test_randomized_string_list);
-    ("variant_list", `Quick, test_randomized_variant_list);
-  ]
+    ("variant_list", `Quick, test_randomized_variant_list) ]

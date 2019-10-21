@@ -368,10 +368,8 @@ let schema meth url (cctxt : #Client_context.full) =
     | Some {input = Some input; output; _} ->
         let json =
           `O
-            [
-              ("input", Json_schema.to_json (fst input));
-              ("output", Json_schema.to_json (fst output));
-            ]
+            [ ("input", Json_schema.to_json (fst input));
+              ("output", Json_schema.to_json (fst output)) ]
         in
         cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json
         >>= fun () -> return_unit
@@ -517,8 +515,7 @@ let meth_params ?(name = "HTTP method") ?(desc = "") params =
 let group = {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
 
 let commands =
-  [
-    command
+  [ command
       ~group
       ~desc:
         "List RPCs under a given URL prefix.\n\
@@ -624,5 +621,4 @@ let commands =
       ( prefixes ["rpc"; "delete"]
       @@ string ~name:"url" ~desc:"the RPC URL"
       @@ stop )
-      (fun () -> call `DELETE);
-  ]
+      (fun () -> call `DELETE) ]

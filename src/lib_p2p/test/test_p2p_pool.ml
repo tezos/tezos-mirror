@@ -33,8 +33,7 @@ type message = Ping
 let msg_config : message P2p_pool.message_config =
   {
     encoding =
-      [
-        P2p_message.Encoding
+      [ P2p_message.Encoding
           {
             tag = 0x10;
             title = "Ping";
@@ -42,8 +41,7 @@ let msg_config : message P2p_pool.message_config =
             wrap = (function () -> Ping);
             unwrap = (function Ping -> Some ());
             max_length = None;
-          };
-      ];
+          } ];
     chain_name = Distributed_db_version.sandboxed_chain_name;
     distributed_db_versions = [Distributed_db_version.zero];
   }
@@ -314,8 +312,7 @@ let log_config = ref None
 
 let spec =
   Arg.
-    [
-      ("--port", Int (fun p -> port := p), " Listening port of the first peer.");
+    [ ("--port", Int (fun p -> port := p), " Listening port of the first peer.");
       ( "--addr",
         String (fun p -> addr := Ipaddr.V6.of_string_exn p),
         " Listening addr" );
@@ -344,8 +341,7 @@ let spec =
                      "test.p2p.connection-pool -> debug; p2p.connection-pool \
                       -> debug"
                    ())),
-        " Log up to debug msgs" );
-    ]
+        " Log up to debug msgs" ) ]
 
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
@@ -369,15 +365,11 @@ let main () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
-    [
-      ( "p2p-connection-pool",
-        [
-          wrap "simple" (fun _ -> Simple.run points);
+    [ ( "p2p-connection-pool",
+        [ wrap "simple" (fun _ -> Simple.run points);
           wrap "random" (fun _ ->
               Random_connections.run points !repeat_connections);
-          wrap "garbled" (fun _ -> Garbled.run points);
-        ] );
-    ]
+          wrap "garbled" (fun _ -> Garbled.run points) ] ) ]
 
 let () =
   Sys.catch_break true ;

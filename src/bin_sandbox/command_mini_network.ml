@@ -75,14 +75,12 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
              Some
                ( acc,
                  client,
-                 [
-                   Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key;
+                 [ Tezos_daemon.baker_of_node ~exec:baker_exec ~client node ~key;
                    Tezos_daemon.endorser_of_node
                      ~exec:endorser_exec
                      ~client
                      node
-                     ~key;
-                 ] ))
+                     ~key ] ))
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
       Tezos_client.bootstrapped ~state client
@@ -95,10 +93,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         EF.(
           desc_list
             (haf "Registration-as-delegate:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
+            [ desc (af "Client:") (af "%S" client.Tezos_client.id);
+              desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
       Tezos_client.register_as_delegate ~state client key
       >>= fun () ->
@@ -107,10 +103,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         EF.(
           desc_list
             (haf "Starting daemons:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
+            [ desc (af "Client:") (af "%S" client.Tezos_client.id);
+              desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
           Running_processes.start state (Tezos_daemon.process daemon ~state)
@@ -122,12 +116,11 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       ~commands:
         Interactive_test.Commands.(
           all_defaults state ~nodes
-          @ [
-              secret_keys state ~protocol;
+          @ [ secret_keys state ~protocol;
               arbitrary_command_on_clients
                 state
                 ~clients:
-                  (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec));
+                  (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))
             ]))
 
 let cmd ~pp_error () =
@@ -201,11 +194,9 @@ let cmd ~pp_error () =
     $ Test_command_line.cli_state ~name:"mininet" () )
     (let doc = "Small network sandbox with bakers, endorsers, and accusers." in
      let man : Manpage.block list =
-       [
-         `P
+       [ `P
            "This test builds a small sandbox network, start various daemons, \
             and then gives the user an interactive command prompt to inspect \
-            the network.";
-       ]
+            the network." ]
      in
      info "mini-network" ~man ~doc)

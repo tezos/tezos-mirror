@@ -26,14 +26,12 @@ module Small_utilities = struct
         "key-of-name"
         ~doc:"Make an unencrypted key-pair deterministically from a string."
         ~man:
-          [
-            `P
+          [ `P
               "`flextesa key-of-name hello-world` generates a key-pair of the \
                `unencrypted:..` kind and outputs it as a 4 values separated \
                by commas: `name,pub-key,pub-key-hash,private-uri` (hence \
                compatible with the `--add-bootstrap-account` option of some \
-               of the test scenarios).";
-          ] )
+               of the test scenarios)." ] )
 
   let netstat_ports ~pp_error () =
     let open Cmdliner in

@@ -32,8 +32,7 @@ let unique_switch =
 
 let commands () =
   Clic.
-    [
-      command
+    [ command
         ~desc:
           "Autocomplete a prefix of Base58Check-encoded hash.\n\
            This actually works only for blocks, operations, public key and \
@@ -75,5 +74,5 @@ let commands () =
                 Time.System.pp_hum
                 (Tezos_stdlib_unix.Systime_os.now ()))
             stream
-          >>= fun () -> cctxt#answer "Bootstrapped." >>= fun () -> return_unit);
+          >>= fun () -> cctxt#answer "Bootstrapped." >>= fun () -> return_unit)
     ]

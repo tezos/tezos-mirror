@@ -53,12 +53,10 @@ let default_minimal_nanotez_per_byte = Z.of_int 1000
 let config_encoding : config Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {
-           minimal_fees;
+    (fun { minimal_fees;
            minimal_nanotez_per_gas_unit;
            minimal_nanotez_per_byte;
-           allow_script_failure;
-         } ->
+           allow_script_failure } ->
       ( minimal_fees,
         minimal_nanotez_per_gas_unit,
         minimal_nanotez_per_byte,

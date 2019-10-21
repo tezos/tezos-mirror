@@ -45,15 +45,13 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   >>=? fun chain_id ->
   Shell_services.Blocks.protocols cctxt ~chain ~block ()
   >>=? fun {current_protocol = protocol; next_protocol} ->
-  let {
-    Tezos_base.Block_header.predecessor;
-    fitness;
-    timestamp;
-    level;
-    context;
-    proto_level;
-    _;
-  } =
+  let { Tezos_base.Block_header.predecessor;
+        fitness;
+        timestamp;
+        level;
+        context;
+        proto_level;
+        _ } =
     shell_header
   in
   match Raw_level.of_int32 level with
@@ -111,8 +109,7 @@ module Block_seen_event = struct
              (req
                 "occurrence"
                 (union
-                   [
-                     case
+                   [ case
                        ~title:"heads"
                        (Tag 0)
                        (obj1 (req "occurrence-kind" (constant "heads")))
@@ -126,8 +123,7 @@ module Block_seen_event = struct
                           (req "chain-id" Chain_id.encoding))
                        (function
                          | `Valid_blocks ch -> Some ((), ch) | _ -> None)
-                       (fun ((), ch) -> `Valid_blocks ch);
-                   ]))
+                       (fun ((), ch) -> `Valid_blocks ch) ]))
              (req "header" Tezos_base.Block_header.encoding))
       in
       With_version.(encoding ~name (first_version v0_encoding))

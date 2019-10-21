@@ -26,8 +26,7 @@
 let () =
   Alcotest.run
     "protocol_alpha"
-    [
-      ("transfer", Transfer.tests);
+    [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
       ("activation", Activation.tests);
       ("endorsement", Endorsement.tests);
@@ -39,5 +38,4 @@ let () =
       ("rolls", Rolls.tests);
       ("combined", Combined_operations.tests);
       ("qty", Qty.tests);
-      ("voting", Voting.tests);
-    ]
+      ("voting", Voting.tests) ]
