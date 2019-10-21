@@ -216,6 +216,10 @@ let revelation ctxt public_key =
   in
   return @@ sign account.sk ctxt sop
 
+let failing_noop ctxt source arbitrary =
+  let op = Contents_list (Single (Failing_noop arbitrary)) in
+  Account.find source >>=? fun account -> return @@ sign account.sk ctxt op
+
 let originated_contract op =
   let nonce = Contract.initial_origination_nonce (Operation.hash_packed op) in
   Contract.originated_contract nonce

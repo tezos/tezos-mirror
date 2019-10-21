@@ -63,6 +63,9 @@ val delegation :
 
 val revelation : Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
+val failing_noop :
+  Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
+
 val origination :
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
