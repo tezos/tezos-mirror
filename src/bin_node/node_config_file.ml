@@ -48,12 +48,13 @@ type blockchain_network = {
   sandboxed_chain_name : chain_name;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  default_bootstrap_peers : string list;
 }
 
 let make_blockchain_network ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
-    genesis =
+    ?(default_bootstrap_peers = []) genesis =
   let of_string = Distributed_db_version.of_string in
   {
     genesis;
@@ -70,6 +71,7 @@ let make_blockchain_network ~chain_name ?old_chain_name
         (fun (a, b) ->
           (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
         user_activated_protocol_overrides;
+    default_bootstrap_peers;
   }
 
 let blockchain_network_mainnet =
@@ -94,6 +96,7 @@ let blockchain_network_mainnet =
     ~user_activated_protocol_overrides:
       [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
+    ~default_bootstrap_peers:["boot.tzbeta.net"]
 
 let blockchain_network_alphanet =
   make_blockchain_network
@@ -111,6 +114,7 @@ let blockchain_network_alphanet =
     ~old_chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
+    ~default_bootstrap_peers:["boot.tzalpha.net"; "bootalpha.tzbeta.net"]
 
 let blockchain_network_zeronet =
   make_blockchain_network
@@ -126,6 +130,7 @@ let blockchain_network_zeronet =
       }
     ~chain_name:"TEZOS_ZERONET_2019-08-06T15:18:56Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:["bootstrap.zeronet.fun"; "bootzero.tzbeta.net"]
 
 let blockchain_network_babylonnet =
   make_blockchain_network
@@ -141,6 +146,8 @@ let blockchain_network_babylonnet =
       }
     ~chain_name:"TEZOS_ALPHANET_BABYLON_2019-09-27T07:43:32Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      ["35.246.251.120"; "34.89.154.253"; "babylonnet.kaml.fr"; "tezaria.com"]
 
 let blockchain_network_sandbox =
   make_blockchain_network
@@ -166,21 +173,24 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            incompatible_chain_name;
            sandboxed_chain_name;
            user_activated_upgrades;
-           user_activated_protocol_overrides } ->
+           user_activated_protocol_overrides;
+           default_bootstrap_peers } ->
       ( genesis,
         chain_name,
         old_chain_name,
         incompatible_chain_name,
         sandboxed_chain_name,
         user_activated_upgrades,
-        user_activated_protocol_overrides ))
+        user_activated_protocol_overrides,
+        default_bootstrap_peers ))
     (fun ( genesis,
            chain_name,
            old_chain_name,
            incompatible_chain_name,
            sandboxed_chain_name,
            user_activated_upgrades,
-           user_activated_protocol_overrides ) ->
+           user_activated_protocol_overrides,
+           default_bootstrap_peers ) ->
       {
         genesis;
         chain_name;
@@ -189,18 +199,26 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         sandboxed_chain_name;
         user_activated_upgrades;
         user_activated_protocol_overrides;
+        default_bootstrap_peers;
       })
     (let chain = Distributed_db_version.name_encoding in
-     obj7
+     obj8
        (req "genesis" State.Chain.genesis_encoding)
        (req "chain_name" chain)
        (opt "old_chain_name" chain)
        (opt "incompatible_chain_name" chain)
        (req "sandboxed_chain_name" chain)
-       (req "user_activated_upgrades" User_activated.upgrades_encoding)
-       (req
+       (dft "user_activated_upgrades" User_activated.upgrades_encoding [])
+       (dft
           "user_activated_protocol_overrides"
-          User_activated.protocol_overrides_encoding))
+          User_activated.protocol_overrides_encoding
+          [])
+       (dft
+          "default_bootstrap_peers"
+          ~description:
+            "List of hosts to use if p2p.bootstrap_peers is unspecified."
+          (list string)
+          []))
 
 let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
@@ -255,7 +273,7 @@ type t = {
 
 and p2p = {
   expected_pow : float;
-  bootstrap_peers : string list;
+  bootstrap_peers : string list option;
   listen_addr : string option;
   discovery_addr : string option;
   private_mode : bool;
@@ -313,7 +331,7 @@ let default_p2p_limits : P2p.limits =
 let default_p2p =
   {
     expected_pow = 26.;
-    bootstrap_peers = [];
+    bootstrap_peers = None;
     listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port);
     discovery_addr = None;
     private_mode = false;
@@ -589,13 +607,12 @@ let p2p =
              zeroes are expected in the hash."
           float
           default_p2p.expected_pow)
-       (dft
+       (opt
           "bootstrap-peers"
           ~description:
             "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. If \
              the port is not specified, default port 9732 will be assumed."
-          (list string)
-          default_p2p.bootstrap_peers)
+          (list string))
        (opt
           "listen-addr"
           ~description:
@@ -1199,8 +1216,15 @@ let check_bootstrap_peer addr =
       | exn ->
           Lwt.fail exn)
 
+let bootstrap_peers config =
+  match config.p2p.bootstrap_peers with
+  | None ->
+      config.blockchain_network.default_bootstrap_peers
+  | Some peers ->
+      peers
+
 let check_bootstrap_peers config =
-  Lwt_list.iter_p check_bootstrap_peer config.p2p.bootstrap_peers
+  Lwt_list.iter_p check_bootstrap_peer (bootstrap_peers config)
 
 let fail fmt = Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
 

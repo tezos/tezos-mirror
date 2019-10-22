@@ -418,7 +418,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
     if no_bootstrap_peers || ignore_bootstrap_peers then (
       log_info "Ignoring bootstrap peers" ;
       peers )
-    else cfg.p2p.bootstrap_peers @ peers
+    else Node_config_file.bootstrap_peers cfg @ peers
   in
   Node_config_file.update
     ?data_dir
@@ -430,7 +430,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
     ?binary_chunks_size
     ?peer_table_size
     ?expected_pow
-    ~bootstrap_peers
+    ~bootstrap_peers:(Some bootstrap_peers)
     ?listen_addr
     ?discovery_addr
     ~rpc_listen_addrs

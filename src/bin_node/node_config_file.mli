@@ -36,6 +36,7 @@ type blockchain_network = {
   sandboxed_chain_name : chain_name;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  default_bootstrap_peers : string list;
 }
 
 type t = {
@@ -50,7 +51,7 @@ type t = {
 
 and p2p = {
   expected_pow : float;
-  bootstrap_peers : string list;
+  bootstrap_peers : string list option;
   listen_addr : string option;
   discovery_addr : string option;
   private_mode : bool;
@@ -97,7 +98,7 @@ val update :
   ?binary_chunks_size:int ->
   ?peer_table_size:int ->
   ?expected_pow:float ->
-  ?bootstrap_peers:string list ->
+  ?bootstrap_peers:string list option ->
   ?listen_addr:string ->
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
@@ -130,3 +131,7 @@ val resolve_bootstrap_addrs : string list -> (P2p_addr.t * int) list Lwt.t
 val encoding : t Data_encoding.t
 
 val check : t -> unit Lwt.t
+
+(** Return [p2p.bootstrap_peers] if not [None],
+    [network.default_bootstrap_peers] otherwise. *)
+val bootstrap_peers : t -> string list

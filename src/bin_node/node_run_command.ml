@@ -113,7 +113,8 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   | (None, Some _) ->
       return_none
   | _ ->
-      Node_config_file.resolve_bootstrap_addrs config.p2p.bootstrap_peers
+      Node_config_file.resolve_bootstrap_addrs
+        (Node_config_file.bootstrap_peers config)
       >>= fun trusted_points ->
       Node_identity_file.read
         (config.data_dir // Node_data_version.default_identity_file_name)
