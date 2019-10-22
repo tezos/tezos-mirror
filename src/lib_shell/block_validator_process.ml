@@ -34,13 +34,33 @@ let get_context index hash =
 
 (** The standard block validation method *)
 module Seq_validator = struct
-  type status = Init | Close
+  type status =
+    | Init
+    | Close
+    | Validation_request of Block_hash.t * Chain_id.t
+    | Validation_success of Block_hash.t * Ptime.t
 
   let status_pp ppf = function
     | Init ->
         Format.fprintf ppf "Initialized"
     | Close ->
         Format.fprintf ppf "Shutting down"
+    | Validation_request (block_hash, chain_id) ->
+        Format.fprintf
+          ppf
+          "Requesting validation of block %a for chain %a"
+          Block_hash.pp_short
+          block_hash
+          Chain_id.pp_short
+          chain_id
+    | Validation_success (block_hash, start_time) ->
+        Format.fprintf
+          ppf
+          "Block %a successfully validated in %a"
+          Block_hash.pp_short
+          block_hash
+          Ptime.Span.pp
+          (Ptime.diff (Systime_os.now ()) start_time)
 
   type s = status Time.System.stamped
 
@@ -64,19 +84,37 @@ module Seq_validator = struct
                ~title:"Close"
                empty
                (function Close -> Some () | _ -> None)
-               (fun () -> Close) ]
+               (fun () -> Close);
+             case
+               (Tag 2)
+               ~title:"Validation_request"
+               (tup2 Block_hash.encoding Chain_id.encoding)
+               (function
+                 | Validation_request (h, c) -> Some (h, c) | _ -> None)
+               (fun (h, c) -> Validation_request (h, c));
+             case
+               (Tag 3)
+               ~title:"Validation_success"
+               (tup2 Block_hash.encoding Time.System.encoding)
+               (function
+                 | Validation_success (bh, st) -> Some (bh, st) | _ -> None)
+               (fun (bh, st) -> Validation_success (bh, st)) ]
 
     let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
 
-    let doc = "Block_validator_process_sequential status."
+    let doc = "Sequential block validator status."
 
     let level (status : t) =
-      match status.data with Init | Close -> Internal_event.Notice
+      match status.data with
+      | Init | Close ->
+          Internal_event.Notice
+      | Validation_request _ | Validation_success _ ->
+          Internal_event.Debug
   end
 
   module Event_block_validator_process = Internal_event.Make (Definition)
 
-  let lwt_emit (status : status) =
+  let lwt_emit status =
     let time = Systime_os.now () in
     Event_block_validator_process.emit
       ~section:(Internal_event.Section.make_sanitized [Definition.name])
@@ -90,6 +128,10 @@ module Seq_validator = struct
           "Block_validator_process_sequential_event.emit: %a"
           pp_print_error
           el
+
+  let lwt_timmed_emit status =
+    let now = Systime_os.now () in
+    lwt_emit status >>= fun () -> Lwt.return now
 
   type validation_context = {
     context_index : Context.index;
@@ -119,6 +161,9 @@ module Seq_validator = struct
       validator_process.context_index
       predecessor_block_header.shell.context
     >>=? fun predecessor_context ->
+    lwt_timmed_emit
+      (Validation_request (Block_header.hash block_header, chain_id))
+    >>= fun event_start ->
     Block_validation.apply
       chain_id
       ~user_activated_upgrades:validator_process.user_activated_upgrades
@@ -129,15 +174,20 @@ module Seq_validator = struct
       ~predecessor_context
       ~block_header
       operations
+    >>=? fun result ->
+    lwt_emit (Validation_success (Block_header.hash block_header, event_start))
+    >>= fun () -> return result
 end
 
-(* Block validation using an external processes *)
+(** Block validation using an external process *)
 module External_validator = struct
   type status =
     | Init
     | Close
     | Process_status of Unix.process_status
-    | Validation_started of int
+    | Validator_started of int
+    | Request of External_validation.request
+    | Request_result of External_validation.request * Ptime.t
 
   let status_pp ppf = function
     | Init ->
@@ -157,8 +207,18 @@ module External_validator = struct
           Format.fprintf ppf "The process was killed by signal %i" i
       | WSTOPPED i ->
           Format.fprintf ppf "The process was stopped by signal %i" i )
-    | Validation_started pid ->
-        Format.fprintf ppf "Block validation started on pid %i " pid
+    | Validator_started pid ->
+        Format.fprintf ppf "Block validator started on pid %i " pid
+    | Request r ->
+        Format.fprintf ppf "Request for %a" External_validation.request_pp r
+    | Request_result (req, start_time) ->
+        Format.fprintf
+          ppf
+          "Completion of %a in %a"
+          External_validation.request_pp
+          req
+          Ptime.Span.pp
+          (Ptime.diff (Systime_os.now ()) start_time)
 
   type s = status Time.System.stamped
 
@@ -216,24 +276,38 @@ module External_validator = struct
                (Tag 3)
                ~title:"Validation_started"
                int31
-               (function Validation_started pid -> Some pid | _ -> None)
-               (fun pid -> Validation_started pid) ]
+               (function Validator_started pid -> Some pid | _ -> None)
+               (fun pid -> Validator_started pid);
+             case
+               (Tag 4)
+               ~title:"Request_sent"
+               External_validation.request_encoding
+               (function Request r -> Some r | _ -> None)
+               (fun r -> Request r);
+             case
+               (Tag 5)
+               ~title:"Request_result"
+               (tup2 External_validation.request_encoding Time.System.encoding)
+               (function Request_result (r, st) -> Some (r, st) | _ -> None)
+               (fun (r, st) -> Request_result (r, st)) ]
 
     let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
 
-    let doc = "Block_validator_process_external status."
+    let doc = "External block validator status."
 
     let level (status : t) =
       match status.data with
-      | Init | Close | Process_status (WEXITED 0) | Validation_started _ ->
+      | Init | Close | Process_status (WEXITED 0) | Validator_started _ ->
           Internal_event.Notice
       | Process_status _ ->
           Internal_event.Fatal
+      | Request _ | Request_result _ ->
+          Internal_event.Debug
   end
 
   module Event_block_validator_process = Internal_event.Make (Definition)
 
-  let lwt_emit (status : status) =
+  let lwt_emit status =
     let time = Systime_os.now () in
     Event_block_validator_process.emit
       ~section:(Internal_event.Section.make_sanitized [Definition.name])
@@ -247,6 +321,10 @@ module External_validator = struct
           "Block_validator_process_external_event.emit: %a"
           pp_print_error
           el
+
+  let lwt_timed_emit status =
+    let now = Systime_os.now () in
+    lwt_emit status >>= fun () -> Lwt.return now
 
   type validation_context = {
     context_root : string;
@@ -283,10 +361,13 @@ module External_validator = struct
     >>= fun () ->
     match vp.validator_process with
     | Some process ->
+        let request = External_validation.Terminate in
+        lwt_emit (Request request)
+        >>= fun () ->
         External_validation.send
           process#stdin
           External_validation.request_encoding
-          External_validation.Terminate
+          request
         >>= fun () ->
         process#status
         >>= (function
@@ -305,7 +386,7 @@ module External_validator = struct
       let process =
         Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
       in
-      lwt_emit (Validation_started process#pid)
+      lwt_emit (Validator_started process#pid)
       >>= fun () ->
       let parameters =
         {
@@ -345,12 +426,17 @@ module External_validator = struct
         (* Make sure that the promise is not canceled between a send and recv *)
         Lwt.protected
           (Lwt_mutex.with_lock vp.lock (fun () ->
+               lwt_timed_emit (Request request)
+               >>= fun event_start ->
                External_validation.send
                  process#stdin
                  External_validation.request_encoding
                  request
                >>= fun () ->
-               External_validation.recv_result process#stdout result_encoding))
+               External_validation.recv_result process#stdout result_encoding
+               >>= fun res ->
+               lwt_emit (Request_result (request, event_start))
+               >>= fun () -> Lwt.return res))
         >>=? fun res ->
         match process#state with
         | Running ->
