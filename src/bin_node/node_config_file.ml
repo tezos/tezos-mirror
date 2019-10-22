@@ -142,7 +142,7 @@ let blockchain_network_babylonnet =
     ~chain_name:"TEZOS_ALPHANET_BABYLON_2019-09-27T07:43:32Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
 
-let blockchain_network_default =
+let blockchain_network_sandbox =
   make_blockchain_network
     State.Chain.
       {
@@ -235,7 +235,13 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
         ~title:"Babylonnet"
         (constant "Babylonnet")
         (fun _ -> None)
-        (fun () -> blockchain_network_babylonnet) ]
+        (fun () -> blockchain_network_babylonnet);
+      case
+        (Tag 5)
+        ~title:"Sandbox"
+        (constant "Sandbox")
+        (fun _ -> None)
+        (fun () -> blockchain_network_sandbox) ]
 
 type t = {
   data_dir : string;
@@ -337,7 +343,7 @@ let default_config =
     log = Lwt_log_sink_unix.default_cfg;
     internal_events = Internal_event_unix.Configuration.default;
     shell = default_shell;
-    blockchain_network = blockchain_network_default;
+    blockchain_network = blockchain_network_mainnet;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -922,7 +928,7 @@ let encoding =
           ~description:
             "Configuration of which network/blockchain to connect to"
           sugared_blockchain_network_encoding
-          blockchain_network_default))
+          blockchain_network_mainnet))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message

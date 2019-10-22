@@ -38,14 +38,6 @@ type blockchain_network = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
 }
 
-val blockchain_network_mainnet : blockchain_network
-
-val blockchain_network_alphanet : blockchain_network
-
-val blockchain_network_zeronet : blockchain_network
-
-val blockchain_network_default : blockchain_network
-
 type t = {
   data_dir : string;
   p2p : p2p;
