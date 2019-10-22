@@ -40,9 +40,9 @@ let with_node f =
     let node_config : Node.config =
       {
         genesis;
-        chain_name = Distributed_db_version.of_string "TEZOS_DOCGEN";
+        chain_name = Distributed_db_version.Name.of_string "TEZOS_DOCGEN";
         sandboxed_chain_name =
-          Distributed_db_version.of_string "SANDBOXED_TEZOS_DOCGEN";
+          Distributed_db_version.Name.of_string "SANDBOXED_TEZOS_DOCGEN";
         user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
         patch_context = None;

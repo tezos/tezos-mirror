@@ -26,7 +26,7 @@
 
 [@@@ocaml.warning "-30"]
 
-type chain_name = Distributed_db_version.name
+type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
   genesis : State.Chain.genesis;

@@ -29,7 +29,7 @@ end)
 
 type 'msg message_config = {
   encoding : 'msg P2p_message.encoding list;
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
   distributed_db_versions : Distributed_db_version.t list;
 }
 
@@ -382,9 +382,9 @@ let raw_authenticate t ?point_info canceler fd point =
             "No common protocol@.(chains: local %a - remote \
              %a)@.(db_versions: local [%a] - remote %a)@.(p2p_versions: local \
              [%a] - remote %a)"
-            Distributed_db_version.pp_name
+            Distributed_db_version.Name.pp
             t.message_config.chain_name
-            Distributed_db_version.pp_name
+            Distributed_db_version.Name.pp
             info.announced_version.chain_name
             (Format.pp_print_list Distributed_db_version.pp)
             t.message_config.distributed_db_versions

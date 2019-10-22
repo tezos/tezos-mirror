@@ -53,7 +53,7 @@ type 'msg app_message_encoding = 'msg P2p_message.encoding =
 
 type 'msg message_config = 'msg P2p_connect_handler.message_config = {
   encoding : 'msg app_message_encoding list;
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
   distributed_db_versions : Distributed_db_version.t list;
 }
 

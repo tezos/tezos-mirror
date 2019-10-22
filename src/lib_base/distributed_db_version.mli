@@ -26,13 +26,15 @@
 
 (** [Distributed_db] protocol version. *)
 
-type name = private string
+module Name : sig
+  type t = private string
 
-val of_string : string -> name
+  val of_string : string -> t
 
-val pp_name : Format.formatter -> name -> unit
+  val pp : Format.formatter -> t -> unit
 
-val name_encoding : name Data_encoding.t
+  val encoding : t Data_encoding.t
+end
 
 (** An abstract version number for the high-level [Distributed_db] messages. *)
 type t = private int

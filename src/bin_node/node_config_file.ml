@@ -38,7 +38,7 @@ let default_p2p_port = 9732
 
 let default_discovery_port = 10732
 
-type chain_name = Distributed_db_version.name
+type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
   genesis : State.Chain.genesis;
@@ -55,7 +55,7 @@ let make_blockchain_network ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
     ?(default_bootstrap_peers = []) genesis =
-  let of_string = Distributed_db_version.of_string in
+  let of_string = Distributed_db_version.Name.of_string in
   {
     genesis;
     chain_name = of_string chain_name;
@@ -201,7 +201,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         user_activated_protocol_overrides;
         default_bootstrap_peers;
       })
-    (let chain = Distributed_db_version.name_encoding in
+    (let chain = Distributed_db_version.Name.encoding in
      obj8
        (req "genesis" State.Chain.genesis_encoding)
        (req "chain_name" chain)

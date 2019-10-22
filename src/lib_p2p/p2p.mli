@@ -90,7 +90,7 @@ type 'conn_meta conn_meta_config = {
    the type of the application level protocol *)
 type 'msg message_config = {
   encoding : 'msg P2p_message.encoding list;  (** Encoding of the messages. *)
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
       (** Identifier for this P2p protocol when establishing session. *)
   distributed_db_versions : Distributed_db_version.t list;
       (** List of versions supported by this P2p protocol. *)

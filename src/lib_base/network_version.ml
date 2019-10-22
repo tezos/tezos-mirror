@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type t = {
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
   distributed_db_version : Distributed_db_version.t;
   p2p_version : P2p_version.t;
 }
@@ -34,7 +34,7 @@ let pp ppf {chain_name; distributed_db_version; p2p_version} =
   Format.fprintf
     ppf
     "%a.%a (p2p: %a)"
-    Distributed_db_version.pp_name
+    Distributed_db_version.Name.pp
     chain_name
     Distributed_db_version.pp
     distributed_db_version
@@ -54,7 +54,7 @@ let encoding =
        (fun (chain_name, distributed_db_version, p2p_version) ->
          {chain_name; distributed_db_version; p2p_version})
        (obj3
-          (req "chain_name" Distributed_db_version.name_encoding)
+          (req "chain_name" Distributed_db_version.Name.encoding)
           (req "distributed_db_version" Distributed_db_version.encoding)
           (req "p2p_version" P2p_version.encoding))
 

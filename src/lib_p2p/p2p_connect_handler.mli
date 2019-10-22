@@ -82,7 +82,7 @@ type config = {
 
 type 'msg message_config = {
   encoding : 'msg P2p_message.encoding list;
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
   distributed_db_versions : Distributed_db_version.t list;
 }
 

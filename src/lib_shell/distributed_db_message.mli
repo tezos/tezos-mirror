@@ -51,7 +51,7 @@ val encoding : t P2p_message.encoding list
 
 val distributed_db_versions : Distributed_db_version.t list
 
-val cfg : Distributed_db_version.name -> t P2p.message_config
+val cfg : Distributed_db_version.Name.t -> t P2p.message_config
 
 val pp_json : Format.formatter -> t -> unit
 

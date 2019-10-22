@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type t = {
-  chain_name : Distributed_db_version.name;
+  chain_name : Distributed_db_version.Name.t;
   distributed_db_version : Distributed_db_version.t;
   p2p_version : P2p_version.t;
 }
@@ -38,7 +38,7 @@ val encoding : t Data_encoding.t
     announced on peer connection, given the [supported] versions for
     the higher-level messages. *)
 val announced :
-  chain_name:Distributed_db_version.name ->
+  chain_name:Distributed_db_version.Name.t ->
   distributed_db_versions:Distributed_db_version.t list ->
   p2p_versions:P2p_version.t list ->
   t
@@ -48,7 +48,7 @@ val announced :
     by the remote peer, and [acceptables] the locally accepted
     versions for the higher-level messages. *)
 val select :
-  chain_name:Distributed_db_version.name ->
+  chain_name:Distributed_db_version.Name.t ->
   distributed_db_versions:Distributed_db_version.t list ->
   p2p_versions:P2p_version.t list ->
   t ->

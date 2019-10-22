@@ -26,18 +26,20 @@
 
 (** Distributed_db protocol version. *)
 
-type name = string
+module Name = struct
+  type t = string
 
-let of_string x = x
+  let of_string x = x
 
-let pp_name = Format.pp_print_string
+  let pp = Format.pp_print_string
 
-let name_encoding =
-  let open Data_encoding in
-  def
-    "distributed_db_version.name"
-    ~description:"A name for the distributed DB protocol"
-    string
+  let encoding =
+    let open Data_encoding in
+    def
+      "distributed_db_version.name"
+      ~description:"A name for the distributed DB protocol"
+      string
+end
 
 type t = int
 
@@ -53,5 +55,5 @@ let encoding =
 let zero = 0
 
 let () =
-  Data_encoding.Registration.register ~pp:pp_name name_encoding ;
+  Data_encoding.Registration.register ~pp:Name.pp Name.encoding ;
   Data_encoding.Registration.register ~pp encoding
