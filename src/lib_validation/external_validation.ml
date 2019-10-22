@@ -52,6 +52,36 @@ type request =
     }
   | Terminate
 
+let request_pp ppf = function
+  | Init ->
+      Format.fprintf ppf "process handshake"
+  | Validate {block_header; chain_id; _} ->
+      Format.fprintf
+        ppf
+        "block validation %a for chain %a"
+        Block_hash.pp_short
+        (Block_header.hash block_header)
+        Chain_id.pp_short
+        chain_id
+  | Commit_genesis {chain_id; genesis_hash; protocol; _} ->
+      Format.fprintf
+        ppf
+        "genesis block commit %a(%a) for chain %a"
+        Block_hash.pp_short
+        genesis_hash
+        Protocol_hash.pp_short
+        protocol
+        Chain_id.pp_short
+        chain_id
+  | Fork_test_chain {forked_header; _} ->
+      Format.fprintf
+        ppf
+        "test chain fork on block %a"
+        Block_hash.pp_short
+        (Block_header.hash forked_header)
+  | Terminate ->
+      Format.fprintf ppf "terminate validation process"
+
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
 let parameters_encoding =
