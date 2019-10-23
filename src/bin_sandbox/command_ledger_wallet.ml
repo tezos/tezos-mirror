@@ -455,7 +455,9 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             wf
               ppf
               "The ledger should be prompting for acknowledgment to provide a \
-               signature of an unknown operation.") ]
+               signature of an unknown operation. This is not an actual test, and \
+               is only part of the test setup. There is no need for a verification \
+               of this hash. Please accept this Unrecognized Operation.") ]
     (fun ~user_answer:_ ->
       originate_manager_tz_script
         state
