@@ -59,6 +59,11 @@ check_linting:
     - src/tooling/lint.sh check.ci
     - src/tooling/lint.sh check_scripts
 
+check_python_linting:
+  <<: *build_definition
+  script:
+    - make test-lint
+
 build:
   <<: *build_definition
   script:

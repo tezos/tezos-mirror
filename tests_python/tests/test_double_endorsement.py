@@ -29,8 +29,8 @@ class TestDoubleEndorsement:
         sandbox.node(2).terminate()
 
     def test_bake_node_0(self, sandbox):
-        """Client 0 bakes block A at level 3, not communicated to 1 and 2"""
-        """Inject an endorsement to ensure a different hash"""
+        """Client 0 bakes block A at level 3, not communicated to 1 and 2
+           Inject an endorsement to ensure a different hash"""
         sandbox.client(0).endorse('bootstrap1')
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 

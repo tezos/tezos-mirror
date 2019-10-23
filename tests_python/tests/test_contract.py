@@ -156,6 +156,7 @@ class TestChainId:
                         ['--arg', f'Pair {operation} \"{signature}\"'])
         client.bake('bootstrap5', BAKE_ARGS)
 
+
 @pytest.mark.contract
 class TestBigMapToSelf:
 
