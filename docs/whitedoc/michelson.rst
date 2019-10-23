@@ -407,7 +407,7 @@ with ``by``.
 
 ::
 
-    { PUSH nat 5 ; ADD ; PUSH nat 10 ; SWAP ; MUL }
+    { PUSH nat 5 ; ADD ; PUSH nat 10 ; MUL }
     :: [ nat : [] -> nat : [] ]
        by { PUSH nat 5 ; ADD }
           :: [ nat : [] -> nat : [] ]
@@ -416,16 +416,14 @@ with ``by``.
                    by 5 :: nat
             and ADD
                 :: [ nat : nat : [] -> nat : [] ]
-      and { PUSH nat 10 ; SWAP ; MUL }
+      and { PUSH nat 10 ; MUL }
           :: [ nat : [] -> nat : [] ]
              by PUSH nat 10
                 :: [ nat : [] -> nat : nat : [] ]
                    by 10 :: nat
-            and { SWAP ; MUL }
+            and { MUL }
                 :: [ nat : nat : [] -> nat : [] ]
-                   by SWAP
-                      :: [ nat : nat : [] -> nat : nat : [] ]
-                  and MUL
+                   by  MUL
                       :: [ nat : nat : [] -> nat : [] ]
 
 Producing such a typing derivation can be done in a number of manners,
