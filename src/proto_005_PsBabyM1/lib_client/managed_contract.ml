@@ -106,8 +106,14 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
              in
              parse lambda >>=? fun param -> return (param, entrypoint)
          | None -> (
-             (*  their is no "do" entrypoint trying "set_delegate" *)
-             let entrypoint = "set_delegate" in
+             (*  their is no "do" entrypoint trying "set/remove_delegate" *)
+             let entrypoint =
+               match delegate with
+               | Some _ ->
+                   "set_delegate"
+               | None ->
+                   "remove_delegate"
+             in
              Michelson_v1_entrypoints.contract_entrypoint_type
                cctxt
                ~chain
@@ -116,7 +122,7 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
                ~entrypoint
              >>=? function
              | Some _ ->
-                 (*  their is a "set_delegate" entrypoint *)
+                 (*  their is a "set/remove_delegate" entrypoint *)
                  let delegate_data =
                    match delegate with
                    | Some delegate ->
@@ -126,13 +132,6 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
                        "0x" ^ delegate
                    | None ->
                        "Unit"
-                 in
-                 let entrypoint =
-                   match delegate with
-                   | Some _ ->
-                       "set_delegate"
-                   | None ->
-                       "remove_delegate"
                  in
                  parse delegate_data
                  >>=? fun param -> return (param, entrypoint)
