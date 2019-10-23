@@ -411,7 +411,7 @@ To set delegate using the manager.tz script, one can use:
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
-               --arg '{ DROP ; NIL operation ; PUSH key_hash <dlgt> ; SOME ; SET_DELEGATE ; CONS }'
+               --arg '{ DROP ; NIL operation ; PUSH key_hash "<dlgt>" ; SOME ; SET_DELEGATE ; CONS }'
 
 - ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
   i.e. its manager.
@@ -436,7 +436,7 @@ To transfer (spend) tezos from originated contract to an implicit account, use:
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
-               --arg '{ DROP ; NIL operation ; PUSH key_hash <adr> ; IMPLICIT_ACCOUNT ; PUSH mutez <val> ; UNIT ; TRANSFER_TOKENS ; CONS }'
+               --arg '{ DROP ; NIL operation ; PUSH key_hash "<adr>" ; IMPLICIT_ACCOUNT ; PUSH mutez <val> ; UNIT ; TRANSFER_TOKENS ; CONS }'
 
 - ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
   i.e. its manager.
@@ -523,7 +523,7 @@ To set delegate using the added entrypoint, one can use:
 
   tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'set_delegate' \
-               --arg '<dlgt>'
+               --arg '"<dlgt>"'
 
 - ``src``: has to be equal to the ``key_hash`` found in the left part of the
   contract's storage ``pair``, i.e. its manager.
@@ -536,7 +536,7 @@ To remove delegate, use:
 
   tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'remove_delegate' \
-               --arg 'unit' # arg is optional, it defaults to unit when omitted
+               --arg 'Unit' # arg is optional, it defaults to Unit when omitted
 
 - ``src``: has to be equal to the ``key_hash`` found in the left part of the
   contract's storage ``pair``, i.e. its manager.
