@@ -27,6 +27,7 @@
 type t = {
   data_dir : string option;
   config_file : string;
+  network : Node_config_file.blockchain_network option;
   min_connections : int option;
   expected_connections : int option;
   max_connections : int option;

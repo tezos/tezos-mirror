@@ -42,6 +42,7 @@ EOF
     if ! [ -f "${node_dir}/config.json" ]; then
         if [ -n "$USE_TLS" ]; then
             $node config init \
+                  --network "sandbox" \
                   --data-dir "$node_dir" \
                   --net-addr "127.0.0.1:$port" \
                   --rpc-addr "127.0.0.1:$rpc" \
@@ -170,6 +171,7 @@ EOF
 
         else
             $node config init \
+                  --network "sandbox" \
                   --data-dir "$node_dir" \
                   --net-addr "127.0.0.1:$port" \
                   --rpc-addr "127.0.0.1:$rpc" \
@@ -179,7 +181,7 @@ EOF
     fi
 
     [ -f "${node_dir}/identity.json" ] || $node identity generate "$expected_pow" --data-dir "$node_dir"
-    $node run --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
+    $node run --network "sandbox" --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
     node_pids+=("$!")
 
 }

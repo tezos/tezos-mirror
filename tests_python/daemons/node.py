@@ -64,7 +64,7 @@ class Node:
         assert node_dir is None or os.path.isdir(node_dir), (f'{node_dir} not '
                                                              f'a dir')
         if params is None:
-            params = []
+            params = ["--network=sandbox"]
 
         self.log_file = log_file
         self._temp_dir = node_dir is None

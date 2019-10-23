@@ -32,6 +32,7 @@ let ( // ) = Filename.concat
 type t = {
   data_dir : string option;
   config_file : string;
+  network : Node_config_file.blockchain_network option;
   min_connections : int option;
   expected_connections : int option;
   max_connections : int option;
@@ -56,11 +57,11 @@ type t = {
   history_mode : History_mode.t option;
 }
 
-let wrap data_dir config_file connections max_download_speed max_upload_speed
-    binary_chunks_size peer_table_size listen_addr discovery_addr peers
-    no_bootstrap_peers bootstrap_threshold private_mode disable_mempool
-    disable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
-    cors_headers log_output history_mode =
+let wrap data_dir config_file network connections max_download_speed
+    max_upload_speed binary_chunks_size peer_table_size listen_addr
+    discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
+    disable_mempool disable_testchain expected_pow rpc_listen_addrs rpc_tls
+    cors_origins cors_headers log_output history_mode =
   let actual_data_dir =
     Option.unopt ~default:Node_config_file.default_data_dir data_dir
   in
@@ -104,6 +105,7 @@ let wrap data_dir config_file connections max_download_speed max_upload_speed
   {
     data_dir;
     config_file;
+    network;
     min_connections;
     expected_connections;
     max_connections;
@@ -205,6 +207,22 @@ module Term = struct
       value
       & opt (some string) None
       & info ~docs ~doc ~docv:"FILE" ["config-file"])
+
+  let network =
+    let open Cmdliner in
+    let doc =
+      "Select which network to run. Possible values are: "
+      ^ String.concat
+          ", "
+          (List.map fst Node_config_file.builtin_blockchain_networks)
+      ^ ". Default is mainnet. You cannot specify custom networks on the \
+         command-line, but you can specify them in the node configuration \
+         file."
+    in
+    Arg.(
+      value
+      & opt (some (enum Node_config_file.builtin_blockchain_networks)) None
+      & info ~docs ~doc ~docv:"NETWORK" ["network"])
 
   (* P2p args *)
 
@@ -365,12 +383,12 @@ module Term = struct
 
   let args =
     let open Term in
-    const wrap $ data_dir $ config_file $ connections $ max_download_speed
-    $ max_upload_speed $ binary_chunks_size $ peer_table_size $ listen_addr
-    $ discovery_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold
-    $ private_mode $ disable_mempool $ disable_testchain $ expected_pow
-    $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers $ log_output
-    $ history_mode
+    const wrap $ data_dir $ config_file $ network $ connections
+    $ max_download_speed $ max_upload_speed $ binary_chunks_size
+    $ peer_table_size $ listen_addr $ discovery_addr $ peers
+    $ no_bootstrap_peers $ bootstrap_threshold $ private_mode $ disable_mempool
+    $ disable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
+    $ cors_origins $ cors_headers $ log_output $ history_mode
 end
 
 let read_config_file args =
@@ -411,14 +429,29 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
         log_output;
         bootstrap_threshold;
         history_mode;
+        network;
         config_file = _ } =
     args
   in
+  (* Update bootstrap peers must take into account the updated config file
+     with the [--network] argument, so we cannot use [Node_config_file]. *)
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers then (
       log_info "Ignoring bootstrap peers" ;
       peers )
-    else Node_config_file.bootstrap_peers cfg @ peers
+    else
+      let cfg_peers =
+        match cfg.p2p.bootstrap_peers with
+        | Some peers ->
+            peers
+        | None -> (
+          match network with
+          | Some network ->
+              network.default_bootstrap_peers
+          | None ->
+              cfg.blockchain_network.default_bootstrap_peers )
+      in
+      cfg_peers @ peers
   in
   Node_config_file.update
     ?data_dir
@@ -443,4 +476,5 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
     ?log_output
     ?bootstrap_threshold
     ?history_mode
+    ?network
     cfg

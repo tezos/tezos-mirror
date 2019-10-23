@@ -168,6 +168,7 @@ class Sandbox:
             params = ['--connections', '3']
         if private:
             params = params + ['--private-mode']
+        params = params + ['--network=sandbox']
         peers_rpc = [self.p2p + p for p in peers]
         node_bin = self._wrap_path(NODE, branch)
         local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
@@ -183,10 +184,12 @@ class Sandbox:
             assert os.path.isfile(snapshot)
             sandboxed_import = [f'--sandbox', self.sandbox_file]
             if reconstruct:
-                node.snapshot_import(snapshot, ['--reconstruct']
-                                     + sandboxed_import)
+                node.snapshot_import(snapshot,
+                                     ['--reconstruct', '--network=sandbox'] +
+                                     sandboxed_import)
             else:
-                node.snapshot_import(snapshot, sandboxed_import)
+                node.snapshot_import(snapshot,
+                                     ['--network=sandbox'] + sandboxed_import)
             node.init_id()
             node.init_config()
         node.run()

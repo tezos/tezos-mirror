@@ -220,46 +220,38 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           (list string)
           []))
 
+let builtin_blockchain_networks_with_tags =
+  [ (1, "zeronet", blockchain_network_zeronet);
+    (2, "alphanet", blockchain_network_alphanet);
+    (3, "mainnet", blockchain_network_mainnet);
+    (4, "babylonnet", blockchain_network_babylonnet);
+    (5, "sandbox", blockchain_network_sandbox) ]
+
+let builtin_blockchain_networks =
+  List.map
+    (fun (_, name, network) -> (name, network))
+    builtin_blockchain_networks_with_tags
+
 let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
+  let builtin_encoding (tag, name, network) =
+    let constructor = String.capitalize_ascii name in
+    case
+      (Tag tag)
+      ~title:constructor
+      (constant constructor)
+      (fun _ -> None)
+      (fun () -> network)
+  in
   union
     ~tag_size:`Uint8
-    [ case
+    ( case
         (Tag 0)
         ~title:"Custom"
         blockchain_network_encoding
         (fun x -> Some x)
-        (fun x -> x);
-      case
-        (Tag 1)
-        ~title:"Zeronet"
-        (constant "Zeronet")
-        (fun _ -> None)
-        (fun () -> blockchain_network_zeronet);
-      case
-        (Tag 2)
-        ~title:"Alphanet"
-        (constant "Alphanet")
-        (fun _ -> None)
-        (fun () -> blockchain_network_alphanet);
-      case
-        (Tag 3)
-        ~title:"Mainnet"
-        (constant "Mainnet")
-        (fun _ -> None)
-        (fun () -> blockchain_network_mainnet);
-      case
-        (Tag 4)
-        ~title:"Babylonnet"
-        (constant "Babylonnet")
-        (fun _ -> None)
-        (fun () -> blockchain_network_babylonnet);
-      case
-        (Tag 5)
-        ~title:"Sandbox"
-        (constant "Sandbox")
-        (fun _ -> None)
-        (fun () -> blockchain_network_sandbox) ]
+        (fun x -> x)
+    :: List.map builtin_encoding builtin_blockchain_networks_with_tags )
 
 type t = {
   data_dir : string;
@@ -1008,7 +1000,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(disable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode cfg =
+    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network cfg =
   let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1074,7 +1066,12 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }
   in
-  return {cfg with data_dir; p2p; rpc; log; shell}
+  (* If --network is specified it overrides the "network" entry of the
+     configuration file, which itself defaults to mainnet. *)
+  let blockchain_network =
+    Option.unopt ~default:cfg.blockchain_network network
+  in
+  return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
 
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in

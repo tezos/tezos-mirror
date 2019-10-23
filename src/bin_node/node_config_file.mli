@@ -39,6 +39,9 @@ type blockchain_network = {
   default_bootstrap_peers : string list;
 }
 
+(** List of built-in networks with their command-line name. *)
+val builtin_blockchain_networks : (string * blockchain_network) list
+
 type t = {
   data_dir : string;
   p2p : p2p;
@@ -111,6 +114,7 @@ val update :
   ?log_output:Lwt_log_sink_unix.Output.t ->
   ?bootstrap_threshold:int ->
   ?history_mode:History_mode.t ->
+  ?network:blockchain_network ->
   t ->
   t tzresult Lwt.t
 
