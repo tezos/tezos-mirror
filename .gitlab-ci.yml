@@ -860,9 +860,6 @@ publish:doc:
   stage: doc
   only:
     - master@tezos/tezos
-    - alphanet@tezos/tezos
-    - zeronet@tezos/tezos
-    - mainnet@tezos/tezos
   before_script:
     - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
@@ -873,7 +870,7 @@ publish:doc:
     - git clone git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io
     - rsync --recursive --links --perms --delete --verbose
         --exclude=.doctrees
-        docs/_build/ gitlab.io/public/"${CI_COMMIT_REF_NAME}"
+        docs/_build/ gitlab.io/public/
     - cd gitlab.io
     - if [ -z "$(git status -s)" ] ; then
         echo "Nothing to commit!" ;
