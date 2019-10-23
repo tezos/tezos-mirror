@@ -421,10 +421,8 @@ with ``by``.
              by PUSH nat 10
                 :: [ nat : [] -> nat : nat : [] ]
                    by 10 :: nat
-            and { MUL }
+            and MUL
                 :: [ nat : nat : [] -> nat : [] ]
-                   by  MUL
-                      :: [ nat : nat : [] -> nat : [] ]
 
 Producing such a typing derivation can be done in a number of manners,
 such as unification or abstract interpretation. In the implementation of
