@@ -318,6 +318,10 @@ class Client:
         res = self.run(['get', 'balance', 'for', account])
         return client_output.extract_balance(res)
 
+    def get_mutez_balance(self, account) -> float:
+        res = self.run(['get', 'balance', 'for', account])
+        return int(client_output.extract_balance(res)*1000000)
+
     def get_receipt(self,
                     operation: str,
                     args: List[str] = None) -> client_output.GetReceiptResult:

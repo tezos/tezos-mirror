@@ -92,43 +92,53 @@ class TestManager:
         assert client.get_delegate('delegatable_target', []) == "none"
 
     def test_transfer_to_manager(self, client):
-        balance = client.get_balance('manager')
-        balance_bootstrap = client.get_balance('bootstrap2')
+        balance = client.get_mutez_balance('manager')
+        balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10.001
+        amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'bootstrap2', 'manager', ['--gas-limit', '15285'])
         client.bake('bootstrap5', BAKE_ARGS)
-        new_balance = client.get_balance('manager')
-        new_balance_bootstrap = client.get_balance('bootstrap2')
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
         fee = 0.00178
-        assert balance + amount == new_balance
-        assert balance_bootstrap - fee -  amount == new_balance_bootstrap
+        fee_mutez = utils.mutez_of_tez(fee)
+        assert balance + amount_mutez == new_balance
+        assert (balance_bootstrap - fee_mutez - amount_mutez
+                == new_balance_bootstrap)
 
     def test_simple_transfer_from_manager_to_implicit(self, client):
-        balance = client.get_balance('manager')
-        balance_bootstrap = client.get_balance('bootstrap2')
-        amount = 10.0002
-        client.transfer(amount, 'manager', 'bootstrap2', ['--gas-limit', '36558'])
+        balance = client.get_mutez_balance('manager')
+        balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        amount = 10.1
+        amount_mutez = utils.mutez_of_tez(amount)
+        client.transfer(amount, 'manager', 'bootstrap2',
+                        ['--gas-limit', '26183'])
         client.bake('bootstrap5', BAKE_ARGS)
-        new_balance = client.get_balance('manager')
-        new_balance_bootstrap = client.get_balance('bootstrap2')
-        fee = 0.004001
-        assert balance - amount == new_balance
-        assert balance_bootstrap + amount- fee == new_balance_bootstrap
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        fee = 0.002931
+        fee_mutez = utils.mutez_of_tez(fee)
+        assert balance - amount_mutez == new_balance
+        assert (balance_bootstrap + amount_mutez - fee_mutez
+                == new_balance_bootstrap)
 
     def test_transfer_from_manager_to_manager(self, client):
-        balance = client.get_balance('manager')
-        balance_dest = client.get_balance('manager2')
-        balance_bootstrap = client.get_balance('bootstrap2')
+        balance = client.get_mutez_balance('manager')
+        balance_dest = client.get_mutez_balance('manager2')
+        balance_bootstrap = client.get_mutez_balance('bootstrap2')
         amount = 10
-        client.transfer(amount, 'manager', 'manager2', ['--gas-limit', '44659'])
+        amount_mutez = utils.mutez_of_tez(amount)
+        client.transfer(amount, 'manager', 'manager2',
+                        ['--gas-limit', '44625'])
         client.bake('bootstrap5', BAKE_ARGS)
-        new_balance = client.get_balance('manager')
-        new_balance_dest = client.get_balance('manager2')
-        new_balance_bootstrap = client.get_balance('bootstrap2')
-        fee = 0.004811
-        assert balance_bootstrap - fee == new_balance_bootstrap
-        assert balance - amount == new_balance
-        assert balance_dest + amount == new_balance_dest
+        new_balance = client.get_mutez_balance('manager')
+        new_balance_dest = client.get_mutez_balance('manager2')
+        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
+        fee = 0.004804
+        fee_mutez = utils.mutez_of_tez(fee)
+        assert balance_bootstrap - fee_mutez == new_balance_bootstrap
+        assert balance - amount_mutez == new_balance
+        assert balance_dest + amount_mutez == new_balance_dest
 
     def test_transfer_from_manager_to_default(self, client):
         client.transfer(10, 'manager', 'bootstrap2',
