@@ -178,13 +178,13 @@ let transfer
     Format.asprintf
       "{ DROP ; NIL operation ;\
        PUSH address 0x%s; CONTRACT %s %a; ASSERT_SOME;\
-       PUSH mutez %a ;\
+       PUSH mutez %Ld ;\
        PUSH %a %a;\
        TRANSFER_TOKENS ; CONS }"
       destination
       (match entrypoint with "default" -> "" | s -> "%"^s)
       Michelson_v1_printer.print_expr parameter_type
-      Tez.pp amount
+      (Tez.to_mutez amount)
       Michelson_v1_printer.print_expr parameter_type
       Michelson_v1_printer.print_expr parameters
   in
