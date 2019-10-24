@@ -100,6 +100,7 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Introduction tutorials:
 
+   introduction/test_networks
    introduction/howtoget
    introduction/howtouse
    introduction/howtorun
