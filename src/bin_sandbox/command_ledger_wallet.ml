@@ -546,7 +546,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
            delegate_pkh)
       ~expected:
         MFmt.
-          [ ("Manager.tz Delegation", const string "");
+          [ ("Confirm Delegation", const string "");
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string delegate_pkh);
@@ -559,7 +559,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
         "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
       ~expected:
         MFmt.
-          [ ("Withdraw Manager.tz Delegation", const string "");
+          [ ("Withdraw Delegation", const string "");
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Delegate", const string "None");
@@ -576,7 +576,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
            10000000)
       ~expected:
         MFmt.
-          [ ("Confirm Manager.tz Transaction", const string "");
+          [ ("Confirm Transaction", const string "");
             ("Amount", const int 10);
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
@@ -594,7 +594,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
            (300 * 1000000))
       ~expected:
         MFmt.
-          [ ("Confirm Manager.tz Transaction", const string "");
+          [ ("Confirm Transaction", const string "");
             ("Amount", const int 300);
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
@@ -609,11 +609,11 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
            "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; \
             ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }"
            random_contract_pkh
-           300)
+           3)
       ~expected:
         MFmt.
-          [ ("Confirm Manager.tz Transaction", const string "");
-            ("Amount", const string "0.0003");
+          [ ("Confirm Transaction", const string "");
+            ("Amount", const string "0.000003");
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Destination", const string random_contract_pkh);
