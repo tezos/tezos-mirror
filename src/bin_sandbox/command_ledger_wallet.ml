@@ -409,7 +409,7 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
       ["--wait"; "none"; "originate"; "contract"; name]
       @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
       @ [ "transferring";
-          "20";
+          "350";
           "from";
           from;
           "running";
@@ -584,18 +584,36 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
             ("Storage Limit", const int 500) ]
       ~output_msg:"transfer-from-manager-tz-to-implicit"
   in
-  let manager_tz_to_originated () =
+  let manager_tz_to_originated_large () =
     manager_tz_test
       ~contract_arg:
         (sprintf
            "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; \
             ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }"
            random_contract_pkh
-           10000000)
+           (300 * 1000000))
       ~expected:
         MFmt.
           [ ("Confirm Manager.tz Transaction", const string "");
-            ("Amount", const int 10);
+            ("Amount", const int 300);
+            ("Fee", const string "0.00XXX");
+            ("Source", const string contract_address);
+            ("Destination", const string random_contract_pkh);
+            ("Storage Limit", const int 500) ]
+      ~output_msg:"transfer-from-manager-tz-to-originated"
+  in
+  let manager_tz_to_originated_small () =
+    manager_tz_test
+      ~contract_arg:
+        (sprintf
+           "{ DROP ; NIL operation ; PUSH address \"%s\" ; CONTRACT unit ; \
+            ASSERT_SOME ; PUSH mutez %d ; UNIT ; TRANSFER_TOKENS ; CONS }"
+           random_contract_pkh
+           300)
+      ~expected:
+        MFmt.
+          [ ("Confirm Manager.tz Transaction", const string "");
+            ("Amount", const string "0.0003");
             ("Fee", const string "0.00XXX");
             ("Source", const string contract_address);
             ("Destination", const string random_contract_pkh);
@@ -616,13 +634,22 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
   >>= fun _ ->
   ksprintf bake "transferring from %s to %s" contract_address random_acc_pkh
   >>= fun () ->
-  manager_tz_to_originated ()
+  manager_tz_to_originated_large ()
   >>= fun _ ->
   ksprintf
     bake
     "transfering from %s to %s"
     contract_address
     random_contract_pkh
+  >>= fun () ->
+  manager_tz_to_originated_small ()
+  >>= fun _ ->
+  ksprintf
+    bake
+    "transfering from %s to %s"
+    contract_address
+    random_contract_pkh
+
 
 let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
     ~ledger_account ~delegate ~bake () =
