@@ -222,16 +222,18 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you use the ``alphanet.sh`` script, you should prefix the file
+If you use the ``alphanet.sh`` script (renamed as ``babylonnet.sh``
+to run Babylonnet for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image:
-``./alphanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
+``./babylonnet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
 
 Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
-Please preserve the JSON file, after each reset of Zeronet or
-Alphanet, you will have to reactivate the wallet.
+Please preserve the JSON file. After each reset of Zeronet or
+when Babylonnet is replaced by a test network for the next protocol,
+you will have to reactivate the wallet.
 
 Please drink carefully and don't abuse the faucet: it only contains
 30,000 wallets for a total amount of ꜩ760,000,000.
