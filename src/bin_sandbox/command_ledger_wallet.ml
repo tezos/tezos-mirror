@@ -919,10 +919,14 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~pair_string_nat_kt1_account ~ledger_account ~unit_kt1_account ~bake () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
-  let test_transaction ?(storage = 0) ?arguments ~name ~dst_name ~dst_pkh
-      ?entrypoint ?(amount = 15) () =
+  let test_transaction ?storage_limit ?arguments ~name ~dst_name ~dst_pkh
+      ?entrypoint ?(amount = 15) ?fee () =
     let command =
       let opt = Option.value_map ~default:[] in
+      let storage = match storage_limit with
+          None -> []
+        | Some limit -> ["--storage-limit"; (sprintf "%d" limit)]
+      in
       [ "--wait";
         "none";
         "transfer";
@@ -932,6 +936,9 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
         "to";
         dst_name ]
       @ Option.value_map ~default:[] arguments ~f:(fun a -> ["--arg"; a])
+      @ Option.value_map ~default:[] fee ~f:(fun f -> ["--fee"; (sprintf "%d" f)])
+      @ storage
+      @ ["--fee-cap"; "10"]
       @ opt entrypoint ~f:(fun e -> ["--entrypoint"; e])
       @ ["--burn-cap"; "100"; "--verbose-signing"]
     in
@@ -953,10 +960,10 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
                   ledger_should_display
                     ppf
                     [ ("Amount", const int amount);
-                      ("Fee", const string "0.00XXX");
+                      ("Fee", const string @@ Option.value_map ~default:"0.00XXX" fee ~f:(sprintf "%d"));
                       ("Source", const string ledger_pkh);
                       ("Destination", const string dst_pkh);
-                      ("Storage", const int storage) ]
+                      ("Storage Limit", const int @@ match storage_limit with None -> 0 | Some s -> s) ]
               | _ (* some arguments *) ->
                   please_check_the_hash ppf ()) ]
       (fun ~user_answer ->
@@ -994,15 +1001,30 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
     ~name:"transaction-to-random-tz1"
     ~dst_pkh:(Acc.pubkey_hash random_account)
     ~dst_name:(Acc.pubkey_hash random_account)
-    ~storage:277
+    ~storage_limit:277
     (* First time: there is a reveal *) ()
   >>= fun () ->
   test_transaction
     ~name:"transaction-to-random-tz1-again"
     ~dst_pkh:(Acc.pubkey_hash random_account)
     ~dst_name:(Acc.pubkey_hash random_account)
-    ~storage:0
+    ~storage_limit:0
     (* no moa reveal *) ()
+  >>= fun () ->
+  test_transaction
+    ~name:"transaction-to-random-tz1-fee-no-storage-limit"
+    ~dst_pkh:(Acc.pubkey_hash random_account)
+    ~dst_name:(Acc.pubkey_hash random_account)
+    ~fee:2
+    ()
+  >>= fun () ->
+  test_transaction
+    ~name:"transaction-to-random-tz1-fee-storage-limit"
+    ~dst_pkh:(Acc.pubkey_hash random_account)
+    ~dst_name:(Acc.pubkey_hash random_account)
+    ~fee:2
+    ~storage_limit:500
+    ()
   >>= fun () ->
   test_transaction
     ~name:"parameterless-transaction-to-kt1"
