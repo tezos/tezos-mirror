@@ -65,6 +65,8 @@ module Level : sig
   val of_string : string -> t option
 
   val encoding : t Data_encoding.t
+
+  val compare : t -> t -> int
 end
 
 (** Sections are a simple way of classifying events at the time of
