@@ -13,10 +13,10 @@ depends: [
   "genspio" { = "0.0.2" }
   "dum"
   "tezos-stdlib-unix"
-  "tezos-base"
   "lwt"
   "fmt"
   "cohttp-lwt-unix"
+  "tezos-base"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
@@ -24,3 +24,4 @@ build: [
 ]
 synopsis:
     "Flexible Tezos Sandboxes: library to run various Tezos network-sandboxes"
+

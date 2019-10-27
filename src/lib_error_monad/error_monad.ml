@@ -849,19 +849,21 @@ let () =
     ~id:"canceled"
     ~title:"Canceled"
     ~description:"A promise was unexpectedly canceled"
+    ~pp:(fun f () ->
+      Format.pp_print_string f "The promise was unexpectedly canceled")
     Data_encoding.unit
     (function Canceled -> Some () | _ -> None)
     (fun () -> Canceled)
 
 let protect ?on_error ?canceler t =
-  let cancelation =
+  let cancellation =
     match canceler with
     | None ->
         Lwt_utils.never_ending ()
     | Some canceler ->
-        Lwt_canceler.cancelation canceler >>= fun () -> fail Canceled
+        Lwt_canceler.cancellation canceler >>= fun () -> fail Canceled
   in
-  let res = Lwt.pick [cancelation; Lwt.catch t (fun exn -> fail (Exn exn))] in
+  let res = Lwt.pick [cancellation; Lwt.catch t (fun exn -> fail (Exn exn))] in
   res
   >>= function
   | Ok _ ->
@@ -885,6 +887,7 @@ let () =
     ~id:"utils.Timeout"
     ~title:"Timeout"
     ~description:"Timeout"
+    ~pp:(fun f () -> Format.pp_print_string f "The request has timed out")
     Data_encoding.unit
     (function Timeout -> Some () | _ -> None)
     (fun () -> Timeout)

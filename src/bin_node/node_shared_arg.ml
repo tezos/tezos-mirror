@@ -65,7 +65,9 @@ let wrap data_dir config_file connections max_download_speed max_upload_speed
     Option.unopt ~default:Node_config_file.default_data_dir data_dir
   in
   let config_file =
-    Option.unopt ~default:(actual_data_dir // "config.json") config_file
+    Option.unopt
+      ~default:(actual_data_dir // Node_data_version.default_config_file_name)
+      config_file
   in
   let rpc_tls =
     Option.map ~f:(fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls

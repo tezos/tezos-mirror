@@ -44,7 +44,7 @@
 
 type ('msg, 'peer_meta, 'conn_meta) t
 
-(** The type of a pool of connections, parametrized by resp. the type
+(** The type of a pool of connections, parametrized by, resp., the type
     of messages and the meta-informations associated to an identity and
     a connection. *)
 type ('msg, 'peer_meta, 'conn_meta) pool = ('msg, 'peer_meta, 'conn_meta) t
@@ -76,7 +76,7 @@ type config = {
       [accept] will fail, i.e. not add more connections
       (also triggers [LogEvent.too_many_connections]). *)
   max_incoming_connections : int;
-      (** Max not-yet-authentified incoming connections.
+      (** Max not-yet-authenticated incoming connections.
       Above this number, [accept] will start dropping incoming
       connections. *)
   connection_timeout : Time.System.Span.t;
@@ -97,10 +97,10 @@ type config = {
   known_points_history_size : int;
       (** Size of the known points log buffer (default: 50) *)
   max_known_points : (int * int) option;
-      (** Parameters for the the garbage collection of known points. If
+      (** Parameters for the garbage collection of known points. If
       None, no garbage collection is performed. Otherwise, the first
       integer of the couple limits the size of the "known points"
-      table. When this number is reached, the table is expurged from
+      table. When this number is reached, the table is purged off of
       disconnected points, older first, to try to reach the amount of
       connections indicated by the second integer. *)
   max_known_peer_ids : (int * int) option;
@@ -153,7 +153,7 @@ val pool_stat : ('msg, 'peer_meta, 'conn_meta) pool -> P2p_stat.t
 val config : _ pool -> config
 
 (** [send_swap_request pool] given two connected peers pi and pj (pi
-    <> pj), suggest swap with pi for the peer pj. This behaviour is
+    <> pj), suggest swap with pi for the peer pj. This behavior is
     disabled in private mode *)
 val send_swap_request : ('msg, 'peer_meta, 'conn_meta) pool -> unit
 
@@ -256,11 +256,11 @@ module Connection : sig
     P2p_peer.Id.t ->
     ('msg, 'peer_meta, 'conn_meta) connection option
 
-  (** [private_node conn] returns 'true' if the node assocoatied to this
+  (** [private_node conn] returns 'true' if the node associated to this
       connection is in private mode *)
   val private_node : ('msg, 'peer_meta, 'conn_meta) connection -> bool
 
-  (** [trusted_node conn] returns 'true' if the node assocoatied to this
+  (** [trusted_node conn] returns 'true' if the node associated to this
       connection is trusted *)
   val trusted_node : ('msg, 'peer_meta, 'conn_meta) connection -> bool
 end

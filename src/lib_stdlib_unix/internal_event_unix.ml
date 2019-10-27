@@ -59,6 +59,12 @@ end
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
 let init ?lwt_log_sink ?(configuration = Configuration.default) () =
+  let _ =
+    (* This is just here to force the linking (and hence
+       initialization) of all these modules: *)
+    [ File_descriptor_sink.Sink_implementation_path.uri_scheme;
+      File_event_sink.Sink_implementation.uri_scheme ]
+  in
   Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
   >>= fun () ->
   ( match Sys.(getenv_opt env_var_name) with

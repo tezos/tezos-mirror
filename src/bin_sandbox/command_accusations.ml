@@ -4,7 +4,7 @@ open Console
 
 let default_attempts = 35
 
-let little_mesh_with_bakers ?base_port ?generate_kiln_config state
+let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     ~starting_level ~node_exec ~client_exec ~bakers () =
   Helpers.clear_root state
   >>= fun () ->
@@ -14,8 +14,8 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
   >>= fun () ->
   let block_interval = 1 in
   let (protocol, baker_list) =
+    let d = protocol in
     let open Tezos_protocol in
-    let d = default () in
     let bakers = List.take d.bootstrap_accounts bakers in
     ( {
         d with
@@ -63,10 +63,10 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
   >>= fun (client_2, baker_2) ->
   Interactive_test.Pauser.add_commands
     state
-    Interactive_test.Commands.
-      [ arbitrary_command_on_clients
-          state
-          ~clients:[client_0; client_1; client_2] ] ;
+    Interactive_test.Commands.(
+      arbitrary_commands_for_each_and_all_clients
+        state
+        ~clients:[client_0; client_1; client_2]) ;
   Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
       Tezos_client.rpc
         state
@@ -96,7 +96,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state
         ~client_exec
       >>= fun () ->
       return EF.(wf "Kiln was configured at `%s`" kiln_config.path))
-  >>= fun kiln_info_opt ->
+  >>= fun _ ->
   let bake msg baker = Tezos_client.Keyed.bake state baker msg in
   List.fold
     (List.init (starting_level - 1) ~f:(fun n -> n))
@@ -144,10 +144,11 @@ let wait_for_operation_in_mempools state ~nodes:all_nodes ~kind ~client_exec
             (`Not_done
               (sprintf "Waiting for %S to show up in the mempool" kind)))
 
-let simple_double_baking ~starting_level ?generate_kiln_config ~state
+let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
     ~base_port node_exec client_exec () =
   little_mesh_with_bakers
     ~bakers:1
+    ~protocol
     state
     ~node_exec
     ~client_exec
@@ -165,8 +166,14 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state
   >>= fun () ->
   kill_nth 2
   >>= fun () ->
-  Loop.n_times number_of_lonely_bakes (fun _ ->
+  Loop.n_times (number_of_lonely_bakes - 1) (fun _ ->
       Tezos_client.Keyed.bake state baker_0 "Bake-on-0")
+  >>= fun () ->
+  (* Bake one block less and inject an operation to generate a different
+     block's hash *)
+  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
+  >>= fun () ->
+  Tezos_client.Keyed.bake state baker_0 "Bake-on-0"
   >>= fun () ->
   Tezos_client.get_block_header state ~client:client_0 `Head
   >>= fun baking_0_header ->
@@ -294,9 +301,10 @@ let find_endorsement_in_mempool state ~client =
           return (`Done e))
 
 let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
-    ~base_port node_exec client_exec () =
+    ~protocol ~base_port node_exec client_exec () =
   little_mesh_with_bakers
     ~bakers:2
+    ~protocol
     state
     ~node_exec
     ~client_exec
@@ -323,6 +331,9 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
   Helpers.kill_node state node_1
   >>= fun () ->
   Helpers.kill_node state node_2
+  >>= fun () ->
+  (* Inject an operation to generate a different block's hash *)
+  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_0 "baker-0 baking with node 0"
   >>= fun () ->
@@ -455,13 +466,14 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
                  last_level)))
   >>= fun () -> say state EF.(af "Test done.")
 
-let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
+let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
+    client_exec () =
   Helpers.clear_root state
   >>= fun () ->
   let block_interval = 2 in
   let (protocol, baker_0_account) =
+    let d = protocol in
     let open Tezos_protocol in
-    let d = default () in
     let baker = List.hd_exn d.bootstrap_accounts in
     ( {
         d with
@@ -514,11 +526,10 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes:all_nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~clients:[client_0; client_1; client_2] ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~clients:[client_0; client_1; client_2]) ;
   let pause ?force msgs = Interactive_test.Pauser.generic state ?force msgs in
   let starting_level = 10 in
   List.fold
@@ -545,7 +556,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
         af "Node 0 baked %d times." (starting_level - 1);
         af "All nodes should be at level %d." starting_level ]
   >>= fun () ->
-  let transfer msg client =
+  let transfer _msg client =
     let dest =
       List.random_element_exn protocol.Tezos_protocol.bootstrap_accounts
       |> fst |> Tezos_protocol.Account.pubkey_hash
@@ -609,7 +620,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
       Tezos_client.Keyed.bake state baker_0 (sprintf "n0 only alive: %d" n))
   >>= fun () ->
   get_block_header ~client:client_0 `Head
-  >>= fun baking_0_header ->
+  >>= fun _baking_0_header ->
   Tezos_client.Keyed.endorse state baker_0 "self-endorsing"
   >>= fun () ->
   Tezos_client.Keyed.bake state baker_0 "baking self-endorsement"
@@ -624,7 +635,7 @@ let with_accusers ~state ~base_port node_exec accuser_exec client_exec () =
       Tezos_client.Keyed.bake state baker_1 "after transfer")
   >>= fun () ->
   get_block_header ~client:client_1 `Head
-  >>= fun baking_1_header ->
+  >>= fun _baking_1_header ->
   kill_nth_node mesh_nodes 1
   >>= fun () ->
   pause
@@ -750,6 +761,7 @@ let cmd ~pp_error () =
              bcli
              accex
              generate_kiln_config
+             protocol
              state
              ->
           let checks () =
@@ -764,7 +776,7 @@ let cmd ~pp_error () =
             | `With_accusers ->
                 checks ()
                 >>= fun () ->
-                with_accusers ~state bnod accex bcli ~base_port ()
+                with_accusers ~state bnod accex bcli ~base_port () ~protocol
             | `Simple_double_baking ->
                 checks ()
                 >>= fun () ->
@@ -775,6 +787,7 @@ let cmd ~pp_error () =
                   ~base_port
                   ?generate_kiln_config
                   ~starting_level
+                  ~protocol
                   ()
             | `Simple_double_endorsing ->
                 checks ()
@@ -786,6 +799,7 @@ let cmd ~pp_error () =
                   ~base_port
                   ?generate_kiln_config
                   ~starting_level
+                  ~protocol
                   ()
           in
           (state, Interactive_test.Pauser.run_test ~pp_error state actual_test))
@@ -814,6 +828,7 @@ let cmd ~pp_error () =
     $ Tezos_executable.cli_term `Client "tezos"
     $ Tezos_executable.cli_term `Accuser "tezos"
     $ Kiln.Configuration_directory.cli_term ()
+    $ Tezos_protocol.cli_term ()
     $ Test_command_line.cli_state ~name:"accusing" () )
     (let doc = "Sandbox networks which record double-bakings." in
      let man : Manpage.block list =

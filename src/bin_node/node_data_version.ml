@@ -27,7 +27,12 @@ let ( // ) = Filename.concat
 
 type t = string
 
-let data_version = "0.0.3"
+(* Data_version hitory:
+ *  - 0.0.1 : original storage
+ *  - 0.0.2 : never released
+ *  - 0.0.3 : store upgrade (introducing history mode)
+ *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2) *)
+let data_version = "0.0.4"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -46,11 +51,13 @@ let lock_file data_dir = data_dir // "lock"
 
 let default_identity_file_name = "identity.json"
 
-let version_encoding = Data_encoding.(obj1 (req "version" string))
+let default_peers_file_name = "peers.json"
+
+let default_config_file_name = "config.json"
 
 let version_file_name = "version.json"
 
-let pp ppf version = Format.pp_print_string ppf version
+let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 type error += Invalid_data_dir_version of t * t
 
@@ -145,15 +152,23 @@ let version_file data_dir = Filename.concat data_dir version_file_name
 
 let check_data_dir_version data_dir =
   let version_file = version_file data_dir in
-  fail_unless
-    (Sys.file_exists version_file)
-    (No_data_dir_version_file version_file)
+  Lwt_unix.file_exists version_file
+  >>= fun ex ->
+  fail_unless ex (No_data_dir_version_file version_file)
   >>=? fun () ->
   Lwt_utils_unix.Json.read_file version_file
   |> trace (Could_not_read_data_dir_version version_file)
   >>=? fun json ->
   ( try return (Data_encoding.Json.destruct version_encoding json)
-    with _ -> fail (Could_not_read_data_dir_version version_file) )
+    with
+    | Data_encoding.Json.Cannot_destruct _
+    | Data_encoding.Json.Unexpected _
+    | Data_encoding.Json.No_case_matched _
+    | Data_encoding.Json.Bad_array_size _
+    | Data_encoding.Json.Missing_field _
+    | Data_encoding.Json.Unexpected_field _
+    ->
+      fail (Could_not_read_data_dir_version version_file) )
   >>=? fun version ->
   if String.equal version data_version then return_none
   else
@@ -174,46 +189,44 @@ let write_version data_dir =
 
 let ensure_data_dir bare data_dir =
   let write_version () = write_version data_dir >>=? fun () -> return_none in
-  try
-    if Sys.file_exists data_dir then
-      match Sys.readdir data_dir with
-      | [||] ->
-          write_version ()
-      | [|single|] when single = default_identity_file_name ->
-          write_version ()
-      | [|file_a; file_b|]
-        when bare && file_a = version_file_name
-             && file_b = default_identity_file_name
-             || file_b = version_file_name
-                && file_a = default_identity_file_name ->
-          write_version ()
-      | files when bare ->
-          let files =
-            List.filter
-              (fun e -> e <> default_identity_file_name)
-              (Array.to_list files)
-          in
-          let to_delete =
-            Format.asprintf
-              "@[<v>%a@]"
-              (Format.pp_print_list
-                 ~pp_sep:Format.pp_print_cut
-                 Format.pp_print_string)
-              files
-          in
-          fail
-            (Invalid_data_dir
-               (Format.asprintf
-                  "Please provide a clean directory (only %s is allowed) by \
-                   deleting :@ %s"
-                  default_identity_file_name
-                  to_delete))
-      | _ ->
-          check_data_dir_version data_dir
-    else
-      Lwt_utils_unix.create_dir ~perm:0o700 data_dir
-      >>= fun () -> write_version ()
-  with Sys_error _ | Unix.Unix_error _ -> fail (Invalid_data_dir data_dir)
+  Lwt.catch
+    (fun () ->
+      Lwt_unix.file_exists data_dir
+      >>= function
+      | true -> (
+          Lwt_stream.to_list (Lwt_unix.files_of_directory data_dir)
+          >|= List.filter (fun s ->
+                  s <> "." && s <> ".." && s <> version_file_name
+                  && s <> default_identity_file_name
+                  && s <> default_config_file_name
+                  && s <> default_peers_file_name)
+          >>= function
+          | [] ->
+              write_version ()
+          | files when bare ->
+              let to_delete =
+                Format.asprintf
+                  "@[<v>%a@]"
+                  (Format.pp_print_list
+                     ~pp_sep:Format.pp_print_cut
+                     Format.pp_print_string)
+                  files
+              in
+              fail
+                (Invalid_data_dir
+                   (Format.asprintf
+                      "Please provide a clean directory by deleting:@ %s"
+                      to_delete))
+          | _ ->
+              check_data_dir_version data_dir )
+      | false ->
+          Lwt_utils_unix.create_dir ~perm:0o700 data_dir
+          >>= fun () -> write_version ())
+    (function
+      | Unix.Unix_error _ ->
+          fail (Invalid_data_dir data_dir)
+      | exc ->
+          raise exc)
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir

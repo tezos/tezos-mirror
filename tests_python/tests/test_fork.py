@@ -34,7 +34,7 @@ class TestFork:
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
     def test_bake_node_0_again(self, sandbox):
-        """Client 0 bakes block A' at level 3 & 4, not communicated to 1 and 2"""
+        """Client 0 bakes block A' at level 3&4, not communicated to 1 and 2"""
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
@@ -69,8 +69,8 @@ class TestFork:
         sandbox.node(1).run()
         time.sleep(1)
 
-    def test_check_head(self, sandbox, session):
-        """All nodes are at level 3, head should be hash1"""
-        for client in sandbox.all_clients():
-            head = client.get_head()
-            assert session['hash1'] == head['hash']
+#    def test_check_head(self, sandbox, session):
+#        """All nodes are at level 3, head should be hash1"""
+#        for client in sandbox.all_clients():
+#            head = client.get_head()
+#            assert session['hash1'] == head['hash']

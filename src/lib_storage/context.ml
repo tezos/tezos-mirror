@@ -28,10 +28,6 @@
 module Path = Irmin.Path.String_list
 module Metadata = Irmin.Metadata.None
 
-exception TODO of string
-
-let todo fmt = Fmt.kstrf (fun s -> raise (TODO s)) fmt
-
 let reporter () =
   let report src level ~over k msgf =
     let k _ = over () ; k () in
@@ -99,8 +95,13 @@ end = struct
     match Context_hash.of_b58check x with
     | Ok x ->
         Ok (of_context_hash x)
-    | Error _ ->
-        todo "Hash.of_string"
+    | Error err ->
+        Error
+          (`Msg
+            (Format.asprintf
+               "Failed to read b58check_encoding data: %a"
+               Error_monad.pp_print_error
+               err))
 
   let short_hash t = Irmin.Type.(short_hash string (H.to_raw_string t))
 
@@ -522,13 +523,13 @@ module Pruned_block = struct
   let of_bytes pruned_block =
     Data_encoding.Binary.of_bytes encoding pruned_block
 
-  let header {block_header} = block_header
+  let header {block_header; _} = block_header
 end
 
 module Block_data = struct
   type t = {block_header : Block_header.t; operations : Operation.t list list}
 
-  let header {block_header} = block_header
+  let header {block_header; _} = block_header
 
   let encoding =
     let open Data_encoding in
@@ -612,18 +613,6 @@ module Dumpable_context = struct
   let batch index f =
     P.Repo.batch index.repo (fun x y _ -> f (Batch (index.repo, x, y)))
 
-  let hash_import ty mb =
-    Context_hash.of_bytes mb
-    >>? fun h ->
-    match ty with `Node -> ok @@ `Node h | `Blob -> ok @@ `Contents (h, ())
-
-  let hash_equal h1 h2 =
-    match (h1, h2) with
-    | (`Contents (h1, ()), `Contents (h2, ())) | (`Node h1, `Node h2) ->
-        Context_hash.(h1 = h2)
-    | (`Contents _, `Node _) | (`Node _, `Contents _) ->
-        false
-
   let commit_info_encoding =
     let open Data_encoding in
     conv
@@ -634,14 +623,6 @@ module Dumpable_context = struct
         (author, message, date))
       (fun (author, message, date) -> Irmin.Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
-
-  let blob_encoding =
-    let open Data_encoding in
-    conv (fun (`Blob h) -> h) (fun h -> `Blob h) (obj1 (req "blob" bytes))
-
-  let node_encoding =
-    let open Data_encoding in
-    conv (fun (`Node h) -> h) (fun h -> `Node h) (obj1 (req "node" bytes))
 
   let hash_encoding : hash Data_encoding.t =
     let open Data_encoding in
@@ -673,11 +654,6 @@ module Dumpable_context = struct
         Store.Commit.info c
     | _ ->
         assert false
-
-  let context_info_export i = Irmin.Info.(date i, author i, message i)
-
-  let context_info_import (date, author, message) =
-    Irmin.Info.v ~date ~author message
 
   let get_context idx bh = checkout idx bh.Block_header.shell.context
 
@@ -768,18 +744,6 @@ end
 let data_node_hash context =
   Store.Tree.get_tree context.tree current_data_key
   >|= fun tree -> Hash.to_context_hash (Store.Tree.hash tree)
-
-let get_transition_block_headers pruned_blocks =
-  let rec aux hs x bs =
-    match bs with
-    | [] ->
-        x :: hs
-    | b :: bs ->
-        let xl = x.Pruned_block.block_header.shell.proto_level in
-        let bl = b.Pruned_block.block_header.shell.proto_level in
-        if not (xl = bl) then aux (x :: hs) b bs else aux hs b bs
-  in
-  match pruned_blocks with [] -> assert false | x :: xs -> aux [] x xs
 
 let get_protocol_data_from_header index block_header =
   checkout_exn index block_header.Block_header.shell.context

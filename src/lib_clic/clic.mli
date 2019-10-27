@@ -44,7 +44,7 @@ open Error_monad
 
     The first type parameter is the OCaml type of the argument once
     parsed from its string notation. The second parameter is a context
-    that is passed througout the parsing of the command line. Some
+    that is passed throughout the parsing of the command line. Some
     parameters (for instance a simple [int]) can remain polymorphic,
     while others need a context to be parsed. Of course, a command line
     can only contain parameters that bear the same context type. *)
@@ -437,7 +437,7 @@ val command :
   ('b -> 'a) ->
   'ctx command
 
-(** Combinator to use a command in an adaptated context. *)
+(** Combinator to use a command in an adapted context. *)
 val map_command : ('a -> 'b) -> 'b command -> 'a command
 
 (** {2 Output formatting} *)
@@ -452,7 +452,7 @@ type format = Plain | Ansi | Html
 (** Verbosity level, from terse to verbose. *)
 type verbosity = Terse | Short | Details | Full
 
-(** Updates the formatter's functions to interprete some semantic tags
+(** Updates the formatter's functions to interpret some semantic tags
     used in manual production. Returns the previous state of the
     formatter to restore it afterwards if needed.
 
@@ -468,7 +468,7 @@ type verbosity = Terse | Short | Details | Full
     * [<commandline>]: wraps the command line in a [<command>]
     * [<commanddoc>]: wraps everything but the command line in a [<command>]
 
-    Cosmetic tags for hilighting text:
+    Cosmetic tags for highlighting text:
 
     * [<opt>]: optional arguments * [<arg>]: positional arguments
     * [<kwd>]: positional keywords * [<hilight>]: search results
@@ -507,9 +507,9 @@ val parse_global_options :
   string list ->
   ('a * string list) tzresult Lwt.t
 
-(** Pretty printfs the error messages to the given formatter.
+(** Pretty prints the error messages to the given formatter.
     [executable_name] and [global_options] are for help screens.
-    [default] is used to print non-cli errors. *)
+    [default] is used to print non-CLI errors. *)
 val pp_cli_errors :
   Format.formatter ->
   executable_name:string ->

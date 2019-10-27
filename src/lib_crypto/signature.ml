@@ -668,13 +668,9 @@ let zero = of_ed25519 Ed25519.zero
 
 let bytes_of_watermark = function
   | Block_header chain_id ->
-      Bytes.concat
-        (Bytes.of_string "")
-        [Bytes.of_string "\x01"; Chain_id.to_bytes chain_id]
+      Bytes.cat (Bytes.of_string "\x01") (Chain_id.to_bytes chain_id)
   | Endorsement chain_id ->
-      Bytes.concat
-        (Bytes.of_string "")
-        [Bytes.of_string "\x02"; Chain_id.to_bytes chain_id]
+      Bytes.cat (Bytes.of_string "\x02") (Chain_id.to_bytes chain_id)
   | Generic_operation ->
       Bytes.of_string "\x03"
   | Custom bytes ->
@@ -737,10 +733,9 @@ let check ?watermark public_key signature message =
       false
 
 let append ?watermark sk msg =
-  Bytes.concat (Bytes.of_string "") [msg; to_bytes (sign ?watermark sk msg)]
+  Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
-let concat msg signature =
-  Bytes.concat (Bytes.of_string "") [msg; to_bytes signature]
+let concat msg signature = Bytes.cat msg (to_bytes signature)
 
 type algo = Ed25519 | Secp256k1 | P256
 

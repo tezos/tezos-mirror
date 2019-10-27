@@ -48,7 +48,7 @@ val shutdown : t -> unit Lwt.t
     current testchain, ...) *)
 type chain_db
 
-(** Activate a given chain. The node will notify its neighbours that
+(** Activate a given chain. The node will notify its neighbors that
     it now handles the given chain and that it expects notification
     for new head or new operations. *)
 val activate : t -> State.Chain.t -> chain_db
@@ -56,7 +56,7 @@ val activate : t -> State.Chain.t -> chain_db
 (** Look for the database of an active chain. *)
 val get_chain : t -> Chain_id.t -> chain_db option
 
-(** Deactivate a given chain. The node will notify its neighbours
+(** Deactivate a given chain. The node will notify its neighbors
     that it does not care anymore about this chain. *)
 val deactivate : chain_db -> unit Lwt.t
 
@@ -94,12 +94,12 @@ val get_peer_metadata : chain_db -> P2p_peer.Id.t -> Peer_metadata.t
 module Request : sig
   (** Send to a given peer, or to all known active peers for the
       chain, a friendly request "Hey, what's your current branch
-      ?". The expected answer is a `Block_locator.t.`. *)
+      ?". The expected answer is a [Block_locator.t.]. *)
   val current_branch : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
   (** Send to a given peer, or to all known active peers for the
       given chain, a friendly request "Hey, what's your current
-      branch ?". The expected answer is a `Block_locator.t.`. *)
+      branch ?". The expected answer is a [Block_locator.t.]. *)
   val current_head : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 end
 

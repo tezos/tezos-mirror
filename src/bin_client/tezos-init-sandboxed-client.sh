@@ -19,16 +19,16 @@ init_sandboxed_client() {
         client="$local_client -S -base-dir $client_dir -addr $host -port $rpc"
         admin_client="$local_admin_client -S -base-dir $client_dir -addr $host -port $rpc"
         alpha_baker="$local_alpha_baker -S -base-dir $client_dir -addr $host -port $rpc"
-	alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr $host -port $rpc"
-	alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr $host -port $rpc"
+        alpha_endorser="$local_alpha_endorser -S -base-dir $client_dir -addr $host -port $rpc"
+        alpha_accuser="$local_alpha_accuser -S -base-dir $client_dir -addr $host -port $rpc"
         signer="$local_signer -S -base-dir $client_dir -addr $host -port $rpc"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -addr $host -port $rpc"
         admin_client="$local_admin_client -base-dir $client_dir -addr $host -port $rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -addr $host -port $rpc"
-	alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr $host -port $rpc"
-	alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr $host -port $rpc"
+        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -addr $host -port $rpc"
+        alpha_accuser="$local_alpha_accuser -base-dir $client_dir -addr $host -port $rpc"
         signer="$local_signer -base-dir $client_dir -addr $host -port $rpc"
         compiler="$local_compiler"
     fi
@@ -109,7 +109,7 @@ activate_alpha() {
         activate protocol PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS \
         with fitness 1 \
         and key activator \
-	and parameters "${parameters_file}" \
+        and parameters "${parameters_file}" \
         --timestamp $(TZ='AAA+1' date +%FT%TZ)
 }
 
@@ -122,7 +122,7 @@ usage() {
 
 main () {
 
-    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
@@ -132,7 +132,7 @@ main () {
         parameters_file="$bin_dir/../../sandbox-parameters.json"
 
     else
-	# we assume a clean install with tezos-(admin-)client in the path
+        # we assume a clean install with tezos-(admin-)client in the path
         local_client="${local_client:-$(which tezos-client)}"
         local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
         local_signer="${local_signer:-$(which tezos-signer)}"
@@ -166,12 +166,12 @@ main () {
 
         if [ -n "$USE_TLS" ]; then
             baker="$local_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	    endorser="$local_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	    accuser="$local_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            endorser="$local_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            accuser="$local_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         else
             baker="$local_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	    endorser="$local_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-	    accuser="$local_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            endorser="$local_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            accuser="$local_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
         fi
 
         echo '#!/bin/sh' > $client_dir/bin/tezos-baker-$protocol

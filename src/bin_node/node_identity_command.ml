@@ -88,7 +88,8 @@ module Term = struct
       ( match (data_dir, config_file) with
       | (None, None) ->
           let default_config =
-            Node_config_file.default_data_dir // "config.json"
+            Node_config_file.default_data_dir
+            // Node_data_version.default_config_file_name
           in
           if Sys.file_exists default_config then
             Node_config_file.read default_config
@@ -96,7 +97,8 @@ module Term = struct
       | (None, Some config_file) ->
           Node_config_file.read config_file
       | (Some data_dir, None) ->
-          Node_config_file.read (data_dir // "config.json")
+          Node_config_file.read
+            (data_dir // Node_data_version.default_config_file_name)
           >>=? fun cfg -> return {cfg with data_dir}
       | (Some data_dir, Some config_file) ->
           Node_config_file.read config_file

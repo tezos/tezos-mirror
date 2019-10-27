@@ -34,7 +34,6 @@ type config = {
   protocol_root : string;
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  test_chain_max_tll : int option;
   checkpoint : Block_header.t option;
 }
 
@@ -73,6 +72,7 @@ val default_chain_validator_limits : chain_validator_limits
 
 val create :
   ?sandboxed:bool ->
+  ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   config ->
   peer_validator_limits ->

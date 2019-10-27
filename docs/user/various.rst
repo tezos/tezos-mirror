@@ -248,7 +248,7 @@ Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the alphanet
 protocol with ``tezos-activate-alpha``) so that useful information
 about the program can be displayed.
 We can now open our favourite contract ``emacs
-./src/bin_client/test/contracts/id.tz`` and, when moving the cursor on
+./src/bin_client/test/contracts/attic/id.tz`` and, when moving the cursor on
 a Michelson instruction, in the bottom of the windows Emacs should
 display the state of the stack before (left) and after (right) the
 application of the instruction.
@@ -258,7 +258,7 @@ run it locally:
 
 ::
 
-   tezos-client run script ./src/bin_client/test/contracts/id.tz \
+   tezos-client run script ./src/bin_client/test/contracts/attic/id.tz \
                 on storage '"hello"' and input '"world"'
 
 

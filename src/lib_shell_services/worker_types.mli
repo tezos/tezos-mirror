@@ -51,7 +51,7 @@ type worker_information = {
 val worker_information_encoding :
   error list Data_encoding.t -> worker_information Data_encoding.t
 
-(** The runnning status of an individual request. *)
+(** The running status of an individual request. *)
 type request_status = {
   pushed : Time.System.t;
   treated : Time.System.t;

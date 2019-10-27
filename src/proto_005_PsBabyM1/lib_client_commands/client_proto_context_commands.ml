@@ -1119,7 +1119,7 @@ let commands version () =
       command
         ~group
         ~desc:"Submit a ballot"
-        (args2 verbose_signing_switch dry_run_switch)
+        (args1 dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
         @@ Client_keys.Secret_key.alias_param
              ~name:"delegate"
@@ -1150,7 +1150,7 @@ let commands version () =
                   | s ->
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
-        (fun (verbose_signing, dry_run)
+        (fun dry_run
              (_, src_sk)
              proposal
              ballot
@@ -1173,7 +1173,6 @@ let commands version () =
             ~block:cctxt#block
             ~src_sk
             src_pkh
-            ~verbose_signing
             ~dry_run
             proposal
             ballot

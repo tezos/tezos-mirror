@@ -36,10 +36,10 @@ val split_path : string -> string list
     string, if [limit] is passed, stops after [limit] split(s). *)
 val split : char -> ?dup:bool -> ?limit:int -> string -> string list
 
-(** [true] if input has prefix **)
+(** [true] if input has prefix *)
 val has_prefix : prefix:string -> string -> bool
 
-(** Some (input with [prefix] removed), if string has [prefix], else [None] **)
+(** Some (input with [prefix] removed), if string has [prefix], else [None] *)
 val remove_prefix : prefix:string -> string -> string option
 
 (** Length of common prefix of input strings *)

@@ -24,15 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos P2p layer - Dynamic overlay network of authentified peers.
+(** Tezos P2p layer - Dynamic overlay network of authenticated peers.
 
     The P2P layer implements several mechanisms, notably:
-    - It maintains pools of known points (p2p servers), peers (authentified
-      p2p servers), connections,
+    - It maintains pools of known points (P2P servers), peers (authenticated
+      P2P servers), connections,
     - it implements an "administrative" protocol for maintaining the network
       topology,
-    - it regulates bandwith usage between connections,
-    - it implements an authentification / session agreement protocol,
+    - it regulates bandwidth usage between connections,
+    - it implements an authentication / session agreement protocol,
     - it can ban or greylist peers or IP addresses who don't behave well,
     - it offers the ability to the upper-layer to send, broadcast, or
       receive messages.
@@ -42,7 +42,7 @@
     by the upper-layer. See [P2p_message].
 
     The protocol may operate in *private* mode, in which only user-provided
-     points (a.k.a *trusted) are used. In particular, points
+    points (a.k.a. *trusted* ) are used. In particular, points
     advertisements and swap requests messages are ignored.
 
     The module [P2p_pool] maintains pools of points, peers and
@@ -55,9 +55,9 @@
     - A protocol worker implements the messaging protocol
 
     Points can be trusted. This is relevant in private mode
-    (see above), but generally peers shoudn't advertise trusted points.
+    (see above), but generally peers shouldn't advertise trusted points.
 
-    Addresses and peers can be *banned* (a.k.a. black listed). In
+    Addresses and peers can be *banned* (a.k.a. blacklisted). In
     which case, connections to and from them should be ignored.
 
     Addresses or peers can be *greylisted*. As for banning, greylisting
@@ -99,17 +99,17 @@ type 'msg message_config = {
 (** Network configuration *)
 type config = {
   listening_port : P2p_addr.port option;
-      (** Tells if incoming connections accepted, precising the TCP port
+      (** Tells if incoming connections accepted, specifying the TCP port
       on which the peer can be reached (default: [9732])*)
   listening_addr : P2p_addr.t option;
       (** When incoming connections are accepted, precise on which
-      IP adddress the node listen (default: [[::]]). *)
+      IP address the node listen (default: [[::]]). *)
   discovery_port : P2p_addr.port option;
-      (** Tells if local peer discovery is enabled, precising the TCP port
+      (** Tells if local peer discovery is enabled, specifying the TCP port
       on which the peer can be reached (default: [10732]) *)
   discovery_addr : Ipaddr.V4.t option;
       (** When local peer discovery is enabled, precise on which
-      IP address messages are broadcasted (default: [255.255.255.255]). *)
+      IP address messages are broadcast (default: [255.255.255.255]). *)
   trusted_points : P2p_point.Id.t list;
       (** List of hard-coded known peers to bootstrap the network from. *)
   peers_file : string;
@@ -203,7 +203,7 @@ val faked_network :
   'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net
 
-(** Main network initialisation function *)
+(** Main network initialization function *)
 val create :
   config:config ->
   limits:limits ->

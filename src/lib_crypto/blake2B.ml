@@ -52,7 +52,7 @@ module Make_minimal (K : Name) = struct
 
   let of_string_opt s =
     if String.length s <> size then None
-    else Some (Blake2b.Hash (Bigstring.of_string s))
+    else Some (Blake2b.Hash (Bytes.of_string s))
 
   let of_string s =
     match of_string_opt s with
@@ -75,7 +75,7 @@ module Make_minimal (K : Name) = struct
     | Some h ->
         h
 
-  let to_string (Blake2b.Hash h) = Bigstring.to_string h
+  let to_string (Blake2b.Hash h) = Bytes.to_string h
 
   let of_hex s = of_string (Hex.to_string s)
 
@@ -94,8 +94,7 @@ module Make_minimal (K : Name) = struct
     Format.pp_print_string ppf (String.sub h 0 8)
 
   let of_bytes_opt b =
-    if Bytes.length b <> size then None
-    else Some (Blake2b.Hash (Bigstring.of_bytes b))
+    if Bytes.length b <> size then None else Some (Blake2b.Hash b)
 
   let of_bytes_exn b =
     match of_bytes_opt b with
@@ -117,18 +116,17 @@ module Make_minimal (K : Name) = struct
     | None ->
         generic_error "Failed to deserialize a hash (%s)" K.name
 
-  let to_bytes (Blake2b.Hash h) = Bigstring.to_bytes h
+  let to_bytes (Blake2b.Hash h) = h
 
   let hash_bytes ?key l =
-    let key = Option.map ~f:Bigstring.of_bytes key in
     let state = Blake2b.init ?key size in
-    List.iter (fun b -> Blake2b.update state (Bigstring.of_bytes b)) l ;
+    List.iter (fun b -> Blake2b.update state b) l ;
     Blake2b.final state
 
   let hash_string ?key l =
-    let key = Option.map ~f:Bigstring.of_string key in
+    let key = Option.map ~f:Bytes.of_string key in
     let state = Blake2b.init ?key size in
-    List.iter (fun s -> Blake2b.update state (Bigstring.of_string s)) l ;
+    List.iter (fun s -> Blake2b.update state (Bytes.of_string s)) l ;
     Blake2b.final state
 
   let path_length = 6
@@ -170,7 +168,7 @@ module Make_minimal (K : Name) = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Bigstring.compare h1 h2
+    let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Bytes.compare h1 h2
   end)
 end
 

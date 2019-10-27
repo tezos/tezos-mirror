@@ -17,7 +17,7 @@ val write :
   -> path:string
   -> (string * string) list
   -> ( unit
-     , [> `Lwt_exn of exn | `Wrong_status of Process_result.t * string] )
+     , [> System_error.t | `Wrong_status of Process_result.t * string] )
      Asynchronous_result.t
 
 val pp : Format.formatter -> t -> unit

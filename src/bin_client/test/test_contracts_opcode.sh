@@ -98,7 +98,7 @@ assert_storage $contract_op_dir/xor.tz None "(Pair True True)" '(Some False)'
 assert_storage $contract_op_dir/concat_list.tz '""' '{ "a" ; "b" ; "c" }' '"abc"'
 assert_storage $contract_op_dir/concat_list.tz '""' '{}' '""'
 assert_storage $contract_op_dir/concat_list.tz \
-			  '""' '{ "Hello" ; " " ; "World" ; "!" }' '"Hello World!"'
+               '""' '{ "Hello" ; " " ; "World" ; "!" }' '"Hello World!"'
 
 # Identity on lists
 assert_storage $contract_op_dir/list_id.tz '{""}' '{ "1" ; "2" ; "3" }' '{ "1" ; "2" ; "3" }'
@@ -160,38 +160,38 @@ assert_storage $contract_op_dir/map_size.tz 111 \
 # Contains all elements -- does the second list contain all of the same elements
 # as the first one? I'm ignoring element multiplicity
 assert_storage $contract_op_dir/contains_all.tz \
-			  None '(Pair {} {})' '(Some True)'
+               None '(Pair {} {})' '(Some True)'
 assert_storage $contract_op_dir/contains_all.tz \
-			  None '(Pair { "a" } { "B" })' '(Some False)'
+               None '(Pair { "a" } { "B" })' '(Some False)'
 assert_storage $contract_op_dir/contains_all.tz \
-			  None '(Pair { "A" } { "B" })' '(Some False)'
+               None '(Pair { "A" } { "B" })' '(Some False)'
 assert_storage $contract_op_dir/contains_all.tz \
-			  None '(Pair { "B" } { "B" })' '(Some True)'
+               None '(Pair { "B" } { "B" })' '(Some True)'
 assert_storage $contract_op_dir/contains_all.tz None \
-			  '(Pair { "B" ; "C" ; "asdf" } { "B" ; "B" ; "asdf" ; "C" })' '(Some True)'
+               '(Pair { "B" ; "C" ; "asdf" } { "B" ; "B" ; "asdf" ; "C" })' '(Some True)'
 assert_storage $contract_op_dir/contains_all.tz None \
-			  '(Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" })' '(Some True)'
+               '(Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" })' '(Some True)'
 
 # Concatenate the string in storage with all strings in the given list
 assert_storage $contract_op_dir/concat_hello.tz '{}' \
-			  '{ "World!" }' '{ "Hello World!" }'
+               '{ "World!" }' '{ "Hello World!" }'
 assert_storage $contract_op_dir/concat_hello.tz '{}' \
-			  '{}' '{}'
+               '{}' '{}'
 assert_storage $contract_op_dir/concat_hello.tz '{}' \
-			  '{ "test1" ; "test2" }' '{ "Hello test1" ; "Hello test2" }'
+               '{ "test1" ; "test2" }' '{ "Hello test1" ; "Hello test2" }'
 
 # Create an empty map and add a string to it
 assert_storage $contract_op_dir/empty_map.tz '{}' Unit \
-			  '{ Elt "hello" "world" }'
+               '{ Elt "hello" "world" }'
 
 # Get the value stored at the given key in the map
 assert_storage $contract_op_dir/get_map_value.tz '(Pair None { Elt "hello" "hi" })' \
-			  '"hello"' '(Pair (Some "hi") { Elt "hello" "hi" })'
+               '"hello"' '(Pair (Some "hi") { Elt "hello" "hi" })'
 assert_storage $contract_op_dir/get_map_value.tz '(Pair None { Elt "hello" "hi" })' \
-			  '""' '(Pair None { Elt "hello" "hi" })'
+               '""' '(Pair None { Elt "hello" "hi" })'
 assert_storage $contract_op_dir/get_map_value.tz \
-			  '(Pair None { Elt "1" "one" ; Elt "2" "two" })' \
-			  '"1"' '(Pair (Some "one") { Elt "1" "one" ; Elt "2" "two" })'
+               '(Pair None { Elt "1" "one" ; Elt "2" "two" })' \
+               '"1"' '(Pair (Some "one") { Elt "1" "one" ; Elt "2" "two" })'
 
 # Map iter
 assert_storage $contract_op_dir/map_iter.tz '(Pair 0 0)' '{ Elt 0 100 ; Elt 2 100 }' '(Pair 2 200)'
@@ -323,13 +323,14 @@ assert_balance test_transfer_contract2 "120 ꜩ"
 
 # Test SELF
 init_with_transfer $contract_op_dir/self.tz \
-				   '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' 1,000 bootstrap1
+                   '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' 1,000 bootstrap1
 bake_after $client transfer 0 from bootstrap1 to self --burn-cap 10
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
 # Test SLICE and SIZE on bytes
 init_with_transfer $contract_op_dir/slices.tz \
-				   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' 1,000 bootstrap1
+                   '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"' \
+                   1,000 bootstrap1
 
 assert_fails $client transfer 0 from bootstrap1 to slices -arg \
         '(Pair 0xe009ab79e8b84ef0e55c43a9a857214d8761e67b75ba63500a5694fb2ffe174acc2de22d01ccb7259342437f05e1987949f0ad82e9f32e9a0b79cb252d7f7b8236ad728893f4e7150742eefdbeda254970f9fcd92c6228c178e1a923e5600758eb83f2a05edd0be7625657901f2ba81eaf145d003dbef78e33f43a32a3788bdf0501000000085341554349535345 "p2sigsceCzcDw2AeYDzUonj4JT341WC9Px4wdhHBxbZcG1FhfqFVuG7f2fGCzrEHSAZgrsrQWpxduDPk9qZRgrpzwJnSHC3gZJ")' --burn-cap 10

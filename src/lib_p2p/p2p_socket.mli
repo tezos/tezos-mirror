@@ -26,17 +26,34 @@
 
 (** Typed and encrypted connections to peers.
 
-    This modules adds message encoding and encryption to
-    [P2p_io_scheduler]'s generic throttled connections.
+    This module defines:
+    - primitive functions to implement a session-establishment protocol
+      (set up an authentication/encryption symmetric session key,
+       check proof of work target, authenticate hosts, exchange meta data),
+    - a higher-level, authenticated and encrypted, type of connection.
 
-    Each connection have an associated internal read (resp. write)
-    queue containing messages (of type ['msg]), whose size can be
-    limited by providing corresponding arguments to [accept].
-*)
+    It is parametric in two (abstract data) types. ['msg] is the unit of
+    communication. ['meta] is a type of message sent in session establishment.
+
+    Connections defined in this module wrap a [P2p_io_scheduler.connection]
+    (which is simply a file descriptor on which R/W are regulated.)
+
+    Each connection has an associated internal read (resp. write) queue
+    containing messages (of type ['msg]), whose size can be limited by
+    providing corresponding arguments to [accept]. *)
 
 (** {1 Types} *)
 
-(** Type for the parameter negotiation mechanism. *)
+(** This defines an abstract data type ['meta]. Mainly a placeholder to be
+    used by the calling layer. ['meta] objects are communicated at session
+    initiation and both ends ['meta'] are known once session is set up. ['meta]
+    object should at least contain the private status of the node. *)
+
+(* TODO:
+   - this type is duplicated at several places. Define it once for all in a
+     separate module (with [msg_config] and [peer_config]).
+   - the parameter [P2p_peer.Id.t] provides more control when constructing a
+     ['meta] but may not be useful. *)
 type 'meta metadata_config = {
   conn_meta_encoding : 'meta Data_encoding.t;
   conn_meta_value : P2p_peer.Id.t -> 'meta;
@@ -52,24 +69,56 @@ type 'meta authenticated_connection
     messages exchanged between peers. *)
 type ('msg, 'meta) t
 
+(** [equal t1 t2] returns true iff the identities of the underlying
+    [P2p_io_scheduler.connection]s are equal. *)
 val equal : ('mst, 'meta) t -> ('msg, 'meta) t -> bool
 
 val pp : Format.formatter -> ('msg, 'meta) t -> unit
 
 val info : ('msg, 'meta) t -> 'meta P2p_connection.Info.t
 
+(** [local_metadata t] returns the metadata provided when calling
+    [authenticate]. *)
 val local_metadata : ('msg, 'meta) t -> 'meta
 
+(** [local_metadata t] returns the remote metadata, communicated by the
+    remote host when the session was established. *)
 val remote_metadata : ('msg, 'meta) t -> 'meta
 
 val private_node : ('msg, 'meta) t -> bool
 
-(** {1 Low-level functions (do not use directly)} *)
+(** {1 Session-establishment functions} these should be used together
+    to implement the session establishment protocol. Session establishment
+    proceeds in three synchronous, symmetric, steps. First two steps are
+    implemented by [authenticate]. Third step is implemented by either [accept]
+    or [kick].
 
-(** (Low-level) (Cancelable) Authentication function of a remote
-    peer. Used in [P2p_pool], to promote a
-    [P2P_io_scheduler.connection] into an [authenticated_connection] (auth
-    correct, acceptation undecided). *)
+    1. Hosts send each other an authentication message. The message contains
+       notably a public key, a nonce, and proof of work stamp computed from
+       the public key. PoW work is checked, and a session key is established
+       (authenticated key exchange). The session key will be used to
+       encrypt/authenticate all subsequent messages over this connection.
+
+    2. Hosts send each other a ['meta] message.
+
+    3. Each host send either an [Ack] message ([accept] function) or an [Nack]
+       message ([kick] function). If both hosts send an [Ack], the connection
+       is established and they can start to read/write ['msg].
+
+    Note that [P2p_errors.Decipher_error] can be raised from all functions
+    receiving messages after step 1, when a message can't be decrypted.
+
+    Typically, the calling module will make additional checks after step 2 to
+    decide what to do in step 3. For instance, based on network version or
+    ['meta] information. *)
+
+(** [authenticate canceler pow incoming conn point ?port identity version meta]
+    returns a couple [(info, auth_conn) tries to set up a session with
+    the host connected via [conn].
+
+    Can fail with
+    - [P2p_errors.Not_enough_proof_of_work] if PoW target isn't reached
+    - [P2p_errors.Myself] if both hosts are the same peer *)
 val authenticate :
   canceler:Lwt_canceler.t ->
   proof_of_work_target:Crypto_box.target ->
@@ -82,15 +131,16 @@ val authenticate :
   'meta metadata_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 
-(** (Low-level) (Cancelable) [kick afd] notifies the remote peer that
-    we refuse this connection and then closes [afd]. Used in
-    [P2p_pool] to reject an [authenticated_connection] which we do
-    not want to connect to for some reason. *)
+(** [kick ac] sends a [Nack] message to the remote peer, notifying it
+    that its connection is rejected. It then closes the connection. *)
 val kick : 'meta authenticated_connection -> unit Lwt.t
 
-(** (Low-level) (Cancelable) Accepts a remote peer given an
-    authenticated_connection. Used in [P2p_pool], to promote an
-    [authenticated_connection] to the status of an active peer. *)
+(** [Accepts] sends an [Ack message] to the remote peer and wait for an [Ack]
+    from the remote peer to complete session set up. This can fail with errors:
+    - [P2p_errors.Rejected_socket_connection] (connection closed or [Nack]
+      received)
+    - [P2p_errors.Invalid_auth] thrown if [P2p_error.Decipher_error]
+      TODO why not let propagate [P2p_error.Decipher_error] *)
 val accept :
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
@@ -100,7 +150,7 @@ val accept :
   'msg Data_encoding.t ->
   ('msg, 'meta) t tzresult Lwt.t
 
-(** Precheck for the [?binary_chunks_size] parameter of [accept]. *)
+(** Check for the [?binary_chunks_size] parameter of [accept]. *)
 val check_binary_chunks_size : int -> unit tzresult Lwt.t
 
 (** {1 IO functions on connections} *)

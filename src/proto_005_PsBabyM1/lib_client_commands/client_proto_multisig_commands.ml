@@ -890,6 +890,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
               Format.printf
                 "  0x%a@."
                 Hex.pp
-                (Hex.of_bytes (Script_expr_hash.to_bytes h)))
+                (Script_expr_hash.to_bytes h |> Hex.of_bytes))
             l ;
           return_unit) ]

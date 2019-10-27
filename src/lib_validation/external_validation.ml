@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {context_root : string; protocol_root : string}
+type parameters = {
+  context_root : string;
+  protocol_root : string;
+  sandbox_parameters : Data_encoding.json option;
+}
 
 type request =
   | Init
@@ -46,14 +50,19 @@ type request =
     }
   | Terminate
 
-let magic = MBytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
+let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
 let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun {context_root; protocol_root} -> (context_root, protocol_root))
-    (fun (context_root, protocol_root) -> {context_root; protocol_root})
-    (obj2 (req "context_root" string) (req "protocol_root" string))
+    (fun {context_root; protocol_root; sandbox_parameters} ->
+      (context_root, protocol_root, sandbox_parameters))
+    (fun (context_root, protocol_root, sandbox_parameters) ->
+      {context_root; protocol_root; sandbox_parameters})
+    (obj3
+       (req "context_root" string)
+       (req "protocol_root" string)
+       (opt "sandbox_parameters" json))
 
 let request_encoding =
   let open Data_encoding in
@@ -144,13 +153,11 @@ let request_encoding =
               None)
         (fun () -> Terminate) ]
 
-let data_size msg = String.length msg
-
 let send pin encoding data =
   let msg = Data_encoding.Binary.to_bytes_exn encoding data in
-  let msg = MBytes.to_string msg in
-  Lwt_io.write_int pin (data_size msg)
-  >>= fun () -> Lwt_io.write pin msg >>= fun () -> Lwt_io.flush pin
+  Lwt_io.write_int pin (Bytes.length msg)
+  >>= fun () ->
+  Lwt_io.write pin (Bytes.to_string msg) >>= fun () -> Lwt_io.flush pin
 
 let recv_result pout encoding =
   Lwt_io.read_int pout
@@ -161,15 +168,11 @@ let recv_result pout encoding =
   Lwt.return
     (Data_encoding.Binary.of_bytes_exn
        (Error_monad.result_encoding encoding)
-       (MBytes.of_string (Bytes.to_string buf)))
+       buf)
 
 let recv pout encoding =
   Lwt_io.read_int pout
   >>= fun count ->
   let buf = Bytes.create count in
   Lwt_io.read_into_exactly pout buf 0 count
-  >>= fun () ->
-  Lwt.return
-    (Data_encoding.Binary.of_bytes_exn
-       encoding
-       (MBytes.of_string (Bytes.to_string buf)))
+  >>= fun () -> Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)

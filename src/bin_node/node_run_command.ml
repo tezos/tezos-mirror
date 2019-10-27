@@ -133,7 +133,8 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           discovery_addr;
           discovery_port;
           trusted_points;
-          peers_file = config.data_dir // "peers.json";
+          peers_file =
+            config.data_dir // Node_data_version.default_peers_file_name;
           private_mode = config.p2p.private_mode;
           greylisting_config = config.p2p.greylisting_config;
           identity;
@@ -145,6 +146,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       in
       return_some (p2p_config, config.p2p.limits) )
   >>=? fun p2p_config ->
+  let sandbox_parameters = sandbox_param in
   let sandbox_param =
     Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_param
   in
@@ -156,13 +158,12 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
-      test_chain_max_tll = Some (48 * 3600);
-      (* 2 days *)
       checkpoint;
     }
   in
   Node.create
     ~sandboxed:(sandbox <> None)
+    ?sandbox_parameters
     ~singleprocess
     node_config
     config.shell.peer_validator_limits
@@ -278,8 +279,9 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!"
   >>= fun () ->
-  Lwt_exit.wrap_promise (Lwt_utils.never_ending ())
-  >>= fun unit_or_error ->
+  Lwt_exit.(
+    wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
+  >>= fun retcode ->
   (* Clean-shutdown code *)
   Lwt_exit.termination_thread
   >>= fun x ->
@@ -292,8 +294,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   Lwt_list.iter_p RPC_server.shutdown rpc
   >>= fun () ->
   lwt_log_notice "BYE (%d)" x
-  >>= fun () ->
-  Internal_event_unix.close () >>= fun () -> Lwt.return unit_or_error
+  >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
 
 let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
@@ -346,8 +347,11 @@ let process sandbox verbosity checkpoint singleprocess args =
         failwith "Data directory is locked by another process"
   in
   match Lwt_main.run run with
-  | Ok () ->
+  | Ok (0 | 2) ->
+      (* 2 means that we exit by a signal that was handled *)
       `Ok ()
+  | Ok _ ->
+      `Error (false, "")
   | Error err ->
       `Error (false, Format.asprintf "%a" pp_print_error err)
 

@@ -1,8 +1,7 @@
 (library
  (name tezos_base)
  (public_name tezos-base)
- (flags (:standard -w -30
-                   -open Tezos_stdlib
+ (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_data_encoding
                    -open Tezos_error_monad
@@ -10,7 +9,7 @@
                    -open Tezos_clic
                    -open Tezos_micheline
                    -open Tezos_event_logging
-                   -safe-string))
+                   ))
  (libraries tezos-stdlib
             tezos-crypto
             tezos-data-encoding

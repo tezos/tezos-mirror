@@ -5,20 +5,20 @@
 
 module Blake2b : sig
   type t
-  type hash = Hash of Bigstring.t
+  type hash = Hash of Bytes.t
 
-  val init : ?key:Bigstring.t -> int -> t
+  val init : ?key:Bytes.t -> int -> t
   (** [init ?key size] is a blake2b context for hashes of size [size],
       using [key] if present. *)
 
-  val update : t -> Bigstring.t -> unit
+  val update : t -> Bytes.t -> unit
   (** [update t buf] updates [t] with the data in [buf]. *)
 
   val final : t -> hash
   (** [final t] is the blake2b hash of all data updated in [t] so
       far. *)
 
-  val direct : ?key:Bigstring.t -> Bigstring.t -> int -> hash
+  val direct : ?key:Bytes.t -> Bytes.t -> int -> hash
   (** [direct ?key inbuf len] is the blake2b hash of length [len],
       using [key] is present. *)
 end

@@ -4,15 +4,14 @@ val equal : t -> t -> bool
 (** The equality function for fan-out. *)
 
 val v : hash_size:int -> entry_size:int -> int -> t
-(** [v ~hash_size ~entry_size n] creates a fan_out for an index with [hash_size]
-    and [entry_size], containing [n] elements. *)
+(** [v ~hash_size ~entry_size n] creates a fan_out for an index with
+    [hash_size] and [entry_size], containing [n] elements. *)
 
 val nb_fans : t -> int
 (** [nb_fans t] is the number of fans in [t]. *)
 
 val search : t -> int -> int64 * int64
-(** [search t hash] is the interval of offsets in witch [hash] is, if
-    present. *)
+(** [search t hash] is the interval of offsets containing [hash], if present. *)
 
 val update : t -> int -> int64 -> unit
 (** [update t hash off] updates [t] so that [hash] is registered to be at
@@ -23,8 +22,8 @@ val finalize : t -> unit
     query. *)
 
 val exported_size : t -> int
-(** [exported_size t] is the size of [export t]. This does not actually
-    compute the encoding of [t]. *)
+(** [exported_size t] is the size of [export t]. This does not actually compute
+    the encoding of [t]. *)
 
 val export : t -> string
 (** [export t] is a string encoded form of [t]. *)

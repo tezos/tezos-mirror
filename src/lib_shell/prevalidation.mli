@@ -25,7 +25,7 @@
 
 (** A newly received block is validated by replaying locally the block
     creation, applying each operation and its finalization to ensure their
-    consistency. This module is stateless and creates and manupulates the
+    consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
 module type T = sig

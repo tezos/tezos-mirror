@@ -97,7 +97,7 @@ Node synchronization
 
 Whenever a node starts, it tries to retrieve the most current head of the chain
 from its peers. This can be a long process if there are many blocks to retrieve
-(e.g when a node is launched for the first time, or has been out of sync for a
+(e.g. when a node is launched for the first time, or has been out of sync for a
 while), or on a slow network connection.
 
 Once the synchronization is complete, the node is said to be *bootstrapped*.
@@ -392,7 +392,9 @@ be seen equivalently as an object with a single method, and a single attribute.
 The method updates the state (the storage), and submits operations as a side
 effect.
 
-For the sake of this example, here is the `id.tz` contract::
+For the sake of this example, here is the `id.tz` contract:
+
+.. code-block:: michelson
 
     parameter string;
     storage string;

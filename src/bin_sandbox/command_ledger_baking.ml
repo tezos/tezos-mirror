@@ -25,7 +25,7 @@ let assert_failure state msg f () =
   >>= fun () ->
   Asynchronous_result.bind_on_error
     (f () >>= fun _ -> return `Worked)
-    ~f:(fun ~result _ -> return `Didn'tWork)
+    ~f:(fun ~result:_ _ -> return `Didn'tWork)
   >>= function `Worked -> failf "%s" msg | `Didn'tWork -> return ()
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
@@ -43,7 +43,7 @@ let assert_eq to_string ~expected ~actual =
 let rec ask state ef =
   Console.say state EF.(list [ef; wf " (y/n)?"])
   >>= fun () ->
-  Lwt_exception.catch Lwt_io.read_char Lwt_io.stdin
+  System_error.catch Lwt_io.read_char Lwt_io.stdin
   >>= function
   | 'y' | 'Y' -> return true | 'n' | 'N' -> return false | _ -> ask state ef
 
@@ -258,8 +258,8 @@ let setup_baking_ledger state uri ~client ~protocol =
         "Setting up %S for baking.\n\
          Address: %S\n\
          Chain: mainnet\n\
-         Main HWM: 0\n\
-         Test HWM: 0"
+         Main Chain HWM: 0\n\
+         Test Chain HWM: 0"
         uri
         (Tezos_protocol.Account.pubkey_hash account))
     (fun () ->
@@ -293,8 +293,8 @@ let setup_baking_ledger state uri ~client ~protocol =
   >>= test_invalid_delegations
   >>= fun () -> return (baker, account)
 
-let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
-    ~enable_deterministic_nonce_tests () =
+let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
+    ~uri ~enable_deterministic_nonce_tests () =
   Helpers.clear_root state
   >>= fun () ->
   Interactive_test.Pauser.generic
@@ -306,14 +306,15 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
   >>= fun ledger_account ->
   let protocol =
     let open Tezos_protocol in
-    let d = default () in
     {
-      d with
+      protocol with
       time_between_blocks = [1; 2];
       bootstrap_accounts =
-        (ledger_account, 1_000_000_000_000L)
-        :: List.map ~f:(fun (a, _) -> (a, 1_000L)) d.bootstrap_accounts;
+        (ledger_account, 1_000_000_000_000L) :: protocol.bootstrap_accounts;
     }
+  in
+  let other_baker_account =
+    fst (List.nth_exn protocol.Tezos_protocol.bootstrap_accounts 1)
   in
   Test_scenario.network_with_protocol
     ~protocol
@@ -328,19 +329,31 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~command_names:["all-clients"]
-            ~make_admin
-            ~clients:
-              (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec)) ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~make_admin
+          ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
   Interactive_test.Pauser.generic state EF.[af "About to really start playing"]
   >>= fun () ->
   let client n =
     Tezos_client.of_node ~exec:client_exec (List.nth_exn nodes n)
   in
+  Tezos_client.successful_client_cmd
+    state
+    ~client:(client 0)
+    Tezos_protocol.Account.
+      [ "import";
+        "secret";
+        "key";
+        name other_baker_account;
+        private_key other_baker_account ]
+  >>= fun _ ->
+  Tezos_client.successful_client_cmd
+    state
+    ~client:(client 0)
+    Tezos_protocol.Account.["bake"; "for"; name other_baker_account]
+  >>= fun _ ->
   let assert_hwms_ ~main ~test () =
     assert_hwms state ~client:(client 0) ~uri ~main ~test
   in
@@ -359,7 +372,7 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_clients
+      [ arbitrary_command_on_all_clients
           state
           ~command_names:["baker"]
           ~make_admin
@@ -412,7 +425,7 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
     state
     EF.(wf "Self delegating address %s with fee %f" ledger_pkh fee)
     (sign state ~client:baker ~bytes:forged_delegation_bytes)
-  >>= bake >>= ask_hwm ~main:2 ~test:0
+  >>= bake >>= ask_hwm ~main:3 ~test:0
   >>= fun () ->
   (let level = 1 in
    with_ledger_test_reject_and_succeed
@@ -422,18 +435,18 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
        Tezos_client.Ledger.set_hwm state ~client:(client 0) ~uri ~level))
   >>= assert_hwms_ ~main:1 ~test:1
   >>= bake
-  >>= assert_hwms_ ~main:3 ~test:1
-  >>= set_hwm_ 4
-  >>= assert_hwms_ ~main:4 ~test:4
+  >>= assert_hwms_ ~main:4 ~test:1
+  >>= set_hwm_ 5
+  >>= assert_hwms_ ~main:5 ~test:5
   >>= assert_failure state "endorsing a level beneath HWM should fail" endorse
   >>= assert_failure state "baking a level beneath HWM should fail" bake
-  >>= set_hwm_ 3 >>= bake
-  >>= assert_hwms_ ~main:4 ~test:3
-  >>= endorse
+  >>= set_hwm_ 4 >>= bake
+  >>= assert_hwms_ ~main:5 ~test:4
+  >>= endorse (* does not increase level since we just baked *)
   >>= assert_failure state "endorsing same block twice should not work" endorse
-  >>= assert_hwms_ ~main:4 ~test:3
+  >>= assert_hwms_ ~main:5 ~test:4
   >>= bake
-  >>= assert_hwms_ ~main:5 ~test:3
+  >>= assert_hwms_ ~main:6 ~test:4
   >>= forge_endorsement state ~client:baker.client ~chain_id ~level:1
   >>= fun endorsement_at_low_level_bytes ->
   assert_failure
@@ -441,11 +454,11 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
     "endorsing-after-baking a level beneath HWM should fail"
     (sign state ~client:baker ~bytes:endorsement_at_low_level_bytes)
     ()
-  >>= assert_hwms_ ~main:5 ~test:3
+  >>= assert_hwms_ ~main:6 ~test:4
   (* HWM has not changed *)
   >>= endorse
   (* HWM still has not changed *)
-  >>= assert_hwms_ ~main:5 ~test:3
+  >>= assert_hwms_ ~main:6 ~test:4
   (* Forge an endorsement on a different chain *)
   >>= fun () ->
   let other_chain_id = "NetXSzLHKwSumh7" in
@@ -457,14 +470,14 @@ let run state ~node_exec ~client_exec ~admin_exec ~size ~base_port ~uri
         state
         ~client:baker.client
         ~chain_id:(Tezos_crypto.Chain_id.of_b58check_exn other_chain_id)
-        ~level:4
+        ~level:5
   >>= fun endorsement_on_different_chain_bytes ->
   sign state ~client:baker ~bytes:endorsement_on_different_chain_bytes ()
   (* Only the test HWM has changed *)
-  >>= assert_hwms_ ~main:5 ~test:4
+  >>= assert_hwms_ ~main:6 ~test:5
   >>= fun () ->
   Loop.n_times 5 (fun _ -> bake ())
-  >>= ask_hwm ~main:10 ~test:4
+  >>= ask_hwm ~main:11 ~test:5
   >>= fun () ->
   Tezos_client.Ledger.deauthorize_baking state ~client:(client 0) ~uri
   >>= assert_failure state "baking after deauthorization should fail" bake
@@ -486,6 +499,7 @@ let cmd ~pp_error () =
              size
              (`Base_port base_port)
              no_deterministic_nonce_tests
+             protocol
              state
              ->
           ( state,
@@ -494,6 +508,7 @@ let cmd ~pp_error () =
               state
               (run
                  state
+                 ~protocol
                  ~node_exec
                  ~size
                  ~admin_exec
@@ -526,6 +541,7 @@ let cmd ~pp_error () =
              (info
                 ["no-deterministic-nonce-tests"]
                 ~doc:"Disable tests for deterministic nonces")))
+    $ Tezos_protocol.cli_term ()
     $ Test_command_line.cli_state ~name:"ledger-baking" () )
     (let doc = "Interactive test exercising the Ledger Baking app features" in
      info ~doc "ledger-baking")

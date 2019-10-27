@@ -5,7 +5,7 @@
         test_blake2b
         test_pvss
         test_crypto_box
-	test_deterministic_nonce)
+        test_deterministic_nonce)
  (libraries tezos-stdlib
             tezos-crypto
             tezos-data-encoding
@@ -60,7 +60,7 @@
        (alias runtest_blake2b)
        (alias runtest_pvss)
        (alias runtest_crypto_box)
-	   (alias runtest_deterministic_nonce)))
+       (alias runtest_deterministic_nonce)))
 
 (alias
  (name runtest_lint)

@@ -47,14 +47,14 @@ val take : 'a t -> 'a Lwt.t
 val take_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 
 (** Read the current element of the dropbox without removing it. It
-    immediatly returns [None] if the dropbox is empty. *)
+    immediately returns [None] if the dropbox is empty. *)
 val peek : 'a t -> 'a option
 
 (** The exception returned when trying to access a 'closed' dropbox. *)
 exception Closed
 
-(** Close the dropox. It terminates all the waiting reader with the
-    exception [Closed]. All further read or write will also immediatly
+(** Close the dropbox. It terminates all the waiting reader with the
+    exception [Closed]. All further read or write will also immediately
     fail with [Closed], except if the dropbox is not empty when
     [close] is called. In that can, a single (and last) [take] will
     succeed. *)

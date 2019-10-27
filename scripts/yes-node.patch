@@ -1,0 +1,41 @@
+diff --git a/src/lib_crypto/signature.ml b/src/lib_crypto/signature.ml
+index 8aec1057e..5b47714e4 100644
+--- a/src/lib_crypto/signature.ml
++++ b/src/lib_crypto/signature.ml
+@@ -539,7 +539,7 @@ let pp_watermark ppf =
+       fprintf ppf "Custom: 0x%s"
+         (try String.sub hexed 0 10 ^ "..." with _ ->  hexed)
+ 
+-let sign ?watermark secret_key message =
++let _sign ?watermark secret_key message =
+   let watermark = Option.map ~f:bytes_of_watermark watermark in
+   match secret_key with
+   | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
+@@ -572,6 +572,27 @@ let check ?watermark public_key signature message =
+       P256.check ?watermark pk signature message
+   | _ -> false
+ 
++let fake_sign pk_bytes msg =
++  let half = size / 2 in
++  let tmp = MBytes.init size (fun _ -> '0') in
++  let all_or_half buf = Pervasives.min (MBytes.length buf) half in
++  MBytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
++  MBytes.blit msg 0 tmp half (all_or_half msg) ;
++  of_bytes_exn tmp
++
++let fake_check ?watermark pk signature msg =
++  let pk_bytes = Data_encoding.Binary.to_bytes_exn
++      Public_key.encoding pk in
++  if equal signature (fake_sign pk_bytes msg) then true else
++    check ?watermark pk signature msg
++
++let sign ?watermark:_ sk msg =
++  let pk_bytes = Data_encoding.Binary.to_bytes_exn
++      Secret_key.encoding sk in
++  fake_sign pk_bytes msg
++
++let check = fake_check
++
+ let append ?watermark sk msg =
+   MBytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
+ 

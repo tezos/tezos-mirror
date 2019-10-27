@@ -158,7 +158,6 @@ type config = {
   protocol_root : string;
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  test_chain_max_tll : int option;
   checkpoint : Block_header.t option;
 }
 
@@ -291,14 +290,13 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let create ?(sandboxed = false) ~singleprocess
+let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     { genesis;
       store_root;
       context_root;
       protocol_root;
       patch_context;
       p2p = p2p_params;
-      test_chain_max_tll = max_child_ttl;
       checkpoint } peer_validator_limits block_validator_limits
     prevalidator_limits chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
@@ -320,7 +318,12 @@ let create ?(sandboxed = false) ~singleprocess
   else
     init
       (External
-         {context_root; protocol_root; process_path = Sys.executable_name})
+         {
+           context_root;
+           protocol_root;
+           process_path = Sys.executable_name;
+           sandbox_parameters;
+         })
     >>=? fun validator_process ->
     let commit_genesis =
       Block_validator_process.commit_genesis
@@ -355,7 +358,6 @@ let create ?(sandboxed = false) ~singleprocess
   (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate
     validator
-    ?max_child_ttl
     ~start_prevalidator
     ~validator_process
     mainchain_state

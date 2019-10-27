@@ -35,7 +35,12 @@ The Community
   important meeting point of the community.
 - Several community-built block explorers are available:
 
-    - https://tzscan.io
+    - https://tezos.id
+    - https://mvp.tezblock.io/
+    - https://teztracker.everstake.one/
+    - https://tzkt.io/ (Baking focused Explorer)
+    - https://mininax.cryptonomic.tech/mainnet
+    - https://baking-bad.org/ (Reward Tracker)
 
 - A few community-run websites collect useful Tezos links:
 
@@ -157,6 +162,7 @@ in the :ref:`introduction <howtoget>`.
    releases/april-2019
    releases/may-2019
    releases/september-2019
+   releases/october-2019
 
 .. toctree::
    :maxdepth: 2
