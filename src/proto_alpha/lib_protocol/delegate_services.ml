@@ -379,7 +379,7 @@ module Baking_rights = struct
     Baking.baking_priorities ctxt level
     >>=? fun contract_list ->
     let rec loop l acc priority =
-      if Compare.Int.(priority >= max_prio) then return (List.rev acc)
+      if Compare.Int.(priority > max_prio) then return (List.rev acc)
       else
         let (Misc.LCons (pk, next)) = l in
         let delegate = Signature.Public_key.hash pk in
