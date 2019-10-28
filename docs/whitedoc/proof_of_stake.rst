@@ -75,18 +75,15 @@ Protocol header
 Block size
 ~~~~~~~~~~
 
-Tezos does not download blocks all at once, but rather considers headers
-and various lists of operations separately. A maximum
-size in bytes is applied to the list of transactions
-``MAX_TRANSACTION_LIST_SIZE`` = 500kB (that's 5MB every 10 minutes at
-most).
+Tezos does not download blocks all at once, but rather considers
+headers and various types of operations separately.  Transactions are
+limited by a total maximum size of 512kB (that is 5MB every 10 minutes
+at most).
 
-Other lists of operations (endorsements, denunciations, reveals) are
+Consensus operations (endorsements, denunciations, reveals) are
 limited in terms of number of operations (though the defensive
 programming style also puts limits on the size of operations it
-expects).
-
-This ensure that consensus critical operations do not compete with
+expects). This ensures that critical operations do not compete with
 transactions for block space.
 
 Cycles
