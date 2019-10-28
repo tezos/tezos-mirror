@@ -1,0 +1,2 @@
+;; tezos: We ignore the tests, to avoid warnings/errors:
+(data_only_dirs test)
