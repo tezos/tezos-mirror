@@ -29,44 +29,71 @@ open Script_typed_ir
 (** Default annotations *)
 
 val default_now_annot : var_annot option
+
 val default_amount_annot : var_annot option
+
 val default_balance_annot : var_annot option
+
 val default_steps_annot : var_annot option
+
 val default_source_annot : var_annot option
+
 val default_sender_annot : var_annot option
+
 val default_self_annot : var_annot option
+
 val default_arg_annot : var_annot option
+
 val default_param_annot : var_annot option
+
 val default_storage_annot : var_annot option
 
 val default_car_annot : field_annot option
+
 val default_cdr_annot : field_annot option
+
 val default_contract_annot : field_annot option
+
 val default_addr_annot : field_annot option
+
 val default_manager_annot : field_annot option
+
 val default_pack_annot : field_annot option
+
 val default_unpack_annot : field_annot option
+
 val default_slice_annot : field_annot option
 
 val default_elt_annot : field_annot option
+
 val default_key_annot : field_annot option
+
 val default_hd_annot : field_annot option
+
 val default_tl_annot : field_annot option
+
 val default_some_annot : field_annot option
+
 val default_left_annot : field_annot option
+
 val default_right_annot : field_annot option
+
 val default_binding_annot : field_annot option
 
 (** Unparse annotations to their string representation *)
 
 val unparse_type_annot : type_annot option -> string list
+
 val unparse_var_annot : var_annot option -> string list
+
 val unparse_field_annot : field_annot option -> string list
 
 (** Convertions functions between different annotation kinds *)
 
 val field_to_var_annot : field_annot option -> var_annot option
+
 val type_to_var_annot : type_annot option -> var_annot option
+
 val var_to_field_annot : var_annot option -> field_annot option
 
 (** Replace an annotation by its default value if it is [None] *)
@@ -75,23 +102,30 @@ val default_annot : default:'a option -> 'a option -> 'a option
 (** Generate annotation for field accesses, of the form [var.field1.field2] *)
 val gen_access_annot :
   var_annot option ->
-  ?default:field_annot option -> field_annot option -> var_annot option
+  ?default:field_annot option ->
+  field_annot option ->
+  var_annot option
 
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)
 val merge_type_annot :
-  legacy: bool -> type_annot option -> type_annot option -> type_annot option tzresult
+  legacy:bool ->
+  type_annot option ->
+  type_annot option ->
+  type_annot option tzresult
 
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)
 val merge_field_annot :
-  legacy: bool -> field_annot option -> field_annot option -> field_annot option tzresult
+  legacy:bool ->
+  field_annot option ->
+  field_annot option ->
+  field_annot option tzresult
 
 (** Merge variable annotations, does not fail ([None] if different). *)
-val merge_var_annot :
-  var_annot option -> var_annot option -> var_annot option
+val merge_var_annot : var_annot option -> var_annot option -> var_annot option
 
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : int -> 'a list -> unit tzresult
@@ -103,8 +137,7 @@ val fail_unexpected_annot : int -> 'a list -> unit tzresult Lwt.t
 val parse_type_annot : int -> string list -> type_annot option tzresult
 
 (** Parse a field annotation only. *)
-val parse_field_annot :
-  int -> string list -> field_annot option tzresult
+val parse_field_annot : int -> string list -> field_annot option tzresult
 
 (** Parse an annotation for composed types, of the form
     [:ty_name %field] in any order. *)
@@ -114,7 +147,8 @@ val parse_type_field_annot :
 (** Parse an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
 val parse_composed_type_annot :
-  int -> string list ->
+  int ->
+  string list ->
   (type_annot option * field_annot option * field_annot option) tzresult
 
 (** Extract and remove a field annotation from a node *)
@@ -129,23 +163,25 @@ val check_correct_field :
 
 (** Parse a variable annotation, replaced by a default value if [None]. *)
 val parse_var_annot :
-  int ->
-  ?default:var_annot option ->
-  string list -> var_annot option tzresult
+  int -> ?default:var_annot option -> string list -> var_annot option tzresult
 
 val parse_constr_annot :
   int ->
   ?if_special_first:field_annot option ->
   ?if_special_second:field_annot option ->
   string list ->
-  (var_annot option * type_annot option *
-   field_annot option * field_annot option) tzresult
+  ( var_annot option
+  * type_annot option
+  * field_annot option
+  * field_annot option )
+  tzresult
 
 val parse_two_var_annot :
   int -> string list -> (var_annot option * var_annot option) tzresult
 
 val parse_destr_annot :
-  int -> string list ->
+  int ->
+  string list ->
   default_accessor:field_annot option ->
   field_name:field_annot option ->
   pair_annot:var_annot option ->

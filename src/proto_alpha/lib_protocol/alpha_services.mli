@@ -26,22 +26,14 @@
 open Alpha_context
 
 module Seed : sig
-
-  val get: 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
-
+  val get : 'a #RPC_context.simple -> 'a -> Seed.seed shell_tzresult Lwt.t
 end
 
 module Nonce : sig
+  type info = Revealed of Nonce.t | Missing of Nonce_hash.t | Forgotten
 
-  type info =
-    | Revealed of Nonce.t
-    | Missing of Nonce_hash.t
-    | Forgotten
-
-  val get:
-    'a #RPC_context.simple ->
-    'a -> Raw_level.t -> info shell_tzresult Lwt.t
-
+  val get :
+    'a #RPC_context.simple -> 'a -> Raw_level.t -> info shell_tzresult Lwt.t
 end
 
 module Contract = Contract_services
@@ -52,4 +44,4 @@ module Forge = Helpers_services.Forge
 module Parse = Helpers_services.Parse
 module Voting = Voting_services
 
-val register: unit -> unit
+val register : unit -> unit

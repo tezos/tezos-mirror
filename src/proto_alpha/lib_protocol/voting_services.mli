@@ -25,11 +25,12 @@
 
 open Alpha_context
 
-val ballots :
-  'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
+val ballots : 'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
 
 val ballot_list :
-  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
 
 val current_period_kind :
   'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
@@ -38,10 +39,14 @@ val current_quorum :
   'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
 
 val listings :
-  'a #RPC_context.simple -> 'a -> (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
 
 val proposals :
-  'a #RPC_context.simple -> 'a -> Int32.t Protocol_hash.Map.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Int32.t Protocol_hash.Map.t shell_tzresult Lwt.t
 
 val current_proposal :
   'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t

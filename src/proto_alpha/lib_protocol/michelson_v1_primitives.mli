@@ -24,8 +24,14 @@
 (*****************************************************************************)
 
 type error += Unknown_primitive_name of string (* `Permanent *)
+
 type error += Invalid_case of string (* `Permanent *)
-type error += Invalid_primitive_name of string Micheline.canonical * Micheline.canonical_location (* `Permanent *)
+
+type error +=
+  | Invalid_primitive_name of
+      string Micheline.canonical * Micheline.canonical_location
+
+(* `Permanent *)
 
 type prim =
   | K_parameter
@@ -153,6 +159,7 @@ val string_of_prim : prim -> string
 
 val prim_of_string : string -> prim tzresult
 
-val prims_of_strings : string Micheline.canonical -> prim Micheline.canonical tzresult
+val prims_of_strings :
+  string Micheline.canonical -> prim Micheline.canonical tzresult
 
 val strings_of_prims : prim Micheline.canonical -> string Micheline.canonical

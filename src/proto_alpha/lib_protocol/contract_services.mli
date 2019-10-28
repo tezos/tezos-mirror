@@ -25,61 +25,95 @@
 
 open Alpha_context
 
-val list:
-  'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
+val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
-  balance: Tez.t ;
-  delegate: public_key_hash option ;
-  counter: counter option ;
-  script: Script.t option ;
+  balance : Tez.t;
+  delegate : public_key_hash option;
+  counter : counter option;
+  script : Script.t option;
 }
 
-val info_encoding: info Data_encoding.t
+val info_encoding : info Data_encoding.t
 
-val info:
+val info :
   'a #RPC_context.simple -> 'a -> Contract.t -> info shell_tzresult Lwt.t
 
-val balance:
+val balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
-val manager_key:
-  'a #RPC_context.simple -> 'a -> public_key_hash -> public_key option shell_tzresult Lwt.t
+val manager_key :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  public_key option shell_tzresult Lwt.t
 
-val delegate:
-  'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash shell_tzresult Lwt.t
+val delegate :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  public_key_hash shell_tzresult Lwt.t
 
-val delegate_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> public_key_hash option shell_tzresult Lwt.t
+val delegate_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  public_key_hash option shell_tzresult Lwt.t
 
-val counter:
-  'a #RPC_context.simple -> 'a -> public_key_hash -> counter shell_tzresult Lwt.t
+val counter :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  counter shell_tzresult Lwt.t
 
-val script:
+val script :
   'a #RPC_context.simple -> 'a -> Contract.t -> Script.t shell_tzresult Lwt.t
 
-val script_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.t option shell_tzresult Lwt.t
+val script_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Script.t option shell_tzresult Lwt.t
 
-val storage:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr shell_tzresult Lwt.t
-
-val entrypoint_type:
-  'a #RPC_context.simple -> 'a -> Contract.t -> string -> Script.expr shell_tzresult Lwt.t
-
-val list_entrypoints:
-  'a #RPC_context.simple -> 'a -> Contract.t ->
-  (Michelson_v1_primitives.prim list list *
-   (string * Script.expr) list) shell_tzresult Lwt.t
-
-val storage_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr option shell_tzresult Lwt.t
-
-val big_map_get:
-  'a #RPC_context.simple -> 'a -> Z.t -> Script_expr_hash.t ->
+val storage :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
   Script.expr shell_tzresult Lwt.t
 
-val contract_big_map_get_opt:
-  'a #RPC_context.simple -> 'a -> Contract.t -> Script.expr * Script.expr -> Script.expr option shell_tzresult Lwt.t
+val entrypoint_type :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  string ->
+  Script.expr shell_tzresult Lwt.t
 
-val register: unit -> unit
+val list_entrypoints :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  (Michelson_v1_primitives.prim list list * (string * Script.expr) list)
+  shell_tzresult
+  Lwt.t
+
+val storage_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Script.expr option shell_tzresult Lwt.t
+
+val big_map_get :
+  'a #RPC_context.simple ->
+  'a ->
+  Z.t ->
+  Script_expr_hash.t ->
+  Script.expr shell_tzresult Lwt.t
+
+val contract_big_map_get_opt :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Script.expr * Script.expr ->
+  Script.expr option shell_tzresult Lwt.t
+
+val register : unit -> unit

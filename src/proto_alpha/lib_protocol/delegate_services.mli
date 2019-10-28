@@ -25,78 +25,87 @@
 
 open Alpha_context
 
-val list:
-  'a #RPC_context.simple -> 'a ->
+val list :
+  'a #RPC_context.simple ->
+  'a ->
   ?active:bool ->
   ?inactive:bool ->
-  unit -> Signature.Public_key_hash.t list shell_tzresult Lwt.t
+  unit ->
+  Signature.Public_key_hash.t list shell_tzresult Lwt.t
 
 type info = {
-  balance: Tez.t ;
-  frozen_balance: Tez.t ;
-  frozen_balance_by_cycle: Delegate.frozen_balance Cycle.Map.t ;
-  staking_balance: Tez.t ;
-  delegated_contracts: Contract_repr.t list ;
-  delegated_balance: Tez.t ;
-  deactivated: bool ;
-  grace_period: Cycle.t ;
+  balance : Tez.t;
+  frozen_balance : Tez.t;
+  frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+  staking_balance : Tez.t;
+  delegated_contracts : Contract_repr.t list;
+  delegated_balance : Tez.t;
+  deactivated : bool;
+  grace_period : Cycle.t;
 }
 
-val info_encoding: info Data_encoding.t
+val info_encoding : info Data_encoding.t
 
-val info:
-  'a #RPC_context.simple -> 'a ->
+val info :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   info shell_tzresult Lwt.t
 
-val balance:
-  'a #RPC_context.simple -> 'a ->
+val balance :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
-val frozen_balance:
-  'a #RPC_context.simple -> 'a ->
+val frozen_balance :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
-val frozen_balance_by_cycle:
-  'a #RPC_context.simple -> 'a ->
+val frozen_balance_by_cycle :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Delegate.frozen_balance Cycle.Map.t shell_tzresult Lwt.t
 
-val staking_balance:
-  'a #RPC_context.simple -> 'a ->
+val staking_balance :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
-val delegated_contracts:
-  'a #RPC_context.simple -> 'a ->
+val delegated_contracts :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Contract_repr.t list shell_tzresult Lwt.t
 
-val delegated_balance:
-  'a #RPC_context.simple -> 'a ->
+val delegated_balance :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
 
-val deactivated:
-  'a #RPC_context.simple -> 'a ->
+val deactivated :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   bool shell_tzresult Lwt.t
 
-val grace_period:
-  'a #RPC_context.simple -> 'a ->
+val grace_period :
+  'a #RPC_context.simple ->
+  'a ->
   Signature.Public_key_hash.t ->
   Cycle.t shell_tzresult Lwt.t
 
-
 module Baking_rights : sig
-
   type t = {
-    level: Raw_level.t ;
-    delegate: Signature.Public_key_hash.t ;
-    priority: int ;
-    timestamp: Timestamp.t option ;
+    level : Raw_level.t;
+    delegate : Signature.Public_key_hash.t;
+    priority : int;
+    timestamp : Timestamp.t option;
   }
 
   (** Retrieves the list of delegates allowed to bake a block.
@@ -117,24 +126,23 @@ module Baking_rights : sig
       omitted for levels in the past, and are only estimates for levels
       later that the next block, based on the hypothesis that all
       predecessor blocks were baked at the first priority. *)
-  val get:
+  val get :
     'a #RPC_context.simple ->
-    ?levels: Raw_level.t list ->
-    ?cycles: Cycle.t list ->
-    ?delegates: Signature.public_key_hash list ->
-    ?all: bool ->
-    ?max_priority: int ->
-    'a -> t list shell_tzresult Lwt.t
-
+    ?levels:Raw_level.t list ->
+    ?cycles:Cycle.t list ->
+    ?delegates:Signature.public_key_hash list ->
+    ?all:bool ->
+    ?max_priority:int ->
+    'a ->
+    t list shell_tzresult Lwt.t
 end
 
 module Endorsing_rights : sig
-
   type t = {
-    level: Raw_level.t ;
-    delegate: Signature.Public_key_hash.t ;
-    slots: int list ;
-    estimated_time: Timestamp.t option ;
+    level : Raw_level.t;
+    delegate : Signature.Public_key_hash.t;
+    slots : int list;
+    estimated_time : Timestamp.t option;
   }
 
   (** Retrieves the delegates allowed to endorse a block.
@@ -153,66 +161,51 @@ module Endorsing_rights : sig
       estimates for levels later that the next block, based on the
       hypothesis that all predecessor blocks were baked at the first
       priority. *)
-  val get:
+  val get :
     'a #RPC_context.simple ->
-    ?levels: Raw_level.t list ->
-    ?cycles: Cycle.t list ->
-    ?delegates: Signature.public_key_hash list ->
-    'a -> t list shell_tzresult Lwt.t
-
+    ?levels:Raw_level.t list ->
+    ?cycles:Cycle.t list ->
+    ?delegates:Signature.public_key_hash list ->
+    'a ->
+    t list shell_tzresult Lwt.t
 end
 
 module Endorsing_power : sig
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
+  val get :
+    'a #RPC_context.simple ->
+    'a ->
     Alpha_context.packed_operation ->
     Chain_id.t ->
     int shell_tzresult Lwt.t
-
 end
 
 module Required_endorsements : sig
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
-    Period.t -> int shell_tzresult Lwt.t
-
+  val get :
+    'a #RPC_context.simple -> 'a -> Period.t -> int shell_tzresult Lwt.t
 end
 
 module Minimal_valid_time : sig
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
-    int -> int -> Time.t shell_tzresult Lwt.t
-
+  val get :
+    'a #RPC_context.simple -> 'a -> int -> int -> Time.t shell_tzresult Lwt.t
 end
 
 (* temporary export for deprecated unit test *)
-val endorsement_rights:
-  Alpha_context.t ->
-  Level.t ->
-  public_key_hash list tzresult Lwt.t
+val endorsement_rights :
+  Alpha_context.t -> Level.t -> public_key_hash list tzresult Lwt.t
 
-val baking_rights:
+val baking_rights :
   Alpha_context.t ->
   int option ->
   (Raw_level.t * (public_key_hash * Time.t option) list) tzresult Lwt.t
 
-val endorsing_power:
+val endorsing_power :
   Alpha_context.t ->
-  (Alpha_context.packed_operation * Chain_id.t) ->
+  Alpha_context.packed_operation * Chain_id.t ->
   int tzresult Lwt.t
 
-val required_endorsements:
-  Alpha_context.t ->
-  Alpha_context.Period.t ->
-  int tzresult Lwt.t
+val required_endorsements :
+  Alpha_context.t -> Alpha_context.Period.t -> int tzresult Lwt.t
 
-val minimal_valid_time:
-  Alpha_context.t ->
-  int ->
-  int ->
-  Time.t tzresult Lwt.t
+val minimal_valid_time : Alpha_context.t -> int -> int -> Time.t tzresult Lwt.t
 
-val register: unit -> unit
+val register : unit -> unit

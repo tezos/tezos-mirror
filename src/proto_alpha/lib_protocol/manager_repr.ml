@@ -34,27 +34,19 @@ type t = manager_key
 open Data_encoding
 
 let hash_case tag =
-  case tag
+  case
+    tag
     ~title:"Public_key_hash"
     Signature.Public_key_hash.encoding
-    (function
-      | Hash hash -> Some hash
-      | _ -> None)
+    (function Hash hash -> Some hash | _ -> None)
     (fun hash -> Hash hash)
 
 let pubkey_case tag =
-  case tag
+  case
+    tag
     ~title:"Public_key"
     Signature.Public_key.encoding
-    (function
-      | Public_key hash -> Some hash
-      | _ -> None)
+    (function Public_key hash -> Some hash | _ -> None)
     (fun hash -> Public_key hash)
 
-
-let encoding =
-  union [
-    hash_case (Tag 0) ;
-    pubkey_case (Tag 1) ;
-  ]
-
+let encoding = union [hash_case (Tag 0); pubkey_case (Tag 1)]

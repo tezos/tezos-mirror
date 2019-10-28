@@ -24,62 +24,65 @@
 (*****************************************************************************)
 
 type bootstrap_account = {
-  public_key_hash : Signature.Public_key_hash.t ;
-  public_key : Signature.Public_key.t option ;
-  amount : Tez_repr.t ;
+  public_key_hash : Signature.Public_key_hash.t;
+  public_key : Signature.Public_key.t option;
+  amount : Tez_repr.t;
 }
 
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t ;
-  amount : Tez_repr.t ;
-  script : Script_repr.t ;
+  delegate : Signature.Public_key_hash.t;
+  amount : Tez_repr.t;
+  script : Script_repr.t;
 }
 
 type t = {
-  bootstrap_accounts : bootstrap_account list ;
-  bootstrap_contracts : bootstrap_contract list ;
-  commitments : Commitment_repr.t list ;
-  constants : Constants_repr.parametric ;
-  security_deposit_ramp_up_cycles : int option ;
-  no_reward_cycles : int option ;
+  bootstrap_accounts : bootstrap_account list;
+  bootstrap_contracts : bootstrap_contract list;
+  commitments : Commitment_repr.t list;
+  constants : Constants_repr.parametric;
+  security_deposit_ramp_up_cycles : int option;
+  no_reward_cycles : int option;
 }
 
 let bootstrap_account_encoding =
   let open Data_encoding in
   union
-    [ case (Tag 0) ~title:"Public_key_known"
-        (tup2
-           Signature.Public_key.encoding
-           Tez_repr.encoding)
+    [ case
+        (Tag 0)
+        ~title:"Public_key_known"
+        (tup2 Signature.Public_key.encoding Tez_repr.encoding)
         (function
-          | { public_key_hash ; public_key = Some public_key ; amount } ->
-              assert (Signature.Public_key_hash.equal
-                        (Signature.Public_key.hash public_key)
-                        public_key_hash) ;
+          | {public_key_hash; public_key = Some public_key; amount} ->
+              assert (
+                Signature.Public_key_hash.equal
+                  (Signature.Public_key.hash public_key)
+                  public_key_hash ) ;
               Some (public_key, amount)
-          | { public_key = None }  -> None)
+          | {public_key = None} ->
+              None)
         (fun (public_key, amount) ->
-           { public_key = Some public_key ;
-             public_key_hash = Signature.Public_key.hash public_key ;
-             amount }) ;
-      case (Tag 1) ~title:"Public_key_unknown"
-        (tup2
-           Signature.Public_key_hash.encoding
-           Tez_repr.encoding)
+          {
+            public_key = Some public_key;
+            public_key_hash = Signature.Public_key.hash public_key;
+            amount;
+          });
+      case
+        (Tag 1)
+        ~title:"Public_key_unknown"
+        (tup2 Signature.Public_key_hash.encoding Tez_repr.encoding)
         (function
-          | { public_key_hash ; public_key = None ; amount } ->
+          | {public_key_hash; public_key = None; amount} ->
               Some (public_key_hash, amount)
-          | { public_key = Some _ }  -> None)
+          | {public_key = Some _} ->
+              None)
         (fun (public_key_hash, amount) ->
-           { public_key = None ;
-             public_key_hash ;
-             amount }) ]
+          {public_key = None; public_key_hash; amount}) ]
 
 let bootstrap_contract_encoding =
   let open Data_encoding in
   conv
-    (fun { delegate ; amount ; script } -> (delegate, amount, script))
-    (fun (delegate, amount, script) -> { delegate ; amount ; script })
+    (fun {delegate; amount; script} -> (delegate, amount, script))
+    (fun (delegate, amount, script) -> {delegate; amount; script})
     (obj3
        (req "delegate" Signature.Public_key_hash.encoding)
        (req "amount" Tez_repr.encoding)
@@ -88,16 +91,32 @@ let bootstrap_contract_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun { bootstrap_accounts ; bootstrap_contracts ; commitments ; constants ;
-           security_deposit_ramp_up_cycles ; no_reward_cycles } ->
-      ((bootstrap_accounts, bootstrap_contracts, commitments,
-        security_deposit_ramp_up_cycles, no_reward_cycles),
-       constants))
-    (fun ( (bootstrap_accounts, bootstrap_contracts, commitments,
-            security_deposit_ramp_up_cycles, no_reward_cycles),
-           constants) ->
-      { bootstrap_accounts ; bootstrap_contracts ; commitments ; constants ;
-        security_deposit_ramp_up_cycles ; no_reward_cycles })
+    (fun { bootstrap_accounts;
+           bootstrap_contracts;
+           commitments;
+           constants;
+           security_deposit_ramp_up_cycles;
+           no_reward_cycles } ->
+      ( ( bootstrap_accounts,
+          bootstrap_contracts,
+          commitments,
+          security_deposit_ramp_up_cycles,
+          no_reward_cycles ),
+        constants ))
+    (fun ( ( bootstrap_accounts,
+             bootstrap_contracts,
+             commitments,
+             security_deposit_ramp_up_cycles,
+             no_reward_cycles ),
+           constants ) ->
+      {
+        bootstrap_accounts;
+        bootstrap_contracts;
+        commitments;
+        constants;
+        security_deposit_ramp_up_cycles;
+        no_reward_cycles;
+      })
     (merge_objs
        (obj5
           (req "bootstrap_accounts" (list bootstrap_account_encoding))

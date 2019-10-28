@@ -27,21 +27,29 @@
     since genesis: genesis is 0, all other blocks have increasing levels from
     there. *)
 type t
+
 type raw_level = t
-val encoding: raw_level Data_encoding.t
-val rpc_arg: raw_level RPC_arg.arg
-val pp: Format.formatter -> raw_level -> unit
+
+val encoding : raw_level Data_encoding.t
+
+val rpc_arg : raw_level RPC_arg.arg
+
+val pp : Format.formatter -> raw_level -> unit
+
 include Compare.S with type t := raw_level
 
-val to_int32: raw_level -> int32
-val of_int32_exn: int32 -> raw_level
-val of_int32: int32 -> raw_level tzresult
+val to_int32 : raw_level -> int32
 
-val diff: raw_level -> raw_level -> int32
+val of_int32_exn : int32 -> raw_level
 
-val root: raw_level
+val of_int32 : int32 -> raw_level tzresult
 
-val succ: raw_level -> raw_level
-val pred: raw_level -> raw_level option
+val diff : raw_level -> raw_level -> int32
+
+val root : raw_level
+
+val succ : raw_level -> raw_level
+
+val pred : raw_level -> raw_level option
 
 module Index : Storage_description.INDEX with type t = raw_level

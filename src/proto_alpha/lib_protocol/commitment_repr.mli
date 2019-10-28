@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 type t = {
-  blinded_public_key_hash : Blinded_public_key_hash.t ;
-  amount : Tez_repr.t ;
+  blinded_public_key_hash : Blinded_public_key_hash.t;
+  amount : Tez_repr.t;
 }
 
 val encoding : t Data_encoding.t

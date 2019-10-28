@@ -28,86 +28,76 @@ open Alpha_context
 let custom_root = RPC_path.open_root
 
 module Seed = struct
-
   module S = struct
-
     open Data_encoding
 
     let seed =
       RPC_service.post_service
-        ~description: "Seed of the cycle to which the block belongs."
-        ~query: RPC_query.empty
-        ~input: empty
-        ~output: Seed.seed_encoding
+        ~description:"Seed of the cycle to which the block belongs."
+        ~query:RPC_query.empty
+        ~input:empty
+        ~output:Seed.seed_encoding
         RPC_path.(custom_root / "context" / "seed")
-
   end
 
   let () =
     let open Services_registration in
-    register0 S.seed begin fun ctxt () () ->
-      let l = Level.current ctxt in
-      Seed.for_cycle ctxt l.cycle
-    end
+    register0 S.seed (fun ctxt () () ->
+        let l = Level.current ctxt in
+        Seed.for_cycle ctxt l.cycle)
 
-
-  let get ctxt block =
-    RPC_context.make_call0 S.seed ctxt block () ()
-
+  let get ctxt block = RPC_context.make_call0 S.seed ctxt block () ()
 end
 
 module Nonce = struct
-
-  type info =
-    | Revealed of Nonce.t
-    | Missing of Nonce_hash.t
-    | Forgotten
+  type info = Revealed of Nonce.t | Missing of Nonce_hash.t | Forgotten
 
   let info_encoding =
     let open Data_encoding in
-    union [
-      case (Tag 0)
-        ~title:"Revealed"
-        (obj1 (req "nonce" Nonce.encoding))
-        (function Revealed nonce -> Some nonce | _ -> None)
-        (fun nonce -> Revealed nonce) ;
-      case (Tag 1)
-        ~title:"Missing"
-        (obj1 (req "hash" Nonce_hash.encoding))
-        (function Missing nonce -> Some nonce | _ -> None)
-        (fun nonce -> Missing nonce) ;
-      case (Tag 2)
-        ~title:"Forgotten"
-        empty
-        (function Forgotten -> Some () | _ -> None)
-        (fun () -> Forgotten) ;
-    ]
+    union
+      [ case
+          (Tag 0)
+          ~title:"Revealed"
+          (obj1 (req "nonce" Nonce.encoding))
+          (function Revealed nonce -> Some nonce | _ -> None)
+          (fun nonce -> Revealed nonce);
+        case
+          (Tag 1)
+          ~title:"Missing"
+          (obj1 (req "hash" Nonce_hash.encoding))
+          (function Missing nonce -> Some nonce | _ -> None)
+          (fun nonce -> Missing nonce);
+        case
+          (Tag 2)
+          ~title:"Forgotten"
+          empty
+          (function Forgotten -> Some () | _ -> None)
+          (fun () -> Forgotten) ]
 
   module S = struct
-
     let get =
       RPC_service.get_service
-        ~description: "Info about the nonce of a previous block."
-        ~query: RPC_query.empty
-        ~output: info_encoding
+        ~description:"Info about the nonce of a previous block."
+        ~query:RPC_query.empty
+        ~output:info_encoding
         RPC_path.(custom_root / "context" / "nonces" /: Raw_level.rpc_arg)
-
   end
 
   let register () =
     let open Services_registration in
-    register1 S.get begin fun ctxt raw_level () () ->
-      let level = Level.from_raw ctxt raw_level in
-      Nonce.get ctxt level >>= function
-      | Ok (Revealed nonce) -> return (Revealed nonce)
-      | Ok (Unrevealed { nonce_hash ; _ }) ->
-          return (Missing nonce_hash)
-      | Error _ -> return Forgotten
-    end
+    register1 S.get (fun ctxt raw_level () () ->
+        let level = Level.from_raw ctxt raw_level in
+        Nonce.get ctxt level
+        >>= function
+        | Ok (Revealed nonce) ->
+            return (Revealed nonce)
+        | Ok (Unrevealed {nonce_hash; _}) ->
+            return (Missing nonce_hash)
+        | Error _ ->
+            return Forgotten)
 
   let get ctxt block level =
     RPC_context.make_call1 S.get ctxt block level () ()
-
 end
 
 module Contract = Contract_services

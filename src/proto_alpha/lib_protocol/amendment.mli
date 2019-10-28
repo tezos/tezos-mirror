@@ -51,8 +51,7 @@ open Alpha_context
 
 (** If at the end of a voting period, moves to the next one following
     the state machine of the amendment procedure. *)
-val may_start_new_voting_period:
-  context -> context tzresult Lwt.t
+val may_start_new_voting_period : context -> context tzresult Lwt.t
 
 type error +=
   | Unexpected_proposal
@@ -63,17 +62,14 @@ type error +=
 (** Records a list of proposals for a delegate.
     @raise Unexpected_proposal if [ctxt] is not in a proposal period.
     @raise Unauthorized_proposal if [delegate] is not in the listing. *)
-val record_proposals:
-  context ->
-  public_key_hash -> Protocol_hash.t list ->
-  context tzresult Lwt.t
+val record_proposals :
+  context -> public_key_hash -> Protocol_hash.t list -> context tzresult Lwt.t
 
-type error +=
-  | Invalid_proposal
-  | Unexpected_ballot
-  | Unauthorized_ballot
+type error += Invalid_proposal | Unexpected_ballot | Unauthorized_ballot
 
-val record_ballot:
+val record_ballot :
   context ->
-  public_key_hash -> Protocol_hash.t -> Vote.ballot ->
+  public_key_hash ->
+  Protocol_hash.t ->
+  Vote.ballot ->
   context tzresult Lwt.t

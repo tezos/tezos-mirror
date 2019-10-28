@@ -24,19 +24,21 @@
 (*****************************************************************************)
 
 type t = private int32
+
 type roll = t
 
-val encoding: roll Data_encoding.t
-val rpc_arg: roll RPC_arg.t
+val encoding : roll Data_encoding.t
 
-val random:
-  Seed_repr.sequence -> bound:roll -> roll * Seed_repr.sequence
+val rpc_arg : roll RPC_arg.t
 
-val first: roll
-val succ: roll -> roll
+val random : Seed_repr.sequence -> bound:roll -> roll * Seed_repr.sequence
 
-val to_int32: roll -> Int32.t
+val first : roll
 
-val (=): roll -> roll -> bool
+val succ : roll -> roll
+
+val to_int32 : roll -> Int32.t
+
+val ( = ) : roll -> roll -> bool
 
 module Index : Storage_description.INDEX with type t = roll

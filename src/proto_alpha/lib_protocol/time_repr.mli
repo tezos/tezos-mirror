@@ -23,13 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of (struct include Time end)
+include module type of struct
+  include Time
+end
+
 type time = t
 
-val pp: Format.formatter -> t -> unit
-val of_seconds: string -> time option
-val to_seconds_string: time -> string
+val pp : Format.formatter -> t -> unit
 
-val (+?) : time -> Period_repr.t -> time tzresult
-val (-?) : time -> time -> Period_repr.t tzresult
+val of_seconds : string -> time option
 
+val to_seconds_string : time -> string
+
+val ( +? ) : time -> Period_repr.t -> time tzresult
+
+val ( -? ) : time -> time -> Period_repr.t tzresult

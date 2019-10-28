@@ -30,28 +30,29 @@ type error +=
   | Unexpected_nonce
 
 type t = Seed_repr.nonce
+
 type nonce = t
-val encoding: nonce Data_encoding.t
+
+val encoding : nonce Data_encoding.t
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
-  nonce_hash: Nonce_hash.t ;
-  delegate: Signature.Public_key_hash.t ;
-  rewards: Tez_repr.t ;
-  fees: Tez_repr.t ;
+  nonce_hash : Nonce_hash.t;
+  delegate : Signature.Public_key_hash.t;
+  rewards : Tez_repr.t;
+  fees : Tez_repr.t;
 }
 
-type status =
-  | Unrevealed of unrevealed
-  | Revealed of Seed_repr.nonce
+type status = Unrevealed of unrevealed | Revealed of Seed_repr.nonce
 
-val get: Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
+val get : Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
 
-val record_hash:
-  Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
+val record_hash : Raw_context.t -> unrevealed -> Raw_context.t tzresult Lwt.t
 
-val reveal:
+val reveal :
   Raw_context.t -> Level_repr.t -> nonce -> Raw_context.t tzresult Lwt.t
 
-val of_bytes: MBytes.t -> nonce tzresult
-val hash: nonce -> Nonce_hash.t
-val check_hash: nonce -> Nonce_hash.t -> bool
+val of_bytes : MBytes.t -> nonce tzresult
+
+val hash : nonce -> Nonce_hash.t
+
+val check_hash : nonce -> Nonce_hash.t -> bool

@@ -81,7 +81,7 @@ val mul_n : n num -> n num -> n num
 (** Euclidean division between naturals.
     [ediv_n n d] returns [None] if divisor is zero,
     or [Some (q, r)] where [n = d * q + r] and [[0 <= r < d]] otherwise. *)
-val ediv_n:  n num -> n num -> (n num * n num) option
+val ediv_n : n num -> n num -> (n num * n num) option
 
 (** Sign agnostic addition.
     Use {!add_n} when working with naturals to preserve the sign. *)
@@ -99,7 +99,7 @@ val mul : _ num -> _ num -> z num
     [ediv n d] returns [None] if divisor is zero,
     or [Some (q, r)] where [n = d * q + r] and [[0 <= r < |d|]] otherwise.
     Use {!ediv_n} when working with naturals to preserve the sign. *)
-val ediv:  _ num -> _ num -> (z num * n num) option
+val ediv : _ num -> _ num -> (z num * n num) option
 
 (** Compute the absolute value of a relative, turning it into a natural. *)
 val abs : z num -> n num

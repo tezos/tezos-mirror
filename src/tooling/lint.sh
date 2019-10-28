@@ -73,6 +73,7 @@ update_all_dot_ocamlformats () {
         ofmt=$d/.ocamlformat
         say "Dealing with $ofmt"
         case "$d" in
+            src/proto_alpha/lib_protocol | \
             src/proto_demo_noops/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
                 ;;
@@ -94,6 +95,7 @@ update_all_dot_ocamlformats () {
 check_with_dune () {
     for f in $* ; do
         case "$PWD" in
+            */src/proto_alpha/lib_protocol$ | \
             */src/proto_demo_noops/lib_protocol$ )
                 make_dot_ocamlformat .ocamlformat
                 ocamlformat --check $f

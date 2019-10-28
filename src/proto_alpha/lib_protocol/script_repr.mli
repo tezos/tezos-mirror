@@ -43,25 +43,36 @@ val lazy_expr_encoding : lazy_expr Data_encoding.t
 
 val lazy_expr : expr -> lazy_expr
 
-type t = { code : lazy_expr ; storage : lazy_expr }
+type t = {code : lazy_expr; storage : lazy_expr}
 
 val encoding : t Data_encoding.encoding
 
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
 val serialized_cost : MBytes.t -> Gas_limit_repr.cost
+
 val traversal_cost : node -> Gas_limit_repr.cost
+
 val node_cost : node -> Gas_limit_repr.cost
 
 val int_node_cost : Z.t -> Gas_limit_repr.cost
+
 val int_node_cost_of_numbits : int -> Gas_limit_repr.cost
+
 val string_node_cost : string -> Gas_limit_repr.cost
+
 val string_node_cost_of_length : int -> Gas_limit_repr.cost
+
 val bytes_node_cost : MBytes.t -> Gas_limit_repr.cost
+
 val bytes_node_cost_of_length : int -> Gas_limit_repr.cost
+
 val prim_node_cost_nonrec : expr list -> annot -> Gas_limit_repr.cost
+
 val prim_node_cost_nonrec_of_length : int -> annot -> Gas_limit_repr.cost
+
 val seq_node_cost_nonrec : expr list -> Gas_limit_repr.cost
+
 val seq_node_cost_nonrec_of_length : int -> Gas_limit_repr.cost
 
 val force_decode : lazy_expr -> (expr * Gas_limit_repr.cost) tzresult

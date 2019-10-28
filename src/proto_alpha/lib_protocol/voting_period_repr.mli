@@ -27,22 +27,29 @@
     since the root. *)
 
 type t
+
 type voting_period = t
-val encoding: voting_period Data_encoding.t
-val rpc_arg: voting_period RPC_arg.arg
-val pp: Format.formatter -> voting_period -> unit
+
+val encoding : voting_period Data_encoding.t
+
+val rpc_arg : voting_period RPC_arg.arg
+
+val pp : Format.formatter -> voting_period -> unit
+
 include Compare.S with type t := voting_period
 
-val to_int32: voting_period -> int32
-val of_int32_exn: int32 -> voting_period
+val to_int32 : voting_period -> int32
 
-val root: voting_period
-val succ: voting_period -> voting_period
+val of_int32_exn : int32 -> voting_period
+
+val root : voting_period
+
+val succ : voting_period -> voting_period
 
 type kind =
-  | Proposal       (** protocols can be proposed *)
-  | Testing_vote   (** a proposal can be voted *)
-  | Testing        (** winning proposal is forked on a testnet *)
-  | Promotion_vote (** activation can be voted *)
+  | Proposal  (** protocols can be proposed *)
+  | Testing_vote  (** a proposal can be voted *)
+  | Testing  (** winning proposal is forked on a testnet *)
+  | Promotion_vote  (** activation can be voted *)
 
-val kind_encoding: kind Data_encoding.t
+val kind_encoding : kind Data_encoding.t

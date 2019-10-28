@@ -32,7 +32,6 @@
     The only expected property is: It should be difficult to find a
     seed such that the generated sequence is a given one. *)
 
-
 (** {2 Random Generation} *)
 
 (** The state of the random number generator *)
@@ -91,9 +90,11 @@ val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
 (** {2 Predefined nonce} *)
 
 val initial_nonce_0 : nonce
+
 val initial_nonce_hash_0 : Nonce_hash.t
 
 (** {2 Serializers} *)
 
-val nonce_encoding  : nonce Data_encoding.t
+val nonce_encoding : nonce Data_encoding.t
+
 val seed_encoding : seed Data_encoding.t

@@ -24,38 +24,42 @@
 (*****************************************************************************)
 
 include Compare.Int32
+
 type roll = t
 
 let encoding = Data_encoding.int32
 
 let first = 0l
+
 let succ i = Int32.succ i
 
-let random sequence ~bound =
-  Seed_repr.take_int32 sequence bound
+let random sequence ~bound = Seed_repr.take_int32 sequence bound
 
-let rpc_arg =
-  RPC_arg.like
-    RPC_arg.int32
-    "roll"
+let rpc_arg = RPC_arg.like RPC_arg.int32 "roll"
 
 let to_int32 v = v
 
-
 module Index = struct
   type t = roll
+
   let path_length = 3
+
   let to_path roll l =
-    (Int32.to_string @@ Int32.logand roll (Int32.of_int 0xff)) ::
-    (Int32.to_string @@ Int32.logand (Int32.shift_right_logical roll 8) (Int32.of_int 0xff)) ::
-    Int32.to_string roll :: l
+    (Int32.to_string @@ Int32.logand roll (Int32.of_int 0xff))
+    :: ( Int32.to_string
+       @@ Int32.logand (Int32.shift_right_logical roll 8) (Int32.of_int 0xff)
+       )
+    :: Int32.to_string roll :: l
+
   let of_path = function
-    | _ :: _ :: s :: _ -> begin
-        try Some (Int32.of_string s)
-        with _ -> None
-      end
-    | _ -> None
+    | _ :: _ :: s :: _ -> (
+      try Some (Int32.of_string s) with _ -> None )
+    | _ ->
+        None
+
   let rpc_arg = rpc_arg
+
   let encoding = encoding
+
   let compare = compare
 end

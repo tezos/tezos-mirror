@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 let current = Raw_context.current_fitness
+
 let increase ?(gap = 1) ctxt =
   let fitness = current ctxt in
   Raw_context.set_current_fitness ctxt (Int64.add (Int64.of_int gap) fitness)

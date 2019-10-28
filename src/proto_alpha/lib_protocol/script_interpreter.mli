@@ -28,52 +28,62 @@ open Alpha_context
 type execution_trace =
   (Script.location * Gas.t * (Script.expr * string option) list) list
 
-type error += Reject of Script.location * Script.expr * execution_trace option
+type error +=
+  | Reject of Script.location * Script.expr * execution_trace option
+
 type error += Overflow of Script.location * execution_trace option
+
 type error += Runtime_contract_error : Contract.t * Script.expr -> error
+
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
+
 type error += Cannot_serialize_log
+
 type error += Cannot_serialize_failure
+
 type error += Cannot_serialize_storage
 
-type execution_result =
-  { ctxt : context ;
-    storage : Script.expr ;
-    big_map_diff : Contract.big_map_diff option ;
-    operations : packed_internal_operation list }
+type execution_result = {
+  ctxt : context;
+  storage : Script.expr;
+  big_map_diff : Contract.big_map_diff option;
+  operations : packed_internal_operation list;
+}
 
-type step_constants =
-  { source : Contract.t ;
-    payer : Contract.t ;
-    self : Contract.t ;
-    amount : Tez.t ;
-    chain_id : Chain_id.t }
+type step_constants = {
+  source : Contract.t;
+  payer : Contract.t;
+  self : Contract.t;
+  amount : Tez.t;
+  chain_id : Chain_id.t;
+}
 
 type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
   | Empty : Script_typed_ir.end_of_stack stack
 
-val step:
-  ?log: execution_trace ref ->
-  context -> step_constants ->
+val step :
+  ?log:execution_trace ref ->
+  context ->
+  step_constants ->
   ('bef, 'aft) Script_typed_ir.descr ->
   'bef stack ->
   ('aft stack * context) tzresult Lwt.t
 
-val execute:
+val execute :
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->
   step_constants ->
-  script: Script.t ->
-  entrypoint: string ->
-  parameter: Script.expr ->
+  script:Script.t ->
+  entrypoint:string ->
+  parameter:Script.expr ->
   execution_result tzresult Lwt.t
 
-val trace:
+val trace :
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->
   step_constants ->
-  script: Script.t ->
-  entrypoint: string ->
-  parameter: Script.expr ->
+  script:Script.t ->
+  entrypoint:string ->
+  parameter:Script.expr ->
   (execution_result * execution_trace) tzresult Lwt.t

@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 type t
+
 type tez = t
 
-include (Qty_repr.S with type qty := t)
+include Qty_repr.S with type qty := t

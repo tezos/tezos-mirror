@@ -24,17 +24,15 @@
 (*****************************************************************************)
 
 type t = {
-  blinded_public_key_hash : Blinded_public_key_hash.t ;
-  amount : Tez_repr.t
+  blinded_public_key_hash : Blinded_public_key_hash.t;
+  amount : Tez_repr.t;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun { blinded_public_key_hash ; amount } ->
-       ( blinded_public_key_hash, amount ))
-    (fun ( blinded_public_key_hash, amount) ->
-       { blinded_public_key_hash ; amount })
-    (tup2
-       Blinded_public_key_hash.encoding
-       Tez_repr.encoding)
+    (fun {blinded_public_key_hash; amount} ->
+      (blinded_public_key_hash, amount))
+    (fun (blinded_public_key_hash, amount) ->
+      {blinded_public_key_hash; amount})
+    (tup2 Blinded_public_key_hash.encoding Tez_repr.encoding)
