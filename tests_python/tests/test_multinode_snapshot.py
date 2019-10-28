@@ -49,7 +49,7 @@ class TestMultiNodeSnapshot:
     def test_rerun_group1(self, sandbox):
         for i in GROUP1:
             sandbox.node(i).run()
-        time.sleep(1)
+        time.sleep(2)
 
     def test_level(self, sandbox):
         for i in GROUP1 + GROUP2:
