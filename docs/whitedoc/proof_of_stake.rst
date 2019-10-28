@@ -278,11 +278,14 @@ endorse ``k`` times the same block.
 Rewards
 ~~~~~~~
 
-Baking a block gives a block reward of ``BLOCK_REWARD /
+Baking a block should give a block reward of ``BLOCK_REWARD /
 (1 + p) * (0.8 + 0.2 * e / ENDORSERS_PER_BLOCK)`` plus all fees paid
 by transactions inside the block, where ``BLOCK_REWARD`` = 16 XTZ,
 ``p`` is the priority at which the block was baked, and ``e`` is the
-number of endorsements the block contains.
+number of endorsements the block contains. Due to a bug in
+``PsBabyM1`, the block reward is actually slightly smaller:
+`BLOCK_REWARD * (8 + 2 * e / ENDORSERS_PER_BLOCK) / 10 / (1 + p)`,
+where `/` is *integer* division.
 
 Endorsers also receive a reward (at the same time as block creators
 do). The reward is ``ENDORSEMENT_REWARD / (1 + p)``, where
