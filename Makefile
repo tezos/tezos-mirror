@@ -89,6 +89,7 @@ build-sandbox:
 	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 build-test: build-sandbox
+	@dune build @check # here we build all the files required for merlin
 	@dune build @buildtest
 
 test:
