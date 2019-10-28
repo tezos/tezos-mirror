@@ -2,10 +2,17 @@ Test Networks
 =============
 
 Mainnet is the main Tezos network, but is not appropriate for testing.
-Other networks are available to this end.
+Other networks are available to this end. Test networks usually run
+with different constants to speed up the chain.
+
+All networks share the same faucet: https://faucet.tzalpha.net/
+Keys that this faucet give you can be used in all test networks.
 
 Zeronet
 -------
+
+- Git branch: ``zeronet``
+- Run Docker image: ``wget -O zeronet.sh https://gitlab.com/tezos/tezos/raw/zeronet/scripts/alphanet.sh``
 
 Zeronet is an unstable test network.
 It is often reset to keep the chain short and to allow testing of
@@ -14,9 +21,12 @@ protocols which are being developed.
 Babylonnet
 ----------
 
+- Git branch: ``babylonnet``
+- Run Docker image: ``wget -O babylonnet.sh https://gitlab.com/tezos/tezos/raw/babylonnet/scripts/alphanet.sh``
+
 Babylonnet is a test network which runs the Babylon protocol.
 It was spawned after the injection of the proposal for Babylon.
-It will run until Babylon is no longer the activate protocol of Mainnet.
+It will run until Babylon is no longer the active protocol of Mainnet.
 
 Future Networks
 ---------------
