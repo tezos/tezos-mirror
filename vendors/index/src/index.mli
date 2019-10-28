@@ -68,6 +68,10 @@ exception RO_not_allowed
 (** The exception raised when a write operation is attempted on a read_only
     index. *)
 
+exception Closed
+(** The exception raised when any operation is attempted on a closed index,
+    except for [close], which is idempotent. *)
+
 (** Index module signature. *)
 module type S = sig
   type t
