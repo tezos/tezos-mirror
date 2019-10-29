@@ -49,7 +49,7 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) : sig
   type logger = (module LOGGER)
 
   val null_logger: logger
-  val timings_logger: Format.formatter -> logger
+  val timings_logger: gettimeofday:(unit -> float) -> Format.formatter -> logger
   val full_logger: Format.formatter -> logger
 
   val generic_call:
