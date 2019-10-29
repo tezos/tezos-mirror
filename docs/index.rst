@@ -60,13 +60,13 @@ The Tezos network has been live and open since June 30th 2018.
 
 All the instructions in this documentation are valid for Mainnet
 however we **strongly** encourage users to first try all the
-introduction tutorials on Alphanet to familiarize themselves without
+introduction tutorials on some :ref:`test network <test-networks>` to familiarize themselves without
 risks.
 
-Alphanet
-~~~~~~~~
+Babylonnet
+~~~~~~~~~~
 
-Tezos Alphanet is a test network for the Tezos blockchain with a
+Tezos Babylonnet is a test network for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
 It is updated and rebooted rarely and it is running the same code as
 the Mainnet.
@@ -74,9 +74,9 @@ It is the reference network for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.
 
-We offer support for Alphanet on IRC.
+We offer support for Babylonnet on IRC.
 
-The Tezos Alpha (test) network has been live and open since February 2017.
+The Tezos Babylonnet (test) network will be live as long as Mainnet will be running the Babylon protocol.
 
 Zeronet
 ~~~~~~~
@@ -84,7 +84,7 @@ Zeronet
 Zeronet is the most cutting-edge development network of Tezos. It is
 restarted without notice, possibly several times a day.
 This network is mostly used internally by the Tezos developers and may
-have *different constants* from Alphanet or Mainnet, for example it
+have *different constants* from Babylonnet or Mainnet, for example it
 has shorter cycles and a shorter interval between blocks.
 We offer no support for the Zeronet.
 
@@ -100,10 +100,10 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Introduction tutorials:
 
-   introduction/test_networks
    introduction/howtoget
    introduction/howtouse
    introduction/howtorun
+   introduction/test_networks
    introduction/support
 
 .. toctree::

@@ -19,12 +19,10 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 
-Note that Alphanet and Zeronet only support the last version of the
-protocol which is always called `alpha` while Mainnet must also
-support all past protocols.
-For this reason the name of the 3 daemons in Mainnet contains the
-incremental number and the partial hash of the protocol they are bound
-to, such as ``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
+Note that on a production branch (Mainnet, Zeronet, etc.), the daemons
+are not suffixed with ``alpha`` but with the partial hash of the
+protocol they are bound to, such as
+``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
 
 
 Read The Friendly Manual
@@ -213,7 +211,7 @@ Get free tez
 ~~~~~~~~~~~~
 
 In order to test the networks and help users get familiar with the
-system, on Zeronet and Alphanet you can obtain free tez from a
+system, on Zeronet and Babylonnet you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -507,9 +505,9 @@ For example the ``get timestamp`` command above is a shortcut for::
 
 The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific information you'll
-have to resort to RPCs.
-For example to check the value of important constants in Tezos, which
-may differ between Mainnet, Alphanet and Zeronet, you can use::
+have to resort to RPCs. For example to check the value of important
+constants in Tezos, which may differ between Mainnet and other
+:ref:`test networks<test-networks>`, you can use::
 
    tezos-client rpc get /chains/main/blocks/head/context/constants | jq
    {
