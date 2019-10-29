@@ -628,14 +628,16 @@ let update_caboose chain_data ~genesis block_header oldest_header max_op_ttl =
   >>= fun () -> return_unit
 
 let import_protocol_data index store block_hash_arr level_oldest_block
-    (level, protocol_data) =
+    new_header (level, protocol_data) =
   (* Retrieve the original context hash of the block. *)
   let delta = Int32.(to_int (sub level level_oldest_block)) in
-  let pruned_block_hash = block_hash_arr.(delta) in
-  let block_store = Store.Block.get store in
-  State.Block.Header.read_opt (block_store, pruned_block_hash)
-  >>= (function
-        | None -> assert false | Some block_header -> Lwt.return block_header)
+  ( if delta = Array.length block_hash_arr then Lwt.return new_header
+  else
+    let pruned_block_hash = block_hash_arr.(delta) in
+    let block_store = Store.Block.get store in
+    State.Block.Header.read_opt (block_store, pruned_block_hash)
+    >>= function
+    | None -> assert false | Some block_header -> Lwt.return block_header )
   >>= fun block_header ->
   let expected_context_hash = block_header.Block_header.shell.context in
   (* Retrieve the input info. *)
@@ -668,7 +670,7 @@ let import_protocol_data index store block_hash_arr level_oldest_block
       fail (Wrong_protocol_hash protocol_hash)
 
 let import_protocol_data_list index store block_hash_arr level_oldest_block
-    protocol_data =
+    new_head protocol_data =
   let rec aux = function
     | [] ->
         return_unit
@@ -678,6 +680,7 @@ let import_protocol_data_list index store block_hash_arr level_oldest_block
           store
           block_hash_arr
           level_oldest_block
+          new_head
           (level, protocol_data)
         >>=? fun () -> aux xs
   in
@@ -1014,6 +1017,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
         chain_store
         block_hashes_arr
         oldest_header.Block_header.shell.level
+        block_header
         protocol_data
       >>=? fun () ->
       (* Everything is ok. We can store the new head *)
