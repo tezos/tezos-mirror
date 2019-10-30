@@ -12,23 +12,47 @@ https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html.
 
 Brief Overview
 --------------
-A blockchain is a linked list of **blocks**. In Tezos, blocks to be added to the blockchain are agreed upon through a proof-of-stake consensus mechanism. Proof-of-stake means that participants in the consensus algorithm are chosen in function of their stake.  In Tezos, a participant needs to have a minimum stake of 8,000 XTZ (which is called a **roll**). If one does not have enough stake to participate on its own or does not want to set up the needed infrastructure, (s)he can use **delegation**. Therefore, in Tezos, participants in the consensus algorithm are called **delegates**. There are two roles a delegate can have: that of a **baker**, that is a delegate that creates blocks, or that of an **endorser**, that is a delegate that contributes in agreeing on a block by **endorsing** that block.
 
-**Baking rights** and **endorsing rights** are determined at the beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi strategy starting from a **random seed** computed from information already found on blockchain.
+A blockchain is a linked list of **blocks**. In Tezos, blocks to be
+added to the blockchain are agreed upon through a proof-of-stake
+consensus mechanism. Proof-of-stake means that participants in the
+consensus algorithm are chosen in function of their stake. In Tezos, a
+participant needs to have a minimum stake of 8,000 XTZ (which is
+called a **roll**). If one does not have enough stake to participate
+on its own or does not want to set up the needed infrastructure, (s)he
+can use **delegation**. Therefore, in Tezos, participants in the
+consensus algorithm are called **delegates**. There are two roles a
+delegate can have: that of a **baker**, that is a delegate that
+creates blocks, or that of an **endorser**, that is a delegate that
+contributes in agreeing on a block by **endorsing** that block.
 
-To incentivize participation in the consensus algorithm, delegates are **rewarded** for their baking and endorsing. As a counter-measure against double-baking or double-endorsement a **security deposit** is frozen from the delegate's account. The deposit is either released after a number of cycles or burnt in case of proven bad behaviour.
+**Baking rights** and **endorsing rights** are determined at the
+ beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi
+ strategy starting from a **random seed** computed from information
+ already found on blockchain.
 
-The remainder of this document contains the detailed description of the notions which are in bold in the text above.
+To incentivize participation in the consensus algorithm, delegates are
+**rewarded** for their baking and endorsing. As a counter-measure
+against double-baking or double-endorsement a **security deposit** is
+frozen from the delegate's account. The deposit is either released
+after a number of cycles or burnt in case of proven bad behaviour.
+
+The remainder of this document contains the detailed description of
+the notions which are in bold in the text above.
 
 Further External Resources
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The original design of the proof-of-stake mechanism in Tezos can be found in the `whitepaper <https://tezos.com/static/white_paper-2dc8c02267a8fb86bd67a108199441bf.pdf>`_.
-Here are a few more resources that present Tezos' proof-of-stake mechanism:
+The original design of the proof-of-stake mechanism in Tezos can be
+found in the `whitepaper
+<https://tezos.com/static/white_paper-2dc8c02267a8fb86bd67a108199441bf.pdf>`_.
+Here are a few more resources that present Tezos' proof-of-stake
+mechanism:
 
 -  `Proof of Stake <https://learn.tqgroup.io/files/proofofstake.html#consensus>`_
 -  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
--  `All you ever wanted to ask about Tezos — Illustrated <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
+- `All you ever wanted to ask about Tezos — Illustrated
+   <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
 
 
 Blocks
@@ -229,14 +253,17 @@ cryptographically secure pseudo-random number generator which is used
 to draw baking rights for a cycle.
 
 To each level is associated a priority list of delegates.
-This list is obtained by randomly selecting an active roll for each position in the list, and then taking the owner of the selected roll.
-As the draw is independent for each list position, it is possible that the same public key appears multiple times in
-this list.
+This list is obtained by randomly selecting an active roll for each
+position in the list, and then taking the owner of the selected roll.
+As the draw is independent for each list position, it is possible that
+the same public key appears multiple times in this list.
 The first baker in the list is the first one who can bake a block at
 that level.
 If a delegate is for some reason unable to bake, the next delegate in
 the list can step up and bake the block.
-The elements of the list that contain a certain delegate are also called the *baking slots* of that delegate, and the indexes of these slots are called *priorities*.
+The elements of the list that contain a certain delegate are also
+called the *baking slots* of that delegate, and the indexes of these
+slots are called *priorities*.
 
 Baking a block gives a block reward (detailed below) plus
 all fees paid by transactions inside the block.
@@ -244,8 +271,8 @@ all fees paid by transactions inside the block.
 Endorsements
 ~~~~~~~~~~~~
 
-To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` = 32
-*endorsers*. Endorsers are drawn similarly as bakers, by randomly
+To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` =
+32 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
 selecting 32 active rolls with replacement.
 
 Each endorser verifies the last block that was baked, say at level
@@ -256,7 +283,9 @@ endorsement for block ``n`` will be considered valid.
 Minimal block delays
 ~~~~~~~~~~~~~~~~~~~~
 
-A block is valid only if its timestamp has a minimal delay with respect to the previous block’s timestamp. The minimal delay is given by the following expression:
+A block is valid only if its timestamp has a minimal delay with
+respect to the previous block’s timestamp. The minimal delay is given
+by the following expression:
 ```
 TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p + DELAY_PER_MISSING_ENDORSEMENT * MAX (0, INITIAL_ENDORSERS - e),
 ```
@@ -313,10 +342,10 @@ Inflation from block rewards and endorsement reward is at most
 Random seed
 ~~~~~~~~~~~
 
-Cycle ``n`` is associated with a random seed, a 256 bit number generated
-at the end of cycle ``(n-PRESERVED_CYCLES-1)`` using commitments made during
-cycle ``(n-PRESERVED_CYCLES-2)``, in one out of every
-``BLOCKS_PER_COMMITMENT`` = 32 blocks.
+Cycle ``n`` is associated with a random seed, a 256 bit number
+generated at the end of cycle ``(n-PRESERVED_CYCLES-1)`` using
+commitments made during cycle ``(n-PRESERVED_CYCLES-2)``, in one out
+of every ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 
 The commitment must be revealed by the original baker during cycle
 ``(n-PRESERVED_CYCLES-1)`` under penalty of forfeiting the rewards and
@@ -341,18 +370,20 @@ Once computed, this new seed is stored and used during cycle ``n``.
 Accusations
 -----------
 
-If two endorsements are made for the same slot or two blocks at the same
-height by a delegate, the evidence can be collected by an accuser and included
-in a block for a period of ``PRESERVED_CYCLES``, including the current cycle.
+If two endorsements are made for the same slot or two blocks at the
+same height by a delegate, the evidence can be collected by an accuser
+and included in a block for a period of ``PRESERVED_CYCLES``,
+including the current cycle.
 
-This accusation forfeits the entirety of the safety deposit and future reward up
-to that point in the cycle. Half is burned, half goes to the accuser in the form
-of a block reward.
+This accusation forfeits the entirety of the safety deposit and future
+reward up to that point in the cycle. Half is burned, half goes to the
+accuser in the form of a block reward.
 
-In the current protocol, accusations for the *same* incident can be made several
-times after the fact. This means that the deposits and rewards for the entire
-cycle are forfeited, including any deposit made, or reward earned, after
-the incident.
+In the current protocol, accusations for the *same* incident can be
+made several times after the fact. This means that the deposits and
+rewards for the entire cycle are forfeited, including any deposit
+made, or reward earned, after the incident.
 
-Pragmatically, any baker who either double bakes or endorses in a given cycle
-should immediately stop both baking and endorsing for the rest of that cycle.
+Pragmatically, any baker who either double bakes or endorses in a
+given cycle should immediately stop both baking and endorsing for the
+rest of that cycle.
