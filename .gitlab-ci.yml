@@ -92,75 +92,100 @@ build:
     - build
   retry: 2
 
-unit:stdlib:
+# this section is update using the script scripts/update_unit_test.sh
+##BEGIN_UNITEST##
+unit:crypto:
   <<: *test_definition
   script:
-    - dune build @src/lib_stdlib/runtest
-
-unit:stdlib_unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib_unix/runtest
+    - dune build @src/lib_crypto/runtest
 
 unit:data_encoding:
   <<: *test_definition
   script:
     - dune build @src/lib_data_encoding/runtest
 
-unit:storage:
+unit:error_monad:
   <<: *test_definition
   script:
-    - dune build @src/lib_storage/runtest
+    - dune build @src/lib_error_monad/runtest
 
-unit:crypto:
+unit:micheline:
   <<: *test_definition
   script:
-    - dune build @src/lib_crypto/runtest
+    - dune build @src/lib_micheline/runtest
+
+unit:p2p:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_p2p/runtest
+
+unit:protocol_environment:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_environment/runtest
 
 unit:shell:
   <<: *test_definition
   script:
     - dune build @src/lib_shell/runtest
 
-unit:p2p:io-scheduler:
+unit:signer_backends:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_io_scheduler_ipv4
+    - dune build @src/lib_signer_backends/runtest
 
-unit:p2p:socket:
+unit:stdlib:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_socket_ipv4
+    - dune build @src/lib_stdlib/runtest
 
-unit:p2p:pool:
+unit:storage:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_pool_ipv4
+    - dune build @src/lib_storage/runtest
 
-unit:p2p:peerset:
+unit:ocaml-bip39:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_peerset
+    - dune build @vendors/ocaml-bip39/runtest
 
-unit:p2p:ipv6set:
+unit:ocaml-blake2:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_ipv6set
+    - dune build @vendors/ocaml-blake2/runtest
 
-unit:p2p:banned_peers:
+unit:ocaml-hacl:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest_p2p_banned_peers
+    - dune build @vendors/ocaml-hacl/runtest
 
-unit:validation:
+unit:ocaml-ledger-wallet:
   <<: *test_definition
   script:
-    - dune build @src/lib_validation/runtest
+    - dune build @vendors/ocaml-ledger-wallet/runtest
 
-unit:micheline:
+unit:ocaml-lmdb:
   <<: *test_definition
   script:
-    - dune build @src/lib_micheline/runtest
+    - dune build @vendors/ocaml-lmdb/runtest
+
+unit:ocaml-pbkdf:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-pbkdf/runtest
+
+unit:ocaml-secp256k1:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-secp256k1/runtest
+
+unit:ocaml-uecc:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-uecc/runtest
+
+
+##END_UNITEST##
 
 ############################################################
 ## Stage: run shell integration tests                     ##
@@ -260,6 +285,7 @@ integration:sandboxes:acc-endorsement:
 ## Stage: run python integration tests                    ##
 ############################################################
 
+# this section is update using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
 integration:baker_endorser:
   <<: *integration_definition
@@ -404,6 +430,7 @@ documentation:linkcheck:
   tags:
     - gitlab-org
 
+# this section is update using the script scripts/update_opam_test.sh
 ##BEGIN_OPAM##
 opam:00:ocplib-json-typed:
   <<: *opam_definition
