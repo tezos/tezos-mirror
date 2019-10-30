@@ -27,9 +27,9 @@ creates blocks, or that of an **endorser**, that is a delegate that
 contributes in agreeing on a block by **endorsing** that block.
 
 **Baking rights** and **endorsing rights** are determined at the
- beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi
- strategy starting from a **random seed** computed from information
- already found on blockchain.
+beginning of a **cycle** (a chunk of blocks) by a follow-the-satoshi
+strategy starting from a **random seed** computed from information
+already found on blockchain.
 
 To incentivize participation in the consensus algorithm, delegates are
 **rewarded** for their baking and endorsing. As a counter-measure
@@ -51,8 +51,7 @@ mechanism:
 
 -  `Proof of Stake <https://learn.tqgroup.io/files/proofofstake.html#consensus>`_
 -  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
-- `All you ever wanted to ask about Tezos — Illustrated
-   <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
+-  `All you ever wanted to ask about Tezos — Illustrated <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
 
 
 Blocks
@@ -78,8 +77,8 @@ The shell header contains
    length and then lexicographically. It represents the claimed fitness
    of the chain ending in this block.
 -  ``operations_hash``: the hash of a list of root hashes of Merkle
-      trees of operations. There is one list of operations per
-      validation pass.
+   trees of operations. There is one list of operations per
+   validation pass.
 -  ``context`` Hash of the state of the context after application of
    this block.
 
@@ -286,9 +285,7 @@ Minimal block delays
 A block is valid only if its timestamp has a minimal delay with
 respect to the previous block’s timestamp. The minimal delay is given
 by the following expression:
-```
-TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p + DELAY_PER_MISSING_ENDORSEMENT * MAX (0, INITIAL_ENDORSERS - e),
-```
+``TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p + DELAY_PER_MISSING_ENDORSEMENT * MAX (0, INITIAL_ENDORSERS - e)``
 where ``TIME_BETWEEN_BLOCKS[0]`` = 60 seconds,
 ``TIME_BETWEEN_BLOCKS[1]`` = 40 seconds,
 ``DELAY_PER_MISSING_ENDORSEMENT`` = 8 seconds, ``INITIAL_ENDORSERS`` =
@@ -312,7 +309,7 @@ Baking a block should give a block reward of ``BLOCK_REWARD /
 by transactions inside the block, where ``BLOCK_REWARD`` = 16 XTZ,
 ``p`` is the priority at which the block was baked, and ``e`` is the
 number of endorsements the block contains. Due to a bug in
-``PsBabyM1`, the block reward is actually slightly smaller:
+``PsBabyM1``, the block reward is actually slightly smaller:
 ``BLOCK_REWARD * (8 + 2 * e / ENDORSERS_PER_BLOCK) / 10 / (1 + p)``,
 where `/` is *integer* division.
 
