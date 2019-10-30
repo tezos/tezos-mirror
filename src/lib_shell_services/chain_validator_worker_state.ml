@@ -40,6 +40,8 @@ module Event = struct
         request_status : Worker_types.request_status;
         update : update;
         fitness : Fitness.t;
+        level : Int32.t;
+        timestamp : Time.Protocol.t;
       }
     | Could_not_switch_testchain of error list
 
@@ -59,7 +61,7 @@ module Event = struct
       [ case
           (Tag 0)
           ~title:"Processed_block"
-          (obj4
+          (obj6
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding)
              (req
@@ -68,14 +70,19 @@ module Event = struct
                    [ ("ignored", Ignored_head);
                      ("branch", Branch_switch);
                      ("increment", Head_increment) ]))
-             (req "fitness" Fitness.encoding))
+             (req "fitness" Fitness.encoding)
+             (req "level" int32)
+             (req "timestamp" Time.Protocol.encoding))
           (function
-            | Processed_block {request; request_status; update; fitness} ->
-                Some (request, request_status, update, fitness)
+            | Processed_block
+                {request; request_status; update; fitness; level; timestamp} ->
+                Some
+                  (request, request_status, update, fitness, level, timestamp)
             | _ ->
                 None)
-          (fun (request, request_status, update, fitness) ->
-            Processed_block {request; request_status; update; fitness});
+          (fun (request, request_status, update, fitness, level, timestamp) ->
+            Processed_block
+              {request; request_status; update; fitness; level; timestamp});
         case
           (Tag 1)
           ~title:"Could_not_switch_testchain"
@@ -90,17 +97,23 @@ module Event = struct
         | Ignored_head ->
             Format.fprintf
               ppf
-              "Current head is better than %a (fitness %a), we do not switch@,"
+              "Current head is better than %a (level %ld, timestamp %a, \
+               fitness %a), we do not switch@,"
         | Branch_switch ->
             Format.fprintf
               ppf
-              "Update current head to %a (fitness %a), changing branch@,"
+              "Update current head to %a (level %ld, timestamp %a, fitness \
+               %a), changing branch@,"
         | Head_increment ->
             Format.fprintf
               ppf
-              "Update current head to %a (fitness %a), same branch@," )
+              "Update current head to %a (level %ld, timestamp %a, fitness \
+               %a), same branch@," )
           Request.pp
           req.request
+          req.level
+          Time.Protocol.pp_hum
+          req.timestamp
           Fitness.pp
           req.fitness ;
         Format.fprintf ppf "%a@]" Worker_types.pp_status req.request_status

@@ -40,6 +40,8 @@ module Event : sig
         request_status : Worker_types.request_status;
         update : update;
         fitness : Fitness.t;
+        level : Int32.t;
+        timestamp : Time.Protocol.t;
       }
     | Could_not_switch_testchain of error list
 

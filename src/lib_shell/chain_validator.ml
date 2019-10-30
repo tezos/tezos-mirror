@@ -421,9 +421,12 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
   let (Request.Validated block) = req in
   let fitness = State.Block.fitness block in
   let request = State.Block.hash block in
+  let level = State.Block.level block in
+  let timestamp = State.Block.timestamp block in
   Worker.record_event
     w
-    (Processed_block {request; request_status; update; fitness}) ;
+    (Processed_block
+       {request; request_status; update; fitness; level; timestamp}) ;
   Lwt.return_unit
 
 let on_close w =
