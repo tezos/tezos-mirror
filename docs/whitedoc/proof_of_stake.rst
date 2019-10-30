@@ -112,7 +112,7 @@ transactions for block space.
 Cycles
 ------
 
-Blocks in the Tezos.Alpha Blockchain are grouped into *cycles* of
+Blocks in Tezos are grouped into *cycles* of
 ``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
 ``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
 least* 2 days, 20 hours, and 16 minutes. In the following description,
@@ -162,7 +162,7 @@ cannot be selected for baking or endorsement.
 
 A delegate becomes passive for cycle ``n`` when they fail to create
 any of the blocks or endorsements in the past ``PRESERVED_CYCLES`` = 5
-cycles, that is, in cycles ``n-1``, ``n-3``, ..., ``n -
+cycles, that is, in cycles ``n-1``, ``n-2``, ..., ``n -
 PRESERVED_CYCLES``.
 
 Discussion: giving ``PRESERVED_CYCLES`` a small value means
