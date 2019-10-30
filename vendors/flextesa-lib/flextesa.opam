@@ -14,7 +14,7 @@ depends: [
   "dum"
   "tezos-stdlib-unix"
   "lwt"
-  "fmt"
+  "fmt" { >= "0.8.6" }
   "cohttp-lwt-unix"
   "tezos-base"
 ]
