@@ -53,9 +53,9 @@ The shell header contains
 -  ``fitness``: a sequence of sequences of unsigned bytes, ordered by
    length and then lexicographically. It represents the claimed fitness
    of the chain ending in this block.
--  ``operations_hash``: The hash of a list of root hashes of Merkle
+-  ``operations_hash``: the hash of a list of root hashes of Merkle
       trees of operations. There is one list of operations per
-      validation pass
+      validation pass.
 -  ``context`` Hash of the state of the context after application of
    this block.
 
@@ -267,7 +267,7 @@ where ``TIME_BETWEEN_BLOCKS[0]`` = 60 seconds,
 ``e`` is the number of endorsements the block contains. That is, the
 higher the priority and the fewer endorsements a block carries the
 longer it takes before it can be considered valid. However, if the
-block contains more than `INITIAL_ENDORSERS` then there is no time
+block contains more than ``INITIAL_ENDORSERS`` then there is no time
 penalty.
 
 It is possible that the same endorser be selected ``k`` times for the
@@ -284,7 +284,7 @@ by transactions inside the block, where ``BLOCK_REWARD`` = 16 XTZ,
 ``p`` is the priority at which the block was baked, and ``e`` is the
 number of endorsements the block contains. Due to a bug in
 ``PsBabyM1`, the block reward is actually slightly smaller:
-`BLOCK_REWARD * (8 + 2 * e / ENDORSERS_PER_BLOCK) / 10 / (1 + p)`,
+``BLOCK_REWARD * (8 + 2 * e / ENDORSERS_PER_BLOCK) / 10 / (1 + p)``,
 where `/` is *integer* division.
 
 Endorsers also receive a reward (at the same time as block creators
@@ -343,7 +343,7 @@ Accusations
 
 If two endorsements are made for the same slot or two blocks at the same
 height by a delegate, the evidence can be collected by an accuser and included
-in a block for a period of `PRESERVED_CYCLES`, including the current cycle.
+in a block for a period of ``PRESERVED_CYCLES``, including the current cycle.
 
 This accusation forfeits the entirety of the safety deposit and future reward up
 to that point in the cycle. Half is burned, half goes to the accuser in the form
