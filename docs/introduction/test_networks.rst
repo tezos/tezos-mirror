@@ -30,9 +30,11 @@ On Zeronet, the following constants differ from Mainnet:
 - ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
 - ``delay_per_missing_endorsement`` is 2 instead of 8.
 
-This results in a chain which moves faster (about 3 blocks per minute insead of 1)
-and with much smaller cycles (32 times less blocks per cycle),
-so each cycle lasts about 100 times less.
+This results in a chain which moves faster:
+- 3 blocks per minute instead of 1,
+- one cycle should last less than 43 minutes instead of 2 days and 20 hours,
+- a voting period should last less than 16 hours instead of about 23 days.
+Note that in Zeronet, a voting period is 22 cycles instead of 8 cycles in Mainnet.
 
 Babylonnet
 ----------
@@ -56,7 +58,11 @@ On Babylonnet, the following constants differ from Mainnet:
 - ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
 - ``delay_per_missing_endorsement`` is 2 instead of 8.
 
-This results in a faster chain than Mainnet, but not quite as fast as Zeronet.
+This results in a faster chain than Mainnet, but not quite as fast as Zeronet:
+- 2 blocks per minute,
+- a cycle should last about 17 hours,
+- a voting period lasts 4 cycles and should be about 2 days and 20 hours.
+
 Deposits are also smaller, which means that you do not need as many tez to
 bake continuously.
 
