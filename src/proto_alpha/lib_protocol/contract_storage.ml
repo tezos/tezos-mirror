@@ -36,6 +36,9 @@ type error +=
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
   | (* `Temporary *)
+      Empty_implicit_delegated_contract of
+      Signature.Public_key_hash.t
+  | (* `Temporary *)
       Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of
       Signature.Public_key.t
@@ -237,6 +240,20 @@ let () =
     Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
     (function Empty_implicit_contract c -> Some c | _ -> None)
     (fun c -> Empty_implicit_contract c) ;
+  register_error_kind
+    `Branch
+    ~id:"implicit.empty_implicit_delegated_contract"
+    ~title:"Empty implicit delegated contract"
+    ~description:"Emptying an implicit delegated account is not allowed."
+    ~pp:(fun ppf implicit ->
+      Format.fprintf
+        ppf
+        "Emptying implicit delegated contract (%a)"
+        Signature.Public_key_hash.pp
+        implicit)
+    Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
+    (function Empty_implicit_delegated_contract c -> Some c | _ -> None)
+    (fun c -> Empty_implicit_delegated_contract c) ;
   register_error_kind
     `Branch
     ~id:"contract.empty_transaction"
@@ -683,9 +700,10 @@ let spend c contract amount =
             Delegate_storage.get c contract
             >>=? function
             | Some pkh' ->
-                (* Don't delete "delegate" contract *)
-                assert (Signature.Public_key_hash.equal pkh pkh') ;
-                return c
+                if Signature.Public_key_hash.equal pkh pkh' then return c
+                else
+                  (* Delegated implicit accounts cannot be emptied *)
+                  fail (Empty_implicit_delegated_contract pkh)
             | None ->
                 (* Delete empty implicit contract *)
                 delete c contract ) )

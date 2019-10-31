@@ -36,6 +36,9 @@ type error +=
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
   | (* `Temporary *)
+      Empty_implicit_delegated_contract of
+      Signature.Public_key_hash.t
+  | (* `Temporary *)
       Empty_transaction of Contract_repr.t (* `Temporary *)
   | Inconsistent_hash of
       Signature.Public_key.t
