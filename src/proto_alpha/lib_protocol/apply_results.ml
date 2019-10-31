@@ -382,6 +382,7 @@ type 'kind contents_result =
       -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
+  | Failing_noop_result : Kind.failing_noop contents_result
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
@@ -594,6 +595,24 @@ module Encoding = struct
         inj = (fun () -> Ballot_result);
       }
 
+  let failing_noop_case =
+    Case
+      {
+        op_case = Operation.Encoding.failing_noop_case;
+        encoding = Data_encoding.empty;
+        select =
+          (function
+          | Contents_result (Failing_noop_result as op) -> Some op | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Failing_noop _ as op), res) ->
+              Some (op, res)
+          | _ ->
+              None);
+        proj = (fun Failing_noop_result -> ());
+        inj = (fun () -> Failing_noop_result);
+      }
+
   let make_manager_case (type kind)
       (Operation.Encoding.Case op_case :
         kind Kind.manager Operation.Encoding.case)
@@ -664,6 +683,8 @@ module Encoding = struct
           | Contents_result (Activate_account_result _) ->
               None
           | Contents_result Proposals_result ->
+              None
+          | Contents_result Failing_noop_result ->
               None);
         mselect;
         proj =
@@ -755,7 +776,8 @@ let contents_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+         make failing_noop_case ]
 
 let contents_and_result_encoding =
   let open Encoding in
@@ -790,7 +812,8 @@ let contents_and_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+         make failing_noop_case ]
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -930,6 +953,10 @@ let kind_equal :
   | (Ballot _, Ballot_result) ->
       Some Eq
   | (Ballot _, _) ->
+      None
+  | (Failing_noop _, Failing_noop_result) ->
+      Some Eq
+  | (Failing_noop _, _) ->
       None
   | ( Manager_operation {operation = Reveal _; _},
       Manager_operation_result {operation_result = Applied (Reveal_result _); _}

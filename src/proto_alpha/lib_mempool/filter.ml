@@ -163,6 +163,8 @@ let pre_filter config
       true
   | Single (Ballot _) ->
       true
+  | Single (Failing_noop _) ->
+      true
   | Single (Manager_operation _) as op ->
       pre_filter_manager config op bytes
   | Cons (Manager_operation _, _) as op ->
@@ -215,6 +217,8 @@ let post_filter config ~validation_state_before:_
     | Single_result Proposals_result ->
         Lwt.return_true
     | Single_result Ballot_result ->
+        Lwt.return_true
+    | Single_result Failing_noop_result ->
         Lwt.return_true
     | Single_result (Manager_operation_result _) as op ->
         post_filter_manager ctxt op config

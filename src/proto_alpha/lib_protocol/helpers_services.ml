@@ -738,6 +738,9 @@ module Forge = struct
   let ballot ctxt b ~branch ~source ~period ~proposal ~ballot () =
     operation ctxt b ~branch (Ballot {source; period; proposal; ballot})
 
+  let failing_noop ctxt b ~branch ~message () =
+    operation ctxt b ~branch (Failing_noop message)
+
   let seed_nonce_revelation ctxt block ~branch ~level ~nonce () =
     operation ctxt block ~branch (Seed_nonce_revelation {level; nonce})
 

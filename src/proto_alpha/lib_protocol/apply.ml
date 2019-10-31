@@ -65,6 +65,8 @@ type error += (* `Branch *) Double_injection_of_evidence
 
 type error += (* `Branch *) Unrequired_evidence
 
+type error += (* `Permanent *) Failing_noop_error
+
 let () =
   register_error_kind
     `Temporary
@@ -259,7 +261,21 @@ let () =
          delegate has previously been denunciated in this cycle.")
     Data_encoding.empty
     (function Unrequired_evidence -> Some () | _ -> None)
-    (fun () -> Unrequired_evidence)
+    (fun () -> Unrequired_evidence) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.failing_noop"
+    ~title:"Failing_noop operation are not executed by the protocol"
+    ~description:
+      "The failing_noop operation is an operation that is not and never will \
+       be executed by the protocol."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The failing_noop operation cannot be executed by the protocol")
+    Data_encoding.empty
+    (function Failing_noop_error -> Some () | _ -> None)
+    (fun () -> Failing_noop_error)
 
 open Apply_results
 
@@ -993,6 +1009,9 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >>=? fun () ->
       Amendment.record_ballot ctxt source proposal ballot
       >>=? fun ctxt -> return (ctxt, Single_result Ballot_result)
+  | Single (Failing_noop _) ->
+      (* Failing_noop _ always fails *)
+      fail Failing_noop_error
   | Single (Manager_operation _) as op ->
       precheck_manager_contents_list ctxt chain_id operation op
       >>=? fun ctxt ->

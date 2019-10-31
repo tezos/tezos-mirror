@@ -215,6 +215,14 @@ module Forge : sig
     unit ->
     bytes shell_tzresult Lwt.t
 
+  val failing_noop :
+    'a #RPC_context.simple ->
+    'a ->
+    branch:Block_hash.t ->
+    message:string ->
+    unit ->
+    Bytes.t shell_tzresult Lwt.t
+
   val seed_nonce_revelation :
     'a #RPC_context.simple ->
     'a ->

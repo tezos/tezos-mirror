@@ -343,6 +343,12 @@ let compare_operations op1 op2 =
       1
   | (Single (Ballot _), _) ->
       -1
+  | (Single (Failing_noop _), Single (Failing_noop _)) ->
+      0
+  | (_, Single (Failing_noop _)) ->
+      1
+  | (Single (Failing_noop _), _) ->
+      -1
   (* Manager operations with smaller counter are pre-validated first. *)
   | (Single (Manager_operation op1), Single (Manager_operation op2)) ->
       Z.compare op1.counter op2.counter

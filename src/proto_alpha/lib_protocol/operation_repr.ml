@@ -48,6 +48,8 @@ module Kind = struct
 
   type delegation = Delegation_kind
 
+  type failing_noop = Failing_noop_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -110,6 +112,7 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : Signature.public_key_hash;
       fee : Tez_repr.tez;
@@ -527,6 +530,18 @@ module Encoding = struct
             Ballot {source; period; proposal; ballot});
       }
 
+  let failing_noop_case =
+    Case
+      {
+        tag = 7;
+        name = "failing_noop";
+        encoding = obj1 (req "arbitrary" Data_encoding.string);
+        select =
+          (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
+        proj = (function Failing_noop message -> message);
+        inj = (function message -> Failing_noop message);
+      }
+
   let manager_encoding =
     obj5
       (req "source" Signature.Public_key_hash.encoding)
@@ -601,7 +616,8 @@ module Encoding = struct
            make reveal_case;
            make transaction_case;
            make origination_case;
-           make delegation_case ]
+           make delegation_case;
+           make failing_noop_case ]
 
   let contents_list_encoding =
     conv to_list of_list (Variable.list contents_encoding)
@@ -672,6 +688,8 @@ let acceptable_passes (op : packed_operation) =
   match protocol_data.contents with
   | Single (Endorsement _) ->
       [0]
+  | Single (Failing_noop _) ->
+      [1]
   | Single (Proposals _) ->
       [1]
   | Single (Ballot _) ->
@@ -816,6 +834,10 @@ let equal_contents_kind :
   | (Ballot _, Ballot _) ->
       Some Eq
   | (Ballot _, _) ->
+      None
+  | (Failing_noop _, Failing_noop _) ->
+      Some Eq
+  | (Failing_noop _, _) ->
       None
   | (Manager_operation op1, Manager_operation op2) -> (
     match equal_manager_operation_kind op1.operation op2.operation with
