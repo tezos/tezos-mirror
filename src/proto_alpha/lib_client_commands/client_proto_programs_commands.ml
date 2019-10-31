@@ -461,9 +461,9 @@ let commands () =
         "Check the signature of a byte sequence as per Michelson instruction \
          `CHECK_SIGNATURE`."
       (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
-      ( prefixes ["check"; "that"]
+      ( prefixes ["check"; "that"; "bytes"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
-      @@ prefixes ["was"; "signed"; "by"]
+      @@ prefixes ["were"; "signed"; "by"]
       @@ Client_keys.Public_key.alias_param ~name:"key"
       @@ prefixes ["to"; "produce"]
       @@ param

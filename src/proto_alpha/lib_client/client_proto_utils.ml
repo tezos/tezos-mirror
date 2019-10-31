@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.ch>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,13 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Client_commands.register Protocol.hash
-  @@ fun network ->
-  List.map (Clic.map_command (new Protocol_client_context.wrap_full))
-  @@ Client_proto_programs_commands.commands ()
-  @ Client_proto_contracts_commands.commands ()
-  @ Client_proto_context_commands.commands network ()
-  @ Client_proto_multisig_commands.commands ()
-  @ Client_proto_mockup_commands.commands ()
-  @ Client_proto_utils_commands.commands ()
+open Protocol
+open Alpha_context
+open Protocol_client_context
+
+let to_json_and_bytes branch message =
+  let op =
+    ( Environment.Operation.{branch},
+      Contents_list (Single (Failing_noop message)) )
+  in
+  let encoding = Operation.unsigned_encoding in
+  ( Data_encoding.Json.construct encoding op,
+    Data_encoding.Binary.to_bytes_exn encoding op )
+
+let sign_message (cctxt : #full) ~src_sk ~block ~message =
+  let (json, bytes) = to_json_and_bytes block message in
+  cctxt#message "signed content: @[%a@]" Data_encoding.Json.pp json
+  >>= fun () ->
+  Client_keys.sign cctxt ~watermark:Signature.Generic_operation src_sk bytes
+
+let check_message (cctxt : #full) ~block ~src_pk ~quiet ~message ~signature =
+  let (json, bytes) = to_json_and_bytes block message in
+  ( if quiet then Lwt.return_unit
+  else cctxt#message "checked content: @[%a@]" Data_encoding.Json.pp json )
+  >>= fun () ->
+  return
+  @@ Signature.check
+       ~watermark:Signature.Generic_operation
+       src_pk
+       signature
+       bytes

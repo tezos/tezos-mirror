@@ -9,6 +9,7 @@
             tezos-mockup
             tezos-mockup-registration
             tezos-mockup-commands
+            tezos-client-base-unix
             tezos-client-alpha
             tezos-client-commands
             tezos-rpc)
@@ -21,6 +22,7 @@
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
+                   -open Tezos_client_base_unix
                    -open Tezos_rpc)))
 
 (library

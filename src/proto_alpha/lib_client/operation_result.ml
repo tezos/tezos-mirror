@@ -481,6 +481,8 @@ let rec pp_contents_and_result_list :
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+  | Single_and_result (Failing_noop arbitrary, Failing_noop_result) ->
+      Format.fprintf ppf "@[<v 2>Failing_noop arbitrary: %s@]" arbitrary
   | Single_and_result
       ((Manager_operation _ as op), (Manager_operation_result _ as res)) ->
       Format.fprintf ppf "%a" pp_manager_operation_contents_and_result (op, res)
