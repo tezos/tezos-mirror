@@ -413,22 +413,4 @@ struct
   let _assert b loc fmt =
     if b then Format.ikfprintf (fun _ -> return_unit) Format.str_formatter fmt
     else Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
-
-  type 'a tzlazy_state =
-    | Remembered of 'a
-    | Not_yet_known of (unit -> 'a tzresult Lwt.t)
-
-  type 'a tzlazy = {mutable tzcontents : 'a tzlazy_state}
-
-  let tzlazy c = {tzcontents = Not_yet_known c}
-
-  let tzforce v =
-    match v.tzcontents with
-    | Remembered v ->
-        return v
-    | Not_yet_known c ->
-        c ()
-        >>=? fun w ->
-        v.tzcontents <- Remembered w ;
-        return w
 end
