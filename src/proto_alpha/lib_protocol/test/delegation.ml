@@ -1071,6 +1071,40 @@ let failed_self_delegation_emptied_implicit_contract amount () =
       | _ ->
           false)
 
+let emptying_delegated_implicit_contract_fails amount () =
+  Context.init 1
+  >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b
+  >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  Context.Contract.manager (I i) bootstrap
+  >>=? fun bootstrap_manager ->
+  let account = Account.new_account () in
+  let unregistered_pkh = Account.(account.pkh) in
+  let impl_contract = Contract.implicit_contract unregistered_pkh in
+  (* credit unregistered implicit contract and check balance *)
+  Op.transaction (I i) bootstrap impl_contract amount
+  >>=? fun create_contract ->
+  Incremental.add_operation i create_contract
+  >>=? fun i ->
+  Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount
+  >>=? fun _ ->
+  (* delegate the contract to the bootstrap *)
+  Op.delegation (I i) impl_contract (Some bootstrap_manager.pkh)
+  >>=? fun delegation ->
+  Incremental.add_operation i delegation
+  >>=? fun i ->
+  (* empty implicit contract and expect error since the contract is delegated *)
+  Op.transaction (I i) impl_contract bootstrap amount
+  >>=? fun create_contract ->
+  Incremental.add_operation i create_contract
+  >>= fun err ->
+  Assert.proto_error ~loc:__LOC__ err (function
+      | Contract_storage.Empty_implicit_delegated_contract _ ->
+          true
+      | _ ->
+          false)
+
 (** B- valid registration:
     - credit implicit contract with some ꜩ + verification of balance
     - self delegation + verification
@@ -1708,6 +1742,12 @@ let tests_delegate_registration =
       "failed self-delegation: credit & debit 1μꜩ"
       `Quick
       (failed_self_delegation_emptied_implicit_contract Tez.one_mutez);
+    (* credit 1μtz, delegate, debit 1μtz *)
+    Test.tztest
+      "empty delegated contract is not deleted: credit 1μꜩ, delegate & \
+       debit 1μꜩ"
+      `Quick
+      (emptying_delegated_implicit_contract_fails Tez.one_mutez);
     (*** valid registration ***)
     (* valid registration: credit 1 μꜩ, self delegation *)
     Test.tztest
