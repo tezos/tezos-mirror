@@ -1,7 +1,7 @@
 .. _005_babylon:
 
-Protocol 005 Babylon - **Proposal**
-===================================
+Protocol 005_PsBabyM1 Babylon
+=============================
 
 **Important: revision 005_PsBABY5H of protocol Babylon contains a bug that is corrected in the latest version 005_PsBabyM1**
 more details can be found in section `Bug affecting Bigmaps in 005_PsBABY5H`_.
