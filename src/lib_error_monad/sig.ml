@@ -129,11 +129,26 @@ module type WITH_WRAPPED = sig
 end
 
 module type MONAD = sig
-  (* TO BE SUBSTITUTED/CONSTRAINED *)
+  (** This type is meant to be substituted/constrained. The intended use is
+      along the following lines:
+
+      [module Foo : sig
+         include CORE
+         include MONAD with type error := error
+       end = struct
+         ...
+       end]
+
+      See core.mli and monad.mli as examples.
+      *)
   type error
 
-  (* NOTE: Right now we leave this type concrete and public to minimize changes.
-     Later on we might make this type abstract. *)
+  (** A [trace] is a stack of [error]s. It is implemented as an [error list]
+      but such a list MUST NEVER be empty.
+
+      It is implemented as a concrete [error list] for backwards compatibility
+      but future improvements might modify the type or render the type
+      abstract. *)
   type trace = error list
 
   (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
