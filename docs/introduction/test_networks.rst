@@ -7,8 +7,8 @@ Mainnet is the main Tezos network, but is not appropriate for testing.
 Other networks are available to this end. Test networks usually run
 with different constants to speed up the chain.
 
-All networks share the same faucet: https://faucet.tzalpha.net/
-Keys that this faucet give you can be used in all test networks.
+All networks share the same faucet: https://faucet.tzalpha.net/.
+The keys obtained from this faucet can be used in all test networks.
 
 Zeronet
 -------
@@ -31,6 +31,7 @@ On Zeronet, the following constants differ from Mainnet:
 - ``delay_per_missing_endorsement`` is 2 instead of 8.
 
 This results in a chain which moves faster:
+
 - 3 blocks per minute instead of 1,
 - one cycle should last less than 43 minutes instead of 2 days and 20 hours,
 - a voting period should last less than 16 hours instead of about 23 days.
@@ -59,6 +60,7 @@ On Babylonnet, the following constants differ from Mainnet:
 - ``delay_per_missing_endorsement`` is 2 instead of 8.
 
 This results in a faster chain than Mainnet, but not quite as fast as Zeronet:
+
 - 2 blocks per minute,
 - a cycle should last about 17 hours,
 - a voting period lasts 4 cycles and should be about 2 days and 20 hours.
