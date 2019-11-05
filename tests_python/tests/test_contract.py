@@ -636,7 +636,6 @@ class TestMiniScenarios:
 @pytest.mark.contract
 class TestComparablePairs:
 
-    @pytest.mark.xfail(reason="To be fixed in next protocol")
     def test_comparable_pair(self, client):
         # tests that comb pairs are comparable and that the order is the
         # expected one
