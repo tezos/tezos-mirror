@@ -80,15 +80,15 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
       let log_response = (fun _ ?media:_ _ _ _ -> Lwt.return_unit)
     end : LOGGER)
 
-  let timings_logger ppf =
+  let timings_logger ~gettimeofday ppf =
     (module struct
       type request = string * float
       let log_empty_request uri =
-        let tzero = Unix.gettimeofday () in
+        let tzero = gettimeofday () in
         Lwt.return (Uri.to_string uri, tzero)
       let log_request ?media:_ _enc uri _body = log_empty_request uri
       let log_response (uri, tzero) ?media:_ _enc _code _body =
-        let time = Unix.gettimeofday () -. tzero in
+        let time = gettimeofday () -. tzero in
         Format.fprintf ppf "Request to %s succeeded in %gs@." uri time ;
         Lwt.return_unit
     end : LOGGER)
@@ -223,7 +223,6 @@ module Make (Encoding : Resto.ENCODING) (Client : Cohttp_lwt.S.Client) = struct
     end begin fun exn ->
       let msg =
         match exn with
-        | Unix.Unix_error (e, _, _) -> Unix.error_message e
         | Failure msg -> msg
         | Invalid_argument msg -> msg
         | e -> Printexc.to_string e in

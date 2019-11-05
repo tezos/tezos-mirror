@@ -31,24 +31,13 @@ type error_category =
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
-include Error_monad_sig.S
+include Sig.CORE
 
-module type Wrapped_error_monad = sig
-  type unwrapped = ..
+include Sig.EXT with type error := error
 
-  include Error_monad_sig.S with type error := unwrapped
+include Sig.WITH_WRAPPED with type error := error
 
-  val unwrap : error -> unwrapped option
-
-  val wrap : unwrapped -> error
-end
-
-val register_wrapped_error_kind :
-  (module Wrapped_error_monad) ->
-  id:string ->
-  title:string ->
-  description:string ->
-  unit
+include Sig.MONAD with type error := error
 
 (** Erroneous result (shortcut for generic errors) *)
 val generic_error : ('a, Format.formatter, unit, 'b tzresult) format4 -> 'a
@@ -66,7 +55,7 @@ val generic_trace :
   ( 'a,
     Format.formatter,
     unit,
-    ('b, error list) result Lwt.t -> ('b, error list) result Lwt.t )
+    ('b, trace) result Lwt.t -> ('b, trace) result Lwt.t )
   format4 ->
   'a
 
@@ -80,7 +69,7 @@ type error += Exn of exn
 type error += Canceled
 
 (** [protect] is a wrapper around [Lwt.catch] where the error handler operates
-    over `error list` instead of `exn`. Besides, [protect ~on_error ~canceler ~f]
+    over `trace` instead of `exn`. Besides, [protect ~on_error ~canceler ~f]
     may *cancel* [f] via a [Lwt_canceler.t].
 
     More precisely, [protect ~on_error ~canceler f] runs [f ()]. An Lwt failure
@@ -92,7 +81,7 @@ type error += Canceled
     is returned. An Lwt failure triggered by [~on_error] is wrapped into an
     [Exn] *)
 val protect :
-  ?on_error:(error list -> 'a tzresult Lwt.t) ->
+  ?on_error:(trace -> 'a tzresult Lwt.t) ->
   ?canceler:Lwt_canceler.t ->
   (unit -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
@@ -105,12 +94,16 @@ val with_timeout :
   (Lwt_canceler.t -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
-module Make (Prefix : sig
-  val id : string
-end) : Error_monad_sig.S
+module Make (Prefix : Sig.PREFIX) : sig
+  include Sig.CORE
+
+  include Sig.EXT with type error := error
+
+  include Sig.WITH_WRAPPED with type error := error
+end
 
 (**/**)
 
 val json_to_string : (Data_encoding.json -> string) ref
 
-val errs_tag : error list Tag.def
+val errs_tag : trace Tag.def

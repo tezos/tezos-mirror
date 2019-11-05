@@ -3,9 +3,8 @@
 How to start reading protocol Alpha
 ===================================
 
-Protocol Alpha, whose Alpha has nothing to do with the one in Alphanet,
-is the name of the initial economic protocol. Alpha is a placeholder
-name, while we decide on the naming convention for protocol versions.
+Protocol Alpha is the name of the initial economic protocol. Alpha is a placeholder
+name and is not related to the old Alphanet :ref:`test network <test-networks>`.
 
 Before reading that document, you may want to:
 

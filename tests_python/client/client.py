@@ -279,12 +279,48 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
+    def set_delegate(self,
+                     account1: str,
+                     account2: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['set', 'delegate', 'for', account1, 'to', account2]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.SetDelegateResult(res)
+
+    def get_delegate(self,
+                     account1: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['get', 'delegate', 'for', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.GetDelegateResult(res).delegate
+
+    def withdraw_delegate(
+            self,
+            account1: str,
+            args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['withdraw', 'delegate', 'from', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return res
+
     def p2p_stat(self) -> str:
         return self.run(['p2p', 'stat'], admin=True)
 
     def get_balance(self, account) -> float:
         res = self.run(['get', 'balance', 'for', account])
         return client_output.extract_balance(res)
+
+    def get_mutez_balance(self, account) -> float:
+        res = self.run(['get', 'balance', 'for', account])
+        return int(client_output.extract_balance(res)*1000000)
 
     def get_receipt(self,
                     operation: str,

@@ -48,7 +48,7 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
     method private filename alias_name =
       Filename.concat
         base_dir
-        (Str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
+        (String.map (function ' ' -> '_' | c -> c) alias_name ^ "s")
 
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t =
       fun f ->

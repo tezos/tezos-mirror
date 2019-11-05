@@ -17,7 +17,7 @@ If you are unsure about an issue ask on IRC first and always make sure
 to search the existing issues before reporting a new one.
 Some info that are probably important to include in the description:
 the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
-Stretch*), the network you are connected to (e.g. *Alphanet*), the
+Stretch*), the network you are connected to (e.g. *Zeronet*), the
 binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
 while Z was expected*).
 

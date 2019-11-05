@@ -56,91 +56,6 @@ type block_error =
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
 
-let errno : Unix.error Data_encoding.t =
-  let open Data_encoding in
-  union
-    [ case
-        ~title:"unknown_unix_error"
-        (Tag 0)
-        int8
-        (function Unix.EUNKNOWNERR i -> Some i | _ -> None)
-        (fun i -> EUNKNOWNERR i);
-      case
-        ~title:"unix_error"
-        (Tag 1)
-        (string_enum
-           Unix.
-             [ ("2big", E2BIG);
-               ("acces", EACCES);
-               ("again", EAGAIN);
-               ("badf", EBADF);
-               ("busy", EBUSY);
-               ("child", ECHILD);
-               ("deadlk", EDEADLK);
-               ("dom", EDOM);
-               ("exist", EEXIST);
-               ("fault", EFAULT);
-               ("fbig", EFBIG);
-               ("intr", EINTR);
-               ("inval", EINVAL);
-               ("io", EIO);
-               ("isdir", EISDIR);
-               ("mfile", EMFILE);
-               ("mlink", EMLINK);
-               ("nametoolong", ENAMETOOLONG);
-               ("nfile", ENFILE);
-               ("nodev", ENODEV);
-               ("noent", ENOENT);
-               ("noexec", ENOEXEC);
-               ("nolck", ENOLCK);
-               ("nomem", ENOMEM);
-               ("nospc", ENOSPC);
-               ("nosys", ENOSYS);
-               ("notdir", ENOTDIR);
-               ("notempty", ENOTEMPTY);
-               ("notty", ENOTTY);
-               ("nxio", ENXIO);
-               ("perm", EPERM);
-               ("pipe", EPIPE);
-               ("range", ERANGE);
-               ("rofs", EROFS);
-               ("spipe", ESPIPE);
-               ("srch", ESRCH);
-               ("xdev", EXDEV);
-               ("wouldblock", EWOULDBLOCK);
-               ("inprogress", EINPROGRESS);
-               ("already", EALREADY);
-               ("notsock", ENOTSOCK);
-               ("destaddrreq", EDESTADDRREQ);
-               ("msgsize", EMSGSIZE);
-               ("prototype", EPROTOTYPE);
-               ("noprotoopt", ENOPROTOOPT);
-               ("protonosupport", EPROTONOSUPPORT);
-               ("socktnosupport", ESOCKTNOSUPPORT);
-               ("opnotsupp", EOPNOTSUPP);
-               ("pfnosupport", EPFNOSUPPORT);
-               ("afnosupport", EAFNOSUPPORT);
-               ("addrinuse", EADDRINUSE);
-               ("addrnotavail", EADDRNOTAVAIL);
-               ("netdown", ENETDOWN);
-               ("netunreach", ENETUNREACH);
-               ("netreset", ENETRESET);
-               ("connaborted", ECONNABORTED);
-               ("connreset", ECONNRESET);
-               ("nobufs", ENOBUFS);
-               ("isconn", EISCONN);
-               ("notconn", ENOTCONN);
-               ("shutdown", ESHUTDOWN);
-               ("toomanyrefs", ETOOMANYREFS);
-               ("timedout", ETIMEDOUT);
-               ("connrefused", ECONNREFUSED);
-               ("hostdown", EHOSTDOWN);
-               ("hostunreach", EHOSTUNREACH);
-               ("loop", ELOOP);
-               ("overflow", EOVERFLOW) ])
-        (fun x -> Some x)
-        (fun x -> x) ]
-
 let block_error_encoding =
   let open Data_encoding in
   union
@@ -446,7 +361,7 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
-  | System_error of {errno : Unix.error; fn : string; msg : string}
+  | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
 
@@ -548,9 +463,9 @@ let () =
         "System error while validating a block (in function %s(%s)):@ %s"
         fn
         msg
-        (Unix.error_message errno))
+        errno)
     Data_encoding.(
-      obj3 (req "errno" errno) (req "function" string) (req "msg" string))
+      obj3 (req "errno" string) (req "function" string) (req "msg" string))
     (function
       | System_error {errno; fn; msg} -> Some (errno, fn, msg) | _ -> None)
     (fun (errno, fn, msg) -> System_error {errno; fn; msg}) ;

@@ -1,7 +1,7 @@
 .. _005_babylon:
 
-Protocol 005 Babylon - **Proposal**
-===================================
+Protocol 005_PsBabyM1 Babylon
+=============================
 
 **Important: revision 005_PsBABY5H of protocol Babylon contains a bug that is corrected in the latest version 005_PsBabyM1**
 more details can be found in section `Bug affecting Bigmaps in 005_PsBABY5H`_.
@@ -548,13 +548,19 @@ entrypoints with ``tezos-client transfer 0``.
 
 Gas cost changes
 ^^^^^^^^^^^^^^^^
+The cost for managing the delegate of the ``manager.tz`` script is 25817
+gas to set the delegate and 25722 to withdraw the current delegation.
 
-Below you can find the gas cost for each operation.
+For other contracts with ``%set_delegate`` and
+``remove_delegate``, it varies with the contract as the gas cost for
+typechecking depends on the contract's code.
 
-tz1|tz2|tz3 -> tz1|tz2|tz3 :  10207 gas
-tz1|tz2|tz3 → manager.tz : 15285 gas
-manager.tz → tz1|tz2|tz3 : 26183 gas
-manager.tz → manager.tz : 44625 gas
+The gas cost for each kind of transfer operation is as follow:
+
+- implicit account (tz1|tz2|tz3...) → implicit account :  10207 gas
+- implicit account → originated manager.tz : 15285 gas
+- originated manager.tz → implicit account : 26183 gas
+- originated manager.tz → originated manager.tz : 44625 gas
 
 .. _005-bigmap-bug:
 

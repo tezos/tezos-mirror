@@ -151,10 +151,13 @@ let main (module C : M) ~select_commands =
                match parsed_args with
                | Some parsed_args ->
                    if parsed_args.Client_config.print_timings then
+                     let gettimeofday = Unix.gettimeofday in
                      {
                        rpc_config with
                        logger =
-                         RPC_client_unix.timings_logger Format.err_formatter;
+                         RPC_client_unix.timings_logger
+                           ~gettimeofday
+                           Format.err_formatter;
                      }
                    else if parsed_args.Client_config.log_requests then
                      {

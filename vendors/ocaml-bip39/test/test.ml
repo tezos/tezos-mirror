@@ -1,4 +1,3 @@
-open Alcotest
 
 type vector = {
   entropy : Hex.t ;
@@ -119,7 +118,7 @@ let pp_diff ppf (l1, l2) =
       end
 
 let vectors () =
-  ListLabels.iteri vectors ~f:begin fun i { entropy ; words ; seed } ->
+  ListLabels.iteri vectors ~f:begin fun _ { entropy ; words ; seed } ->
     let words = String.split_on_char ' ' words in
     let mnemonic = Bip39.of_entropy (Cstruct.to_bigarray (Hex.to_cstruct entropy)) in
     let words_computed = Bip39.to_words mnemonic in

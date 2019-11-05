@@ -347,8 +347,8 @@ Adding a test
   layers structure. API shouldn't rely testing constants (``tools/constant.py``
   or ``tools/paths.py``).
 
-Testing on ``zeronet``, ``alphanet``,...
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Testing on a production branch (``zeronet``, ``mainnet``,...)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 On ``master``, protocol alpha is named
 ``PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS``, and deamons binary

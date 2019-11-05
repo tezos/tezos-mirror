@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -62,10 +63,19 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data ->
       Lwt.return_some data
 
-let file_parameter =
+let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
-      if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
-      else return p)
+      match String.split ~limit:1 ':' p with
+      | ["text"; text] ->
+          return (Ezjsonm.from_string text)
+      | ["file"; path] ->
+          Lwt_utils_unix.Json.read_file path
+      | _ -> (
+          if Sys.file_exists p then Lwt_utils_unix.Json.read_file p
+          else
+            try return (Ezjsonm.from_string p)
+            with Ezjsonm.Parse_error _ ->
+              failwith "Neither an existing file nor valid JSON: '%s'" p ))
 
 let data_parameter =
   Clic.parameter (fun _ data ->
@@ -143,7 +153,7 @@ let commands version () =
       ~group
       ~desc:"Get the storage of a contract."
       no_options
-      ( prefixes ["get"; "script"; "storage"; "for"]
+      ( prefixes ["get"; "contract"; "storage"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
@@ -208,9 +218,9 @@ let commands version () =
         >>= fun () -> return_unit);
     command
       ~group
-      ~desc:"Get the storage of a contract."
+      ~desc:"Get the code of a contract."
       no_options
-      ( prefixes ["get"; "script"; "code"; "for"]
+      ( prefixes ["get"; "contract"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
@@ -232,6 +242,61 @@ let commands version () =
                 Michelson_v1_printer.unparse_toplevel code
               in
               cctxt#answer "%a" Format.pp_print_text source >>= return ));
+    command
+      ~group
+      ~desc:"Get the type of an entrypoint of a contract."
+      no_options
+      ( prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
+      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ prefixes ["for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop )
+      (fun () entrypoint (_, contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.contract_entrypoint_type
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~contract
+          ~entrypoint
+        >>= Michelson_v1_entrypoints.print_entrypoint_type
+              cctxt
+              ~emacs:false
+              ~contract
+              ~entrypoint);
+    command
+      ~group
+      ~desc:"Get the entrypoint list of a contract."
+      no_options
+      ( prefixes ["get"; "contract"; "entrypoints"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop )
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.list_contract_entrypoints
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~contract
+        >>= Michelson_v1_entrypoints.print_entrypoints_list
+              cctxt
+              ~emacs:false
+              ~contract);
+    command
+      ~group
+      ~desc:"Get the list of unreachable pathsin a contract's parameter type."
+      no_options
+      ( prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop )
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        Michelson_v1_entrypoints.list_contract_unreachables
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~contract
+        >>= Michelson_v1_entrypoints.print_unreachables
+              cctxt
+              ~emacs:false
+              ~contract);
     command
       ~group
       ~desc:"Get the delegate of a contract."
@@ -302,7 +367,31 @@ let commands version () =
         in
         match Contract.is_implicit contract with
         | None ->
-            failwith "only implicit accounts can be delegated"
+            Managed_contract.get_contract_manager cctxt contract
+            >>=? fun source ->
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
+            Managed_contract.set_delegate
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              contract
+              (Some delegate)
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source:true
+              ~msg:"Setting delegate through entrypoints failed."
+              cctxt
+              errors
+            >>= fun _ -> return_unit
         | Some mgr ->
             Client_keys.get_key cctxt mgr
             >>=? fun (_, src_pk, manager_sk) ->
@@ -347,22 +436,46 @@ let commands version () =
              burn_cap )
            (_, contract)
            (cctxt : Protocol_client_context.full) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
         match Contract.is_implicit contract with
         | None ->
-            failwith "only implicit accounts can be delegated"
+            Managed_contract.get_contract_manager cctxt contract
+            >>=? fun source ->
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
+            Managed_contract.set_delegate
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              contract
+              None
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source:true
+              ~msg:"Withdrawing delegate through entrypoints failed."
+              cctxt
+              errors
+            >>= fun _ -> return_unit
         | Some mgr ->
             Client_keys.get_key cctxt mgr
             >>=? fun (_, src_pk, manager_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -376,7 +489,7 @@ let commands version () =
               ?fee
               ~src_pk
               ~manager_sk
-            >>=? fun _ -> return_unit);
+            >>= fun _ -> return_unit);
     command
       ~group
       ~desc:"Launch a smart contract on the blockchain."
@@ -536,22 +649,47 @@ let commands version () =
            (_, source)
            (_, destination)
            cctxt ->
-        match Contract.is_implicit source with
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        ( match Contract.is_implicit source with
         | None ->
-            failwith "only implicit accounts can be the source of a transfer"
-        | Some source -> (
+            let contract = source in
+            Managed_contract.get_contract_manager cctxt source
+            >>=? fun source ->
             Client_keys.get_key cctxt source
             >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
+            Managed_contract.transfer
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~contract
+              ~source
+              ~src_pk
+              ~src_sk
+              ~destination
+              ?entrypoint
+              ?arg
+              ~amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ()
+        | Some source ->
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
             transfer
               cctxt
               ~chain:cctxt#chain
@@ -571,17 +709,17 @@ let commands version () =
               ?gas_limit
               ?storage_limit
               ?counter
-              ()
-            >>= report_michelson_errors
-                  ~no_print_source
-                  ~msg:"transfer simulation failed"
-                  cctxt
-            >>= function
-            | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              () )
+        >>= report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+        >>= function
+        | None -> return_unit | Some (_res, _contracts) -> return_unit);
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args14
+      (args15
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -595,7 +733,8 @@ let commands version () =
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
+         burn_cap_arg
+         entrypoint_arg)
       ( prefixes ["call"]
       @@ prefix "from"
       @@ ContractAlias.destination_param
@@ -619,27 +758,53 @@ let commands version () =
              minimal_nanotez_per_gas_unit,
              force_low_fee,
              fee_cap,
-             burn_cap )
+             burn_cap,
+             entrypoint )
            (_, source)
            (_, destination)
            cctxt ->
-        match Contract.is_implicit source with
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        let amount = Tez.zero in
+        ( match Contract.is_implicit source with
         | None ->
-            failwith "only implicit accounts can be the source of a transfer"
-        | Some source -> (
+            let contract = source in
+            Managed_contract.get_contract_manager cctxt source
+            >>=? fun source ->
             Client_keys.get_key cctxt source
             >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
-            let amount = Tez.zero in
+            Managed_contract.transfer
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~fee_parameter
+              ?fee
+              ~contract
+              ~source
+              ~src_pk
+              ~src_sk
+              ~destination
+              ?entrypoint
+              ?arg
+              ~amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ()
+        | Some source ->
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
             transfer
               cctxt
               ~chain:cctxt#chain
@@ -653,18 +818,19 @@ let commands version () =
               ~src_pk
               ~src_sk
               ~destination
+              ?entrypoint
               ?arg
               ~amount
               ?gas_limit
               ?storage_limit
               ?counter
-              ()
-            >>= report_michelson_errors
-                  ~no_print_source
-                  ~msg:"transfer simulation failed"
-                  cctxt
-            >>= function
-            | None -> return_unit | Some (_res, _contracts) -> return_unit ));
+              () )
+        >>= report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+        >>= function
+        | None -> return_unit | Some (_res, _contracts) -> return_unit);
     command
       ~group
       ~desc:"Reveal the public key of the contract manager."
@@ -796,19 +962,17 @@ let commands version () =
           @@ param
                ~name:"activation_key"
                ~desc:
-                 "Activate an Alphanet/Zeronet faucet account from the \
-                  downloaded JSON file."
-               file_parameter
+                 "Activate an Alphanet/Zeronet faucet account from the JSON \
+                  (file or directly inlined)."
+               json_file_or_text_parameter
           @@ stop )
-          (fun (force, encrypted) name activation_key_file cctxt ->
+          (fun (force, encrypted) name activation_json cctxt ->
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
-            Lwt_utils_unix.Json.read_file activation_key_file
-            >>=? fun json ->
             match
               Data_encoding.Json.destruct
                 Client_proto_context.activation_key_encoding
-                json
+                activation_json
             with
             | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
                 Format.kasprintf
@@ -817,7 +981,7 @@ let commands version () =
                   (fun ppf -> Data_encoding.Json.print_error ppf)
                   exn
                   Data_encoding.Json.pp
-                  json
+                  activation_json
             | key ->
                 activate_account
                   cctxt
@@ -1119,7 +1283,7 @@ let commands version () =
       command
         ~group
         ~desc:"Submit a ballot"
-        (args1 dry_run_switch)
+        (args2 verbose_signing_switch dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
         @@ Client_keys.Secret_key.alias_param
              ~name:"delegate"
@@ -1150,7 +1314,7 @@ let commands version () =
                   | s ->
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
-        (fun dry_run
+        (fun (verbose_signing, dry_run)
              (_, src_sk)
              proposal
              ballot
@@ -1173,6 +1337,7 @@ let commands version () =
             ~block:cctxt#block
             ~src_sk
             src_pkh
+            ~verbose_signing
             ~dry_run
             proposal
             ballot

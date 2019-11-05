@@ -273,3 +273,7 @@ def sign_operation(encoded_operation: str, secret_key: str) -> str:
     sig_hex = sign(watermarked_operation, sender_sk_bin)
     signed_op = encoded_operation + sig_hex
     return signed_op
+
+
+def mutez_of_tez(tez: float):
+    return int(tez*1000000)
