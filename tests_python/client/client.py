@@ -163,6 +163,9 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['typecheck', 'script', contract])
 
+    def typecheck_data(self, data: str, typ: str) -> str:
+        return self.run(['typecheck', 'data', data, 'against', 'type', typ])
+
     def run_script(self,
                    contract: str,
                    storage: str,

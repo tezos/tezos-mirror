@@ -321,3 +321,26 @@ class TestBigMapToSelf:
 
     def test_big_map_to_self_transfer(self, client):
         client.transfer(0, 'bootstrap2', "big_map_to_self", [])
+
+
+@pytest.mark.contract
+class TestComparablePairs:
+
+    def test_comparable_pair_empty_set(self, client, session):
+        client.typecheck_data('{}', '(set (pair nat string))')
+        client.typecheck_data('{Pair 0 "foo"}', '(set (pair nat string))')
+        client.typecheck_data('{Pair 0 "foo"; Pair 1 "bar"}', '(set (pair nat string))')
+        client.typecheck_data('{Pair 0 "bar"; Pair 0 "foo"; Pair 1 "bar"; Pair 1 "foo"}', '(set (pair nat string))')
+        client.typecheck_data('{}', '(set (pair nat (pair string bytes)))')
+
+        client.typecheck_data('{}', '(map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "foo") Unit}', '(map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "foo") Unit; Elt (Pair 1 "bar") Unit}', '(map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "bar") Unit; Elt (Pair 0 "foo") Unit; Elt (Pair 1 "bar") Unit; Elt (Pair 1 "foo") Unit}', '(map (pair nat string) unit)')
+        client.typecheck_data('{}', '(map (pair nat (pair string bytes)) unit)')
+
+        client.typecheck_data('{}', '(big_map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "foo") Unit}', '(big_map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "foo") Unit; Elt (Pair 1 "bar") Unit}', '(big_map (pair nat string) unit)')
+        client.typecheck_data('{Elt (Pair 0 "bar") Unit; Elt (Pair 0 "foo") Unit; Elt (Pair 1 "bar") Unit; Elt (Pair 1 "foo") Unit}', '(big_map (pair nat string) unit)')
+        client.typecheck_data('{}', '(big_map (pair nat (pair string bytes)) unit)')
