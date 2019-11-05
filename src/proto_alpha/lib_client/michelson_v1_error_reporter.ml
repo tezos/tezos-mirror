@@ -313,11 +313,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
-        Format.fprintf
-          ppf
-          "%abig_map type not allowed inside another big_map"
-          print_loc
-          loc ;
+        Format.fprintf ppf "%abig_map type not expected here" print_loc loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
