@@ -264,11 +264,7 @@ let reward_retrieval_two_endorsers () =
   >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
-             { parametric =
-                 { preserved_cycles;
-                   endorsement_reward;
-                   endorsement_security_deposit;
-                   _ };
+             { parametric = {preserved_cycles; endorsement_security_deposit; _};
                _ } ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
@@ -293,10 +289,10 @@ let reward_retrieval_two_endorsers () =
   let policy = Block.Excluding [endorser1.delegate; endorser2.delegate] in
   Block.get_next_baker ~policy b
   >>=? fun (_, priority, _) ->
-  Tez.(endorsement_reward /? Int64.(succ (of_int priority)))
-  >>?= fun reward_per_slot ->
-  Lwt.return
-    Tez.(reward_per_slot *? Int64.of_int (List.length endorser1.slots))
+  Context.get_endorsing_reward
+    (B b)
+    ~priority
+    ~endorsing_power:(List.length endorser1.slots)
   >>=? fun reward1 ->
   (* bake next block, include endorsement of endorser1 *)
   Block.bake ~policy ~operation:(Operation.pack operation1) b
@@ -351,10 +347,10 @@ let reward_retrieval_two_endorsers () =
   Block.bake ~policy ~operation:(Operation.pack operation2) b
   >>=? fun b ->
   let priority = b.header.protocol_data.contents.priority in
-  Tez.(endorsement_reward /? Int64.(succ (of_int priority)))
-  >>?= fun reward_per_slot ->
-  Lwt.return
-    Tez.(reward_per_slot *? Int64.of_int (List.length endorser2.slots))
+  Context.get_endorsing_reward
+    (B b)
+    ~priority
+    ~endorsing_power:(List.length endorser2.slots)
   >>=? fun reward2 ->
   Assert.balance_was_debited
     ~loc:__LOC__
