@@ -5330,7 +5330,7 @@ let typecheck_data :
   let legacy = false in
   trace
     (Ill_formed_type (None, exp_ty, 0))
-    (Lwt.return @@ parse_packable_ty ctxt ~legacy (root exp_ty))
+    (Lwt.return @@ parse_parameter_ty ctxt ~legacy (root exp_ty))
   >>=? fun (Ex_ty exp_ty, ctxt) ->
   trace_eval
     (fun () ->
