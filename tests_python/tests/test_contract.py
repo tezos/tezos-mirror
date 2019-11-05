@@ -685,4 +685,15 @@ class TestComparablePairs:
                               '(big_map (pair nat string) unit)')
         client.typecheck_data('{}',
                               '(big_map (pair nat (pair string bytes)) unit)')
-                                                     
+
+    def test_order_of_pairs(self, client):
+        # tests that badly-ordered set literals are rejected
+        assert utils.check_typecheck_data_failure(
+            client, '{Pair 0 "foo"; Pair 0 "bar"}', '(set (pair nat string))')
+        assert utils.check_typecheck_data_failure(
+            client, '{Pair 1 "bar"; Pair 0 "foo"}', '(set (pair nat string))')
+
+    def test_non_comparable_non_comb_pair(self, client):
+        # tests that non-comb pairs are rejected by the typechecker
+        assert utils.check_typecheck_data_failure(
+            client, '{}', '(set (pair (pair nat nat) nat))')
