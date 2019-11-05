@@ -2,6 +2,7 @@ from typing import List
 import shutil
 import datetime
 import os
+import sys
 import subprocess
 import tempfile
 import json
@@ -113,6 +114,7 @@ class Client:
 
         print(format_command(cmd))
 
+        stderr = ""
         stdout = ""
         new_env = os.environ.copy()
         if self._disable_disclaimer:
@@ -120,6 +122,7 @@ class Client:
         # in python3.7, cleaner to use capture_output=true, text=True
         with subprocess.Popen(cmd,
                               stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
                               bufsize=1,
                               universal_newlines=True,
                               env=new_env) as process:
@@ -127,9 +130,14 @@ class Client:
                 print(line, end='')
                 stdout += line
 
+            for line in process.stderr:
+                print(line, end='', file=sys.stderr)
+                stderr += line
         if check and process.returncode:
             raise subprocess.CalledProcessError(process.returncode,
-                                                process.args)
+                                                process.args,
+                                                stdout,
+                                                stderr)
 
         return stdout
 
