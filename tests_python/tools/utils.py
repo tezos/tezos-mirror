@@ -357,3 +357,10 @@ def assert_run_script_failwith(client: Client,
         client.run_script(contract, param, storage)
 
     assert check_run_failure(cmd, r'script reached FAILWITH instruction')
+
+
+def check_typecheck_data_failure(client, data: str, typ: str) -> None:
+    def cmd():
+        client.typecheck_data(data, typ)
+
+    return check_run_failure(cmd, 'ill-typed data')
