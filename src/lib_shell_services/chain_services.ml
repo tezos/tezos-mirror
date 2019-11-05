@@ -76,6 +76,13 @@ module S = struct
       ~output:checkpoint_encoding
       RPC_path.(path / "checkpoint")
 
+  let sync_state =
+    RPC_service.get_service
+      ~description:"The synchronization state of a chain"
+      ~query:RPC_query.empty
+      ~output:Encoding.string
+      RPC_path.(path / "sync_state")
+
   module Blocks = struct
     let list_query =
       let open RPC_query in

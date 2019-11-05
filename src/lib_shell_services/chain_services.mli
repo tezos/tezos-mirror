@@ -100,6 +100,8 @@ module S : sig
       Block_header.t * int32 * int32 * History_mode.t )
     RPC_service.t
 
+  val sync_state : ([`GET], prefix, prefix, unit, unit, string) RPC_service.t
+
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t
 
