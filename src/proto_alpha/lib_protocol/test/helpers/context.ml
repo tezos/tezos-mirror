@@ -144,26 +144,28 @@ let get_minimal_valid_time ctxt ~priority ~endorsing_power =
 let get_baking_reward ctxt ~priority ~endorsing_power =
   get_constants ctxt
   >>=? fun Constants.{parametric = {block_reward; endorsers_per_block; _}; _} ->
-  let prio_factor_denominator = Int64.(succ (of_int priority)) in
-  let endo_factor_numerator =
-    Int64.of_int (8 + (2 * endorsing_power / endorsers_per_block))
+  let block_reward = Test_tez.Tez.to_mutez block_reward in
+  let numerator =
+    Int64.mul
+      block_reward
+      (Int64.of_int ((80 * endorsers_per_block) + (20 * endorsing_power)))
   in
-  let endo_factor_denominator = 10L in
-  Lwt.return
-    Test_tez.Tez.(
-      block_reward *? endo_factor_numerator
-      >>? fun val1 ->
-      val1 /? endo_factor_denominator
-      >>? fun val2 -> val2 /? prio_factor_denominator)
+  let denominator =
+    Int64.mul
+      Int64.(succ (of_int priority))
+      (Int64.of_int (100 * endorsers_per_block))
+  in
+  let result = Int64.div numerator denominator in
+  Lwt.return Test_tez.Tez.(one_mutez *? result)
 
 let get_endorsing_reward ctxt ~priority ~endorsing_power =
   get_constants ctxt
   >>=? fun Constants.{parametric = {endorsement_reward; _}; _} ->
   let open Test_utils in
   Test_tez.Tez.(
-    (endorsement_reward /? Int64.(succ (of_int priority)))
-    >>?= fun reward_per_slot ->
-    reward_per_slot *? Int64.of_int endorsing_power
+    endorsement_reward *? Int64.of_int endorsing_power
+    >>?= fun rewards ->
+    (rewards /? Int64.(succ (of_int priority)))
     >>?= fun reward -> return reward)
 
 (* Voting *)
