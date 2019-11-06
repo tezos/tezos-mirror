@@ -572,6 +572,18 @@ Control structures
     > DIP code / x : S  =>  x : S'
         where    code / S  =>  S'
 
+- ``DIP n code``: Runs code protecting the ``n`` topmost elements of
+   the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
+   and ``DIP 1 code`` is equivalent to ``DIP code``.
+
+::
+
+    :: 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'B
+       iff   code :: [ 'A -> 'B ]
+
+    > DIP n code / x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : S'
+        where    code / S  =>  S'
+
 -  ``EXEC``: Execute a function from the stack.
 
 ::
@@ -603,6 +615,16 @@ Stack operations
 
     > DROP / _ : S  =>  S
 
+- ``DROP n``: Drop the `n` topmost elements of the stack. In
+  particular, ``DROP 0`` is a noop and ``DROP 1`` is equivalent to
+  ``DROP``.
+
+::
+
+   :: 'a{1} : ... : 'a{n} : 'A   ->   'A
+
+   > DROP n / x{1} : ... : x{n} : S  =>  S
+
 -  ``DUP``: Duplicate the top element of the stack.
 
 ::
@@ -618,6 +640,26 @@ Stack operations
     :: 'a : 'b : 'A   ->   'b : 'a : 'A
 
     > SWAP / x : y : S  =>  y : x : S
+
+- ``DIG n``: Take the element at depth ``n`` of the stack and move it
+  on top. The element on top of the stack is at depth ``0`` so that
+  ``DIG 0`` is a no-op and ``DIG 1`` is equivalent to ``SWAP``.
+
+::
+
+    :: 'a{1} : ... : 'a{n} : 'b : 'A   ->   'b : 'a{1} : ... : 'a{n} : 'A
+
+    > DIG n / x{1} : ... : x{n} : y : S  =>  y : x{1} : ... : x{n} : S
+
+- ``DUG n``: Place the element on top of the stack at depth ``n``. The
+  element on top of the stack is at depth ``0`` so that ``DUG 0`` is a
+  no-op and ``DUG 1`` is equivalent to ``SWAP``.
+
+::
+
+    :: 'b : 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'b : 'A
+
+    > DUG n / y : x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : y : S
 
 -  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
 
@@ -1880,18 +1922,14 @@ Syntactic Conveniences
 These macros are simply more convenient syntax for various common
 operations.
 
--  ``DII+P code``: A syntactic sugar for working deeper in the stack.
-
-::
-
-    > DII(\rest=I*)P code / S  =>  DIP (DI(\rest)P code) / S
-
--  ``DUU+P``: A syntactic sugar for duplicating the ``n``\ th element of
+-  ``DUP n``: A syntactic sugar for duplicating the ``n``\ th element of
    the stack.
 
 ::
 
-    > DUU(\rest=U*)P / S  =>  DIP (DU(\rest)P) ; SWAP / S
+    > DUP 1 / S  =>  DUP / S
+    > DUP 2 / S  =>  DIP (DUP) ; SWAP / S
+    > DUP (n+1) / S  =>  DIP n (DUP) ; DIG (n+1) / S
 
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
    for building nested pairs.
@@ -2272,6 +2310,8 @@ The instructions which do not accept any variable annotations are:
 
    DROP
    SWAP
+   DIG
+   DUG
    IF_NONE
    IF_LEFT
    IF_CONS
@@ -3015,8 +3055,11 @@ Full grammar
     <instruction> ::=
       | { <instruction> ... }
       | DROP
+      | DROP <natural number constant>
       | DUP
       | SWAP
+      | DIG <natural number constant>
+      | DUG <natural number constant>
       | PUSH <type> <data>
       | SOME
       | NONE <type>
@@ -3046,6 +3089,7 @@ Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
+      | DIP <natural number constant> { <instruction> ... }
       | FAILWITH
       | CAST
       | RENAME
