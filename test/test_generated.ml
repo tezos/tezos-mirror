@@ -37,25 +37,29 @@ let string = Crowbar.bytes
 let short_string =
   let open Crowbar in
   choose
-    [ const "";
+    [
+      const "";
       map [char] (fun c -> String.make 1 c);
       map [char; char; char; char] (fun c1 c2 c3 c4 ->
           let s = Bytes.make 4 c1 in
           Bytes.set s 1 c2 ;
           Bytes.set s 2 c3 ;
           Bytes.set s 3 c4 ;
-          Bytes.to_string s) ]
+          Bytes.to_string s);
+    ]
 
 let short_string1 =
   let open Crowbar in
   choose
-    [ map [char] (fun c -> String.make 1 c);
+    [
+      map [char] (fun c -> String.make 1 c);
       map [char; char; char; char] (fun c1 c2 c3 c4 ->
           let s = Bytes.make 4 c1 in
           Bytes.set s 1 c2 ;
           Bytes.set s 2 c3 ;
           Bytes.set s 3 c4 ;
-          Bytes.to_string s) ]
+          Bytes.to_string s);
+    ]
 
 let mbytes = Crowbar.map [Crowbar.bytes] Bytes.of_string
 
@@ -876,19 +880,22 @@ let tup_gen (tgen : testable Crowbar.gen) : testable Crowbar.gen =
   (* Stack overflow if there are more levels *)
   with_printer testable_printer
   @@ choose
-       [ map [tgen] map_tup1;
+       [
+         map [tgen] map_tup1;
          map [tgen; tgen] map_tup2;
          map [tgen; tgen; tgen] map_tup3;
          map [tgen; tgen; tgen; tgen] map_tup4;
          map [tgen; tgen; tgen; tgen; tgen] map_tup5;
-         map [tgen; tgen; tgen; tgen; tgen; tgen] map_tup6 ]
+         map [tgen; tgen; tgen; tgen; tgen; tgen] map_tup6;
+       ]
 
 let gen =
   let open Crowbar in
   let g : testable Crowbar.gen =
     fix (fun g ->
         choose
-          [ const null;
+          [
+            const null;
             const empty;
             const unit;
             map [short_string] map_constant;
@@ -898,10 +905,10 @@ let gen =
               map [int16] map_int16;
               map [uint16] map_uint16;
         *)
-            map [int32] map_int32;
+              map [int32] map_int32;
             map [int64] map_int64;
             (* NOTE: the int encoding require ranges to be 30-bit compatible *)
-            map [int8; int8; int8] map_range_int;
+              map [int8; int8; int8] map_range_int;
             map [float; float; float] map_range_float;
             map [bool] map_bool;
             map [short_string] map_string;
@@ -925,8 +932,8 @@ let gen =
             map [g; g; g] (fun t1 t2 t3 ->
                 map_merge_tups (map_tup2 t1 t2) (map_tup1 t3));
             map [g; g; g] (fun t1 t2 t3 ->
-                map_merge_tups (map_tup1 t1) (map_tup2 t2 t3))
-            (* NOTE: we cannot use lists/arrays for now. They require the
+                map_merge_tups (map_tup1 t1) (map_tup2 t2 t3));
+              (* NOTE: we cannot use lists/arrays for now. They require the
            data-inside to be homogeneous (e.g., same rangedness of ranged
            numbers) which we cannot guarantee right now. This can be fixed once
            we update Crowbar and get access to the new `dynamic_bind` generator
@@ -935,7 +942,8 @@ let gen =
            map [g; list g] map_variable_list;
            map [g; list g] (fun t ts -> map_variable_array t (Array.of_list ts));
         *)
-           ])
+            
+          ])
   in
   with_printer testable_printer g
 
