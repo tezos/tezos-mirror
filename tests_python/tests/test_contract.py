@@ -79,15 +79,18 @@ class TestManager:
         client.set_delegate('delegatable_target', 'bootstrap2', [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap2']['identity']
-        assert client.get_delegate('manager', []).delegate == delegate
-        assert client.get_delegate('delegatable_target', []).delegate == delegate
+        assert client.get_delegate('manager', []).delegate \
+            == delegate
+        assert client.get_delegate('delegatable_target', []).delegate \
+            == delegate
         client.set_delegate('manager', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
         client.set_delegate('delegatable_target', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
         delegate = IDENTITIES['bootstrap3']['identity']
         assert client.get_delegate('manager', []).delegate == delegate
-        assert client.get_delegate('delegatable_target', []).delegate == delegate
+        assert client.get_delegate('delegatable_target', []).delegate \
+            == delegate
 
     def test_manager_withdraw_delegate(self, client):
         client.withdraw_delegate('manager', [])

@@ -279,6 +279,12 @@ integration:contract_opcodes:
     - pytest tests_python/tests/test_contract_opcodes.py
   stage: test
 
+integration:contract_onchain_opcodes:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract_onchain_opcodes.py
+  stage: test
+  
 integration:cors:
   <<: *integration_definition
   script:
