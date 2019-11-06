@@ -1,11 +1,11 @@
-import os
 import pytest
 from tools import paths
-from tools.utils import check_run_failure
+from tools.utils import check_run_failure, assert_storage_contains, bake, \
+    init_with_transfer, assert_balance, assert_run_script_success, \
+    assert_run_script_failwith
 from tools.constants import IDENTITIES
 
 from client.client import Client
-from client.client_output import BakeForResult, RunScriptResult
 
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
 KEY1 = 'foo'
@@ -136,10 +136,14 @@ class TestContractOpcodes:
             ('not_binary.tz', 'None', '(Right 7)', '(Some -8)'),
 
             # XOR
-            ('xor.tz', 'None', 'Left (Pair False False)', '(Some (Left False))'),
-            ('xor.tz', 'None', 'Left (Pair False True)', '(Some (Left True))'),
-            ('xor.tz', 'None', 'Left (Pair True False)', '(Some (Left True))'),
-            ('xor.tz', 'None', 'Left (Pair True True)', '(Some (Left False))'),
+            ('xor.tz', 'None', 'Left (Pair False False)',
+             '(Some (Left False))'),
+            ('xor.tz', 'None', 'Left (Pair False True)',
+             '(Some (Left True))'),
+            ('xor.tz', 'None', 'Left (Pair True False)',
+             '(Some (Left True))'),
+            ('xor.tz', 'None', 'Left (Pair True True)',
+             '(Some (Left False))'),
 
             ('xor.tz', 'None', 'Right (Pair 0 0)', '(Some (Right 0))'),
             ('xor.tz', 'None', 'Right (Pair 0 1)', '(Some (Right 1))'),
@@ -528,14 +532,21 @@ class TestContractOpcodes:
              '(Pair (Some (Pair 4 0)) (Some (Pair 4 0)))))'),
 
             # Test EDIV on mutez
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 10))', '(Left (Some (Pair 1 0)))'),
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 3))', '(Left (Some (Pair 3 1)))'),
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 0))', '(Left None)'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 10))',
+             '(Left (Some (Pair 1 0)))'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 3))',
+             '(Left (Some (Pair 3 1)))'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Left 0))',
+             '(Left None)'),
 
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 10))', '(Right (Some (Pair 1 0)))'),
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 3))', '(Right (Some (Pair 3 1)))'),
-            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 0))', '(Right None)'),
-            ('ediv_mutez.tz', '(Left None)', '(Pair 5 (Right 10))', '(Right (Some (Pair 0 5)))'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 10))',
+             '(Right (Some (Pair 1 0)))'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 3))',
+             '(Right (Some (Pair 3 1)))'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 10 (Right 0))',
+             '(Right None)'),
+            ('ediv_mutez.tz', '(Left None)', '(Pair 5 (Right 10))',
+             '(Right (Some (Pair 0 5)))'),
 
             # Test compare
             ('compare.tz', 'Unit', 'Unit', 'Unit'),
@@ -563,7 +574,8 @@ class TestContractOpcodes:
              'Unit'),
 
             # Test create_contract
-            ('create_contract.tz', 'None', 'Unit', '(Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")'),
+            ('create_contract.tz', 'None', 'Unit',
+             '(Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")'),
 
             # Test multiplication - success case (no overflow)
             # Failure case is tested in m̀ul_overflow.tz
@@ -577,9 +589,9 @@ class TestContractOpcodes:
             ('neg.tz', '0', '(Left -2)', '2'),
 
             # Test DIGN, DUGN, DROPN, DIPN
-            ('dign.tz','0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '5'),
+            ('dign.tz', '0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '5'),
             ('dugn.tz', '0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '1'),
-            ('dropn.tz','0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '5'),
+            ('dropn.tz', '0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '5'),
             ('dipn.tz', '0', '(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)', '6'),
 
             # Test DIGN 17 times.
@@ -694,48 +706,50 @@ class TestContractOpcodes:
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
              '(Left Unit)',
              '(Left (Pair 0 1))',
-             [ ['New map(1) of type (big_map string string)'],
-               ['Set map(1)["1"] to "one"'],
-               ['New map(0) of type (big_map string string)'],
-               ['Set map(0)["2"] to "two"'] ]),
+             [['New map(1) of type (big_map string string)'],
+              ['Set map(1)["1"] to "one"'],
+              ['New map(0) of type (big_map string string)'],
+              ['Set map(0)["2"] to "two"']]),
             # test reset with new map
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
-             '(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))',
+             '(Right (Left (Left (Pair { Elt "3" "three" } ' +
+             '{ Elt "4" "four" }))))',
              '(Left (Pair 0 1))',
-             [ ['New map(1) of type (big_map string string)'],
-               ['Set map(1)["4"] to "four"'],
-               ['New map(0) of type (big_map string string)'],
-               ['Set map(0)["3"] to "three"'] ]),
+             [['New map(1) of type (big_map string string)'],
+              ['Set map(1)["4"] to "four"'],
+              ['New map(0) of type (big_map string string)'],
+              ['Set map(0)["3"] to "three"']]),
             # test reset to unit
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
              '(Right (Left (Right Unit)))',
              '(Right Unit)',
-             [ ['\n'] ] ),
+             [['\n']]),
             # test import to big_map
             ('(Right Unit)',
-             '(Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) )))',
+             '(Right (Right (Left (Pair { Pair "foo" "bar" } ' +
+             '{ Pair "gaz" "baz" }) )))',
              '(Left (Pair 0 1))',
-             [ ['New map(1) of type (big_map string string)'],
-               ['Set map(1)["gaz"] to "baz"'],
-               ['New map(0) of type (big_map string string)'],
-               ['Set map(0)["foo"] to "bar"'] ]),
+             [['New map(1) of type (big_map string string)'],
+              ['Set map(1)["gaz"] to "baz"'],
+              ['New map(0) of type (big_map string string)'],
+              ['Set map(0)["foo"] to "bar"']]),
             # test add to big_map
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }) )',
              '(Right (Right (Right (Left { Pair "3" "three" }))))',
              '(Left (Pair 0 1))',
-             [ ['New map(1) of type (big_map string string)'],
-               ['Set map(1)["2"] to "two"'],
-               ['New map(0) of type (big_map string string)'],
-               ['Set map(0)["1"] to "one"'],
-               ['Set map(0)["3"] to "three"'] ]),
+             [['New map(1) of type (big_map string string)'],
+              ['Set map(1)["2"] to "two"'],
+              ['New map(0) of type (big_map string string)'],
+              ['Set map(0)["1"] to "one"'],
+              ['Set map(0)["3"] to "three"']]),
             # test remove from big_map
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
              '(Right (Right (Right (Right { "1" }))))',
              '(Left (Pair 0 1))',
-             [ ['New map(1) of type (big_map string string)'],
-               ['Set map(1)["2"] to "two"'],
-               ['New map(0) of type (big_map string string)'],
-               ['Unset map(0)["1"]'] ])
+             [['New map(1) of type (big_map string string)'],
+              ['Set map(1)["2"] to "two"'],
+              ['New map(0) of type (big_map string string)'],
+              ['Unset map(0)["1"]']])
         ])
     def test_big_map_magic(self,
                            client,
@@ -890,6 +904,7 @@ class TestContractOpcodes:
         client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
         bake(client)
         addr = client.get_contract_address('contract')
+
         def cmd():
             client.transfer(
                 0, 'bootstrap1', 'contract',
@@ -917,7 +932,6 @@ class TestContractOpcodes:
         source_addr = IDENTITIES['bootstrap2']['identity']
         assert_storage_contains(client, 'source', f'"{source_addr}"')
 
-
         # indirect transfer to the contract through proxy
         contract_addr = client.get_contract_address('source')
         client.transfer(0, 'bootstrap2', 'proxy',
@@ -938,7 +952,6 @@ class TestContractOpcodes:
 
         sender_addr = IDENTITIES['bootstrap2']['identity']
         assert_storage_contains(client, 'sender', f'"{sender_addr}"')
-
 
         # indirect transfer to the contract through proxy
         contract_addr = client.get_contract_address('sender')
@@ -1026,7 +1039,6 @@ class TestContractOpcodes:
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))')
         assert run_script_res.storage == hash_result
 
-
     @pytest.mark.parametrize(
         "contract,param,storage",
         [   # FORMAT: assert_output contract_file storage input
@@ -1055,7 +1067,7 @@ class TestContractOpcodes:
                            'Unit', 1000, 'bootstrap1')
         bake(client)
 
-        assert client.get_delegate('set_delegate').delegate == 'none'
+        assert client.get_delegate('set_delegate').delegate is None
 
         addr = IDENTITIES['bootstrap5']['identity']
         client.transfer(0, 'bootstrap1', 'set_delegate',
@@ -1068,7 +1080,7 @@ class TestContractOpcodes:
                         ['-arg', f'None'])
         bake(client)
 
-        assert client.get_delegate('set_delegate').delegate == 'none'
+        assert client.get_delegate('set_delegate').delegate is None
 
     @pytest.mark.skip(reason="Bug in annotation system")
     def test_fails_annotated_set_car_cdr(self, client):
@@ -1078,60 +1090,3 @@ class TestContractOpcodes:
                               '(Pair %wrong %field "hello" 0)',
                               '""')
         assert check_run_failure(cmd, r'The two annotations do not match')
-
-
-
-
-def assert_storage_contains(client: Client,
-                            contract: str,
-                            expected_storage: str) -> None:
-    actual_storage = client.get_storage(contract)
-    assert actual_storage == expected_storage
-
-
-def contract_name_of_file(contract_path: str) -> str:
-    return os.path.splitext(os.path.basename(contract_path))[0]
-
-
-def bake(client: Client) -> BakeForResult:
-    return client.bake('bootstrap1',
-                       ['--max-priority', '512',
-                        '--minimal-timestamp',
-                        '--minimal-fees', '0',
-                        '--minimal-nanotez-per-byte', '0',
-                        '--minimal-nanotez-per-gas-unit', '0'])
-
-
-def init_with_transfer(client: Client,
-                       contract: str,
-                       initial_storage: str,
-                       amount: float,
-                       sender: str):
-    client.originate(contract_name_of_file(contract), amount,
-                     sender, contract,
-                     ['-init', initial_storage, '--burn-cap', '10'])
-    bake(client)
-
-
-def assert_balance(client: Client,
-                   account: str,
-                   expected_balance: float) -> None:
-    actual_balance = client.get_balance(account)
-    assert actual_balance == expected_balance
-
-
-def assert_run_script_success(client: Client,
-                              contract: str,
-                              param: str,
-                              storage: str) -> RunScriptResult:
-    return client.run_script(contract, param, storage)
-
-
-def assert_run_script_failwith(client: Client,
-                               contract: str,
-                               param: str,
-                               storage: str) -> None:
-    def cmd():
-        client.run_script(contract, param, storage)
-
-    assert check_run_failure(cmd, r'script reached FAILWITH instruction')

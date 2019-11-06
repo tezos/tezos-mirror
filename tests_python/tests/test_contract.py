@@ -7,7 +7,7 @@ from tools.constants import IDENTITIES
 
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts'
 ILLTYPED_CONTRACT_PATH = f'{CONTRACT_PATH}/ill_typed'
-DEPRECATED_CONTRACT_PATH  = f'{CONTRACT_PATH}/deprecated'
+DEPRECATED_CONTRACT_PATH = f'{CONTRACT_PATH}/deprecated'
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -42,14 +42,14 @@ class TestManager:
 
     def test_manager_origination(self, client, session):
         path = f'{CONTRACT_PATH}/entrypoints/manager.tz'
-        pubkey = constants.IDENTITIES['bootstrap2']['identity']
+        pubkey = IDENTITIES['bootstrap2']['identity']
         originate(client, session, path, f'"{pubkey}"', 1000)
         originate(client, session, path, f'"{pubkey}"', 1000,
                   contract_name="manager2")
 
     def test_delegatable_origination(self, client, session):
         path = f'{CONTRACT_PATH}/entrypoints/delegatable_target.tz'
-        pubkey = constants.IDENTITIES['bootstrap2']['identity']
+        pubkey = IDENTITIES['bootstrap2']['identity']
         originate(client, session, path,
                   f'Pair "{pubkey}" (Pair "hello" 45)', 1000)
 
@@ -78,24 +78,24 @@ class TestManager:
         client.bake('bootstrap5', BAKE_ARGS)
         client.set_delegate('delegatable_target', 'bootstrap2', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        delegate = constants.IDENTITIES['bootstrap2']['identity']
-        assert client.get_delegate('manager', []) == delegate
-        assert client.get_delegate('delegatable_target', []) == delegate
+        delegate = IDENTITIES['bootstrap2']['identity']
+        assert client.get_delegate('manager', []).delegate == delegate
+        assert client.get_delegate('delegatable_target', []).delegate == delegate
         client.set_delegate('manager', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
         client.set_delegate('delegatable_target', 'bootstrap3', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        delegate = constants.IDENTITIES['bootstrap3']['identity']
-        assert client.get_delegate('manager', []) == delegate
-        assert client.get_delegate('delegatable_target', []) == delegate
+        delegate = IDENTITIES['bootstrap3']['identity']
+        assert client.get_delegate('manager', []).delegate == delegate
+        assert client.get_delegate('delegatable_target', []).delegate == delegate
 
     def test_manager_withdraw_delegate(self, client):
         client.withdraw_delegate('manager', [])
         client.bake('bootstrap5', BAKE_ARGS)
         client.withdraw_delegate('delegatable_target', [])
         client.bake('bootstrap5', BAKE_ARGS)
-        assert client.get_delegate('manager', []) is None
-        assert client.get_delegate('delegatable_target', []) is None
+        assert client.get_delegate('manager', []).delegate is None
+        assert client.get_delegate('delegatable_target', []).delegate is None
 
     def test_transfer_to_manager(self, client):
         balance = client.get_mutez_balance('manager')
@@ -199,6 +199,7 @@ def all_contracts():
         for contract in os.listdir(f'{CONTRACT_PATH}/{directory}'):
             contracts.append(f'{directory}/{contract}')
     return contracts
+
 
 def all_deprecated_contract():
     contracts = []

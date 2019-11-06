@@ -389,10 +389,6 @@ class Client:
         res = self.run(cmd)
         return res.rstrip()
 
-    def get_delegate(self, contract: str) -> client_output.GetDelegateResult:
-        cmd = ['get', 'delegate', 'for', contract]
-        return client_output.GetDelegateResult(self.run(cmd))
-
     def get_prevalidator(self) -> dict:
         return self.rpc('get', '/workers/prevalidators')
 
@@ -423,7 +419,9 @@ class Client:
         return self.run(['show', 'known', 'contract', contract]).strip()
 
     def get_known_addresses(self) -> str:
-        return client_output.GetAddressesResult(self.run(['list', 'known', 'addresses']))
+        return client_output.GetAddressesResult(self.run(
+            ['list', 'known', 'addresses']
+        ))
 
     def get_current_period_kind(self) -> dict:
         return self.rpc('get',

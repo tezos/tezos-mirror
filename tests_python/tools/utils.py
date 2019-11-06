@@ -7,11 +7,13 @@ import time
 import re
 import hashlib
 import subprocess
+import os
 import requests
 import ed25519
 import base58check
 import pyblake2
 from client.client import Client
+from client.client_output import BakeForResult, RunScriptResult
 from . import constants
 
 
@@ -299,3 +301,58 @@ def check_run_failure(code, pattern, mode='stderr'):
             if re.search(pattern, line):
                 return True
         return False
+
+
+def assert_storage_contains(client: Client,
+                            contract: str,
+                            expected_storage: str) -> None:
+    actual_storage = client.get_storage(contract)
+    assert actual_storage == expected_storage
+
+
+def contract_name_of_file(contract_path: str) -> str:
+    return os.path.splitext(os.path.basename(contract_path))[0]
+
+
+def bake(client: Client) -> BakeForResult:
+    return client.bake('bootstrap1',
+                       ['--max-priority', '512',
+                        '--minimal-timestamp',
+                        '--minimal-fees', '0',
+                        '--minimal-nanotez-per-byte', '0',
+                        '--minimal-nanotez-per-gas-unit', '0'])
+
+
+def init_with_transfer(client: Client,
+                       contract: str,
+                       initial_storage: str,
+                       amount: float,
+                       sender: str):
+    client.originate(contract_name_of_file(contract), amount,
+                     sender, contract,
+                     ['-init', initial_storage, '--burn-cap', '10'])
+    bake(client)
+
+
+def assert_balance(client: Client,
+                   account: str,
+                   expected_balance: float) -> None:
+    actual_balance = client.get_balance(account)
+    assert actual_balance == expected_balance
+
+
+def assert_run_script_success(client: Client,
+                              contract: str,
+                              param: str,
+                              storage: str) -> RunScriptResult:
+    return client.run_script(contract, param, storage)
+
+
+def assert_run_script_failwith(client: Client,
+                               contract: str,
+                               param: str,
+                               storage: str) -> None:
+    def cmd():
+        client.run_script(contract, param, storage)
+
+    assert check_run_failure(cmd, r'script reached FAILWITH instruction')
