@@ -27,7 +27,7 @@ with success in the past on windows/mac/linux.
 The same script can be used to run Mainnet, Babylonnet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Babylonnet::
+For example, to run Babylonnet test network::
 
     wget -O babylonnet.sh https://gitlab.com/tezos/tezos/raw/babylonnet/scripts/alphanet.sh
     chmod +x babylonnet.sh
@@ -37,7 +37,7 @@ Alternatively, to run Mainnet::
     wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
     chmod +x mainnet.sh
 
-In the following we assume you are running Babylonnet.
+In the following we assume you are running Babylonnet test network.
 You are now one step away from a working node::
 
     ./babylonnet.sh start
@@ -71,8 +71,26 @@ can be executed using ``./babylonnet.sh admin-client``.
 Build from sources
 ------------------
 
-**TL;DR**: Typically you want to do::
+**TL;DR**: Typically you want to do for Mainnet:
 
+   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
+   wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
+   sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
+   sudo chmod a+x /usr/local/bin/opam
+   git clone https://gitlab.com/tezos/tezos.git
+   cd tezos
+   git checkout mainnet
+   opam init --bare
+   make build-deps
+   eval $(opam env)
+   make
+   export PATH=~/tezos:$PATH
+   source ./src/bin_client/bash-completion.sh
+   export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+   
+   
+            For Babylonnet test network:
+            
    sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
    wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
    sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
@@ -87,6 +105,9 @@ Build from sources
    export PATH=~/tezos:$PATH
    source ./src/bin_client/bash-completion.sh
    export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+
+
+
 
 For development, numerous shell scripts also rely on jq:
 
