@@ -18,7 +18,6 @@
             tezos-client-003-PsddFKi3-commands.registration
             tezos-client-004-Pt24m4xi-commands.registration
             tezos-client-005-PsBabyM1-commands.registration
-            tezos-baking-004-Pt24m4xi-commands.registration
             tezos-baking-005-PsBabyM1-commands.registration
             tezos-signer-backends.unix)
   (flags (:standard -open Tezos_base__TzPervasives
