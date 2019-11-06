@@ -63,7 +63,7 @@ however we **strongly** encourage users to first try all the
 introduction tutorials on some :ref:`test network <test-networks>` to familiarize themselves without
 risks.
 
-Babylonnet
+Babylonnet test network
 ~~~~~~~~~~
 
 Tezos Babylonnet is a test network for the Tezos blockchain with a
@@ -76,7 +76,7 @@ themselves with Tezos before using their real tez.
 
 We offer support for Babylonnet on IRC.
 
-The Tezos Babylonnet (test) network will be live as long as Mainnet will be running the Babylon protocol.
+The Tezos Babylonnet test network will be live as long as Mainnet will be running the Babylon protocol.
 
 Zeronet
 ~~~~~~~
