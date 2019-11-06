@@ -34,7 +34,8 @@ let () =
     ~id:"node.p2p_io_scheduler.connection_closed"
     ~title:"Connection closed"
     ~description:"IO error: connection with a peer is closed."
-    ~pp:(fun ppf () -> Format.fprintf ppf "IO error: connection with a peer is closed.")
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "IO error: connection with a peer is closed.")
     Data_encoding.empty
     (function Connection_closed -> Some () | _ -> None)
     (fun () -> Connection_closed)
@@ -42,15 +43,24 @@ let () =
 (***************************** p2p socket *********************************)
 
 type error += Decipher_error
+
 type error += Invalid_message_size
+
 type error += Encoding_error
+
 type error += Rejected_socket_connection
-type error += Rejected_no_common_protocol of { announced : Network_version.t }
+
+type error += Rejected_no_common_protocol of {announced : Network_version.t}
+
 type error += Decoding_error
+
 type error += Myself of P2p_connection.Id.t
+
 type error += Not_enough_proof_of_work of P2p_peer.Id.t
+
 type error += Invalid_auth
-type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
+
+type error += Invalid_chunks_size of {value : int; min : int; max : int}
 
 let () =
   (* Decipher error *)
@@ -59,7 +69,8 @@ let () =
     ~id:"node.p2p_socket.decipher_error"
     ~title:"Decipher error"
     ~description:"An error occurred while deciphering."
-    ~pp:(fun ppf () -> Format.fprintf ppf "An error occurred while deciphering.")
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "An error occurred while deciphering.")
     Data_encoding.empty
     (function Decipher_error -> Some () | _ -> None)
     (fun () -> Decipher_error) ;
@@ -69,7 +80,8 @@ let () =
     ~id:"node.p2p_socket.invalid_message_size"
     ~title:"Invalid message size"
     ~description:"The size of the message to be written is invalid."
-    ~pp:(fun ppf () -> Format.fprintf ppf "The size of the message to be written is invalid.")
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "The size of the message to be written is invalid.")
     Data_encoding.empty
     (function Invalid_message_size -> Some () | _ -> None)
     (fun () -> Invalid_message_size) ;
@@ -89,7 +101,10 @@ let () =
     ~id:"node.p2p_socket.rejected_socket_connection"
     ~title:"Rejected socket connection"
     ~description:"Rejected peer connection: rejected socket connection."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Rejected peer connection: rejected socket connection.")
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Rejected peer connection: rejected socket connection.")
     Data_encoding.empty
     (function Rejected_socket_connection -> Some () | _ -> None)
     (fun () -> Rejected_socket_connection) ;
@@ -98,16 +113,17 @@ let () =
     `Permanent
     ~id:"node.p2p_socket.rejected_no_common_protocol"
     ~title:"Rejected socket connection - no common network protocol"
-    ~description:"Rejected peer connection: \
-                  rejected socket connection as we have no common \
-                  network protocol with the peer."
-    ~pp:(fun ppf _lst -> Format.fprintf ppf
-            "Rejected peer connection: no common network protocol.")
+    ~description:
+      "Rejected peer connection: rejected socket connection as we have no \
+       common network protocol with the peer."
+    ~pp:(fun ppf _lst ->
+      Format.fprintf
+        ppf
+        "Rejected peer connection: no common network protocol.")
     Data_encoding.(obj1 (req "announced_version" Network_version.encoding))
     (function
-      | Rejected_no_common_protocol { announced } -> Some announced
-      | _ -> None)
-    (fun announced -> Rejected_no_common_protocol { announced });
+      | Rejected_no_common_protocol {announced} -> Some announced | _ -> None)
+    (fun announced -> Rejected_no_common_protocol {announced}) ;
   (* Decoding error *)
   register_error_kind
     `Permanent
@@ -124,9 +140,12 @@ let () =
     ~id:"node.p2p_socket.myself"
     ~title:"Myself"
     ~description:"Remote peer is actually yourself."
-    ~pp:(fun ppf id -> Format.fprintf ppf
-            "Remote peer %a cannot be authenticated: peer is actually yourself."
-            P2p_connection.Id.pp id)
+    ~pp:(fun ppf id ->
+      Format.fprintf
+        ppf
+        "Remote peer %a cannot be authenticated: peer is actually yourself."
+        P2p_connection.Id.pp
+        id)
     Data_encoding.(obj1 (req "connection id" P2p_connection.Id.encoding))
     (function Myself id -> Some id | _ -> None)
     (fun id -> Myself id) ;
@@ -135,11 +154,14 @@ let () =
     `Permanent
     ~id:"node.p2p_socket.not_enough_proof_of_work"
     ~title:"Not enough proof of work"
-    ~description:"Remote peer cannot be authenticated: not enough proof of work."
+    ~description:
+      "Remote peer cannot be authenticated: not enough proof of work."
     ~pp:(fun ppf id ->
-        Format.fprintf ppf
-          "Remote peer %a cannot be authenticated: not enough proof of work."
-          P2p_peer.Id.pp id)
+      Format.fprintf
+        ppf
+        "Remote peer %a cannot be authenticated: not enough proof of work."
+        P2p_peer.Id.pp
+        id)
     Data_encoding.(obj1 (req "peer id" P2p_peer.Id.encoding))
     (function Not_enough_proof_of_work id -> Some id | _ -> None)
     (fun id -> Not_enough_proof_of_work id) ;
@@ -149,7 +171,8 @@ let () =
     ~id:"node.p2p_socket.invalid_auth"
     ~title:"Invalid authentication"
     ~description:"Rejected peer connection: invalid authentication."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Rejected peer connection: invalid authentication.")
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Rejected peer connection: invalid authentication.")
     Data_encoding.empty
     (function Invalid_auth -> Some () | _ -> None)
     (fun () -> Invalid_auth) ;
@@ -160,24 +183,37 @@ let () =
     ~title:"Invalid chunks size"
     ~description:"Size of chunks is not valid."
     ~pp:(fun ppf (value, min, max) ->
-        Format.fprintf ppf "Size of chunks is invalid: should be between %d and %d but is %d" min max value)
-    Data_encoding.(obj3
-                     (req "value" int31)
-                     (req "min" int31)
-                     (req "max" int31))
-    (function Invalid_chunks_size { value ; min ; max }
-      -> Some (value, min, max) | _ -> None)
-    (fun (value, min, max) -> Invalid_chunks_size { value ; min ; max })
+      Format.fprintf
+        ppf
+        "Size of chunks is invalid: should be between %d and %d but is %d"
+        min
+        max
+        value)
+    Data_encoding.(
+      obj3 (req "value" int31) (req "min" int31) (req "max" int31))
+    (function
+      | Invalid_chunks_size {value; min; max} ->
+          Some (value, min, max)
+      | _ ->
+          None)
+    (fun (value, min, max) -> Invalid_chunks_size {value; min; max})
 
 (***************************** p2p pool ***********************************)
 
 type error += Pending_connection
+
 type error += Connected
+
 type error += Connection_refused
+
 type error += Rejected of P2p_peer.Id.t
+
 type error += Too_many_connections
+
 type error += Private_mode
+
 type error += Point_banned of P2p_point.Id.t
+
 type error += Peer_banned of P2p_peer.Id.t
 
 let () =
@@ -186,8 +222,12 @@ let () =
     `Permanent
     ~id:"node.p2p_pool.pending_connection"
     ~title:"Pending connection"
-    ~description:"Fail to connect with a peer: a connection is already pending."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Fail to connect with a peer: a connection is already pending.")
+    ~description:
+      "Fail to connect with a peer: a connection is already pending."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Fail to connect with a peer: a connection is already pending.")
     Data_encoding.empty
     (function Pending_connection -> Some () | _ -> None)
     (fun () -> Pending_connection) ;
@@ -196,8 +236,12 @@ let () =
     `Permanent
     ~id:"node.p2p_pool.connected"
     ~title:"Connected"
-    ~description:"Fail to connect with a peer: a connection is already established."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Fail to connect with a peer: a connection is already established.")
+    ~description:
+      "Fail to connect with a peer: a connection is already established."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Fail to connect with a peer: a connection is already established.")
     Data_encoding.empty
     (function Connected -> Some () | _ -> None)
     (fun () -> Connected) ;
@@ -218,7 +262,11 @@ let () =
     ~title:"Rejected peer"
     ~description:"Connection to peer was rejected."
     ~pp:(fun ppf id ->
-        Format.fprintf ppf "Connection to peer %a was rejected." P2p_peer.Id.pp id)
+      Format.fprintf
+        ppf
+        "Connection to peer %a was rejected."
+        P2p_peer.Id.pp
+        id)
     Data_encoding.(obj1 (req "peer id" P2p_peer.Id.encoding))
     (function Rejected id -> Some id | _ -> None)
     (fun id -> Rejected id) ;
@@ -249,9 +297,11 @@ let () =
     ~title:"Point Banned"
     ~description:"The address you tried to connect is banned."
     ~pp:(fun ppf (addr, _port) ->
-        Format.fprintf ppf
-          "The address you tried to connect (%a) is banned."
-          P2p_addr.pp addr)
+      Format.fprintf
+        ppf
+        "The address you tried to connect (%a) is banned."
+        P2p_addr.pp
+        addr)
     Data_encoding.(obj1 (req "point" P2p_point.Id.encoding))
     (function Point_banned point -> Some point | _ -> None)
     (fun point -> Point_banned point) ;
@@ -262,9 +312,11 @@ let () =
     ~title:"Peer Banned"
     ~description:"The peer identity you tried to connect is banned."
     ~pp:(fun ppf peer_id ->
-        Format.fprintf ppf
-          "The peer identity you tried to connect (%a) is banned."
-          P2p_peer.Id.pp peer_id)
+      Format.fprintf
+        ppf
+        "The peer identity you tried to connect (%a) is banned."
+        P2p_peer.Id.pp
+        peer_id)
     Data_encoding.(obj1 (req "peer" P2p_peer.Id.encoding))
     (function Peer_banned peer_id -> Some peer_id | _ -> None)
     (fun peer_id -> Peer_banned peer_id)

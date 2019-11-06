@@ -25,52 +25,55 @@
 
 module Request : sig
   type view = Block_hash.t
+
   val encoding : view Data_encoding.encoding
+
   val pp : Format.formatter -> view -> unit
 end
 
 module Event : sig
-  type update =
-    | Ignored_head
-    | Branch_switch
-    | Head_incrememt
+  type update = Ignored_head | Branch_switch | Head_incrememt
+
   type t =
-    | Processed_block of
-        { request : Request.view ;
-          request_status : Worker_types.request_status ;
-          update : update ;
-          fitness : Fitness.t }
+    | Processed_block of {
+        request : Request.view;
+        request_status : Worker_types.request_status;
+        update : update;
+        fitness : Fitness.t;
+      }
     | Could_not_switch_testchain of error list
+
   val level : t -> Internal_event.level
+
   val encoding : t Data_encoding.encoding
+
   val pp : Format.formatter -> t -> unit
 end
 
 module Worker_state : sig
-  type view =
-    { active_peers : P2p_peer.Id.t list ;
-      bootstrapped_peers : P2p_peer.Id.t list ;
-      bootstrapped : bool }
+  type view = {
+    active_peers : P2p_peer.Id.t list;
+    bootstrapped_peers : P2p_peer.Id.t list;
+    bootstrapped : bool;
+  }
+
   val encoding : view Data_encoding.encoding
+
   val pp : Format.formatter -> view -> unit
 end
 
 module Distributed_db_state : sig
-
-  type table_scheduler = { table_length : int;
-                           scheduler_length : int;}
+  type table_scheduler = {table_length : int; scheduler_length : int}
 
   type view = {
-    p2p_readers_length: int ;
-    active_chains_length: int ;
-
-    operation_db : table_scheduler ;
-    operations_db : table_scheduler ;
-    block_header_db : table_scheduler ;
-    operations_hashed_db : table_scheduler ;
-
-    active_connections_length: int ;
-    active_peers_length: int ;
+    p2p_readers_length : int;
+    active_chains_length : int;
+    operation_db : table_scheduler;
+    operations_db : table_scheduler;
+    block_header_db : table_scheduler;
+    operations_hashed_db : table_scheduler;
+    active_connections_length : int;
+    active_peers_length : int;
   }
 
   val encoding : view Data_encoding.encoding

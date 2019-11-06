@@ -25,33 +25,25 @@
 
 open RPC_context
 
-val contents:
-  #simple -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
+val contents : #simple -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
-val list:
-  #simple ->
-  Protocol_hash.t list tzresult Lwt.t
+val list : #simple -> Protocol_hash.t list tzresult Lwt.t
 
-val fetch:
-  #simple ->
-  Protocol_hash.t ->
-  unit tzresult Lwt.t
+val fetch : #simple -> Protocol_hash.t -> unit tzresult Lwt.t
 
 module S : sig
+  val contents :
+    ( [`GET],
+      unit,
+      unit * Protocol_hash.t,
+      unit,
+      unit,
+      Protocol.t )
+    RPC_service.t
 
-  val contents:
-    ([ `GET ], unit,
-     unit * Protocol_hash.t, unit, unit,
-     Protocol.t) RPC_service.t
+  val list :
+    ([`GET], unit, unit, unit, unit, Protocol_hash.t list) RPC_service.t
 
-  val list:
-    ([ `GET ], unit,
-     unit, unit, unit,
-     Protocol_hash.t list) RPC_service.t
-
-  val fetch:
-    ([ `GET ], unit,
-     unit * Protocol_hash.t, unit, unit,
-     unit) RPC_service.t
-
+  val fetch :
+    ([`GET], unit, unit * Protocol_hash.t, unit, unit, unit) RPC_service.t
 end

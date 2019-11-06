@@ -62,10 +62,12 @@ val parameter :
     resulting parser will try the first parser and if it fails will
     try the second. The auto-complete contents of the two will be
     concatenated. *)
-val compose_parameters : ('a, 'ctx) parameter -> ('a, 'ctx) parameter -> ('a, 'ctx) parameter
+val compose_parameters :
+  ('a, 'ctx) parameter -> ('a, 'ctx) parameter -> ('a, 'ctx) parameter
 
 (** Map a pure function over the result of a parameter parser. *)
-val map_parameter : f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
+val map_parameter :
+  f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
 
 (** {2 Flags and Options } *)
 
@@ -78,7 +80,7 @@ val map_parameter : f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
     ["lowercase short description\nOptional longer description."]. *)
 type ('a, 'ctx) arg
 
-val constant: 'a -> ('a, 'ctx) arg
+val constant : 'a -> ('a, 'ctx) arg
 
 (** [arg ~doc ~long ?short converter] creates an argument to a command.
     The [~long] argument is the long format, without the double dashes.
@@ -105,11 +107,7 @@ val default_arg :
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
 val switch :
-  doc:string ->
-  ?short:char ->
-  long:string ->
-  unit ->
-  (bool, 'ctx) arg
+  doc:string -> ?short:char -> long:string -> unit -> (bool, 'ctx) arg
 
 (** {2 Groups of Optional Arguments} *)
 
@@ -123,15 +121,10 @@ type ('a, 'ctx) options
 val no_options : (unit, 'ctx) options
 
 (** Include 1 optional parameter *)
-val args1 :
-  ('a, 'ctx) arg ->
-  ('a, 'ctx) options
+val args1 : ('a, 'ctx) arg -> ('a, 'ctx) options
 
 (** Include 2 optional parameters *)
-val args2 :
-  ('a, 'ctx) arg ->
-  ('b, 'ctx) arg ->
-  ('a * 'b, 'ctx) options
+val args2 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('a * 'b, 'ctx) options
 
 (** Include 3 optional parameters *)
 val args3 :
@@ -173,72 +166,216 @@ val args7 :
   ('b, 'ctx) arg ->
   ('c, 'ctx) arg ->
   ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g, 'ctx) options
 
 (** Include 8 optional parameters *)
-val args8 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+val args8 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h, 'ctx) options
 
 (** Include 9 optional parameters *)
-val args9 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
+val args9 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
   ('i, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i, 'ctx) options
 
 (** Include 10 optional parameters *)
-val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg ->
+val args10 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j, 'ctx) options
 
 (** Include 11 optional parameters *)
-val args11 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg ->
+val args11 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k, 'ctx) options
 
 (** Include 12 optional parameters *)
-val args12 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
+val args12 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l, 'ctx) options
 
 (** Include 13 optional parameters *)
-val args13 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg -> ('m, 'ctx) arg ->
-  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm, 'ctx) options
+val args13 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ( 'a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm,
+    'ctx )
+  options
 
 (** Include 14 optional parameters *)
-val args14 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
-  ('m, 'ctx) arg -> ('n, 'ctx) arg ->
-  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n, 'ctx) options
+val args14 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ( 'a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n,
+    'ctx )
+  options
 
 (** Include 15 optional parameters *)
-val args15 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
-  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg ->
-  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o, 'ctx) options
+val args15 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ('o, 'ctx) arg ->
+  ( 'a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o,
+    'ctx )
+  options
 
 (** Include 16 optional parameters *)
-val args16 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
-  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg -> ('p, 'ctx) arg ->
-  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p, 'ctx) options
+val args16 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ('o, 'ctx) arg ->
+  ('p, 'ctx) arg ->
+  ( 'a
+    * 'b
+    * 'c
+    * 'd
+    * 'e
+    * 'f
+    * 'g
+    * 'h
+    * 'i
+    * 'j
+    * 'k
+    * 'l
+    * 'm
+    * 'n
+    * 'o
+    * 'p,
+    'ctx )
+  options
 
 (** Include 17 optional parameters *)
-val args17 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
-  ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
-  ('i, 'ctx) arg -> ('j, 'ctx) arg -> ('k, 'ctx) arg -> ('l, 'ctx) arg ->
-  ('m, 'ctx) arg -> ('n, 'ctx) arg -> ('o, 'ctx) arg -> ('p, 'ctx) arg ->
+val args17 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ('o, 'ctx) arg ->
+  ('p, 'ctx) arg ->
   ('q, 'ctx) arg ->
-  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l * 'm * 'n * 'o * 'p * 'q, 'ctx) options
+  ( 'a
+    * 'b
+    * 'c
+    * 'd
+    * 'e
+    * 'f
+    * 'g
+    * 'h
+    * 'i
+    * 'j
+    * 'k
+    * 'l
+    * 'm
+    * 'n
+    * 'o
+    * 'p
+    * 'q,
+    'ctx )
+  options
 
 (** {2 Parameter based command lines} *)
 
@@ -246,46 +383,37 @@ val args17 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
 type ('a, 'ctx) params
 
 (** A piece of data inside a command line *)
-val param:
-  name: string ->
-  desc: string ->
+val param :
+  name:string ->
+  desc:string ->
   ('a, 'ctx) parameter ->
   ('b, 'ctx) params ->
   ('a -> 'b, 'ctx) params
 
 (** A word in a command line.
     Should be descriptive. *)
-val prefix:
-  string ->
-  ('a, 'ctx) params ->
-  ('a, 'ctx) params
+val prefix : string -> ('a, 'ctx) params -> ('a, 'ctx) params
 
 (** Multiple words given in sequence for a command line *)
-val prefixes:
-  string list ->
-  ('a, 'ctx) params ->
-  ('a, 'ctx) params
+val prefixes : string list -> ('a, 'ctx) params -> ('a, 'ctx) params
 
 (** A fixed series of words that trigger a command. *)
-val fixed:
-  string list ->
-  ('ctx -> unit tzresult Lwt.t, 'ctx) params
+val fixed : string list -> ('ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** End the description of the command line *)
-val stop:
-  ('ctx -> unit tzresult Lwt.t, 'ctx) params
+val stop : ('ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** Take a sequence of parameters instead of only a single one.
     Must be the last thing in the command line. *)
-val seq_of_param:
+val seq_of_param :
   (('ctx -> unit tzresult Lwt.t, 'ctx) params ->
-   ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
+  ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
   ('a list -> 'ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** Parameter that expects a string *)
-val string:
-  name: string ->
-  desc: string ->
+val string :
+  name:string ->
+  desc:string ->
   ('a, 'ctx) params ->
   (string -> 'a, 'ctx) params
 
@@ -297,22 +425,20 @@ type 'ctx command
 (** Type of a group of commands.
     Groups have their documentation printed together
     and should include a descriptive title. *)
-type group =
-  { name : string ;
-    title : string }
+type group = {name : string; title : string}
 
 (** A complete command, with documentation, a specification of its
     options, parameters, and handler function. *)
-val command:
-  ?group: group ->
-  desc: string ->
+val command :
+  ?group:group ->
+  desc:string ->
   ('b, 'ctx) options ->
   ('a, 'ctx) params ->
   ('b -> 'a) ->
   'ctx command
 
 (** Combinator to use a command in an adaptated context. *)
-val map_command: ('a -> 'b) -> 'b command -> 'a command
+val map_command : ('a -> 'b) -> 'b command -> 'a command
 
 (** {2 Output formatting} *)
 
@@ -359,10 +485,7 @@ type verbosity = Terse | Short | Details | Full
     above that level. Use prefix [=] for an exact match, or [-]
     for the inverse interpretation. *)
 val setup_formatter :
-  Format.formatter ->
-  format ->
-  verbosity ->
-  formatter_state
+  Format.formatter -> format -> verbosity -> formatter_state
 
 (** Restore the formatter state after [setup_formatter]. *)
 val restore_formatter : Format.formatter -> formatter_state -> unit
@@ -374,20 +497,24 @@ type error += Help : _ command option -> error
 
 (** Find and call the applicable command on the series of arguments.
     @raise [Failure] if the command list would be ambiguous. *)
-val dispatch: 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
+val dispatch : 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of
     the command to be parsed. *)
-val parse_global_options : ('a, 'ctx) options -> 'ctx -> string list -> ('a * string list) tzresult Lwt.t
+val parse_global_options :
+  ('a, 'ctx) options ->
+  'ctx ->
+  string list ->
+  ('a * string list) tzresult Lwt.t
 
 (** Pretty printfs the error messages to the given formatter.
     [executable_name] and [global_options] are for help screens.
     [default] is used to print non-cli errors. *)
 val pp_cli_errors :
   Format.formatter ->
-  executable_name: string ->
-  global_options: (_, _) options ->
-  default: (Format.formatter -> error -> unit) ->
+  executable_name:string ->
+  global_options:(_, _) options ->
+  default:(Format.formatter -> error -> unit) ->
   error list ->
   unit
 
@@ -395,8 +522,13 @@ val pp_cli_errors :
     [prev_arg] is a valid prefix command, returning the list of valid
     next words, filtered with [cur_arg]. *)
 val autocompletion :
-  script:string -> cur_arg:string -> prev_arg:string -> args:string list ->
-  global_options:('a, 'ctx) options -> 'ctx command list -> 'ctx ->
+  script:string ->
+  cur_arg:string ->
+  prev_arg:string ->
+  args:string list ->
+  global_options:('a, 'ctx) options ->
+  'ctx command list ->
+  'ctx ->
   string list Error_monad.tzresult Lwt.t
 
 (** Displays a help page for the given commands. *)
@@ -413,8 +545,8 @@ val usage :
     For this to work, the command list must be complete.
     Commands added later will not appear in the manual. *)
 val add_manual :
-  executable_name: string ->
-  global_options: ('a, 'ctx) options ->
+  executable_name:string ->
+  global_options:('a, 'ctx) options ->
   format ->
   Format.formatter ->
   'ctx command list ->

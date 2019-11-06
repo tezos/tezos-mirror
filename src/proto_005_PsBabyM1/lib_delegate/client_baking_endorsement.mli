@@ -27,22 +27,22 @@
 open Protocol
 open Alpha_context
 
-val forge_endorsement:
-  #Protocol_client_context.full ->
-  ?async: bool ->
-  chain: Chain_services.chain ->
-  block: Block_services.block ->
-  src_sk: Client_keys.sk_uri ->
-  public_key ->
-  Operation_hash.t tzresult Lwt.t
 (** [forge_endorsement cctxt blk ~src_sk src_pk] emits an endorsement
     operation for the block [blk]
 *)
-
+val forge_endorsement :
+  #Protocol_client_context.full ->
+  ?async:bool ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  src_sk:Client_keys.sk_uri ->
+  public_key ->
+  Operation_hash.t tzresult Lwt.t
 
 val create :
   #Protocol_client_context.full ->
-  ?max_past: int64 (* number of seconds *) ->
-  delay: int ->
+  ?max_past:int64 (* number of seconds *) ->
+  delay:int ->
   public_key_hash list ->
-  Client_baking_blocks.block_info tzresult Lwt_stream.t -> unit tzresult Lwt.t
+  Client_baking_blocks.block_info tzresult Lwt_stream.t ->
+  unit tzresult Lwt.t

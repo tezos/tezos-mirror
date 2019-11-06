@@ -25,9 +25,9 @@
 
 open Protocol
 
-val bake:
+val bake :
   #Client_context.full ->
-  ?timestamp: Time.Protocol.t ->
+  ?timestamp:Time.Protocol.t ->
   Shell_services.block ->
   Data.Command.t ->
   Client_keys.sk_uri ->

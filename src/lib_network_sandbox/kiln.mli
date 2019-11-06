@@ -4,23 +4,23 @@ open Internal_pervasives
 
 (** Generate Kiln ["./config/"] directories from sandbox parameters. *)
 module Configuration_directory : sig
-  type t = {path: string; clean: bool; p2p_port: int}
+  type t = {path : string; clean : bool; p2p_port : int}
 
   val generate :
-       < application_name: string
-       ; paths: Paths.t
-       ; runner: Running_processes.State.t
-       ; .. >
-    -> ?protocol_execs:(string * Tezos_executable.t * Tezos_executable.t) list
-    -> t
-    -> peers:int list
-    -> sandbox_json:string
-    -> nodes:string list
-    -> bakers:(string * string) list
-    -> network_string:string
-    -> node_exec:Tezos_executable.t
-    -> client_exec:Tezos_executable.t
-    -> (unit, [> Lwt_exception.t]) Asynchronous_result.t
+    < application_name : string
+    ; paths : Paths.t
+    ; runner : Running_processes.State.t
+    ; .. > ->
+    ?protocol_execs:(string * Tezos_executable.t * Tezos_executable.t) list ->
+    t ->
+    peers:int list ->
+    sandbox_json:string ->
+    nodes:string list ->
+    bakers:(string * string) list ->
+    network_string:string ->
+    node_exec:Tezos_executable.t ->
+    client_exec:Tezos_executable.t ->
+    (unit, [> Lwt_exception.t]) Asynchronous_result.t
 
   val cli_term : unit -> t option Cmdliner.Term.t
 end

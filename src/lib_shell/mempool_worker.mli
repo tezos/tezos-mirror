@@ -24,20 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type limits = {
-  worker_limits : Worker_types.limits ;
-}
+type limits = {worker_limits : Worker_types.limits}
 
 module type T = sig
-
-  module Proto: Registered_protocol.T
+  module Proto : Registered_protocol.T
 
   type t
 
   type operation = private {
-    hash: Operation_hash.t ;
-    raw: Operation.t ;
-    protocol_data: Proto.operation_data ;
+    hash : Operation_hash.t;
+    raw : Operation.t;
+    protocol_data : Proto.operation_data;
   }
 
   type result =
@@ -47,10 +44,12 @@ module type T = sig
     | Refused of error list
     | Duplicate
     | Not_in_branch
+
   val result_encoding : result Data_encoding.t
 
   (** Creates/tear-down a new mempool validator context. *)
   val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
+
   val shutdown : t -> unit Lwt.t
 
   (** parse a new operation *)
@@ -62,11 +61,11 @@ module type T = sig
   val chain_db : t -> Distributed_db.chain_db
 
   val rpc_directory : t RPC_directory.t
-
 end
 
 module type STATIC = sig
-  val max_size_parsed_cache: int
+  val max_size_parsed_cache : int
 end
 
-module Make (Static : STATIC) (Proto : Registered_protocol.T) : T with module Proto = Proto
+module Make (Static : STATIC) (Proto : Registered_protocol.T) :
+  T with module Proto = Proto

@@ -27,19 +27,28 @@ module M = struct
   type t = unit
 
   type key = string list
+
   type value = MBytes.t
+
   let mem _ _ = assert false
+
   let dir_mem _ _ = assert false
+
   let get _ _ = assert false
+
   let set _ _ _ = assert false
+
   let copy _ ~from:_ ~to_:_ = assert false
+
   let del _ _ = assert false
+
   let remove_rec _ _ = assert false
+
   let fold _ _ ~init:_ ~f:_ = assert false
 
   let set_protocol _ _ = assert false
-  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
 
+  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
 end
 
 open Tezos_protocol_environment
@@ -48,5 +57,4 @@ type _ Context.kind += Faked : unit Context.kind
 
 let ops = (module M : CONTEXT with type t = 'ctxt)
 
-let empty =
-  Context.Context { ops ; ctxt = () ; kind = Faked }
+let empty = Context.Context {ops; ctxt = (); kind = Faked}

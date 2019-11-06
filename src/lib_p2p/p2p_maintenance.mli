@@ -44,49 +44,45 @@
     might ask its actual peers for new peers.  *)
 
 type bounds = {
-  min_threshold: int ;
-  min_target: int ;
-  max_target: int ;
-  max_threshold: int ;
+  min_threshold : int;
+  min_target : int;
+  max_target : int;
+  max_threshold : int;
 }
 
 type config = {
-
-  maintenance_idle_time: Time.System.Span.t ;
-  (** How long to wait at most, in seconds, before running a maintenance loop. *)
-
-  greylist_timeout: Time.System.Span.t ;
-  (** GC delay for the greylists tables, in seconds. *)
-
-  private_mode: bool ;
-  (** If [true], only open outgoing/accept incoming connections
+  maintenance_idle_time : Time.System.Span.t;
+      (** How long to wait at most, in seconds, before running a maintenance loop. *)
+  greylist_timeout : Time.System.Span.t;
+      (** GC delay for the greylists tables, in seconds. *)
+  private_mode : bool;
+      (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
       these peers that the identity of this node should be revealed to
       the rest of the network. *)
-
 }
 
-
-type 'meta t
 (** Type of a maintenance worker. *)
+type 'meta t
 
-val create:
-  ?discovery:P2p_discovery.t ->
-  config -> bounds ->
-  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
-  'meta t
 (** [run ?discovery config bounds pool] returns a maintenance worker, with
     the [discovery] worker if present, for [pool] with connection targets
     specified in [bounds]. *)
+val create :
+  ?discovery:P2p_discovery.t ->
+  config ->
+  bounds ->
+  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  'meta t
 
-val activate: 'meta t -> unit
 (** [activate t] start the worker that will maintain connections *)
+val activate : 'meta t -> unit
 
-val maintain: 'meta t -> unit Lwt.t
 (** [maintain t] gives a hint to maintenance worker [t] that
     maintenance is needed and returns whenever [t] has done a
     maintenance cycle. *)
+val maintain : 'meta t -> unit Lwt.t
 
-val shutdown: 'meta t -> unit Lwt.t
 (** [shutdown t] is a thread that returns whenever [t] has
     successfully shut down. *)
+val shutdown : 'meta t -> unit Lwt.t

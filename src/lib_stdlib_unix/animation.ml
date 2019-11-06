@@ -23,38 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
-let animation = [|
-  "|.....|" ;
-  "|o....|" ;
-  "|oo...|" ;
-  "|ooo..|" ;
-  "|.ooo.|" ;
-  "|..ooo|" ;
-  "|...oo|" ;
-  "|....o|" ;
-  "|.....|" ;
-  "|.....|" ;
-  "|.....|" ;
-  "|.....|" ;
-|]
+let animation =
+  [| "|.....|";
+     "|o....|";
+     "|oo...|";
+     "|ooo..|";
+     "|.ooo.|";
+     "|..ooo|";
+     "|...oo|";
+     "|....o|";
+     "|.....|";
+     "|.....|";
+     "|.....|";
+     "|.....|" |]
 
 let init = String.make (String.length animation.(0)) ' '
+
 let clean = String.make (String.length animation.(0)) '\b'
+
 let animation = Array.map (fun x -> clean ^ x) animation
+
 let number_of_frames = Array.length animation
 
 let make_with_animation ppf ~make ~on_retry seed =
   Format.fprintf ppf "%s%!" init ;
   let rec loop n seed =
     let start = Mtime_clock.counter () in
-    Format.fprintf ppf "%s%!" animation.(n mod number_of_frames);
+    Format.fprintf ppf "%s%!" animation.(n mod number_of_frames) ;
     match make seed with
-    | Ok v -> v
+    | Ok v ->
+        v
     | Error r ->
         let time = Mtime_clock.count start in
         let v = on_retry time r in
-        loop (n+1) v
+        loop (n + 1) v
   in
   let result = loop 0 seed in
   Format.fprintf ppf "%s%s\n%!" clean init ;

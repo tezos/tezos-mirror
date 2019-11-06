@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val driver: Compiler.driver
+val driver : Compiler.driver

@@ -27,6 +27,9 @@
     use the corresponding module intended for use: {!Data_encoding.Bson}. *)
 
 type bson = Json_repr_bson.bson
+
 type t = bson
+
 val construct : 't Encoding.t -> 't -> bson
+
 val destruct : 't Encoding.t -> bson -> 't

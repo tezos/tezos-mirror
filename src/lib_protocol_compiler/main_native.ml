@@ -29,5 +29,5 @@ let () =
       Tezos_protocol_compiler_native.Native.driver ;
     Pervasives.exit 0
   with exn ->
-    Format.eprintf "%a\n%!" Opterrors.report_error exn;
+    Format.eprintf "%a\n%!" Opterrors.report_error exn ;
     Pervasives.exit 1

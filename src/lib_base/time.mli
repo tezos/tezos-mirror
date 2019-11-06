@@ -47,7 +47,6 @@
 *)
 
 module Protocol : sig
-
   (** {1:Protocol time} *)
 
   (** The out-of-protocol view of in-protocol timestamps. The precision of
@@ -56,47 +55,49 @@ module Protocol : sig
       Note that the out-of-protocol view does not necessarily match the
       in-protocol representation.  *)
 
-
-  type t
   (** The type of protocol times *)
+  type t
 
-  val epoch : t
   (** Unix epoch is 1970-01-01 00:00:00 +0000 (UTC) *)
+  val epoch : t
 
   include Compare.S with type t := t
 
-  val add: t -> int64 -> t
   (** [add t s] is [s] seconds later than [t] *)
+  val add : t -> int64 -> t
 
-  val diff: t -> t -> int64
   (** [diff a b] is the number of seconds between [a] and [b]. It is negative if
       [b] is later than [a]. *)
+  val diff : t -> t -> int64
 
   (** Conversions to and from string representations. *)
 
   val of_notation : string -> t option
+
   val of_notation_exn : string -> t
+
   val to_notation : t -> string
 
   (** Conversion to and from "number of seconds since epoch" representation. *)
 
   val of_seconds : int64 -> t
+
   val to_seconds : t -> int64
 
   (** Serialization functions *)
 
   val encoding : t Data_encoding.t
+
   val rfc_encoding : t Data_encoding.t
+
   val rpc_arg : t RPC_arg.t
 
   (** Pretty-printing functions *)
 
   val pp_hum : Format.formatter -> t -> unit
-
 end
 
 module System : sig
-
   (** {1:System time} *)
 
   (** A representation of timestamps.
@@ -109,43 +110,51 @@ module System : sig
       [Mtime]. *)
 
   type t = Ptime.t
+
   val epoch : t
 
   module Span : sig
-    type t = Ptime.Span.t
     (** A representation of spans of time between two timestamps. *)
+    type t = Ptime.Span.t
 
-    val multiply_exn : float -> t -> t
     (** [multiply_exn factor t] is a time spans that lasts [factor] time as long
         as [t]. It fails if the time span cannot be represented. *)
+    val multiply_exn : float -> t -> t
 
-    val of_seconds_exn : float -> t
     (** [of_seconds_exn f] is a time span of [f] seconds. It fails if the time
         span cannot be represented. *)
+    val of_seconds_exn : float -> t
 
     (** Serialization functions *)
 
     val rpc_arg : t RPC_arg.t
+
     val encoding : t Data_encoding.t
   end
 
   (** Conversions to and from Protocol time. Note that converting system time to
       protocol time truncates any subsecond precision.  *)
 
-  val of_protocol_opt: Protocol.t -> t option
-  val of_protocol_exn: Protocol.t -> t
-  val to_protocol: t -> Protocol.t
+  val of_protocol_opt : Protocol.t -> t option
+
+  val of_protocol_exn : Protocol.t -> t
+
+  val to_protocol : t -> Protocol.t
 
   (** Conversions to and from string. It uses rfc3339. *)
 
   val of_notation_opt : string -> t option
+
   val of_notation_exn : string -> t
+
   val to_notation : t -> string
 
   (** Serialization. *)
 
   val encoding : t Data_encoding.t
+
   val rfc_encoding : t Data_encoding.t
+
   val rpc_arg : t RPC_arg.t
 
   (** Pretty-printing *)
@@ -154,34 +163,30 @@ module System : sig
 
   (** Timestamping data. *)
 
-  type 'a stamped = {
-    data: 'a ;
-    stamp: t ;
-  }
   (** Data with an associated time stamp. *)
+  type 'a stamped = {data : 'a; stamp : t}
 
   val stamped_encoding : 'a Data_encoding.t -> 'a stamped Data_encoding.t
 
-  val stamp : time:t -> 'a -> 'a stamped
   (** [stamp d] is a timestamped version of [d]. *)
+  val stamp : time:t -> 'a -> 'a stamped
 
   val pp_stamped :
-    (Format.formatter -> 'a -> unit) ->
-    Format.formatter ->
-    'a stamped ->
-    unit
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a stamped -> unit
 
-  val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
   (** [recent a b] is either [a] or [b] (which ever carries the most recent
       timestamp), or [None] if both [a] and [b] are [None]. *)
+  val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
 
   (** Helper modules *)
 
-  val hash: t -> int
+  val hash : t -> int
+
   include Compare.S with type t := t
+
   module Set : Set.S with type elt = t
+
   module Map : Map.S with type key = t
+
   module Table : Hashtbl.S with type key = t
-
 end
-

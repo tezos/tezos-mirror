@@ -25,7 +25,7 @@
 
 (** This is for use *within* the data encoding library only. *)
 
-type integer_extended = [ Binary_size.integer | `Int32 | `Int64 ]
+type integer_extended = [Binary_size.integer | `Int32 | `Int64]
 
 type field_descr =
   | Named_field of string * Encoding.Kind.t * layout
@@ -50,21 +50,21 @@ and layout =
 and fields = field_descr list
 
 and toplevel_encoding =
-  | Obj of { fields : fields }
-  | Cases of { kind : Encoding.Kind.t ;
-               tag_size : Binary_size.tag_size ;
-               cases : (int * string option * fields) list }
-  | Int_enum of { size : Binary_size.integer ;
-                  cases : (int * string) list }
+  | Obj of {fields : fields}
+  | Cases of {
+      kind : Encoding.Kind.t;
+      tag_size : Binary_size.tag_size;
+      cases : (int * string option * fields) list;
+    }
+  | Int_enum of {size : Binary_size.integer; cases : (int * string) list}
 
-and description =
-  { title : string ;
-    description : string option }
+and description = {title : string; description : string option}
 
 type t = {
-  toplevel: toplevel_encoding ;
-  fields: (description * toplevel_encoding) list ;
+  toplevel : toplevel_encoding;
+  fields : (description * toplevel_encoding) list;
 }
 
-val pp: Format.formatter -> t -> unit
-val encoding: t Encoding.t
+val pp : Format.formatter -> t -> unit
+
+val encoding : t Encoding.t

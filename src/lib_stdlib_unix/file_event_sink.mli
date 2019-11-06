@@ -41,9 +41,9 @@
 (** The module {!Query} provides a {!fold} function over the events
     stored by a given instantiation of the [SINK.t]. *)
 module Query : sig
-
   module Time_constraint : sig
-    type op = [ `Lt | `Le | `Ge | `Gt ]
+    type op = [`Lt | `Le | `Ge | `Gt]
+
     type t =
       [ `All
       | `And of t * t
@@ -56,21 +56,17 @@ module Query : sig
       warnings that happened during the scan, those are defined in
       {!Report.item}. *)
   module Report : sig
-    type item = [
-      | `Error of [
-          | `Parsing_event of [
-              | `Encoding of string * exn
-              | `Json of string * error list
-            ]
-          | `Cannot_recognize_section of string
-        ]
-      | `Warning of [
-          | `Expecting_regular_file_at of string
-          | `Expecting_directory_at of string
-          | `Unknown_event_name_at of string * string
-        ]
-    ]
-    val pp: Format.formatter -> item -> unit
+    type item =
+      [ `Error of
+        [ `Parsing_event of
+          [`Encoding of string * exn | `Json of string * error list]
+        | `Cannot_recognize_section of string ]
+      | `Warning of
+        [ `Expecting_regular_file_at of string
+        | `Expecting_directory_at of string
+        | `Unknown_event_name_at of string * string ] ]
+
+    val pp : Format.formatter -> item -> unit
   end
 
   (** Scan a folder for events.
@@ -93,6 +89,9 @@ module Query : sig
     ?time_query:Time_constraint.t ->
     Uri.t ->
     init:'a ->
-    f:('a -> time_stamp:float -> Internal_event.Generic.event -> 'a tzresult Lwt.t) ->
+    f:('a ->
+      time_stamp:float ->
+      Internal_event.Generic.event ->
+      'a tzresult Lwt.t) ->
     (Report.item list * 'a) tzresult Lwt.t
 end

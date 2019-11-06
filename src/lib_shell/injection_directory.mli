@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val build_rpc_directory: Validator.t -> unit RPC_directory.t
+val build_rpc_directory : Validator.t -> unit RPC_directory.t

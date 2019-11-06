@@ -33,15 +33,14 @@ type 'o t =
   | `Forbidden of error list option (* 403 *)
   | `Not_found of error list option (* 404 *)
   | `Conflict of error list option (* 409 *)
-  | `Error of error list option (* 500 *)
-  ]
+  | `Error of error list option (* 500 *) ]
 
-and 'a stream = {
-  next: unit -> 'a option Lwt.t ;
-  shutdown: unit -> unit ;
-}
+and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 
-val return: 'o -> 'o t Lwt.t
-val return_stream: 'o stream -> 'o t Lwt.t
-val not_found: 'o t Lwt.t
-val fail: error list -> 'a t Lwt.t
+val return : 'o -> 'o t Lwt.t
+
+val return_stream : 'o stream -> 'o t Lwt.t
+
+val not_found : 'o t Lwt.t
+
+val fail : error list -> 'a t Lwt.t

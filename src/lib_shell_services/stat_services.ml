@@ -25,30 +25,66 @@
 open Gc
 
 let gc_stat_encoding =
-  let open  Data_encoding in
+  let open Data_encoding in
   conv
-    (fun
-      { minor_words ; promoted_words ; major_words ;
-        minor_collections ; major_collections ;
-        heap_words ; heap_chunks ; live_words ; live_blocks ;
-        free_words ; free_blocks ; largest_free ; fragments ;
-        compactions ; top_heap_words ; stack_size ; } ->
-      ((minor_words, promoted_words, major_words, minor_collections,
-        major_collections),
-       ((heap_words, heap_chunks, live_words, live_blocks, free_words),
-        (free_blocks, largest_free, fragments, compactions,
-         top_heap_words, stack_size))))
-    (fun
-      ((minor_words, promoted_words, major_words, minor_collections,
-        major_collections),
-       ((heap_words, heap_chunks, live_words, live_blocks, free_words),
-        (free_blocks, largest_free, fragments, compactions,
-         top_heap_words, stack_size)))  ->
-      { minor_words ; promoted_words ; major_words ;
-        minor_collections ; major_collections ;
-        heap_words ; heap_chunks ; live_words ; live_blocks ;
-        free_words ; free_blocks ; largest_free ; fragments ;
-        compactions ; top_heap_words ; stack_size ; })
+    (fun { minor_words;
+           promoted_words;
+           major_words;
+           minor_collections;
+           major_collections;
+           heap_words;
+           heap_chunks;
+           live_words;
+           live_blocks;
+           free_words;
+           free_blocks;
+           largest_free;
+           fragments;
+           compactions;
+           top_heap_words;
+           stack_size } ->
+      ( ( minor_words,
+          promoted_words,
+          major_words,
+          minor_collections,
+          major_collections ),
+        ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+          ( free_blocks,
+            largest_free,
+            fragments,
+            compactions,
+            top_heap_words,
+            stack_size ) ) ))
+    (fun ( ( minor_words,
+             promoted_words,
+             major_words,
+             minor_collections,
+             major_collections ),
+           ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+             ( free_blocks,
+               largest_free,
+               fragments,
+               compactions,
+               top_heap_words,
+               stack_size ) ) ) ->
+      {
+        minor_words;
+        promoted_words;
+        major_words;
+        minor_collections;
+        major_collections;
+        heap_words;
+        heap_chunks;
+        live_words;
+        live_blocks;
+        free_words;
+        free_blocks;
+        largest_free;
+        fragments;
+        compactions;
+        top_heap_words;
+        stack_size;
+      })
     (merge_objs
        (obj5
           (req "minor_words" float)
@@ -69,22 +105,20 @@ let gc_stat_encoding =
              (req "fragments" int31)
              (req "compactions" int31)
              (req "top_heap_words" int31)
-             (req "stack_size" int31)))
-    )
+             (req "stack_size" int31))))
 
 let proc_stat_encoding =
   let open Memory in
-  let open  Data_encoding in
+  let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case (Tag 0)
+    [ case
+        (Tag 0)
         (conv
-           (fun { page_size ; size ; resident ; shared ; text ;
-                  lib ; data ; dt ; } ->
-             (page_size , size, resident, shared, text,  lib, data, dt))
-           ( fun (page_size , size, resident, shared, text,  lib, data, dt) ->
-               { page_size ; size ; resident ; shared ; text ;
-                 lib ; data ; dt ; })
+           (fun {page_size; size; resident; shared; text; lib; data; dt} ->
+             (page_size, size, resident, shared, text, lib, data, dt))
+           (fun (page_size, size, resident, shared, text, lib, data, dt) ->
+             {page_size; size; resident; shared; text; lib; data; dt})
            (obj8
               (req "page_size" int31)
               (req "size" int64)
@@ -96,43 +130,36 @@ let proc_stat_encoding =
               (req "dt" int64)))
         ~title:"Linux_proc_statm"
         (function Statm x -> Some x | _ -> None)
-        (function res -> Statm res) ;
-      case (Tag 1)
+        (function res -> Statm res);
+      case
+        (Tag 1)
         (conv
-           (fun { page_size ; mem ; resident } ->
-              (page_size , mem, resident))
-           ( fun (page_size , mem, resident) ->
-               { page_size ; mem ; resident })
+           (fun {page_size; mem; resident} -> (page_size, mem, resident))
+           (fun (page_size, mem, resident) -> {page_size; mem; resident})
            (obj3
               (req "page_size" int31)
               (req "mem" float)
               (req "resident" int64)))
         ~title:"Darwin_ps"
         (function Ps x -> Some x | _ -> None)
-        (function res -> Ps res)
-    ]
+        (function res -> Ps res) ]
 
 module S = struct
-
   let gc =
     RPC_service.get_service
       ~description:"Gets stats from the OCaml Garbage Collector"
-      ~query: RPC_query.empty
+      ~query:RPC_query.empty
       ~output:gc_stat_encoding
       RPC_path.(root / "stats" / "gc")
 
   let memory =
     RPC_service.get_service
       ~description:"Gets memory usage stats"
-      ~query: RPC_query.empty
+      ~query:RPC_query.empty
       ~output:proc_stat_encoding
       RPC_path.(root / "stats" / "memory")
-
-
 end
 
-let gc ctxt =
-  RPC_context.make_call S.gc ctxt () () ()
+let gc ctxt = RPC_context.make_call S.gc ctxt () () ()
 
-let memory ctxt =
-  RPC_context.make_call S.memory ctxt () () ()
+let memory ctxt = RPC_context.make_call S.memory ctxt () () ()

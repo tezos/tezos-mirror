@@ -27,42 +27,43 @@ open Protocol
 open Alpha_context
 open Clic
 
-module RawContractAlias :
-  Client_aliases.Alias with type t = Contract.t
+module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
 module ContractAlias : sig
-  val get_contract:
-    #Client_context.wallet ->
-    string -> (string * Contract.t) tzresult Lwt.t
-  val alias_param:
+  val get_contract :
+    #Client_context.wallet -> string -> (string * Contract.t) tzresult Lwt.t
+
+  val alias_param :
     ?name:string ->
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (string * Contract.t -> 'a, 'wallet) params
-  val destination_param:
+
+  val destination_param :
     ?name:string ->
     ?desc:string ->
     ('a, (#Client_context.wallet as 'wallet)) params ->
     (string * Contract.t -> 'a, 'wallet) params
-  val destination_arg:
+
+  val destination_arg :
     ?name:string ->
     ?doc:string ->
     unit ->
     ((string * Contract.t) option, #Client_context.wallet) Clic.arg
-  val rev_find:
-    #Client_context.wallet ->
-    Contract.t -> string option tzresult Lwt.t
-  val name:
-    #Client_context.wallet ->
-    Contract.t -> string tzresult Lwt.t
-  val autocomplete: #Client_context.wallet -> string list tzresult Lwt.t
+
+  val rev_find :
+    #Client_context.wallet -> Contract.t -> string option tzresult Lwt.t
+
+  val name : #Client_context.wallet -> Contract.t -> string tzresult Lwt.t
+
+  val autocomplete : #Client_context.wallet -> string list tzresult Lwt.t
 end
 
-val list_contracts:
+val list_contracts :
   #Client_context.wallet ->
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
-val get_delegate:
+val get_delegate :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->

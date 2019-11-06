@@ -26,9 +26,11 @@
 type t
 
 type error += Invalid_data_dir_version of t * t
+
 type error += Could_not_read_data_dir_version of string
 
 val data_version : t
+
 val default_identity_file_name : string
 
 val pp : Format.formatter -> t -> unit
@@ -39,7 +41,10 @@ val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
 
 val upgrade_data_dir : string -> unit tzresult Lwt.t
 
-val store_dir: string -> string
-val context_dir: string -> string
-val protocol_dir: string -> string
-val lock_file: string -> string
+val store_dir : string -> string
+
+val context_dir : string -> string
+
+val protocol_dir : string -> string
+
+val lock_file : string -> string

@@ -23,19 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make(C : sig val cctxt: Client_context.prompter end) : Client_keys.SIGNER
+module Make (C : sig
+  val cctxt : Client_context.prompter
+end) : Client_keys.SIGNER
 
-val decrypt:
+val decrypt :
   #Client_context.prompter ->
   ?name:string ->
-  Client_keys.sk_uri -> Signature.secret_key tzresult Lwt.t
+  Client_keys.sk_uri ->
+  Signature.secret_key tzresult Lwt.t
 
-val decrypt_all:
-  #Client_context.io_wallet -> unit tzresult Lwt.t
+val decrypt_all : #Client_context.io_wallet -> unit tzresult Lwt.t
 
-val decrypt_list:
+val decrypt_list :
   #Client_context.io_wallet -> string list -> unit tzresult Lwt.t
 
-val encrypt:
+val encrypt :
   #Client_context.io ->
-  Signature.secret_key -> Client_keys.sk_uri tzresult Lwt.t
+  Signature.secret_key ->
+  Client_keys.sk_uri tzresult Lwt.t

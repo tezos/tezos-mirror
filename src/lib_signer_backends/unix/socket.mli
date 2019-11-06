@@ -23,12 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make(P : sig
-    val authenticate: Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
-  end) : sig
+module Make (P : sig
+  val authenticate :
+    Signature.Public_key_hash.t list -> MBytes.t -> Signature.t tzresult Lwt.t
+end) : sig
   module Unix : Client_keys.SIGNER
+
   module Tcp : Client_keys.SIGNER
 end
 
-val make_unix_base: string -> Uri.t
-val make_tcp_base: string -> int -> Uri.t
+val make_unix_base : string -> Uri.t
+
+val make_tcp_base : string -> int -> Uri.t

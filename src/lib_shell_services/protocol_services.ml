@@ -26,36 +26,32 @@
 open Data_encoding
 
 module S = struct
-
   let protocols_arg = Protocol_hash.rpc_arg
 
   let contents =
     RPC_service.get_service
-      ~query: RPC_query.empty
-      ~output: Protocol.encoding
+      ~query:RPC_query.empty
+      ~output:Protocol.encoding
       RPC_path.(root / "protocols" /: protocols_arg)
 
   let list =
     RPC_service.get_service
-      ~query: RPC_query.empty
-      ~output: (list Protocol_hash.encoding)
+      ~query:RPC_query.empty
+      ~output:(list Protocol_hash.encoding)
       RPC_path.(root / "protocols")
 
   let fetch =
     RPC_service.get_service
-      ~description: "Fetch a protocol from the network."
-      ~query: RPC_query.empty
-      ~output: unit
+      ~description:"Fetch a protocol from the network."
+      ~query:RPC_query.empty
+      ~output:unit
       RPC_path.(root / "fetch_protocol" /: protocols_arg)
-
 end
 
 open RPC_context
-let contents ctxt h =
-  make_call1 S.contents ctxt h () ()
 
-let list ctxt =
-  make_call S.list ctxt () () ()
+let contents ctxt h = make_call1 S.contents ctxt h () ()
 
-let fetch ctxt h =
-  make_call1 S.fetch ctxt h () ()
+let list ctxt = make_call S.list ctxt () () ()
+
+let fetch ctxt h = make_call1 S.fetch ctxt h () ()

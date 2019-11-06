@@ -29,14 +29,19 @@
     Little-endian operations in the LE submodule. **)
 
 include module type of Bigstring
+
 include Compare.S with type t := t
 
 include EndianBigstring.EndianBigstringSig
+
 module LE : EndianBigstring.EndianBigstringSig
 
 val make : int -> char -> t
+
 val of_hex : Hex.t -> t
+
 val to_hex : t -> Hex.t
+
 val pp_hex : Format.formatter -> t -> unit
 
 (** [cut ?copy size bytes] cut [bytes] the in a list of successive
@@ -46,4 +51,4 @@ val pp_hex : Format.formatter -> t -> unit
     can be garbage-collected only when all the blocks are
     unreachable (because of the 'optimized' implementation of
     [sub] used internally. *)
-val cut: ?copy:bool -> int  -> t -> t list
+val cut : ?copy:bool -> int -> t -> t list

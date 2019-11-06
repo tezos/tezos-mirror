@@ -23,21 +23,16 @@
 (*****************************************************************************)
 
 type proc_statm = {
-  page_size : int ;
+  page_size : int;
   size : int64;
-  resident : int64 ;
-  shared : int64 ;
-  text : int64 ;
-  lib : int64 ;
-  data : int64 ;
-  dt : int64
+  resident : int64;
+  shared : int64;
+  text : int64;
+  lib : int64;
+  data : int64;
+  dt : int64;
 }
 
-type ps_stats = {
-  page_size : int ;
-  mem : float ;
-  resident : int64 }
+type ps_stats = {page_size : int; mem : float; resident : int64}
 
-type mem_stats =
-  | Statm of proc_statm
-  | Ps of ps_stats
+type mem_stats = Statm of proc_statm | Ps of ps_stats

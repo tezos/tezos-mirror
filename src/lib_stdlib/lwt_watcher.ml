@@ -24,52 +24,47 @@
 (*****************************************************************************)
 
 type 'a inner_stopper = {
-  id: int ;
-  push: ('a option -> unit) ;
+  id : int;
+  push : 'a option -> unit;
   mutable active : bool;
   input : 'a input;
 }
 
-and 'a input =
-  { mutable watchers : 'a inner_stopper list;
-    mutable cpt : int; }
+and 'a input = {mutable watchers : 'a inner_stopper list; mutable cpt : int}
 
 type stopper = unit -> unit
 
-let create_input () =
-  { watchers = [];
-    cpt = 0 }
+let create_input () = {watchers = []; cpt = 0}
 
 let shutdown_input input =
-  let { watchers ; _ } = input in
-  List.iter (fun w ->
+  let {watchers; _} = input in
+  List.iter
+    (fun w ->
       w.active <- false ;
-      w.push None
-    ) watchers ;
+      w.push None)
+    watchers ;
   input.cpt <- 0 ;
   input.watchers <- []
 
 let create_fake_stream () =
-  let str, push = Lwt_stream.create () in
-  str, (fun () -> push None)
+  let (str, push) = Lwt_stream.create () in
+  (str, fun () -> push None)
 
-let notify input info =
-  List.iter (fun w -> w.push (Some info)) input.watchers
+let notify input info = List.iter (fun w -> w.push (Some info)) input.watchers
 
 let shutdown_output output =
-  if output.active then begin
-    output.active <- false;
-    output.push None;
+  if output.active then (
+    output.active <- false ;
+    output.push None ;
     output.input.watchers <-
-      List.filter (fun w -> w.id <> output.id) output.input.watchers;
-  end
+      List.filter (fun w -> w.id <> output.id) output.input.watchers )
 
 let create_stream input =
-  input.cpt <- input.cpt + 1;
+  input.cpt <- input.cpt + 1 ;
   let id = input.cpt in
-  let stream, push = Lwt_stream.create () in
-  let output = { id; push; input; active = true } in
-  input.watchers <- output :: input.watchers;
-  stream, (fun () -> shutdown_output output)
+  let (stream, push) = Lwt_stream.create () in
+  let output = {id; push; input; active = true} in
+  input.watchers <- output :: input.watchers ;
+  (stream, fun () -> shutdown_output output)
 
 let shutdown f = f ()

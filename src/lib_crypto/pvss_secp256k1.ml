@@ -26,18 +26,24 @@
 open Secp256k1_group
 
 module G : Pvss.CYCLIC_GROUP = struct
-
   module Z_m = struct
     include Group.Scalar
+
     let n = Group.order
-    let ( + )   = Group.Scalar.add
-    let ( * )   = Group.Scalar.mul
-    let ( - )   = Group.Scalar.sub
-    let ( = )   = Group.Scalar.equal
-    let inv     = Group.Scalar.inverse
+
+    let ( + ) = Group.Scalar.add
+
+    let ( * ) = Group.Scalar.mul
+
+    let ( - ) = Group.Scalar.sub
+
+    let ( = ) = Group.Scalar.equal
+
+    let inv = Group.Scalar.inverse
   end
 
   include Group
+
   let name = "secp256k1"
 
   (* This pvss algorithm assumes the public keys of the participants receiving
@@ -45,18 +51,16 @@ module G : Pvss.CYCLIC_GROUP = struct
      public keys.
   *)
   let g1 = Group.h
+
   let g2 = Group.g
 
   (* We use a multiplicative notation in the pvss module, but
      secp256k1 usually uses an additive notation. *)
   let ( * ) = Group.(( + ))
+
   let pow x n = Group.mul n x
 
-  let of_bits b =
-    try
-      Some (Group.of_bits_exn b)
-    with _ -> None
-
+  let of_bits b = try Some (Group.of_bits_exn b) with _ -> None
 end
 
 include Pvss.MakePvss (G)

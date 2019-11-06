@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make(struct let name = "updater" end)
+include Internal_event.Legacy_logging.Make (struct
+  let name = "updater"
+end)

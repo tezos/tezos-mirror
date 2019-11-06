@@ -27,15 +27,24 @@
 
 module type S = sig
   type k
+
   type v
-  val register: k -> v -> unit
-  val alter: k -> (v -> v) -> unit
-  val remove: k -> unit
-  val query: k -> v option
-  val iter_p: (k -> v -> unit Lwt.t) -> unit Lwt.t
-  val fold: (k -> v -> 'a -> 'a) -> 'a -> 'a
+
+  val register : k -> v -> unit
+
+  val alter : k -> (v -> v) -> unit
+
+  val remove : k -> unit
+
+  val query : k -> v option
+
+  val iter_p : (k -> v -> unit Lwt.t) -> unit Lwt.t
+
+  val fold : (k -> v -> 'a -> 'a) -> 'a -> 'a
 end
 
-module Make (M: sig type v include Map.OrderedType end) : S
-  with type k = M.t
-   and type v = M.v
+module Make (M : sig
+  type v
+
+  include Map.OrderedType
+end) : S with type k = M.t and type v = M.v

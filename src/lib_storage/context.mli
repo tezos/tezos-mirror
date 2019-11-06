@@ -30,138 +30,143 @@ type index
 
 (** A (key x value) store for a given block. *)
 type t
+
 type context = t
 
 (** Open or initialize a versioned store at a given path. *)
-val init:
+val init :
   ?patch_context:(context -> context Lwt.t) ->
   ?mapsize:int64 ->
   ?readonly:bool ->
   string ->
   index Lwt.t
 
-val compute_testchain_chain_id:
-  Block_hash.t -> Chain_id.t
+val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
-val compute_testchain_genesis:
-  Block_hash.t -> Block_hash.t
+val compute_testchain_genesis : Block_hash.t -> Block_hash.t
 
-val commit_genesis:
+val commit_genesis :
   index ->
   chain_id:Chain_id.t ->
   time:Time.Protocol.t ->
   protocol:Protocol_hash.t ->
   Context_hash.t Lwt.t
 
-val commit_test_chain_genesis:
-  context ->
-  Block_header.t ->
-  Block_header.t Lwt.t
+val commit_test_chain_genesis :
+  context -> Block_header.t -> Block_header.t Lwt.t
 
 (** {2 Generic interface} *)
 
-type key = string list
 (** [key] indicates a path in a context. *)
+type key = string list
 
 type value = MBytes.t
 
-val mem: context -> key -> bool Lwt.t
-val dir_mem: context -> key -> bool Lwt.t
-val get: context -> key -> value option Lwt.t
-val set: context -> key -> value -> t Lwt.t
-val del: context -> key -> t Lwt.t
-val remove_rec: context -> key -> t Lwt.t
+val mem : context -> key -> bool Lwt.t
+
+val dir_mem : context -> key -> bool Lwt.t
+
+val get : context -> key -> value option Lwt.t
+
+val set : context -> key -> value -> t Lwt.t
+
+val del : context -> key -> t Lwt.t
+
+val remove_rec : context -> key -> t Lwt.t
 
 (** [copy] returns None if the [from] key is not bound *)
-val copy: context -> from:key -> to_:key -> context option Lwt.t
+val copy : context -> from:key -> to_:key -> context option Lwt.t
 
 (** [fold] iterates over elements under a path (not recursive). Iteration order
     is undeterministic. *)
-val fold:
-  context -> key -> init:'a ->
-  f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+val fold :
+  context ->
+  key ->
+  init:'a ->
+  f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
 (** {2 Accessing and Updating Versions} *)
 
-val exists: index -> Context_hash.t -> bool Lwt.t
-val checkout: index -> Context_hash.t -> context option Lwt.t
-val checkout_exn: index -> Context_hash.t -> context Lwt.t
-val hash:   time:Time.Protocol.t ->
-  ?message:string -> t -> Context_hash.t Lwt.t
-val commit:
-  time:Time.Protocol.t ->
-  ?message:string ->
-  context ->
-  Context_hash.t Lwt.t
-val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
-val set_master: index -> Context_hash.t -> unit Lwt.t
+val exists : index -> Context_hash.t -> bool Lwt.t
 
+val checkout : index -> Context_hash.t -> context option Lwt.t
+
+val checkout_exn : index -> Context_hash.t -> context Lwt.t
+
+val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t
+
+val commit :
+  time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
+
+val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
+
+val set_master : index -> Context_hash.t -> unit Lwt.t
 
 (** {2 Predefined Fields} *)
 
-val get_protocol: context -> Protocol_hash.t Lwt.t
-val set_protocol: context -> Protocol_hash.t -> context Lwt.t
+val get_protocol : context -> Protocol_hash.t Lwt.t
 
-val get_test_chain: context -> Test_chain_status.t Lwt.t
-val set_test_chain: context -> Test_chain_status.t -> context Lwt.t
+val set_protocol : context -> Protocol_hash.t -> context Lwt.t
 
-val del_test_chain: context -> context Lwt.t
+val get_test_chain : context -> Test_chain_status.t Lwt.t
 
-val fork_test_chain:
-  context -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> context Lwt.t
-val clear_test_chain: index -> Chain_id.t -> unit Lwt.t
+val set_test_chain : context -> Test_chain_status.t -> context Lwt.t
+
+val del_test_chain : context -> context Lwt.t
+
+val fork_test_chain :
+  context ->
+  protocol:Protocol_hash.t ->
+  expiration:Time.Protocol.t ->
+  context Lwt.t
+
+val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
 (** {2 Context dumping} ******************************************************)
 
 module Pruned_block : sig
-
   type t = {
-    block_header : Block_header.t ;
-    operations : ( int * Operation.t list ) list ;
-    operation_hashes : (int * Operation_hash.t list) list ;
+    block_header : Block_header.t;
+    operations : (int * Operation.t list) list;
+    operation_hashes : (int * Operation_hash.t list) list;
   }
 
   val encoding : t Data_encoding.t
 
   val to_bytes : t -> MBytes.t
+
   val of_bytes : MBytes.t -> t option
 end
 
 module Block_data : sig
-
-  type t = {
-    block_header : Block_header.t ;
-    operations : Operation.t list list ;
-  }
+  type t = {block_header : Block_header.t; operations : Operation.t list list}
 
   val to_bytes : t -> MBytes.t
+
   val of_bytes : MBytes.t -> t option
+
   val encoding : t Data_encoding.t
 end
 
 module Protocol_data : sig
-
   type t = Int32.t * data
 
-  and info = {
-    author : string ;
-    message : string ;
-    timestamp : Time.Protocol.t ;
-  }
+  and info = {author : string; message : string; timestamp : Time.Protocol.t}
 
   and data = {
-    info : info ;
-    protocol_hash : Protocol_hash.t ;
-    test_chain_status : Test_chain_status.t ;
-    data_key : Context_hash.t ;
-    parents : Context_hash.t list ;
+    info : info;
+    protocol_hash : Protocol_hash.t;
+    test_chain_status : Test_chain_status.t;
+    data_key : Context_hash.t;
+    parents : Context_hash.t list;
   }
 
   val to_bytes : t -> MBytes.t
-  val of_bytes : MBytes.t -> t option
-  val encoding : t Data_encoding.t
 
+  val of_bytes : MBytes.t -> t option
+
+  val encoding : t Data_encoding.t
 end
 
 val get_protocol_data_from_header :
@@ -169,18 +174,30 @@ val get_protocol_data_from_header :
 
 val dump_contexts :
   index ->
-  (Block_header.t * Block_data.t * History_mode.t *
-   (Block_header.t -> (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t)) ->
+  Block_header.t
+  * Block_data.t
+  * History_mode.t
+  * (Block_header.t ->
+    (Pruned_block.t option * Protocol_data.t option) tzresult Lwt.t) ->
   filename:string ->
   unit tzresult Lwt.t
 
-val restore_contexts : index -> filename:string ->
+val restore_contexts :
+  index ->
+  filename:string ->
   ((Block_hash.t * Pruned_block.t) list -> unit tzresult Lwt.t) ->
   (Block_header.t option ->
-   Block_hash.t -> Pruned_block.t -> unit tzresult Lwt.t) ->
-  (Block_header.t * Block_data.t * History_mode.t *
-   Block_header.t option * Block_hash.t list  *
-   Protocol_data.t list) tzresult Lwt.t
+  Block_hash.t ->
+  Pruned_block.t ->
+  unit tzresult Lwt.t) ->
+  ( Block_header.t
+  * Block_data.t
+  * History_mode.t
+  * Block_header.t option
+  * Block_hash.t list
+  * Protocol_data.t list )
+  tzresult
+  Lwt.t
 
 val validate_context_hash_consistency_and_commit :
   data_hash:Context_hash.t ->

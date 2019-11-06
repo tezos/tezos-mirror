@@ -23,16 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  c : string ;
-  t : string ;
-  h : string ;
-  d : string ;
-}
+type t = {c : string; t : string; h : string; d : string}
 
 val pp : Format.formatter -> t -> unit
 
-val crouching_tiger : string -> t
 (** [crouching_tiger str] is a sentence derived deterministically from
     [str] with the form adjective-animal-adjective-animal.
     E.g. crouching-tiger-hidden-dragon *)
+val crouching_tiger : string -> t

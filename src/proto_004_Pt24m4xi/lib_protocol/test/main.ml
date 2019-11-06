@@ -24,18 +24,18 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run "protocol_004_Pt24m4xi" [
-    "transfer", Transfer.tests ;
-    "origination", Origination.tests ;
-    "activation", Activation.tests ;
-    "endorsement", Endorsement.tests ;
-    "double endorsement", Double_endorsement.tests ;
-    "double baking", Double_baking.tests ;
-    "seed", Seed.tests ;
-    "baking", Baking.tests ;
-    "delegation", Delegation.tests ;
-    "rolls", Rolls.tests ;
-    "combined", Combined_operations.tests ;
-    "qty", Qty.tests ;
-    "voting", Voting.tests ;
-  ]
+  Alcotest.run
+    "protocol_004_Pt24m4xi"
+    [ ("transfer", Transfer.tests);
+      ("origination", Origination.tests);
+      ("activation", Activation.tests);
+      ("endorsement", Endorsement.tests);
+      ("double endorsement", Double_endorsement.tests);
+      ("double baking", Double_baking.tests);
+      ("seed", Seed.tests);
+      ("baking", Baking.tests);
+      ("delegation", Delegation.tests);
+      ("rolls", Rolls.tests);
+      ("combined", Combined_operations.tests);
+      ("qty", Qty.tests);
+      ("voting", Voting.tests) ]

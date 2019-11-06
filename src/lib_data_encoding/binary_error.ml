@@ -29,8 +29,8 @@ type read_error =
   | No_case_matched
   | Unexpected_tag of int
   | Invalid_size of int
-  | Invalid_int of { min : int ; v : int ; max : int }
-  | Invalid_float of { min : float ; v : float ; max : float }
+  | Invalid_int of {min : int; v : int; max : int}
+  | Invalid_float of {min : float; v : float; max : float}
   | Trailing_zero
   | Size_limit_exceeded
   | List_too_long
@@ -47,9 +47,9 @@ let pp_read_error ppf = function
       Format.fprintf ppf "Unexpected tag %d" tag
   | Invalid_size sz ->
       Format.fprintf ppf "Invalid size %d" sz
-  | Invalid_int { min ; v ; max}  ->
+  | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
-  | Invalid_float { min ; v ; max}  ->
+  | Invalid_float {min; v; max} ->
       Format.fprintf ppf "Invalid float (%f <= %f <= %f) " min v max
   | Trailing_zero ->
       Format.fprintf ppf "Trailing zero in Z"
@@ -65,10 +65,10 @@ exception Read_error of read_error
 type write_error =
   | Size_limit_exceeded
   | No_case_matched
-  | Invalid_int of { min : int ; v : int ; max : int }
-  | Invalid_float of { min : float ; v : float ; max : float }
-  | Invalid_bytes_length of { expected : int ; found : int }
-  | Invalid_string_length of { expected : int ; found : int }
+  | Invalid_int of {min : int; v : int; max : int}
+  | Invalid_float of {min : float; v : float; max : float}
+  | Invalid_bytes_length of {expected : int; found : int}
+  | Invalid_string_length of {expected : int; found : int}
   | Invalid_natural
   | List_too_long
   | Array_too_long
@@ -78,18 +78,22 @@ let pp_write_error ppf = function
       Format.fprintf ppf "Size limit exceeded"
   | No_case_matched ->
       Format.fprintf ppf "No case matched"
-  | Invalid_int { min ; v ; max}  ->
+  | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
-  | Invalid_float { min ; v ; max}  ->
+  | Invalid_float {min; v; max} ->
       Format.fprintf ppf "Invalid float (%f <= %f <= %f) " min v max
-  | Invalid_bytes_length { expected ; found } ->
-      Format.fprintf ppf
+  | Invalid_bytes_length {expected; found} ->
+      Format.fprintf
+        ppf
         "Invalid bytes length (expected: %d ; found %d)"
-        expected found
-  | Invalid_string_length { expected ; found } ->
-      Format.fprintf ppf
+        expected
+        found
+  | Invalid_string_length {expected; found} ->
+      Format.fprintf
+        ppf
         "Invalid string length (expected: %d ; found %d)"
-        expected found
+        expected
+        found
   | Invalid_natural ->
       Format.fprintf ppf "Negative natural"
   | List_too_long ->

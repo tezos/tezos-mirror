@@ -39,74 +39,98 @@
 *)
 
 module type CYCLIC_GROUP = sig
-
   type t
+
   include S.B58_DATA with type t := t
+
   include S.ENCODER with type t := t
 
-  val name      : string
-  module Z_m    : Znz.ZN
-  val e         : t
-  val g1        : t
-  val g2        : t
-  val ( * )     : t -> t -> t
-  val (=)       : t -> t -> bool
-  val pow       : t -> Z_m.t -> t
+  val name : string
+
+  module Z_m : Znz.ZN
+
+  val e : t
+
+  val g1 : t
+
+  val g2 : t
+
+  val ( * ) : t -> t -> t
+
+  val ( = ) : t -> t -> bool
+
+  val pow : t -> Z_m.t -> t
 
   (** Binary representation *)
-  val to_bits   : t -> String.t
-  val of_bits   : String.t -> t option
+  val to_bits : t -> String.t
 
+  val of_bits : String.t -> t option
 end
 
 (** PVSS construction, based on a cyclic group G of prime order *)
 module type PVSS = sig
-
   module type ENCODED = sig
     type t
+
     include S.B58_DATA with type t := t
+
     include S.ENCODER with type t := t
   end
 
   module Commitment : ENCODED
+
   module Encrypted_share : ENCODED
+
   module Clear_share : ENCODED
 
   module Public_key : ENCODED
+
   module Secret_key : sig
     include ENCODED
+
     val to_public_key : t -> Public_key.t
   end
 
   type proof
+
   val proof_encoding : proof Data_encoding.t
 
-  val dealer_shares_and_proof:
-    secret:Secret_key.t -> t:int -> public_keys:Public_key.t list ->
-    (Encrypted_share.t list * Commitment.t list * proof)
   (** Lets a dealer share a secret with a set of participant by breaking it into
       pieces, encrypting it with the participant's public keys, and publishing
       these encrypted shares. Any t participants can reconstruct the secret. A
       zero-knowledge proof is produced showing that the  dealer correctly
       followed the protocol, making the protocol publicly verifiable. *)
+  val dealer_shares_and_proof :
+    secret:Secret_key.t ->
+    t:int ->
+    public_keys:Public_key.t list ->
+    Encrypted_share.t list * Commitment.t list * proof
 
-  val check_dealer_proof:
-    Encrypted_share.t list -> Commitment.t list -> proof:proof ->
-    public_keys:Public_key.t list -> bool
   (** Checks the proof produced by the dealer, given the encrypted shares,
       the commitment list, the proof, and the participant's public keys. *)
+  val check_dealer_proof :
+    Encrypted_share.t list ->
+    Commitment.t list ->
+    proof:proof ->
+    public_keys:Public_key.t list ->
+    bool
 
-  val reveal_share : Encrypted_share.t -> secret_key:Secret_key.t
-    -> public_key:Public_key.t -> Clear_share.t * proof
   (** Lets a participant provably decrypt an encrypted share. *)
+  val reveal_share :
+    Encrypted_share.t ->
+    secret_key:Secret_key.t ->
+    public_key:Public_key.t ->
+    Clear_share.t * proof
 
-  val check_revealed_share:
-    Encrypted_share.t -> Clear_share.t -> public_key:Public_key.t -> proof
-    -> bool
   (** Checks that the participant honestly decrypted its share. *)
+  val check_revealed_share :
+    Encrypted_share.t ->
+    Clear_share.t ->
+    public_key:Public_key.t ->
+    proof ->
+    bool
 
-  val reconstruct: Clear_share.t list -> int list -> Public_key.t
-
+  val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 
-module MakePvss : functor (G: CYCLIC_GROUP) -> PVSS
+module MakePvss (G : CYCLIC_GROUP) : PVSS

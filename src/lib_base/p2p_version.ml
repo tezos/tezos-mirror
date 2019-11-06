@@ -27,8 +27,9 @@
 type t = int
 
 let pp = Format.pp_print_int
+
 let encoding = Data_encoding.uint16
 
 let zero = 0
 
-let supported = [ zero ]
+let supported = [zero]

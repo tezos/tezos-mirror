@@ -27,16 +27,12 @@ let hide_progress_line s =
   let len = String.length s in
   if len > 0 then Printf.eprintf "\r%*s\r" len ""
 
-let display_progress ?(refresh_rate = 1,1) fmt =
-  let prnt =
-    fun s ->
-      if Unix.isatty Unix.stderr then
-        let index, rate = refresh_rate in
-        if index mod rate == 0 then
-          begin
-            hide_progress_line s;
-            Format.eprintf "%s%!" s
-          end
+let display_progress ?(refresh_rate = (1, 1)) fmt =
+  let prnt s =
+    if Unix.isatty Unix.stderr then
+      let (index, rate) = refresh_rate in
+      if index mod rate == 0 then (
+        hide_progress_line s ; Format.eprintf "%s%!" s )
   in
   Format.kasprintf prnt fmt
 

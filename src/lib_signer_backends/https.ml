@@ -23,4 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Http_gen.Make(struct let scheme = "https" end)
+include Http_gen.Make (struct
+  let scheme = "https"
+end)

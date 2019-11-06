@@ -44,12 +44,11 @@
     of sets of [int * int].
 *)
 
-module type OrderedType =
-sig
-  type t
+(** Input signature of the functor {!Set.Make}. *)
+module type OrderedType = sig
   (** The type of the set elements. *)
+  type t
 
-  val compare : t -> t -> int
   (** A total ordering function over the set elements.
       This is a two-argument function [f] such that
       [f e1 e2] is zero if the elements [e1] and [e2] are equal,
@@ -57,9 +56,9 @@ sig
       and [f e1 e2] is strictly positive if [e1] is greater than [e2].
       Example: a suitable ordering function is the generic structural
       comparison function {!Pervasives.compare}. *)
+  val compare : t -> t -> int
 end
-(** Input signature of the functor {!Set.Make}. *)
 
-module Make (Ord : OrderedType) : S.SET with type elt = Ord.t
 (** Functor building an implementation of the set structure
     given a totally ordered type. *)
+module Make (Ord : OrderedType) : S.SET with type elt = Ord.t

@@ -27,25 +27,31 @@ open Protocol
 open Alpha_context
 
 type t
+
 type incremental = t
 
-val predecessor: incremental -> Block.t
-val header: incremental -> Block_header.t
-val rev_tickets: incremental -> operation_receipt list
-val level: incremental -> int32
+val predecessor : incremental -> Block.t
 
-val begin_construction:
+val header : incremental -> Block_header.t
+
+val rev_tickets : incremental -> operation_receipt list
+
+val level : incremental -> int32
+
+val begin_construction :
   ?priority:int ->
   ?timestamp:Time.Protocol.t ->
-  ?seed_nonce_hash: Nonce_hash.t ->
+  ?seed_nonce_hash:Nonce_hash.t ->
   ?policy:Block.baker_policy ->
   Block.t ->
   incremental tzresult Lwt.t
 
-val add_operation:
+val add_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
-  incremental -> Operation.packed -> incremental tzresult Lwt.t
+  incremental ->
+  Operation.packed ->
+  incremental tzresult Lwt.t
 
-val finalize_block: incremental -> Block.t tzresult Lwt.t
+val finalize_block : incremental -> Block.t tzresult Lwt.t
 
-val rpc_ctxt: incremental Environment.RPC_context.simple
+val rpc_ctxt : incremental Environment.RPC_context.simple

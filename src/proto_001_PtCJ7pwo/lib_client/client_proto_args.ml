@@ -35,37 +35,46 @@ let () =
     `Permanent
     ~id:"badTezArg"
     ~title:"Bad Tez Arg"
-    ~description:("Invalid \xEA\x9C\xA9 notation in parameter.")
+    ~description:"Invalid \xEA\x9C\xA9 notation in parameter."
     ~pp:(fun ppf (arg_name, literal) ->
-        Format.fprintf ppf
-          "Invalid \xEA\x9C\xA9 notation in parameter %s: '%s'"
-          arg_name literal)
-    Data_encoding.(obj2
-                     (req "parameter" string)
-                     (req "literal" string))
-    (function Bad_tez_arg (parameter, literal) -> Some (parameter, literal) | _ -> None)
+      Format.fprintf
+        ppf
+        "Invalid \xEA\x9C\xA9 notation in parameter %s: '%s'"
+        arg_name
+        literal)
+    Data_encoding.(obj2 (req "parameter" string) (req "literal" string))
+    (function
+      | Bad_tez_arg (parameter, literal) ->
+          Some (parameter, literal)
+      | _ ->
+          None)
     (fun (parameter, literal) -> Bad_tez_arg (parameter, literal))
 
-let tez_sym =
-  "\xEA\x9C\xA9"
+let tez_sym = "\xEA\x9C\xA9"
 
 let tez_parameter param =
-  parameter
-    (fun _ s ->
-       match Tez.of_string s with
-       | Some tez -> return tez
-       | None -> fail (Bad_tez_arg (param, s)))
+  parameter (fun _ s ->
+      match Tez.of_string s with
+      | Some tez ->
+          return tez
+      | None ->
+          fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg ~long:parameter ~placeholder:"amount" ~doc ~default
+  default_arg
+    ~long:parameter
+    ~placeholder:"amount"
+    ~doc
+    ~default
     (tez_parameter ("--" ^ parameter))
 
 let no_print_source_flag =
   switch
     ~long:"no-print-source"
     ~short:'q'
-    ~doc:"don't print the source code\n\
-          If an error is encountered, the client will print the \
-          contract's source code by default.\n\
-          This option disables this behaviour."
+    ~doc:
+      "don't print the source code\n\
+       If an error is encountered, the client will print the contract's \
+       source code by default.\n\
+       This option disables this behaviour."
     ()

@@ -26,10 +26,10 @@
 open Protocol
 open Alpha_context
 
-val inject_seed_nonce_revelation:
+val inject_seed_nonce_revelation :
   #Protocol_client_context.full ->
-  chain: Chain_services.chain ->
-  block: Block_services.block ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
   ?async:bool ->
   (Raw_level.t * Nonce.t) list ->
   unit tzresult Lwt.t

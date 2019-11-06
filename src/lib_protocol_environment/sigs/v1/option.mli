@@ -23,17 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val map: f:('a -> 'b) -> 'a option -> 'b option
+val map : f:('a -> 'b) -> 'a option -> 'b option
 
-val apply: f:('a -> 'b option) -> 'a option -> 'b option
+val apply : f:('a -> 'b option) -> 'a option -> 'b option
 
-val iter: f:('a -> unit) -> 'a option -> unit
+val iter : f:('a -> unit) -> 'a option -> unit
 
-val unopt: default:'a -> 'a option -> 'a
+val unopt : default:'a -> 'a option -> 'a
 
-val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
+val unopt_map : f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
-val first_some: 'a option -> 'a option -> 'a option
+val first_some : 'a option -> 'a option -> 'a option
 
 val try_with : (unit -> 'a) -> 'a option
 

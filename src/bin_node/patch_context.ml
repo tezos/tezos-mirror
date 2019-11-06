@@ -27,27 +27,32 @@
 open Genesis_chain
 
 let patch_context key_json ctxt =
-  begin
-    match key_json with
-    | None -> Lwt.return ctxt
-    | Some (key, json) ->
-        Tezos_storage.Context.set ctxt
-          [key]
-          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
-  end >>= fun ctxt ->
+  ( match key_json with
+  | None ->
+      Lwt.return ctxt
+  | Some (key, json) ->
+      Tezos_storage.Context.set
+        ctxt
+        [key]
+        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+  >>= fun ctxt ->
   let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  Proto.init ctxt {
-    level = 0l ;
-    proto_level = 0 ;
-    predecessor = genesis.block ;
-    timestamp = genesis.time ;
-    validation_passes = 0 ;
-    operations_hash = Operation_list_list_hash.empty ;
-    fitness = [] ;
-    context = Context_hash.zero ;
-  } >>= function
-  | Error _ -> assert false (* FIXME error *)
-  | Ok { context ; _ } ->
+  Proto.init
+    ctxt
+    {
+      level = 0l;
+      proto_level = 0;
+      predecessor = genesis.block;
+      timestamp = genesis.time;
+      validation_passes = 0;
+      operations_hash = Operation_list_list_hash.empty;
+      fitness = [];
+      context = Context_hash.zero;
+    }
+  >>= function
+  | Error _ ->
+      assert false (* FIXME error *)
+  | Ok {context; _} ->
       let context = Shell_context.unwrap_disk_context context in
       Lwt.return context

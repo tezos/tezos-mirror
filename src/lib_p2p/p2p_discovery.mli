@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-
 (** Local peer discovery.
 
     This module manages the discovery of local peers through UDP broadcasting.
@@ -45,9 +44,11 @@ type t
     the [listening_port] through the address [discovery_addr:discovery_port]. *)
 val create :
   listening_port:int ->
-  discovery_port:int -> discovery_addr:Ipaddr.V4.t ->
+  discovery_port:int ->
+  discovery_addr:Ipaddr.V4.t ->
   trust_discovered_peers:bool ->
-  ('a, 'b, 'c) P2p_pool.t -> P2p_peer.Table.key ->
+  ('a, 'b, 'c) P2p_pool.t ->
+  P2p_peer.Table.key ->
   t
 
 val activate : t -> unit

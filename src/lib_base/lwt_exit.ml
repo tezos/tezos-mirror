@@ -25,25 +25,30 @@
 
 exception Exit
 
-let termination_thread, exit_wakener = Lwt.wait ()
-let exit x = Lwt.wakeup exit_wakener x; raise Exit
+let (termination_thread, exit_wakener) = Lwt.wait ()
+
+let exit x = Lwt.wakeup exit_wakener x ; raise Exit
 
 let () =
   Lwt.async_exception_hook :=
-    (function
-      | Exit -> ()
-      | e ->
-          let backtrace = Printexc.get_backtrace () in
-          let pp_exn_trace ppf backtrace =
-            if String.length backtrace <> 0 then
-              Format.fprintf ppf
-                "@,Backtrace:@,  @[<h>%a@]"
-                Format.pp_print_text backtrace
-          in
-          (* TODO Improve this *)
-          Format.eprintf
-            "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
-            (Unix.getpid ())
-            (Printexc.to_string e)
-            pp_exn_trace backtrace ;
-          Lwt.wakeup exit_wakener 1)
+    function
+    | Exit ->
+        ()
+    | e ->
+        let backtrace = Printexc.get_backtrace () in
+        let pp_exn_trace ppf backtrace =
+          if String.length backtrace <> 0 then
+            Format.fprintf
+              ppf
+              "@,Backtrace:@,  @[<h>%a@]"
+              Format.pp_print_text
+              backtrace
+        in
+        (* TODO Improve this *)
+        Format.eprintf
+          "@[<v 2>@[Uncaught (asynchronous) exception (%d):@ %s@]%a@]@.%!"
+          (Unix.getpid ())
+          (Printexc.to_string e)
+          pp_exn_trace
+          backtrace ;
+        Lwt.wakeup exit_wakener 1

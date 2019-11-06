@@ -28,18 +28,21 @@
     Accept incoming connections and add them to the pool.
 *)
 
-type t
 (** Type of a welcome worker. *)
+type t
 
-val create :
-  ?addr:P2p_addr.t -> backlog:int ->
-  ('msg, 'meta, 'meta_conn) P2p_pool.t -> P2p_addr.port -> t Lwt.t
 (** [create ?addr ~backlog pool port] returns a running welcome worker
     adding connections into [pool] listening on [addr:port]. [backlog]
     is passed to [Lwt_unix.listen]. *)
+val create :
+  ?addr:P2p_addr.t ->
+  backlog:int ->
+  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  P2p_addr.port ->
+  t Lwt.t
 
-val activate : t -> unit
 (** [activate t] start the worker that will accept connections *)
+val activate : t -> unit
 
-val shutdown: t -> unit Lwt.t
 (** [shutdown t] returns when [t] has completed shutdown. *)
+val shutdown : t -> unit Lwt.t

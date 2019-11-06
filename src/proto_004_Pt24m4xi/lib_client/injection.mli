@@ -31,17 +31,17 @@ type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type fee_parameter = {
-  minimal_fees: Tez.t ;
-  minimal_nanotez_per_byte: Z.t ;
-  minimal_nanotez_per_gas_unit: Z.t ;
-  force_low_fee: bool ;
-  fee_cap: Tez.t ;
-  burn_cap: Tez.t ;
+  minimal_fees : Tez.t;
+  minimal_nanotez_per_byte : Z.t;
+  minimal_nanotez_per_gas_unit : Z.t;
+  force_low_fee : bool;
+  fee_cap : Tez.t;
+  burn_cap : Tez.t;
 }
 
-val dummy_fee_parameter: fee_parameter
+val dummy_fee_parameter : fee_parameter
 
-val preapply:
+val preapply :
   #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -55,7 +55,7 @@ val preapply:
 type 'kind result_list =
   Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
-val inject_operation:
+val inject_operation :
   #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -69,10 +69,9 @@ val inject_operation:
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
-type 'kind result =
-  Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
-val inject_manager_operation:
+val inject_manager_operation :
   #Alpha_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
@@ -91,5 +90,5 @@ val inject_manager_operation:
   'kind manager_operation ->
   'kind Kind.manager result tzresult Lwt.t
 
-val originated_contracts:
+val originated_contracts :
   'kind contents_result_list -> Contract.t list tzresult

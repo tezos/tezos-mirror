@@ -24,26 +24,22 @@
 (*****************************************************************************)
 
 type shell_header = {
-  level: Int32.t ;
-  (** The number of preceding block in this chain, i.e. the genesis
+  level : Int32.t;
+      (** The number of preceding block in this chain, i.e. the genesis
       has level 0. *)
-  proto_level: int ;
-  (** The number of preceding protocol change in the chain (modulo 256),
+  proto_level : int;
+      (** The number of preceding protocol change in the chain (modulo 256),
       i.e the genesis has proto_level 0. *)
-  predecessor: Block_hash.t ;
-  timestamp: Time.t ;
-  validation_passes: int ;
-  operations_hash: Operation_list_list_hash.t ;
-  fitness: MBytes.t list ;
-  context: Context_hash.t ;
+  predecessor : Block_hash.t;
+  timestamp : Time.t;
+  validation_passes : int;
+  operations_hash : Operation_list_list_hash.t;
+  fitness : MBytes.t list;
+  context : Context_hash.t;
 }
 
-val shell_header_encoding: shell_header Data_encoding.t
+val shell_header_encoding : shell_header Data_encoding.t
 
-type t = {
-  shell: shell_header ;
-  protocol_data: MBytes.t ;
-}
+type t = {shell : shell_header; protocol_data : MBytes.t}
 
-include S.HASHABLE with type t := t
-                    and type hash := Block_hash.t
+include S.HASHABLE with type t := t and type hash := Block_hash.t

@@ -42,11 +42,12 @@ let is_updated_constant_len = String.length is_updated_constant
 
 (* add a version to the pow *)
 let generate_proof_of_work_nonce () =
-  MBytes.concat ""
+  MBytes.concat
+    ""
     [ is_updated_cstruct;
       Rand.generate
         ( Alpha_context.Constants.proof_of_work_nonce_size
-          - is_updated_constant_len ) ]
+        - is_updated_constant_len ) ]
 
 (* This was used before November 2018 *)
 (* (\* Random proof of work *\)
@@ -54,17 +55,16 @@ let generate_proof_of_work_nonce () =
  *   Rand.generate Alpha_context.Constants.proof_of_work_nonce_size *)
 
 let empty_proof_of_work_nonce =
-  MBytes.of_string
-    (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+  MBytes.of_string (String.make Constants_repr.proof_of_work_nonce_size '\000')
 
 let mine cctxt chain block shell builder =
-  Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
+  Alpha_services.Constants.all cctxt (chain, block)
+  >>=? fun constants ->
   let threshold = constants.parametric.proof_of_work_threshold in
   let rec loop () =
     let block = builder (generate_proof_of_work_nonce ()) in
     if Baking.check_header_proof_of_work_stamp shell block threshold then
       return block
-    else
-      loop ()
+    else loop ()
   in
   loop ()

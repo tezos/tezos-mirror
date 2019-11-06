@@ -27,14 +27,15 @@ open Protocol
 open Alpha_context
 
 type t = {
-  hash : Block_hash.t ;
-  header : Block_header.t ;
-  operations : Operation.packed list ;
-  context : Tezos_protocol_environment.Context.t ; (** Resulting context *)
+  hash : Block_hash.t;
+  header : Block_header.t;
+  operations : Operation.packed list;
+  context : Tezos_protocol_environment.Context.t;  (** Resulting context *)
 }
+
 type block = t
 
-val rpc_ctxt: t Environment.RPC_context.simple
+val rpc_ctxt : t Environment.RPC_context.simple
 
 (** Policies to select the next baker:
     - [By_priority p] selects the baker at priority [p]
@@ -48,60 +49,59 @@ type baker_policy =
 
 (** Returns (account, priority, timestamp) of the next baker given
     a policy, defaults to By_priority 0. *)
-val get_next_baker:
+val get_next_baker :
   ?policy:baker_policy ->
-  t -> (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
+  t ->
+  (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 module Forge : sig
-
-  val contents:
+  val contents :
     ?proof_of_work_nonce:MBytes.t ->
     ?priority:int ->
-    ?seed_nonce_hash: Nonce_hash.t ->
-    unit -> Block_header.contents
+    ?seed_nonce_hash:Nonce_hash.t ->
+    unit ->
+    Block_header.contents
 
   type header
 
   (** Forges a correct header following the policy.
       The header can then be modified and applied with [apply]. *)
-  val forge_header:
+  val forge_header :
     ?policy:baker_policy ->
-    ?operations: Operation.packed list ->
-    t -> header tzresult Lwt.t
+    ?operations:Operation.packed list ->
+    t ->
+    header tzresult Lwt.t
 
   (** Sets uniquely seed_nonce_hash of a header *)
-  val set_seed_nonce_hash:
-    Nonce_hash.t option -> header -> header
+  val set_seed_nonce_hash : Nonce_hash.t option -> header -> header
 
   (** Sets the baker that will sign the header to an arbitrary pkh *)
-  val set_baker:
-    public_key_hash -> header -> header
+  val set_baker : public_key_hash -> header -> header
 
   (** Signs the header with the key of the baker configured in the header.
       The header can no longer be modified, only applied. *)
-  val sign_header:
-    header ->
-    Block_header.block_header tzresult Lwt.t
-
+  val sign_header : header -> Block_header.block_header tzresult Lwt.t
 end
 
 (** [genesis <opts> accounts] : generates an initial block with the
     given constants [<opts>] and initializes [accounts] with their
     associated amounts.
 *)
-val genesis:
+val genesis :
   ?with_commitments:bool ->
   ?endorsers_per_block:int ->
-  (Account.t * Tez_repr.tez) list -> block tzresult Lwt.t
+  (Account.t * Tez_repr.tez) list ->
+  block tzresult Lwt.t
 
-val genesis_with_parameters: Parameters_repr.t -> block tzresult Lwt.t
+val genesis_with_parameters : Parameters_repr.t -> block tzresult Lwt.t
 
 (** Applies a signed header and its operations to a block and
     obtains a new block *)
-val apply:
+val apply :
   Block_header.block_header ->
-  ?operations: Operation.packed list ->
-  t -> t tzresult Lwt.t
+  ?operations:Operation.packed list ->
+  t ->
+  t tzresult Lwt.t
 
 (**
    [bake b] returns a block [b'] which has as predecessor block [b].
@@ -111,11 +111,12 @@ val apply:
    testing together with setters for properties of the headers.
    For examples see seed.ml or double_baking.ml
 *)
-val bake:
-  ?policy: baker_policy ->
-  ?operation: Operation.packed ->
-  ?operations: Operation.packed list ->
-  t -> t tzresult Lwt.t
+val bake :
+  ?policy:baker_policy ->
+  ?operation:Operation.packed ->
+  ?operations:Operation.packed list ->
+  t ->
+  t tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
 val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
@@ -125,7 +126,8 @@ val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
 val bake_until_cycle_end : ?policy:baker_policy -> t -> t tzresult Lwt.t
 
 (** Bakes enough blocks to end [n] cycles. *)
-val bake_until_n_cycle_end : ?policy:baker_policy -> int -> t -> t tzresult Lwt.t
+val bake_until_n_cycle_end :
+  ?policy:baker_policy -> int -> t -> t tzresult Lwt.t
 
 (** Bakes enough blocks to reach the cycle. *)
 val bake_until_cycle : ?policy:baker_policy -> Cycle.t -> t -> t tzresult Lwt.t

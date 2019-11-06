@@ -25,15 +25,17 @@
 
 (** Dispatch tree *)
 type 'prefix t
+
 type 'prefix directory = 'prefix t
 
 (** Empty list of dispatch trees *)
-val empty: 'prefix directory
+val empty : 'prefix directory
 
-val map: ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
+val map : ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
-val prefix: ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
-val merge: 'a directory -> 'a directory -> 'a directory
+val prefix : ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
+
+val merge : 'a directory -> 'a directory -> 'a directory
 
 (** Possible error while registring services. *)
 type step =
@@ -42,32 +44,35 @@ type step =
   | DynamicTail of RPC_arg.descr
 
 type conflict =
-  | CService of RPC_service.meth | CDir | CBuilder | CTail
-  | CTypes of RPC_arg.descr *
-              RPC_arg.descr
+  | CService of RPC_service.meth
+  | CDir
+  | CBuilder
+  | CTail
+  | CTypes of RPC_arg.descr * RPC_arg.descr
   | CType of RPC_arg.descr * string list
+
 exception Conflict of step list * conflict
 
 (** Registring handler in service tree. *)
-val register:
+val register :
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register:
+val opt_register :
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output option tzresult Lwt.t) ->
   'prefix directory
 
-val gen_register:
+val gen_register :
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
-  ('params -> 'query -> 'input -> [< 'output RPC_answer.t ] Lwt.t) ->
+  ('params -> 'query -> 'input -> [< 'output RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val lwt_register:
+val lwt_register :
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output Lwt.t) ->
@@ -75,153 +80,178 @@ val lwt_register:
 
 (** Registring handler in service tree. Curryfied variant.  *)
 
-val register0:
+val register0 :
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o tzresult Lwt.t) ->
   unit directory
 
-val register1:
+val register1 :
   'prefix directory ->
-  ('m, 'prefix, unit * 'a, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
-val register2:
+val register2 :
   'prefix directory ->
-  ('m, 'prefix, (unit * 'a) * 'b, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
-val register3:
+val register3 :
   'prefix directory ->
-  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
-val register4:
+val register4 :
   'prefix directory ->
-  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
-val register5:
+val register5 :
   'prefix directory ->
-  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
+  ( 'm,
+    'prefix,
+    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
+    'q,
+    'i,
+    'o )
+  RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register0:
+val opt_register0 :
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o option tzresult Lwt.t) ->
   unit directory
 
-val opt_register1:
+val opt_register1 :
   'prefix directory ->
-  ('m, 'prefix, unit * 'a, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register2:
+val opt_register2 :
   'prefix directory ->
-  ('m, 'prefix, (unit * 'a) * 'b, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register3:
+val opt_register3 :
   'prefix directory ->
-  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register4:
+val opt_register4 :
   'prefix directory ->
-  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
-val opt_register5:
+val opt_register5 :
   'prefix directory ->
-  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
+  ( 'm,
+    'prefix,
+    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
+    'q,
+    'i,
+    'o )
+  RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
-val gen_register0:
+val gen_register0 :
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
-  ('q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ('q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   unit directory
 
-val gen_register1:
+val gen_register1 :
   'prefix directory ->
-  ('m, 'prefix, unit * 'a, 'q , 'i, 'o) RPC_service.t ->
-  ('a -> 'q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
+  ('a -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val gen_register2:
+val gen_register2 :
   'prefix directory ->
-  ('m, 'prefix, (unit * 'a) * 'b, 'q , 'i, 'o) RPC_service.t ->
-  ('a -> 'b -> 'q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val gen_register3:
+val gen_register3 :
   'prefix directory ->
-  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q , 'i, 'o) RPC_service.t ->
-  ('a -> 'b -> 'c -> 'q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'c -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val gen_register4:
+val gen_register4 :
   'prefix directory ->
-  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q , 'i, 'o) RPC_service.t ->
-  ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val gen_register5:
+val gen_register5 :
   'prefix directory ->
-  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
-  ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> [< 'o RPC_answer.t ] Lwt.t) ->
+  ( 'm,
+    'prefix,
+    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
+    'q,
+    'i,
+    'o )
+  RPC_service.t ->
+  ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
-val lwt_register0:
+val lwt_register0 :
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o Lwt.t) ->
   unit directory
 
-val lwt_register1:
+val lwt_register1 :
   'prefix directory ->
-  ('m, 'prefix, unit * 'a, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-val lwt_register2:
+val lwt_register2 :
   'prefix directory ->
-  ('m, 'prefix, (unit * 'a) * 'b, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-val lwt_register3:
+val lwt_register3 :
   'prefix directory ->
-  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-val lwt_register4:
+val lwt_register4 :
   'prefix directory ->
-  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q , 'i, 'o) RPC_service.t ->
+  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-val lwt_register5:
+val lwt_register5 :
   'prefix directory ->
-  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
+  ( 'm,
+    'prefix,
+    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
+    'q,
+    'i,
+    'o )
+  RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
 (** Registring dynamic subtree. *)
-val register_dynamic_directory:
+val register_dynamic_directory :
   ?descr:string ->
   'prefix directory ->
-  ('prefix, 'a) RPC_path.t -> ('a -> 'a directory Lwt.t) ->
+  ('prefix, 'a) RPC_path.t ->
+  ('a -> 'a directory Lwt.t) ->
   'prefix directory

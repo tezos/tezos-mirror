@@ -26,142 +26,156 @@
 open Data_encoding
 
 module Prevalidators = struct
-
   module S = struct
-
     let list =
       RPC_service.get_service
         ~description:"Lists the Prevalidator workers and their status."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (list
              (obj4
                 (req "chain_id" Chain_id.encoding)
-                (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))
-                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipelines" int8)
-             ))
+                (req
+                   "status"
+                   (Worker_types.worker_status_encoding RPC_error.encoding))
+                (req
+                   "information"
+                   (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req "pipelines" int8)))
         RPC_path.(root / "workers" / "prevalidators")
 
     let state =
       RPC_service.get_service
         ~description:"Introspect the state of prevalidator workers."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (Worker_types.full_status_encoding
              Prevalidator_worker_state.Request.encoding
              Prevalidator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "prevalidators" /: Chain_services.chain_arg )
-
+        RPC_path.(
+          root / "workers" / "prevalidators" /: Chain_services.chain_arg)
   end
 
   open RPC_context
-  let list ctxt = make_call S.list ctxt () () ()
-  let state ctxt h = make_call1 S.state ctxt h () ()
 
+  let list ctxt = make_call S.list ctxt () () ()
+
+  let state ctxt h = make_call1 S.state ctxt h () ()
 end
 
 module Block_validator = struct
-
   module S = struct
-
     let state =
       RPC_service.get_service
         ~description:"Introspect the state of the block_validator worker."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (Worker_types.full_status_encoding
              Block_validator_worker_state.Request.encoding
              Block_validator_worker_state.Event.encoding
              RPC_error.encoding)
         RPC_path.(root / "workers" / "block_validator")
-
   end
 
   open RPC_context
-  let state ctxt = make_call S.state ctxt () () ()
 
+  let state ctxt = make_call S.state ctxt () () ()
 end
 
 module Peer_validators = struct
-
   module S = struct
-
     let list =
       RPC_service.get_service
         ~description:"Lists the peer validator workers and their status."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (list
              (obj4
                 (req "peer_id" P2p_peer.Id.encoding)
-                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
-                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipelines" Peer_validator_worker_state.Worker_state.pipeline_length_encoding)
-             ))
-        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" )
+                (req
+                   "status"
+                   (Worker_types.worker_status_encoding RPC_error.encoding))
+                (req
+                   "information"
+                   (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req
+                   "pipelines"
+                   Peer_validator_worker_state.Worker_state
+                   .pipeline_length_encoding)))
+        RPC_path.(
+          root / "workers" / "chain_validators" /: Chain_services.chain_arg
+          / "peers_validators")
 
     let state =
       RPC_service.get_service
         ~description:"Introspect the state of a peer validator worker."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (Worker_types.full_status_encoding
              Peer_validator_worker_state.Request.encoding
              Peer_validator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "peers_validators" /: P2p_peer.Id.rpc_arg)
-
+        RPC_path.(
+          root / "workers" / "chain_validators" /: Chain_services.chain_arg
+          / "peers_validators" /: P2p_peer.Id.rpc_arg)
   end
 
   open RPC_context
-  let list ctxt n = make_call1 S.list ctxt n () ()
-  let state ctxt n h = make_call2 S.state ctxt n h () ()
 
+  let list ctxt n = make_call1 S.list ctxt n () ()
+
+  let state ctxt n h = make_call2 S.state ctxt n h () ()
 end
 
 module Chain_validators = struct
-
   module S = struct
-
     let list =
       RPC_service.get_service
         ~description:"Lists the chain validator workers and their status."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (list
              (obj4
                 (req "chain_id" Chain_id.encoding)
-                (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))
-                (req "information" (Worker_types.worker_information_encoding RPC_error.encoding))
-                (req "pipelines" int8)
-             ))
+                (req
+                   "status"
+                   (Worker_types.worker_status_encoding RPC_error.encoding))
+                (req
+                   "information"
+                   (Worker_types.worker_information_encoding RPC_error.encoding))
+                (req "pipelines" int8)))
         RPC_path.(root / "workers" / "chain_validators")
 
     let state =
       RPC_service.get_service
         ~description:"Introspect the state of a chain validator worker."
-        ~query: RPC_query.empty
+        ~query:RPC_query.empty
         ~output:
           (Worker_types.full_status_encoding
              Chain_validator_worker_state.Request.encoding
              Chain_validator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg )
+        RPC_path.(
+          root / "workers" / "chain_validators" /: Chain_services.chain_arg)
 
     let ddb_state =
       RPC_service.get_service
-        ~description:"Introspect the state of the DDB attached to a chain validator worker."
-        ~query: RPC_query.empty
-        ~output: Chain_validator_worker_state.Distributed_db_state.encoding
-        RPC_path.(root / "workers" / "chain_validators" /: Chain_services.chain_arg / "ddb")
-
+        ~description:
+          "Introspect the state of the DDB attached to a chain validator \
+           worker."
+        ~query:RPC_query.empty
+        ~output:Chain_validator_worker_state.Distributed_db_state.encoding
+        RPC_path.(
+          root / "workers" / "chain_validators" /: Chain_services.chain_arg
+          / "ddb")
   end
 
   open RPC_context
-  let list ctxt = make_call S.list ctxt () () ()
-  let state ctxt h = make_call1 S.state ctxt h () ()
-  let ddb_state ctxt h = make_call1 S.ddb_state ctxt h () ()
 
+  let list ctxt = make_call S.list ctxt () () ()
+
+  let state ctxt h = make_call1 S.state ctxt h () ()
+
+  let ddb_state ctxt h = make_call1 S.ddb_state ctxt h () ()
 end

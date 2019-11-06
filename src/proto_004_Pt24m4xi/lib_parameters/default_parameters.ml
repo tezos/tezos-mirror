@@ -25,81 +25,86 @@
 
 open Protocol
 
-let constants_mainnet = Constants_repr.{
-    preserved_cycles = 5 ;
-    blocks_per_cycle = 4096l ;
-    blocks_per_commitment = 32l ;
-    blocks_per_roll_snapshot = 256l ;
-    blocks_per_voting_period = 32768l ;
-    time_between_blocks =
-      List.map Period_repr.of_seconds_exn [ 60L ; 75L ] ;
-    endorsers_per_block = 32 ;
-    hard_gas_limit_per_operation = Z.of_int 800_000 ;
-    hard_gas_limit_per_block = Z.of_int 8_000_000 ;
-    proof_of_work_threshold =
-      Int64.(sub (shift_left 1L 46) 1L) ;
-    tokens_per_roll = Tez_repr.(mul_exn one 8_000) ;
-    michelson_maximum_type_size = 1000 ;
-    seed_nonce_revelation_tip = begin
-      match Tez_repr.(one /? 8L) with
-      | Ok c -> c
-      | Error _ -> assert false
-    end ;
-    origination_size = 257 ;
-    block_security_deposit = Tez_repr.(mul_exn one 512) ;
-    endorsement_security_deposit = Tez_repr.(mul_exn one 64) ;
-    block_reward = Tez_repr.(mul_exn one 16) ;
-    endorsement_reward = Tez_repr.(mul_exn one 2) ;
-    hard_storage_limit_per_operation = Z.of_int 60_000 ;
-    cost_per_byte = Tez_repr.of_mutez_exn 1_000L ;
-    test_chain_duration = Int64.mul 32768L 60L;
-  }
+let constants_mainnet =
+  Constants_repr.
+    {
+      preserved_cycles = 5;
+      blocks_per_cycle = 4096l;
+      blocks_per_commitment = 32l;
+      blocks_per_roll_snapshot = 256l;
+      blocks_per_voting_period = 32768l;
+      time_between_blocks = List.map Period_repr.of_seconds_exn [60L; 75L];
+      endorsers_per_block = 32;
+      hard_gas_limit_per_operation = Z.of_int 800_000;
+      hard_gas_limit_per_block = Z.of_int 8_000_000;
+      proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
+      tokens_per_roll = Tez_repr.(mul_exn one 8_000);
+      michelson_maximum_type_size = 1000;
+      seed_nonce_revelation_tip =
+        (match Tez_repr.(one /? 8L) with Ok c -> c | Error _ -> assert false);
+      origination_size = 257;
+      block_security_deposit = Tez_repr.(mul_exn one 512);
+      endorsement_security_deposit = Tez_repr.(mul_exn one 64);
+      block_reward = Tez_repr.(mul_exn one 16);
+      endorsement_reward = Tez_repr.(mul_exn one 2);
+      hard_storage_limit_per_operation = Z.of_int 60_000;
+      cost_per_byte = Tez_repr.of_mutez_exn 1_000L;
+      test_chain_duration = Int64.mul 32768L 60L;
+    }
 
-let constants_sandbox = Constants_repr.{
-    constants_mainnet with
-    preserved_cycles = 2 ;
-    blocks_per_cycle = 8l ;
-    blocks_per_commitment = 4l ;
-    blocks_per_roll_snapshot = 4l ;
-    blocks_per_voting_period = 64l ;
-    time_between_blocks =
-      List.map Period_repr.of_seconds_exn [ 1L ; 0L ] ;
-    proof_of_work_threshold = Int64.of_int (-1) ;
-  }
+let constants_sandbox =
+  Constants_repr.
+    {
+      constants_mainnet with
+      preserved_cycles = 2;
+      blocks_per_cycle = 8l;
+      blocks_per_commitment = 4l;
+      blocks_per_roll_snapshot = 4l;
+      blocks_per_voting_period = 64l;
+      time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
+      proof_of_work_threshold = Int64.of_int (-1);
+    }
 
-let constants_test = Constants_repr.{
-    constants_mainnet with
-    blocks_per_cycle = 128l ;
-    blocks_per_commitment = 4l ;
-    blocks_per_roll_snapshot = 32l ;
-    blocks_per_voting_period = 256l ;
-    time_between_blocks =
-      List.map Period_repr.of_seconds_exn [ 1L ; 0L ] ;
-    proof_of_work_threshold = Int64.of_int (-1) ;
-  }
+let constants_test =
+  Constants_repr.
+    {
+      constants_mainnet with
+      blocks_per_cycle = 128l;
+      blocks_per_commitment = 4l;
+      blocks_per_roll_snapshot = 32l;
+      blocks_per_voting_period = 256l;
+      time_between_blocks = List.map Period_repr.of_seconds_exn [1L; 0L];
+      proof_of_work_threshold = Int64.of_int (-1);
+    }
 
-let bootstrap_accounts_strings = [
-  "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ;
-  "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9" ;
-  "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV" ;
-  "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU" ;
-  "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ;
-]
+let bootstrap_accounts_strings =
+  [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+    "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9";
+    "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV";
+    "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
+    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" ]
+
 let boostrap_balance = Tez_repr.of_mutez_exn 4_000_000_000_000L
-let bootstrap_accounts = List.map (fun s ->
-    let public_key = Signature.Public_key.of_b58check_exn s in
-    let public_key_hash = Signature.Public_key.hash public_key in
-    Parameters_repr.{
-      public_key_hash ;
-      public_key = Some public_key ;
-      amount = boostrap_balance ;
-    })
+
+let bootstrap_accounts =
+  List.map
+    (fun s ->
+      let public_key = Signature.Public_key.of_b58check_exn s in
+      let public_key_hash = Signature.Public_key.hash public_key in
+      Parameters_repr.
+        {
+          public_key_hash;
+          public_key = Some public_key;
+          amount = boostrap_balance;
+        })
     bootstrap_accounts_strings
 
 (* TODO this could be generated from OCaml together with the faucet
    for now these are harcoded values in the tests *)
 let commitments =
-  let json_result = Data_encoding.Json.from_string {json|
+  let json_result =
+    Data_encoding.Json.from_string
+      {json|
   [
     [ "btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343" ],
     [ "btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032" ],
@@ -114,27 +119,28 @@ let commitments =
   ]|json}
   in
   match json_result with
-  | Error err -> raise (Failure err)
-  | Ok json -> Data_encoding.Json.destruct
-                 (Data_encoding.list Commitment_repr.encoding) json
+  | Error err ->
+      raise (Failure err)
+  | Ok json ->
+      Data_encoding.Json.destruct
+        (Data_encoding.list Commitment_repr.encoding)
+        json
 
 let make_bootstrap_account (pkh, pk, amount) =
-  Parameters_repr.{ public_key_hash = pkh ; public_key = Some pk ; amount }
+  Parameters_repr.{public_key_hash = pkh; public_key = Some pk; amount}
 
-let parameters_of_constants
-    ?(bootstrap_accounts = bootstrap_accounts)
-    ?(bootstrap_contracts = [])
-    ?(with_commitments = false)
-    constants =
+let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
+    ?(bootstrap_contracts = []) ?(with_commitments = false) constants =
   let commitments = if with_commitments then commitments else [] in
-  Parameters_repr.{
-    bootstrap_accounts ;
-    bootstrap_contracts ;
-    commitments ;
-    constants ;
-    security_deposit_ramp_up_cycles = None ;
-    no_reward_cycles = None ;
-  }
+  Parameters_repr.
+    {
+      bootstrap_accounts;
+      bootstrap_contracts;
+      commitments;
+      constants;
+      security_deposit_ramp_up_cycles = None;
+      no_reward_cycles = None;
+    }
 
 let json_of_parameters parameters =
   Data_encoding.Json.construct Parameters_repr.encoding parameters

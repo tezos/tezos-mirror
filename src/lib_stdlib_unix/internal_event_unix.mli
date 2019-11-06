@@ -40,16 +40,11 @@ module Configuration : sig
   (** Parse a json file at [path] into a configuration. *)
   val of_file : string -> t tzresult Lwt.t
 
-  val apply : t -> unit tzresult Lwt.t
   (** Run {!Tezos_base.Internal_event.All_sinks.activate} for every
       URI in the configuration. *)
+  val apply : t -> unit tzresult Lwt.t
 end
 
-val init :
-  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
-  ?configuration:Configuration.t ->
-  unit ->
-  unit Lwt.t
 (** Initialize the internal-event sinks by looking at the
     [?configuration] argument and then at the (whitespace separated) list
     of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
@@ -61,6 +56,11 @@ val init :
     The function also initializes the {!Lwt_log_sink_unix} module
     (corresponding to the ["TEZOS_LOG"] environment variable).
 *)
+val init :
+  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
+  ?configuration:Configuration.t ->
+  unit ->
+  unit Lwt.t
 
-val close : unit -> unit Lwt.t
 (** Call [close] on all the sinks. *)
+val close : unit -> unit Lwt.t

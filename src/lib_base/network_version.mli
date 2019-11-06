@@ -25,29 +25,31 @@
 (*****************************************************************************)
 
 type t = {
-  chain_name : Distributed_db_version.name ;
-  distributed_db_version : Distributed_db_version.t ;
-  p2p_version : P2p_version.t ;
+  chain_name : Distributed_db_version.name;
+  distributed_db_version : Distributed_db_version.t;
+  p2p_version : P2p_version.t;
 }
 
-val pp: Format.formatter -> t -> unit
-val encoding: t Data_encoding.t
+val pp : Format.formatter -> t -> unit
+
+val encoding : t Data_encoding.t
 
 (** [announced supported] computes the network protocol version
     announced on peer connection, given the [supported] versions for
     the higher-level messages. *)
-val announced:
-  chain_name: Distributed_db_version.name ->
-  distributed_db_versions: Distributed_db_version.t list ->
-  p2p_versions: P2p_version.t list ->
+val announced :
+  chain_name:Distributed_db_version.name ->
+  distributed_db_versions:Distributed_db_version.t list ->
+  p2p_versions:P2p_version.t list ->
   t
 
 (** [select acceptables remote] computes network protocol version to
     be used on a given connection where [remote] is version annouced
     by the remote peer, and [acceptables] the locally accepted
     versions for the higher-level messages. *)
-val select:
-  chain_name: Distributed_db_version.name ->
-  distributed_db_versions: Distributed_db_version.t list ->
-  p2p_versions: P2p_version.t list ->
-  t -> t option
+val select :
+  chain_name:Distributed_db_version.name ->
+  distributed_db_versions:Distributed_db_version.t list ->
+  p2p_versions:P2p_version.t list ->
+  t ->
+  t option

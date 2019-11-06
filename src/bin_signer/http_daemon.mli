@@ -23,18 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val run_https:
+val run_https :
   #Client_context.io_wallet ->
-  host:string -> port:int -> cert:string -> key:string ->
-  ?magic_bytes: int list ->
-  check_high_watermark: bool ->
-  require_auth: bool ->
+  host:string ->
+  port:int ->
+  cert:string ->
+  key:string ->
+  ?magic_bytes:int list ->
+  check_high_watermark:bool ->
+  require_auth:bool ->
   'a tzresult Lwt.t
 
-val run_http:
+val run_http :
   #Client_context.io_wallet ->
-  host:string -> port:int ->
-  ?magic_bytes: int list ->
-  check_high_watermark: bool ->
-  require_auth: bool ->
+  host:string ->
+  port:int ->
+  ?magic_bytes:int list ->
+  check_high_watermark:bool ->
+  require_auth:bool ->
   'a tzresult Lwt.t

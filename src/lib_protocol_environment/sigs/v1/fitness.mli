@@ -25,4 +25,5 @@
 
 (** The fitness of a block is defined as a list of bytes,
     compared in a lexicographical order (longer list are greater). *)
-include S.T with type t = MBytes.t list
+include
+  S.T with type t = MBytes.t list

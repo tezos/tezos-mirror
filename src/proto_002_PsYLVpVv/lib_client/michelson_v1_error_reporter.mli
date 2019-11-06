@@ -24,9 +24,9 @@
 (*****************************************************************************)
 
 val report_errors :
-  details: bool ->
-  show_source: bool ->
-  ?parsed: Michelson_v1_parser.parsed ->
+  details:bool ->
+  show_source:bool ->
+  ?parsed:Michelson_v1_parser.parsed ->
   Format.formatter ->
   Error_monad.error list ->
   unit

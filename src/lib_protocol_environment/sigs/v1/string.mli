@@ -57,23 +57,21 @@
 
 *)
 
-external length : string -> int = "%string_length"
 (** Return the length (number of characters) of the given string. *)
+external length : string -> int = "%string_length"
 
-external get : string -> int -> char = "%string_safe_get"
 (** [String.get s n] returns the character at index [n] in string [s].
     You can also write [s.[n]] instead of [String.get s n].
 
     Raise [Invalid_argument] if [n] not a valid index in [s]. *)
+external get : string -> int -> char = "%string_safe_get"
 
-
-val make : int -> char -> string
 (** [String.make n c] returns a fresh string of length [n],
     filled with the character [c].
 
     Raise [Invalid_argument] if [n < 0] or [n > ]{!Sys.max_string_length}. *)
+val make : int -> char -> string
 
-val init : int -> (int -> char) -> string
 (** [String.init n f] returns a string of length [n], with character
     [i] initialized to the result of [f i] (called in increasing
     index order).
@@ -82,57 +80,57 @@ val init : int -> (int -> char) -> string
 
     @since 4.02.0
 *)
+val init : int -> (int -> char) -> string
 
-val sub : string -> int -> int -> string
 (** [String.sub s start len] returns a fresh string of length [len],
     containing the substring of [s] that starts at position [start] and
     has length [len].
 
     Raise [Invalid_argument] if [start] and [len] do not
     designate a valid substring of [s]. *)
+val sub : string -> int -> int -> string
 
-val blit : string -> int -> bytes -> int -> int -> unit
 (** Same as {!Bytes.blit_string}. *)
+val blit : string -> int -> bytes -> int -> int -> unit
 
-val concat : string -> string list -> string
 (** [String.concat sep sl] concatenates the list of strings [sl],
     inserting the separator string [sep] between each.
 
     Raise [Invalid_argument] if the result is longer than
     {!Sys.max_string_length} bytes. *)
+val concat : string -> string list -> string
 
-val iter : (char -> unit) -> string -> unit
 (** [String.iter f s] applies function [f] in turn to all
     the characters of [s].  It is equivalent to
     [f s.[0]; f s.[1]; ...; f s.[String.length s - 1]; ()]. *)
+val iter : (char -> unit) -> string -> unit
 
-val iteri : (int -> char -> unit) -> string -> unit
 (** Same as {!String.iter}, but the
     function is applied to the index of the element as first argument
     (counting from 0), and the character itself as second argument.
     @since 4.00.0 *)
+val iteri : (int -> char -> unit) -> string -> unit
 
-val map : (char -> char) -> string -> string
 (** [String.map f s] applies function [f] in turn to all the
     characters of [s] (in increasing index order) and stores the
     results in a new string that is returned.
     @since 4.00.0 *)
+val map : (char -> char) -> string -> string
 
-val mapi : (int -> char -> char) -> string -> string
 (** [String.mapi f s] calls [f] with each character of [s] and its
     index (in increasing index order) and stores the results in a new
     string that is returned.
     @since 4.02.0 *)
+val mapi : (int -> char -> char) -> string -> string
 
-val trim : string -> string
 (** Return a copy of the argument, without leading and trailing
     whitespace.  The characters regarded as whitespace are: [' '],
     ['\012'], ['\n'], ['\r'], and ['\t'].  If there is neither leading nor
     trailing whitespace character in the argument, return the original
     string itself, not a copy.
     @since 4.00.0 *)
+val trim : string -> string
 
-val escaped : string -> string
 (** Return a copy of the argument, with special characters
     represented by escape sequences, following the lexical
     conventions of OCaml.
@@ -148,20 +146,20 @@ val escaped : string -> string
     The function {!Scanf.unescaped} is a left inverse of [escaped],
     i.e. [Scanf.unescaped (escaped s) = s] for any string [s] (unless
     [escape s] fails). *)
+val escaped : string -> string
 
-val index_opt: string -> char -> int option
 (** [String.index_opt s c] returns the index of the first
     occurrence of character [c] in string [s], or
     [None] if [c] does not occur in [s].
     @since 4.05 *)
+val index_opt : string -> char -> int option
 
-val rindex_opt: string -> char -> int option
 (** [String.rindex_opt s c] returns the index of the last occurrence
     of character [c] in string [s], or [None] if [c] does not occur in
     [s].
     @since 4.05 *)
+val rindex_opt : string -> char -> int option
 
-val index_from_opt: string -> int -> char -> int option
 (** [String.index_from_opt s i c] returns the index of the
     first occurrence of character [c] in string [s] after position [i]
     or [None] if [c] does not occur in [s] after position [i].
@@ -171,8 +169,8 @@ val index_from_opt: string -> int -> char -> int option
 
     @since 4.05
 *)
+val index_from_opt : string -> int -> char -> int option
 
-val rindex_from_opt: string -> int -> char -> int option
 (** [String.rindex_from_opt s i c] returns the index of the
     last occurrence of character [c] in string [s] before position [i+1]
     or [None] if [c] does not occur in [s] before position [i+1].
@@ -184,60 +182,60 @@ val rindex_from_opt: string -> int -> char -> int option
 
     @since 4.05
 *)
+val rindex_from_opt : string -> int -> char -> int option
 
-val contains : string -> char -> bool
 (** [String.contains s c] tests if character [c]
     appears in the string [s]. *)
+val contains : string -> char -> bool
 
-val contains_from : string -> int -> char -> bool
 (** [String.contains_from s start c] tests if character [c]
     appears in [s] after position [start].
     [String.contains s c] is equivalent to
     [String.contains_from s 0 c].
 
     Raise [Invalid_argument] if [start] is not a valid position in [s]. *)
+val contains_from : string -> int -> char -> bool
 
-val rcontains_from : string -> int -> char -> bool
 (** [String.rcontains_from s stop c] tests if character [c]
     appears in [s] before position [stop+1].
 
     Raise [Invalid_argument] if [stop < 0] or [stop+1] is not a valid
     position in [s]. *)
+val rcontains_from : string -> int -> char -> bool
 
-val uppercase_ascii : string -> string
 (** Return a copy of the argument, with all lowercase letters
     translated to uppercase, using the US-ASCII character set.
     @since 4.03.0 *)
+val uppercase_ascii : string -> string
 
-val lowercase_ascii : string -> string
 (** Return a copy of the argument, with all uppercase letters
     translated to lowercase, using the US-ASCII character set.
     @since 4.03.0 *)
+val lowercase_ascii : string -> string
 
-val capitalize_ascii : string -> string
 (** Return a copy of the argument, with the first character set to uppercase,
     using the US-ASCII character set.
     @since 4.03.0 *)
+val capitalize_ascii : string -> string
 
-val uncapitalize_ascii : string -> string
 (** Return a copy of the argument, with the first character set to lowercase,
     using the US-ASCII character set.
     @since 4.03.0 *)
+val uncapitalize_ascii : string -> string
 
-type t = string
 (** An alias for the type of strings. *)
+type t = string
 
-val compare: t -> t -> int
 (** The comparison function for strings, with the same specification as
     {!Pervasives.compare}.  Along with the type [t], this function [compare]
     allows the module [String] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
+val compare : t -> t -> int
 
-val equal: t -> t -> bool
 (** The equal function for strings.
     @since 4.03.0 *)
+val equal : t -> t -> bool
 
-val split_on_char: char -> string -> string list
 (** [String.split_on_char sep s] returns the list of all (possibly empty)
     substrings of [s] that are delimited by the [sep] character.
 
@@ -251,52 +249,51 @@ val split_on_char: char -> string -> string list
 
     @since 4.04.0
 *)
+val split_on_char : char -> string -> string list
 
 (** Functions reading bytes  *)
 
-val get_char: t -> int -> char
 (** [get_char buff i] reads 1 byte at offset i as a char *)
+val get_char : t -> int -> char
 
-val get_uint8: t -> int -> int
 (** [get_uint8 buff i] reads 1 byte at offset i as an unsigned int of 8
     bits. i.e. It returns a value between 0 and 2^8-1 *)
+val get_uint8 : t -> int -> int
 
-val get_int8: t -> int -> int
 (** [get_int8 buff i] reads 1 byte at offset i as a signed int of 8
     bits. i.e. It returns a value between -2^7 and 2^7-1 *)
+val get_int8 : t -> int -> int
 
 (** Functions reading according to Big Endian byte order *)
 
-val get_uint16: t -> int -> int
 (** [get_uint16 buff i] reads 2 bytes at offset i as an unsigned int
       of 16 bits. i.e. It returns a value between 0 and 2^16-1 *)
+val get_uint16 : t -> int -> int
 
-val get_int16: t -> int -> int
 (** [get_int16 buff i] reads 2 byte at offset i as a signed int of
       16 bits. i.e. It returns a value between -2^15 and 2^15-1 *)
+val get_int16 : t -> int -> int
 
-val get_int32: t -> int -> int32
 (** [get_int32 buff i] reads 4 bytes at offset i as an int32. *)
+val get_int32 : t -> int -> int32
 
-val get_int64: t -> int -> int64
 (** [get_int64 buff i] reads 8 bytes at offset i as an int64. *)
+val get_int64 : t -> int -> int64
 
-module LE: sig
-
+module LE : sig
   (** Functions reading according to Little Endian byte order *)
 
-  val get_uint16: t -> int -> int
   (** [get_uint16 buff i] reads 2 bytes at offset i as an unsigned int
       of 16 bits. i.e. It returns a value between 0 and 2^16-1 *)
+  val get_uint16 : t -> int -> int
 
-  val get_int16: t -> int -> int
   (** [get_int16 buff i] reads 2 byte at offset i as a signed int of
       16 bits. i.e. It returns a value between -2^15 and 2^15-1 *)
+  val get_int16 : t -> int -> int
 
-  val get_int32: t -> int -> int32
   (** [get_int32 buff i] reads 4 bytes at offset i as an int32. *)
+  val get_int32 : t -> int -> int32
 
-  val get_int64: t -> int -> int64
   (** [get_int64 buff i] reads 8 bytes at offset i as an int64. *)
-
+  val get_int64 : t -> int -> int64
 end

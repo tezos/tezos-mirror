@@ -26,20 +26,23 @@
 let raw_commit_hash = "$Format:%H$"
 
 let commit_hash =
-  if String.equal raw_commit_hash ("$Format:"^"%H$"(*trick to avoid git-subst*))
+  if
+    String.equal
+      raw_commit_hash
+      ("$Format:" ^ "%H$" (*trick to avoid git-subst*))
   then Generated_git_info.commit_hash
   else raw_commit_hash
 
 let raw_abbreviated_commit_hash = "$Format:%h$"
 
 let abbreviated_commit_hash =
-  if String.equal raw_abbreviated_commit_hash ("$Format:"^"%h$")
-  then Generated_git_info.abbreviated_commit_hash
+  if String.equal raw_abbreviated_commit_hash ("$Format:" ^ "%h$") then
+    Generated_git_info.abbreviated_commit_hash
   else raw_abbreviated_commit_hash
 
 let raw_committer_date = "$Format:%ci$"
 
 let committer_date =
-  if String.equal raw_committer_date ("$Format:"^"%ci$")
-  then Generated_git_info.committer_date
+  if String.equal raw_committer_date ("$Format:" ^ "%ci$") then
+    Generated_git_info.committer_date
   else raw_committer_date

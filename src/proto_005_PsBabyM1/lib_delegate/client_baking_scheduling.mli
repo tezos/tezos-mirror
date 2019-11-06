@@ -23,12 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val sleep_until: Time.Protocol.t -> unit Lwt.t option
+val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
-val wait_for_first_event:
-  name:string ->
-  'event tzresult Lwt_stream.t ->
-  'event Lwt.t
+val wait_for_first_event :
+  name:string -> 'event tzresult Lwt_stream.t -> 'event Lwt.t
 
 val main :
   name:string ->

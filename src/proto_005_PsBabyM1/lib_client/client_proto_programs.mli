@@ -28,8 +28,9 @@ open Protocol
 open Alpha_context
 open Tezos_micheline
 
-module Program : Client_aliases.Alias
-  with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
+module Program :
+  Client_aliases.Alias
+    with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
 val run :
   #Protocol_client_context.rpc_context ->
@@ -44,9 +45,9 @@ val run :
   ?gas:Z.t ->
   ?entrypoint:string ->
   unit ->
-  (Script.expr *
-   packed_internal_operation list *
-   Contract.big_map_diff option) tzresult Lwt.t
+  (Script.expr * packed_internal_operation list * Contract.big_map_diff option)
+  tzresult
+  Lwt.t
 
 val trace :
   #Protocol_client_context.rpc_context ->
@@ -61,28 +62,33 @@ val trace :
   ?gas:Z.t ->
   ?entrypoint:string ->
   unit ->
-  (Script.expr *
-   packed_internal_operation list *
-   Script_interpreter.execution_trace *
-   Contract.big_map_diff option) tzresult Lwt.t
+  ( Script.expr
+  * packed_internal_operation list
+  * Script_interpreter.execution_trace
+  * Contract.big_map_diff option )
+  tzresult
+  Lwt.t
 
 val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr *
-   packed_internal_operation list *
-   Contract.big_map_diff option) tzresult -> unit tzresult Lwt.t
+  ( Script_repr.expr
+  * packed_internal_operation list
+  * Contract.big_map_diff option )
+  tzresult ->
+  unit tzresult Lwt.t
 
 val print_trace_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  (Script_repr.expr *
-   packed_internal_operation list *
-   Script_interpreter.execution_trace *
-   Contract.big_map_diff option)
-    tzresult -> unit tzresult Lwt.t
+  ( Script_repr.expr
+  * packed_internal_operation list
+  * Script_interpreter.execution_trace
+  * Contract.big_map_diff option )
+  tzresult ->
+  unit tzresult Lwt.t
 
 val typecheck_data :
   #Protocol_client_context.rpc_context ->
@@ -119,7 +125,7 @@ val entrypoint_type :
   entrypoint:string ->
   Script.expr option tzresult Lwt.t
 
-val print_entrypoint_type:
+val print_entrypoint_type :
   #Client_context.printer ->
   emacs:bool ->
   ?script_name:string ->
@@ -136,7 +142,7 @@ val list_entrypoints :
   Michelson_v1_parser.parsed ->
   (string * Script.expr) list tzresult Lwt.t
 
-val print_entrypoints_list:
+val print_entrypoints_list :
   #Client_context.printer ->
   emacs:bool ->
   ?script_name:string ->
@@ -145,7 +151,6 @@ val print_entrypoints_list:
   (string * Script.expr) list tzresult ->
   unit tzresult Lwt.t
 
-
 val list_unreachables :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -153,7 +158,7 @@ val list_unreachables :
   Michelson_v1_parser.parsed ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
-val print_unreachables:
+val print_unreachables :
   #Client_context.printer ->
   emacs:bool ->
   ?script_name:string ->

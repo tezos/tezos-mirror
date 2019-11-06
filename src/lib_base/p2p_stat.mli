@@ -26,12 +26,14 @@
 (** Bandwidth usage statistics *)
 
 type t = {
-  total_sent : int64 ;
-  total_recv : int64 ;
-  current_inflow : int ;
-  current_outflow : int ;
+  total_sent : int64;
+  total_recv : int64;
+  current_inflow : int;
+  current_outflow : int;
 }
 
 val empty : t
+
 val pp : Format.formatter -> t -> unit
+
 val encoding : t Data_encoding.t

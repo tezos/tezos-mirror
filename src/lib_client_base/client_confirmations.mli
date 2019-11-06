@@ -30,7 +30,7 @@
 
     This functions also looks for the operations in the `predecessors`
     of the intial chain head. *)
-val wait_for_operation_inclusion:
+val wait_for_operation_inclusion :
   #Client_context.full ->
   chain:Chain_services.chain ->
   ?predecessors:int ->
@@ -41,7 +41,7 @@ val wait_for_operation_inclusion:
 
 (** lookup an operation in [predecessors] previous blocks, starting
     from head *)
-val lookup_operation_in_previous_blocks:
+val lookup_operation_in_previous_blocks :
   #Client_context.full ->
   chain:Block_services.chain ->
   predecessors:int ->
@@ -49,5 +49,4 @@ val lookup_operation_in_previous_blocks:
   (Block_hash.t * int * int) option tzresult Lwt.t
 
 (** wait for the node to be bootstrapped *)
-val wait_for_bootstrapped:
-  #Client_context.full -> unit tzresult Lwt.t
+val wait_for_bootstrapped : #Client_context.full -> unit tzresult Lwt.t

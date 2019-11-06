@@ -27,38 +27,50 @@
 type t
 
 type limits = {
-  protocol_timeout: Time.System.Span.t ;
-  worker_limits : Worker_types.limits ;
+  protocol_timeout : Time.System.Span.t;
+  worker_limits : Worker_types.limits;
 }
 
-type validator_kind =
-  | Internal of Context.index
+type validator_kind = Internal of Context.index
 
-val create:
-  limits ->  Distributed_db.t -> validator_kind ->
+val create :
+  limits ->
+  Distributed_db.t ->
+  validator_kind ->
   start_testchain:bool ->
   t tzresult Lwt.t
 
-val validate:
+val validate :
   t ->
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
   ?notify_new_block:(State.Block.t -> unit) ->
   Distributed_db.chain_db ->
-  Block_hash.t -> Block_header.t -> Operation.t list list ->
+  Block_hash.t ->
+  Block_header.t ->
+  Operation.t list list ->
   State.Block.t option tzresult Lwt.t
 
-val fetch_and_compile_protocol:
+val fetch_and_compile_protocol :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Time.System.Span.t ->
-  Protocol_hash.t -> Registered_protocol.t tzresult Lwt.t
+  Protocol_hash.t ->
+  Registered_protocol.t tzresult Lwt.t
 
-val shutdown: t -> unit Lwt.t
+val shutdown : t -> unit Lwt.t
 
-val running_worker: unit -> t
-val status: t -> Worker_types.worker_status
+val running_worker : unit -> t
 
-val pending_requests : t -> (Time.System.t * Block_validator_worker_state.Request.view) list
-val current_request : t -> (Time.System.t * Time.System.t * Block_validator_worker_state.Request.view) option
-val last_events : t -> (Internal_event.level * Block_validator_worker_state.Event.t list) list
+val status : t -> Worker_types.worker_status
+
+val pending_requests :
+  t -> (Time.System.t * Block_validator_worker_state.Request.view) list
+
+val current_request :
+  t ->
+  (Time.System.t * Time.System.t * Block_validator_worker_state.Request.view)
+  option
+
+val last_events :
+  t -> (Internal_event.level * Block_validator_worker_state.Event.t list) list

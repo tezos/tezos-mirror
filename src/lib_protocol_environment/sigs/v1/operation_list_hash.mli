@@ -24,5 +24,5 @@
 (*****************************************************************************)
 
 (** Blocks hashes / IDs. *)
-include S.MERKLE_TREE with type elt = Operation_hash.t
-
+include
+  S.MERKLE_TREE with type elt = Operation_hash.t

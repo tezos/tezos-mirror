@@ -27,13 +27,13 @@ open Protocol
 
 (** A null proof-of-work nonce. This should only be used to non-sensical blocks
     of the correct size and shape. *)
-val empty_proof_of_work_nonce: Cstruct.buffer
+val empty_proof_of_work_nonce : Cstruct.buffer
 
 (** [mine cctxt chain block header builder] returns a block with a valid
     proof-of-work nonce. The function [builder], provided by the caller, is used
     to make the block. All the internal logic of generating nonces and checking
     for the proof-of-work threshold is handled by [mine]. *)
-val mine:
+val mine :
   #Alpha_client_context.full ->
   Shell_services.chain ->
   Block_services.block ->

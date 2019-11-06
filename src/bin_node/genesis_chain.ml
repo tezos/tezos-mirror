@@ -24,13 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let genesis : State.Chain.genesis = {
-  time =
-    Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z" ;
-  block =
-    Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" ;
-  protocol =
-    Protocol_hash.of_b58check_exn
-      "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ;
-}
+let genesis : State.Chain.genesis =
+  {
+    time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+    block =
+      Block_hash.of_b58check_exn
+        "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+    protocol =
+      Protocol_hash.of_b58check_exn
+        "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+  }

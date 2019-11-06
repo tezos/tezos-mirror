@@ -29,17 +29,21 @@
 type name = string
 
 let pp_name = Format.pp_print_string
+
 let name_encoding = Data_encoding.string
 
 let chain_name = "TEZOS_MAINNET"
+
 let old_chain_name = "TEZOS_BETANET_2018-06-30T16:07:32Z"
+
 let incompatible_chain_name = "INCOMPATIBLE"
+
 let sandboxed_chain_name = "SANDBOXED_TEZOS_MAINNET"
 
 type t = int
 
 let pp = Format.pp_print_int
+
 let encoding = Data_encoding.uint16
 
 let zero = 0
-

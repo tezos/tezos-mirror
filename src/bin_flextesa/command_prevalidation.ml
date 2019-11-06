@@ -6,7 +6,8 @@ let run state node_exec client_exec () =
   Test_scenario.network_with_protocol ~size:2 state ~node_exec ~client_exec
   >>= fun (nodes, protocol) ->
   match nodes with
-  | [] | [_] | _ :: _ :: _ :: _ -> assert false
+  | [] | [_] | _ :: _ :: _ :: _ ->
+      assert false
   | [n1; n2] ->
       let c1 = Tezos_client.of_node ~exec:client_exec n1 in
       let c2 = Tezos_client.of_node ~exec:client_exec n2 in
@@ -28,7 +29,8 @@ let run state node_exec client_exec () =
 let cmd ~pp_error () =
   let open Cmdliner in
   let open Term in
-  Test_command_line.Run_command.make ~pp_error
+  Test_command_line.Run_command.make
+    ~pp_error
     ( pure (fun bnod bcli state -> (state, run state bnod bcli))
     $ Tezos_executable.cli_term `Node "tezos"
     $ Tezos_executable.cli_term `Client "tezos"

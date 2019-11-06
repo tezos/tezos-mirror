@@ -46,14 +46,16 @@ module type S = sig
       the table. The next call to [find_or_make] with the same key causes the
       provided [gen] function to be called. *)
 
-
   type key
+
   type 'a t
-  val create: int -> 'a t
+
+  val create : int -> 'a t
+
   val clear : 'a t -> unit
+
   val reset : 'a t -> unit
 
-  val find_or_make : 'a t -> key -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
   (** [find_or_make t k gen] is [p] if [k] is already bound to [k] in [t]. In
       this case, no side-effect is performed.
 
@@ -61,37 +63,42 @@ module type S = sig
       ()]. In this case, [r] becomes bound to [k] in [t]. In addition, a
       listener is added to [r] so that if [r] resolves to [Error _], the binding
       is removed. *)
+  val find_or_make :
+    'a t -> key -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-  val remove: 'a t -> key -> unit
+  val remove : 'a t -> key -> unit
 
-  val find_opt: 'a t -> key -> 'a tzresult Lwt.t option
   (** [find_opt t k] is [None] if there are no bindings for [k] in [t], and
       [Some p] if [p] is bound to [k] in [t]. *)
+  val find_opt : 'a t -> key -> 'a tzresult Lwt.t option
 
   val mem : 'a t -> key -> bool
-  val iter_s: (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
-  val iter_p: (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
+  val iter_s : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
   (** [iter_{s,p} f t] iterates [f] over the promises of [t]. It blocks on
       unresolved promises and only applies the function on the ones that resolve
       successfully. *)
+  val iter_p : (key -> 'a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
-  val fold: (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
   (** [fold f t init] folds [f] over the successfully resolving promises
       of [t]. I.e., it goes through the promises in the table and waits for each
       of the promise to resolve in order to fold over it. *)
+  val fold : (key -> 'a -> 'b -> 'b Lwt.t) -> 'a t -> 'b -> 'b Lwt.t
 
-  val fold_promises: (key -> 'a tzresult Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
   (** [fold_promises f t init] folds [f] over the promises of [t]. *)
+  val fold_promises :
+    (key -> 'a tzresult Lwt.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
-  val fold_resolved: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
   (** [fold_resolved f t init] folds [f] over the successfully resolved promises
       of [t]. *)
+  val fold_resolved : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
-  val fold_keys: (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
   (** [fold_keys f t init] folds [f] over the keys bound in [t]. *)
+  val fold_keys : (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
-  val length: 'a t -> int
+  val length : 'a t -> int
 end
 
-module Make(T: Hashtbl.S) : S with type key = T.key
 (** Intended use: [Make(Hashtbl.Make(M))]. *)
+module Make (T : Hashtbl.S) : S with type key = T.key

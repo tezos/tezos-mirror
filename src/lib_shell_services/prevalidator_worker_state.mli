@@ -31,29 +31,40 @@ module Request : sig
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
+
   type view = View : _ t -> view
+
   val view : 'a t -> view
+
   val encoding : view Data_encoding.t
+
   val pp : Format.formatter -> view -> unit
 end
 
 module Event : sig
   type t =
-    | Request of (Request.view * Worker_types.request_status * error list option)
+    | Request of
+        (Request.view * Worker_types.request_status * error list option)
     | Debug of string
+
   val level : t -> Internal_event.level
+
   val encoding : t Data_encoding.t
+
   val pp : Format.formatter -> t -> unit
 end
 
 module Worker_state : sig
-  type view =
-    { head : Block_hash.t ;
-      timestamp : Time.System.t ;
-      fetching : Operation_hash.Set.t ;
-      pending : Operation_hash.Set.t ;
-      applied : Operation_hash.t list ;
-      delayed : Operation_hash.Set.t }
+  type view = {
+    head : Block_hash.t;
+    timestamp : Time.System.t;
+    fetching : Operation_hash.Set.t;
+    pending : Operation_hash.Set.t;
+    applied : Operation_hash.t list;
+    delayed : Operation_hash.Set.t;
+  }
+
   val encoding : view Data_encoding.t
+
   val pp : Format.formatter -> view -> unit
 end

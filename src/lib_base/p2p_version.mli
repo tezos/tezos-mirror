@@ -29,9 +29,10 @@
 (** An abstract version number for the low-level p2p layer. *)
 type t = private int
 
-val pp: Format.formatter -> t -> unit
-val encoding: t Data_encoding.t
+val pp : Format.formatter -> t -> unit
 
-val supported: t list
+val encoding : t Data_encoding.t
 
-val zero: t
+val supported : t list
+
+val zero : t

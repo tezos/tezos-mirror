@@ -27,8 +27,7 @@ open Client_keys
 
 let scheme = "unencrypted"
 
-let title =
-  "Built-in signer using raw unencrypted keys."
+let title = "Built-in signer using raw unencrypted keys."
 
 let description =
   "Please DO NOT USE this signer outside of test environments.\n\
@@ -47,7 +46,7 @@ let make_sk sk =
   Client_keys.make_sk_uri
     (Uri.make ~scheme ~path:(Signature.Secret_key.to_b58check sk) ())
 
-let public_key ?interactive:(_) pk_uri =
+let public_key ?interactive:_ pk_uri =
   Lwt.return
     (Signature.Public_key.of_b58check (Uri.path (pk_uri : pk_uri :> Uri.t)))
 
@@ -56,23 +55,22 @@ let make_pk pk =
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
 
 let neuterize sk_uri =
-  secret_key sk_uri >>=? fun sk ->
-  return (make_pk (Signature.Secret_key.to_public_key sk))
+  secret_key sk_uri
+  >>=? fun sk -> return (make_pk (Signature.Secret_key.to_public_key sk))
 
 let public_key_hash ?interactive pk_uri =
-  public_key ?interactive pk_uri >>=? fun pk ->
-  return (Signature.Public_key.hash pk, Some pk)
+  public_key ?interactive pk_uri
+  >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
 
 let sign ?watermark sk_uri buf =
-  secret_key sk_uri >>=? fun sk ->
-  return (Signature.sign ?watermark sk buf)
+  secret_key sk_uri >>=? fun sk -> return (Signature.sign ?watermark sk buf)
 
 let deterministic_nonce sk_uri buf =
-  secret_key sk_uri >>=? fun sk ->
-  return (Signature.deterministic_nonce sk buf)
+  secret_key sk_uri
+  >>=? fun sk -> return (Signature.deterministic_nonce sk buf)
 
 let deterministic_nonce_hash sk_uri buf =
-  secret_key sk_uri >>=? fun sk ->
-  return (Signature.deterministic_nonce_hash sk buf)
+  secret_key sk_uri
+  >>=? fun sk -> return (Signature.deterministic_nonce_hash sk buf)
 
 let supports_deterministic_nonces _ = return_true

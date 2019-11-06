@@ -31,18 +31,14 @@
 
 let remove_trailing_null s =
   let n = String.length s in
-  let i = ref (n-1) in
-  while (!i >= 0) && (String.get s !i = '\000') do
+  let i = ref (n - 1) in
+  while !i >= 0 && s.[!i] = '\000' do
     i := !i - 1
-  done; String.sub s 0 (!i+1)
+  done ;
+  String.sub s 0 (!i + 1)
 
 let serialize z =
-  let n =
-    if Z.(lt z zero) then
-      Z.(neg (add (add z z) one))
-    else
-      Z.(add z z)
-  in
+  let n = if Z.(lt z zero) then Z.(neg (add (add z z) one)) else Z.(add z z) in
   n |> Z.to_bits |> remove_trailing_null
 
 let deserialize z =
@@ -50,24 +46,24 @@ let deserialize z =
   let z = Z.shift_right_trunc n 1 in
   if Z.(n land one = zero) then z else Z.neg z
 
-let leq a b = (Z.compare a b) <= 0
+let leq a b = Z.compare a b <= 0
 
-let geq a b = (Z.compare a b) >= 0
+let geq a b = Z.compare a b >= 0
 
-let lt  a b = (Z.compare a b) < 0
+let lt a b = Z.compare a b < 0
 
-let gt  a b = (Z.compare a b) > 0
+let gt a b = Z.compare a b > 0
 
-let (<) = lt
-let (>) = gt
-let (<=) = leq
-let (>=) = geq
+let ( < ) = lt
+
+let ( > ) = gt
+
+let ( <= ) = leq
+
+let ( >= ) = geq
 
 let zero = Z.zero
+
 let one = Z.one
 
-let invert a n =
-  try
-    Some (Z.invert a n)
-  with
-    Division_by_zero -> None
+let invert a n = try Some (Z.invert a n) with Division_by_zero -> None

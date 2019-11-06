@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val dump: out_channel -> Protocol_hash.t -> string array -> unit
+val dump : out_channel -> Protocol_hash.t -> string array -> unit
