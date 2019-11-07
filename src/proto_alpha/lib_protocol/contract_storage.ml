@@ -712,7 +712,9 @@ let credit c contract amount =
       Storage.Contract.Balance.set c contract balance
       >>=? fun c -> Roll_storage.Contract.add_amount c contract amount
 
-let init c = Storage.Contract.Global_counter.init c Z.zero
+let init c =
+  Storage.Contract.Global_counter.init c Z.zero
+  >>=? fun c -> Storage.Big_map.Next.init c
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract
