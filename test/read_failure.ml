@@ -131,10 +131,12 @@ let all ?expected name write_encoding read_encoding value =
   let json_value = Json.construct write_encoding value in
   let bson_value = Bson.construct write_encoding value in
   let bytes_value = Binary.to_bytes_exn write_encoding value in
-  [ (name ^ ".json", `Quick, json ?expected read_encoding json_value);
+  [
+    (name ^ ".json", `Quick, json ?expected read_encoding json_value);
     (name ^ ".bson", `Quick, bson ?expected read_encoding bson_value);
     (name ^ ".bytes", `Quick, binary ?expected read_encoding bytes_value);
-    (name ^ ".stream", `Quick, stream ?expected read_encoding bytes_value) ]
+    (name ^ ".stream", `Quick, stream ?expected read_encoding bytes_value);
+  ]
 
 let all_ranged_int minimum maximum =
   let encoding = ranged_int minimum maximum in
@@ -170,12 +172,14 @@ let all_ranged_int minimum maximum =
   else
     let json_value = Json.construct write_encoding (minimum - 1) in
     let bson_value = Bson.construct write_encoding (minimum - 1) in
-    [ ( name ^ "min.json",
+    [
+      ( name ^ "min.json",
         `Quick,
         json ~expected:invalid_int encoding json_value );
       ( name ^ "min..bson",
         `Quick,
-        bson ~expected:invalid_int encoding bson_value ) ]
+        bson ~expected:invalid_int encoding bson_value );
+    ]
 
 let all_ranged_float minimum maximum =
   let encoding = ranged_float minimum maximum in
@@ -193,7 +197,8 @@ let test_bounded_string_list =
   let test name ~total ~elements v expected_read expected_read' =
     let bytes = Binary.to_bytes_exn (Variable.list string) v in
     let vbytes = Binary.to_bytes_exn (list string) v in
-    [ ( "bounded_string_list." ^ name,
+    [
+      ( "bounded_string_list." ^ name,
         `Quick,
         binary ~expected (bounded_list ~total ~elements string) bytes );
       ( "bounded_string_list_stream." ^ name,
@@ -217,7 +222,8 @@ let test_bounded_string_list =
           (check_size
              (total + 4)
              (dynamic_size (Variable.list (check_size elements string))))
-          vbytes ) ]
+          vbytes );
+    ]
   in
   test "a" ~total:0 ~elements:0 [""] 4 4
   @ test "b1" ~total:3 ~elements:4 [""] 4 4
@@ -256,7 +262,8 @@ let tests =
   @ all "unknown_case.E" ~expected:missing_case union_enc mini_union_enc E
   @ all "enum.missing" ~expected:missing_enum enum_enc mini_enum_enc 4
   @ test_bounded_string_list
-  @ [ ( "n.truncated",
+  @ [
+      ( "n.truncated",
         `Quick,
         binary ~expected:not_enough_data n (Bytes.of_string "\x83") );
       ( "n.trailing_zero",
@@ -303,4 +310,5 @@ let tests =
         binary
           ~expected:extra_bytes
           (dynamic_size uint8)
-          (Bytes.of_string "\x00\x00\x00\x02\x00\x00") ) ]
+          (Bytes.of_string "\x00\x00\x00\x02\x00\x00") );
+    ]

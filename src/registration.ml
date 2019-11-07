@@ -89,7 +89,7 @@ let register ?pp encoding =
                 Some record
             | Some _ ->
                 Format.kasprintf
-                  Pervasives.invalid_arg
+                  invalid_arg
                   "Encoding %s previously registered"
                   id)
           !table
