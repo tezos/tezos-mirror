@@ -593,7 +593,16 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       >>=? fun ctxt ->
       set_constants ctxt param.constants >>= fun ctxt -> return ctxt
   | Alpha_previous | Babylon_005 ->
-      return ctxt )
+      get_constants ctxt
+      >>=? fun constants ->
+      let constants =
+        {
+          constants with
+          hard_gas_limit_per_operation = Z.of_int 1_040_000;
+          hard_gas_limit_per_block = Z.of_int 10_400_000;
+        }
+      in
+      set_constants ctxt constants >>= fun ctxt -> return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >>=? fun ctxt -> return (previous_proto, ctxt)
