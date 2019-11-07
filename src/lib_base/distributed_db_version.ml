@@ -37,7 +37,7 @@ let name_encoding =
     ~description:"A name for the distributed DB protocol"
     string
 
-let chain_name = "TEZOS_ALPHANET_CARTHAGE_2019-11-07T13:39:28"
+let chain_name = "TEZOS_ALPHANET_CARTHAGE_2019-11-07T12:02:31Z"
 
 let sandboxed_chain_name = "SANDBOXED_TEZOS"
 
