@@ -64,7 +64,7 @@ introduction tutorials on some :ref:`test network <test-networks>` to familiariz
 risks.
 
 Babylonnet test network
-~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Tezos Babylonnet is a test network for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
