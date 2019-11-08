@@ -37,8 +37,6 @@ module type S = sig
       binding can be found with [find_opt] or traversed with [fold]. *)
   val add : 'a t -> key -> 'a -> unit
 
-  val add_and_return_erased : 'a t -> key -> 'a -> key option
-
   val iter : (key -> 'a -> unit) -> 'a t -> unit
 
   (** [fold f t acc] folds the function [f] and value [acc] through the recently

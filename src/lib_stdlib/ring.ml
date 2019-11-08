@@ -101,8 +101,6 @@ module type TABLE = sig
 
   val add : t -> v -> unit
 
-  val add_and_return_erased : t -> v -> v option
-
   val mem : t -> v -> bool
 
   val remove : t -> v -> unit
@@ -129,15 +127,6 @@ module MakeTable (V : Hashtbl.HashedType) = struct
   let add {contents = t} v =
     Option.iter (Ring.add_and_return_erased t.ring v) ~f:(Table.remove t.table) ;
     Table.add t.table v ()
-
-  let add_and_return_erased {contents = t} v =
-    match Ring.add_and_return_erased t.ring v with
-    | None ->
-        Table.add t.table v () ; None
-    | Some erased ->
-        Table.remove t.table erased ;
-        Table.add t.table v () ;
-        Some erased
 
   let mem {contents = t} v = Table.mem t.table v
 

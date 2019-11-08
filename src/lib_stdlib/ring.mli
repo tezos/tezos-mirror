@@ -73,8 +73,6 @@ module type TABLE = sig
       the first element is removed and [v] is added. *)
   val add : t -> v -> unit
 
-  val add_and_return_erased : t -> v -> v option
-
   (** [mem t v] check if v is in the ring. O(1) *)
   val mem : t -> v -> bool
 

@@ -31,8 +31,6 @@ module type S = sig
 
   val add : 'a t -> key -> 'a -> unit
 
-  val add_and_return_erased : 'a t -> key -> 'a -> key option
-
   val iter : (key -> 'a -> unit) -> 'a t -> unit
 
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
@@ -77,11 +75,6 @@ module Make (M : Hashtbl.HashedType) = struct
     let i = M.hash k in
     Ring.add ring (i, k) ;
     Table.replace table i v
-
-  let add_and_return_erased {ring; table} k v =
-    let i = M.hash k in
-    let erased = Option.map ~f:snd (Ring.add_and_return_erased ring (i, k)) in
-    Table.replace table i v ; erased
 
   let find_opt {table; _} k =
     let i = M.hash k in
