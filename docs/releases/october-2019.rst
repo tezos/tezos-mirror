@@ -7,8 +7,8 @@ Mainnet October 2019
 
 The new storage backend uses a different file format for context
 files, which contain chain data. As a result, a mainnet node in
-archive mode requires less than 40Gb disk space, compared to more than
-200Gb before that.
+archive mode requires less than 40GB disk space, compared to more than
+200GB before that.
 
 To upgrade a mainnet node which is **in archive mode**, you need to
 bootstrap from scratch (delete the old context and store folders in the 
