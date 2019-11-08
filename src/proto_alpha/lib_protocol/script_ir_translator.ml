@@ -4740,8 +4740,13 @@ and parse_instr :
       fail (Invalid_arity (loc, name, 1, List.length l))
   | ( Prim
         ( loc,
-          ( (I_PUSH | I_IF_NONE | I_IF_LEFT | I_IF_CONS | I_EMPTY_MAP | I_IF)
-          as name ),
+          ( ( I_PUSH
+            | I_IF_NONE
+            | I_IF_LEFT
+            | I_IF_CONS
+            | I_EMPTY_MAP
+            | I_EMPTY_BIG_MAP
+            | I_IF ) as name ),
           (([] | [_] | _ :: _ :: _ :: _) as l),
           _ ),
       _ ) ->
@@ -4930,6 +4935,7 @@ and parse_instr :
              I_IF_LEFT;
              I_IF_CONS;
              I_EMPTY_MAP;
+             I_EMPTY_BIG_MAP;
              I_IF;
              I_SOURCE;
              I_SENDER;
