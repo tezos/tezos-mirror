@@ -211,7 +211,7 @@ Get free tez
 ~~~~~~~~~~~~
 
 In order to test the networks and help users get familiar with the
-system, on Zeronet and Babylonnet test network you can obtain free tez from a
+system, on Zeronet and Babylonnet test networks you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
