@@ -503,14 +503,14 @@ let rec step :
         >>=? fun ctxt ->
         match l with
         | [] ->
-            return (acc, ctxt)
+            return (Item (acc, rest), ctxt)
         | ((k, _) as hd) :: tl ->
             step ?log ctxt step_constants body (Item (hd, rest))
             >>=? fun (Item (hd, rest), ctxt) ->
             loop rest ctxt tl (map_update k (Some hd) acc)
       in
       loop rest ctxt l (empty_map (map_key_ty map))
-      >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
+      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Map_iter body, Item (map, init)) ->
       Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map))
       >>=? fun ctxt ->
