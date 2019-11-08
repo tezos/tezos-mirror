@@ -120036,6 +120036,14 @@ cat > /tmp/parameters.json <<EOF
    "edpkuAz6xjTsJAUjbqN87rJrqK7YUSjEw7EaukF1d4Rspj2gC8WSuu",
    "400000000000"
   ],
+  [
+   "tz3WXYtyDUNL91qfiCJtVUX746QpNv5i5ve5",
+   "800000000000"
+  ],
+  [
+   "tz3gN8NTLNLJg5KRsUU47NHNVHbdhcFXjjaB",
+   "800000000000"
+  ]
  ],
  "bootstrap_contracts": [],
  "security_deposit_ramp_up_cycles": 64,
