@@ -697,3 +697,16 @@ class TestComparablePairs:
         # tests that non-comb pairs are rejected by the typechecker
         assert utils.check_typecheck_data_failure(
             client, '{}', '(set (pair (pair nat nat) nat))')
+
+
+@pytest.mark.contract
+class TestTypecheckingErrors:
+    @pytest.mark.xfail(reason="To be fixed in next protocol")
+    def test_big_map_arity_error(self, client):
+        def cmd():
+            client.typecheck(f'{CONTRACT_PATH}/ill_typed/big_map_arity.tz')
+
+        assert utils.check_run_failure(
+            cmd,
+            'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
+        )
