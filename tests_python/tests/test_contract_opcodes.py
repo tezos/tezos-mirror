@@ -833,3 +833,26 @@ class TestContractOpcodes:
                               '(Pair %wrong %field "hello" 0)',
                               '""')
         assert check_run_failure(cmd, r'The two annotations do not match')
+
+    @pytest.mark.skip(reason="To be fixed in next protocol")
+    @pytest.mark.parametrize(
+        "contract,param,storage,expected",
+        [   # FORMAT: assert_output contract_file storage input expected_result
+            # Mapping over maps
+            ('map_map_sideeffect.tz',
+             '(Pair {} 0)', '10', '(Pair {} 0)'),
+            ('map_map_sideeffect.tz',
+             '(Pair { Elt "foo" 1 } 1)', '10', '(Pair { Elt "foo" 11 } 11)'),
+            ('map_map_sideeffect.tz',
+             '(Pair { Elt "bar" 5 ; Elt "foo" 1 } 6)', '15',
+             '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
+        ])
+    def test_map_map_sideeffect(self,
+                                client,
+                                contract,
+                                param,
+                                storage,
+                                expected):
+        contract = f'{CONTRACT_PATH}/{contract}'
+        run_script_res = client.run_script(contract, param, storage)
+        assert run_script_res.storage == expected
