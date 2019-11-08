@@ -400,3 +400,14 @@ class TestComparablePairs:
         contract = f'{CONTRACT_PATH}/opcodes/{contract}'
         run_script_res = client.run_script(contract, param, storage)
         assert run_script_res.storage == expected
+
+
+class TestTypecheckingErrors:
+    def test_big_map_arity_error(self, client):
+        def cmd():
+            client.typecheck(f'{CONTRACT_PATH}/illtyped/big_map_arity.tz')
+
+        utils.check_run_failure(
+            cmd,
+            'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
+        )
