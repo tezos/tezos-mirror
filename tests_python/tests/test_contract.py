@@ -691,7 +691,6 @@ class TestComparablePairs:
 
 @pytest.mark.contract
 class TestTypecheckingErrors:
-    @pytest.mark.xfail(reason="To be fixed in next protocol")
     def test_big_map_arity_error(self, client):
         def cmd():
             client.typecheck(os.path.join(CONTRACT_PATH, 'ill_typed',
