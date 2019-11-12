@@ -80,7 +80,6 @@ Build from sources
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
    git checkout mainnet
-   opam init --bare
    make build-deps
    eval $(opam env)
    make
@@ -98,7 +97,6 @@ Build from sources
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
    git checkout babylonnet
-   opam init --bare
    make build-deps
    eval $(opam env)
    make
