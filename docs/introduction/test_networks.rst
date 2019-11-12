@@ -37,6 +37,33 @@ This results in a chain which moves faster:
 - a voting period should last less than 16 hours instead of about 23 days.
 Note that in Zeronet, a voting period is 22 cycles instead of 8 cycles in Mainnet.
 
+Carthagenet
+-----------
+
+- Git branch: ``carthagenet``
+- Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/carthagenet/scripts/alphanet.sh``
+
+Carthagenet is a test network which was started with the Babylon protocol,
+and which will be upgraded with the Carthage protocol by vote once Carthage
+is ready. If Carthage becomes the active protocol of Mainnet,
+Carthagenet will run until Carthage is replaced by another protocol.
+If Carthage is not activated on Mainnet, Carthagenet will also end.
+
+On Carthagenet, the following constants differ from Mainnet:
+
+- ``preserved_cycles`` is 3 instead of 5;
+- ``blocks_per_cycle`` is 2048 instead of 4096;
+- ``blocks_per_voting_period`` is 2048 instead of 32768;
+- ``time_between_blocks`` is ``[ 30, 40 ]`` instead of ``[ 60, 40 ]``;
+- ``test_chain_duration`` is 43200 instead of 1966080;
+- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
+
+This results in a faster chain than Mainnet, but not quite as fast as Zeronet:
+
+- 2 blocks per minute;
+- a cycle should last about 17 hours;
+- a voting period lasts 1 cycle and should thus also last about 17 hours.
+
 Babylonnet
 ----------
 
@@ -71,12 +98,12 @@ bake continuously.
 Future Networks
 ---------------
 
-At some point, there will be a proposal for a successor to the Babylon
-protocol (let's call it C for now). After C is injected, a new test network
-(let's call it C-net) will be spawned. It will run alongside Babylonnet
-until either C is rejected or activated. If C is rejected, C-net will
-end, unless C is immediately re-submitted for injection. If, however,
-C is activated, Babylonnet will end and C-net will continue on its own.
+At some point, there will be a proposal for a successor to the current
+protocol (let's call this new protocol P). After P is injected, a new test network
+(let's call it P-net) will be spawned. It will run alongside the latest
+test network until either P is rejected or activated. If P is rejected, P-net will
+end, unless P is immediately re-submitted for injection. If, however,
+P is activated, the previous test network will end and P-net will continue on its own.
 
 Old Networks
 ------------
