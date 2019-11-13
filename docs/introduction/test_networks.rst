@@ -80,8 +80,6 @@ On Babylonnet, the following constants differ from Mainnet:
 - ``blocks_per_cycle`` is 2048 instead of 4096;
 - ``blocks_per_voting_period`` is 8192 instead of 32768;
 - ``time_between_blocks`` is ``[ 30, 40 ]`` instead of ``[ 60, 40 ]``;
-- ``block_security_deposit`` is 136000000 instead of 512000000;
-- ``endorsement_security_deposit`` is 17000000 instead of 64000000;
 - ``test_chain_duration`` is 86400 instead of 1966080;
 - ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%);
 - ``delay_per_missing_endorsement`` is 2 instead of 8.
