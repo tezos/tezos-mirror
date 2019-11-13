@@ -6,13 +6,13 @@ import json
 import time
 import re
 import hashlib
+import subprocess
 import requests
 import ed25519
 import base58check
 import pyblake2
 from client.client import Client
 from . import constants
-import subprocess
 
 
 def retry(timeout: float, attempts: float):  # pylint: disable=unused-argument
@@ -280,9 +280,9 @@ def mutez_of_tez(tez: float):
 
 
 def check_run_failure(code, pattern, mode='stderr'):
-    """Executes [code()] and expects the code to fail and raise [subprocess.CalledProcessError].
-    If so, the [pattern] is searched in stderr. If it is found, returns True;
-    else returns False.
+    """Executes [code()] and expects the code to fail and raise
+    [subprocess.CalledProcessError]. If so, the [pattern] is searched
+    in stderr. If it is found, returns True; else returns False.
     """
     try:
         code()
@@ -292,7 +292,7 @@ def check_run_failure(code, pattern, mode='stderr'):
         stderr_output = exc.args[3]
         data = []
         if mode == 'stderr':
-            data = stderr_output
+            data = stderr_output.split('\n')
         else:
             data = stdout_output.split('\n')
         for line in data:

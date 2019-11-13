@@ -114,7 +114,7 @@ class Client:
 
         print(format_command(cmd))
 
-        stderr = []
+        stderr = ""
         stdout = ""
         stderr = ""
         new_env = os.environ.copy()
@@ -136,7 +136,7 @@ class Client:
 
             for line in process.stderr:
                 print(line, end='', file=sys.stderr)
-                stderr.append(line)
+                stderr += line
         if check and process.returncode:
             raise subprocess.CalledProcessError(process.returncode,
                                                 process.args,

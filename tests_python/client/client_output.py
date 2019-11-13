@@ -234,6 +234,8 @@ def extract_balance(client_output: str) -> float:
     try:
         pattern = r"([\w.]*) ꜩ"
         match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
         return float(match.groups()[0])
     except Exception:
         raise InvalidClientOutput(client_output)

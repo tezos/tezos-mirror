@@ -184,11 +184,6 @@ unit:micheline:
   tags:
     - gitlab-org
 
-integration:contracts.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts.sh
-
 integration:contracts_opcode.sh:
   <<: *integration_definition
   script:
@@ -198,11 +193,6 @@ integration:contracts_macros.sh:
   <<: *integration_definition
   script:
     - dune build @src/bin_client/runtest_contracts_macros.sh
-
-integration:contracts_mini_scenarios.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_mini_scenarios.sh
 
 integration:multinode.sh:
   <<: *integration_definition
