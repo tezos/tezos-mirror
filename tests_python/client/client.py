@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 import json
+import sys
 from . import client_output
 
 
@@ -113,6 +114,7 @@ class Client:
 
         print(format_command(cmd))
 
+        stderr = []
         stdout = ""
         stderr = ""
         new_env = os.environ.copy()
@@ -132,9 +134,13 @@ class Client:
                 print(line, end='')
                 stderr += line
 
+            for line in process.stderr:
+                print(line, end='', file=sys.stderr)
+                stderr.append(line)
         if check and process.returncode:
             raise subprocess.CalledProcessError(process.returncode,
                                                 process.args,
+                                                stdout,
                                                 stderr)
 
         return stdout
