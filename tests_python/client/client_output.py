@@ -74,7 +74,8 @@ class RunScriptResult:
     """Result of a 'get script' operation."""
 
     def __init__(self, client_output: str):
-        pattern = r"^storage\n\s*(.*)"
+        # read storage output
+        pattern = r"(?s)storage\n\s*(.*)\nemitted operations\n"
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
