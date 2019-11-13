@@ -118,7 +118,7 @@ let invalid_double_endorsement () =
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_double_endorsement_evidence ->
+      | Cheating_proofs.Invalid_double_endorsement_evidence _ ->
           true
       | _ ->
           false)
@@ -141,7 +141,7 @@ let too_early_double_endorsement_evidence () =
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Too_early_double_endorsement_evidence _ ->
+      | Cheating_proofs.Too_early_evidence _ ->
           true
       | _ ->
           false)
@@ -171,7 +171,7 @@ let too_late_double_endorsement_evidence () =
   Block.bake ~operation blk
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Outdated_double_endorsement_evidence _ ->
+      | Cheating_proofs.Outdated_evidence _ ->
           true
       | _ ->
           false)
@@ -205,7 +205,7 @@ let different_delegates () =
   Block.bake ~operation blk_b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Inconsistent_double_endorsement_evidence _ ->
+      | Cheating_proofs.Inconsistent_evidence _ ->
           true
       | _ ->
           false)
@@ -242,6 +242,129 @@ let wrong_delegate () =
       | _ ->
           false)
 
+(** inject proof twice in two different cycle *)
+let double_injection_double_endorsement_evidence () =
+  Context.init 2
+  >>=? fun (blk, _contracts) ->
+  block_fork blk
+  >>=? fun (blk_a, blk_b) ->
+  Context.get_endorser (B blk_a)
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B blk_a) ()
+  >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) ()
+  >>=? fun endorsement_b ->
+  Block.bake ~operations:[Operation.pack endorsement_a] blk_a
+  >>=? fun blk_a ->
+  Op.double_endorsement (B blk_a) endorsement_a endorsement_b
+  >>=? fun evidence ->
+  Block.bake ~operation:evidence blk_a
+  >>=? fun blk ->
+  Block.bake_until_cycle_end blk
+  >>=? fun blk ->
+  Block.bake ~operation:evidence blk
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Double_injection_of_evidence ->
+          true
+      | _ ->
+          false)
+
+(** Previously unrequired evidence can be re-injected and slash the baker *)
+let unrequired_evidence_injected () =
+  Context.init 2
+  >>=? fun (blk, _contracts) ->
+  Context.get_endorser (B blk)
+  >>=? fun (delegate, _slots) ->
+  block_fork blk
+  >>=? fun (blk_a, blk_b) ->
+  Op.endorsement ~delegate (B blk_a) ()
+  >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) ()
+  >>=? fun endorsement_b ->
+  Op.double_endorsement (B blk) endorsement_a endorsement_b
+  >>=? fun evidence ->
+  Block.bake blk
+  >>=? fun blk ->
+  block_fork blk
+  >>=? fun (blk_2_a, blk_2_b) ->
+  Op.endorsement ~delegate (B blk_2_a) ()
+  >>=? fun endorsement_2_a ->
+  Op.endorsement ~delegate (B blk_2_b) ()
+  >>=? fun endorsement_2_b ->
+  Op.double_endorsement (B blk) endorsement_2_a endorsement_2_b
+  >>=? fun evidence_2 ->
+  Block.bake ~policy:(By_account delegate) blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [delegate]) ~operation:evidence blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [delegate]) ~operation:evidence_2 blk
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Unrequired_evidence ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  Block.bake ~policy:(By_account delegate) blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [delegate]) ~operation:evidence_2 blk
+  >>=? fun _blk -> return_unit
+
+let assert_proof_exists ~loc ?(exists = true) cheat_level delegate blk =
+  Context.Delegate.info (B blk) delegate
+  >>=? fun delegate_info ->
+  let proof_exists =
+    Raw_level.LSet.mem cheat_level delegate_info.proof_levels
+  in
+  Assert.equal_bool ~loc proof_exists exists
+
+(** Outdated proof is deleted from storage *)
+let outdated_proof_has_been_cleaned () =
+  Context.init 2
+  >>=? fun (blk, _contracts) ->
+  Context.get_constants (B blk)
+  >>=? fun Constants.{parametric = {preserved_cycles; blocks_per_cycle; _}; _} ->
+  block_fork blk
+  >>=? fun (blk_a, blk_b) ->
+  Context.get_level (B blk_a)
+  >>=? fun cheat_level ->
+  Context.get_endorser (B blk_a)
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B blk_a) ()
+  >>=? fun endorsement_a ->
+  Op.endorsement ~delegate (B blk_b) ()
+  >>=? fun endorsement_b ->
+  Op.double_endorsement (B blk_a) endorsement_a endorsement_b
+  >>=? fun evidence ->
+  Block.bake_until_n_cycle_end preserved_cycles blk_a
+  >>=? fun blk ->
+  Block.bake_n (Int32.to_int blocks_per_cycle - 2) blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [delegate]) ~operation:evidence blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ cheat_level delegate blk
+  >>=? fun () ->
+  Block.bake blk
+  >>=? fun blk ->
+  Block.bake ~operation:evidence blk
+  >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Cheating_proofs.Outdated_evidence _ ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  (* proof storage is cleaned at the end of cycle *)
+  (* proof storage is cleaned at the end of cycles *)
+  Block.bake_n (Int32.to_int blocks_per_cycle - 2) blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ cheat_level delegate blk
+  >>=? fun () ->
+  Block.bake blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ ~exists:false cheat_level delegate blk
+
 let tests =
   [ Test.tztest
       "valid double endorsement evidence"
@@ -260,4 +383,16 @@ let tests =
       `Quick
       too_late_double_endorsement_evidence;
     Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_delegate ]
+    Test.tztest "wrong delegate" `Quick wrong_delegate;
+    Test.tztest
+      "reject double injection of an evidence."
+      `Quick
+      double_injection_double_endorsement_evidence;
+    Test.tztest
+      "inject previously unrequired evidence"
+      `Quick
+      unrequired_evidence_injected;
+    Test.tztest
+      "outdated proof has been cleaned from storage"
+      `Quick
+      outdated_proof_has_been_cleaned ]

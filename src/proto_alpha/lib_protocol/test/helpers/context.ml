@@ -307,6 +307,7 @@ module Delegate = struct
     deactivated : bool;
     grace_period : Cycle.t;
     voting_power : int32;
+    proof_levels : Raw_level.LSet.t;
   }
 
   let info ctxt pkh = Alpha_services.Delegate.info rpc_ctxt ctxt pkh

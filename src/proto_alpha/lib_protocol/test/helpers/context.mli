@@ -128,6 +128,7 @@ module Delegate : sig
     deactivated : bool;
     grace_period : Cycle.t;
     voting_power : int32;
+    proof_levels : Raw_level.LSet.t;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t

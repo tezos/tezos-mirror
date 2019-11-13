@@ -106,7 +106,7 @@ let same_blocks () =
   Block.bake ~operation ba
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_double_baking_evidence _ ->
+      | Cheating_proofs.Invalid_double_baking_evidence _ ->
           true
       | _ ->
           false)
@@ -126,7 +126,7 @@ let different_levels () =
   Block.bake ~operation blk_a
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_double_baking_evidence _ ->
+      | Cheating_proofs.Invalid_double_baking_evidence _ ->
           true
       | _ ->
           false)
@@ -143,7 +143,7 @@ let too_early_double_baking_evidence () =
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Too_early_double_baking_evidence _ ->
+      | Cheating_proofs.Too_early_evidence _ ->
           true
       | _ ->
           false)
@@ -157,17 +157,14 @@ let too_late_double_baking_evidence () =
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
-  fold_left_s
-    (fun blk _ -> Block.bake_until_cycle_end blk)
-    blk_a
-    (1 -- (preserved_cycles + 1))
+  Block.bake_until_n_cycle_end (preserved_cycles + 1) blk_a
   >>=? fun blk ->
   Op.double_baking (B blk) blk_a.header blk_b.header
   >>=? fun operation ->
   Block.bake ~operation blk
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Outdated_double_baking_evidence _ ->
+      | Cheating_proofs.Outdated_evidence _ ->
           true
       | _ ->
           false)
@@ -188,7 +185,7 @@ let different_delegates () =
   Block.bake ~operation blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
-      | Apply.Inconsistent_double_baking_evidence _ ->
+      | Cheating_proofs.Inconsistent_evidence _ ->
           true
       | _ ->
           false)
@@ -218,6 +215,115 @@ let wrong_signer () =
       | _ ->
           false)
 
+(** Detect when an evidence is injected twice in two different cycles *)
+let double_injection_double_baking_evidence () =
+  Context.init 2
+  >>=? fun (blk, contracts) ->
+  Context.get_bakers (B blk)
+  >>=? fun bakers ->
+  let baker = List.hd bakers in
+  block_fork ~policy:(By_account baker) contracts blk
+  >>=? fun (blk_a, blk_b) ->
+  Block.bake_until_cycle_end blk_a
+  >>=? fun blk ->
+  Op.double_baking (B blk) blk_a.header blk_b.header
+  >>=? fun evidence ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk
+  >>=? fun blk ->
+  Block.bake_until_cycle_end blk
+  >>=? fun blk ->
+  Op.double_baking (B blk) blk_b.header blk_a.header
+  >>=? fun evidence ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Double_injection_of_evidence ->
+          true
+      | _ ->
+          false)
+
+(** Previously unrequired evidence can be re-injected and slash the baker *)
+let unrequired_evidence_injected () =
+  Context.init 2
+  >>=? fun (blk, contracts) ->
+  Context.get_bakers (B blk)
+  >>=? fun bakers ->
+  let baker = List.hd bakers in
+  block_fork ~policy:(By_account baker) contracts blk
+  >>=? fun (blk_a, blk_b) ->
+  Op.double_baking (B blk_a) blk_a.header blk_b.header
+  >>=? fun evidence ->
+  Block.bake blk_a
+  >>=? fun blk ->
+  block_fork ~policy:(By_account baker) contracts blk
+  >>=? fun (blk_a, blk_b) ->
+  Op.double_baking (B blk_a) blk_a.header blk_b.header
+  >>=? fun evidence_2 ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk_a
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence_2 blk
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Unrequired_evidence ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  Block.bake ~policy:(By_account baker) blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence_2 blk
+  >>=? fun _blk -> return_unit
+
+let assert_proof_exists ~loc ?(exists = true) cheat_level delegate blk =
+  Context.Delegate.info (B blk) delegate
+  >>=? fun delegate_info ->
+  let proof_exists =
+    Raw_level.LSet.mem cheat_level delegate_info.proof_levels
+  in
+  Assert.equal_bool ~loc proof_exists exists
+
+(** Outdated proof is deleted from storage *)
+let outdated_proof_has_been_cleaned () =
+  Context.init 2
+  >>=? fun (blk, contracts) ->
+  Context.get_constants (B blk)
+  >>=? fun Constants.{parametric = {preserved_cycles; blocks_per_cycle; _}; _} ->
+  Context.get_bakers (B blk)
+  >>=? fun bakers ->
+  let baker = List.hd bakers in
+  block_fork ~policy:(By_account baker) contracts blk
+  >>=? fun (blk_a, blk_b) ->
+  Context.get_level (B blk_a)
+  >>=? fun cheat_level ->
+  Op.double_baking (B blk_a) blk_a.header blk_b.header
+  >>=? fun evidence ->
+  Block.bake_until_n_cycle_end preserved_cycles blk_a
+  >>=? fun blk ->
+  Block.bake_n (Int32.to_int blocks_per_cycle - 2) blk
+  >>=? fun blk ->
+  Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ cheat_level baker blk
+  >>=? fun () ->
+  Block.bake blk
+  >>=? fun blk ->
+  Block.bake ~operation:evidence blk
+  >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Cheating_proofs.Outdated_evidence _ ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  (* proof storage is cleaned at the end of cycles *)
+  Block.bake_n (Int32.to_int blocks_per_cycle - 2) blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ cheat_level baker blk
+  >>=? fun () ->
+  Block.bake blk
+  >>=? fun blk ->
+  assert_proof_exists ~loc:__LOC__ ~exists:false cheat_level baker blk
+
 let tests =
   [ Test.tztest
       "valid double baking evidence"
@@ -235,4 +341,20 @@ let tests =
       `Quick
       too_late_double_baking_evidence;
     Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_signer ]
+    Test.tztest "wrong delegate" `Quick wrong_signer;
+    Test.tztest
+      "reject double injection of an evidence"
+      `Quick
+      double_injection_double_baking_evidence;
+    Test.tztest
+      "inject previously unrequired evidence"
+      `Quick
+      unrequired_evidence_injected;
+    Test.tztest
+      "outdated proof has been cleaned from storage"
+      `Quick
+      outdated_proof_has_been_cleaned
+    (* Test.tztest
+     *   "evidence is valid until last block of preserved_cycle "
+     *   `Quick
+     *   evidence_is_valid_or_too_old *) ]
