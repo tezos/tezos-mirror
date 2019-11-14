@@ -61,8 +61,8 @@ the type-checker for comparable types, the Babylon implementation of
 comparable pairs did not allow the use of pairs as elements in sets nor
 keys in maps and big maps. This is fixed in Carthage.
 
-Fixing ``MAP`` ping on ``map`` s with side effects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fixing MAPping on maps with side effects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``MAP`` instruction can be used in Michelson to apply a function to
 each element of a list or each value of a map, producing respectively
@@ -83,7 +83,7 @@ current state of the mainnet chain and we have checked that, at time
 of writing, no contract is affected by this bug. Until the activation
 of Carthage (or any protocol including this fix), smart contract
 authors should avoid relying on the bogus behaviour of the ``MAP``
-instruction on ``map``s by using the ``ITER`` instruction instead when
+instruction on maps by using the ``ITER`` instruction instead when
 they need to perform side effects on the remaining of the stack during
 an iteration.
 
@@ -97,8 +97,8 @@ decreased. Unfortunately, a small mistake in the unfolding of the
 ``UNPAIR`` macro made this special treatment dead code; the interpreter
 is looking for the sequence ``{DUP; CAR; DIP CDR}`` but the unfolding of
 ``UNPAIR`` is actually ``{DUP; CAR; DIP {CDR}}`` (note the extra pair of
-curly braces around ``CDR``). Moreover, the [Babylon gas
-update](https://gitlab.com/nomadic-labs/tezos/merge_requests/73) has
+curly braces around ``CDR``). Moreover, the `Babylon gas
+update <https://gitlab.com/nomadic-labs/tezos/merge_requests/73>`_ has
 made this peephole optimisation of the ``UNPAIR`` macro much less
 interesting because the gas costs of all stack and pair instructions
 are much lower than in previous protocols. We plan to promote ``UNPAIR``
@@ -157,15 +157,15 @@ can run from this branch::
 List of Merge Requests
 ~~~~~~~~~~~~~~~~~~~~~~
 
-* [Baking RPC](https://gitlab.com/nomadic-labs/tezos/merge_requests/108)
-* [Baking/Endorsement Formula](https://gitlab.com/nomadic-labs/tezos/merge_requests/110)
-* [Gas Limit Increases](https://gitlab.com/nomadic-labs/tezos/merge_requests/117)
-* [Dead Code Removal](https://gitlab.com/nomadic-labs/tezos/merge_requests/118)
-* [Comparable Pairs](https://gitlab.com/nomadic-labs/tezos/merge_requests/106)
-* [Michelson Fix for MAP instruction](https://gitlab.com/nomadic-labs/tezos/merge_requests/120)
-* [Improve CONTRACT instruction](https://gitlab.com/nomadic-labs/tezos/merge_requests/95)
-* [Improve BIG_MAP error message](https://gitlab.com/nomadic-labs/tezos/merge_requests/121)
-* [Move BIG_MAP initialisation](https://gitlab.com/nomadic-labs/tezos/merge_requests/119)
+* `Baking RPC <https://gitlab.com/nomadic-labs/tezos/merge_requests/108>`_
+* `Baking/Endorsement Formula <https://gitlab.com/nomadic-labs/tezos/merge_requests/110>`_
+* `Gas Limit Increases <https://gitlab.com/nomadic-labs/tezos/merge_requests/117>`_
+* `Dead Code Removal <https://gitlab.com/nomadic-labs/tezos/merge_requests/118>`_
+* `Comparable Pairs <https://gitlab.com/nomadic-labs/tezos/merge_requests/106>`_
+* `Michelson Fix for MAP instruction <https://gitlab.com/nomadic-labs/tezos/merge_requests/120>`_
+* `Improve CONTRACT instruction <https://gitlab.com/nomadic-labs/tezos/merge_requests/95>`_
+* `Improve BIG_MAP error message <https://gitlab.com/nomadic-labs/tezos/merge_requests/121>`_
+* `Move BIG_MAP initialisation <https://gitlab.com/nomadic-labs/tezos/merge_requests/119>`_
 
 
 Detailed Changelog
