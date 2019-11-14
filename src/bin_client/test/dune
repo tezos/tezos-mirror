@@ -102,8 +102,7 @@
 
 (alias
  (name runtest)
- (deps (alias runtest_contracts_opcode.sh)
-       (alias runtest_contracts_macros.sh)
+ (deps (alias runtest_contracts_macros.sh)
        (alias runtest_multinode.sh)
        (alias runtest_injection.sh)
        (alias runtest_tls.sh)
