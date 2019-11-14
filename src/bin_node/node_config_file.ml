@@ -863,25 +863,30 @@ let bootstrap_conf_encoding default_max_latency default_chain_stuck_delay
        (dft
           "max_latency"
           ~description:
-            "Maximal delay that it should take for a block to reach other \
-             nodes in the network."
-          int64
+            "[max_latency] is the time interval (in seconds) used to \
+             determine if a peer is synchronized with a chain. For instance, \
+             a peer whose known head has a timestamp T is considered \
+             synchronized if T >= now - max_latency. This parameter depends \
+             on the baking rate and the latency of the network."
+          uint16
           default_max_latency)
        (dft
           "chain_stuck_delay"
-          ~description:"Delay after which we consider the chain is stuck."
-          int64
+          ~description:
+            "Delay (seconds) after which we consider the chain is stuck."
+          uint16
           default_chain_stuck_delay)
        (dft
           "sync_polling_period"
-          ~description:"Polling period used to check for synchronization."
-          float
+          ~description:
+            "Polling period (seconds) used to check for synchronization."
+          uint16
           default_sync_polling_period)
        (dft
           "bootstrap_threshold"
           ~description:
-            "Set the number of peers with whom a chain synchronization must \
-             be completed to bootstrap the node."
+            "The minimal number of peers this peer should be synchronized \
+             with in order to be bootstrapped."
           uint8
           default_bootstrap_threshold))
 
@@ -1050,7 +1055,8 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
-    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network cfg =
+    ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network
+    ?max_latency ?chain_stuck_delay ?sync_polling_period cfg =
   let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1108,17 +1114,35 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       block_validator_limits = cfg.shell.block_validator_limits;
       prevalidator_limits = cfg.shell.prevalidator_limits;
       chain_validator_limits =
-        Option.unopt_map
-          ~default:cfg.shell.chain_validator_limits
-          ~f:(fun bootstrap_threshold ->
-            let bootstrap_conf =
-              {
-                cfg.shell.chain_validator_limits.bootstrap_conf with
-                bootstrap_threshold;
-              }
-            in
-            {cfg.shell.chain_validator_limits with bootstrap_conf})
-          bootstrap_threshold;
+        (let bootstrap_conf : Chain_validator.bootstrap_conf =
+           {
+             max_latency =
+               Option.unopt
+                 ~default:
+                   Node.default_chain_validator_limits.bootstrap_conf
+                     .max_latency
+                 max_latency;
+             chain_stuck_delay =
+               Option.unopt
+                 ~default:
+                   Node.default_chain_validator_limits.bootstrap_conf
+                     .chain_stuck_delay
+                 chain_stuck_delay;
+             sync_polling_period =
+               Option.unopt
+                 ~default:
+                   Node.default_chain_validator_limits.bootstrap_conf
+                     .sync_polling_period
+                 sync_polling_period;
+             bootstrap_threshold =
+               Option.unopt
+                 ~default:
+                   Node.default_chain_validator_limits.bootstrap_conf
+                     .bootstrap_threshold
+                 bootstrap_threshold;
+           }
+         in
+         {cfg.shell.chain_validator_limits with bootstrap_conf});
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }
   in

@@ -28,14 +28,16 @@ type t
 
 (** Constants parameterizing the bootstrap heuristics. *)
 type bootstrap_conf = {
-  max_latency : Int64.t;
-      (** [max_latency] is the maximal delay that it should take for a block to reach
-          other nodes in the network *)
-  chain_stuck_delay : Int64.t;
-      (** [chain_stuck_delay] is the delay after which we consider the chain is stuck
-          if we don't get new heads from peers. *)
-  sync_polling_period : float;
-      (** [sync_polling_period] is the polling period used to check for
+  max_latency : int;
+      (** [max_latency] is the time interval (seconds) used to determine if a node is
+          synchronized with a chain. For instance, a node that knows head
+          with timestamp T is synchronized if T >= now - max_latency. This
+          parameter depends on the baking rate and the latency of the network. *)
+  chain_stuck_delay : int;
+      (** [chain_stuck_delay] is the delay (seconds) after which we consider
+          the chain is stuck if we don't get new heads from peers. *)
+  sync_polling_period : int;
+      (** [sync_polling_period] is the polling period (seconds) used to check for
           synchronisation. *)
   bootstrap_threshold : int;
 }

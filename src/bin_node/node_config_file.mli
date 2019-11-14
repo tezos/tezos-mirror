@@ -118,6 +118,9 @@ val update :
   ?bootstrap_threshold:int ->
   ?history_mode:History_mode.t ->
   ?network:blockchain_network ->
+  ?max_latency:int ->
+  ?chain_stuck_delay:int ->
+  ?sync_polling_period:int ->
   t ->
   t tzresult Lwt.t
 

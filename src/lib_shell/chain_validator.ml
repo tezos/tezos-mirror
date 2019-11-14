@@ -45,9 +45,9 @@ module Request = struct
 end
 
 type bootstrap_conf = {
-  max_latency : Int64.t;
-  chain_stuck_delay : Int64.t;
-  sync_polling_period : float;
+  max_latency : int;
+  chain_stuck_delay : int;
+  sync_polling_period : int;
   bootstrap_threshold : int;
 }
 
@@ -188,9 +188,9 @@ let sync_state nv =
     | Some (min_head_time, max_head_time, last_heard) ->
         let now = Time.System.to_protocol @@ Systime_os.now () in
         let some_time_from_now =
-          Time.Protocol.add now (Int64.neg chain_stuck_delay)
+          Time.Protocol.add now (Int64.of_int (-chain_stuck_delay))
         in
-        let almost_now = Time.Protocol.add now (Int64.neg max_latency) in
+        let almost_now = Time.Protocol.add now (Int64.of_int (-max_latency)) in
         if Time.Protocol.(min_head_time >= almost_now) then `Sync
         else if
           min_head_time = max_head_time && last_heard <= some_time_from_now
@@ -214,7 +214,8 @@ let poll_sync w nv =
         | `Sync ->
             Lwt.return_unit
         | `Unsync ->
-            Lwt_unix.sleep sync_polling_period >>= fun () -> loop ()
+            Lwt_unix.sleep (float_of_int sync_polling_period)
+            >>= fun () -> loop ()
       in
       loop ()
     in
