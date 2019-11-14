@@ -64,15 +64,15 @@ module Voting_period = struct
 end
 
 module Protocol_kind = struct
-  type t = [`Athens | `Babylon]
+  type t = [`Babylon | `Carthage]
 
-  let names = [("Athens", `Athens); ("Babylon", `Babylon)]
+  let names = [("Babylon", `Babylon); ("Carthage", `Carthage)]
 
   let cmdliner_term () : t Cmdliner.Term.t =
     let open Cmdliner in
     Arg.(
       value
-        (opt (enum names) `Babylon
+        (opt (enum names) `Carthage
            (info ["protocol-kind"] ~doc:"Set the protocol family.")))
 
   let pp ppf n =
@@ -104,15 +104,15 @@ let compare a b = String.compare a.id b.id
 let default () =
   let dictator = Account.of_name "dictator-default" in
   { id= "default-bootstrap"
-  ; kind= `Babylon
+  ; kind= `Carthage
   ; bootstrap_accounts=
       List.init 4 ~f:(fun n ->
           (Account.of_namef "bootacc-%d" n, 4_000_000_000_000L))
   ; dictator
     (* ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)] *)
   ; expected_pow= 1
-  ; name= "005_PsBabyM1"
-  ; hash= "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
+  ; name= "006_PtCartha"
+  ; hash= "PtCarthavAMoXqbjBPVgDCRd5LgT7qqKWUPXnYii3xCaHRBMfHH"
   ; time_between_blocks= [2; 3]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16
@@ -130,9 +130,21 @@ let protocol_parameters_json t : Ezjsonm.t =
       ; ("amount", ksprintf string "%d" amount)
       ; ("script", (Script.load script :> Ezjsonm.value)) ] in
   *)
-  let extra_babylon_stuff_to_put =
+  let common =
     Ezjsonm.
-      [ ("blocks_per_commitment", int 4)
+      [ ( "bootstrap_accounts"
+        , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
+        )
+        (* ; ("bootstrap_contracts", list make_contract t.bootstrap_contracts) *)
+      ; ( "time_between_blocks"
+        , list (ksprintf string "%d") t.time_between_blocks )
+      ; ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
+      ; ("blocks_per_voting_period", int t.blocks_per_voting_period)
+      ; ("blocks_per_cycle", int t.blocks_per_cycle)
+      ; ("preserved_cycles", int t.preserved_cycles)
+      ; ( "proof_of_work_threshold"
+        , ksprintf string "%d" t.proof_of_work_threshold )
+      ; ("blocks_per_commitment", int 4)
       ; ("endorsers_per_block", int 32)
       ; ("hard_gas_limit_per_operation", string (Int.to_string 100_000_000_000))
       ; ("hard_gas_limit_per_block", string (Int.to_string 10_000_000_000_000))
@@ -153,25 +165,9 @@ let protocol_parameters_json t : Ezjsonm.t =
       ; ("min_proposal_quorum", int 500)
       ; ("initial_endorsers", int 1)
       ; ("delay_per_missing_endorsement", string (Int.to_string 1)) ] in
-  let common =
-    [ ( "bootstrap_accounts"
-      , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
-      )
-      (* ; ("bootstrap_contracts", list make_contract t.bootstrap_contracts) *)
-    ; ("time_between_blocks", list (ksprintf string "%d") t.time_between_blocks)
-    ; ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
-    ; ("blocks_per_voting_period", int t.blocks_per_voting_period)
-    ; ("blocks_per_cycle", int t.blocks_per_cycle)
-    ; ("preserved_cycles", int t.preserved_cycles)
-    ; ( "proof_of_work_threshold"
-      , ksprintf string "%d" t.proof_of_work_threshold ) ] in
   match t.custom_protocol_parameters with
   | Some s -> s
-  | None ->
-      dict
-        ( match t.kind with
-        | `Babylon -> common @ extra_babylon_stuff_to_put
-        | `Athens -> common )
+  | None -> dict (match t.kind with `Carthage -> common | `Babylon -> common)
 
 let sandbox {dictator; _} =
   let pk = Account.pubkey dictator in

@@ -105,8 +105,8 @@ IDENTITIES_SHORT = {
 }
 
 
-ALPHA = "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
-ALPHA_DEAMON = "005-PsBabyM1"  # tezos-baker-005-PsBabyM1
+ALPHA = "PtCarthavAMoXqbjBPVgDCRd5LgT7qqKWUPXnYii3xCaHRBMfHH"
+ALPHA_DEAMON = "006-PtCartha"  # tezos-baker-006-PtCartha
 
 
 TEZOS_CRT = """

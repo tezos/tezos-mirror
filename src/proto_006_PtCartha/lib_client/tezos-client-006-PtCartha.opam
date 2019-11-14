@@ -9,18 +9,16 @@ depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
   "dune" { >= "1.7" }
-  "tezos-data-encoding"
   "tezos-base"
-  "tezos-stdlib-unix"
-  "tezos-event-logging"
-  "tezos-client-base"
+  "tezos-protocol-environment"
+  "tezos-protocol-006-PtCartha"
+  "tezos-shell-services"
   "tezos-client-base-unix"
-  "tezos-clic"
-  "tezos-signer-services"
-  "tezos-client-006-PtCartha"
+  "tezos-signer-backends"
+  "alcotest-lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-codec` binary to encode and decode values"
+synopsis: "Tezos/Protocol: protocol specific library for `tezos-client`"

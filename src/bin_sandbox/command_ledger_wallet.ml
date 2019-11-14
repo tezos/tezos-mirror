@@ -269,13 +269,11 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
         [ (fun ppf () -> wf ppf "Submitting single proposal %s" tested_proposal);
           (fun ppf () ->
             match protocol_kind with
-            | `Athens ->
-                ()
-            | `Babylon ->
+            | `Carthage | `Babylon ->
                 wf
                   ppf
-                  "On Babylon, You will first be asked to provide the public \
-                   key." ;
+                  "On Babylon and Carthage, You will first be asked to \
+                   provide the public key." ;
                 cut ppf () ;
                 wf
                   ppf
@@ -315,13 +313,11 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
           MFmt.
             [ (fun ppf () ->
                 match protocol_kind with
-                | `Athens ->
-                    ()
-                | `Babylon ->
+                | `Babylon | `Carthage ->
                     wf
                       ppf
-                      "On Babylon, You will first be asked to provide the \
-                       public key." ;
+                      "On Babylon and carthage, You will first be asked to \
+                       provide the public key." ;
                     cut ppf () ;
                     wf
                       ppf
@@ -418,7 +414,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
             | `Accept ->
                 `Success ))
     >>= fun _ -> ksprintf bake "setting self-delegate of %s" src
-    (* Self-delegate deletion is forbidden for both Athens and Babylon *)
+    (* Self-delegate deletion is forbidden for both Babylon and Carthage *)
   in
   let tz_account_delegation () =
     let command =
@@ -473,156 +469,10 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
             | `Accept ->
                 `Success ))
     >>= fun _ -> ksprintf bake "setting delegate of %s" src
-    (* Self-delegate deletion is forbidden for both Athens and Babylon *)
-  in
-  let run_command_and_check state ~client ~command ~message ~user_answer =
-    Tezos_client.client_cmd state ~client command
-    >>= fun (_, res) ->
-    expect_from_output
-      ~message
-      res
-      ~expectation:
-        ( match user_answer with
-        | `Reject ->
-            `Ledger_reject_or_timeout
-        | `Accept ->
-            `Success )
-  in
-  let delegate_with_scriptless_account () =
-    let originated_account_name = "ledginated" in
-    let amount = "200" in
-    let burn_cap = "0.257" in
-    let command =
-      [ "--wait";
-        "none";
-        "originate";
-        "account";
-        originated_account_name;
-        "for";
-        src;
-        "transferring";
-        "200";
-        "from";
-        src;
-        "--delegatable";
-        "--burn-cap";
-        burn_cap;
-        "--force" ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf ppf "Originating account `%s`" originated_account_name);
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Amount", const string amount);
-                  ("Fee", const string (strf "≤ %S" burn_cap));
-                  ("Source", const string ledger_pkh);
-                  ("Manager", const string ledger_pkh);
-                  ("Delegation", const string "Any");
-                  ("Storage", const int 277) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command
-          ~message:"account origination"
-          ~user_answer)
-    >>= fun _ ->
-    ksprintf bake "origination of %s" originated_account_name
-    >>= fun () ->
-    Tezos_client.client_cmd
-      state
-      ~client
-      ["show"; "known"; "contract"; originated_account_name]
-    >>= fun (_, proc_result) ->
-    let contract_address = proc_result#out |> String.concat ~sep:"" in
-    Tezos_client.client_cmd state ~client ["show"; "address"; delegate]
-    >>= fun (_, proc_result) ->
-    let delegate_address =
-      List.hd_exn proc_result#out
-      |> String.split ~on:' ' |> List.last
-      |> Option.value ~default:delegate
-    in
-    let command =
-      [ "--wait";
-        "none";
-        "set";
-        "delegate";
-        "for";
-        originated_account_name;
-        "to";
-        delegate ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf
-                ppf
-                "Setting `%s` as delegate for `%s`"
-                delegate
-                originated_account_name);
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Source", const string contract_address);
-                  ("Fee", const string "≤ 0.001");
-                  ("Delegate", const string delegate_address);
-                  ("Storage", const int 0) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command
-          ~message:"setting delegate of KT1"
-          ~user_answer)
-    >>= fun () ->
-    ksprintf bake "setting delegate of %s" originated_account_name
-    >>= fun () ->
-    let withdraw_command =
-      [ "--wait";
-        "none";
-        "withdraw";
-        "delegate";
-        "from";
-        originated_account_name ]
-    in
-    with_ledger_test_reject_and_accept
-      state
-      ~only_success
-      ~messages:
-        MFmt.
-          [ (fun ppf () ->
-              wf ppf "Withdrawing delegate from `%s`" originated_account_name);
-            show_command_message withdraw_command;
-            (fun ppf () ->
-              ledger_should_display
-                ppf
-                [ ("Source", const string contract_address);
-                  ("Fee", const string "≤ 0.001");
-                  ("Delegate", const string "None");
-                  ("Storage", const int 0) ]) ]
-      (fun ~user_answer ->
-        run_command_and_check
-          state
-          ~client
-          ~command:withdraw_command
-          ~message:"withdrawing delegate from originated account"
-          ~user_answer)
-    >>= fun () ->
-    ksprintf bake "withdrawing delegate of %s" originated_account_name
+    (* Self-delegate deletion is forbidden for both Babylon and Carthage *)
   in
   match protocol_kind with
-  | `Athens ->
-      self_delegation () >>= fun () -> delegate_with_scriptless_account ()
-  | `Babylon ->
+  | `Babylon | `Carthage ->
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
@@ -720,7 +570,7 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
 
 let prepare_origination_of_id_script ?(spendable = false)
     ?(delegatable = false) ?delegate ?(push_drops = 0) ?(amount = "2") state
-    ~client:_ ~name ~from ~protocol_kind ~parameter ~init_storage =
+    ~client:_ ~name ~from ~parameter ~init_storage =
   let id_script parameter =
     Fmt.strf
       "parameter %s;\n\
@@ -755,7 +605,6 @@ let prepare_origination_of_id_script ?(spendable = false)
   let origination =
     let opt = Option.value_map ~default:[] in
     ["--wait"; "none"; "originate"; "contract"; name]
-    @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
     @ [ "transferring";
         amount;
         "from";
@@ -779,14 +628,13 @@ let prepare_origination_of_id_script ?(spendable = false)
   in
   return origination
 
-let originate_id_script ?push_drops state ~client ~name ~from ~bake
-    ~protocol_kind ~parameter ~init_storage =
+let originate_id_script ?push_drops state ~client ~name ~from ~bake ~parameter
+    ~init_storage =
   prepare_origination_of_id_script
     state
     ~client
     ~name
     ~from
-    ~protocol_kind
     ?push_drops
     ~parameter
     ~init_storage
@@ -817,7 +665,7 @@ let pp_warning_ledger_takes_a_while ~adjective =
     tag "shout" ppf (fun ppf -> string ppf ("\\" ^ String.make wl '=' ^ "/"))
 
 let basic_contract_operations_tests state ~client ~src ~with_rejections
-    ~protocol_kind ~ledger_account ~bake ~delegate () =
+    ~ledger_account ~bake ~delegate () =
   let ledger_pkh = Tezos_protocol.Account.pubkey_hash ledger_account in
   let only_success = not with_rejections in
   let test_origination ?delegate ?delegatable ?spendable ?push_drops ~name
@@ -832,7 +680,6 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
       ?delegate
       ?delegatable
       ?spendable
-      ~protocol_kind
       ~parameter
       ~init_storage
     >>= fun origination ->
@@ -895,19 +742,6 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
     ~delegate
     ~init_storage:"\"tz1YPSCGWXwBdTncK2aCctSZAXWvGsGwVJqU\""
     ()
-  >>= fun () ->
-  ( match protocol_kind with
-  | `Athens ->
-      test_origination
-        ~name:"ID-string+delegatable"
-        ~amount:"0"
-        ~parameter:"string"
-        ~delegate
-        ~init_storage:"\"delegatable contract\""
-        ~delegatable:true
-        ()
-  | `Babylon ->
-      return () )
   >>= fun () ->
   let push_drops =
     (* Found by dichotomic trial-and-error :)
@@ -1220,7 +1054,6 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~name:unit_kt1_account
     ~from:baker_0.Tezos_client.Keyed.key_name
     ~bake
-    ~protocol_kind
     ~parameter:"unit"
     ~init_storage:"Unit"
   >>= fun () ->
@@ -1232,7 +1065,6 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~push_drops:10
     ~from:baker_0.Tezos_client.Keyed.key_name
     ~bake
-    ~protocol_kind
     ~parameter:"(pair string nat)"
     ~init_storage:"Pair \"the answer is: \" 42"
   >>= fun () ->
@@ -1259,7 +1091,6 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
       ()
       ~bake
       ~with_rejections
-      ~protocol_kind
   in
   let bake_command =
     Console.Prompt.unit_and_loop

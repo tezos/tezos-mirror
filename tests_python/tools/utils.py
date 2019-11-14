@@ -279,6 +279,7 @@ def sign_operation(encoded_operation: str, secret_key: str) -> str:
 def mutez_of_tez(tez: float):
     return int(tez*1000000)
 
+
 def check_run_failure(code, pattern, mode='stderr'):
     """Executes [code()] and expects the code to fail and raise
     [subprocess.CalledProcessError]. If so, the [pattern] is searched

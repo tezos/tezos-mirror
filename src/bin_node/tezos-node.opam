@@ -19,6 +19,7 @@ depends: [
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-005-PsBabyM1"
+  "tezos-embedded-protocol-006-PtCartha"
   "cmdliner"
   "tls"
   "cstruct"

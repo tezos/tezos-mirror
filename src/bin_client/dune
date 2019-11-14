@@ -9,10 +9,13 @@
             tezos-client-commands
             tezos-client-genesis
             tezos-client-005-PsBabyM1
+            tezos-client-006-PtCartha
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-client-005-PsBabyM1-commands.registration
             tezos-baking-005-PsBabyM1-commands.registration
+            tezos-client-006-PtCartha-commands.registration
+            tezos-baking-006-PtCartha-commands.registration
             tezos-signer-backends.unix)
   (flags (:standard -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http_client
