@@ -566,6 +566,9 @@ class Client:
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])
 
+    def sync_state(self) -> dict:
+        return self.rpc('get', 'chains/main/sync_state')
+
     def cleanup(self) -> None:
         """Remove base dir, only if not provided by user."""
         if self._is_tmp_dir:

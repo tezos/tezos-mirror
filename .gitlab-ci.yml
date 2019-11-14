@@ -308,6 +308,12 @@ integration:basic:
     - pytest tests_python/tests/test_basic.py -s --log-dir=tmp
   stage: test
 
+integration:bootstrap:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_bootstrap.py -s --log-dir=tmp
+  stage: test
+
 integration:contract:
   <<: *integration_python_definition
   script:
