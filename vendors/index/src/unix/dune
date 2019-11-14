@@ -2,4 +2,4 @@
  (public_name index.unix)
  (name index_unix)
  (c_names pread pwrite)
- (libraries unix index))
+ (libraries index logs logs.threaded threads unix))
