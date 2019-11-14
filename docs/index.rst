@@ -151,6 +151,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/003_PsddFKi3
    protocols/004_Pt24m4xi
    protocols/005_babylon
+   protocols/006_carthage
 
 .. toctree::
    :maxdepth: 2
