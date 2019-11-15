@@ -176,9 +176,10 @@ struct
     if Operation_hash.Set.mem op.hash pv.live_operations then
       Lwt.return Outdated
     else
-      Proto.apply_operation
-        pv.state
-        {shell = op.raw.shell; protocol_data = op.protocol_data}
+      protect (fun () ->
+          Proto.apply_operation
+            pv.state
+            {shell = op.raw.shell; protocol_data = op.protocol_data})
       >|= function
       | Ok (state, receipt) ->
           let pv =
