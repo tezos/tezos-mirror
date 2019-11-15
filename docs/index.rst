@@ -143,6 +143,7 @@ in the :ref:`introduction <howtoget>`.
    developer/flextesa
    developer/python_testing_framework
    developer/contributing
+   developer/merge_team
 
 .. toctree::
    :maxdepth: 2
