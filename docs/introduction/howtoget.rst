@@ -71,7 +71,7 @@ can be executed using ``./babylonnet.sh admin-client``.
 Build from sources
 ------------------
 
-**TL;DR**: Typically you want to do for Mainnet:
+**TL;DR**: Typically you want to do:
 
    sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
    wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
@@ -79,7 +79,8 @@ Build from sources
    sudo chmod a+x /usr/local/bin/opam
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
-   git checkout mainnet
+   git checkout mainnet # or babylonnet or zeronet
+   opam init --bare
    make build-deps
    eval $(opam env)
    make
@@ -88,25 +89,6 @@ Build from sources
    export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
    
    
-            For Babylonnet test network:
-            
-   sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
-   wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
-   sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
-   sudo chmod a+x /usr/local/bin/opam
-   git clone https://gitlab.com/tezos/tezos.git
-   cd tezos
-   git checkout babylonnet
-   make build-deps
-   eval $(opam env)
-   make
-   export PATH=~/tezos:$PATH
-   source ./src/bin_client/bash-completion.sh
-   export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
-
-
-
-
 For development, numerous shell scripts also rely on jq:
 
 ::
