@@ -49,7 +49,7 @@ found in the `whitepaper
 Here are a few more resources that present Tezos' proof-of-stake
 mechanism:
 
--  `Proof of Stake <https://learn.tqgroup.io/files/proofofstake.html#consensus>`_
+-  `Proof of Stake <https://learn.tqtezos.com/files/proofofstake.html#consensus>`_
 -  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
 -  `All you ever wanted to ask about Tezos — Illustrated <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
 
