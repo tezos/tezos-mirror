@@ -1,5 +1,7 @@
 #! /bin/sh
 
+# See `update_unit_test.sh` for documentation.
+
 set -e
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
