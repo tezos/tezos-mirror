@@ -215,6 +215,11 @@ module Block : sig
   val store_invalid :
     Chain.t -> Block_header.t -> error list -> bool tzresult Lwt.t
 
+  (** [remove block] deletes every occurrence of [block] in the
+      different stores. If [block] is the current head, the head is
+      also backtracked to the [block] predecessor *)
+  val remove : t -> unit tzresult Lwt.t
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
