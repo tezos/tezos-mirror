@@ -1245,6 +1245,36 @@ module Block = struct
           Lwt_watcher.notify chain_state.global_state.block_watcher block ;
           return_some block)
 
+  let remove block =
+    let hash = block.hash in
+    let header = block.header in
+    protect (fun () ->
+        Shared.use block.chain_state.block_store (fun store ->
+            Store.Block.Contents.remove (store, hash)
+            >>= fun () ->
+            Store.Block.Operations.remove_all (store, hash)
+            >>= fun () ->
+            Store.Block.Operations_metadata.remove_all (store, hash)
+            >>= fun () ->
+            Store.Block.Operation_hashes.remove_all (store, hash)
+            >>= fun () ->
+            Shared.use block.chain_state.chain_data (fun chain_data ->
+                let store = chain_data.chain_data_store in
+                let predecessor = header.shell.predecessor in
+                Store.Chain_data.Known_heads.remove store hash
+                >>= fun () ->
+                Store.Chain_data.Known_heads.store store predecessor
+                >>= fun () ->
+                Store.Chain_data.In_main_branch.remove (store, hash)
+                >>= fun () ->
+                Store.Chain_data.Current_head.read_opt store
+                >>= function
+                | Some block_hash when block_hash = hash ->
+                    Store.Chain_data.Current_head.store store predecessor
+                | Some _ | None ->
+                    Lwt.return_unit)
+            >>= fun () -> return_unit))
+
   let store_invalid chain_state block_header errors =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
