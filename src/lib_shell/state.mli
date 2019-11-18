@@ -266,6 +266,8 @@ module Block : sig
 
   val context_exn : t -> Context.t Lwt.t
 
+  val context_exists : t -> bool Lwt.t
+
   val protocol_hash : t -> Protocol_hash.t tzresult Lwt.t
 
   val protocol_hash_exn : t -> Protocol_hash.t Lwt.t
