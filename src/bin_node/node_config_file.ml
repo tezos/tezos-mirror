@@ -717,12 +717,52 @@ let encoding =
           shell
           default_shell))
 
+(* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
+   string representation of the path, second argument is the error message
+   of the actual exception which was raised (as [Cannot_destruct] takes an [exn]
+   as second argument). *)
+type error += Invalid_content of string option * string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"node_config_file.invalid_content"
+    ~title:"Invalid config file"
+    ~description:"Invalid content in node config file"
+    ~pp:(fun ppf (path, exn) ->
+      match path with
+      | Some path ->
+          Format.fprintf
+            ppf
+            "@[<hov>Invalid configuration file:@ at %s:@ %s@]"
+            path
+            exn
+      | None ->
+          Format.fprintf ppf "@[<hov>Invalid configuration file:@ %s@]" exn)
+    Data_encoding.(obj2 (req "path" (option string)) (req "error" string))
+    (function Invalid_content (p, e) -> Some (p, e) | _ -> None)
+    (fun (p, e) -> Invalid_content (p, e))
+
+let string_of_json_encoding_error exn =
+  Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn
+
 let read fp =
   if Sys.file_exists fp then
     Lwt_utils_unix.Json.read_file fp
     >>=? fun json ->
-    try return (Data_encoding.Json.destruct encoding json)
-    with exn -> fail (Exn exn)
+    try return (Data_encoding.Json.destruct encoding json) with
+    | Json_encoding.Cannot_destruct (path, exn) ->
+        let path = Json_query.json_pointer_of_path path in
+        let exn = string_of_json_encoding_error exn in
+        fail (Invalid_content (Some path, exn))
+    | ( Json_encoding.Unexpected _
+      | Json_encoding.No_case_matched _
+      | Json_encoding.Bad_array_size _
+      | Json_encoding.Missing_field _
+      | Json_encoding.Unexpected_field _
+      | Json_encoding.Bad_schema _ ) as exn ->
+        let exn = string_of_json_encoding_error exn in
+        fail (Invalid_content (None, exn))
   else return default_config
 
 let write fp cfg =
