@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell Module - Manging the current head. *)
+(** Tezos Shell Module - Managing the current head. *)
 
 (** The genesis block of the chain. On a test chain,
     the test protocol has been promoted as "main" protocol. *)
