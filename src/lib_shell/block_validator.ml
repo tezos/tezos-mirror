@@ -185,7 +185,12 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                     ~forking_testchain
                   >>=? function
                   | None ->
-                      assert false (* should not happen *)
+                      (* This case can be reached if the block was
+                         previously validated but its associated
+                         context has not been written on disk and
+                         therefore it means that it already exists in
+                         the store. *)
+                      State.Block.read chain_state hash
                   | Some block ->
                       return block) )
             >>= function
