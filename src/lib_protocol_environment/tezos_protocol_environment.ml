@@ -310,7 +310,6 @@ struct
   include Pervasives
   module Pervasives = Pervasives
   module Compare = Compare
-  module Array = Array
   module List = List
 
   module Bytes = struct
