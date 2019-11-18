@@ -1381,7 +1381,18 @@ module Block = struct
     | Some context ->
         return context
     | None ->
-        failwith "State.Block.context failed to checkout context"
+        failwith
+          "State.Block.context failed to checkout context for block %a"
+          Block_hash.pp
+          block.hash
+
+  let context_exists {chain_state; hash; _} =
+    Shared.use chain_state.block_store (fun block_store ->
+        Store.Block.Contents.read_opt (block_store, hash))
+    >|= Option.unopt_assert ~loc:__POS__
+    >>= fun {context = commit; _} ->
+    Shared.use chain_state.context_index (fun context_index ->
+        Context.exists context_index commit)
 
   let protocol_hash block =
     context block >>=? fun context -> Context.get_protocol context >>= return
