@@ -739,11 +739,6 @@ opam:tezos-protocol-alpha:
   variables:
     package: tezos-protocol-alpha
 
-opam:tezos-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-004-Pt24m4xi
-
 opam:tezos-protocol-updater:
   <<: *opam_definition
   variables:
@@ -784,10 +779,10 @@ opam:tezos-protocol-003-PsddFKi3:
   variables:
     package: tezos-protocol-003-PsddFKi3
 
-opam:tezos-client-004-Pt24m4xi:
+opam:tezos-protocol-004-Pt24m4xi:
   <<: *opam_definition
   variables:
-    package: tezos-client-004-Pt24m4xi
+    package: tezos-protocol-004-Pt24m4xi
 
 opam:tezos-validation:
   <<: *opam_definition
@@ -829,6 +824,11 @@ opam:tezos-client-003-PsddFKi3:
   variables:
     package: tezos-client-003-PsddFKi3
 
+opam:tezos-client-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-004-Pt24m4xi
+
 opam:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
@@ -854,30 +854,30 @@ opam:ocplib-resto-json:
   variables:
     package: ocplib-resto-json
 
+opam:tezos-protocol-demo-noops:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-demo-noops
+
 opam:ocplib-resto-cohttp-server:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp-server
+
+opam:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
 
 opam:tezos-protocol-005-PsBABY5H:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBABY5H
 
-opam:tezos-protocol-demo-noops:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-demo-noops
-
 opam:tezos-embedded-protocol-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-005-PsBabyM1
-
-opam:tezos-shell:
-  <<: *opam_definition
-  variables:
-    package: tezos-shell
 
 opam:tezos-embedded-protocol-006-PsCARTHA:
   <<: *opam_definition
@@ -964,15 +964,30 @@ opam:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:tezos-embedded-protocol-004-Pt24m4xi:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-004-Pt24m4xi
-
 opam:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
+
+opam:tezos-embedded-protocol-demo-noops:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo-noops
+
+opam:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:tezos-rpc-http-server:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc-http-server
+
+opam:tezos-validator:
+  <<: *opam_definition
+  variables:
+    package: tezos-validator
 
 opam:tezos-protocol-alpha-parameters:
   <<: *opam_definition
@@ -983,11 +998,6 @@ opam:tezos-protocol-006-PsCARTHA-parameters:
   <<: *opam_definition
   variables:
     package: tezos-protocol-006-PsCARTHA-parameters
-
-opam:tezos-rpc-http-server:
-  <<: *opam_definition
-  variables:
-    package: tezos-rpc-http-server
 
 opam:tezos-embedded-protocol-000-Ps9mPmXa:
   <<: *opam_definition
@@ -1009,20 +1019,15 @@ opam:tezos-embedded-protocol-003-PsddFKi3:
   variables:
     package: tezos-embedded-protocol-003-PsddFKi3
 
+opam:tezos-embedded-protocol-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-004-Pt24m4xi
+
 opam:tezos-embedded-protocol-005-PsBABY5H:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-005-PsBABY5H
-
-opam:tezos-embedded-protocol-demo-noops:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-demo-noops
-
-opam:tezos-embedded-protocol-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis
 
 opam:tezos-embedded-protocol-genesis-alphanet:
   <<: *opam_definition
@@ -1049,11 +1054,6 @@ opam:tezos-mempool-006-PsCARTHA:
   variables:
     package: tezos-mempool-006-PsCARTHA
 
-opam:tezos-validator:
-  <<: *opam_definition
-  variables:
-    package: tezos-validator
-
 opam:tezos-protocol-005-PsBabyM1-parameters:
   <<: *opam_definition
   variables:
@@ -1063,6 +1063,11 @@ opam:tezos-endorser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha-commands
+
+opam:tezos-cache:
+  <<: *opam_definition
+  variables:
+    package: tezos-cache
 
 opam:tezos-client:
   <<: *opam_definition

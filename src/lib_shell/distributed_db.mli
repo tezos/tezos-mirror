@@ -27,12 +27,11 @@
 (** Tezos Shell - High-level API for the Gossip network and local storage. *)
 
 open Distributed_db_functors
+module Message = Distributed_db_message
 
 type t
 
 type db = t
-
-module Message = Distributed_db_message
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 

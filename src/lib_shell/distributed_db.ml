@@ -24,11 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Message = Distributed_db_message
-
 module Logging = Internal_event.Legacy_logging.Make (struct
   let name = "node.distributed_db"
 end)
+
+module Message = Distributed_db_message
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
