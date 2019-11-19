@@ -2584,20 +2584,6 @@ and parse_instr :
          ( merge_types ~legacy ctxt loc exp got
          >>? fun (Eq, ty, ctxt) -> ok ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
-  let check_item_comparable_ty (type a b) (exp : a comparable_ty)
-      (got : b comparable_ty) loc name n m :
-      ((a, b) eq * a comparable_ty * context) tzresult Lwt.t =
-    Lwt.return
-    @@ record_trace_eval (fun () ->
-           serialize_stack_for_error ctxt stack_ty
-           >>? fun (stack_ty, _ctxt) ->
-           error (Bad_stack (loc, name, m, stack_ty)))
-    @@ record_trace
-         (Bad_stack_item n)
-         ( merge_comparable_types ~legacy ctxt exp got
-         >>? fun (Eq, ty, ctxt) ->
-         ok ((Eq : (a, b) eq), (ty : a comparable_ty), ctxt) )
-  in
   let log_stack ctxt loc stack_ty aft =
     match (type_logger, script_instr) with
     | (None, _) | (Some _, (Seq (-1, _) | Int _ | String _ | Bytes _)) ->
@@ -3091,18 +3077,12 @@ and parse_instr :
       Item_t
         ( v,
           Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest, set_annot), _),
-          _ ) ) -> (
-    match comparable_ty_of_ty_no_gas v with
-    | None ->
-        unparse_ty ctxt v
-        >>?= fun (v, _ctxt) ->
-        fail (Comparable_type_expected (loc, Micheline.strip_locations v))
-    | Some v ->
-        parse_var_annot loc annot ~default:set_annot
-        >>?= fun annot ->
-        check_item_comparable_ty elt v loc I_UPDATE 1 3
-        >>=? fun (Eq, elt, ctxt) ->
-        typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot)) )
+          _ ) ) ->
+      check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
+      >>?= fun (Eq, _, ctxt) ->
+      parse_var_annot loc annot ~default:set_annot
+      >>?= fun annot ->
+      typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
