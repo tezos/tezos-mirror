@@ -92,47 +92,27 @@ build:
     - build
   retry: 2
 
-# this section is update using the script scripts/update_unit_test.sh
+# this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
-unit:crypto:
+unit:src/proto_005_PsBabyM1/lib_client:
   <<: *test_definition
   script:
-    - dune build @src/lib_crypto/runtest
+    - dune build @src/proto_005_PsBabyM1/lib_client/runtest
 
-unit:data_encoding:
+unit:src/proto_005_PsBabyM1/lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/lib_data_encoding/runtest
+    - dune build @src/proto_005_PsBabyM1/lib_protocol/runtest
 
-unit:error_monad:
+unit:src/proto_006_PtCartha/lib_client:
   <<: *test_definition
   script:
-    - dune build @src/lib_error_monad/runtest
+    - dune build @src/proto_006_PtCartha/lib_client/runtest
 
-unit:micheline:
+unit:src/proto_006_PtCartha/lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/lib_micheline/runtest
-
-unit:p2p:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_p2p/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
-
-unit:shell:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_shell/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
+    - dune build @src/proto_006_PtCartha/lib_protocol/runtest
 
 unit:stdlib:
   <<: *test_definition
@@ -144,45 +124,105 @@ unit:storage:
   script:
     - dune build @src/lib_storage/runtest
 
-unit:ocaml-bip39:
+unit:data_encoding:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-bip39/runtest
+    - dune build @src/lib_data_encoding/runtest
 
-unit:ocaml-blake2:
+unit:error_monad:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-blake2/runtest
+    - dune build @src/lib_error_monad/runtest
 
-unit:ocaml-hacl:
+unit:shell:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-hacl/runtest
+    - dune build @src/lib_shell/runtest
 
-unit:ocaml-ledger-wallet:
+unit:p2p:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
+    - dune build @src/lib_p2p/runtest
 
-unit:ocaml-lmdb:
+unit:signer_backends:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-lmdb/runtest
+    - dune build @src/lib_signer_backends/runtest
+
+unit:signer_backends/unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/unix/runtest
+
+unit:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
+
+unit:protocol_environment:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_environment/runtest
+
+unit:src/bin_client:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest
+
+unit:crypto:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_crypto/runtest
+
+unit:ocplib-resto/lib_ezresto-directory:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocplib-resto/lib_ezresto-directory/runtest
+
+unit:ocplib-resto/lib_resto-directory:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocplib-resto/lib_resto-directory/runtest
 
 unit:ocaml-pbkdf:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-pbkdf/runtest
 
-unit:ocaml-secp256k1:
+unit:ocaml-lmdb:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-secp256k1/runtest
+    - dune build @vendors/ocaml-lmdb/runtest
 
 unit:ocaml-uecc:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-uecc/runtest
+
+unit:ocaml-bip39:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-bip39/runtest
+
+unit:ocaml-hacl:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-hacl/runtest
+
+unit:ocaml-secp256k1:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-secp256k1/runtest
+
+unit:ocaml-ledger-wallet:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-ledger-wallet/runtest
+
+unit:ocaml-blake2:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-blake2/runtest
 
 
 ##END_UNITEST##
@@ -285,7 +325,7 @@ integration:sandboxes:acc-endorsement:
 ## Stage: run python integration tests                    ##
 ############################################################
 
-# this section is update using the script scripts/update_integration_test.sh
+# this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
 integration:baker_endorser:
   <<: *integration_definition
@@ -430,7 +470,7 @@ documentation:linkcheck:
   tags:
     - gitlab-org
 
-# this section is update using the script scripts/update_opam_test.sh
+# this section is updated using the script scripts/update_opam_test.sh
 ##BEGIN_OPAM##
 opam:00:ocplib-json-typed:
   <<: *opam_definition
