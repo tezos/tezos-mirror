@@ -341,6 +341,12 @@ integration:multinode_snapshot:
     - pytest tests_python/tests/test_multinode_snapshot.py
   stage: test
 
+integration:multinode_storage_reconstruction:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_multinode_storage_reconstruction.py
+  stage: test
+
 integration:proto_demo_noops_manual_bake:
   <<: *integration_definition
   script:
