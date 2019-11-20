@@ -94,18 +94,19 @@ def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
     return max(levels) - min(levels) <= max_diff
 
 
+def get_block_per_level(client: Client, level: int) -> str:
+    """ Return the block at a given level, level must be less or equal than
+        current head. If the level is higher than the current, it will fail"""
+    block = client.rpc('get', f'/chains/main/blocks/{level}')
+    return block
+
+
 def get_block_hash(client: Client, level: int) -> str:
     """Return block hash at given level, level must be less or equal
        than current head."""
-    cur = 'head'
-    while True:
-        block = client.rpc('get', f'/chains/main/blocks/{cur}')
-        assert level <= block['header']['level']
-        if block['header']['level'] == level:
-            block_hash = block['hash']
-            assert isinstance(block_hash, str)
-            return str(block)
-        cur = block['header']['predecessor']
+    block_hash = get_block_per_level(client, level)['hash']
+    assert isinstance(block_hash, str)
+    return str(block_hash)
 
 
 def all_blocks(client: Client) -> List[dict]:
