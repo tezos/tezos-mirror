@@ -3,8 +3,6 @@ from tools import paths
 from tools.utils import check_run_failure, assert_run_script_success, \
     assert_run_script_failwith
 
-from client.client import Client
-
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
 
 

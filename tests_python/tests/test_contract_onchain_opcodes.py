@@ -4,8 +4,6 @@ from tools.utils import check_run_failure, assert_storage_contains, bake, \
     init_with_transfer, assert_balance
 from tools.constants import IDENTITIES
 
-from client.client import Client
-
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
 KEY1 = 'foo'
 KEY2 = 'bar'
