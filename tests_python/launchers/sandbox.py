@@ -117,6 +117,7 @@ class Sandbox:
                  config_client: bool = True,
                  use_tls: Tuple[str, str] = None,
                  snapshot: str = None,
+                 reconstruct: bool = False,
                  branch: str = "") -> None:
         """ Launches new node with given node_id and initializes client
 
@@ -180,7 +181,12 @@ class Sandbox:
             node.init_config()
         else:
             assert os.path.isfile(snapshot)
-            node.snapshot_import(snapshot)
+            sandboxed_import = [f'--sandbox', self.sandbox_file]
+            if reconstruct:
+                node.snapshot_import(snapshot, ['--reconstruct']
+                                     + sandboxed_import)
+            else:
+                node.snapshot_import(snapshot, sandboxed_import)
             node.init_id()
             node.init_config()
         node.run()
@@ -436,6 +442,7 @@ class SandboxMultiBranch(Sandbox):
                  config_client: bool = True,
                  use_tls: Tuple[str, str] = None,
                  snapshot: str = None,
+                 reconstruct: bool = False,
                  branch: str = "") -> None:
         assert not branch
         branch = self._branch_map[node_id]
