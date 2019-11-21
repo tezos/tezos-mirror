@@ -782,7 +782,8 @@ let rec ty_of_comparable_ty : type a s. (a, s) comparable_struct -> a ty =
           tname,
           false )
 
-let rec comparable_ty_of_ty : type a. a ty -> a comparable_ty option = function
+let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
+  function
   | Int_t tname ->
       Some (Int_key tname)
   | Nat_t tname ->
@@ -802,11 +803,11 @@ let rec comparable_ty_of_ty : type a. a ty -> a comparable_ty option = function
   | Address_t tname ->
       Some (Address_key tname)
   | Pair_t ((l, al, _), (r, ar, _), pname, _) -> (
-    match comparable_ty_of_ty r with
+    match comparable_ty_of_ty_no_gas r with
     | None ->
         None
     | Some rty -> (
-      match comparable_ty_of_ty l with
+      match comparable_ty_of_ty_no_gas l with
       | None ->
           None
       | Some (Pair_key _) ->
@@ -3363,7 +3364,7 @@ and parse_instr :
         ( v,
           Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest, set_annot), _),
           _ ) ) -> (
-    match comparable_ty_of_ty v with
+    match comparable_ty_of_ty_no_gas v with
     | None ->
         unparse_ty ctxt v
         >>=? fun (v, _ctxt) ->
@@ -4227,7 +4228,9 @@ and parse_instr :
       >>=? fun annot ->
       check_item_ty ctxt t1 t2 loc I_COMPARE 1 2
       >>=? fun (Eq, t, ctxt) ->
-      match comparable_ty_of_ty t with
+      (* gas for [comparable_ty_of_ty_no_gas] is somehow already counted in
+         [check_item_ty] because it traverses the types to merge them *)
+      match comparable_ty_of_ty_no_gas t with
       | None ->
           Lwt.return (serialize_ty_for_error ctxt t)
           >>=? fun (t, _ctxt) -> fail (Comparable_type_expected (loc, t))
