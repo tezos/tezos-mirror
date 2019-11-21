@@ -25,15 +25,15 @@
 
 (**
    This module implements four Access Control Lists:
-   - ip greylist is a set of banned ip addresses automatically added by
-     the p2p layer.
-   - peer_id greylist is a set of banned peers ids automatically added by
-     the p2p layer.
-   - ip blacklist is a set of ip addresses manually added by the node admin.
+   - IP greylist is a set of banned IP addresses automatically added by
+     the P2P layer.
+   - [peer_id] greylist is a set of banned peers ids automatically added by
+     the P2P layer.
+   - IP blacklist is a set of IP addresses manually added by the node admin.
    - peers blacklist is a set of peers ids manually added by the node admin.
 
    IP greylists use a time based GC to periodically remove entries from
-   the table, while peer_id grey lists are built using a ring structure,
+   the table, while [peer_id] greylists are built using a ring structure,
    where peers are removed from the table when removed from the fixed size
    ring. Other tables are user defined and static.
 
@@ -49,9 +49,13 @@ val create : int -> t
     greylisted. *)
 val banned_addr : t -> P2p_addr.t -> bool
 
+val unban_addr : t -> P2p_addr.t -> unit
+
 (** [banned_peer t peer_id] is [true] if peer with id [peer_id] is
     blacklisted or greylisted. *)
 val banned_peer : t -> P2p_peer.Id.t -> bool
+
+val unban_peer : t -> P2p_peer.Id.t -> unit
 
 (** [clear t] clears all four ACLs. *)
 val clear : t -> unit
@@ -72,15 +76,11 @@ end
 module IPBlacklist : sig
   val add : t -> P2p_addr.t -> unit
 
-  val remove : t -> P2p_addr.t -> unit
-
   val mem : t -> P2p_addr.t -> bool
 end
 
 module PeerBlacklist : sig
   val add : t -> P2p_peer.Id.t -> unit
-
-  val remove : t -> P2p_peer.Id.t -> unit
 
   val mem : t -> P2p_peer.Id.t -> bool
 end

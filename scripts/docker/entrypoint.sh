@@ -32,13 +32,13 @@ shift 1
 case $command in
     tezos-node)
         launch_node "$@"
-	    ;;
+        ;;
     tezos-upgrade-storage)
-	    upgrade_node_storage
-	    ;;
+        upgrade_node_storage
+        ;;
     tezos-snapshot-import)
-	    snapshot_import
-	    ;;
+        snapshot_import
+        ;;
     tezos-baker)
         launch_baker "$@"
         ;;
@@ -71,15 +71,34 @@ case $command in
     *)
         cat <<EOF
 Available commands:
+
+The following are wrappers around the tezos binaries.
+To call the tezos binaries directly you must override the
+entrypoint using --entrypoint . All binaries are in
+$BIN_DIR and the tezos data in $DATA_DIR
+
+Daemons:
 - tezos-node [args]
-- tezos-client [args]
+  Initialize a new identity and run the tezos node.
+
 - tezos-baker [keys]
 - tezos-baker-test [keys]
 - tezos-accuser [keys]
 - tezos-accuser-test [keys]
 - tezos-endorser [keys]
 - tezos-endorser-test [keys]
+
+Clients:
+- tezos-client [args]
 - tezos-signer [args]
+- tezos-admin-client
+
+Commands:
+  - tezos-upgrade-storage
+  - tezos-snapshot-import
+    Import a snapshot. The snapshot must be available in the file /snapshot
+    Using docker run, you can make it available using the command :
+       docker run -v <yourfilename>:/snapshot tezos/tezos tezos-snapshot-import
 EOF
         ;;
 esac

@@ -1,7 +1,7 @@
 (executables
   (names main)
   (libraries flextesa)
-  (flags (:standard -w -9-27-30-32-40@8 -safe-string)))
+  (flags :standard))
 
 (alias
   (name runtest_sandbox_accusations_simple_double_baking)

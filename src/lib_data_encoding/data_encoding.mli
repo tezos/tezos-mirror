@@ -549,7 +549,7 @@ module Encoding : sig
   module Bounded : sig
     (** Encoding of a string whose length does not exceed the specified length.
         The size field uses the smallest integer that can accommodate the
-        maximum size - e.g, [`Uint8] for very short strings, [`Uint16] for
+        maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
         longer strings, etc.
 
         Attempting to construct a string with a length that is too long causes

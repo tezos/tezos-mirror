@@ -29,7 +29,6 @@ type t
 type limits = {bootstrap_threshold : int; worker_limits : Worker_types.limits}
 
 val create :
-  ?max_child_ttl:int ->
   start_prevalidator:bool ->
   start_testchain:bool ->
   active_chains:t Chain_id.Table.t ->

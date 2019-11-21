@@ -95,7 +95,7 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
       Alpha_services.Constants.all cctxt (chain, `Head 0)
   | Some constants ->
       return constants )
-  >>=? fun {Constants.parametric = {blocks_per_cycle; _}; _} ->
+  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} ->
   get_block_level_opt cctxt ~chain ~block:(`Head 0)
   >>= function
   | None ->
@@ -107,9 +107,9 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
       >>= fun () -> return (empty, empty)
   | Some current_level ->
       let current_cycle = Int32.(div current_level blocks_per_cycle) in
-      let is_older_than_5_cycles block_level =
+      let is_older_than_preserved_cycles block_level =
         let block_cycle = Int32.(div block_level blocks_per_cycle) in
-        Int32.sub current_cycle block_cycle > 5l
+        Int32.sub current_cycle block_cycle > Int32.of_int preserved_cycles
       in
       Block_hash.Map.fold
         (fun hash nonce acc ->
@@ -118,7 +118,7 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
           get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
           >>= function
           | Some level ->
-              if is_older_than_5_cycles level then
+              if is_older_than_preserved_cycles level then
                 return (orphans, add outdated hash nonce)
               else acc
           | None ->

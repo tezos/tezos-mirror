@@ -1,3 +1,4 @@
+# This contract always fail because it tries to execute twice the same operation
 parameter unit ;
 storage unit ;
 code { CDR ; NIL operation ;

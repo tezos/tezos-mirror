@@ -865,5 +865,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
           Lwt.return Client_proto_multisig.known_multisig_hashes
           >>=? fun l ->
           Format.printf "Hashes of supported multisig contracts:@." ;
-          List.iter (fun h -> Format.printf "  0x%a@." Script_expr_hash.pp h) l ;
+          List.iter
+            (fun h ->
+              Format.printf
+                "  0x%a@."
+                Hex.pp
+                (Script_expr_hash.to_bytes h |> Hex.of_bytes))
+            l ;
           return_unit) ]

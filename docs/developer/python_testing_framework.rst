@@ -347,11 +347,11 @@ Adding a test
   layers structure. API shouldn't rely testing constants (``tools/constant.py``
   or ``tools/paths.py``).
 
-Testing on ``zeronet``, ``alphanet``,...
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Testing on a production branch (``zeronet``, ``mainnet``,...)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 On ``master``, protocol alpha is named
-``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and deamons binary
+``PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU``, and deamons binary
 name are suffixed with ``alpha`` (``tezos-baker-alpha``,
 ``tezos-endorser-alpha``...). However, on *production* branches, an actual
 hash of the protocol is used, and a shortened string is used to specify

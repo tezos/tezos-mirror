@@ -8,9 +8,7 @@
             irmin
             irmin-pack
             tezos-stdlib-unix)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_shell_services
+ (flags (:standard -open Tezos_shell_services
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib)))

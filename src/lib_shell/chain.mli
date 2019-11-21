@@ -60,7 +60,7 @@ val set_head : State.Chain.t -> State.Block.t -> State.Block.t tzresult Lwt.t
 
 (** Atomically change the current head of the chain.
     This returns [true] whenever the change succeeded, or [false]
-    when the current head os not equal to the [old] argument. *)
+    when the current head is not equal to the [old] argument. *)
 val test_and_set_head :
   State.Chain.t -> old:State.Block.t -> State.Block.t -> bool tzresult Lwt.t
 

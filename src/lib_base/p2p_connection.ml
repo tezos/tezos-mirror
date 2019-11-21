@@ -172,7 +172,7 @@ module Info = struct
       remote_metadata
 end
 
-module Pool_event = struct
+module P2p_event = struct
   (** Pool-level events *)
 
   type t =
@@ -473,4 +473,4 @@ end
 
 let () =
   Data_encoding.Registration.register ~pp:Id.pp Id.encoding ;
-  Data_encoding.Registration.register ~pp:Pool_event.pp Pool_event.encoding
+  Data_encoding.Registration.register ~pp:P2p_event.pp P2p_event.encoding

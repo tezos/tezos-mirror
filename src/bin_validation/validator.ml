@@ -25,8 +25,6 @@
 
 let ( // ) = Filename.concat
 
-type proto_status = Embeded | Dynlinked
-
 let load_protocol proto protocol_root =
   if Registered_protocol.mem proto then return_unit
   else
@@ -60,31 +58,47 @@ let run stdin stdout =
     (inconsistent_handshake "bad magic")
   >>=? fun () ->
   External_validation.recv stdin External_validation.parameters_encoding
-  >>= fun {context_root; protocol_root} ->
+  >>= fun {context_root; protocol_root; sandbox_parameters} ->
   let genesis_block = ref Block_hash.zero in
   let genesis_time = ref Time.Protocol.epoch in
   let genesis_protocol = ref Protocol_hash.zero in
+  let sandbox_param =
+    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_parameters
+  in
   let patch_context ctxt =
-    let module Proto = (val Registered_protocol.get_exn !genesis_protocol) in
-    let ctxt = Shell_context.wrap_disk_context ctxt in
-    Proto.init
-      ctxt
-      {
-        level = 0l;
-        proto_level = 0;
-        predecessor = !genesis_block;
-        timestamp = !genesis_time;
-        validation_passes = 0;
-        operations_hash = Operation_list_list_hash.empty;
-        fitness = [];
-        context = Context_hash.zero;
-      }
-    >>= function
-    | Error _ ->
+    ( match sandbox_param with
+    | None ->
+        Lwt.return ctxt
+    | Some (key, json) ->
+        Tezos_storage.Context.set
+          ctxt
+          [key]
+          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+    >>= fun ctxt ->
+    match Registered_protocol.get !genesis_protocol with
+    | None ->
         assert false (* FIXME error *)
-    | Ok {context; _} ->
-        let context = Shell_context.unwrap_disk_context context in
-        Lwt.return context
+    | Some proto -> (
+        let module Proto = (val proto) in
+        let ctxt = Shell_context.wrap_disk_context ctxt in
+        Proto.init
+          ctxt
+          {
+            level = 0l;
+            proto_level = 0;
+            predecessor = !genesis_block;
+            timestamp = !genesis_time;
+            validation_passes = 0;
+            operations_hash = Operation_list_list_hash.empty;
+            fitness = [];
+            context = Context_hash.zero;
+          }
+        >>= function
+        | Error _ ->
+            assert false (* FIXME error *)
+        | Ok {context; _} ->
+            let context = Shell_context.unwrap_disk_context context in
+            Lwt.return context )
   in
   Context.init ~patch_context context_root
   >>= fun context_index ->
@@ -102,31 +116,49 @@ let run stdin stdout =
                     predecessor_block_header.shell.context
                   in
                   Context.checkout context_index pred_context_hash
-                  >>= (function
-                        | Some context ->
-                            return context
-                        | None ->
-                            fail
-                              (Block_validator_errors
-                               .Failed_to_checkout_context
-                                 pred_context_hash))
-                  >>=? fun predecessor_context ->
-                  Context.get_protocol predecessor_context
-                  >>= fun protocol_hash ->
-                  load_protocol protocol_hash protocol_root
-                  >>=? fun () ->
-                  Block_validation.apply
-                    chain_id
-                    ~max_operations_ttl
-                    ~predecessor_block_header
-                    ~predecessor_context
-                    ~block_header
-                    operations)
-              >>= fun result ->
+                  >>= function
+                  | Some context ->
+                      return context
+                  | None ->
+                      fail
+                        (Block_validator_errors.Failed_to_checkout_context
+                           pred_context_hash))
+              >>=? (fun predecessor_context ->
+                     Context.get_protocol predecessor_context
+                     >>= fun protocol_hash ->
+                     load_protocol protocol_hash protocol_root
+                     >>=? fun () ->
+                     Block_validation.apply
+                       chain_id
+                       ~max_operations_ttl
+                       ~predecessor_block_header
+                       ~predecessor_context
+                       ~block_header
+                       operations
+                     >>= function
+                     | Error
+                         [ Block_validator_errors.Unavailable_protocol
+                             {protocol; _} ] as err -> (
+                         (* If `next_protocol` is missing, try to load it *)
+                         load_protocol protocol protocol_root
+                         >>= function
+                         | Error _ ->
+                             Lwt.return err
+                         | Ok () ->
+                             Block_validation.apply
+                               chain_id
+                               ~max_operations_ttl
+                               ~predecessor_block_header
+                               ~predecessor_context
+                               ~block_header
+                               operations )
+                     | result ->
+                         Lwt.return result)
+              >>= fun res ->
               External_validation.send
                 stdout
                 (Error_monad.result_encoding Block_validation.result_encoding)
-                result
+                res
           | External_validation.Commit_genesis
               {chain_id; time; genesis_hash; protocol} ->
               genesis_time := time ;
@@ -155,11 +187,20 @@ let run stdin stdout =
               >>= function
               | Some ctxt ->
                   Block_validation.init_test_chain ctxt forked_header
-                  >>= fun genesis_header ->
+                  >>= (function
+                        | Error
+                            [ Block_validator_errors.Missing_test_protocol
+                                protocol ] ->
+                            load_protocol protocol protocol_root
+                            >>=? fun () ->
+                            Block_validation.init_test_chain ctxt forked_header
+                        | result ->
+                            Lwt.return result)
+                  >>= fun result ->
                   External_validation.send
                     stdout
                     (Error_monad.result_encoding Block_header.encoding)
-                    genesis_header
+                    result
               | None ->
                   External_validation.send
                     stdout

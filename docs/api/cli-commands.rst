@@ -8,7 +8,7 @@ using the following shell commands.
 
 ::
 
-   tezos-client -protocol ProtoALphaALph man -verbosity 3
+   tezos-client -protocol PsBABY5HQ man -verbosity 3
    tezos-admin-client man -verbosity 3
 
 

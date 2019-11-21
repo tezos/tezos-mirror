@@ -3,6 +3,6 @@
  (libraries bip39 hex alcotest))
 
 (alias
- (name    runtest-bip39)
+ (name    runtest)
  (deps    (:exe test.exe))
  (action  (run %{exe})))

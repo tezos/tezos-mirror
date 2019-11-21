@@ -74,6 +74,8 @@ module Level = struct
       (List.map
          (fun l -> (to_string l, l))
          [Debug; Info; Notice; Warning; Error; Fatal])
+
+  let compare = compare
 end
 
 module Section : sig

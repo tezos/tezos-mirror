@@ -29,7 +29,7 @@ type shell_header = {
       has level 0. *)
   proto_level : int;
       (** The number of preceding protocol change in the chain (modulo 256),
-      i.e the genesis has proto_level 0. *)
+      i.e. the genesis has proto_level 0. *)
   predecessor : Block_hash.t;
   timestamp : Time.t;
   validation_passes : int;

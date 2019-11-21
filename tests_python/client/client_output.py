@@ -29,6 +29,7 @@ class TransferResult:
     """Result of a 'transfer' operation."""
 
     def __init__(self, client_output: str):
+        self.client_output = client_output
         pattern = r"Operation hash is '?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
@@ -58,15 +59,36 @@ class GetReceiptResult:
         self.block_hash = match.groups()[0]
 
 
+class GetAddressesResult:
+    """Result of 'list known addresses' operation.
+
+    """
+
+    def __init__(self, client_output: str):
+
+        pattern = re.compile(r"^(\w+):\s*(\w+).*$", re.MULTILINE)
+        self.wallet = dict(re.findall(pattern, client_output))
+
+
 class RunScriptResult:
     """Result of a 'get script' operation."""
 
     def __init__(self, client_output: str):
-        pattern = r"^storage\n\s*(.*)"
+        # read storage output
+        pattern = r"(?s)storage\n\s*(.*)\nemitted operations\n"
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
         self.storage = match.groups()[0]
+
+        # read map diff output
+        self.big_map_diff = []
+        pattern = r"big_map diff\n"
+        match = re.search(pattern, client_output)
+        if match is not None:
+            pattern = re.compile(r"  ([^ ].*?)\n")
+            for match_diff in pattern.finditer(client_output, match.end(0)):
+                self.big_map_diff.append([match_diff.group(1)])
 
 
 class OriginationResult:
@@ -137,19 +159,17 @@ class HashResult:
         pattern = r'''Raw packed data: ?(0x[0-9a-f]*)
 Script-expression-ID-Hash: ?(\w*)
 Raw Script-expression-ID-Hash: ?(\w*)
-Ledger Blake2b hash: ?(\w*)
+.*
 Raw Sha256 hash: ?(\w*)
-Raw Sha512 hash: ?(\w*)
-Gas remaining: ?(\w*)'''
+Raw Sha512 hash: ?(\w*)'''
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
         self.packed = match.groups()[0]
         self.hash = match.groups()[1]
-        self.raw_hash = match.groups()[2]
-        self.blake2b = match.groups()[3]
-        self.sha256 = match.groups()[4]
-        self.sha512 = match.groups()[5]
+        self.blake2b = match.groups()[2]
+        self.sha256 = match.groups()[3]
+        self.sha512 = match.groups()[4]
 
 
 class SignatureResult:
@@ -162,6 +182,49 @@ class SignatureResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.sig = match.groups()[0]
+
+
+class SetDelegateResult:
+    """Result of a 'set delegate' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Operation hash is '?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.operation_hash = match.groups()[0]
+        pattern = r"--branch ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.branch_hash = match.groups()[0]
+
+
+class GetDelegateResult:
+    """Result of a 'get delegate' command."""
+
+    def __init__(self, client_output: str):
+        if client_output == 'none\n':
+            self.delegate = None
+        else:
+            pattern = r"(\w+)( \(known as (\w+)\))*"
+            match = re.search(pattern, client_output)
+            if match is None:
+                raise InvalidClientOutput(client_output)
+            self.address = match.groups()[0]
+            self.alias = match.groups()[2]
+            self.delegate = self.address
+
+
+class SignBytesResult:
+    """Result of a 'sign bytes' command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Signature: ?(\w+)"
+        match = re.search(pattern, client_output[:-1])
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.signature = match.groups()[0]
 
 
 def extract_rpc_answer(client_output: str) -> dict:
@@ -178,7 +241,11 @@ def extract_rpc_answer(client_output: str) -> dict:
 def extract_balance(client_output: str) -> float:
     """Extract float balance from the output of 'get_balance' operation."""
     try:
-        return float(client_output[:-3])
+        pattern = r"([\w.]*) ꜩ"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        return float(match.groups()[0])
     except Exception:
         raise InvalidClientOutput(client_output)
 

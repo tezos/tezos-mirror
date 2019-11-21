@@ -67,18 +67,26 @@ end
 
 (** Debug-display module (non-cooperative output to [stderr]). *)
 module Dbg = struct
+  let on = ref false
+
+  let () =
+    Option.iter (Sys.getenv_opt "FLEXTESA_DEBUG") ~f:(function
+      | "true" -> on := true
+      | _ -> ())
+
   let e ef =
-    EF.(
-      list ~delimiters:("<DBG|", "|DBG>") ~sep:""
-        ~param:
-          { default_list with
-            separator_style= Some "debug"
-          ; align_closing= true
-          ; space_after_opening= true
-          ; space_before_closing= true }
-        [ef]
-      |> Easy_format.Pretty.to_stderr) ;
-    Printf.eprintf "\n%!"
+    if !on then (
+      EF.(
+        list ~delimiters:("<DBG|", "|DBG>") ~sep:""
+          ~param:
+            { default_list with
+              separator_style= Some "debug"
+            ; align_closing= true
+            ; space_after_opening= true
+            ; space_before_closing= true }
+          [ef]
+        |> Easy_format.Pretty.to_stderr) ;
+      Printf.eprintf "\n%!" )
 
   let i (e : EF.t) = ignore e
   let f f = e (EF.pr f)
@@ -290,7 +298,19 @@ module Asynchronous_result = struct
   end
 
   let run_application r =
-    match Lwt_main.run (r () : (_, _) t) with
+    Lwt_main.at_exit
+      Lwt.(
+        fun () ->
+          Dbg.e EF.(wf "Lwt-at-exit: run_application") ;
+          return ()) ;
+    match
+      Lwt_main.run
+        Lwt.(
+          Lwt_unix.yield ()
+          >>= fun () ->
+          Dbg.e EF.(wf "Lwt_main.run") ;
+          r ())
+    with
     | {result= Ok (); _} -> exit 0
     | {result= Error (`Die ret); _} -> exit ret
 end
@@ -299,23 +319,29 @@ include Asynchronous_result.Std
 module List_sequential = Asynchronous_result.List_sequential
 module Loop = Asynchronous_result.Loop
 
-module Lwt_exception = struct
-  type t = [`Lwt_exn of exn]
+module System_error = struct
+  type static = Exception of exn | Message of string
+  type t = [`System_error of [`Fatal] * static]
 
-  let fail ?attach (e : exn) = fail ?attach (`Lwt_exn e : [> t])
+  let fatal e : [> t] = `System_error (`Fatal, e)
+  let fatal_message e : [> t] = `System_error (`Fatal, Message e)
+  let fail_fatal ?attach e = fail ?attach (`System_error (`Fatal, e) : [> t])
 
   let catch ?attach f x =
     Lwt.catch
       (fun () -> Lwt.bind (f x) @@ fun r -> return r)
-      (fun exn -> fail ?attach exn)
+      (fun exn -> fail_fatal ?attach (Exception exn))
 
-  let pp fmt (`Lwt_exn e) =
-    Format.fprintf fmt "LWT-Exception:@ %s" (Printexc.to_string e)
-end
+  let fail_fatalf ?attach fmt =
+    Format.kasprintf (fun e -> fail_fatal ?attach (Message e)) fmt
 
-module System_error = struct
-  let fail ?attach fmt = ksprintf (fun e -> fail ?attach (`Sys_error e)) fmt
-  let pp fmt (`Sys_error e) = Format.fprintf fmt "System-error:@ %s" e
+  let pp fmt (e : [< t]) =
+    match e with
+    | `System_error (`Fatal, e) ->
+        Format.fprintf fmt "@[<2>Fatal-system-error:@ %a@]"
+          (fun ppf -> function Exception e -> Fmt.exn ppf e
+            | Message e -> Fmt.string ppf e)
+          e
 end
 
 (** A wrapper around a structural type describing the result of
@@ -336,7 +362,7 @@ module Process_result = struct
     type t = [`Wrong_status of output * string]
 
     let wrong_status (res : output) msgf =
-      ksprintf (fun msg -> fail (`Wrong_status (res, msg))) msgf
+      ksprintf (fun msg -> fail (`Wrong_status (res, msg) : [> t])) msgf
 
     let pp fmt = function
       | (`Wrong_status (res, msg) : [< t]) ->
@@ -368,17 +394,17 @@ end
 
 (** Some {!Lwt_unix} functions. *)
 module System = struct
-  let sleep f = Lwt_exception.catch Lwt_unix.sleep f
+  let sleep f = System_error.catch Lwt_unix.sleep f
 
   let write_file (_state : _ Base_state.t) ?perm path ~content =
-    Lwt_exception.catch
+    System_error.catch
       (fun () ->
         Lwt_io.with_file ?perm ~mode:Lwt_io.output path (fun out ->
             Lwt_io.write out content))
       ()
 
   let read_file (_state : _ Base_state.t) path =
-    Lwt_exception.catch
+    System_error.catch
       (fun () ->
         Lwt_io.with_file ~mode:Lwt_io.input path (fun out -> Lwt_io.read out))
       ()

@@ -12,7 +12,7 @@
  (modules RPC_client)
  (libraries tezos-base
             ocplib-resto-cohttp-client
-	    tezos-rpc-http)
+            tezos-rpc-http)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http)))
 
@@ -22,9 +22,9 @@
  (modules RPC_client_unix)
  (libraries tezos-stdlib-unix
             tezos-base
-	    cohttp-lwt-unix
+            cohttp-lwt-unix
             ocplib-resto-cohttp-client
-	    tezos-rpc-http-client)
+            tezos-rpc-http-client)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http_client)))
 
@@ -33,13 +33,11 @@
  (public_name tezos-rpc-http-server)
  (libraries tezos-base
             ocplib-resto-cohttp-server
-	    tezos-rpc-http)
+            tezos-rpc-http)
  (modules RPC_server)
- (flags (:standard -w -9+27-30-32-40@8
-                   -safe-string
-                   -open Tezos_base__TzPervasives
+ (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc
-		   -open Tezos_rpc_http)))
+                   -open Tezos_rpc_http)))
 
 (alias
  (name runtest_lint)

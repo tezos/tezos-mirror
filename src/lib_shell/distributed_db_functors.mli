@@ -30,7 +30,7 @@
 
 (** Generic interface for a "distributed" index.
 
-    By "distributed", it means that this interface abstract the p2p
+    By "distributed", it means that this interface abstract the P2P
     gossip layer and it is able to fetch missing data from known
     peers in a "synchronous" interface.
 
@@ -86,7 +86,7 @@ module type DISTRIBUTED_DB = sig
 
       A internal scheduler is able to re-send the request with an
       exponential back-off until the data is received. If the function
-      is called multiple time with the same key but with disctinct
+      is called multiple time with the same key but with distinct
       peers, the internal scheduler randomly chooses the requested
       peer (at each retry). *)
   val fetch :
@@ -104,7 +104,7 @@ module type DISTRIBUTED_DB = sig
 
   (** [resolve_pending t pids k v] resolves pending request (if any) in the
       local index for key k with [Found v]. It notifies the scheduler using
-      'notify_cancelation' for this key and wakes up the the waiter on this
+      'notify_cancellation' for this key and wakes up the waiter on this
       request. *)
   val resolve_pending : t -> key -> value -> unit
 
@@ -163,7 +163,7 @@ module type SCHEDULER_EVENTS = sig
 
   val notify : t -> P2p_peer.Id.t -> key -> unit
 
-  val notify_cancelation : t -> key -> unit
+  val notify_cancellation : t -> key -> unit
 
   val notify_unrequested : t -> P2p_peer.Id.t -> key -> unit
 

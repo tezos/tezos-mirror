@@ -84,7 +84,7 @@ module IO : Index.IO = struct
     let really_write fd off buf =
       let rec aux fd_off buf_off len =
         let w = pwrite fd fd_off buf buf_off len in
-        if w = 0 then ()
+        if w = 0 || w = len then ()
         else
           (aux [@tailcall]) (fd_off ++ Int64.of_int w) (buf_off + w) (len - w)
       in

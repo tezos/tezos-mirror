@@ -45,7 +45,6 @@ let with_node f =
         context_root = dir / "context";
         protocol_root = dir / "protocol";
         p2p = None;
-        test_chain_max_tll = None;
         checkpoint = None;
       }
     in

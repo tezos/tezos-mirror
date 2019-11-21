@@ -61,7 +61,7 @@ val deterministic_nonce_hash :
   require_auth:bool ->
   Bytes.t tzresult Lwt.t
 
-(** [supports_deterministic_nonces cctxt pkh] determines whether the
-    the signer provides the determinsitic nonce functionality. *)
+(** [supports_deterministic_nonces cctxt pkh] determines whether the signer
+    provides the deterministic nonce functionality. *)
 val supports_deterministic_nonces :
   #Client_context.wallet -> Signature.public_key_hash -> bool tzresult Lwt.t

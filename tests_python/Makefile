@@ -5,15 +5,12 @@ LINT2=pycodestyle
 PACKAGES=daemons launchers client tools scripts tests examples tests/multibranch
 LOG_DIR=tmp
 
-some:
+fast:
 	pytest -m "not slow"
 
 all:
 	mkdir -p $(LOG_DIR)
 	pytest --log-dir=tmp --tb=no
-
-injection:
-	pytest -s tests/test_injection.py
 
 lint_all: lint lint2
 
@@ -25,9 +22,6 @@ lint:
 
 lint2:
 	$(LINT2) $(PACKAGES)
-
-test:
-	pytest tests_simple -sv
 
 clean:
 	rm -rf tmp/*  __pycache__ *.pyc */__pycache__ */*.pyc .mypy_cache .pytest_cache .pytype

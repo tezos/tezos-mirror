@@ -30,45 +30,24 @@ type error_category =
   | `Temporary  (** Errors that may not happen in a later context *)
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
-module type S = sig
+let string_of_category = function
+  | `Permanent ->
+      "permanent"
+  | `Temporary ->
+      "temporary"
+  | `Branch ->
+      "branch"
+
+module type PREFIX = sig
+  val id : string
+end
+
+module type CORE = sig
   type error = ..
 
-  (** Catch all error when 'serializing' an error. *)
-  type error +=
-    private
-    | Unclassified of string
-          (** Catch all error when 'deserializing' an error. *)
-
-  type error += private Unregistred_error of Data_encoding.json
-
-  val pp : Format.formatter -> error -> unit
-
-  val pp_print_error : Format.formatter -> error list -> unit
-
-  (** An error serializer *)
   val error_encoding : error Data_encoding.t
 
-  val json_of_error : error -> Data_encoding.json
-
-  val error_of_json : Data_encoding.json -> error
-
-  (** {2 Error documentation} *)
-
-  (** Error information *)
-  type error_info = {
-    category : error_category;
-    id : string;
-    title : string;
-    description : string;
-    schema : Data_encoding.json_schema;
-  }
-
-  val pp_info : Format.formatter -> error_info -> unit
-
-  (** Retrieves information of registered errors *)
-  val get_registered_errors : unit -> error_info list
-
-  (** {2 Error classification} *)
+  val pp : Format.formatter -> error -> unit
 
   (** The error data type is extensible. Each module can register specialized
       error serializers
@@ -90,16 +69,104 @@ module type S = sig
     unit
 
   (** Classify an error using the registered kinds *)
-  val classify_errors : error list -> error_category
+  val classify_error : error -> error_category
+end
 
-  (** {2 Monad definition} *)
+module type EXT = sig
+  type error = ..
+
+  (** Catch all error when 'serializing' an error. *)
+  type error +=
+    private
+    | Unclassified of string
+          (** Catch all error when 'deserializing' an error. *)
+
+  type error += private Unregistred_error of Data_encoding.json
+
+  (** An error serializer *)
+  val json_of_error : error -> Data_encoding.json
+
+  val error_of_json : Data_encoding.json -> error
+
+  (** {2 Error documentation} *)
+
+  (** Error information *)
+  type error_info = {
+    category : error_category;
+    id : string;
+    title : string;
+    description : string;
+    schema : Data_encoding.json_schema;
+  }
+
+  val pp_info : Format.formatter -> error_info -> unit
+
+  (** Retrieves information of registered errors *)
+  val get_registered_errors : unit -> error_info list
+end
+
+module type WITH_WRAPPED = sig
+  type error
+
+  module type Wrapped_error_monad = sig
+    type unwrapped = ..
+
+    include CORE with type error := unwrapped
+
+    include EXT with type error := unwrapped
+
+    val unwrap : error -> unwrapped option
+
+    val wrap : unwrapped -> error
+  end
+
+  val register_wrapped_error_kind :
+    (module Wrapped_error_monad) ->
+    id:string ->
+    title:string ->
+    description:string ->
+    unit
+end
+
+module type MONAD = sig
+  (** This type is meant to be substituted/constrained. The intended use is
+      along the following lines:
+
+      [module Foo : sig
+         include CORE
+         include MONAD with type error := error
+       end = struct
+         ...
+       end]
+
+      See core.mli and monad.mli as examples.
+      *)
+  type error
+
+  (** A [trace] is a stack of [error]s. It is implemented as an [error list]
+      but such a list MUST NEVER be empty.
+
+      It is implemented as a concrete [error list] for backwards compatibility
+      but future improvements might modify the type or render the type
+      abstract. *)
+  type trace = error list
+
+  (* NOTE: Right now we leave this [pp_print_error] named as is. Later on we
+     might rename it to [pp_print_trace]. *)
+  val pp_print_error : Format.formatter -> trace -> unit
+
+  val trace_encoding : trace Data_encoding.t
+
+  (* NOTE: Right now we leave this [classify_errors] named as is. Later on we
+     might rename it to [classify_trace]. *)
+  val classify_errors : trace -> error_category
 
   (** The error monad wrapper type, the error case holds a stack of
       error, initialized by the first call to {!fail} and completed by
       each call to {!trace} as the stack is rewinded. The most general
       error is thus at the top of the error stack, going down to the
       specific error that actually caused the failure. *)
-  type 'a tzresult = ('a, error list) result
+  type 'a tzresult = ('a, trace) result
 
   (** A serializer for result of a given type *)
   val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
@@ -258,18 +325,4 @@ module type S = sig
 
   (** A {!Lwt.join} in the monad *)
   val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
-
-  (** Lazy values with retry-until success semantics *)
-  type 'a tzlazy
-
-  (** Create a {!tzlazy} value. *)
-  val tzlazy : (unit -> 'a tzresult Lwt.t) -> 'a tzlazy
-
-  (** [tzforce tzl] is either
-      (a) the remembered value carried by [tzl] if available
-      (b) the result of the callback/closure used to create [tzl] if successful,
-      in which case the value is remembered, or
-      (c) an error if the callback/closure used to create [tzl] is unsuccessful.
-  *)
-  val tzforce : 'a tzlazy -> 'a tzresult Lwt.t
 end

@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Log = Internal_event.Legacy_logging.Make (struct
+  let name = "baker.main"
+end)
+
 let () =
   Client_commands.register Protocol.hash
   @@ fun _network ->
@@ -35,4 +39,8 @@ let select_commands _ _ =
        (Clic.map_command (new Protocol_client_context.wrap_full))
        (Delegate_commands.accuser_commands ()))
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () =
+  Client_main_run.run
+    ~log:(Log.fatal_error "%s")
+    (module Client_config)
+    ~select_commands

@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type M = (* This module type lists the parameters you can give to the function [run]
-   defined below; most calls use and will use the default value for this module
-   type, which is module [Client_config] (client_config.ml).
-   Another instance of this module type is in main_signer.ml *)
+module type M = (* This module type lists the parameters you can give to the
+                   function [run] defined below; most calls use and will use the
+                   default value for this module type, which is module
+                   [Client_config] (client_config.ml). Another instance of this
+                   module type is in main_signer.ml *)
 sig
   type t
 
@@ -77,6 +78,7 @@ sig
 end
 
 val run :
+  ?log:(string -> unit) ->
   (module M) ->
   select_commands:(RPC_client_unix.http_ctxt ->
                   Client_config.cli_args ->

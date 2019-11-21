@@ -287,20 +287,20 @@ class Sandbox:
         """Kill baker for given node_id and proto"""
         baker = self.bakers[proto][node_id]
         del self.bakers[proto][node_id]
-        baker.kill()
+        baker.terminate_or_kill()
 
     def rm_endorser(self, node_id: int, proto: str) -> None:
         """Kill endorser for given node_id and proto"""
         endorser = self.bakers[proto][node_id]
         del self.endorsers[proto][node_id]
-        endorser.kill()
+        endorser.terminate_or_kill()
 
     def rm_node(self, node_id: int) -> None:
         """Kill node for given node_id"""
         node = self.nodes[node_id]
         del self.nodes[node_id]
         del self.clients[node_id]
-        node.kill()
+        node.terminate_or_kill()
         node.cleanup()
 
     def client(self, node_id: int) -> Client:
@@ -330,14 +330,14 @@ class Sandbox:
     def cleanup(self):
         """Kill all deamons and cleanup temp dirs."""
         for node in self.nodes.values():
-            node.kill()
+            node.terminate_or_kill()
             node.cleanup()
         for proto in self.bakers:
             for baker in self.bakers[proto].values():
-                baker.kill()
+                baker.terminate_or_kill()
         for proto in self.endorsers:
             for endorser in self.endorsers[proto].values():
-                endorser.kill()
+                endorser.terminate_or_kill()
         for client in self.clients.values():
             client.cleanup()
         shutil.rmtree(self.sandbox_dir)

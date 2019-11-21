@@ -49,7 +49,7 @@ let txn () =
   assert (rwtxn = rwtxn) ;
   let env2 = get_txn_env rwtxn in
   assert (env = env2) ;
-  opendb rwtxn >>= fun defaultdbi ->
+  opendb rwtxn >>= fun _ ->
   opendb ~flags:[Create] rwtxn ~name:"bleh" >>= fun dbi ->
   put_string rwtxn dbi "test" "test" >>= fun () ->
   get rwtxn dbi "test" >>= fun buffer ->
@@ -94,7 +94,7 @@ let cursors_del () =
     with_cursor txn db ~f:begin fun cursor ->
       cursor_put_string cursor "k1" "v1" >>= fun () ->
       cursor_first cursor >>= fun () ->
-      cursor_fold_left cursor ~init:() ~f:begin fun acc (_k, _v) ->
+      cursor_fold_left cursor ~init:() ~f:begin fun _acc (_k, _v) ->
         cursor_del cursor
       end >>= fun () ->
       assert_error KeyNotFound (cursor_first cursor) ;
@@ -112,7 +112,7 @@ let cursors_del4 () =
       cursor_put_string cursor "k3" "v3" >>= fun () ->
       cursor_put_string cursor "k4" "v4" >>= fun () ->
       cursor_first cursor >>= fun () ->
-      cursor_fold_left cursor ~init:() ~f:begin fun acc (_k, _v) ->
+      cursor_fold_left cursor ~init:() ~f:begin fun _acc (_k, _v) ->
         cursor_del cursor
       end >>= fun () ->
       assert_error KeyNotFound (cursor_first cursor) ;

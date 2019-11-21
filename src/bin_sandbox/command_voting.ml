@@ -103,9 +103,9 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
       >>= function
       | `String p when p = period_name ->
           return (`Done (nth - 1))
-      | other ->
+      | _ ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
-              register state ~client ~dst >>= fun res -> return ())
+              register state ~client ~dst)
           >>= fun _ ->
           ksprintf
             (Tezos_client.Keyed.bake state baker)
@@ -130,7 +130,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
           List.find client_protocols_result#out ~f:(fun prefix ->
               String.is_prefix protocol_hash ~prefix)
         with
-        | Some p ->
+        | Some _ ->
             return `Proper_understanding
         | None when expect_clueless_client ->
             return `Expected_misunderstanding
@@ -141,7 +141,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
       | Error e ->
           fail e)
 
-let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
+let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~clueless_winner ~admin_exec ~winner_client_exec ~size ~base_port
     ~serialize_proposals ?with_ledger () =
   let default_attempts = 50 in
@@ -159,15 +159,12 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   >>= fun () ->
   let (protocol, baker_0_account, baker_0_balance) =
     let open Tezos_protocol in
-    let d = default () in
-    let baker = List.nth_exn d.bootstrap_accounts 0 in
-    let hash = Option.value ~default:d.hash current_hash in
+    let baker = List.nth_exn protocol.bootstrap_accounts 0 in
     ( {
-        d with
-        hash;
+        protocol with
         time_between_blocks = [1; 0];
         bootstrap_accounts =
-          List.map d.bootstrap_accounts ~f:(fun (n, v) ->
+          List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
               if fst baker = n then (n, v) else (n, 1_000L));
       },
       fst baker,
@@ -186,14 +183,11 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes
-      @ [ secret_keys state ~protocol;
-          Log_recorder.Operations.show_all state;
-          arbitrary_command_on_clients
-            state
-            ~command_names:["all-clients"]
-            ~make_admin
-            ~clients:
-              (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec)) ]) ;
+      @ [secret_keys state ~protocol; Log_recorder.Operations.show_all state]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~make_admin
+          ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
   Interactive_test.Pauser.generic state EF.[af "About to really start playing"]
   >>= fun () ->
   let client n =
@@ -241,7 +235,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_clients
+      [ arbitrary_command_on_all_clients
           state
           ~command_names:["wc"; "winner-client"]
           ?make_admin:None
@@ -253,7 +247,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_clients
+      [ arbitrary_command_on_all_clients
           state
           ~command_names:["baker"]
           ~make_admin
@@ -454,7 +448,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     state
     ~client:baker_0.client
     ["submit"; "proposals"; "for"; baker_0.key_name; winner_hash]
-  >>= fun res ->
+  >>= fun _ ->
   bake_until_voting_period
     state
     ~baker:baker_0
@@ -473,7 +467,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
     nodes
     (`At_least (Counter_log.sum level_counter))
   >>= fun () ->
-  Helpers.wait_for state ~attempts:default_attempts ~seconds:2. (fun nth ->
+  Helpers.wait_for state ~attempts:default_attempts ~seconds:2. (fun _ ->
       Tezos_client.rpc
         state
         ~client:(client 1)
@@ -579,7 +573,7 @@ let run state ~winner_path ~demo_path ~current_hash ~node_exec ~client_exec
         | `Failure_to_understand ->
             failf "Winner-Client cannot bake on test chain!")
   >>= fun () ->
-  Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun nth ->
+  Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun _ ->
       Tezos_client.rpc
         state
         ~client:(client 1)
@@ -820,10 +814,10 @@ let cmd ~pp_error () =
              winner_client_exec
              size
              (`Clueless_winner clueless_winner)
-             (`Hash current_hash)
              (`Base_port base_port)
              (`With_ledger with_ledger)
              (`Serialize_proposals serialize_proposals)
+             protocol
              state
              ->
           ( state,
@@ -833,7 +827,6 @@ let cmd ~pp_error () =
               (run
                  state
                  ~serialize_proposals
-                 ~current_hash
                  ~winner_path
                  ~clueless_winner
                  ~demo_path
@@ -843,6 +836,7 @@ let cmd ~pp_error () =
                  ~base_port
                  ~client_exec
                  ~winner_client_exec
+                 ~protocol
                  ?with_ledger) ))
     $ Arg.(
         pure Filename.dirname
@@ -886,7 +880,8 @@ let cmd ~pp_error () =
                   ~doc:
                     "Do not fail if the client does not know about “next” \
                      protocol.")))
-    $ Arg.(
+    (*
+$ Arg.(
         pure (fun p -> `Hash p)
         $ value
             (opt
@@ -895,6 +890,7 @@ let cmd ~pp_error () =
                (info
                   ["current-hash"]
                   ~doc:"The hash to advertise as the current protocol.")))
+ *)
     $ Arg.(
         pure (fun p -> `Base_port p)
         $ value
@@ -923,6 +919,7 @@ let cmd ~pp_error () =
                   ~doc:
                     "Run the proposals one-by-one instead of all together \
                      (preferred by the Ledger).")))
+    $ Tezos_protocol.cli_term ()
     $ Test_command_line.cli_state ~name:"voting" () )
     (let doc = "Sandbox network with a full round of voting." in
      let man : Manpage.block list =

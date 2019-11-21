@@ -116,7 +116,7 @@ module type SCHEDULER_EVENTS = sig
 
   val notify : t -> P2p_peer.Id.t -> key -> unit
 
-  val notify_cancelation : t -> key -> unit
+  val notify_cancellation : t -> key -> unit
 
   val notify_unrequested : t -> P2p_peer.Id.t -> key -> unit
 
@@ -272,7 +272,7 @@ end = struct
             data.waiters <- data.waiters - 1 ;
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
-              Scheduler.notify_cancelation s.scheduler k )) ;
+              Scheduler.notify_cancellation s.scheduler k )) ;
     match timeout with
     | None ->
         t
@@ -357,7 +357,7 @@ end = struct
   let resolve_pending s k v =
     match Memory_table.find_opt s.memory k with
     | Some (Pending {wakener; _}) ->
-        Scheduler.notify_cancelation s.scheduler k ;
+        Scheduler.notify_cancellation s.scheduler k ;
         Memory_table.replace s.memory k (Found v) ;
         Lwt.wakeup_later wakener (Ok v) ;
         Option.iter s.global_input ~f:(fun input ->
@@ -371,7 +371,7 @@ end = struct
     | None ->
         ()
     | Some (Pending {wakener = w; _}) ->
-        Scheduler.notify_cancelation s.scheduler k ;
+        Scheduler.notify_cancellation s.scheduler k ;
         Memory_table.remove s.memory k ;
         Lwt.wakeup_later w (error (Canceled k))
     | Some (Found _) ->
@@ -453,7 +453,7 @@ end = struct
   and event =
     | Request of P2p_peer.Id.t option * key
     | Notify of P2p_peer.Id.t * key
-    | Notify_cancelation of key
+    | Notify_cancellation of key
     | Notify_invalid of P2p_peer.Id.t * key
     | Notify_duplicate of P2p_peer.Id.t * key
     | Notify_unrequested of P2p_peer.Id.t * key
@@ -469,13 +469,14 @@ end = struct
           -% a P2p_peer.Id.Logging.tag p) ;
     assert (Lwt_pipe.push_now t.queue (Notify (p, k)))
 
-  let notify_cancelation t k =
+  let notify_cancellation t k =
     debug
       Tag.DSL.(
         fun f ->
-          f "push cancelation %a" -% t event "push_cancelation"
+          f "push cancellation %a"
+          -% t event "push_cancellation"
           -% a Hash.Logging.tag k) ;
-    assert (Lwt_pipe.push_now t.queue (Notify_cancelation k))
+    assert (Lwt_pipe.push_now t.queue (Notify_cancellation k))
 
   let notify_invalid t p k =
     debug
@@ -586,7 +587,7 @@ end = struct
               f "received %a from %a" -% t event "received"
               -% a Hash.Logging.tag key
               -% a P2p_peer.Id.Logging.tag peer)
-    | Notify_cancelation key ->
+    | Notify_cancellation key ->
         Table.remove state.pending key ;
         lwt_debug
           Tag.DSL.(
@@ -620,7 +621,7 @@ end = struct
               -% a P2p_peer.Id.Logging.tag peer)
 
   let worker_loop state =
-    let shutdown = Lwt_canceler.cancelation state.canceler in
+    let shutdown = Lwt_canceler.cancellation state.canceler in
     let rec loop state =
       let timeout = compute_timeout state in
       Lwt.choose [(state.events >|= fun _ -> ()); timeout; shutdown]

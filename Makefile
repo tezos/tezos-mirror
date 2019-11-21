@@ -89,6 +89,7 @@ build-sandbox:
 	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 build-test: build-sandbox
+	@dune build @check # here we build all the files required for merlin
 	@dune build @buildtest
 
 test:
@@ -98,6 +99,7 @@ test:
 test-lint:
 	@dune build @runtest_lint
 	make -C tests_python lint_all
+	@src/tooling/lint.sh check_scripts
 
 fmt:
 	@src/tooling/lint.sh format
@@ -127,8 +129,10 @@ clean:
 		tezos-client \
 		tezos-signer \
 		tezos-admin-client \
+		tezos-codec \
 		tezos-protocol-compiler \
-	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p))
+		tezos-sandbox \
+	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p) sandbox-parameters.json)
 	@-${MAKE} -C docs clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 

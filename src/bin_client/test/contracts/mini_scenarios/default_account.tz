@@ -1,3 +1,7 @@
+/*
+Send 100 tz to the implicit account given as parameter.
+*/
+
 parameter key_hash;
 storage unit;
 code {DIP{UNIT}; CAR; IMPLICIT_ACCOUNT;

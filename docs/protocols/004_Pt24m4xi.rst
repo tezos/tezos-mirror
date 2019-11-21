@@ -1,7 +1,7 @@
 .. _004_Pt24m4xi:
 
-Protocol 004_Pt24m4xi
-=====================
+Protocol 004_Pt24m4xi Athens
+============================
 
 The main changes in this protocol are:
 

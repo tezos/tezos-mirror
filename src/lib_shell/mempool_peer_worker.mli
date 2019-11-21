@@ -42,7 +42,7 @@ module type T = sig
 
   (** [input] are the batches of operations that are given to a peer worker to
       validate. These hashes are gossiped on the network, and the mempool checks
-      their validity before gossiping them furhter. *)
+      their validity before gossiping them further. *)
   type input = Operation_hash.t list
 
   (** [create limits peer_id mempool_worker] creates a peer worker meant

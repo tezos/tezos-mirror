@@ -29,7 +29,7 @@
     the operation and the operation position in the block.
 
     This functions also looks for the operations in the `predecessors`
-    of the intial chain head. *)
+    of the initial chain head. *)
 val wait_for_operation_inclusion :
   #Client_context.full ->
   chain:Chain_services.chain ->

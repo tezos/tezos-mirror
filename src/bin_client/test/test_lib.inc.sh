@@ -187,7 +187,7 @@ get_NOW () {
     local TBB=`$client rpc get /chains/main/blocks/head/context/constants | \
                jq '.time_between_blocks | .[0]' | \
                tr -d '"'`
-	echo "$(TZ='AAA' date -d "${PRED_TS} + ${TBB} seconds" +%FT%TZ)"
+    echo "$(TZ='AAA' date -d "${PRED_TS} + ${TBB} seconds" +%FT%TZ)"
 }
 
 get_contract_addr () {
@@ -197,7 +197,7 @@ get_contract_addr () {
 
 contract_storage () {
     local CONTRACT_NAME="$1"    # Can be either an alias or hash
-    $client get script storage for ${CONTRACT_NAME}
+    $client get contract storage for ${CONTRACT_NAME}
 }
 
 assert_storage_contains () {

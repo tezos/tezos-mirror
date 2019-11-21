@@ -82,7 +82,8 @@ module Configuration_directory = struct
               , list
                   (fun (p, bak, endo) ->
                     strings [p; absolutize bak; absolutize endo])
-                  protocol_execs ) ]
+                  protocol_execs );
+            ]
           |> to_string ~minify:false)
     >>= fun () ->
     Running_processes.run_cmdf state " chmod -R 777 %s" path

@@ -45,25 +45,30 @@ end
 type t = (module T)
 
 let build_v1 hash =
-  let (module F) = Tezos_protocol_registerer.Registerer.get_exn hash in
-  let module Name = struct
-    let name = Protocol_hash.to_b58check hash
-  end in
-  let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
-  ( module struct
-    module Raw = F (Env)
+  match Tezos_protocol_registerer.Registerer.get hash with
+  | None ->
+      None
+  | Some protocol ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
+      Some
+        ( module struct
+          module Raw = F (Env)
 
-    module P = struct
-      let hash = hash
+          module P = struct
+            let hash = hash
 
-      include Env.Lift (Raw)
-    end
+            include Env.Lift (Raw)
+          end
 
-    include P
-    module Block_services = Block_services.Make (P) (P)
+          include P
+          module Block_services = Block_services.Make (P) (P)
 
-    let complete_b58prefix = Env.Context.complete
-  end : T )
+          let complete_b58prefix = Env.Context.complete
+        end : T )
 
 module VersionTable = Protocol_hash.Table
 
@@ -75,14 +80,15 @@ let mem hash =
   VersionTable.mem versions hash
   || Tezos_protocol_registerer.Registerer.mem hash
 
-let get_exn hash =
-  try VersionTable.find versions hash
-  with Not_found ->
-    let proto = build_v1 hash in
-    VersionTable.add versions hash proto ;
-    proto
-
-let get hash = try Some (get_exn hash) with Not_found -> None
+let get hash =
+  try Some (VersionTable.find versions hash)
+  with Not_found -> (
+    match build_v1 hash with
+    | Some proto ->
+        VersionTable.add versions hash proto ;
+        Some proto
+    | None ->
+        None )
 
 let list () = VersionTable.fold (fun _ p acc -> p :: acc) versions []
 

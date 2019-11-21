@@ -16,7 +16,10 @@ module Commands = struct
 
   module Sexp_options = struct
     let option_doc pattern doc = EF.(desc (haf "`%s`:" pattern) doc)
-    let option_list_doc l = EF.(desc_list (wf "Options:") l)
+
+    let option_list_doc = function
+      | [] -> EF.(wf "(no-options)")
+      | l -> EF.(desc_list (wf "Options:") l)
 
     let port_number_doc _ ~default_port =
       option_doc "(port <int>)"
@@ -231,7 +234,9 @@ module Commands = struct
               fun json ->
                 match field ~k:"history_mode" json |> get_string with
                 | "archive" -> 1
-                | _ -> field ~k:"save_point" json |> get_int)
+                | _ ->
+                    let sp = field ~k:"save_point" json |> get_int in
+                    Int.max 1 sp)
         >>= fun save_point ->
         let balance block contract =
           let path =
@@ -260,8 +265,8 @@ module Commands = struct
                      ( if init = cur then af "%f (unchanged)" (tz cur)
                      else af "%f → %f" (tz init) (tz cur) )))))
 
-  let arbitrary_command_on_clients ?make_admin
-      ?(command_names = ["cc"; "client-command"]) state ~clients =
+  let arbitrary_command_on_all_clients ?make_admin
+      ?(command_names = ["atc"; "all-clients"]) state ~clients =
     Prompt.unit_and_loop
       EF.(
         desc
@@ -274,13 +279,16 @@ module Commands = struct
                    ( List.map more ~f:(fun c -> c.Tezos_client.id)
                    |> String.concat ~sep:", " ) ))
           Sexp_options.(
-            option_list_doc
-              [ option_doc "(only <name1> <name2>)"
-                  (wf "Restrict the clients by name")
-              ; option_doc "(admin)"
-                  (wf "Use the admin-client instead%s"
-                     (match make_admin with None -> " (DISABLED)" | _ -> ""))
-              ]))
+            let only_opt =
+              option_doc "(only <name1> <name2>)"
+                (wf "Restrict the clients by name") in
+            ( (match clients with [_] -> [] | _ -> [only_opt])
+            @
+            match make_admin with
+            | None -> []
+            | _ -> [option_doc "(admin)" (wf "Use the admin-client instead.")]
+            )
+            |> option_list_doc))
       command_names
       (fun sexps ->
         let args =
@@ -355,7 +363,55 @@ module Commands = struct
                                ( if List.length subset_of_clients = 1 then ""
                                else "s" )
                                (String.concat ~sep:", " clients))
-                            (markdown_verbatim res)))) ]))
+                            (markdown_verbatim res))));
+              ]))
+
+  let arbitrary_commands_for_each_client ?make_admin
+      ?(make_command_names = fun i -> [sprintf "c%d" i; sprintf "client-%d" i])
+      state ~clients =
+    List.mapi clients ~f:(fun i c ->
+        arbitrary_command_on_all_clients state ?make_admin ~clients:[c]
+          ~command_names:(make_command_names i))
+
+  let arbitrary_commands_for_each_and_all_clients ?make_admin
+      ?make_individual_command_names ?all_clients_command_names state ~clients
+      =
+    arbitrary_command_on_all_clients state ?make_admin ~clients
+      ?command_names:all_clients_command_names
+    :: arbitrary_commands_for_each_client state ?make_admin ~clients
+         ?make_command_names:make_individual_command_names
+
+  let bake_command state ~clients =
+    Prompt.unit_and_loop
+      EF.(
+        wf "Manually bake a block (with %s)."
+          ( match clients with
+          | [] -> "NO CLIENT, this is just wrong"
+          | [one] -> one.Tezos_client.Keyed.client.id
+          | m ->
+              sprintf "one of %s"
+                ( List.mapi m ~f:(fun ith one ->
+                      sprintf "%d: %s" ith one.Tezos_client.Keyed.client.id)
+                |> String.concat ~sep:", " ) ))
+      ["bake"]
+      (fun sexps ->
+        let client =
+          let open Base.Sexp in
+          match sexps with
+          | [] -> List.nth_exn clients 0
+          | [Atom s] -> List.nth_exn clients (Int.of_string s)
+          | _ -> Fmt.kstrf failwith "Wrong command line: %a" pp (List sexps)
+        in
+        Asynchronous_result.bind_on_error
+          (Fmt.kstrf
+             (Tezos_client.Keyed.bake state client)
+             "Command-line baking with client %s (account: %s)"
+             client.Tezos_client.Keyed.client.id
+             client.Tezos_client.Keyed.key_name)
+          ~f:(fun ~result:_ -> function
+            | `Client_command_error (m, _) -> cmdline_fail "Error: %s" m
+            | #System_error.t as e ->
+                cmdline_fail "Error: %a" System_error.pp e))
 
   let all_defaults state ~nodes =
     let default_port = (List.hd_exn nodes).Tezos_node.rpc_port in
@@ -454,42 +510,88 @@ module Pauser = struct
       >>= fun () -> Running_processes.wait_all state in
     Sys.catch_break false ;
     let cond = Lwt_condition.create () in
-    let () =
+    let catch_signals () =
       Lwt_unix.on_signal Sys.sigint (fun i ->
           Printf.eprintf
             "\nReceived signal SIGINT (%d), type `q` to quit prompts.\n\n%!" i ;
-          Lwt_condition.broadcast cond "INT")
+          Lwt_condition.broadcast cond `Sig_int)
       |> ignore ;
       Lwt_unix.on_signal Sys.sigterm (fun i ->
           Printf.eprintf
             "\nReceived signal SIGTERM (%d), type `q` to quit prompts.\n\n%!" i ;
-          Lwt_condition.broadcast cond "TERM")
+          Lwt_condition.broadcast cond `Sig_term)
       |> ignore in
-    let wait () =
-      Lwt_exception.catch Lwt_condition.wait cond
-      >>= fun sig_name -> Lwt_exception.fail (Failure sig_name) in
+    let wait_on_signals () =
+      System_error.catch Lwt_condition.wait cond
+      >>= fun sig_name -> return (`Woken_up_by_signal sig_name) in
     Dbg.e
       EF.(wf "Running test %s on %s" state#application_name (Paths.root state)) ;
-    let rec protect procedure =
-      Asynchronous_result.bind_on_error
-        ( (try Lwt.pick [procedure (); wait ()] with e -> fail (`Lwt_exn e))
-        >>= fun () ->
-        ( match (Interactivity.pause_on_success state, default_end state) with
-        | true, _ -> generic state ~force:true EF.[af "Scenario done; pausing"]
-        | false, `Sleep n ->
-            say state EF.(wf "Test done, sleeping %.02f seconds" n)
-            >>= fun () -> System.sleep n )
-        >>= fun () -> finish () )
-        ~f:(fun ~result error_value ->
-          ( match error_value with
-          | `Lwt_exn (Failure sigterm) when sigterm = "TERM" ->
+    let wrap_result f = f () >>= fun o -> return (`Successful_procedure o) in
+    let run_with_signal_catching ~name procedure =
+      Lwt.(
+        pick
+          [ ( wrap_result (fun () -> procedure ())
+            >>= fun res ->
+            match res.Attached_result.result with
+            | Ok _ ->
+                Dbg.e EF.(wf "Procedure %s ended: ok" name) ;
+                return res
+            | Error (`System_error (_, System_error.Exception Lwt.Canceled)) ->
+                Dbg.e EF.(wf "Procedure %s was cancelled" name) ;
+                System.sleep 2.
+                >>= fun _ ->
+                Dbg.e EF.(wf "Procedure %s slept 2." name) ;
+                return res
+            | Error e ->
+                Dbg.e
+                  EF.(wf "Procedure %s ended with error %a" name pp_error e) ;
+                return res )
+          ; ( wait_on_signals ()
+            >>= fun res ->
+            Dbg.e EF.(wf "Signal-wait %S go woken up" name) ;
+            return res ) ]) in
+    let last_pause_status = ref `Not_done in
+    let rec protect ~name procedure =
+      catch_signals () ;
+      Dbg.e EF.(wf "protecting %S" name) ;
+      let last_pause () =
+        protect ~name:"Last-pause" (fun () ->
+            generic state ~force:true
+              EF.
+                [ haf
+                    "Last pause before the application will Kill 'Em All and \
+                     Quit." ]
+            >>= fun () ->
+            last_pause_status := `Done ;
+            return ()) in
+      Asynchronous_result.bind_on_result
+        ( try
+            Dbg.e EF.(wf "protecting: %S in-try" name) ;
+            run_with_signal_catching ~name procedure
+          with e ->
+            System_error.fail_fatalf
+              ~attach:[("protected", `String_value name)]
+              "protecting %S: ocaml-exn: %a" name Exn.pp e )
+        ~f:(function
+          | Ok (`Successful_procedure o) -> return (`Was_ok o)
+          | Ok (`Woken_up_by_signal `Sig_term) ->
               Console.say state
                 EF.(
                   desc (shout "Received SIGTERM")
                     (wf
                        "Will not pause because it's the wrong thing to do; \
                         killing everything and quitting."))
-          | `Lwt_exn End_of_file ->
+              >>= fun () -> return `Quit_with_error
+          | Ok (`Woken_up_by_signal `Sig_int) ->
+              Console.say state
+                EF.(
+                  desc (shout "Received SIGINT")
+                    (wf
+                       "Please the command `q` (a.k.a. `quit`) for quitting \
+                        prompts."))
+              >>= fun () -> return `Error_that_can_be_interactive
+          | Error (`System_error (`Fatal, System_error.Exception End_of_file))
+            ->
               Console.say state
                 EF.(
                   desc
@@ -497,25 +599,34 @@ module Pauser = struct
                     (wf
                        "Cannot pause because interactivity broken; killing \
                         everything and quitting."))
-          | _ when Interactivity.pause_on_error state ->
-              protect (fun () ->
-                  generic state ~force:true
-                    EF.
-                      [ haf
-                          "Last pause before the test will Kill 'Em All and \
-                           Quit."
-                      ; desc (shout "Error:")
-                          (af "%a"
-                             (fun ppf c -> Attached_result.pp ppf c ~pp_error)
-                             result) ])
-          | _ ->
+              >>= fun () -> return `Quit_with_error
+          | Error e ->
               Console.say state
                 EF.(
                   desc
-                    (shout "Dying of Exception")
-                    (wf "Killing everything and quitting now.")) )
+                    (shout "An error happened")
+                    (custom (fun ppf -> pp_error ppf e)))
+              >>= fun () -> return `Error_that_can_be_interactive)
+      >>= fun todo_next ->
+      match todo_next with
+      | `Was_ok ()
+        when Interactivity.pause_on_success state
+             && !last_pause_status = `Not_done ->
+          last_pause ()
+      | `Was_ok () -> (
+          finish ()
           >>= fun () ->
-          finish () >>= fun () -> fail error_value ~attach:result.attachments)
-    in
-    protect f
+          match default_end state with
+          | `Sleep n ->
+              say state EF.(wf "Test done, sleeping %.02f seconds" n)
+              >>= fun () -> System.sleep n )
+      | `Error_that_can_be_interactive when Interactivity.pause_on_error state
+        ->
+          last_pause ()
+      | `Error_that_can_be_interactive | `Quit_with_error ->
+          finish () >>= fun () -> Asynchronous_result.die 4 in
+    protect f ~name:"Main-function"
+    >>= fun () ->
+    Dbg.e EF.(wf "Finiching Interactive_test.run_test") ;
+    return ()
 end

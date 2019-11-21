@@ -101,8 +101,8 @@ module Answer = struct
                 P2p_pool.register_new_point
                   ~trusted:st.trust_discovered_peers
                   pool
-                  st.my_peer_id
-                  (addr, remote_port) ;
+                  (addr, remote_port)
+                |> ignore ;
                 aux () )
         | _ ->
             aux () )

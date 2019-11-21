@@ -59,8 +59,8 @@ endorse.
 In the network, rights for baking and endorsing are randomly assigned
 to delegates proportionally to the number of rolls they have been
 delegated.
-A roll is just a block of 10kꜩ and all computations with rolls are
-rounded to the nearest lower integer e.g. if you have 16kꜩ it amounts
+A roll is just a block of 8kꜩ and all computations with rolls are
+rounded to the nearest lower integer e.g. if you have 15kꜩ it amounts
 to 1 roll.
 
 When you obtain coins from :ref:`the faucet<faucet>`, if you
@@ -279,8 +279,8 @@ Docker
 The docker image runs the daemons by default for all your keys.
 To know if you baked, just run::
 
-    ./alphanet.sh baker log
-    ./alphanet.sh endorser log
+    ./babylonnet.sh baker log
+    ./babylonnet.sh endorser log
 
 You should see lines such as::
 

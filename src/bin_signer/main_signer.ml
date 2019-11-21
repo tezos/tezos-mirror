@@ -28,11 +28,6 @@ module Log = Internal_event.Legacy_logging.Make (struct
   let name = "signer.main"
 end)
 
-let () =
-  let log s = Log.fatal_error "%s" s in
-  Lwt_exit.exit_on ~log Sys.sigint ;
-  Lwt_exit.exit_on ~log Sys.sigterm
-
 let default_tcp_host =
   match Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST" with
   | None ->
@@ -151,18 +146,17 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          Lwt_exit.wrap_promise
-            ( may_setup_pidfile pidfile
-            >>=? fun () ->
-            Tezos_signer_backends.Encrypted.decrypt_all cctxt
-            >>=? fun () ->
-            Socket_daemon.run
-              cctxt
-              (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
-              ?magic_bytes
-              ~check_high_watermark
-              ~require_auth
-            >>=? fun _ -> return_unit ));
+          may_setup_pidfile pidfile
+          >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt
+          >>=? fun () ->
+          Socket_daemon.run
+            cctxt
+            (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
+            ?magic_bytes
+            ~check_high_watermark
+            ~require_auth
+          >>=? fun _ -> return_unit);
       command
         ~group
         ~desc:"Launch a signer daemon over a local Unix socket."
@@ -179,18 +173,17 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "local"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
-          Lwt_exit.wrap_promise
-            ( may_setup_pidfile pidfile
-            >>=? fun () ->
-            Tezos_signer_backends.Encrypted.decrypt_all cctxt
-            >>=? fun () ->
-            Socket_daemon.run
-              cctxt
-              (Unix path)
-              ?magic_bytes
-              ~check_high_watermark
-              ~require_auth
-            >>=? fun _ -> return_unit ));
+          may_setup_pidfile pidfile
+          >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt
+          >>=? fun () ->
+          Socket_daemon.run
+            cctxt
+            (Unix path)
+            ?magic_bytes
+            ~check_high_watermark
+            ~require_auth
+          >>=? fun _ -> return_unit);
       command
         ~group
         ~desc:"Launch a signer daemon over HTTP."
@@ -216,18 +209,17 @@ let commands base_dir require_auth : Client_context.full command list =
                    with Failure _ -> failwith "Invalid port %s" x))))
         (prefixes ["launch"; "http"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          Lwt_exit.wrap_promise
-            ( may_setup_pidfile pidfile
-            >>=? fun () ->
-            Tezos_signer_backends.Encrypted.decrypt_all cctxt
-            >>=? fun () ->
-            Http_daemon.run_http
-              cctxt
-              ~host
-              ~port
-              ?magic_bytes
-              ~check_high_watermark
-              ~require_auth ));
+          may_setup_pidfile pidfile
+          >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt
+          >>=? fun () ->
+          Http_daemon.run_http
+            cctxt
+            ~host
+            ~port
+            ?magic_bytes
+            ~check_high_watermark
+            ~require_auth);
       command
         ~group
         ~desc:"Launch a signer daemon over HTTPS."
@@ -271,20 +263,19 @@ let commands base_dir require_auth : Client_context.full command list =
              cert
              key
              cctxt ->
-          Lwt_exit.wrap_promise
-            ( may_setup_pidfile pidfile
-            >>=? fun () ->
-            Tezos_signer_backends.Encrypted.decrypt_all cctxt
-            >>=? fun () ->
-            Http_daemon.run_https
-              cctxt
-              ~host
-              ~port
-              ~cert
-              ~key
-              ?magic_bytes
-              ~check_high_watermark
-              ~require_auth ));
+          may_setup_pidfile pidfile
+          >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt
+          >>=? fun () ->
+          Http_daemon.run_https
+            cctxt
+            ~host
+            ~port
+            ~cert
+            ~key
+            ?magic_bytes
+            ~check_high_watermark
+            ~require_auth);
       command
         ~group
         ~desc:"Authorize a given public key to perform signing requests."
@@ -382,4 +373,7 @@ module C = struct
 end
 
 let () =
-  Client_main_run.run (module C) ~select_commands:(fun _ _ -> return_nil)
+  Client_main_run.run
+    ~log:(Log.fatal_error "%s")
+    (module C)
+    ~select_commands:(fun _ _ -> return_nil)

@@ -38,8 +38,17 @@ module Voting_period : sig
   val to_string : t -> string
 end
 
+module Protocol_kind : sig
+  type t = [`Athens | `Babylon]
+
+  val names : (string * t) list
+  val cmdliner_term : unit -> t Cmdliner.Term.t
+  val pp : Format.formatter -> t -> unit
+end
+
 type t =
   { id: string
+  ; kind: Protocol_kind.t
   ; bootstrap_accounts: (Account.t * Int64.t) list
   ; dictator: Account.t
         (* ; bootstrap_contracts: (Account.t * int * Script.origin) list *)
@@ -52,26 +61,8 @@ type t =
   ; blocks_per_cycle: int
   ; preserved_cycles: int
   ; proof_of_work_threshold: int
-  ; blocks_per_commitment: int
-  ; endorsers_per_block: int
-  ; hard_gas_limit_per_operation: int
-  ; hard_gas_limit_per_block: int
-  ; tokens_per_roll: int
-  ; michelson_maximum_type_size: int
-  ; seed_nonce_revelation_tip: int
-  ; origination_size: int
-  ; block_security_deposit: int
-  ; endorsement_security_deposit: int
-  ; block_reward: int
-  ; endorsement_reward: int
-  ; hard_storage_limit_per_operation: int
-  ; cost_per_byte: int
-  ; test_chain_duration: int
-  ; quorum_min: int
-  ; quorum_max: int
-  ; min_proposal_quorum: int
-  ; initial_endorsers: int
-  ; delay_per_missing_endorsement: int }
+  ; custom_protocol_parameters: Ezjsonm.t option }
+(** [t] wraps bootstrap parameters for sandboxed protocols. *)
 
 val compare : t -> t -> int
 val default : unit -> t
@@ -81,6 +72,7 @@ val protocol_parameters : t -> string
 val expected_pow : t -> int
 val id : t -> string
 val bootstrap_accounts : t -> Account.t list
+val kind : t -> Protocol_kind.t
 val dictator_name : t -> string
 val dictator_secret_key : t -> string
 val sandbox_path : config:< paths: Paths.t ; .. > -> t -> string
@@ -94,7 +86,7 @@ val ensure_script :
 val ensure :
   t
   -> config:< paths: Paths.t ; .. >
-  -> (unit, [> `Lwt_exn of exn]) Asynchronous_result.t
+  -> (unit, [> System_error.t]) Asynchronous_result.t
 (** Run the script created by [ensure_script], i.e. create the JSON
     bootstrap parameters. *)
 

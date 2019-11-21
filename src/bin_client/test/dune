@@ -3,57 +3,6 @@
        protocol_parameters.json))
 
 (alias
- (name runtest_basic.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       king_commitment.json
-       queen_commitment.json
-       test_lib.inc.sh
-       (glob_files contracts/opcodes/*)
-       (glob_files contracts/mini_scenarios/*))
-  (locks /tcp-port/18731
-         /tcp-port/19731)
-  (action
-   (run bash %{dep:test_basic.sh}
-             %{bin:tezos-sandboxed-node.sh}
-             %{bin:tezos-node}
-             %{bin:tezos-init-sandboxed-client.sh}
-             %{bin:tezos-client}
-             %{bin:tezos-admin-client})))
-
-(alias
- (name runtest_contracts.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files contracts/attic/*))
- (locks /tcp-port/18731
-        /tcp-port/19731)
- (action
-  (run bash %{dep:test_contracts.sh}
-            %{bin:tezos-sandboxed-node.sh}
-            %{bin:tezos-node}
-            %{bin:tezos-init-sandboxed-client.sh}
-            %{bin:tezos-client}
-            %{bin:tezos-admin-client})))
-
-(alias
- (name runtest_contracts_opcode.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files contracts/opcodes/*))
-  (locks /tcp-port/18731
-         /tcp-port/19731)
-  (action
-  (run bash %{dep:test_contracts_opcode.sh}
-            %{bin:tezos-sandboxed-node.sh}
-            %{bin:tezos-node}
-            %{bin:tezos-init-sandboxed-client.sh}
-            %{bin:tezos-client}
-            %{bin:tezos-admin-client})))
-
-(alias
  (name runtest_contracts_macros.sh)
  (deps sandbox.json
        protocol_parameters.json
@@ -63,22 +12,6 @@
         /tcp-port/19731)
  (action
  (run bash %{dep:test_contracts_macros.sh}
-           %{bin:tezos-sandboxed-node.sh}
-           %{bin:tezos-node}
-           %{bin:tezos-init-sandboxed-client.sh}
-           %{bin:tezos-client}
-           %{bin:tezos-admin-client})))
-
-(alias
- (name runtest_contracts_mini_scenarios.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files contracts/mini_scenarios/*))
- (locks /tcp-port/18731
-        /tcp-port/19731)
- (action
- (run bash %{dep:test_contracts_mini_scenarios.sh}
            %{bin:tezos-sandboxed-node.sh}
            %{bin:tezos-node}
            %{bin:tezos-init-sandboxed-client.sh}
@@ -169,11 +102,7 @@
 
 (alias
  (name runtest)
- (deps (alias runtest_basic.sh)
-       (alias runtest_contracts.sh)
-       (alias runtest_contracts_opcode.sh)
-       (alias runtest_contracts_macros.sh)
-       (alias runtest_contracts_mini_scenarios.sh)
+ (deps (alias runtest_contracts_macros.sh)
        (alias runtest_multinode.sh)
        (alias runtest_injection.sh)
        (alias runtest_tls.sh)

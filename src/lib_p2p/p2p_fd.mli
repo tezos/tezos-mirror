@@ -23,11 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Bottom-up logging facility for the P2P layer. Use this to track
-   all information related to a particular connection. *)
+(** This module defines a type [t] which wraps a file descriptor. Most
+    functions simply call the underlying file descriptor function and generate
+    logs with prefix "p2p.fd". *)
 
 type t
 
+(** [id t] returns a unique, positive, identifier for t. Identifiers
+    are generated sequentially at creation time. *)
 val id : t -> int
 
 val read : t -> Bytes.t -> int -> int -> int Lwt.t

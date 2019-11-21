@@ -47,7 +47,7 @@ let wait_for_voting_period ?level_within_period state ~client ~attempts period
       | `String p when p = period_name && (lvl_ok = None || lvl_ok = Some true)
         ->
           return (`Done (nth - 1))
-      | other ->
+      | _ ->
           Tezos_client.successful_client_cmd
             state
             ~client
@@ -115,7 +115,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   in
   List_sequential.iter accusers ~f:(fun acc ->
       Running_processes.start state (Tezos_daemon.process acc ~state)
-      >>= fun {process; lwt} -> return ())
+      >>= fun _ -> return ())
   >>= fun () ->
   let keys_and_daemons =
     let pick_a_node_and_client idx =
@@ -185,7 +185,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
           Running_processes.start state (Tezos_daemon.process daemon ~state)
-          >>= fun {process; lwt} -> return ()))
+          >>= fun _ -> return ()))
   >>= fun () ->
   let client_0 =
     Tezos_client.of_node (List.nth_exn nodes 0) ~exec:client_exec
@@ -195,18 +195,11 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     state
     Interactive_test.Commands.(
       all_defaults state ~nodes
-      @ [ secret_keys state ~protocol;
-          arbitrary_command_on_clients
-            state
-            ~command_names:["all-clients"; "cc"]
-            ~make_admin
-            ~clients:
-              (List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec));
-          arbitrary_command_on_clients
-            state
-            ~command_names:["c0"; "client-0"]
-            ~make_admin
-            ~clients:[client_0] ]) ;
+      @ [secret_keys state ~protocol]
+      @ arbitrary_commands_for_each_and_all_clients
+          state
+          ~make_admin
+          ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
   (* 
      For each node we try to see if the node knows about the protocol,
      if it does we're good, if not we inject it.

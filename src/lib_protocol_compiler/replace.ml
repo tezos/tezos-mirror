@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 module StringMap = Map.Make (String)
+open Re
 
 let regexp = Str.regexp "%%[^%]*%%"
 

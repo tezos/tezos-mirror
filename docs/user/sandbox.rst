@@ -52,8 +52,8 @@ It will also define in the current shell session an alias ``tezos-client``
 preconfigured for communicating with the same-numbered node.
 
 When you bootstrap a new network, the network is initialized with a
-dummy economic protocol, called `genesis`. If you want to run the same
-protocol as the alphanet, ``init-sandboxed-client`` also defines an
+dummy economic protocol, called `genesis`. If you want to run the whole implemented
+protocol, ``init-sandboxed-client`` also defines an
 alias ``tezos-activate-alpha``, that you need to execute once for
 activating the whole network.
 For instance:
@@ -69,7 +69,7 @@ For instance:
 
 We now have the possibility to send transactions to the sandboxed network.
 As the genesis block used to initialize the sandboxed network differs from the
-one used in Alphanet and Zeronet, it is not possible to activate
+one used in :ref:`test networks<test-networks>`, it is not possible to activate
 accounts obtained from the faucet. However, we can use the
 preconfigured accounts which can be listed with:
 

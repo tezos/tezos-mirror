@@ -55,7 +55,7 @@ val iter_predecessors :
     path)], where [ancestor] is the common ancestor of [from_block]
     and [to_block] and where [path] is the chain from [ancestor]
     (excluded) to [to_block] (included).  The function raises an
-    exception when the two provided blocks do not belong the the same
+    exception when the two provided blocks do not belong to the same
     [chain].  *)
 val new_blocks :
   from_block:Block.t -> to_block:Block.t -> (Block.t * Block.t list) Lwt.t

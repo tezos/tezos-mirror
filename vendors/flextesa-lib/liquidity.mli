@@ -38,7 +38,7 @@ module Contract : sig
        < paths: Paths.t ; runner: Running_processes.State.t ; .. > Base_state.t
     -> t
     -> ( string
-       , [> `Lwt_exn of exn | `Wrong_status of Process_result.t * string] )
+       , [> System_error.t | `Wrong_status of Process_result.t * string] )
        Asynchronous_result.t
 
   val base_liquidity_command : 'a -> t -> string
@@ -47,7 +47,7 @@ module Contract : sig
        < paths: Paths.t ; runner: Running_processes.State.t ; .. > Base_state.t
     -> t
     -> ( string
-       , [> `Lwt_exn of exn | `Wrong_status of Process_result.t * string] )
+       , [> System_error.t | `Wrong_status of Process_result.t * string] )
        Asynchronous_result.t
 
   val storage_initialization :
@@ -59,7 +59,7 @@ module Contract : sig
     -> tezos_node:string
     -> storage:Data.t list
     -> ( string
-       , [> `Lwt_exn of exn | `Wrong_status of Process_result.t * string] )
+       , [> System_error.t | `Wrong_status of Process_result.t * string] )
        Asynchronous_result.t
 
   val arguments :
@@ -68,7 +68,7 @@ module Contract : sig
     -> entry_point:string
     -> data:Data.t
     -> ( string
-       , [> `Lwt_exn of exn | `Wrong_status of Process_result.t * string] )
+       , [> System_error.t | `Wrong_status of Process_result.t * string] )
        Asynchronous_result.t
 
   val cmdliner_term : prefix:string -> name:string -> unit -> t Cmdliner.Term.t
@@ -90,7 +90,7 @@ module On_chain : sig
     -> storage:string
     -> ( < err: string list ; out: string list ; status: Unix.process_status >
        , [> `Client_command_error of string * string list option
-         | `Lwt_exn of exn ] )
+         | System_error.t ] )
        Asynchronous_result.t
 
   val build_and_deploy :
@@ -107,7 +107,7 @@ module On_chain : sig
     -> balance:int
     -> ( string
        , [> `Client_command_error of string * string list option
-         | `Lwt_exn of exn
+         | System_error.t
          | `Wrong_status of Process_result.t * string ] )
        Asynchronous_result.t
 
@@ -115,7 +115,7 @@ module On_chain : sig
        < paths: Paths.t ; runner: Running_processes.State.t ; .. > Base_state.t
     -> client:Tezos_client.t
     -> string list
-    -> (bool * Process_result.t, [> `Lwt_exn of exn]) Asynchronous_result.t
+    -> (bool * Process_result.t, [> System_error.t]) Asynchronous_result.t
 
   val call :
        ?msg:string
@@ -135,7 +135,7 @@ module On_chain : sig
     -> entry_point:string
     -> data:Data.t
     -> ( Process_result.t
-       , [> `Lwt_exn of exn
+       , [> System_error.t
          | `Scenario_error of string
          | `Wrong_status of Process_result.t * string ] )
        Asynchronous_result.t
@@ -153,7 +153,7 @@ module On_chain : sig
     -> key:[< `Nat of int]
     -> ( < post: string ; result: Ezjsonm.value >
        , [> `Client_command_error of string * string list option
-         | `Lwt_exn of exn ] )
+         | System_error.t ] )
        Asynchronous_result.t
 
   val show_contract_command :
@@ -167,7 +167,7 @@ module On_chain : sig
     -> address:string
     -> pp_error:(   Format.formatter
                  -> [> `Client_command_error of string * string list option
-                    | `Lwt_exn of exn ]
+                    | System_error.t ]
                  -> unit)
     -> Console.Prompt.item
 
@@ -186,7 +186,7 @@ module On_chain : sig
                       -> ( [< `Nat of int]
                          , ([> `Client_command_error of
                                string * string list option
-                            | `Lwt_exn of exn
+                            | System_error.t
                             | `Scenario_error of string ]
                             as
                             'a) )

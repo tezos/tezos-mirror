@@ -5,7 +5,7 @@ module More_fmt = struct
   (** Little experiment for fun … *)
 
   let vertical_box ?indent ppf f = vbox ?indent (fun ppf () -> f ppf) ppf ()
-  let wrapping_box ?indent ppf f = hvbox ?indent (fun ppf () -> f ppf) ppf ()
+  let wrapping_box ?indent ppf f = box ?indent (fun ppf () -> f ppf) ppf ()
 
   let wf ppf fmt =
     Format.kasprintf (fun s -> box (fun ppf () -> text ppf s) ppf ()) fmt

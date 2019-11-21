@@ -7,7 +7,7 @@ This specification gives a detailed formal semantics of the Michelson
 language, and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
-The language is stack-based, with high level data types and primitives
+The language is stack-based, with high level data types and primitives,
 and strict static type checking. Its design cherry picks traits from
 several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
@@ -276,7 +276,7 @@ The domain of instruction names, symbolic constants and data
 constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
-Be aware that the syntax used in the specification may differ a bit from
+Be aware that the syntax used in the specification may differ from
 the :ref:`concrete syntax <ConcreteSyntax>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
@@ -374,7 +374,7 @@ Here are the notations for meta type variables:
 Typing rules
 ~~~~~~~~~~~~
 
-The system is syntax directed, which means here that it defines a single
+The system is syntax directed, meaning that it defines a single
 typing rule for each syntax construct. A typing rule restricts the type
 of input stacks that are authorized for this syntax construct, links the
 output type to the input type, and links both of them to the
@@ -407,7 +407,7 @@ with ``by``.
 
 ::
 
-    { PUSH nat 5 ; ADD ; PUSH nat 10 ; SWAP ; MUL }
+    { PUSH nat 5 ; ADD ; PUSH nat 10 ; MUL }
     :: [ nat : [] -> nat : [] ]
        by { PUSH nat 5 ; ADD }
           :: [ nat : [] -> nat : [] ]
@@ -416,17 +416,13 @@ with ``by``.
                    by 5 :: nat
             and ADD
                 :: [ nat : nat : [] -> nat : [] ]
-      and { PUSH nat 10 ; SWAP ; MUL }
+      and { PUSH nat 10 ; MUL }
           :: [ nat : [] -> nat : [] ]
              by PUSH nat 10
                 :: [ nat : [] -> nat : nat : [] ]
                    by 10 :: nat
-            and { SWAP ; MUL }
+            and MUL
                 :: [ nat : nat : [] -> nat : [] ]
-                   by SWAP
-                      :: [ nat : nat : [] -> nat : nat : [] ]
-                  and MUL
-                      :: [ nat : nat : [] -> nat : [] ]
 
 Producing such a typing derivation can be done in a number of manners,
 such as unification or abstract interpretation. In the implementation of
@@ -457,35 +453,35 @@ Core data types and notations
    ``False``.
 
 -  ``unit``: The type whose only value is ``Unit``, to use as a
-   placeholder when some result or parameter is non necessary. For
+   placeholder when some result or parameter is not necessary. For
    instance, when the only goal of a contract is to update its storage.
 
 -  ``list (t)``: A single, immutable, homogeneous linked list, whose
-   elements are of type ``(t)``, and that we note ``{}`` for the empty
+   elements are of type ``(t)``, and that we write ``{}`` for the empty
    list or ``{ first ; ... }``. In the semantics, we use chevrons to
-   denote a subsequence of elements. For instance ``{ head ; <tail> }``.
+   denote a subsequence of elements. For instance: ``{ head ; <tail> }``.
 
 -  ``pair (l) (r)``: A pair of values ``a`` and ``b`` of types ``(l)``
    and ``(r)``, that we write ``(Pair a b)``.
 
--  ``option (t)``: Optional value of type ``(t)`` that we note ``None``
+-  ``option (t)``: Optional value of type ``(t)`` that we write ``None``
    or ``(Some v)``.
 
 -  ``or (l) (r)``: A union of two types: a value holding either a value
    ``a`` of type ``(l)`` or a value ``b`` of type ``(r)``, that we write
    ``(Left a)`` or ``(Right b)``.
 
--  ``set (t)``: Immutable sets of values of type ``(t)`` that we note as
+-  ``set (t)``: Immutable sets of values of type ``(t)`` that we write as
    lists ``{ item ; ... }``, of course with their elements unique, and
    sorted.
 
 -  ``map (k) (t)``: Immutable maps from keys of type ``(k)`` of values
-   of type ``(t)`` that we note ``{ Elt key value ; ... }``, with keys
+   of type ``(t)`` that we write ``{ Elt key value ; ... }``, with keys
    sorted.
 
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ; ... }``,
-   with keys sorted. These maps should be used if you intend to store
+   ``(k)`` of values of type ``(t)`` that we write ``{ Elt key value ; ... }``,
+   with keys sorted.  These maps should be used if one intends to store
    large amounts of data in a map. They have higher gas costs than
    standard maps as data is lazily deserialized. A ``big_map`` cannot
    appear inside another ``big_map``.
@@ -501,7 +497,7 @@ Control structures
    'a :: \_ -> \_
 
    This special instruction aborts the current program exposing the top
-   of the stack in its error message (first rule below). It makes the
+   element of the stack in its error message (first rule below). It makes the
    output useless since all subsequent instructions will simply ignore
    their usual semantics to propagate the failure up to the main result
    (second rule below). Its type is thus completely generic.
@@ -562,7 +558,7 @@ Control structures
     > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
     > LOOP_LEFT body / (Right b) : S  =>  b : S
 
--  ``DIP code``: Runs code protecting the top of the stack.
+-  ``DIP code``: Runs code protecting the top element of the stack.
 
 ::
 
@@ -570,6 +566,18 @@ Control structures
        iff   code :: [ 'A -> 'C ]
 
     > DIP code / x : S  =>  x : S'
+        where    code / S  =>  S'
+
+- ``DIP n code``: Runs code protecting the ``n`` topmost elements of
+   the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
+   and ``DIP 1 code`` is equivalent to ``DIP code``.
+
+::
+
+    :: 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'B
+       iff   code :: [ 'A -> 'B ]
+
+    > DIP n code / x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : S'
         where    code / S  =>  S'
 
 -  ``EXEC``: Execute a function from the stack.
@@ -603,7 +611,17 @@ Stack operations
 
     > DROP / _ : S  =>  S
 
--  ``DUP``: Duplicate the top of the stack.
+- ``DROP n``: Drop the `n` topmost elements of the stack. In
+  particular, ``DROP 0`` is a noop and ``DROP 1`` is equivalent to
+  ``DROP``.
+
+::
+
+   :: 'a{1} : ... : 'a{n} : 'A   ->   'A
+
+   > DROP n / x{1} : ... : x{n} : S  =>  S
+
+-  ``DUP``: Duplicate the top element of the stack.
 
 ::
 
@@ -618,6 +636,26 @@ Stack operations
     :: 'a : 'b : 'A   ->   'b : 'a : 'A
 
     > SWAP / x : y : S  =>  y : x : S
+
+- ``DIG n``: Take the element at depth ``n`` of the stack and move it
+  on top. The element on top of the stack is at depth ``0`` so that
+  ``DIG 0`` is a no-op and ``DIG 1`` is equivalent to ``SWAP``.
+
+::
+
+    :: 'a{1} : ... : 'a{n} : 'b : 'A   ->   'b : 'a{1} : ... : 'a{n} : 'A
+
+    > DIG n / x{1} : ... : x{n} : y : S  =>  y : x{1} : ... : x{n} : S
+
+- ``DUG n``: Place the element on top of the stack at depth ``n``. The
+  element on top of the stack is at depth ``0`` so that ``DUG 0`` is a
+  no-op and ``DUG 1`` is equivalent to ``SWAP``.
+
+::
+
+    :: 'b : 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'b : 'A
+
+    > DUG n / y : x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : y : S
 
 -  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
 
@@ -636,8 +674,8 @@ Stack operations
 
     > UNIT / S  =>  Unit : S
 
--  ``LAMBDA 'a 'b code``: Push a lambda with given parameter and return
-   types onto the stack.
+-  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
+   type `'b` onto the stack.
 
 ::
 
@@ -656,7 +694,7 @@ result of ``COMPARE`` is ``0`` if the top two elements of the stack are
 equal, negative if the first element in the stack is less than the
 second, and positive otherwise.
 
--  ``EQ``: Checks that the top of the stack EQuals zero.
+-  ``EQ``: Checks that the top element of the stack is equal to zero.
 
 ::
 
@@ -666,7 +704,7 @@ second, and positive otherwise.
     > EQ / v : S  =>  False : S
         iff v <> 0
 
--  ``NEQ``: Checks that the top of the stack does Not EQual zero.
+-  ``NEQ``: Checks that the top element of the stack is not equal to zero.
 
 ::
 
@@ -676,7 +714,7 @@ second, and positive otherwise.
     > NEQ / v : S  =>  True : S
         iff v <> 0
 
--  ``LT``: Checks that the top of the stack is Less Than zero.
+-  ``LT``: Checks that the top element of the stack is less than zero.
 
 ::
 
@@ -687,7 +725,7 @@ second, and positive otherwise.
     > LT / v : S  =>  False : S
         iff v >= 0
 
--  ``GT``: Checks that the top of the stack is Greater Than zero.
+-  ``GT``: Checks that the top element of the stack is greater than zero.
 
 ::
 
@@ -698,7 +736,7 @@ second, and positive otherwise.
     > GT / v : S  =>  C / False : S
         iff v <= 0
 
--  ``LE``: Checks that the top of the stack is Less Than of Equal to
+-  ``LE``: Checks that the top element of the stack is less than or equal to
    zero.
 
 ::
@@ -710,7 +748,7 @@ second, and positive otherwise.
     > LE / v : S  =>  False : S
         iff v > 0
 
--  ``GE``: Checks that the top of the stack is Greater Than of Equal to
+-  ``GE``: Checks that the top of the stack is greater than or equal to
    zero.
 
 ::
@@ -763,8 +801,8 @@ Operations on booleans
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Integers and naturals are arbitrary-precision, meaning the only size
-limit is fuel.
+Integers and naturals are arbitrary-precision, meaning that the only size
+limit is gas.
 
 -  ``NEG``
 
@@ -782,6 +820,26 @@ limit is fuel.
     :: int : 'S   ->   nat : 'S
 
     > ABS / x : S  =>  abs (x) : S
+
+-  ``ISNAT``
+
+::
+
+    :: int : 'S   ->   option nat : 'S
+
+    > ISNAT / x : S  =>  Some (x) : S
+       iff x >= 0
+
+    > ISNAT / x : S  =>  None : S
+       iff x < 0
+
+-  ``INT``
+
+::
+
+    :: nat : 'S   ->   int : 'S
+
+    > INT / x : S  =>  x : S
 
 -  ``ADD``
 
@@ -816,7 +874,7 @@ limit is fuel.
 
     > MUL / x : y : S  =>  (x * y) : S
 
--  ``EDIV`` Perform Euclidian division
+-  ``EDIV``: Perform Euclidian division
 
 ::
 
@@ -839,7 +897,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     > OR / x : y : S  =>  (x | y) : S
 
--  ``AND`` (also available when the top operand is signed)
+-  ``AND``: (also available when the top operand is signed)
 
 ::
 
@@ -856,11 +914,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     > XOR / x : y : S  =>  (x ^ y) : S
 
--  ``NOT`` The return type of ``NOT`` is an ``int`` and not a ``nat``.
-   This is because the sign is also negated. The resulting integer is
-   computed using two's complement. For instance, the boolean negation
-   of ``0`` is ``-1``. To get a natural back, a possibility is to use
-   ``AND`` with an unsigned mask afterwards.
+-  ``NOT``: Two's complement
 
 ::
 
@@ -868,6 +922,14 @@ Bitwise logical operators are also available on unsigned integers.
     :: int : 'S   ->   int : 'S
 
     > NOT / x : S  =>  ~x : S
+
+
+The return type of ``NOT`` is an ``int`` and not a ``nat``.  This is
+because the sign is also negated. The resulting integer is computed
+using two's complement. For instance, the boolean negation of ``0`` is
+``-1``. To get a natural back, a possibility is to use ``AND`` with an
+unsigned mask afterwards.
+
 
 -  ``LSL``
 
@@ -1061,7 +1123,9 @@ Operations on sets
        iff body :: [ 'elt : 'A -> 'A ]
 
     > ITER body / {} : S  =>  S
-    > ITER body / { hd ; <tl> } : S  =>  body; ITER body / hd : { <tl> } : S
+    > ITER body / { hd ; <tl> } : S  =>  ITER body / { <tl> } : S'
+       iff body / hd : S  =>  S'
+
 
 -  ``SIZE``: Get the cardinality of the set.
 
@@ -1149,8 +1213,9 @@ Operations on maps
        iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
 
     > MAP body / {} : S  =>  {} : S
-    > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k (body (Pair k v)) ; <tl'> } : S
-        where MAP body / { <tl> } : S  =>  { <tl'> } : S
+    > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k v' ; <tl'> } : S''
+        where body / Pair k v : S  =>  v' : S'
+        and MAP body / { <tl> } : S'  =>  { <tl'> } : S''
 
 -  ``ITER body``: Apply the body expression to each element of a map.
    The body sequence has access to the stack.
@@ -1161,7 +1226,8 @@ Operations on maps
        iff   body :: [ (pair 'elt 'val : 'A) -> 'A ]
 
     > ITER body / {} : S  =>  S
-    > ITER body / { Elt k v ; <tl> } : S  =>  body ; ITER body / (Pair k v) : { <tl> } : S
+    > ITER body / { Elt k v ; <tl> } : S  =>  ITER body / { <tl> } : S'
+       iff body / (Pair k v) : S  =>  S'
 
 -  ``SIZE``: Get the cardinality of the map.
 
@@ -1214,7 +1280,7 @@ deserialized on demand.
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  ``SOME``: Pack a present optional value.
+-  ``SOME``: Pack a value as an optional value.
 
 ::
 
@@ -1271,17 +1337,6 @@ Operations on unions
     > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
     > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
 
--  ``IF_RIGHT bt bf``: Inspect a value of a union.
-
-::
-
-    :: or 'a 'b : 'A   ->   'B
-       iff   bt :: [ 'b : 'A -> 'B]
-             bf :: [ 'a : 'A -> 'B]
-
-    > IF_RIGHT bt bf / (Right b) : S  =>  bt / b : S
-    > IF_RIGHT bt bf / (Left a) : S  =>  bf / a : S
-
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
 
@@ -1320,9 +1375,10 @@ Operations on lists
     :: (list 'elt) : 'A   ->  (list 'b) : 'A
        iff   body :: [ 'elt : 'A -> 'b : 'A ]
 
-    > MAP body / { a ; <rest> } : S  =>  { body a ; <rest'> } : S
-        where MAP body / { <rest> } : S  =>  { <rest'> } : S
     > MAP body / {} : S  =>  {} : S
+    > MAP body / { a ; <rest> } : S  =>  { b ; <rest'> } : S''
+        where body / a : S  =>  b : S'
+        and MAP body / { <rest> } : S'  =>  { <rest'> } : S''
 
 -  ``SIZE``: Get the number of elements in the list.
 
@@ -1342,8 +1398,9 @@ Operations on lists
 
     :: (list 'elt) : 'A   ->  'A
          iff body :: [ 'elt : 'A -> 'A ]
-    > ITER body / { a ; <rest> } : S  =>  body ; ITER body / a : { <rest> } : S
     > ITER body / {} : S  =>  S
+    > ITER body / { a ; <rest> } : S  =>  ITER body / { <rest> } : S'
+       iff body / a : S  =>  S'
 
 
 Domain specific data types
@@ -1360,9 +1417,9 @@ Domain specific data types
 
 -  ``operation``: An internal operation emitted by a contract.
 
--  ``key``: A public cryptography key.
+-  ``key``: A public cryptographic key.
 
--  ``key_hash``: The hash of a public cryptography key.
+-  ``key_hash``: The hash of a public cryptographic key.
 
 -  ``signature``: A cryptographic signature.
 
@@ -1374,8 +1431,8 @@ Domain specific operations
 Operations on timestamps
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Current Timestamps can be obtained by the ``NOW`` operation, or
-retrieved from script parameters or globals.
+Timestamps can be obtained by the ``NOW`` operation, or retrieved from
+script parameters or globals.
 
 -  ``ADD`` Increment / decrement a timestamp of the given number of
    seconds.
@@ -1492,8 +1549,8 @@ Operations on contracts
        -> operation : address : 'S
 
 Originate a contract based on a literal. The parameters are the
-optional delegate, the initial amount taken from the currently
-executed contract, and the initial storage of the originated contract.
+optional delegate, the initial amount taken from the current
+contract, and the initial storage of the originated contract.
 The contract is returned as a first class value (to be dropped, passed
 as parameter or stored). The ``CONTRACT 'p`` instruction will fail
 until it is actually originated.
@@ -1519,13 +1576,15 @@ contract, unit for an account.
 
     :: 'S   ->   mutez : 'S
 
--  ``ADDRESS``: Push the address of a contract.
+-  ``ADDRESS``: Cast the contract to its address.
 
 ::
 
     :: contract _ : 'S   ->   address : 'S
 
--  ``CONTRACT 'p``: Push the untyped version of a contract.
+    > ADDRESS / addr : S  =>  addr : S
+
+-  ``CONTRACT 'p``: Cast the address to the given contract type if possible.
 
 ::
 
@@ -1551,7 +1610,7 @@ contract, unit for an account.
 
 -  ``SENDER``: Push the contract that initiated the current
    internal transaction. It may be the ``SOURCE``, but may
-   also not if the source sent an order to an intermediate
+   also be different if the source sent an order to an intermediate
    smart contract, which then called the current contract.
 
 ::
@@ -1856,21 +1915,17 @@ to increase clarity about illegal states.
 Syntactic Conveniences
 ~~~~~~~~~~~~~~~~~~~~~~
 
-These are macros are simply more convenient syntax for various common
+These macros are simply more convenient syntax for various common
 operations.
 
--  ``DII+P code``: A syntactic sugar for working deeper in the stack.
-
-::
-
-    > DII(\rest=I*)P code / S  =>  DIP (DI(\rest)P code) / S
-
--  ``DUU+P``: A syntactic sugar for duplicating the ``n``\ th element of
+-  ``DUP n``: A syntactic sugar for duplicating the ``n``\ th element of
    the stack.
 
 ::
 
-    > DUU(\rest=U*)P / S  =>  DIP (DU(\rest)P) ; SWAP / S
+    > DUP 1 / S  =>  DUP / S
+    > DUP 2 / S  =>  DIP (DUP) ; SWAP / S
+    > DUP (n+1) / S  =>  DIP n (DUP) ; DIG (n+1) / S
 
 -  ``P(\left=A|P(\left)(\right))(\right=I|P(\left)(\right))R``: A syntactic sugar
    for building nested pairs.
@@ -1922,12 +1977,13 @@ A typing rule can be inferred:
 
 ::
 
-    :: option 'a : 'A   ->   'B
-       iff   bt :: [ 'a : 'A -> 'B]
-             bf :: [ 'A -> 'B]
+    > IF_SOME bt bf / S  =>  IF_NONE bf bt / S
 
-    > IF_SOME / (Some a) : S  =>  bt / a : S
-    > IF_SOME / (None) : S  =>  bf / S
+-  ``IF_RIGHT bt bf``: Inspect a value of a union.
+
+::
+
+    > IF_RIGHT bt bf / S  =>  IF_LEFT bf bt / S
 
 -  ``SET_CAR``: Set the left field of a pair.
 
@@ -1979,12 +2035,13 @@ Concrete syntax
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
-language can only be one of the four following constructs.
+language can only be one of the five following constructs.
 
-1. An integer.
+1. An integer in decimal notation.
 2. A character string.
-3. The application of a primitive to a sequence of expressions.
-4. A sequence of expressions.
+3. A byte sequence in hexadecimal notation prefixed by ``0x``.
+4. The application of a primitive to a sequence of expressions.
+5. A sequence of expressions.
 
 This simple four cases notation is called Micheline.
 
@@ -2074,7 +2131,7 @@ Differences with the formal notation
 The concrete syntax follows the same lexical conventions as the
 specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
-are Capitalized.
+are capitalized.
 
 All domain specific constants are Micheline constants with specific
 formats. Some have two variants accepted by the data type checker: a
@@ -2160,7 +2217,7 @@ type must be unnamed.
 For instance, the following Michelson program which put its integer
 parameter in the storage is not well typed:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage (int :s) ;
@@ -2168,7 +2225,7 @@ parameter in the storage is not well typed:
 
 Whereas this one is:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage int ;
@@ -2181,8 +2238,7 @@ Inner components of composed typed can also be named.
    (pair :point (int :x_pos) (int :y_pos))
 
 Push-like instructions, that act as constructors, can also be given a
-type annotation. The stack type will then have a correspondingly named
-type on top.
+type annotation. The stack type will then have on top a type with a corresponding name.
 
 ::
 
@@ -2250,6 +2306,8 @@ The instructions which do not accept any variable annotations are:
 
    DROP
    SWAP
+   DIG
+   DUG
    IF_NONE
    IF_LEFT
    IF_CONS
@@ -2295,7 +2353,7 @@ The instructions which accept at most one variable annotation are:
    XOR
    NOT
    ABS
-   IS_NAT
+   ISNAT
    INT
    NEG
    EDIV
@@ -2450,7 +2508,7 @@ the primitive name and before its potential arguments.
 
 
 Ordering between different kinds of annotations is not significant, but
-ordering among annotations of the same kind is. Annotations of a same
+ordering among annotations of the same kind is. Annotations of the same
 kind must be grouped together.
 
 For instance these two annotated instructions are equivalent:
@@ -2461,7 +2519,7 @@ For instance these two annotated instructions are equivalent:
 
    PAIR %x %y :t @my_pair
 
-An annotation can be empty, in this case is will mean *no annotation*
+An annotation can be empty, in this case it will mean *no annotation*
 and can be used as a wildcard. For instance, it is useful to annotate
 only the right field of a pair instruction ``PAIR % %right`` or to
 ignore field access constraints, *e.g.* in the macro ``UNPPAIPAIR %x1 %
@@ -2600,7 +2658,7 @@ type (which can be changed). For instance the annotated typing rule for
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
 
-The special variable annotations ``@%%`` can be used on instructions
+The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
 a name for the value on the stack. The following typing rule
 demonstrates their use for instruction ``CAR``.
@@ -2617,7 +2675,7 @@ The special variable annotation ``%@`` can be used on instructions
 ``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
 name annotation in the stack as a field name for the constructed
 element. Two examples with ``PAIR`` follows, notice the special
-treatment of annotations with `.`.
+treatment of annotations with ``.``.
 
 ::
 
@@ -2816,7 +2874,7 @@ Empty contract
 The simplest contract is the contract for which the ``parameter`` and
 ``storage`` are all of type ``unit``. This contract is as follows:
 
-::
+.. code-block:: michelson
 
     code { CDR ;           # keep the storage
            NIL operation ; # return no internal operation
@@ -2864,7 +2922,7 @@ been verified
 using the Coq proof assistant.
 
 
-::
+.. code-block:: michelson
 
    parameter (pair
                 (pair :payload
@@ -2960,14 +3018,8 @@ Full grammar
 
     <data> ::=
       | <int constant>
-      | <natural number constant>
       | <string constant>
-      | <timestamp string constant>
-      | <signature string constant>
-      | <key string constant>
-      | <key_hash string constant>
-      | <mutez string constant>
-      | <contract string constant>
+      | <byte sequence constant>
       | Unit
       | True
       | False
@@ -2979,11 +3031,31 @@ Full grammar
       | { <data> ; ... }
       | { Elt <data> <data> ; ... }
       | instruction
+    <natural number constant> ::=
+      | [0-9]+
+    <int constant> ::=
+      | <natural number constant>
+      | -<natural number constant>
+    <string constant> ::=
+      | "<string content>*"
+    <string content> ::=
+      | \"
+      | \r
+      | \n
+      | \t
+      | \b
+      | \\
+      | [^"\]
+    <byte sequence constant> ::=
+      | 0x[0-9a-fA-F]+
     <instruction> ::=
       | { <instruction> ... }
       | DROP
+      | DROP <natural number constant>
       | DUP
       | SWAP
+      | DIG <natural number constant>
+      | DUG <natural number constant>
       | PUSH <type> <data>
       | SOME
       | NONE <type>
@@ -2995,7 +3067,6 @@ Full grammar
       | LEFT <type>
       | RIGHT <type>
       | IF_LEFT { <instruction> ... } { <instruction> ... }
-      | IF_RIGHT { <instruction> ... } { <instruction> ... }
       | NIL <type>
       | CONS
       | IF_CONS { <instruction> ... } { <instruction> ... }
@@ -3014,18 +3085,21 @@ Full grammar
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
-      | FAILWITH <data>
+      | DIP <natural number constant> { <instruction> ... }
+      | FAILWITH
       | CAST
       | RENAME
       | CONCAT
       | SLICE
       | PACK
-      | UNPACK
+      | UNPACK <type>
       | ADD
       | SUB
       | MUL
       | EDIV
       | ABS
+      | ISNAT
+      | INT
       | NEG
       | LSL
       | LSR
@@ -3100,9 +3174,9 @@ The language is implemented in OCaml as follows:
    parameters encode exactly the typing rules given in this
    specification. In other words, if a program written in this
    representation is accepted by OCaml's typechecker, it is guaranteed
-   type-safe. This of course also valid for programs not handwritten but
-   generated by OCaml code, so we are sure that any manipulated code is
-   type-safe.
+   type-safe. This is of course also valid for programs not
+   handwritten but generated by OCaml code, so we are sure that any
+   manipulated code is type-safe.
 
    In the end, what remains to be checked is the encoding of the typing
    rules as OCaml types, which boils down to half a line of code for
@@ -3116,11 +3190,11 @@ The language is implemented in OCaml as follows:
    each instruction.
 
    The only things that remain to be reviewed are value dependent
-   choices, such as that we did not swap true and false when
-   interpreting the If instruction.
+   choices, such as we did not swap true and false when
+   interpreting the IF instruction.
 
--  The input, untyped internal representation is an OCaml ADT with the
-   only 5 grammar constructions: ``String``, ``Int``, ``Seq`` and
+-  The input, untyped internal representation is an OCaml ADT with
+   only 5 grammar constructions: ``String``, ``Int``, ``Bytes``, ``Seq`` and
    ``Prim``. It is the target language for the parser, since not all
    parsable programs are well typed, and thus could simply not be
    constructed using the GADT.

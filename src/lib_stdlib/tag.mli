@@ -64,7 +64,7 @@ end
 
 (** Tag sets.  If `t` is an extensible variant type, `set` is a set of `t`s
     no two of which have the same constructor.  Most ordinary set and map
-    operations familiar from the Ocaml standard library are provided.
+    operations familiar from the OCaml standard library are provided.
     `equal` and `compare` are purposely not provided as there is no
     meaningful ordering on tags and their arguments may not even have a
     meaningful notion of equality. *)

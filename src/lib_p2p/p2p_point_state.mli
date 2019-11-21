@@ -30,7 +30,7 @@ type 'conn t =
   | Accepted of {current_peer_id : P2p_peer.Id.t; cancel : Lwt_canceler.t}
       (** We accepted a incoming connection. *)
   | Running of {data : 'conn; current_peer_id : P2p_peer.Id.t}
-      (** Successfully authentificated connection, normal business. *)
+      (** Successfully authenticated connection, normal business. *)
   | Disconnected  (** No connection established currently. *)
 
 type 'conn state = 'conn t
@@ -65,8 +65,8 @@ module Info : sig
       i.e. "whitelisted". *)
   val trusted : 'conn point_info -> bool
 
-  (** Points can announce themself as  either public or private.
-      Private points will not be advertized to other nodes. *)
+  (** Points can announce themselves as  either public or private.
+      Private points will not be advertised to other nodes. *)
   val known_public : 'conn point_info -> bool
 
   val set_trusted : 'conn point_info -> unit

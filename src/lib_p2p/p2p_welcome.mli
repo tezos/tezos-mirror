@@ -37,7 +37,7 @@ type t
 val create :
   ?addr:P2p_addr.t ->
   backlog:int ->
-  ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+  ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
   P2p_addr.port ->
   t Lwt.t
 

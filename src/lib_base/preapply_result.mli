@@ -28,7 +28,7 @@ type 'error t = {
   refused : (Operation.t * 'error list) Operation_hash.Map.t;
   (* e.g. invalid signature *)
   branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. insufficent balance *)
+  (* e.g. insufficient balance *)
   branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;
       (* e.g. timestamp in the future *)
 }

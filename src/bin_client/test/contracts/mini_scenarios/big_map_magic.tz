@@ -1,10 +1,20 @@
+# this contracts handles two big_maps
 storage
   (or (pair (big_map string string) (big_map string string)) unit) ;
 parameter
+  # it has 5 entry points
+  # swap: swaps the two maps.
   (or (unit %swap)
+     # reset: resets storage, either to a new pair of maps, or to unit
       (or (or %reset (pair (big_map string string) (big_map string string)) unit)
+          # import: drops the existing storage and creates two maps
+          # from the given lists of string pairs.
           (or (pair %import (list (pair string string)) (list (pair string string)))
+              # add: adds the given list of key - value pairs into the
+              # first map
               (or (list %add (pair string string))
+                  # rem: removes the given list of key - value pairs
+                  # from the first map
                   (list %rem string))))) ;
 code { UNPAIR ;
        IF_LEFT

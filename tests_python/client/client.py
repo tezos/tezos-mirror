@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 import json
+import sys
 from . import client_output
 
 
@@ -113,23 +114,34 @@ class Client:
 
         print(format_command(cmd))
 
+        stderr = ""
         stdout = ""
+        stderr = ""
         new_env = os.environ.copy()
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
         # in python3.7, cleaner to use capture_output=true, text=True
         with subprocess.Popen(cmd,
                               stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
                               bufsize=1,
                               universal_newlines=True,
                               env=new_env) as process:
             for line in process.stdout:
                 print(line, end='')
                 stdout += line
+            for line in process.stderr:
+                print(line, end='')
+                stderr += line
 
+            for line in process.stderr:
+                print(line, end='', file=sys.stderr)
+                stderr += line
         if check and process.returncode:
             raise subprocess.CalledProcessError(process.returncode,
-                                                process.args)
+                                                process.args,
+                                                stdout,
+                                                stderr)
 
         return stdout
 
@@ -159,9 +171,16 @@ class Client:
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 
+    def remember(self, alias: str, contract: str) -> str:
+        assert os.path.isfile(contract), f'{contract} is not a file'
+        return self.run(['remember', 'script', alias, f'file:{contract}'])
+
     def typecheck(self, contract: str) -> str:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['typecheck', 'script', contract])
+
+    def typecheck_data(self, data: str, typ: str) -> str:
+        return self.run(['typecheck', 'data', data, 'against', 'type', typ])
 
     def run_script(self,
                    contract: str,
@@ -267,6 +286,12 @@ class Client:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignatureResult(self.run(cmd)).sig
 
+    def activate_account(self,
+                         manager: str,
+                         contract: str):
+        cmd = ['activate', 'account', manager, 'with', contract]
+        return self.run(cmd)
+
     def transfer(self,
                  amount: float,
                  account1: str,
@@ -279,12 +304,76 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
+    def set_delegate(self,
+                     account1: str,
+                     account2: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['set', 'delegate', 'for', account1, 'to', account2]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.SetDelegateResult(res)
+
+    def get_delegate(self,
+                     account1: str,
+                     args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['get', 'delegate', 'for', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.GetDelegateResult(res)
+
+    def withdraw_delegate(
+            self,
+            account1: str,
+            args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['withdraw', 'delegate', 'from', account1]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return res
+
+    def register_delegate(self, delegate: str) -> str:
+        return self.run(['register', 'key', delegate, 'as', 'delegate'])
+
     def p2p_stat(self) -> str:
         return self.run(['p2p', 'stat'], admin=True)
 
     def get_balance(self, account) -> float:
         res = self.run(['get', 'balance', 'for', account])
         return client_output.extract_balance(res)
+
+    def get_mutez_balance(self, account) -> float:
+        res = self.run(['get', 'balance', 'for', account])
+        return int(client_output.extract_balance(res)*1000000)
+
+    def get_timestamp(self) -> str:
+        res = self.run(['get', 'timestamp'])
+        return res[:-1]
+
+    def get_now(self) -> str:
+        """Returns the timestamp of next-to-last block,
+        offset by time_between_blocks"""
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
+        timestamp = self.rpc(
+            'get', f'/chains/main/blocks/head~1/header'
+            )['timestamp']
+        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
+        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        constants = self.rpc(
+            'get', f'/chains/main/blocks/head/context/constants'
+        )
+        delta = datetime.timedelta(
+            seconds=int(constants['time_between_blocks'][0])
+        )
+
+        now_date = timestamp_date + delta
+
+        return now_date.strftime(rfc3399_format)
 
     def get_receipt(self,
                     operation: str,
@@ -294,6 +383,11 @@ class Client:
             args = []
         cmd += args
         return client_output.GetReceiptResult(self.run(cmd))
+
+    def get_storage(self, contract: str) -> str:
+        cmd = ['get', 'contract', 'storage', 'for', contract]
+        res = self.run(cmd)
+        return res.rstrip()
 
     def get_prevalidator(self) -> dict:
         return self.rpc('get', '/workers/prevalidators')
@@ -320,6 +414,14 @@ class Client:
 
     def get_ballots(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/ballots')
+
+    def get_contract_address(self, contract) -> str:
+        return self.run(['show', 'known', 'contract', contract]).strip()
+
+    def get_known_addresses(self) -> str:
+        return client_output.GetAddressesResult(self.run(
+            ['list', 'known', 'addresses']
+        ))
 
     def get_current_period_kind(self) -> dict:
         return self.rpc('get',
@@ -358,7 +460,7 @@ class Client:
                            branch: str = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
-        cmd += ['--check-previous', '2']
+        cmd += ['--check-previous', '5']
         if branch is not None:
             cmd += ['--branch', branch]
         if args is None:
@@ -393,3 +495,152 @@ class Client:
         """Remove base dir, only if not provided by user."""
         if self._is_tmp_dir:
             shutil.rmtree(self.base_dir)
+
+    def deploy_msig(self, msig_name: str,
+                    amount: float, src: str,
+                    threshold: int, keys: List[str],
+                    args: List[str] = None
+                    ) -> client_output.OriginationResult:
+        cmd = ['deploy', 'multisig', msig_name,
+               'transferring', str(amount), 'from', src, 'with',
+               'threshold', str(threshold), 'on', 'public', 'keys']
+        cmd += keys
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.OriginationResult(self.run(cmd))
+
+    def msig_sign_transfer(self, msig_name: str,
+                           amount: float, dest: str,
+                           secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'transferring', str(amount), 'to', dest,
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_withdraw(self, msig_name: str,
+                           amount: float, dest: str,
+                           secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'transferring', str(amount), 'to', dest,
+               'using', 'secret', 'key', secret_key]
+        return self.run(cmd)
+
+    def msig_sign_set_delegate(self, msig_name: str,
+                               delegate: str,
+                               secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'setting', 'delegate', 'to', delegate,
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_withdrawing_delegate(self, msig_name: str,
+                                       secret_key: str) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'withdrawing', 'delegate',
+               'using', 'secret', 'key', secret_key]
+        res = self.run(cmd)
+        return res[:-1]
+
+    def msig_sign_setting_threshold(self, msig_name: str,
+                                    secret_key: str, threshold: int,
+                                    public_keys: List[str]) -> str:
+        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
+               'using', 'secret', 'key', secret_key, 'setting', 'threshold',
+               'to', str(threshold), 'and', 'public', 'keys', 'to']
+        cmd += public_keys
+        res = self.run(cmd)
+        return res[:-1]
+
+    def sign_bytes(self, to_sign: bytes,
+                   key: str) -> client_output.SignBytesResult:
+        cmd = ['sign', 'bytes', str(to_sign), 'for', key]
+        return client_output.SignBytesResult(self.run(cmd))
+
+    def msig_prepare_transfer(self, msig_name: str,
+                              amount: float, dest: str,
+                              args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'transferring', str(amount), 'to', dest]
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_set_delegate(self, msig_name: str,
+                                  delegate: str,
+                                  args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'setting', 'delegate', 'to', delegate]
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_withdrawing_delegate(self, msig_name: str,
+                                          args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'withdrawing', 'delegate']
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_prepare_setting_threshold(self, msig_name: str,
+                                       threshold: int,
+                                       public_keys: List[str],
+                                       args: List[str] = None):
+        cmd = ['prepare', 'multisig', 'transaction', 'on',
+               msig_name, 'setting', 'threshold',
+               'to', str(threshold), 'and', 'public', 'keys', 'to']
+        cmd += public_keys
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)[:-1]
+
+    def msig_transfer(self, msig_name: str,
+                      amount: float, dest: str,
+                      src: str, signatures: List[str],
+                      args: List[str] = None) -> str:
+        cmd = ['from', 'multisig', 'contract', msig_name,
+               'transfer', str(amount), 'to', dest,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_set_delegate(self, msig_name: str,
+                          delegate: str,
+                          src: str, signatures: List[str],
+                          args: List[str] = None) -> str:
+        cmd = ['set', 'delegate', 'of', 'multisig', 'contract', msig_name,
+               'to', delegate,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_withdrawing_delegate(self, msig_name: str,
+                                  src: str, signatures: List[str],
+                                  args: List[str] = None) -> str:
+        cmd = ['withdraw', 'delegate', 'of', 'multisig', 'contract', msig_name,
+               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def msig_run_transaction(self, msig_name: str,
+                             transaction: bytes,
+                             src: str,
+                             signatures: List[str]) -> str:
+        cmd = ['run', 'transaction', str(transaction), 'on',
+               'multisig', 'contract', msig_name,
+               'on', 'behalf', 'of', src, 'with',
+               'signatures'] + signatures
+        return self.run(cmd)
