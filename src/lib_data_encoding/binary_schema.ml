@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let may_cons xs x = match x with None -> xs | Some x -> x :: xs
+
+let filter_map f l =
+  List.rev @@ List.fold_left (fun acc x -> may_cons acc (f x)) [] l
+
 open Encoding
 
 type integer_extended = [Binary_size.integer | `Int32 | `Int64]
@@ -226,7 +231,7 @@ module Printer_ast = struct
           Table
             {
               headers = binary_table_headers;
-              body = TzList.filter_map (field_descr ()) fields;
+              body = filter_map (field_descr ()) fields;
             } )
     | Cases {kind; tag_size; cases} ->
         ( {
@@ -255,7 +260,7 @@ module Printer_ast = struct
                     },
                     {
                       headers = binary_table_headers;
-                      body = TzList.filter_map (field_descr ()) fields;
+                      body = filter_map (field_descr ()) fields;
                     } ))
                 cases ) )
     | Int_enum {size; cases} ->
