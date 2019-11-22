@@ -361,11 +361,17 @@ and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =
 
 (** Various entry points *)
 
-let write e v buffer offset len =
+let write_exn e v buffer offset len =
   (* By harcoding [allowed_bytes] with the buffer length,
        we ensure that [write] will never reallocate the buffer. *)
   let state = {buffer; offset; allowed_bytes = Some len} in
-  try write_rec e state v ; Some state.offset with Write_error _ -> None
+  write_rec e state v ; state.offset
+
+let write e v buffer offset len =
+  try Ok (write_exn e v buffer offset len) with Write_error err -> Error err
+
+let write_opt e v buffer offset len =
+  try Some (write_exn e v buffer offset len) with Write_error _ -> None
 
 let to_bytes_exn ?(buffer_size = 128) e v =
   match Encoding.classify e with
@@ -384,5 +390,8 @@ let to_bytes_exn ?(buffer_size = 128) e v =
       write_rec e state v ;
       Bytes.sub state.buffer 0 state.offset
 
-let to_bytes ?buffer_size e v =
+let to_bytes_opt ?buffer_size e v =
   try Some (to_bytes_exn ?buffer_size e v) with Write_error _ -> None
+
+let to_bytes ?buffer_size e v =
+  try Ok (to_bytes_exn ?buffer_size e v) with Write_error err -> Error err
