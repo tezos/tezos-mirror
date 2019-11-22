@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Two helper functions *)
+let filter_cons xs x = match x with None -> xs | Some x -> x :: xs
+
+let filter_map f l =
+  List.rev (List.fold_left (fun acc x -> filter_cons acc (f x)) [] l)
+
 open Encoding
 
 type integer_extended = [Binary_size.integer | `Int32 | `Int64]
@@ -104,7 +110,7 @@ module Printer_ast = struct
 
   let rec pp_layout ppf = function
     | Zero_width ->
-        Format.fprintf ppf "placeholder (not actually present in the encoding)"
+        ()
     | Int integer ->
         Format.fprintf ppf "%a" pp_int integer
     | Bool ->
@@ -174,48 +180,56 @@ module Printer_ast = struct
       reference := value + 1 ;
       string_of_int value
     in
+    let is_zero_size_kind = function `Fixed 0 -> true | _ -> false in
     function
     | Named_field (name, kind, desc) ->
-        [name; Format.asprintf "%a" pp_size kind; string_of_layout desc]
+        Some [name; Format.asprintf "%a" pp_size kind; string_of_layout desc]
     | Dynamic_size_field (Some name, 1, size) ->
-        [
-          Format.asprintf "# bytes in field \"%s\"" name;
-          Format.asprintf
-            "%a"
-            pp_size
-            (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+        Some
+          [
+            Format.asprintf "# bytes in field \"%s\"" name;
+            Format.asprintf
+              "%a"
+              pp_size
+              (`Fixed (Binary_size.integer_to_size size));
+            string_of_layout (Int (size :> integer_extended));
+          ]
     | Dynamic_size_field (None, 1, size) ->
-        [
-          Format.asprintf "# bytes in next field";
-          Format.asprintf
-            "%a"
-            pp_size
-            (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+        Some
+          [
+            Format.asprintf "# bytes in next field";
+            Format.asprintf
+              "%a"
+              pp_size
+              (`Fixed (Binary_size.integer_to_size size));
+            string_of_layout (Int (size :> integer_extended));
+          ]
     | Dynamic_size_field (_, i, size) ->
-        [
-          Format.asprintf "# bytes in next %d fields" i;
-          Format.asprintf
-            "%a"
-            pp_size
-            (`Fixed (Binary_size.integer_to_size size));
-          string_of_layout (Int (size :> integer_extended));
-        ]
+        Some
+          [
+            Format.asprintf "# bytes in next %d fields" i;
+            Format.asprintf
+              "%a"
+              pp_size
+              (`Fixed (Binary_size.integer_to_size size));
+            string_of_layout (Int (size :> integer_extended));
+          ]
     | Anonymous_field (kind, desc) ->
-        [
-          "Unnamed field " ^ anon_num ();
-          Format.asprintf "%a" pp_size kind;
-          string_of_layout desc;
-        ]
+        if not (is_zero_size_kind kind) then
+          Some
+            [
+              "Unnamed field " ^ anon_num ();
+              Format.asprintf "%a" pp_size kind;
+              string_of_layout desc;
+            ]
+        else None
     | Optional_field name ->
-        [
-          Format.asprintf "? presence of field \"%s\"" name;
-          Format.asprintf "%a" pp_size (`Fixed 1);
-          string_of_layout Bool;
-        ]
+        Some
+          [
+            Format.asprintf "? presence of field \"%s\"" name;
+            Format.asprintf "%a" pp_size (`Fixed 1);
+            string_of_layout Bool;
+          ]
 
   let binary_table_headers = ["Name"; "Size"; "Contents"]
 
@@ -228,7 +242,7 @@ module Printer_ast = struct
           Table
             {
               headers = binary_table_headers;
-              body = List.map (field_descr ()) fields;
+              body = filter_map (field_descr ()) fields;
             } )
     | Cases {kind; tag_size; cases} ->
         ( {
@@ -257,7 +271,7 @@ module Printer_ast = struct
                     },
                     {
                       headers = binary_table_headers;
-                      body = List.map (field_descr ()) fields;
+                      body = filter_map (field_descr ()) fields;
                     } ))
                 cases ) )
     | Int_enum {size; cases} ->

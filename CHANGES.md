@@ -7,3 +7,4 @@ v0.1.1:
 v0.2:  
 - CI tests
 - error management improvements (use result, allow exn and option)
+- do not print 0-sized fields in binary descriptions
