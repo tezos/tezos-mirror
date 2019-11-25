@@ -4,9 +4,9 @@ variables:
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
-  GIT_DEPTH: 1
-  GET_SOURCES_ATTEMPTS: 2
-  ARTIFACT_DOWNLOAD_ATTEMPTS: 2
+  GIT_DEPTH: "1"
+  GET_SOURCES_ATTEMPTS: "2"
+  ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
 
 stages:
   - doc
