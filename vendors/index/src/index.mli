@@ -1,3 +1,20 @@
+(* The MIT License
+
+Copyright (c) 2019 Craig Ferguson <craig@tarides.com>
+                   Thomas Gazagnaire <thomas@tarides.com>
+                   Ioana Cristescu <ioana@tarides.com>
+                   Clément Pascutto <clement@tarides.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software. *)
+
 (** Index
 
     [Index] is a scalable implementation of persistent indices in OCaml.
@@ -49,6 +66,22 @@ module type Key = sig
   (** Formatter for keys *)
 end
 
+(** These modules should not be used. They are exposed purely for testing
+    purposes. *)
+module Private : sig
+  module Search : module type of Search
+
+  module Io_array : module type of Io_array
+
+  module Fan : module type of Fan
+
+  module Hook : sig
+    type 'a t
+
+    val v : ('a -> unit) -> 'a t
+  end
+end
+
 (** The input of [Make] for values. The same requirements as for [Key] apply. *)
 module type Value = sig
   type t
@@ -67,6 +100,10 @@ module type IO = Io.S
 exception RO_not_allowed
 (** The exception raised when a write operation is attempted on a read_only
     index. *)
+
+exception Closed
+(** The exception raised when any operation is attempted on a closed index,
+    except for [close], which is idempotent. *)
 
 (** Index module signature. *)
 module type S = sig
@@ -110,7 +147,7 @@ module type S = sig
       recent replacements of existing values (after the last merge), this will
       hit both the new and old bindings. *)
 
-  val force_merge : t -> unit
+  val force_merge : ?hook:[ `After | `Before ] Private.Hook.t -> t -> unit
   (** [force_merge t] forces a merge for [t]. *)
 
   val flush : t -> unit
@@ -122,13 +159,3 @@ end
 
 module Make (K : Key) (V : Value) (IO : IO) :
   S with type key = K.t and type value = V.t
-
-(** These modules should not be used. They are exposed purely for testing
-    purposes. *)
-module Private : sig
-  module Search : module type of Search
-
-  module Io_array : module type of Io_array
-
-  module Fan : module type of Fan
-end

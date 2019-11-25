@@ -1,7 +1,30 @@
+(* The MIT License
+
+Copyright (c) 2019 Craig Ferguson <craig@tarides.com>
+                   Thomas Gazagnaire <thomas@tarides.com>
+                   Ioana Cristescu <ioana@tarides.com>
+                   Clément Pascutto <clement@tarides.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software. *)
+
 module Private = struct
   module Fan = Fan
   module Io_array = Io_array
   module Search = Search
+
+  module Hook = struct
+    type 'a t = 'a -> unit
+
+    let v f = f
+  end
 end
 
 module type Key = sig
@@ -59,7 +82,7 @@ module type S = sig
 
   val iter : (key -> value -> unit) -> t -> unit
 
-  val force_merge : t -> unit
+  val force_merge : ?hook:[ `After | `Before ] Private.Hook.t -> t -> unit
 
   val flush : t -> unit
 
@@ -68,7 +91,11 @@ end
 
 let may f = function None -> () | Some bf -> f bf
 
+let assert_and_get = function None -> assert false | Some e -> e
+
 exception RO_not_allowed
+
+exception Closed
 
 module Make (K : Key) (V : Value) (IO : IO) = struct
   type key = K.t
@@ -85,13 +112,13 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
 
   exception Invalid_value_size of value
 
-  let append_entry io e =
-    let encoded_key = K.encode e.key in
-    let encoded_value = V.encode e.value in
+  let append_key_value io key value =
+    let encoded_key = K.encode key in
+    let encoded_value = V.encode value in
     if String.length encoded_key <> K.encoded_size then
-      raise (Invalid_key_size e.key);
+      raise (Invalid_key_size key);
     if String.length encoded_value <> V.encoded_size then
-      raise (Invalid_value_size e.value);
+      raise (Invalid_value_size value);
     IO.append io encoded_key;
     IO.append io encoded_value
 
@@ -103,38 +130,71 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
 
   module Tbl = Hashtbl.Make (K)
 
-  type config = { log_size : int; readonly : bool }
+  type config = { log_size : int; readonly : bool; fresh : bool }
 
   type index = { io : IO.t; fan_out : Fan.t }
 
-  type t = {
+  type log = { io : IO.t; mem : value Tbl.t }
+
+  type instance = {
     config : config;
     root : string;
     mutable generation : int64;
     mutable index : index option;
-    log : IO.t;
-    log_mem : entry Tbl.t;
+    mutable log : log option;
+    mutable log_async : log option;
     mutable open_instances : int;
-    lock : IO.lock option;
+    writer_lock : IO.lock option;
+    mutable merge_lock : IO.Mutex.t;
+    mutable rename_lock : IO.Mutex.t;
   }
 
+  type t = instance option ref
+
+  let check_open t =
+    match !t with Some instance -> instance | None -> raise Closed
+
   let clear t =
+    let t = check_open t in
     Log.debug (fun l -> l "clear %S" t.root);
+    if t.config.readonly then raise RO_not_allowed;
     t.generation <- 0L;
-    IO.clear t.log;
-    Tbl.clear t.log_mem;
-    may
-      (fun i ->
-        IO.clear i.io;
-        IO.close i.io)
-      t.index;
-    t.index <- None
+    IO.Mutex.with_lock t.merge_lock (fun () ->
+        let log = assert_and_get t.log in
+        IO.clear log.io;
+        Tbl.clear log.mem;
+        may
+          (fun l ->
+            IO.clear l.io;
+            IO.close l.io)
+          t.log_async;
+        may
+          (fun (i : index) ->
+            IO.clear i.io;
+            IO.close i.io)
+          t.index;
+        t.index <- None;
+        t.log_async <- None)
+
+  let flush_instance instance =
+    Log.debug (fun l ->
+        l "[%s] flushing instance" (Filename.basename instance.root));
+    if instance.config.readonly then raise RO_not_allowed;
+    may (fun log -> IO.sync log.io) instance.log;
+    may (fun log -> IO.sync log.io) instance.log_async
+
+  let flush t =
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] flush" (Filename.basename t.root));
+    IO.Mutex.with_lock t.rename_lock (fun () -> flush_instance t)
 
   let ( // ) = Filename.concat
 
   let index_dir root = root // "index"
 
   let log_path root = index_dir root // "log"
+
+  let log_async_path root = index_dir root // "log_async"
 
   let index_path root = index_dir root // "data"
 
@@ -215,6 +275,9 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
   let with_cache ~v ~clear =
     let roots = Hashtbl.create 0 in
     let f ?(fresh = false) ?(readonly = false) ~log_size root =
+      Log.info (fun l ->
+          l "[%s] v fresh=%b readonly=%b log_size=%d" (Filename.basename root)
+            fresh readonly log_size);
       try
         if not (Sys.file_exists (index_dir root)) then (
           Log.debug (fun l ->
@@ -225,44 +288,72 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
           raise Not_found );
         let t = Hashtbl.find roots (root, readonly) in
         if t.open_instances <> 0 then (
-          Log.debug (fun l -> l "%s found in cache" root);
+          Log.debug (fun l -> l "[%s] found in cache" (Filename.basename root));
           t.open_instances <- t.open_instances + 1;
+          let t = ref (Some t) in
           if fresh then clear t;
           t )
         else (
           Hashtbl.remove roots (root, readonly);
           raise Not_found )
       with Not_found ->
-        Log.debug (fun l ->
-            l "[%s] v fresh=%b readonly=%b" (Filename.basename root) fresh
-              readonly);
-        let t = v ~fresh ~readonly ~log_size root in
-        Hashtbl.add roots (root, readonly) t;
-        t
+        let instance = v ~fresh ~readonly ~log_size root in
+        Hashtbl.add roots (root, readonly) instance;
+        ref (Some instance)
     in
     `Staged f
 
   let v_no_cache ~fresh ~readonly ~log_size root =
-    let lock =
+    Log.debug (fun l ->
+        l "[%s] not found in cache, creating a new instance"
+          (Filename.basename root));
+    let writer_lock =
       if not readonly then Some (IO.lock (lock_path root)) else None
     in
-    let config = { log_size = log_size * entry_size; readonly } in
+    let config = { log_size = log_size * entry_size; readonly; fresh } in
     let log_path = log_path root in
-    let index_path = index_path root in
-    let log_mem = Tbl.create 1024 in
-    let log = IO.v ~fresh ~readonly ~generation:0L ~fan_size:0L log_path in
-    let generation = IO.get_generation log in
-    let index =
-      if Sys.file_exists index_path then
-        let io =
-          IO.v ~fresh ~readonly ~generation:0L ~fan_size:0L index_path
-        in
-        let fan_out = Fan.import ~hash_size:K.hash_size (IO.get_fanout io) in
-        Some { fan_out; io }
-      else None
+    let log =
+      if readonly then if fresh then raise RO_not_allowed else None
+      else
+        let io = IO.v ~fresh ~readonly ~generation:0L ~fan_size:0L log_path in
+        let entries = Int64.div (IO.offset io) entry_sizeL in
+        Log.debug (fun l ->
+            l "[%s] log file detected. Loading %Ld entries"
+              (Filename.basename root) entries);
+        let mem = Tbl.create (Int64.to_int entries) in
+        iter_io (fun e -> Tbl.replace mem e.key e.value) io;
+        Some { io; mem }
     in
-    iter_io (fun e -> Tbl.replace log_mem e.key e) log;
-    { config; generation; log_mem; root; log; index; open_instances = 1; lock }
+    let generation =
+      match log with None -> 0L | Some log -> IO.get_generation log.io
+    in
+    let index =
+      let index_path = index_path root in
+      if Sys.file_exists index_path then (
+        let io = IO.v ~fresh ~readonly ~generation ~fan_size:0L index_path in
+        let entries = Int64.div (IO.offset io) entry_sizeL in
+        Log.debug (fun l ->
+            l "[%s] index file detected. Loading %Ld entries"
+              (Filename.basename root) entries);
+        let fan_out = Fan.import ~hash_size:K.hash_size (IO.get_fanout io) in
+        Some { fan_out; io } )
+      else (
+        Log.debug (fun l ->
+            l "[%s] no index file detected." (Filename.basename root));
+        None )
+    in
+    {
+      config;
+      generation;
+      log;
+      log_async = None;
+      root;
+      index;
+      open_instances = 1;
+      merge_lock = IO.Mutex.create ();
+      rename_lock = IO.Mutex.create ();
+      writer_lock;
+    }
 
   let (`Staged v) = with_cache ~v:v_no_cache ~clear
 
@@ -274,44 +365,127 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     in
     Search.interpolation_search (IOArray.v index.io) key ~low ~high
 
+  let try_load_log t path =
+    Log.debug (fun l ->
+        l "[%s] checking on-disk %s file" (Filename.basename t.root)
+          (Filename.basename path));
+    if Sys.file_exists path then (
+      let io =
+        IO.v ~fresh:false ~readonly:true ~generation:0L ~fan_size:0L path
+      in
+      let mem = Tbl.create 0 in
+      iter_io (fun e -> Tbl.replace mem e.key e.value) io;
+      Some { io; mem } )
+    else None
+
   let sync_log t =
-    let generation = IO.get_generation t.log in
-    let log_offset = IO.offset t.log in
-    let new_log_offset = IO.force_offset t.log in
-    let add_log_entry e = Tbl.replace t.log_mem e.key e in
-    if t.generation <> generation then (
-      Tbl.clear t.log_mem;
-      iter_io add_log_entry t.log;
-      may (fun i -> IO.close i.io) t.index;
-      if Int64.equal generation 0L then t.index <- None
-      else
-        let index_path = index_path t.root in
-        let io =
-          IO.v ~fresh:false ~readonly:true ~generation ~fan_size:0L index_path
-        in
-        let fan_out = Fan.import ~hash_size:K.hash_size (IO.get_fanout io) in
-        t.index <- Some { fan_out; io };
-        t.generation <- generation )
-    else if log_offset < new_log_offset then
-      iter_io add_log_entry t.log ~min:log_offset
-    else if log_offset > new_log_offset then assert false
+    Log.debug (fun l ->
+        l "[%s] checking for changes on disk" (Filename.basename t.root));
+    let no_changes () =
+      Log.debug (fun l ->
+          l "[%s] no changes detected" (Filename.basename t.root))
+    in
+    let add_log_entry log e = Tbl.replace log.mem e.key e.value in
+    ( match t.log with
+    | None -> t.log <- try_load_log t (log_path t.root)
+    | Some _ -> () );
+    ( match t.log_async with
+    | None -> t.log_async <- try_load_log t (log_async_path t.root)
+    | Some log -> (
+        try
+          let log_offset = IO.offset log.io in
+          IO.close log.io;
+          let path = log_async_path t.root in
+          if Sys.file_exists path then (
+            let io =
+              IO.v ~fresh:false ~readonly:true ~generation:0L ~fan_size:0L path
+            in
+            t.log_async <- Some { log with io };
+            let new_log_offset = IO.offset io in
+            if log_offset <> new_log_offset then (
+              Tbl.clear log.mem;
+              iter_io (add_log_entry log) io ) )
+          else ()
+        with IO.Bad_Read ->
+          (* if log_async does not exist anymore, then its contents have been
+             moved to log and the generation has changed *)
+          () ) );
+    match t.log with
+    | None -> no_changes ()
+    | Some log ->
+        let generation = IO.get_generation log.io in
+        let log_offset = IO.offset log.io in
+        let new_log_offset = IO.force_offset log.io in
+        let add_log_entry e = add_log_entry log e in
+        if t.generation <> generation then (
+          Log.debug (fun l ->
+              l "[%s] generation has changed, reading log and index from disk"
+                (Filename.basename t.root));
+          Tbl.clear log.mem;
+          iter_io add_log_entry log.io;
+          may (fun (i : index) -> IO.close i.io) t.index;
+          if Int64.equal generation 0L then t.index <- None
+          else
+            let index_path = index_path t.root in
+            let io =
+              IO.v ~fresh:false ~readonly:true ~generation ~fan_size:0L
+                index_path
+            in
+            let fan_out =
+              Fan.import ~hash_size:K.hash_size (IO.get_fanout io)
+            in
+            t.index <- Some { fan_out; io };
+            t.generation <- generation )
+        else if log_offset < new_log_offset then (
+          Log.debug (fun l ->
+              l "[%s] new entries detected, reading log from disk"
+                (Filename.basename t.root));
+          iter_io add_log_entry log.io ~min:log_offset )
+        else if log_offset > new_log_offset then
+          (* In that case the log has probably been emptied and is being
+             refilled with async_log contents. *)
+          no_changes ()
+        else no_changes ()
+
+  let find_instance t key =
+    let find_if_exists ~name ~find db () =
+      match db with
+      | None ->
+          Log.debug (fun l ->
+              l "[%s] %s is not present" (Filename.basename t.root) name);
+          raise Not_found
+      | Some e ->
+          let ans = find e key in
+          Log.debug (fun l ->
+              l "[%s] found in %s" (Filename.basename t.root) name);
+          ans
+    in
+    let ( @~ ) a b = try a () with Not_found -> b () in
+    let find_log_index () =
+      find_if_exists ~name:"log" ~find:(fun log -> Tbl.find log.mem) t.log
+      @~ find_if_exists ~name:"index" ~find:interpolation_search t.index
+    in
+    IO.Mutex.with_lock t.rename_lock (fun () ->
+        if t.config.readonly then sync_log t;
+        find_if_exists ~name:"log_async"
+          ~find:(fun log -> Tbl.find log.mem)
+          t.log_async
+        @~ fun () ->
+        find_log_index @~ fun () ->
+        if t.config.readonly then (
+          sync_log t;
+          find_log_index () )
+        else raise Not_found)
 
   let find t key =
-    Log.debug (fun l -> l "find %a" K.pp key);
-    if t.config.readonly then sync_log t;
-    let look_on_disk () =
-      match Tbl.find t.log_mem key with
-      | e -> e.value
-      | exception Not_found -> (
-          match t.index with
-          | Some index -> interpolation_search index key
-          | None -> raise Not_found )
-    in
-    look_on_disk ()
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] find %a" (Filename.basename t.root) K.pp key);
+    find_instance t key
 
   let mem t key =
-    Log.debug (fun l -> l "mem %a" K.pp key);
-    match find t key with _ -> true | exception Not_found -> false
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] mem %a" (Filename.basename t.root) K.pp key);
+    match find_instance t key with _ -> true | exception Not_found -> false
 
   let append_buf_fanout fan_out hash buf_str dst_io =
     Fan.update fan_out hash (IO.offset dst_io);
@@ -319,13 +493,13 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
 
   let append_entry_fanout fan_out entry dst_io =
     Fan.update fan_out entry.key_hash (IO.offset dst_io);
-    append_entry dst_io entry
+    append_key_value dst_io entry.key entry.value
 
   let rec merge_from_log fan_out log log_i hash_e dst_io =
     if log_i >= Array.length log then log_i
     else
       let v = log.(log_i) in
-      if v.key_hash > hash_e then log_i
+      if v.key_hash >= hash_e then log_i
       else (
         append_entry_fanout fan_out v dst_io;
         (merge_from_log [@tailcall]) fan_out log (log_i + 1) hash_e dst_io )
@@ -336,7 +510,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     done
 
   (* Merge [log] with [t] into [dst_io]. [log] must be sorted by key hashes. *)
-  let merge_with log index dst_io =
+  let merge_with log (index : index) dst_io =
     let entries = 10_000 in
     let len = entries * entry_size in
     let buf = Bytes.create len in
@@ -370,100 +544,170 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     in
     (go [@tailcall]) 0L 0 0
 
-  let merge ~witness t =
-    Log.debug (fun l -> l "unforced merge %S\n" t.root);
-    let merge_path = merge_path t.root in
-    let generation = Int64.succ t.generation in
-    let log =
-      let compare_entry e e' = compare e.key_hash e'.key_hash in
-      let b = Array.make (Tbl.length t.log_mem) witness in
-      Tbl.fold
-        (fun _ e i ->
-          b.(i) <- e;
-          i + 1)
-        t.log_mem 0
-      |> ignore;
-      Array.fast_sort compare_entry b;
-      b
+  let merge ?hook ~witness t =
+    IO.Mutex.lock t.merge_lock;
+    Log.info (fun l -> l "[%s] merge" (Filename.basename t.root));
+    flush_instance t;
+    let log_async =
+      let io =
+        let log_async_path = log_async_path t.root in
+        IO.v ~fresh:true ~readonly:false ~generation:(Int64.succ t.generation)
+          ~fan_size:0L log_async_path
+      in
+      let mem = Tbl.create 0 in
+      { io; mem }
     in
-    let fan_size =
-      match t.index with
-      | None -> Tbl.length t.log_mem
-      | Some index ->
-          (Int64.to_int (IO.offset index.io) / entry_size)
-          + Tbl.length t.log_mem
+    t.log_async <- Some log_async;
+
+    let go () =
+      may (fun f -> f `Before) hook;
+      let log = assert_and_get t.log in
+      let generation = Int64.succ t.generation in
+      let log_array =
+        let compare_entry e e' = compare e.key_hash e'.key_hash in
+        let b = Array.make (Tbl.length log.mem) witness in
+        Tbl.fold
+          (fun key value i ->
+            b.(i) <- { key; key_hash = K.hash key; value };
+            i + 1)
+          log.mem 0
+        |> ignore;
+        Array.fast_sort compare_entry b;
+        b
+      in
+      let fan_size =
+        match t.index with
+        | None -> Tbl.length log.mem
+        | Some index ->
+            (Int64.to_int (IO.offset index.io) / entry_size)
+            + Array.length log_array
+      in
+      let fan_out = Fan.v ~hash_size:K.hash_size ~entry_size fan_size in
+      let merge =
+        let merge_path = merge_path t.root in
+        IO.v ~fresh:true ~readonly:false ~generation
+          ~fan_size:(Int64.of_int (Fan.exported_size fan_out))
+          merge_path
+      in
+      let index =
+        match t.index with
+        | None ->
+            let io =
+              IO.v ~fresh:true ~readonly:false ~generation ~fan_size:0L
+                (index_path t.root)
+            in
+            append_remaining_log fan_out log_array 0 merge;
+            { io; fan_out }
+        | Some index ->
+            let index = { index with fan_out } in
+            merge_with log_array index merge;
+            index
+      in
+      Fan.finalize index.fan_out;
+      IO.set_fanout merge (Fan.export index.fan_out);
+      IO.Mutex.with_lock t.rename_lock (fun () ->
+          IO.rename ~src:merge ~dst:index.io;
+          t.index <- Some index;
+          IO.clear ~keep_generation:true log.io;
+          Tbl.clear log.mem;
+          IO.set_generation log.io generation;
+          t.generation <- generation;
+          let log_async = assert_and_get t.log_async in
+          Tbl.iter
+            (fun key value ->
+              Tbl.replace log.mem key value;
+              append_key_value log.io key value)
+            log_async.mem;
+          IO.sync log.io;
+          t.log_async <- None);
+      may (fun f -> f `After) hook;
+      IO.clear log_async.io;
+      IO.close log_async.io;
+      IO.Mutex.unlock t.merge_lock
     in
-    let fan_out = Fan.v ~hash_size:K.hash_size ~entry_size fan_size in
-    let merge =
-      IO.v ~readonly:false ~fresh:true ~generation
-        ~fan_size:(Int64.of_int (Fan.exported_size fan_out))
-        merge_path
-    in
-    ( match t.index with
-    | None ->
-        let io =
-          IO.v ~fresh:true ~readonly:false ~generation:0L ~fan_size:0L
-            (index_path t.root)
-        in
-        append_remaining_log fan_out log 0 merge;
-        t.index <- Some { io; fan_out }
-    | Some index ->
-        let index = { index with fan_out } in
-        merge_with log index merge;
-        t.index <- Some index );
-    match t.index with
-    | None -> assert false
-    | Some index ->
-        Fan.finalize index.fan_out;
-        IO.set_fanout merge (Fan.export index.fan_out);
-        IO.rename ~src:merge ~dst:index.io;
-        IO.clear t.log;
-        Tbl.clear t.log_mem;
-        IO.set_generation t.log generation;
-        t.generation <- generation
+    IO.async go
 
   let get_witness t =
-    let exception Found of entry in
-    match Tbl.iter (fun _ entry -> raise (Found entry)) t.log_mem with
-    | exception Found e -> Some e
-    | () -> (
-        match t.index with
-        | None -> None
-        | Some index ->
-            let buf = Bytes.create entry_size in
-            let n = IO.read index.io ~off:0L ~len:entry_size buf in
-            assert (n = entry_size);
-            Some (decode_entry buf 0) )
+    match t.log with
+    | None -> None
+    | Some log -> (
+        let exception Found of entry in
+        match
+          Tbl.iter
+            (fun key value ->
+              raise (Found { key; value; key_hash = K.hash key }))
+            log.mem
+        with
+        | exception Found e -> Some e
+        | () -> (
+            match t.index with
+            | None -> None
+            | Some index ->
+                let buf = Bytes.create entry_size in
+                let n = IO.read index.io ~off:0L ~len:entry_size buf in
+                assert (n = entry_size);
+                Some (decode_entry buf 0) ) )
 
-  let force_merge t =
-    Log.debug (fun l -> l "forced merge %S\n" t.root);
-    match get_witness t with None -> () | Some witness -> merge ~witness t
+  let force_merge ?hook t =
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] forced merge" (Filename.basename t.root));
+    let witness = IO.Mutex.with_lock t.rename_lock (fun () -> get_witness t) in
+    match witness with
+    | None ->
+        Log.debug (fun l -> l "[%s] index is empty" (Filename.basename t.root))
+    | Some witness -> merge ?hook ~witness t
 
   let replace t key value =
-    Log.debug (fun l -> l "add %a %a" K.pp key V.pp value);
+    let t = check_open t in
+    Log.info (fun l ->
+        l "[%s] replace %a %a" (Filename.basename t.root) K.pp key V.pp value);
     if t.config.readonly then raise RO_not_allowed;
-    let entry = { key; key_hash = K.hash key; value } in
-    append_entry t.log entry;
-    Tbl.replace t.log_mem key entry;
-    if Int64.compare (IO.offset t.log) (Int64.of_int t.config.log_size) > 0
-    then merge ~witness:entry t
+    let do_merge =
+      IO.Mutex.with_lock t.rename_lock (fun () ->
+          let log =
+            match t.log_async with
+            | Some async_log -> async_log
+            | None -> assert_and_get t.log
+          in
+          append_key_value log.io key value;
+          Tbl.replace log.mem key value;
+          Int64.compare (IO.offset log.io) (Int64.of_int t.config.log_size) > 0)
+    in
+    if do_merge then merge ~witness:{ key; key_hash = K.hash key; value } t
 
   let iter f t =
-    Log.debug (fun l -> l "iter %S" t.root);
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] iter" (Filename.basename t.root));
     if t.config.readonly then sync_log t;
-    Tbl.iter (fun _ e -> f e.key e.value) t.log_mem;
-    may (fun index -> iter_io (fun e -> f e.key e.value) index.io) t.index
+    match t.log with
+    | None -> ()
+    | Some log ->
+        Tbl.iter f log.mem;
+        may
+          (fun (i : index) -> iter_io (fun e -> f e.key e.value) i.io)
+          t.index;
+        IO.Mutex.with_lock t.rename_lock (fun () ->
+            ( match t.log_async with
+            | None -> ()
+            | Some log -> Tbl.iter f log.mem );
+            may
+              (fun (i : index) -> iter_io (fun e -> f e.key e.value) i.io)
+              t.index)
 
-  let flush t = IO.sync t.log
-
-  let close t =
-    t.open_instances <- t.open_instances - 1;
-    if t.open_instances = 0 then (
-      Log.debug (fun l -> l "close %S" t.root);
-      if not t.config.readonly then flush t;
-      IO.close t.log;
-      may (fun i -> IO.close i.io) t.index;
-      t.index <- None;
-      Tbl.reset t.log_mem;
-      may (fun lock -> IO.unlock lock) t.lock )
+  let close it =
+    match !it with
+    | None -> Log.info (fun l -> l "close: instance already closed")
+    | Some t ->
+        Log.info (fun l -> l "[%s] close" (Filename.basename t.root));
+        IO.Mutex.with_lock t.merge_lock (fun () ->
+            it := None;
+            t.open_instances <- t.open_instances - 1;
+            if t.open_instances = 0 then (
+              Log.debug (fun l ->
+                  l "[%s] last open instance: closing the file descriptor"
+                    (Filename.basename t.root));
+              if not t.config.readonly then flush_instance t;
+              may (fun l -> IO.close l.io) t.log;
+              may (fun (i : index) -> IO.close i.io) t.index;
+              may (fun lock -> IO.unlock lock) t.writer_lock ))
 end
