@@ -14,15 +14,11 @@ CAMLprim value caml_pread
   size_t fd_off = Int64_val(v_fd_off);
   size_t buf_off = Long_val(v_buf_off);
   size_t len = Long_val(v_len);
-  char iobuf[UNIX_BUFFER_SIZE];
 
   size_t numbytes = (len > UNIX_BUFFER_SIZE) ? UNIX_BUFFER_SIZE : len;
-  caml_enter_blocking_section();
-  ret = pread(fd, iobuf, numbytes, fd_off);
-  caml_leave_blocking_section();
+  ret = pread(fd, &Byte(v_buf, buf_off), numbytes, fd_off);
 
   if (ret == -1) uerror("read", Nothing);
-  memcpy(&Byte(v_buf, buf_off), iobuf, ret);
 
   CAMLreturn(Val_long(ret));
 }

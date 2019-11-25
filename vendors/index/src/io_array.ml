@@ -1,3 +1,20 @@
+(* The MIT License
+
+Copyright (c) 2019 Craig Ferguson <craig@tarides.com>
+                   Thomas Gazagnaire <thomas@tarides.com>
+                   Ioana Cristescu <ioana@tarides.com>
+                   Clément Pascutto <clement@tarides.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software. *)
+
 module type ELT = sig
   type t
 
@@ -78,7 +95,7 @@ module Make (IO : Io.S) (Elt : ELT) :
       Log.warn (fun m ->
           m "Requested pre-fetch region is empty: [%Ld, %Ld]" low high)
     else if range > max_buffer_size then
-      Log.debug (fun m ->
+      Log.warn (fun m ->
           m "Requested pre-fetch [%Ld, %Ld] is larger than %d" low high
             max_buffer_size)
     else
@@ -96,7 +113,7 @@ module Make (IO : Io.S) (Elt : ELT) :
                    pre-fetch [%Ld, %Ld]"
                   low_buf high_buf low high)
           else (
-            Log.debug (fun m ->
+            Log.warn (fun m ->
                 m
                   "Current buffer [%Ld, %Ld] insufficient. Prefetching in \
                    range [%Ld, %Ld]"
