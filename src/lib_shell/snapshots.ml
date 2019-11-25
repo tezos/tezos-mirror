@@ -860,7 +860,7 @@ let reconstruct chain_id store chain_state context_index =
     hash_history
   >>=? fun () -> lwt_emit Reconstruct_success >>= fun () -> return_unit
 
-let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context
+let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
     ~genesis filename block =
   lwt_emit (Import_info filename)
   >>= fun () ->
@@ -875,12 +875,7 @@ let import ?(reconstruct = false) ~data_dir ~dir_cleaner ~patch_context
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
-  (* FIXME: use config value ? *)
-  State.init
-    ~context_root
-    ~store_root
-    genesis
-    ~patch_context:(patch_context None)
+  State.init ~context_root ~store_root genesis ?patch_context
   >>=? fun (state, chain_state, context_index, _history_mode) ->
   Store.init store_root
   >>=? fun store ->

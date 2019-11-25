@@ -37,9 +37,9 @@ val export :
 
 val import :
   ?reconstruct:bool ->
+  ?patch_context:(Context.t -> Context.t Lwt.t) ->
   data_dir:string ->
   dir_cleaner:(string -> unit Lwt.t) ->
-  patch_context:('a option -> Context.t -> Context.t Lwt.t) ->
   genesis:State.Chain.genesis ->
   string ->
   string option ->

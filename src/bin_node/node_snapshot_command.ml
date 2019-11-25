@@ -32,6 +32,20 @@ let context_dir data_dir = data_dir // "context"
 
 let store_dir data_dir = data_dir // "store"
 
+type error += Invalid_sandbox_file of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"main.snapshots.invalid_sandbox_file"
+    ~title:"Invalid sandbox file"
+    ~description:"The provided sandbox file is not a valid sandbox JSON file."
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "The file '%s' is not a valid JSON sandbox file" s)
+    Data_encoding.(obj1 (req "sandbox_file" string))
+    (function Invalid_sandbox_file s -> Some s | _ -> None)
+    (fun s -> Invalid_sandbox_file s)
+
 (** Main *)
 
 module Term = struct
@@ -43,7 +57,8 @@ module Term = struct
     Lwt_utils_unix.remove_dir @@ store_dir data_dir
     >>= fun () -> Lwt_utils_unix.remove_dir @@ context_dir data_dir
 
-  let process subcommand args snapshot_file block export_rolling reconstruct =
+  let process subcommand args snapshot_file block export_rolling reconstruct
+      sandbox_file =
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
@@ -75,12 +90,24 @@ module Term = struct
             ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir)
           >>=? fun () ->
+          Option.unopt_map
+            ~default:return_none
+            ~f:(fun filename ->
+              Lwt_utils_unix.Json.read_file filename
+              >>= function
+              | Error _err ->
+                  fail (Invalid_sandbox_file filename)
+              | Ok json ->
+                  return_some ("sandbox_parameter", json))
+            sandbox_file
+          >>=? fun sandbox_parameters ->
+          let patch_context = Patch_context.patch_context sandbox_parameters in
           Snapshots.import
             ~reconstruct
+            ~patch_context
             ~data_dir
             ~dir_cleaner
             ~genesis
-            ~patch_context:Patch_context.patch_context
             snapshot_file
             block
     in
@@ -141,11 +168,30 @@ module Term = struct
       value & flag
       & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
 
+  let sandbox =
+    let open Cmdliner in
+    let doc =
+      "Run the snapshot import in sandbox mode. P2P to non-localhost \
+       addresses are disabled, and constants of the economic protocol can be \
+       altered with an optional JSON file. $(b,IMPORTANT): Using sandbox mode \
+       affects the node state and subsequent runs of Tezos node must also use \
+       sandbox mode. In order to run the node in normal mode afterwards, a \
+       full reset must be performed (by removing the node's data directory)."
+    in
+    Arg.(
+      value
+      & opt (some non_dir_file) None
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ~docv:"FILE.json"
+          ["sandbox"])
+
   let term =
     let open Cmdliner.Term in
     ret
       ( const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
-      $ blocks $ export_rolling $ reconstruct )
+      $ blocks $ export_rolling $ reconstruct $ sandbox )
 end
 
 module Manpage = struct
