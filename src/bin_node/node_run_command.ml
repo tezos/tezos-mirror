@@ -31,6 +31,8 @@ type error += Non_private_sandbox of P2p_addr.t
 
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
+type error += Invalid_sandbox_file of string
+
 let () =
   register_error_kind
     `Permanent
@@ -63,29 +65,22 @@ let () =
         addrlist)
     Data_encoding.(obj1 (req "addrlist" (list P2p_point.Id.encoding)))
     (function RPC_Port_already_in_use addrlist -> Some addrlist | _ -> None)
-    (fun addrlist -> RPC_Port_already_in_use addrlist)
+    (fun addrlist -> RPC_Port_already_in_use addrlist) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.run.invalid_sandbox_file"
+    ~title:"Invalid sandbox file"
+    ~description:"The provided sandbox file is not a valid sandbox JSON file."
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "The file '%s' is not a valid JSON sandbox file" s)
+    Data_encoding.(obj1 (req "sandbox_file" string))
+    (function Invalid_sandbox_file s -> Some s | _ -> None)
+    (fun s -> Invalid_sandbox_file s)
 
 let ( // ) = Filename.concat
 
 let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
     =
-  ( match sandbox with
-  | None ->
-      Lwt.return_none
-  | Some sandbox_param -> (
-    match sandbox_param with
-    | None ->
-        Lwt.return_none
-    | Some file -> (
-        Lwt_utils_unix.Json.read_file file
-        >>= function
-        | Error err ->
-            lwt_warn "Cannot parse sandbox parameters: %s" file
-            >>= fun () ->
-            lwt_debug "%a" pp_print_error err >>= fun () -> Lwt.return_none
-        | Ok json ->
-            Lwt.return_some json ) ) )
-  >>= fun sandbox_param ->
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.p2p.discovery_addr with
   | None ->
@@ -140,20 +135,28 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
           identity;
           proof_of_work_target = Crypto_box.make_target config.p2p.expected_pow;
           disable_mempool = config.p2p.disable_mempool;
-          trust_discovered_peers = sandbox_param <> None;
+          trust_discovered_peers = sandbox <> None;
           disable_testchain = config.p2p.disable_testchain;
         }
       in
       return_some (p2p_config, config.p2p.limits) )
   >>=? fun p2p_config ->
-  let sandbox_parameters = sandbox_param in
-  let sandbox_param =
-    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_param
-  in
+  Option.unopt_map
+    ~default:return_none
+    ~f:(fun filename ->
+      Lwt_utils_unix.Json.read_file filename
+      >>= function
+      | Error _err ->
+          fail (Invalid_sandbox_file filename)
+      | Ok json ->
+          return_some ("sandbox_parameter", json))
+    sandbox
+  >>=? fun sandbox_param ->
+  let patch_context = Some (Patch_context.patch_context sandbox_param) in
   let node_config : Node.config =
     {
       genesis;
-      patch_context = Some (Patch_context.patch_context sandbox_param);
+      patch_context;
       store_root = Node_data_version.store_dir config.data_dir;
       context_root = Node_data_version.context_dir config.data_dir;
       protocol_root = Node_data_version.protocol_dir config.data_dir;
@@ -163,7 +166,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
-    ?sandbox_parameters
+    ?sandbox_parameters:(Option.map ~f:snd sandbox_param)
     ~singleprocess
     node_config
     config.shell.peer_validator_limits
@@ -379,7 +382,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt ~vopt:(Some None) (some (some string)) None
+      & opt (some non_dir_file) None
       & info
           ~docs:Node_shared_arg.Manpage.misc_section
           ~doc

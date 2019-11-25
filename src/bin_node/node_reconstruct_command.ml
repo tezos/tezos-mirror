@@ -46,11 +46,7 @@ module Term = struct
       Store.init ~mapsize:40_960_000_000L store_root
       >>=? fun store ->
       let genesis = Genesis_chain.genesis in
-      State.init
-        ~context_root
-        ~store_root
-        genesis
-        ~patch_context:(Patch_context.patch_context None)
+      State.init ~context_root ~store_root genesis
       >>=? fun (state, chain_state, context_index, history_mode) ->
       let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
       fail_unless
