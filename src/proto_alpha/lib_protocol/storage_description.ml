@@ -25,7 +25,9 @@
 
 module StringMap = Map.Make (String)
 
-type 'key t = 'key description ref
+type 'key t = 'key desc_with_path
+
+and 'key desc_with_path = {rev_path : string list; dir : 'key description ref}
 
 and 'key description =
   | Empty : 'key description
@@ -43,17 +45,51 @@ and 'key description =
     }
       -> 'key description
 
+let rec pp : type a. Format.formatter -> a t -> unit =
+ fun ppf {dir; _} ->
+  match !dir with
+  | Empty ->
+      Format.fprintf ppf "Empty"
+  | Value _e ->
+      Format.fprintf ppf "Value"
+  | NamedDir map ->
+      Format.fprintf
+        ppf
+        "@[<v>%a@]"
+        (Format.pp_print_list pp_item)
+        (StringMap.bindings map)
+  | IndexedDir {arg; subdir; _} ->
+      let name = Format.asprintf "<%s>" (RPC_arg.descr arg).name in
+      pp_item ppf (name, subdir)
+
+and pp_item : type a. Format.formatter -> string * a t -> unit =
+ fun ppf (name, desc) -> Format.fprintf ppf "@[<hv 2>%s@ %a@]" name pp desc
+
+let pp_path ppf path =
+  Format.fprintf
+    ppf
+    "[%a]"
+    Format.(
+      pp_print_list
+        ~pp_sep:(fun ppf () -> pp_print_string ppf " / ")
+        pp_print_string)
+    (List.rev path)
+
 let rec register_named_subcontext : type r. r t -> string list -> r t =
- fun dir names ->
+ fun ({rev_path; dir} as desc) names ->
   match (!dir, names) with
   | (_, []) ->
-      dir
-  | (Value _, _) ->
-      invalid_arg ""
-  | (IndexedDir _, _) ->
-      invalid_arg ""
+      {rev_path; dir}
+  | (Value _, _) | (IndexedDir _, _) ->
+      Format.kasprintf
+        invalid_arg
+        "Could not register a named subcontext at %a because of an existing %a."
+        pp_path
+        rev_path
+        pp
+        desc
   | (Empty, name :: names) ->
-      let subdir = ref Empty in
+      let subdir = {rev_path = name :: rev_path; dir = ref Empty} in
       dir := NamedDir (StringMap.singleton name subdir) ;
       register_named_subcontext subdir names
   | (NamedDir map, name :: names) ->
@@ -62,7 +98,7 @@ let rec register_named_subcontext : type r. r t -> string list -> r t =
         | Some subdir ->
             subdir
         | None ->
-            let subdir = ref Empty in
+            let subdir = {rev_path = name :: rev_path; dir = ref Empty} in
             dir := NamedDir (StringMap.add name subdir map) ;
             subdir
       in
@@ -125,7 +161,7 @@ let destutter equal l =
 let rec register_indexed_subcontext :
     type r a b.
     r t -> list:(r -> a list tzresult Lwt.t) -> (r, a, b) args -> b t =
- fun dir ~list path ->
+ fun ({dir; rev_path = desc_path} as desc) ~list path ->
   match path with
   | Pair (left, right) ->
       let compare_left = compare left in
@@ -138,53 +174,62 @@ let rec register_indexed_subcontext :
         return (List.map snd (List.filter (fun (x, _) -> equal_left x k) l))
       in
       register_indexed_subcontext
-        (register_indexed_subcontext dir ~list:list_left left)
+        (register_indexed_subcontext desc ~list:list_left left)
         ~list:list_right
         right
   | One {rpc_arg = arg; encoding = arg_encoding; _} -> (
     match !dir with
-    | Value _ ->
-        invalid_arg ""
-    | NamedDir _ ->
-        invalid_arg ""
+    | Value _ | NamedDir _ ->
+        Format.kasprintf
+          invalid_arg
+          "Could not register an indexed subcontext at %a because of an \
+           existing %a."
+          pp_path
+          desc_path
+          pp
+          desc
     | Empty ->
-        let subdir = ref Empty in
+        let subdir =
+          {
+            rev_path =
+              Format.sprintf "Index of %s" RPC_arg.(descr arg).name
+              :: desc.rev_path;
+            dir = ref Empty;
+          }
+        in
         dir := IndexedDir {arg; arg_encoding; list; subdir} ;
         subdir
     | IndexedDir {arg = inner_arg; subdir; _} -> (
       match RPC_arg.eq arg inner_arg with
       | None ->
-          invalid_arg ""
+          Format.kasprintf
+            invalid_arg
+            "An indexed subcontext at %a already exists but has a different \
+             argument: `%s` <> `%s`."
+            pp_path
+            desc_path
+            (RPC_arg.descr arg).name
+            (RPC_arg.descr inner_arg).name
       | Some RPC_arg.Eq ->
           subdir ) )
 
 let register_value :
     type a b.
     a t -> get:(a -> b option tzresult Lwt.t) -> b Data_encoding.t -> unit =
- fun dir ~get encoding ->
-  match !dir with Empty -> dir := Value {get; encoding} | _ -> invalid_arg ""
-
-let create () = ref Empty
-
-let rec pp : type a. Format.formatter -> a t -> unit =
- fun ppf dir ->
+ fun ({dir; rev_path} as desc) ~get encoding ->
   match !dir with
   | Empty ->
-      Format.fprintf ppf "EMPTY"
-  | Value _e ->
-      Format.fprintf ppf "Value"
-  | NamedDir map ->
-      Format.fprintf
-        ppf
-        "@[<v>%a@]"
-        (Format.pp_print_list pp_item)
-        (StringMap.bindings map)
-  | IndexedDir {arg; subdir; _} ->
-      let name = Format.asprintf "<%s>" (RPC_arg.descr arg).name in
-      pp_item ppf (name, subdir)
+      dir := Value {get; encoding}
+  | _ ->
+      Format.kasprintf
+        invalid_arg
+        "Could not register a value at %a because of an existing %a."
+        pp_path
+        rev_path
+        pp
+        desc
 
-and pp_item : type a. Format.formatter -> string * a t -> unit =
- fun ppf (name, dir) -> Format.fprintf ppf "@[<v 2>%s@ %a@]" name pp dir
+let create () = {rev_path = []; dir = ref Empty}
 
 module type INDEX = sig
   type t
@@ -257,7 +302,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
-   fun dir path ->
+   fun {dir; _} path ->
     match !dir with
     | Empty ->
         Opt_handler
