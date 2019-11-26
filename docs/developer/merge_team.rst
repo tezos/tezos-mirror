@@ -193,3 +193,28 @@ Right after the change to the protocol, the code might not compile,
 because the baker is not fixed yet.
 After the baker commit, the test might not pass because of a change in
 behavior.
+
+The Merge-Request Bot
+~~~~~~~~~~~~~~~~~~~~~
+
+Every 6 hours, an automated process running as the
+`Tezbocop <https://gitlab.com/tezbocop>`_ 🤖 user, inspects recent MRs and posts
+or edits one comment on them; giving an inspection report on the contents of the
+MR.
+
+Some warnings/comments are for you to potentially improve your MR, other
+comments just help us in the assignment & review process.
+
+The first time Tezbocop posts a message you should receive a notification; for
+the subsequent edits there won't be notifications; feel free to check Tezbocop's
+comment any time.
+
+If you think some of the remarks/warnings do not apply to your MR feel free to
+add a comment to justify it.
+
+The code for the bot is at
+`smondet/merbocop <https://gitlab.com/smondet/merbocop>`_. It is of course
+work-in-progress and new warnings and comments will appear little by little.
+We welcome specific issues or contributions there too.
+
+
