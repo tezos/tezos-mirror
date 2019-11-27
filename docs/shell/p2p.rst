@@ -100,10 +100,10 @@ The node administrator can also flush greylist tables with the
 The node administrator can also choose to unban peers and addresses that
 were manually banned or accidentally greylisted.
 
-It is possible to ban/unban and whitelist/blacklist both peers and
-addresses. Unbanning a peer does not ensure that its address is also unbanned,
-on the other hand, banning/unbanning an address has the same effect
-on all connected peers associated to that address.
+It is possible to ban/unban trust/untrust both peers and addresses. For
+example, unbanning a peer does not ensure that its ip is also unbanned, on the
+other hand, banning/unbanning an address has also the same effect on all
+connected peers associated to that address.
 
 Maintenance worker
 ------------------

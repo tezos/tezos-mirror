@@ -279,7 +279,9 @@ module Points = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.bool
-        ~description:"Check if a given address is blacklisted or greylisted."
+        ~description:
+          "Check if a given address is blacklisted or greylisted. Port \
+           component is unused."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "banned")
   end

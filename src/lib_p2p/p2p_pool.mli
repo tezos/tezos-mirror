@@ -299,8 +299,8 @@ module Points : sig
       Otherwise it calls [trusted] for this peer info. *)
   val get_trusted : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> bool
 
-  (** [trust t point_id] sets the point info for this point to trusted.
-      The point is registered first if not known (see [register_point]). *)
+  (** [trust t point_id] sets the point info for this point to trusted, and
+      [unban] it.  The point is registered first if not known (see [register_point]). *)
   val trust : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
   (** [untrust t point_id] sets the point info peer info for this point

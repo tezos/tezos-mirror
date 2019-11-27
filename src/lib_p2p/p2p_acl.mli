@@ -55,12 +55,16 @@ val create : int -> t
     greylisted. *)
 val banned_addr : t -> P2p_addr.t -> bool
 
+(** [unban_addr t addr] remove the address from both the blacklist
+    of banned ips and the greylist of addresses *)
 val unban_addr : t -> P2p_addr.t -> unit
 
 (** [banned_peer t peer_id] is [true] if peer with id [peer_id] is
     blacklisted or greylisted. *)
 val banned_peer : t -> P2p_peer.Id.t -> bool
 
+(** [unban_peer t peer] remove the peer from both the blacklist
+    of banned peers and the greylist of peers *)
 val unban_peer : t -> P2p_peer.Id.t -> unit
 
 (** [clear t] clears all four ACLs. *)
