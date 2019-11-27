@@ -120018,23 +120018,35 @@ cat > /tmp/parameters.json <<EOF
  "bootstrap_accounts": [
   [
    "edpkuZK6Hrm2PztAqmQ4VdaBRBBSHdaMCbKoyzucKkutoURMjS7X1G",
-   "1600000000000"
+   "1000000000000"
   ],
   [
    "edpkvFxBKFfqzKpkq4e6CPVouzby4h4qNkz9ot4LarQxQiYtCwbfeq",
-   "1600000000000"
+   "1000000000000"
   ],
   [
    "edpkv1XBR5bdT2fKKCLMbx5VZoT5wvRRW8bLKRi7hRN88bstr8EA6Q",
-   "1600000000000"
+   "1000000000000"
   ],
   [
    "edpktff4PqBjmsQjBknMMzujuw9xThochVnXtdtuDwBNoYLhUbvhVK",
-   "1600000000000"
+   "1000000000000"
   ],
   [
    "edpkuAz6xjTsJAUjbqN87rJrqK7YUSjEw7EaukF1d4Rspj2gC8WSuu",
    "400000000000"
+  ],
+  [
+   "edpku4HKE3q2BhPejtYYSmfF8unntUGWEEXPLZHPJrP45z6Gke64iU",
+   "1000000000000"
+  ],
+  [
+   "edpku6eCbQ3RkCWqDj271JkW9PA58VKMM9465deTW6ZXYf5smUwwqj",
+   "1000000000000"
+  ],
+  [
+   "tz1bbF9xEYRwAhP4HcKagTpPEayXBqrQn51B",
+   "6400000000000"
   ],
   [
    "tz3WXYtyDUNL91qfiCJtVUX746QpNv5i5ve5",
