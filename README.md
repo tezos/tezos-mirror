@@ -26,7 +26,7 @@ The Community
 
     - https://tzstats.com/
     - https://tezos.id
-    - https://mvp.tezblock.io/
+    - https://tezblock.io/
     - https://teztracker.everstake.one/
     - https://tzkt.io/ (Baking focused Explorer)
     - https://mininax.cryptonomic.tech/mainnet
