@@ -280,7 +280,7 @@ module Points : sig
     ('msg, 'peer, 'conn) t -> 'd P2p_point_state.Info.t -> unit
 
   (** [ban t point_id] marks the address of this point_id as blacked-listed.
-      it disconnects all connections to this address. This [port_id]'s port is
+      it disconnects all connections to this address. The [point_id] port is
       ignored. *)
   val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit Lwt.t
 
@@ -288,7 +288,7 @@ module Points : sig
      provided). *)
 
   (** [ban t point_id] removes this point address from the black list.
-      This [point_id]'s port is ignored. *)
+      The [point_id] port is ignored. *)
   val unban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
   (** [banned t point_id] returns [true] if the point addr is in the black list.

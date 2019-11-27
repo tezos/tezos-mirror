@@ -279,7 +279,7 @@ module Points = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.bool
-        ~description:"Check is a given address is blacklisted or greylisted."
+        ~description:"Check if a given address is blacklisted or greylisted."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "banned")
   end
@@ -459,15 +459,18 @@ module ACL = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "DEPRECATED: Clear all greylists tables. Use DELETE \
-           `/network/greylist` instead"
+          "DEPRECATED: Clear all greylists tables. This will unbann all \
+           addresses and peers automatically greylisted by the system. Use \
+           DELETE `/network/greylist` instead"
         RPC_path.(root / "network" / "greylist" / "clear")
 
     let clear_delete =
       RPC_service.delete_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Clear all greylists tables."
+        ~description:
+          "Clear all greylists tables. This will unbann all addresses and \
+           peers automatically greylisted by the system."
         RPC_path.(root / "network" / "greylist")
   end
 
