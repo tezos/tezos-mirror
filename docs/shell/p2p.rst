@@ -93,8 +93,12 @@ block (blacklist) or enable (whitelist) individual IP addresses, while the P2P l
 temporarily banning (greylist) IP addresses and peers who misbehave. The delay to remove an
 IP address from the greylist table is defined by the configuration variable
 ``greylist_timeout``, while peers that are greylisted are periodically removed.
-The node administrator can also flush greylist tables with the
-``tezos-admin-client``.
+
+The node administrator can also choose to unban peers and addresses that
+were manually banned or accidentally greylisted.
+
+Since it is possible to ban/unban and whitelist/blacklist both peers and
+addresses, unbanning a peer does not ensure that its ip is also unbanned.
 
 Maintenance worker
 ------------------
