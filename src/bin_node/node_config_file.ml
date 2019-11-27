@@ -107,7 +107,12 @@ let default_p2p_limits : P2p.limits =
 let default_p2p =
   {
     expected_pow = 26.;
-    bootstrap_peers = ["34.76.169.218"; "34.90.24.160"; "carthagenet.kaml.fr"];
+    bootstrap_peers =
+      [ "tezaria.com";
+        "34.76.169.218";
+        "34.90.24.160";
+        "carthagenet.kaml.fr";
+        "104.248.136.94" ];
     listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port);
     discovery_addr = None;
     private_mode = false;
