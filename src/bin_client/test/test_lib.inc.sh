@@ -268,7 +268,7 @@ assert_protocol() {
     proto=$1
     printf "\n\nAsserting protocol propagation\n"
     for client in "${client_instances[@]}"; do
-        ( $client -p PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV \
+        ( $client -p PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex \
                   rpc get /chains/main/blocks/head/metadata | assert_in_output "\"next_protocol\": \"$proto\"" ) \
               || exit 2
     done

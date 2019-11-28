@@ -32,5 +32,5 @@ let genesis : State.Chain.genesis =
         "BLockGenesisGenesisGenesisGenesisGenesisba8f1dPCdMR";
     protocol =
       Protocol_hash.of_b58check_exn
-        "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+        "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
   }

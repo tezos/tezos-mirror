@@ -2,7 +2,7 @@ import time
 import pytest
 
 PROTO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-PROTO_GENESIS = 'PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV'
+PROTO_GENESIS = 'PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex'
 PARAMS = ['-p', PROTO_GENESIS]
 
 
