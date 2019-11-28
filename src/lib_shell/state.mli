@@ -202,7 +202,6 @@ module Block : sig
     t option Lwt.t
 
   val store :
-    ?dont_enforce_context_hash:bool ->
     Chain.t ->
     Block_header.t ->
     Bytes.t ->

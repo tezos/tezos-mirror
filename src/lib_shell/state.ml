@@ -1129,8 +1129,8 @@ module Block = struct
     Shared.use b.chain_state.block_store (fun block_store ->
         predecessor_n block_store b.hash n)
 
-  let store ?(dont_enforce_context_hash = false) chain_state block_header
-      block_header_metadata operations operations_metadata
+  let store chain_state block_header block_header_metadata operations
+      operations_metadata
       ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
         Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
@@ -1180,21 +1180,12 @@ module Block = struct
             (failure "State.Block.store: context hash not found in context")
           >>=? fun _ ->
           fail_unless
-            ( dont_enforce_context_hash
-            || Context_hash.equal block_header.shell.context commit )
+            (Context_hash.equal block_header.shell.context commit)
             (Inconsistent_hash (commit, block_header.shell.context))
           >>=? fun () ->
-          let header =
-            if dont_enforce_context_hash then
-              {
-                block_header with
-                shell = {block_header.shell with context = commit};
-              }
-            else block_header
-          in
           let contents =
             {
-              header;
+              header = block_header;
               Store.Block.message;
               max_operations_ttl;
               last_allowed_fork_level;
@@ -1240,7 +1231,7 @@ module Block = struct
                   hash)
           else Lwt.return_unit )
           >>= fun () ->
-          let block = {chain_state; hash; header} in
+          let block = {chain_state; hash; header = block_header} in
           Lwt_watcher.notify chain_state.block_watcher block ;
           Lwt_watcher.notify chain_state.global_state.block_watcher block ;
           return_some block)
