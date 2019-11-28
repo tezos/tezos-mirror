@@ -164,6 +164,7 @@ class TestManager:
 
     def test_transfer_from_manager_to_entrypoint_with_args(self, client):
         arg = 'Pair "hello" 42'
+        # using 'transfer'
         client.transfer(0, 'manager', 'target',
                         ['--entrypoint', 'add_left',
                          '--arg', arg,
@@ -174,10 +175,25 @@ class TestManager:
                          '--arg', '"hello"'])
         client.bake('bootstrap5', BAKE_ARGS)
 
+        # using 'call'
+        client.call('manager', 'target',
+                    ['--entrypoint', 'add_left',
+                     '--arg', arg,
+                     '--burn-cap', '0.067'])
+        client.bake('bootstrap5', BAKE_ARGS)
+        client.call('manager', 'target',
+                    ['--entrypoint', 'mem_left',
+                     '--arg', '"hello"'])
+        client.bake('bootstrap5', BAKE_ARGS)
+
     def test_transfer_from_manager_no_entrypoint_with_args(self, client):
         arg = 'Left Unit'
         client.transfer(0, 'manager', 'target_no_entrypoints',
                         ['--arg', arg])
+        client.bake('bootstrap5', BAKE_ARGS)
+
+        client.call('manager', 'target_no_entrypoints',
+                    ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_transfer_from_manager_to_no_default_with_args(self, client):
@@ -186,11 +202,20 @@ class TestManager:
                         ['--arg', arg])
         client.bake('bootstrap5', BAKE_ARGS)
 
+        client.call('manager', 'target_no_default',
+                    ['--arg', arg])
+        client.bake('bootstrap5', BAKE_ARGS)
+
     def test_transfer_from_manager_to_rooted_target_with_args(self, client):
         arg = 'Left Unit'
         client.transfer(0, 'manager', 'rooted_target',
                         ['--arg', arg,
                          '--entrypoint', 'root'])
+        client.bake('bootstrap5', BAKE_ARGS)
+
+        client.call('manager', 'rooted_target',
+                    ['--arg', arg,
+                     '--entrypoint', 'root'])
         client.bake('bootstrap5', BAKE_ARGS)
 
 
@@ -400,7 +425,7 @@ class TestChainId:
     def test_chain_id_opcode(self, client, session):
         path = f'{CONTRACT_PATH}/opcodes/chain_id.tz'
         originate(client, session, path, 'Unit', 0)
-        client.transfer(0, 'bootstrap2', "chain_id", [])
+        client.call('bootstrap2', "chain_id", [])
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_chain_id_authentication_origination(self, client, session):
@@ -423,8 +448,8 @@ class TestChainId:
             'pair (pair chain_id address)' +
             '(pair (lambda unit (list operation)) nat)')
         signature = client.sign(packed, "bootstrap1")
-        client.transfer(0, 'bootstrap2', 'authentication',
-                        ['--arg', f'Pair {operation} \"{signature}\"'])
+        client.call('bootstrap2', 'authentication',
+                    ['--arg', f'Pair {operation} \"{signature}\"'])
         client.bake('bootstrap5', BAKE_ARGS)
 
 
@@ -437,7 +462,11 @@ class TestBigMapToSelf:
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_big_map_to_self_transfer(self, client):
+        client.call('bootstrap2', "big_map_to_self", [])
+        client.bake('bootstrap5', BAKE_ARGS)
+
         client.transfer(0, 'bootstrap2', "big_map_to_self", [])
+        client.bake('bootstrap5', BAKE_ARGS)
 
 
 @pytest.mark.contract

@@ -304,6 +304,17 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
+    def call(self,
+             account1: str,
+             account2: str,
+             args: List[str] = None) -> client_output.TransferResult:
+        cmd = ['call', 'from', account1, 'to', account2]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.TransferResult(res)
+
     def set_delegate(self,
                      account1: str,
                      account2: str,
