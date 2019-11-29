@@ -103,14 +103,13 @@ module Make (IO : Io.S) (Elt : ELT) :
       | Some b ->
           let low_buf, high_buf =
             Int64.
-              ( div b.low_off Elt.encoded_sizeL,
-                div b.high_off Elt.encoded_sizeL )
+              (div b.low_off Elt.encoded_sizeL, div b.high_off Elt.encoded_sizeL)
           in
           if low >= low_buf && high <= high_buf then
             Log.debug (fun m ->
                 m
-                  "Pre-existing buffer [%Ld, %Ld] encloses requested \
-                   pre-fetch [%Ld, %Ld]"
+                  "Pre-existing buffer [%Ld, %Ld] encloses requested pre-fetch \
+                   [%Ld, %Ld]"
                   low_buf high_buf low high)
           else (
             Log.warn (fun m ->

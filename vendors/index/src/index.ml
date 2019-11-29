@@ -324,6 +324,31 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
         iter_io (fun e -> Tbl.replace mem e.key e.value) io;
         Some { io; mem }
     in
+    let log_async_path = log_async_path root in
+    (* If we are in readonly mode, the log_async will be read during sync_log so
+       there is no need to do it here. *)
+    if (not readonly) && Sys.file_exists log_async_path then (
+      let io =
+        IO.v ~fresh ~readonly:false ~generation:0L ~fan_size:0L log_async_path
+      in
+      let entries = Int64.div (IO.offset io) entry_sizeL in
+      Log.debug (fun l ->
+          l "[%s] log_async file detected. Loading %Ld entries"
+            (Filename.basename root) entries);
+      (* If we are not in fresh mode, we move the contents of log_async to
+         log. *)
+      if not fresh then
+        may
+          (fun log ->
+            iter_io
+              (fun e ->
+                Tbl.replace log.mem e.key e.value;
+                append_key_value log.io e.key e.value)
+              io;
+            IO.sync log.io;
+            IO.clear io)
+          log;
+      IO.close io );
     let generation =
       match log with None -> 0L | Some log -> IO.get_generation log.io
     in
@@ -683,9 +708,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     | None -> ()
     | Some log ->
         Tbl.iter f log.mem;
-        may
-          (fun (i : index) -> iter_io (fun e -> f e.key e.value) i.io)
-          t.index;
+        may (fun (i : index) -> iter_io (fun e -> f e.key e.value) i.io) t.index;
         IO.Mutex.with_lock t.rename_lock (fun () ->
             ( match t.log_async with
             | None -> ()
@@ -707,7 +730,11 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
                   l "[%s] last open instance: closing the file descriptor"
                     (Filename.basename t.root));
               if not t.config.readonly then flush_instance t;
-              may (fun l -> IO.close l.io) t.log;
+              may
+                (fun l ->
+                  Tbl.clear l.mem;
+                  IO.close l.io)
+                t.log;
               may (fun (i : index) -> IO.close i.io) t.index;
               may (fun lock -> IO.unlock lock) t.writer_lock ))
 end

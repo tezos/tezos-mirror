@@ -33,5 +33,4 @@ end
 
 (** Takes an IO instance and wraps it in an Array interface with support for
     prefetching sections of the array. *)
-module Make (IO : Io.S) (Elt : ELT) :
-  S with type io = IO.t and type elt = Elt.t
+module Make (IO : Io.S) (Elt : ELT) : S with type io = IO.t and type elt = Elt.t
