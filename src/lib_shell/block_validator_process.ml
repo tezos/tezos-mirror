@@ -189,6 +189,14 @@ module External_validator_process = struct
         Data_encoding.Variable.bytes
         External_validation.magic
       >>= fun () ->
+      External_validation.recv process#stdout Data_encoding.Variable.bytes
+      >>= (function
+            | ack when ack = External_validation.magic ->
+                Lwt.return_unit
+            | _ ->
+                (*TODO : return a proper error*)
+                Lwt.fail_with "Inconsistent_handshake: bad magic")
+      >>= fun () ->
       External_validation.send
         process#stdin
         External_validation.parameters_encoding

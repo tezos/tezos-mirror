@@ -50,12 +50,20 @@ let inconsistent_handshake msg =
   Block_validator_errors.(
     Validation_process_failed (Inconsistent_handshake msg))
 
-let run stdin stdout =
-  External_validation.recv stdin Data_encoding.Variable.bytes
+let handshake input output =
+  External_validation.send
+    output
+    Data_encoding.Variable.bytes
+    External_validation.magic
+  >>= fun () ->
+  External_validation.recv input Data_encoding.Variable.bytes
   >>= fun magic ->
   fail_when
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
+
+let run stdin stdout =
+  handshake stdin stdout
   >>=? fun () ->
   External_validation.recv stdin External_validation.parameters_encoding
   >>= fun { context_root;
