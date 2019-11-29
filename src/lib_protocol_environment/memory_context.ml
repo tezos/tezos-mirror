@@ -109,8 +109,33 @@ module M = struct
     match raw_get m from with
     | None ->
         Lwt.return_none
-    | Some v ->
-        Lwt.return (raw_set m to_ (Some v))
+    | Some v -> (
+        let pp_path =
+          Format.(
+            pp_print_list
+              ~pp_sep:(fun ppf () -> pp_print_string ppf " / ")
+              pp_print_string)
+        in
+        match raw_set m to_ (Some v) with
+        | Some _ as v ->
+            Lwt.return v
+        | None ->
+            Format.kasprintf
+              Lwt.fail_with
+              "Mem_context.copy %a %a: The value is already set."
+              pp_path
+              from
+              pp_path
+              to_
+        | exception Failure s ->
+            Format.kasprintf
+              Lwt.fail_with
+              "Mem_context.copy %a %a: Failed with %s"
+              pp_path
+              from
+              pp_path
+              to_
+              s )
 
   let fold m k ~init ~f =
     match raw_get m k with
