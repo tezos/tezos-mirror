@@ -2043,7 +2043,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple four cases notation is called Micheline.
+This simple five cases notation is called Micheline.
 
 The encoding of a Micheline source file must be UTF-8, and non-ASCII
 characters can only appear in comments and strings.
