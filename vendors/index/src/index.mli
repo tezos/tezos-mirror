@@ -40,8 +40,7 @@ module type Key = sig
   (** The equality function for keys. *)
 
   val hash : t -> int
-  (** Note: Unevenly distributed hash functions may result in performance
-      drops. *)
+  (** Note: Unevenly distributed hash functions may result in performance drops. *)
 
   val hash_size : int
   (** The number of bits necessary to encode the maximum output value of
@@ -55,8 +54,8 @@ module type Key = sig
       size {!encoded_size}. *)
 
   val encoded_size : int
-  (** [encoded_size] is the size of the result of {!encode}, expressed in
-      number of bytes. *)
+  (** [encoded_size] is the size of the result of {!encode}, expressed in number
+      of bytes. *)
 
   val decode : string -> int -> t
   (** [decode s off] is the decoded form of the encoded value at the offset
@@ -139,8 +138,8 @@ module type S = sig
       size than encoded_size *)
 
   val replace : t -> key -> value -> unit
-  (** [replace t k v] binds [k] to [v] in [t], replacing any existing binding
-      of [k]. *)
+  (** [replace t k v] binds [k] to [v] in [t], replacing any existing binding of
+      [k]. *)
 
   val iter : (key -> value -> unit) -> t -> unit
   (** Iterates over the index bindings. Order is not specified. In case of

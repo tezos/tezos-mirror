@@ -85,8 +85,7 @@ module IO : Index.IO = struct
       let rec aux fd_off buf_off len =
         let w = pwrite fd fd_off buf buf_off len in
         if w = 0 || w = len then ()
-        else
-          (aux [@tailcall]) (fd_off ++ Int64.of_int w) (buf_off + w) (len - w)
+        else (aux [@tailcall]) (fd_off ++ Int64.of_int w) (buf_off + w) (len - w)
       in
       (aux [@tailcall]) off 0 (Bytes.length buf)
 
@@ -95,8 +94,7 @@ module IO : Index.IO = struct
         let r = pread fd fd_off buf buf_off len in
         if r = 0 then buf_off (* end of file *)
         else if r = len then buf_off + r
-        else
-          (aux [@tailcall]) (fd_off ++ Int64.of_int r) (buf_off + r) (len - r)
+        else (aux [@tailcall]) (fd_off ++ Int64.of_int r) (buf_off + r) (len - r)
       in
       (aux [@tailcall]) off 0 len
 
@@ -197,8 +195,7 @@ module IO : Index.IO = struct
     else (
       Raw.unsafe_write t.raw ~off:t.flushed buf;
       Raw.Offset.set t.raw offset;
-      assert (
-        t.flushed ++ Int64.of_int (String.length buf) = t.header ++ offset );
+      assert (t.flushed ++ Int64.of_int (String.length buf) = t.header ++ offset);
       t.flushed <- offset ++ t.header )
 
   let name t = t.file
