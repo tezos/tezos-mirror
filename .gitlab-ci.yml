@@ -899,6 +899,7 @@ publish:docker:
     - mainnet-staging@tezos/tezos
     - zeronet-snapshots@tezos/tezos
     - mainnet-snapshots@tezos/tezos
+    - mainnet-lmdb@tezos/tezos
   before_script:
     - apk add git
     - mkdir ~/.docker || true
