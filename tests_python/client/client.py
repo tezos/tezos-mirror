@@ -1,11 +1,12 @@
-from typing import List
-import shutil
 import datetime
-import os
-import subprocess
-import tempfile
 import json
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
+from typing import List
+
 from . import client_output
 
 
@@ -305,10 +306,10 @@ class Client:
         return client_output.TransferResult(res)
 
     def call(self,
-             account1: str,
-             account2: str,
+             source: str,
+             destination: str,
              args: List[str] = None) -> client_output.TransferResult:
-        cmd = ['call', 'from', account1, 'to', account2]
+        cmd = ['call', destination, 'from', source]
         if args is None:
             args = []
         cmd += args
