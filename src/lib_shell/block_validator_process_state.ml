@@ -158,7 +158,7 @@ module External_validator_events = struct
       | WSTOPPED i ->
           Format.fprintf ppf "The process was stopped by signal %i" i )
     | Validator_started pid ->
-        Format.fprintf ppf "Block validator started on pid %i " pid
+        Format.fprintf ppf "Block validator started with pid %i" pid
     | Request r ->
         Format.fprintf ppf "Request for %a" External_validation.request_pp r
     | Request_result (req, start_time) ->

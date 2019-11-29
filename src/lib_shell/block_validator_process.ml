@@ -153,6 +153,13 @@ end
 module External_validator_process = struct
   include Block_validator_process_state.External_validator_events
 
+  type validator_process = {
+    process : Lwt_process.process_none;
+    stdin : Lwt_io.output_channel;
+    stdout : Lwt_io.input_channel;
+    canceler : Lwt_canceler.t;
+  }
+
   type t = {
     context_root : string;
     protocol_root : string;
@@ -160,16 +167,27 @@ module External_validator_process = struct
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
     process_path : string;
-    mutable validator_process : Lwt_process.process_full option;
+    mutable validator_process : validator_process option;
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
   }
 
   let send_request vp request result_encoding =
     let start_process () =
+      let canceler = Lwt_canceler.create () in
+      (* We assume that there is only one validation process per socket *)
       let process =
-        Lwt_process.open_process_full (vp.process_path, [|"tezos-validator"|])
+        Lwt_process.open_process_none (vp.process_path, [|"tezos-validator"|])
       in
+      External_validation.create_socket_listen
+        ~canceler
+        ~max_requests:1
+        ~pid:process#pid
+      >>= fun process_socket ->
+      Lwt_unix.accept process_socket
+      >>= fun (process_socket, _) ->
+      let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
+      let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
       lwt_emit (Validator_started process#pid)
       >>= fun () ->
       let parameters =
@@ -183,37 +201,41 @@ module External_validator_process = struct
             vp.user_activated_protocol_overrides;
         }
       in
-      vp.validator_process <- Some process ;
+      vp.validator_process <-
+        Some
+          {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
       External_validation.send
-        process#stdin
+        process_stdin
         Data_encoding.Variable.bytes
         External_validation.magic
       >>= fun () ->
-      External_validation.recv process#stdout Data_encoding.Variable.bytes
-      >>= (function
-            | ack when ack = External_validation.magic ->
-                Lwt.return_unit
-            | _ ->
-                (*TODO : return a proper error*)
-                Lwt.fail_with "Inconsistent_handshake: bad magic")
-      >>= fun () ->
+      External_validation.recv process_stdout Data_encoding.Variable.bytes
+      >>= fun magic ->
+      fail_when
+        (not (Bytes.equal magic External_validation.magic))
+        (Block_validator_errors.Validation_process_failed
+           (Inconsistent_handshake "bad magic"))
+      >>=? fun () ->
       External_validation.send
-        process#stdin
+        process_stdin
         External_validation.parameters_encoding
         parameters
-      >>= fun () -> Lwt.return process
+      >>= fun () -> return (process, process_stdin, process_stdout)
     in
     ( match vp.validator_process with
-    | Some process -> (
+    | Some {process; stdin = process_stdin; stdout = process_stdout; canceler}
+      -> (
       match process#state with
       | Running ->
-          Lwt.return process
+          return (process, process_stdin, process_stdout)
       | Exited status ->
+          Lwt_canceler.cancel canceler
+          >>= fun () ->
           vp.validator_process <- None ;
           lwt_emit (Process_status status) >>= fun () -> start_process () )
     | None ->
         start_process () )
-    >>= fun process ->
+    >>=? fun (process, process_stdin, process_stdout) ->
     Lwt.catch
       (fun () ->
         (* Make sure that the promise is not canceled between a send and recv *)
@@ -222,11 +244,11 @@ module External_validator_process = struct
                lwt_timed_emit (Request request)
                >>= fun event_start ->
                External_validation.send
-                 process#stdin
+                 process_stdin
                  External_validation.request_encoding
                  request
                >>= fun () ->
-               External_validation.recv_result process#stdout result_encoding
+               External_validation.recv_result process_stdout result_encoding
                >>= fun res ->
                lwt_emit (Request_result (request, event_start))
                >>= fun () -> Lwt.return res))
@@ -305,12 +327,12 @@ module External_validator_process = struct
     lwt_emit Close
     >>= fun () ->
     match vp.validator_process with
-    | Some process ->
+    | Some {process; stdin = process_stdin; canceler; _} ->
         let request = External_validation.Terminate in
         lwt_emit (Request request)
         >>= fun () ->
         External_validation.send
-          process#stdin
+          process_stdin
           External_validation.request_encoding
           request
         >>= fun () ->
@@ -320,6 +342,8 @@ module External_validator_process = struct
                   Lwt.return_unit
               | _ ->
                   process#terminate ; Lwt.return_unit)
+        >>= fun () ->
+        Lwt_canceler.cancel canceler
         >>= fun () ->
         vp.validator_process <- None ;
         Lwt.return_unit
