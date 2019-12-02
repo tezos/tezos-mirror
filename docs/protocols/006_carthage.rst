@@ -1,4 +1,5 @@
 .. _006_carthage:
+.. _proto-006: https://gitlab.com/nomadic-labs/tezos/tree/proto-006
 
 Protocol 006_PtCartha Carthage
 ==============================
@@ -19,7 +20,7 @@ See details in :ref:`Test Networks<test-networks>`
 and instructions to join in :ref:`How to get Tezos<howtoget>`.
 
 The code can be found in the Gitlab branch
-`proto-006 <https://gitlab.com/nomadic-labs/tezos/tree/proto-006>`_ and its
+`proto-006`_ and its
 full hash is ``PtCarthavAMoXqbjBPVgDCRd5LgT7qqKWUPXnYii3xCaHRBMfHH``.
 
 .. contents:: Summary of changes
@@ -145,8 +146,7 @@ There are **no changes** to the binary format of operations.
 Changelog
 ---------
 
-You can see the full git history on the branch `proto-006
-<https://gitlab.com/nomadic-labs/tezos/commits/proto-006>`_.
+You can see the full git history on the branch `proto-006`_.
 In order to regenerate a protocol with the same hash as Carthage you
 can run from this branch::
 
