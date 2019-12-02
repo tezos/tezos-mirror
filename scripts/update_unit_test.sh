@@ -22,8 +22,7 @@ sed -z 's/^\(.*##BEGIN_UNITEST##\n\).*\(\n##END_UNITEST##.*\)$/\1/' "$src_dir/.g
 # 2: Find each test folder and add the matching incantation to the temporary
 # file.
 for lib in `find src/ -name test -type d` ; do
-  git ls-files --error-unmatch $lib  > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
+  if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
     nametest=${lib%%/test}
     name=${nametest##src/lib_}
     cat >> $tmp <<EOF
@@ -38,8 +37,7 @@ done
 
 # 2: Do the same for vendor libraries
 for lib in `find vendors/ -name test -type d` ; do
-  git ls-files --error-unmatch $lib  > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
+  if git ls-files --error-unmatch $lib  > /dev/null 2>&1; then
     nametest=${lib%%/test}
     name=${nametest##vendors/}
     cat >> $tmp <<EOF
