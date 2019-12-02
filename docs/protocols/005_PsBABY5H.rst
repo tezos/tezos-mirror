@@ -1,3 +1,7 @@
+.. This file is only referenced in a blogpost
+
+:orphan:
+
 Protocol 005_PsBABY5H
 =====================
 
