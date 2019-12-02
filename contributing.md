@@ -33,8 +33,8 @@ get merged only once the network has voted on your proposal and accepted it.
 After it has gone through the Tezos governance process it will also get merged
 into `zeronet` for testing and finally into `mainnet` for deployment.
 
-[Here](http://tezos.gitlab.io/master/developer/contributing.html) you can 
-find more documentation on the development flow and [here](http://tezos.gitlab.io/master/whitedoc/voting.html)
+[Here](http://tezos.gitlab.io/developer/contributing.html) you can 
+find more documentation on the development flow and [here](http://tezos.gitlab.io/whitedoc/voting.html)
 you can find more information on the governance and voting process.
 
 ## Conclusion
@@ -44,4 +44,4 @@ person. Furthermore, please don't hesitate to ask questions, we don't bite.
 
 ## Further
 To get more details on the contribution process, check out the
-[online contributing guidelines](http://tezos.gitlab.io/master/developer/contributing.html).
+[online contributing guidelines](http://tezos.gitlab.io/developer/contributing.html).

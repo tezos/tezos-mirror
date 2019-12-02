@@ -20,7 +20,7 @@ Developers are particularly encouraged to carefully read this page and
 to monitor it for updates.
 
 More documentation concerning Emmy+ and Michelson is available `here
-<https://tezos.gitlab.io/zeronet/>`_.
+<https://tezos.gitlab.io/>`_.
 
 .. contents:: Summary of changes
 

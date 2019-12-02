@@ -2915,7 +2915,7 @@ the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
 The multisig commands of `Tezos command line client
-<https://tezos.gitlab.io/mainnet/api/cli-commands.html>`__ use this
+<https://tezos.gitlab.io/api/cli-commands.html>`__ use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified
 <https://gitlab.com/nomadic-labs/mi-cho-coq/blob/master/src/contracts_coq/multisig.v>`__

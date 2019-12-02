@@ -30,7 +30,7 @@ Installation
 
 Prerequisites:
 
-- A working environment (see `documentation <http://tezos.gitlab.io/mainnet/index.html>`_) with the binaries compiled,
+- A working environment (see `documentation <http://tezos.gitlab.io/introduction/howtoget.html#environment>`_) with the binaries compiled,
 - ``python`` (version >= 3.6),
 - A local copy of the tezos `repository <https://gitlab.com/tezos/tezos>`_
 - the ``pip`` package manager.
