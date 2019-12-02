@@ -24,7 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Locked_directory
 
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"main.reconstruct.locked_directory"
+    ~title:"Locked directory"
+    ~description:
+      "The data directory to reconstruct is used by another process."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The data directory to reconstruct is locked by another process. You \
+         should first turn off the node before reconstructing its storage.")
+    Data_encoding.empty
+    (function Locked_directory -> Some () | _ -> None)
+    (fun () -> Locked_directory)
 
 (** Main *)
 
@@ -36,6 +52,10 @@ module Term = struct
       Node_shared_arg.read_data_dir args
       >>=? fun data_dir ->
       Node_data_version.ensure_data_dir data_dir
+      >>=? fun () ->
+      Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
+      >>=? fun is_locked ->
+      fail_when is_locked Locked_directory
       >>=? fun () ->
       let context_root = Node_data_version.context_dir data_dir in
       let store_root = Node_data_version.store_dir data_dir in
