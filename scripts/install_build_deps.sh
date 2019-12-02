@@ -43,5 +43,5 @@ opam install --yes opam-depext
 
 if [ -n "$dev" ]; then
     opam repository add default --rank=-1 > /dev/null 2>&1 || true
-    opam install merlin --criteria="-changed,-removed"
+    opam install merlin odoc --criteria="-changed,-removed"
 fi
