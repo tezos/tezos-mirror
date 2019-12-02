@@ -87,7 +87,9 @@ val remote_metadata : ('msg, 'meta) t -> 'meta
 
 val private_node : ('msg, 'meta) t -> bool
 
-(** {1 Session-establishment functions} these should be used together
+(** {1 Session-establishment functions}
+
+    These should be used together
     to implement the session establishment protocol. Session establishment
     proceeds in three synchronous, symmetric, steps. First two steps are
     implemented by [authenticate]. Third step is implemented by either [accept]
@@ -113,7 +115,7 @@ val private_node : ('msg, 'meta) t -> bool
     ['meta] information. *)
 
 (** [authenticate canceler pow incoming conn point ?port identity version meta]
-    returns a couple [(info, auth_conn) tries to set up a session with
+    returns a couple [(info, auth_conn)] tries to set up a session with
     the host connected via [conn].
 
     Can fail with
