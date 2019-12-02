@@ -106,7 +106,7 @@ _`Baking`/_`Endorsement rights`
     the Score_ of the block_.
 
 _`Contract`
-    `Originated account`_ which is associated to a Michelson_ script.
+    `Originated account`_ which is associated to a `Michelson <glossary_michelson_>`__ script.
     Contracts are sometimes referred to as smart contracts.
 
 _`Cycle`
@@ -157,7 +157,9 @@ _`Implicit account` / _`Manager`
     set as the manager for other accounts, in which case it can perform
     operations_ on these accounts.
 
-_`Michelson`
+.. _glossary_michelson:
+
+Michelson
     The built-in language used in smart contracts.
 
 _`Operations`
@@ -173,7 +175,7 @@ _`Origination`
     An operation_ to create an `originated account`_.
 
 _`Liquidity`
-    A high-level programming language that compiles to Michelson_.
+    A high-level programming language that compiles to `Michelson <glossary_michelson_>`__.
 
 _`Priority`
     A rank of different baking_ rights. Each rank corresponds to a time span. A
