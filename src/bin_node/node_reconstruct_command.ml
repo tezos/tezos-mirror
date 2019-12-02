@@ -24,11 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
 
-let context_dir data_dir = data_dir // "context"
-
-let store_dir data_dir = data_dir // "store"
 
 (** Main *)
 
@@ -41,8 +37,8 @@ module Term = struct
       >>=? fun data_dir ->
       Node_data_version.ensure_data_dir data_dir
       >>=? fun () ->
-      let context_root = context_dir data_dir in
-      let store_root = store_dir data_dir in
+      let context_root = Node_data_version.context_dir data_dir in
+      let store_root = Node_data_version.store_dir data_dir in
       Store.init ~mapsize:40_960_000_000L store_root
       >>=? fun store ->
       let genesis = Genesis_chain.genesis in
