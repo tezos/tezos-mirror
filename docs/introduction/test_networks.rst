@@ -35,7 +35,7 @@ This results in a chain which moves faster:
 - 3 blocks per minute instead of 1,
 - one cycle should last less than 43 minutes instead of 2 days and 20 hours,
 - a voting period should last less than 16 hours instead of about 23 days.
-Note that in Zeronet, a voting period is 22 cycles instead of 8 cycles in Mainnet.
+  Note that in Zeronet, a voting period is 22 cycles instead of 8 cycles in Mainnet.
 
 Carthagenet
 -----------
