@@ -136,6 +136,14 @@ else
     fi
 fi
 
+# $files may contain `*.pp.ml{i}` files which can't be linted. They are filtered
+# by the following loop.
+#
+# Note: another option would be to filter them before calling the script but
+# it was more convenient to do it here.
+
+files=$(echo "$files" | sed "s/\S\+\.pp\.mli\?\b//g")
+
 case "$action" in
     "update.ocamlformat" )
         update_all_dot_ocamlformats ;;
