@@ -1,7 +1,7 @@
 .. _mainnet-october-2019:
 
-Mainnet October 2019
-====================
+Mainnet-Staging October 2019
+============================
 
 **This release changes the storage backend and requires specific care when updating.**
 
