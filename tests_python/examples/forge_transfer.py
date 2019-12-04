@@ -20,6 +20,9 @@ def scenario():
         utils.activate_alpha(sandbox.client(0))
         port = sandbox.node(0).rpc_port
 
+        chain_id = utils.rpc('localhost', port, 'get',
+                             '/chains/main/chain_id').json()
+
         counter_path = (f'/chains/main/blocks/head/context/contracts/'
                         f'{SENDER_ID}/counter')
         counter = utils.rpc('localhost', port, 'get', counter_path).json()
@@ -36,6 +39,7 @@ def scenario():
                                         "amount": '1000',
                                         "destination": RECEIVER_ID}]}
 
+        run_json = {'operation': operation_json, 'chain_id': chain_id}
         # call run_operation
         dummy_sig = ('edsigtkpiSSschcaCt9pUVrpNPf7TTcgvgDEDD6NCEHMy8NNQJCGnMfL'
                      'ZzYoQj74yLjo9wx6MPVV29CvVzgi7qEcEUok3k7AuMg')
@@ -43,7 +47,7 @@ def scenario():
         run_operation_path = ('/chains/main/blocks/head/helpers/scripts/'
                               'run_operation')
         res = utils.rpc('localhost', port, 'post', run_operation_path,
-                        data=operation_json).json()
+                        data=run_json).json()
 
         # update fields before forging
         gas_limit = (res['contents'][0]['metadata']['operation_result']

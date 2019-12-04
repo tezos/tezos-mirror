@@ -36,9 +36,7 @@ class TestExample:
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
         session['operation_hash'] = receipt.operation_hash
 
-    # @pytest.mark.timeout(5, method='thread')
+    @pytest.mark.timeout(5)
     def test_inclusion(self, sandbox, session):
         operation_hash = session['operation_hash']
-        # FIXME retrieve the block hash where the operation was
-        # injected and pass it to `wait_for_inclusion`
-        sandbox.client(0).wait_for_inclusion(operation_hash)
+        sandbox.client(0).wait_for_inclusion(operation_hash, check_previous=2)

@@ -319,16 +319,16 @@ integration:contract_baker:
     - pytest tests_python/tests/test_contract_baker.py
   stage: test
 
-integration:contract_opcodes:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_contract_opcodes.py
-  stage: test
-
 integration:contract_onchain_opcodes:
   <<: *integration_definition
   script:
     - pytest tests_python/tests/test_contract_onchain_opcodes.py
+  stage: test
+
+integration:contract_opcodes:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/tests/test_contract_opcodes.py
   stage: test
 
 integration:cors:
@@ -421,6 +421,23 @@ integration:voting:
     - pytest tests_python/tests/test_voting.py
   stage: test
 
+integration:examples_forge_transfer:
+  <<: *integration_definition
+  script:
+    - PYTHONPATH=tests_python/ python3 tests_python/examples/forge_transfer.py
+  stage: test
+
+integration:examples_example:
+  <<: *integration_definition
+  script:
+    - PYTHONPATH=tests_python/ python3 tests_python/examples/example.py
+  stage: test
+
+integration:examples_test_example:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/examples/test_example.py
+  stage: test
 
 ##END_INTEGRATION_PYTHON##
 

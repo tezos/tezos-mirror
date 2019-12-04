@@ -24,6 +24,26 @@ integration:$testname:
 EOF
 done
 
+cat >> $tmp <<EOF
+integration:examples_forge_transfer:
+  <<: *integration_definition
+  script:
+    - PYTHONPATH=tests_python/ python3 tests_python/examples/forge_transfer.py
+  stage: test
+
+integration:examples_example:
+  <<: *integration_definition
+  script:
+    - PYTHONPATH=tests_python/ python3 tests_python/examples/example.py
+  stage: test
+
+integration:examples_test_example:
+  <<: *integration_definition
+  script:
+    - pytest tests_python/examples/test_example.py
+  stage: test
+EOF
+
 sed -z 's/^\(.*##BEGIN_INTEGRATION_PYTHON##\n\).*\(\n##END_INTEGRATION_PYTHON##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
 
 mv $tmp "$src_dir/.gitlab-ci.yml"

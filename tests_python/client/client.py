@@ -458,9 +458,11 @@ class Client:
     def wait_for_inclusion(self,
                            operation_hash: str,
                            branch: str = None,
+                           check_previous: int = None,
                            args=None) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
-        cmd += ['--check-previous', '5']
+        if check_previous is not None:
+            cmd += ['--check-previous', str(check_previous)]
         if branch is not None:
             cmd += ['--branch', branch]
         if args is None:
