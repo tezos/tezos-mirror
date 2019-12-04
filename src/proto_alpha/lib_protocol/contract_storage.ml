@@ -713,6 +713,8 @@ let spend c contract amount =
 let credit c contract amount =
   ( if Tez_repr.(amount <> Tez_repr.zero) then return c
   else
+    must_exist c contract
+    >>=? fun () ->
     Storage.Contract.Code.mem c contract
     >>=? fun (c, target_has_code) ->
     fail_unless target_has_code (Empty_transaction contract)
