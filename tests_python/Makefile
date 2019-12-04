@@ -18,9 +18,12 @@ typecheck:
 	$(TYPECHECK) $(PACKAGES)
 
 lint:
+	@echo "Linting with pylint, version:"
+	@pylint --version | sed 's/^/  /'
 	$(LINT) $(PACKAGES)
 
 lint2:
+	@echo "Linting with pycodestyle version `pycodestyle --version`"
 	$(LINT2) $(PACKAGES)
 
 clean:
