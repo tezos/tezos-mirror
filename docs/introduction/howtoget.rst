@@ -73,6 +73,8 @@ Build from sources
 
 **TL;DR**: Typically you want to do:
 
+::
+
    sudo apt install -y rsync git m4 build-essential patch unzip bubblewrap wget pkg-config libgmp-dev libev-dev libhidapi-dev which
    wget https://github.com/ocaml/opam/releases/download/2.0.3/opam-2.0.3-x86_64-linux
    sudo cp opam-2.0.3-x86_64-linux /usr/local/bin/opam
@@ -87,8 +89,7 @@ Build from sources
    export PATH=~/tezos:$PATH
    source ./src/bin_client/bash-completion.sh
    export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
-   
-   
+
 For development, numerous shell scripts also rely on jq:
 
 ::
