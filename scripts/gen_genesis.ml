@@ -1,3 +1,5 @@
+(* run this as: cd scripts; ocaml gen_genesis.ml *)
+
 #use "topfind";;
 #thread;;
 #require "threads";;
@@ -15,6 +17,8 @@
 
 open Lwt.Infix;;
 
+(* Generate a random hash for the genesis block.
+   This hash must be a valid Base58 string, so we may have to retry several times. *)
 let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
 let rec genesis () =
   let date =
@@ -29,7 +33,10 @@ let rec genesis () =
 
 let genesis, date = genesis ()
 
+let echo x = Printf.ksprintf print_endline x
+
 let () =
+  echo "Updating alphanet_version (used by Docker images)...";
   Lwt_main.run @@
   let stream = Lwt_io.lines_of_file "alphanet_version" in
   Lwt_stream.to_list stream >>= function
@@ -40,39 +47,44 @@ let () =
         Lwt_io.lines_to_file "alphanet_version" (Lwt_stream.of_list [ contents ])
     | _ -> failwith "bad alphanet_version file"
 
-let sed =
-  Format.sprintf
-    "sed -i.old \
-     -e 's/Time.Protocol.of_notation_exn \"[^\\\"]*\"/Time.Protocol.of_notation_exn \"%s\"/' \
-     -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
-     ../src/bin_node/genesis_chain.ml"
-    date
-    genesis
+let chain_name_prefix = "TEZOS_ALPHANET_"
+let chain_name = chain_name_prefix ^ date
+let sandboxed_chain_name = "SANDBOXED_TEZOS"
+let genesis_protocol_hash_placeholder = "HASH OF GENESIS PROTOCOL TO USE"
 
 let () =
-  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-                Lwt_unix.unlink "../src/bin_node/genesis_chain.ml.old")
-
-let sed =
-  Format.sprintf
-    "sed -i.old \
-     -e 's/Time.Protocol.of_notation_exn \"[^\\\"]*\"/Time.Protocol.of_notation_exn \"%s\"/' \
-     -e 's/BLockGenesisGenesisGenesisGenesisGenesis.........../%s/' \
-     ../docs/doc_gen/node_helpers.ml"
-    date
-    genesis
-
-let () =
-  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-                Lwt_unix.unlink "../docs/doc_gen/node_helpers.ml.old")
-
-let sed =
-  Format.sprintf
-    "sed -E -i.old \
-     -e 's/chain_name = \"(TEZOS[_A-Z]+)[^\"]*\"/chain_name = \"\\1%s\"/' \
-     ../src/lib_base/distributed_db_version.ml"
-    date
-
-let () =
-  Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed) >>= fun _ ->
-                Lwt_unix.unlink "../src/lib_base/distributed_db_version.ml.old")
+  echo "Here is the configuration that you can add to src/bin_node/node_config_file.ml:";
+  echo "";
+  echo "let blockchain_network_XXXXXXXXnet =";
+  echo "  make_blockchain_network";
+  echo "    State.Chain.";
+  echo "      {";
+  echo "        time = Time.Protocol.of_notation_exn %S;" date;
+  echo "        block =";
+  echo "          Block_hash.of_b58check_exn";
+  echo "            %S;" genesis;
+  echo "        protocol =";
+  echo "          Protocol_hash.of_b58check_exn";
+  echo "            %S;" genesis_protocol_hash_placeholder;
+  echo "      }";
+  echo "    ~chain_name:%S" chain_name;
+  echo "    ~sandboxed_chain_name:%S" sandboxed_chain_name;
+  echo "    ~default_bootstrap_peers:[ (* FILL THIS LIST *) ]";
+  echo "";
+  echo "Don't forget to add this network to update builtin_blockchain_networks_with_tags.";
+  echo "Here is a configuration file that you can use instead:";
+  echo "";
+  echo "{";
+  echo "  \"p2p\": {},";
+  echo "  \"network\": {";
+  echo "    \"genesis\": {";
+  echo "      \"timestamp\": %S," date;
+  echo "      \"block\": %S," genesis;
+  echo "      \"protocol\": %S" genesis_protocol_hash_placeholder;
+  echo "    },";
+  echo "    \"chain_name\": %S," chain_name;
+  echo "    \"sandboxed_chain_name\": %S," sandboxed_chain_name;
+  echo "    \"default_bootstrap_peers\": []";
+  echo "  }";
+  echo "}";
+  ()
