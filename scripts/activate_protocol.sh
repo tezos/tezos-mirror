@@ -5,8 +5,7 @@ set -e
 usage="Usage:
 $ ./scripts/activate_protocol.sh src/proto_004_PtDPBVyN
 Inserts the protocol in the right files of the build system to compile it
-If in master activates in addition to alpha.
-If in mainnet activates in addition to its predecessor, here proto_003_PsddFKi3."
+Activate in addition to its predecessor, here proto_003_PsddFKi3."
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
@@ -15,12 +14,6 @@ if [ ! -d "$1" ]; then
     echo "$usage"
     exit 1
 fi
-
-is_mainnet () {
-    # need to check a real file because of phantom git directories
-    if [ -f "src/proto_000_Ps9mPmXa/lib_protocol/TEZOS_PROTOCOL" ]
-    then return 0; else return 1; fi
-}
 
 new_version=$(basename $1 | awk -F'_' '{print $2}')
 new_hash=$(basename $1 | awk -F'_' '{print $3}')
@@ -31,17 +24,12 @@ if [[ -z "${new_version}" || -z "${new_hash}" || -z "${full_hash}" ]] ; then
     exit 1
 fi
 
-# The pattern to look for, "alpha" for master or "00X-<hash>" for mainnet.
+# The pattern to look for is "00X-<hash>".
 # Once found it's either replaced or the line is duplicated and then replaced
-if is_mainnet
-then
-    old_version=$( printf '%03d' $(($new_version -1)) )
-    old_dir=$(ls -d src/proto_${old_version}_*)
-    old_hash=$(basename $old_dir | awk -F'_' '{print $3}')
-    pattern=${old_version}-${old_hash}
-else
-    pattern="alpha"
-fi
+old_version=$( printf '%03d' $(($new_version -1)) )
+old_dir=$(ls -d src/proto_${old_version}_*)
+old_hash=$(basename $old_dir | awk -F'_' '{print $3}')
+pattern=${old_version}-${old_hash}
 
 # if a line matches PATTERN, a new line is printed where the pattern is replaced
 duplicate_and_replace() {
@@ -64,41 +52,8 @@ duplicate_and_replace ${pattern} ${replacement} active_protocol_versions
 duplicate_and_replace -${pattern} -${replacement} \
     src/bin_client/{dune,tezos-client.opam}
 
-read -p "Link in the Node? (no if you want to test injection) (Y/n) " ans
-if [[ "$ans" == "Y" || "$ans" == "y" || -z "$ans" ]]; then
-    duplicate_and_replace -${pattern} -${replacement} \
-                          src/bin_node/{dune,tezos-node.opam}
-    duplicate_and_replace -${pattern} -${replacement} \
-                          src/bin_validation/{dune,tezos-validator.opam}
-fi
-
-read -p "User-activated update? (Y/n) " ans
-if [[ "$ans" == "Y" || "$ans" == "y" || -z "$ans" ]]; then
-
-    read -p "At what level? (e.g. 3 for sandbox): " level
-
-    if [[ $level < 28082 ]]; then
-        # we are testing in sandbox so we clean existing lines
-        awk -i inplace '
-        BEGIN{found=0}{
-        if (!found && $0 ~ "let forced_protocol_upgrades")
-          {found=1; print}
-          else {
-            if (found && $0 ~ "^]")
-            {found=0; print }
-            else
-            { if (!found){print}}
-           }}' src/lib_base/block_header.ml
-    fi
-
-    sed -i.old '/let forced_protocol_upgrades/ a \ \ '${level}'l, Protocol_hash.of_b58check_exn '${full_hash}' ;' \
-        src/lib_base/block_header.ml
-    rm src/lib_base/block_header.ml.old
-
-    patch -p1 < scripts/yes-node.patch
-
-    if ! [ -d yes-wallet ]; then
-        dune utop src/lib_crypto scripts/yes-wallet.ml
-        echo 'Created `yes-wallet` directory.'
-    fi
-fi
+# activate in node
+duplicate_and_replace -${pattern} -${replacement} \
+    src/bin_node/{dune,tezos-node.opam}
+duplicate_and_replace -${pattern} -${replacement} \
+    src/bin_validation/{dune,tezos-validator.opam}
