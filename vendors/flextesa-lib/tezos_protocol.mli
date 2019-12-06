@@ -56,6 +56,8 @@ type t =
   ; name: string
   ; hash: string
   ; time_between_blocks: int list
+  ; baking_reward_per_endorsement: int list
+  ; endorsement_reward: int list
   ; blocks_per_roll_snapshot: int
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int

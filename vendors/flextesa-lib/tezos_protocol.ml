@@ -95,6 +95,8 @@ type t =
   ; name: string (* e.g. alpha *)
   ; hash: string
   ; time_between_blocks: int list
+  ; baking_reward_per_endorsement: int list
+  ; endorsement_reward: int list
   ; blocks_per_roll_snapshot: int
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
@@ -119,6 +121,8 @@ let default () =
   ; name= "alpha"
   ; hash= "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   ; time_between_blocks= [2; 3]
+  ; baking_reward_per_endorsement= [1_250_000; 187_500]
+  ; endorsement_reward= [1_250_000; 833_333]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16
   ; blocks_per_cycle= 8
@@ -153,11 +157,12 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ( match subkind with
       | `Babylon -> ("block_reward", string (Int.to_string 16_000_000))
       | `Carthage ->
-          ("baking_reward_per_endorsement", list_of_zs [1_250_000; 187_500]) )
+          ( "baking_reward_per_endorsement"
+          , list_of_zs t.baking_reward_per_endorsement ) )
     ; ( "endorsement_reward"
       , match subkind with
         | `Babylon -> string (Int.to_string 2_000_000)
-        | `Carthage -> list_of_zs [1_250_000; 833_333] )
+        | `Carthage -> list_of_zs t.endorsement_reward )
     ; ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
     ; ("cost_per_byte", string (Int.to_string 1_000))
     ; ("test_chain_duration", string (Int.to_string 1_966_080))
