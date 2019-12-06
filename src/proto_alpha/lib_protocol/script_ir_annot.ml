@@ -178,17 +178,41 @@ let error_unexpected_annot loc annot =
 let fail_unexpected_annot loc annot =
   Lwt.return (error_unexpected_annot loc annot)
 
+(* Check that the predicate p holds on all s.[k] for k >= i *)
+let string_iter p s i =
+  let len = String.length s in
+  let rec aux i =
+    if Compare.Int.(i >= len) then ok () else p s.[i] >>? fun () -> aux (i + 1)
+  in
+  aux i
+
+(* Valid annotation characters as defined by the allowed_annot_char function from lib_micheline/micheline_parser *)
+let check_char loc = function
+  | 'a' .. 'z' | 'A' .. 'Z' | '_' | '.' | '%' | '@' | '0' .. '9' ->
+      ok ()
+  | _ ->
+      error (Unexpected_annotation loc)
+
+(* This constant is defined in lib_micheline/micheline_parser which is not available in the environment. *)
+let max_annot_length = 255
+
 let parse_annots loc ?(allow_special_var = false)
     ?(allow_special_field = false) l =
   (* allow emtpty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard ~specials wrap s acc =
     let len = String.length s in
+    ( if Compare.Int.(len > max_annot_length) then
+      error (Unexpected_annotation loc)
+    else ok () )
+    >>? fun () ->
     if Compare.Int.(len = 1) then ok @@ (wrap None :: acc)
     else
       match s.[1] with
       | 'a' .. 'z' | 'A' .. 'Z' | '_' ->
-          ok @@ (wrap (Some (String.sub s 1 (len - 1))) :: acc)
+          (* check that all characters are valid*)
+          string_iter (check_char loc) s 2
+          >>? fun () -> ok @@ (wrap (Some (String.sub s 1 (len - 1))) :: acc)
       | '@' when Compare.Int.(len = 2) && List.mem '@' specials ->
           ok @@ (wrap (Some "@") :: acc)
       | '%' when List.mem '%' specials ->
