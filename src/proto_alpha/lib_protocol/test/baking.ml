@@ -172,7 +172,7 @@ let test_rewards_formulas () =
   >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {endorsers_per_block; _}; _} ->
-  let block_priorities = 0 -- 4 in
+  let block_priorities = 0 -- 2 in
   let included_endorsements = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities included_endorsements in
   iter_p
@@ -181,8 +181,7 @@ let test_rewards_formulas () =
       >>=? fun reward ->
       let expected_reward =
         Test_tez.Tez.of_mutez_exn
-          (Int64.of_int
-             Baking_rewards.baking_rewards.(priority).(endorsing_power))
+          (Int64.of_int Rewards.baking_rewards.(priority).(endorsing_power))
       in
       Assert.equal_tez ~loc:__LOC__ reward expected_reward
       >>=? fun () ->
@@ -190,8 +189,7 @@ let test_rewards_formulas () =
       >>=? fun reward ->
       let expected_reward =
         Test_tez.Tez.of_mutez_exn
-          (Int64.of_int
-             Baking_rewards.endorsing_rewards.(priority).(endorsing_power))
+          (Int64.of_int Rewards.endorsing_rewards.(priority).(endorsing_power))
       in
       Assert.equal_tez ~loc:__LOC__ reward expected_reward
       >>=? fun () -> return_unit)

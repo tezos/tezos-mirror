@@ -141,32 +141,36 @@ let get_minimal_valid_time ctxt ~priority ~endorsing_power =
     priority
     endorsing_power
 
+let rec reward_for_priority reward_per_prio prio =
+  match reward_per_prio with
+  | [] ->
+      (* Empty reward list in parameters means no rewards *)
+      Tez.zero
+  | [last] ->
+      last
+  | first :: rest ->
+      if Compare.Int.(prio <= 0) then first
+      else reward_for_priority rest (pred prio)
+
 let get_baking_reward ctxt ~priority ~endorsing_power =
   get_constants ctxt
-  >>=? fun Constants.{parametric = {block_reward; endorsers_per_block; _}; _} ->
-  let block_reward = Test_tez.Tez.to_mutez block_reward in
-  let numerator =
-    Int64.mul
-      block_reward
-      (Int64.of_int ((80 * endorsers_per_block) + (20 * endorsing_power)))
+  >>=? fun {Constants.parametric = {baking_reward_per_endorsement; _}; _} ->
+  let reward_per_endorsement =
+    reward_for_priority baking_reward_per_endorsement priority
   in
-  let denominator =
-    Int64.mul
-      Int64.(succ (of_int priority))
-      (Int64.of_int (100 * endorsers_per_block))
-  in
-  let result = Int64.div numerator denominator in
-  Lwt.return Test_tez.Tez.(one_mutez *? result)
+  Lwt.return
+    (Environment.wrap_error
+       Tez.(reward_per_endorsement *? Int64.of_int endorsing_power))
 
 let get_endorsing_reward ctxt ~priority ~endorsing_power =
   get_constants ctxt
-  >>=? fun Constants.{parametric = {endorsement_reward; _}; _} ->
-  let open Test_utils in
-  Test_tez.Tez.(
-    endorsement_reward *? Int64.of_int endorsing_power
-    >>?= fun rewards ->
-    (rewards /? Int64.(succ (of_int priority)))
-    >>?= fun reward -> return reward)
+  >>=? fun {Constants.parametric = {endorsement_reward; _}; _} ->
+  let reward_per_endorsement =
+    reward_for_priority endorsement_reward priority
+  in
+  Lwt.return
+    (Environment.wrap_error
+       Tez.(reward_per_endorsement *? Int64.of_int endorsing_power))
 
 (* Voting *)
 
