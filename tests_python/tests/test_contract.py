@@ -723,3 +723,36 @@ class TestTypecheckingErrors:
             cmd,
             'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
         )
+
+
+BAD_ANNOT_TEST = '''
+parameter bytes;
+storage (option (lambda unit unit));
+code { CAR; UNPACK (lambda unit unit); NIL operation; PAIR}
+'''
+
+
+@pytest.mark.contract
+class TestBadAnnotation:
+
+    def test_write_contract_bad_annot(self, tmpdir, session):
+        name = 'bad_annot.tz'
+        contract = f'{tmpdir}/{name}'
+        script = BAD_ANNOT_TEST
+        with open(contract, 'w') as contract_file:
+            contract_file.write(script)
+            session[name] = contract
+
+    def test_bad_annotation(self, client, session):
+        name = 'bad_annot.tz'
+        contract = session[name]
+
+        # This was produced by running "tezos-client hash data '{ UNIT
+        # ; PAIR ; CAR %faa }' of type 'lambda unit unit'" and
+        # replacing the two last bytes (that correspond to the two
+        # 'a's at the end of the annotation) by the 0xff byte which is
+        # not a valid UTF8-encoding of a string
+        parameter = '0x05020000000e034f03420416000000042566ffff'
+
+        res = client.run_script(contract, 'None', parameter)
+        assert res.storage == 'None'
