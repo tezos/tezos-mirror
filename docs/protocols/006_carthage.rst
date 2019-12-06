@@ -1,7 +1,7 @@
 .. _006_carthage:
 .. _proto-006: https://gitlab.com/nomadic-labs/tezos/tree/proto-006
 
-Protocol 006_PtCartha Carthage
+Protocol 006_PsCARTHA Carthage
 ==============================
 
 This page contains all the relevant information for protocol 006 Carthage.
@@ -21,7 +21,7 @@ and instructions to join in :ref:`How to get Tezos<howtoget>`.
 
 The code can be found in the Gitlab branch
 `proto-006`_ and its
-full hash is ``PtCarthavAMoXqbjBPVgDCRd5LgT7qqKWUPXnYii3xCaHRBMfHH``.
+full hash is ``PtXXX``.
 
 .. contents:: Summary of changes
 
@@ -37,6 +37,15 @@ Baking and Endorsing
 
 The formula to calculate baking and endorsing rewards was improved
 in order to provide more accurate results.
+
+The formula was further modified in order to make it more resistant
+to certain types of attacks.
+
+Accounts
+--------
+
+The assert that was triggered when a delegated account tried to empty
+itself was replaced by a proper error message.
 
 Michelson
 ---------
@@ -115,14 +124,19 @@ another arity, the error message produced in Babylon was unclear
 because of a missing case in the type checker. This missing case has
 been added and the error message is clearer in Carthage.
 
-Typechecking ``big_map`` litterals
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Typechecking ``big_map`` literals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The typechecking RPCs ``typecheck_script`` and ``typecheck_data`` are
 useful tools for Michelson editors featuring typechecking. The
 ``typecheck_data`` RPC was restricted to non-``big_map`` types for no good
 reason. This limitation has been removed; it is possible in Carthage
-to typecheck ``big_map`` litterals.
+to typecheck ``big_map`` literals.
+
+Checking validity of annotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Annotations are enforced to only contain valid JSON.
 
 
 Changes to RPCs
@@ -151,7 +165,7 @@ In order to regenerate a protocol with the same hash as Carthage you
 can run from this branch::
 
   $ ./scripts/snapshot_alpha.sh carthage_006 from babylon_005
-  $ ls src/proto_006_PtCartha
+  $ ls src/proto_006_PtXXX
 
 
 List of Merge Requests
@@ -159,12 +173,15 @@ List of Merge Requests
 
 * `Baking RPC <https://gitlab.com/nomadic-labs/tezos/merge_requests/108>`_
 * `Baking/Endorsement Formula <https://gitlab.com/nomadic-labs/tezos/merge_requests/110>`_
+* `Empty implicit delegated contract <https://gitlab.com/nomadic-labs/tezos/merge_requests/112>`_
 * `Gas Limit Increases <https://gitlab.com/nomadic-labs/tezos/merge_requests/117>`_
 * `Dead Code Removal <https://gitlab.com/nomadic-labs/tezos/merge_requests/118>`_
 * `Comparable Pairs <https://gitlab.com/nomadic-labs/tezos/merge_requests/106>`_
 * `Michelson Fix for MAP instruction <https://gitlab.com/nomadic-labs/tezos/merge_requests/120>`_
+* `Modified the Emmy+ reward function <https://gitlab.com/nomadic-labs/tezos/merge_requests/134>`_
 * `Improve CONTRACT instruction <https://gitlab.com/nomadic-labs/tezos/merge_requests/95>`_
 * `Improve BIG_MAP error message <https://gitlab.com/nomadic-labs/tezos/merge_requests/121>`_
+* `Check validity of annotations <https://gitlab.com/nomadic-labs/tezos/merge_requests/135>`_
 * `Move BIG_MAP initialisation <https://gitlab.com/nomadic-labs/tezos/merge_requests/119>`_
 
 
