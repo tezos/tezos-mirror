@@ -103,9 +103,9 @@ let endorsement_security_deposit c =
   let constants = Raw_context.constants c in
   constants.endorsement_security_deposit
 
-let block_reward c =
+let baking_reward_per_endorsement c =
   let constants = Raw_context.constants c in
-  constants.block_reward
+  constants.baking_reward_per_endorsement
 
 let endorsement_reward c =
   let constants = Raw_context.constants c in

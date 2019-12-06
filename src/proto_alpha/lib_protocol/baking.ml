@@ -207,31 +207,40 @@ let () =
     (function Incorrect_number_of_endorsements -> Some () | _ -> None)
     (fun () -> Incorrect_number_of_endorsements)
 
-let baking_reward ctxt ~block_priority:prio ~included_endorsements:num_endo =
-  fail_unless Compare.Int.(prio >= 0) Incorrect_priority
+let rec reward_for_priority reward_per_prio prio =
+  match reward_per_prio with
+  | [] ->
+      (* Empty reward list in parameters means no rewards *)
+      Tez.zero
+  | [last] ->
+      last
+  | first :: rest ->
+      if Compare.Int.(prio <= 0) then first
+      else reward_for_priority rest (pred prio)
+
+let baking_reward ctxt ~block_priority ~included_endorsements =
+  fail_unless Compare.Int.(block_priority >= 0) Incorrect_priority
   >>=? fun () ->
-  let max_endo = Constants.endorsers_per_block ctxt in
   fail_unless
-    Compare.Int.(num_endo >= 0 && num_endo <= max_endo)
+    Compare.Int.(
+      included_endorsements >= 0
+      && included_endorsements <= Constants.endorsers_per_block ctxt)
     Incorrect_number_of_endorsements
   >>=? fun () ->
-  let block_reward = Tez.to_mutez (Constants.block_reward ctxt) in
-  let numerator =
-    Int64.mul block_reward (Int64.of_int ((80 * max_endo) + (20 * num_endo)))
+  let reward_per_endorsement =
+    reward_for_priority
+      (Constants.baking_reward_per_endorsement ctxt)
+      block_priority
   in
-  let denominator =
-    Int64.mul Int64.(succ (of_int prio)) (Int64.of_int (100 * max_endo))
-  in
-  let result = Int64.div numerator denominator in
-  Lwt.return Tez.(one_mutez *? result)
+  Lwt.return Tez.(reward_per_endorsement *? Int64.of_int included_endorsements)
 
-let endorsing_reward ctxt ~block_priority:prio num_slots =
-  if Compare.Int.(prio >= 0) then
-    let endorsement_reward = Constants.endorsement_reward ctxt in
-    let denominator = Int64.(succ (of_int prio)) in
-    Lwt.return Tez.(endorsement_reward *? Int64.of_int num_slots)
-    >>=? fun numerator -> Lwt.return Tez.(numerator /? denominator)
-  else fail Incorrect_priority
+let endorsing_reward ctxt ~block_priority num_slots =
+  fail_unless Compare.Int.(block_priority >= 0) Incorrect_priority
+  >>=? fun () ->
+  let reward_per_endorsement =
+    reward_for_priority (Constants.endorsement_reward ctxt) block_priority
+  in
+  Lwt.return Tez.(reward_per_endorsement *? Int64.of_int num_slots)
 
 let baking_priorities c level =
   let rec f priority =

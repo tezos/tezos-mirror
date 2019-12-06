@@ -70,19 +70,20 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   | Some cycles ->
       (* Store pending ramp ups. *)
       let constants = Raw_context.constants ctxt in
-      (* Start without reward *)
+      (* Start without rewards *)
       Raw_context.patch_constants ctxt (fun c ->
           {
             c with
-            block_reward = Tez_repr.zero;
-            endorsement_reward = Tez_repr.zero;
+            baking_reward_per_endorsement = [Tez_repr.zero];
+            endorsement_reward = [Tez_repr.zero];
           })
       >>= fun ctxt ->
       (* Store the final reward. *)
       Storage.Ramp_up.Rewards.init
         ctxt
         (Cycle_repr.of_int32_exn (Int32.of_int cycles))
-        (constants.block_reward, constants.endorsement_reward) )
+        (constants.baking_reward_per_endorsement, constants.endorsement_reward)
+  )
   >>=? fun ctxt ->
   match ramp_up_cycles with
   | None ->
@@ -133,11 +134,11 @@ let cycle_end ctxt last_cycle =
   >>=? (function
          | None ->
              return ctxt
-         | Some (block_reward, endorsement_reward) ->
+         | Some (baking_reward_per_endorsement, endorsement_reward) ->
              Storage.Ramp_up.Rewards.delete ctxt next_cycle
              >>=? fun ctxt ->
              Raw_context.patch_constants ctxt (fun c ->
-                 {c with block_reward; endorsement_reward})
+                 {c with baking_reward_per_endorsement; endorsement_reward})
              >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   Storage.Ramp_up.Security_deposits.get_option ctxt next_cycle

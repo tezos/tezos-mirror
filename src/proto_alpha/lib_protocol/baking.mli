@@ -77,9 +77,7 @@ val check_endorsement_rights :
   (public_key_hash * int list * bool) tzresult Lwt.t
 
 (** Returns the baking reward calculated w.r.t a given priority [p] and a
-    number [e] of included endorsements as follows:
-      (block_reward / (p+1)) * (0.8 + 0.2 * e / endorsers_per_block)
-*)
+    number [e] of included endorsements *)
 val baking_reward :
   context ->
   block_priority:int ->

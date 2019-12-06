@@ -491,8 +491,8 @@ module Constants : sig
     origination_size : int;
     block_security_deposit : Tez.t;
     endorsement_security_deposit : Tez.t;
-    block_reward : Tez.t;
-    endorsement_reward : Tez.t;
+    baking_reward_per_endorsement : Tez.t list;
+    endorsement_reward : Tez.t list;
     cost_per_byte : Tez.t;
     hard_storage_limit_per_operation : Z.t;
     test_chain_duration : int64;
@@ -539,9 +539,9 @@ module Constants : sig
 
   val michelson_maximum_type_size : context -> int
 
-  val block_reward : context -> Tez.t
+  val baking_reward_per_endorsement : context -> Tez.t list
 
-  val endorsement_reward : context -> Tez.t
+  val endorsement_reward : context -> Tez.t list
 
   val seed_nonce_revelation_tip : context -> Tez.t
 

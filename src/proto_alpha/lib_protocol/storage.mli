@@ -383,8 +383,8 @@ module Ramp_up : sig
   module Rewards :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = Tez_repr.t * Tez_repr.t
-      (* baking * endorsement *)
+       and type value := Tez_repr.t list * Tez_repr.t list
+      (* baking rewards per endorsement * endorsement rewards *)
        and type t := Raw_context.t
 
   module Security_deposits :

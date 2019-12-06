@@ -99,8 +99,8 @@ type parametric = {
   origination_size : int;
   block_security_deposit : Tez_repr.t;
   endorsement_security_deposit : Tez_repr.t;
-  block_reward : Tez_repr.t;
-  endorsement_reward : Tez_repr.t;
+  baking_reward_per_endorsement : Tez_repr.t list;
+  endorsement_reward : Tez_repr.t list;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   test_chain_duration : int64;
@@ -132,7 +132,7 @@ let parametric_encoding =
             c.origination_size,
             c.block_security_deposit,
             c.endorsement_security_deposit,
-            c.block_reward ),
+            c.baking_reward_per_endorsement ),
           ( c.endorsement_reward,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
@@ -158,7 +158,7 @@ let parametric_encoding =
                origination_size,
                block_security_deposit,
                endorsement_security_deposit,
-               block_reward ),
+               baking_reward_per_endorsement ),
              ( endorsement_reward,
                cost_per_byte,
                hard_storage_limit_per_operation,
@@ -185,7 +185,7 @@ let parametric_encoding =
         origination_size;
         block_security_deposit;
         endorsement_security_deposit;
-        block_reward;
+        baking_reward_per_endorsement;
         endorsement_reward;
         cost_per_byte;
         hard_storage_limit_per_operation;
@@ -216,9 +216,9 @@ let parametric_encoding =
              (req "origination_size" int31)
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
-             (req "block_reward" Tez_repr.encoding))
+             (req "baking_reward_per_endorsement" (list Tez_repr.encoding)))
           (obj9
-             (req "endorsement_reward" Tez_repr.encoding)
+             (req "endorsement_reward" (list Tez_repr.encoding))
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "test_chain_duration" int64)

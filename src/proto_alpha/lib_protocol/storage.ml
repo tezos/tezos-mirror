@@ -866,10 +866,13 @@ module Ramp_up = struct
          end))
          (Make_index (Cycle_repr.Index))
          (struct
-           type t = Tez_repr.t * Tez_repr.t
+           type t = Tez_repr.t list * Tez_repr.t list
 
            let encoding =
-             Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+             Data_encoding.(
+               obj2
+                 (req "baking_reward_per_endorsement" (list Tez_repr.encoding))
+                 (req "endorsement_reward" (list Tez_repr.encoding)))
          end)
 
   module Security_deposits =
