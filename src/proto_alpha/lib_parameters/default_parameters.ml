@@ -45,8 +45,10 @@ let constants_mainnet =
       origination_size = 257;
       block_security_deposit = Tez_repr.(mul_exn one 512);
       endorsement_security_deposit = Tez_repr.(mul_exn one 64);
-      block_reward = Tez_repr.(mul_exn one 16);
-      endorsement_reward = Tez_repr.(mul_exn one 2);
+      baking_reward_per_endorsement =
+        Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
+      endorsement_reward =
+        Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
       hard_storage_limit_per_operation = Z.of_int 60_000;
       cost_per_byte = Tez_repr.of_mutez_exn 1_000L;
       test_chain_duration = Int64.mul 32768L 60L;
