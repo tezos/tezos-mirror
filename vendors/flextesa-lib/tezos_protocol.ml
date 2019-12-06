@@ -92,6 +92,8 @@ type t =
   ; name: string (* e.g. alpha *)
   ; hash: string
   ; time_between_blocks: int list
+  ; baking_reward_per_endorsement: int list
+  ; endorsement_reward: int list
   ; blocks_per_roll_snapshot: int
   ; blocks_per_voting_period: int
   ; blocks_per_cycle: int
@@ -114,6 +116,8 @@ let default () =
   ; name= "006_PsCARTHA"
   ; hash= "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
   ; time_between_blocks= [2; 3]
+  ; baking_reward_per_endorsement= [1_250_000; 187_500]
+  ; endorsement_reward= [1_250_000; 833_333]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16
   ; blocks_per_cycle= 8
@@ -154,8 +158,9 @@ let protocol_parameters_json t : Ezjsonm.t =
       ; ("origination_size", int 257)
       ; ("block_security_deposit", string (Int.to_string 512_000_000))
       ; ("endorsement_security_deposit", string (Int.to_string 64_000_000))
-      ; ("block_reward", string (Int.to_string 16_000_000))
-      ; ("endorsement_reward", string (Int.to_string 2_000_000))
+      ; ( "baking_reward_per_endorsement"
+        , list (ksprintf string "%d") t.baking_reward_per_endorsement )
+      ; ("endorsement_reward", list (ksprintf string "%d") t.endorsement_reward)
       ; ( "hard_storage_limit_per_operation"
         , string (Int.to_string 10_000_000_000) )
       ; ("cost_per_byte", string (Int.to_string 100))
