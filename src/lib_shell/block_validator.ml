@@ -315,12 +315,7 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
         block ;
       return_none
   | Some (_, true) | None ->
-      map_p
-        (map_p (fun op ->
-             let op_hash = Operation.hash op in
-             return op_hash))
-        operations
-      >>=? fun hashes ->
+      let hashes = List.map (List.map Operation.hash) operations in
       let computed_hash =
         Operation_list_list_hash.compute
           (List.map Operation_list_hash.compute hashes)
