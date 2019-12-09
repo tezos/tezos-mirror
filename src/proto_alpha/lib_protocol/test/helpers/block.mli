@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -126,6 +127,8 @@ val bake :
 
 (** Bakes [n] blocks. *)
 val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
+
+val current_cycle : t -> Cycle.t tzresult Lwt.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
