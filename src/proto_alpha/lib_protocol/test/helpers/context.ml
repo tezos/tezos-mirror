@@ -113,6 +113,8 @@ let get_endorser ctxt =
   let endorser = List.hd endorsers in
   return (endorser.delegate, endorser.slots)
 
+let get_voting_power = Alpha_services.Delegate.voting_power rpc_ctxt
+
 let get_bakers ctxt =
   Alpha_services.Delegate.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
   >>=? fun bakers ->
@@ -302,6 +304,7 @@ module Delegate = struct
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
+    voting_power : int32;
   }
 
   let info ctxt pkh = Alpha_services.Delegate.info rpc_ctxt ctxt pkh

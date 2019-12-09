@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -431,16 +432,19 @@ let bake_until_cycle_end ?policy b =
 let bake_until_n_cycle_end ?policy n b =
   Error_monad.fold_left_s (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
-let bake_until_cycle ?policy cycle (b : t) =
+let current_cycle b =
   get_constants b
   >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  let current_level = b.header.shell.level in
+  let current_cycle = Int32.div current_level blocks_per_cycle in
+  let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
+  return current_cycle
+
+let bake_until_cycle ?policy cycle (b : t) =
   let rec loop (b : t) =
-    let current_cycle =
-      let current_level = b.header.shell.level in
-      let current_cycle = Int32.div current_level blocks_per_cycle in
-      current_cycle
-    in
-    if Int32.equal (Cycle.to_int32 cycle) current_cycle then return b
+    current_cycle b
+    >>=? fun current_cycle ->
+    if Cycle.equal cycle current_cycle then return b
     else bake_until_cycle_end ?policy b >>=? fun b -> loop b
   in
   loop b

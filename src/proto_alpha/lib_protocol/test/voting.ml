@@ -125,6 +125,12 @@ let get_rolls b delegates loc =
           return rolls)
     delegates
 
+(* Checks that the listings are populated *)
+let assert_listings_not_empty b ~loc =
+  Context.Vote.get_listings (B b)
+  >>=? function
+  | [] -> failwith "Unexpected empty listings (%s)" loc | _ -> return_unit
+
 let test_successful_vote num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
   Context.init ~min_proposal_quorum num_delegates
@@ -175,12 +181,7 @@ let test_successful_vote num_delegates () =
   Assert.equal_int ~loc:__LOC__ initial_participation (Int32.to_int v)
   >>=? fun () ->
   (* listings must be populated in proposal period *)
-  Context.Vote.get_listings (B b)
-  >>=? (function
-         | [] ->
-             failwith "%s - Unexpected empty listings" __LOC__
-         | _ ->
-             return_unit)
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* beginning of proposal, denoted by _p1;
      take a snapshot of the active delegates and their rolls from listings *)
@@ -269,13 +270,8 @@ let test_successful_vote num_delegates () =
     v
     Voting_period.(succ root)
   >>=? fun () ->
-  (* listings must be populated in testing_vote period *)
-  Context.Vote.get_listings (B b)
-  >>=? (function
-         | [] ->
-             failwith "%s - Unexpected empty listings" __LOC__
-         | _ ->
-             return_unit)
+  (* listings must be populated in proposal period before moving to testing_vote period *)
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
@@ -405,10 +401,8 @@ let test_successful_vote num_delegates () =
     v
     ballots_zero
   >>=? fun () ->
-  (* listings must be empty in testing period *)
-  Context.Vote.get_listings (B b)
-  >>=? (function
-         | [] -> return_unit | _ -> failwith "%s - Unexpected listings" __LOC__)
+  (* listings must be populated in testing period before moving to promotion_vote period *)
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* skip to promotion_vote period *)
   Block.bake_n (Int32.to_int blocks_per_voting_period) b
@@ -433,12 +427,7 @@ let test_successful_vote num_delegates () =
     Voting_period.(succ (succ (succ root)))
   >>=? fun () ->
   (* listings must be populated in promotion_vote period *)
-  Context.Vote.get_listings (B b)
-  >>=? (function
-         | [] ->
-             failwith "%s - Unexpected empty listings" __LOC__
-         | _ ->
-             return_unit)
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* beginning of promotion_vote period, denoted by _p4;
      take a snapshot of the active delegates and their rolls from listings *)
@@ -1251,6 +1240,53 @@ let test_quorum_capped_minimum num_delegates () =
   | _ ->
       failwith "%s - Unexpected period kind" __LOC__
 
+(* gets the voting power *)
+let get_voting_power block pkhash =
+  let ctxt = Context.B block in
+  Context.get_voting_power ctxt pkhash
+
+let test_voting_power_updated_each_voting_period () =
+  (* Create two accounts with 80.000 tezos each, this is, 10 rolls *)
+  let initial_balance = 80_000_000_000L in
+  Context.init ~initial_balances:[initial_balance; initial_balance] 2
+  >>=? fun (block, contracts) ->
+  (* Retrieve constants blocks_per_voting_period and tokens_per_roll *)
+  Context.get_constants (B block)
+  >>=? fun {parametric = {blocks_per_voting_period; tokens_per_roll; _}; _} ->
+  (* Assert that both bakers have voting power of 10 rolls *)
+  Context.get_bakers (B block)
+  >>=? fun bakers ->
+  let baker1 = List.nth bakers 0 in
+  let baker2 = List.nth bakers 1 in
+  let assert_voting_power n block baker =
+    get_voting_power block baker
+    >>=? fun voting_power ->
+    Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
+  in
+  assert_voting_power 10 block baker1
+  >>=? fun _ ->
+  assert_voting_power 10 block baker2
+  >>=? fun _ ->
+  (* Transfer tokes_per_roll, i.e. one roll, from one baker to the other *)
+  let con1 = List.nth contracts 0 in
+  let con2 = List.nth contracts 1 in
+  let amount = tokens_per_roll in
+  Op.transaction (B block) con1 con2 amount
+  >>=? fun op ->
+  (* Bake the transaction containing the transfer operation *)
+  Block.bake ~operations:[op] block
+  >>=? fun block ->
+  (* Bake until the end of the current ovting period *)
+  Block.bake_n (Int32.to_int blocks_per_voting_period) block
+  >>=? fun block ->
+  (* Assert voting power of both bakers have changed by one roll *)
+  Context.get_bakers (B block)
+  >>=? fun bakers ->
+  let baker1 = List.nth bakers 0 in
+  let baker2 = List.nth bakers 1 in
+  assert_voting_power 9 block baker1
+  >>=? fun _ -> assert_voting_power 11 block baker2
+
 let tests =
   [ Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
     Test.tztest
@@ -1300,4 +1336,8 @@ let tests =
     Test.tztest
       "voting quorum, quorum capped minimum"
       `Quick
-      (test_quorum_capped_minimum 401) ]
+      (test_quorum_capped_minimum 401);
+    Test.tztest
+      "voting power updated in each voting period"
+      `Quick
+      test_voting_power_updated_each_voting_period ]

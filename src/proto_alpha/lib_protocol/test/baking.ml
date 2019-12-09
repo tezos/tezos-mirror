@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -237,6 +238,44 @@ let test_rewards_formulas_equivalence () =
       Assert.equal_tez ~loc:__LOC__ reward1 reward2 >>=? fun () -> return_unit)
     ranges
 
+let test_bake_n_cycles n () =
+  let open Block in
+  let policy = By_priority 0 in
+  Context.init 1
+  >>=? fun (block, _contracts) ->
+  Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
+
+(* gets the voting power *)
+let get_voting_power block pkhash =
+  let ctxt = Context.B block in
+  Context.get_voting_power ctxt pkhash
+
+let test_voting_power_cache () =
+  let open Block in
+  let policy = By_priority 0 in
+  Context.init 1
+  >>=? fun (block, _contracts) ->
+  Context.get_bakers (B block)
+  >>=? fun bakers ->
+  let baker = List.hd bakers in
+  let assert_voting_power n block =
+    get_voting_power block baker
+    >>=? fun voting_power ->
+    Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
+  in
+  assert_voting_power 500 block
+  >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 2 block
+  >>=? fun block ->
+  assert_voting_power 500 block
+  >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 5 block
+  >>=? fun block ->
+  assert_voting_power 500 block
+  >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 1 block
+  >>=? fun block -> assert_voting_power 500 block
+
 let tests =
   [ Test.tztest "cycle" `Quick test_cycle;
     Test.tztest
@@ -250,4 +289,9 @@ let tests =
     Test.tztest
       "check equivalence of rewards formulas"
       `Quick
-      test_rewards_formulas_equivalence ]
+      test_rewards_formulas_equivalence;
+    Test.tztest
+      "test_bake_n_cycles for 12 cycles"
+      `Quick
+      (test_bake_n_cycles 12);
+    Test.tztest "voting_power" `Quick test_voting_power_cache ]

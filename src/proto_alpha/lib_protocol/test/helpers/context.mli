@@ -39,6 +39,9 @@ val get_endorsers :
 
 val get_endorser : t -> (public_key_hash * int list) tzresult Lwt.t
 
+val get_voting_power :
+  t -> public_key_hash -> int32 Environment.Error_monad.shell_tzresult Lwt.t
+
 val get_bakers : t -> public_key_hash list tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
@@ -121,6 +124,7 @@ module Delegate : sig
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
+    voting_power : int32;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
