@@ -140,7 +140,7 @@ internet. With the following command it is available uniquely on the
 
    tezos-node run --rpc-addr 127.0.0.1
 
-The node listens by default on port ``19732`` so it is advisable to
+The node listens by default on port ``9732`` so it is advisable to
 open incoming connections to that port.
 You can read more about the :ref:`node configuration <node-conf>` and
 its :ref:`private mode <private-mode>`.
