@@ -50,7 +50,7 @@ let zeronet () =
        Zeronet is a testing network, with free tokens and frequent resets.@]@\n\
        @."
 
-let alphanet () =
+let test_network () =
   if not disable_disclaimer then
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
@@ -58,10 +58,12 @@ let alphanet () =
       \               This is @{<warning>NOT@} the Tezos Mainnet.@,\
        @,\
       \   The node you are connecting to claims to be running on the@,\
-      \             @{<warning>Tezos Alphanet DEVELOPMENT NETWORK.@}@,\
+      \             @{<warning>Tezos %s DEVELOPMENT NETWORK.@}@,\
       \        Do @{<warning>NOT@} use your fundraiser keys on this network.@,\
-      \        Alphanet is a testing network, with free tokens.@]@\n\
+      \        %s is a testing network, with free tokens.@]@\n\
        @."
+      (Distributed_db_version.network_name :> string)
+      (Distributed_db_version.network_name :> string)
 
 let mainnet () =
   if not disable_disclaimer then
@@ -102,7 +104,7 @@ let check_network ctxt =
         zeronet () ;
         Lwt.return_some `Zeronet )
       else if has_prefix "TEZOS_ALPHANET" then (
-        alphanet () ;
+        test_network () ;
         Lwt.return_some `Alphanet )
       else if has_prefix "TEZOS_BETANET" || has_prefix "TEZOS_MAINNET" then (
         mainnet () ;

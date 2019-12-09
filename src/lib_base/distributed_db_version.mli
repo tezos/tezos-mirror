@@ -34,6 +34,8 @@ val name_encoding : name Data_encoding.t
 
 val chain_name : name
 
+val network_name : name
+
 val sandboxed_chain_name : name
 
 (** An abstract version number for the high-level [Distributed_db] messages. *)
