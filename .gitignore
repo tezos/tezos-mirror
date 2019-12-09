@@ -53,3 +53,5 @@ dune-project
 
 *.rej
 *.orig
+
+.idea

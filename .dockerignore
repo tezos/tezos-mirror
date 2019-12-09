@@ -43,6 +43,8 @@ src/bin_client/test/LOG.*
 **/*.rej
 **/*.orig
 
+.idea
+
 ## Not in .gitignore
 
 .git
