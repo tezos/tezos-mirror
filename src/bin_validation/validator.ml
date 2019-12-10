@@ -29,12 +29,14 @@ let load_protocol proto protocol_root =
   if Registered_protocol.mem proto then return_unit
   else
     let cmxs_file =
-      protocol_root
-      // Protocol_hash.to_short_b58check proto
-      // Format.asprintf "protocol_%a" Protocol_hash.pp proto
+      Format.sprintf
+        "%s.cmxs"
+        ( protocol_root
+        // Protocol_hash.to_short_b58check proto
+        // Format.asprintf "protocol_%a" Protocol_hash.pp proto )
     in
     try
-      Dynlink.loadfile_private (cmxs_file ^ ".cmxs") ;
+      Dynlink.loadfile_private cmxs_file ;
       return_unit
     with Dynlink.Error err ->
       Format.ksprintf
