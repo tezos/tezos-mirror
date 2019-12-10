@@ -1,0 +1,21 @@
+(library
+ (name tezos_client_genesis_carthagenet)
+ (public_name tezos-client-genesis-carthagenet)
+ (libraries tezos-base
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-commands
+            tezos-protocol-environment
+            tezos-protocol-genesis-carthagenet
+            tezos-stdlib-unix)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_protocol_genesis_carthagenet
+                   -open Tezos_client_commands)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{libexec:tezos-tooling:lint.sh} %{deps})))
