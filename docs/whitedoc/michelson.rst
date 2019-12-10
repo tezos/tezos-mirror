@@ -2499,8 +2499,11 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``[@:%](|@|%|%%|[_a-zA-Z][_0-9a-zA-Z\.]*)``. They come after
-the primitive name and before its potential arguments.
+expression ``@%|@%%|%@|[@:%][_a-zA-Z][_0-9a-zA-Z\.%@]*``.
+Note however that ``@%``, ``@%%`` and ``%@`` are
+:ref:`special annotations <SpecialAnnotations>` and are not allowed everywhere.
+
+Annotations come after the primitive name and before its potential arguments.
 
 ::
 
@@ -2657,6 +2660,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
