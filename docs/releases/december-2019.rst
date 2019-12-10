@@ -201,3 +201,59 @@ This section assumes that you compile your node from a clone of the Tezos Git re
   (unless you copied the binaries somewhere else before running them).
 
 - Compile the new binaries: ``make``
+
+
+Guide for ``mainnet.sh`` Users
+------------------------------
+
+This Guide assumes you have been running an archive node with the ``mainnet.sh`` script,
+and helps you upgrade to the new storage format.
+
+1) Create a New Docker Volume
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run: ``docker volume create node_migration``
+
+Now either download a full snapshot file, or create one from your Tezos node.
+
+2a) Import an Existing Snapshot File
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create a new container that will upgrade to the new storage format.
+This is going to to take multiple days.
+Run::
+
+  docker run -d --name upgrader \
+      --mount source=node_migration,target=/tezosdata \
+      -v /path/to/snapshot/file.full:/snap.full \
+      tezos/tezos-bare:master \
+      tezos-node snapshot import /snap.full --data-dir /tezosdata --reconstruct
+
+While this is running you can check the logs with ``docker logs -f upgrader``.
+Wait until this command terminates.
+
+2b) Create Your Own Snapshot File
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run::
+
+  docker exec -it mainnet_node_1 tezos-node snapshot export /snap.full
+
+to create the file, and copy it to your host with::
+
+  docker cp mainnet_node_1:/snap.full ./snap.full
+
+Then proceed with Step 2a.
+
+3) Copy New Data to Your Tezos Node
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+First stop your node with ``mainnet.sh stop``, copy the files with::
+
+  docker run --rm -it \
+      -v mainnet_node_data:/old \
+      -v node_migration:/new  \
+      alpine cp -a /new/. /old
+
+and start your node again with ``./mainnet.sh start``.
+This will automatically update the docker image for your node to the most recent version.
