@@ -149,6 +149,27 @@ let blockchain_network_babylonnet =
     ~default_bootstrap_peers:
       ["35.246.251.120"; "34.89.154.253"; "babylonnet.kaml.fr"; "tezaria.com"]
 
+let blockchain_network_carthagenet =
+  make_blockchain_network
+    State.Chain.
+      {
+        time = Time.Protocol.of_notation_exn "2019-11-28T13:02:13Z";
+        block =
+          Block_hash.of_b58check_exn
+            "BLockGenesisGenesisGenesisGenesisGenesisd6f5afWyME7";
+        protocol =
+          Protocol_hash.of_b58check_exn
+            "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+      }
+    ~chain_name:"TEZOS_ALPHANET_CARTHAGE_2019-11-28T13:02:13Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "tezaria.com";
+        "34.76.169.218";
+        "34.90.24.160";
+        "carthagenet.kaml.fr";
+        "104.248.136.94" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     State.Chain.
@@ -221,11 +242,12 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           []))
 
 let builtin_blockchain_networks_with_tags =
-  [ (1, "zeronet", blockchain_network_zeronet);
-    (2, "alphanet", blockchain_network_alphanet);
-    (3, "mainnet", blockchain_network_mainnet);
-    (4, "babylonnet", blockchain_network_babylonnet);
-    (5, "sandbox", blockchain_network_sandbox) ]
+  [ (1, "sandbox", blockchain_network_sandbox);
+    (2, "zeronet", blockchain_network_zeronet);
+    (3, "alphanet", blockchain_network_alphanet);
+    (4, "mainnet", blockchain_network_mainnet);
+    (5, "babylonnet", blockchain_network_babylonnet);
+    (6, "carthagenet", blockchain_network_carthagenet) ]
 
 let builtin_blockchain_networks =
   List.map
