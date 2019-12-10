@@ -2,24 +2,24 @@
  (names bench_simple bench_tool)
  (libraries tezos-base
             tezos-shell
-            tezos-006-PtCartha-test-helpers)
+            tezos-006-PsCARTHA-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell
-                   -open Tezos_protocol_006_PtCartha
-                   -open Tezos_protocol_006_PtCartha_parameters
-                   -open Tezos_006_PtCartha_test_helpers)))
+                   -open Tezos_protocol_006_PsCARTHA
+                   -open Tezos_protocol_006_PsCARTHA_parameters
+                   -open Tezos_006_PsCARTHA_test_helpers)))
 
 (alias
  (name buildtest)
  (deps bench_tool.exe bench_simple.exe))
 
 (alias
- (name runbench_006_PtCartha_simple)
+ (name runbench_006_PsCARTHA_simple)
  (deps bench_simple.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_simple.exe}))))
 
 (alias
- (name runbench_006_PtCartha)
+ (name runbench_006_PsCARTHA)
  (deps bench_tool.exe)
  (action (chdir %{workspace_root} (run %{exe:bench_tool.exe}))))
 

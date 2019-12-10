@@ -104,16 +104,6 @@ unit:src/proto_005_PsBabyM1/lib_protocol:
   script:
     - dune build @src/proto_005_PsBabyM1/lib_protocol/runtest
 
-unit:src/proto_006_PtCartha/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PtCartha/lib_client/runtest
-
-unit:src/proto_006_PtCartha/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PtCartha/lib_protocol/runtest
-
 unit:stdlib:
   <<: *test_definition
   script:
@@ -143,6 +133,16 @@ unit:p2p:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest
+
+unit:src/proto_006_PsCARTHA/lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
+
+unit:src/proto_006_PsCARTHA/lib_protocol:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
 
 unit:signer_backends:
   <<: *test_definition
@@ -692,30 +692,30 @@ opam:43:tezos-protocol-005-PsBabyM1:
   variables:
     package: tezos-protocol-005-PsBabyM1
 
-opam:44:tezos-protocol-006-PtCartha:
+opam:44:tezos-protocol-006-PsCARTHA:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-006-PtCartha
+    package: tezos-protocol-006-PsCARTHA
 
 opam:45:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:46:tezos-version:
-  <<: *opam_definition
-  variables:
-    package: tezos-version
-
-opam:47:tezos-client-005-PsBabyM1:
+opam:46:tezos-client-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-client-005-PsBabyM1
 
-opam:48:tezos-client-006-PtCartha:
+opam:47:tezos-version:
   <<: *opam_definition
   variables:
-    package: tezos-client-006-PtCartha
+    package: tezos-version
+
+opam:48:tezos-client-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-006-PsCARTHA
 
 opam:49:tezos-validation:
   <<: *opam_definition
@@ -727,10 +727,10 @@ opam:50:tezos-baking-005-PsBabyM1:
   variables:
     package: tezos-baking-005-PsBabyM1
 
-opam:51:tezos-baking-006-PtCartha:
+opam:51:tezos-baking-006-PsCARTHA:
   <<: *opam_definition
   variables:
-    package: tezos-baking-006-PtCartha
+    package: tezos-baking-006-PsCARTHA
 
 opam:52:tezos-protocol-genesis:
   <<: *opam_definition
@@ -762,20 +762,20 @@ opam:57:tezos-baking-005-PsBabyM1-commands:
   variables:
     package: tezos-baking-005-PsBabyM1-commands
 
-opam:58:tezos-baking-006-PtCartha-commands:
+opam:58:tezos-baking-006-PsCARTHA-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baking-006-PtCartha-commands
+    package: tezos-baking-006-PsCARTHA-commands
 
 opam:59:tezos-client-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
     package: tezos-client-005-PsBabyM1-commands
 
-opam:60:tezos-client-006-PtCartha-commands:
+opam:60:tezos-client-006-PsCARTHA-commands:
   <<: *opam_definition
   variables:
-    package: tezos-client-006-PtCartha-commands
+    package: tezos-client-006-PsCARTHA-commands
 
 opam:61:tezos-client-genesis:
   <<: *opam_definition
@@ -787,25 +787,25 @@ opam:62:ocplib-ezresto:
   variables:
     package: ocplib-ezresto
 
-opam:63:tezos-embedded-protocol-006-PtCartha:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-006-PtCartha
-
-opam:64:tezos-embedded-protocol-005-PsBabyM1:
+opam:63:tezos-embedded-protocol-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-005-PsBabyM1
 
-opam:65:tezos-protocol-006-PtCartha-parameters:
+opam:64:tezos-protocol-006-PsCARTHA-parameters:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-006-PtCartha-parameters
+    package: tezos-protocol-006-PsCARTHA-parameters
 
-opam:66:tezos-rpc-http-server:
+opam:65:tezos-rpc-http-server:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http-server
+
+opam:66:tezos-embedded-protocol-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-006-PsCARTHA
 
 opam:67:tezos-embedded-protocol-demo-noops:
   <<: *opam_definition
@@ -827,125 +827,125 @@ opam:70:tezos-protocol-005-PsBabyM1-parameters:
   variables:
     package: tezos-protocol-005-PsBabyM1-parameters
 
-opam:71:tezos-endorser-006-PtCartha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-006-PtCartha-commands
-
-opam:72:tezos-client:
+opam:71:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:73:tezos-accuser-005-PsBabyM1-commands:
+opam:72:tezos-accuser-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
     package: tezos-accuser-005-PsBabyM1-commands
 
-opam:74:ocplib-ezresto-directory:
+opam:73:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:75:tezos-endorser-005-PsBabyM1-commands:
+opam:74:tezos-endorser-005-PsBabyM1-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-005-PsBabyM1-commands
 
-opam:76:tezos-endorser-006-PtCartha:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-006-PtCartha
-
-opam:77:tezos-codec:
+opam:75:tezos-codec:
   <<: *opam_definition
   variables:
     package: tezos-codec
 
-opam:78:ocplib-json-typed-browser:
+opam:76:ocplib-json-typed-browser:
   <<: *opam_definition
   variables:
     package: ocplib-json-typed-browser
 
-opam:79:tezos-accuser-006-PtCartha-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-006-PtCartha-commands
-
-opam:80:tezos-tooling:
+opam:77:tezos-tooling:
   <<: *opam_definition
   variables:
     package: tezos-tooling
 
-opam:81:tezos-mempool-006-PtCartha:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-006-PtCartha
-
-opam:82:flextesa:
+opam:78:flextesa:
   <<: *opam_definition
   variables:
     package: flextesa
 
-opam:83:tezos-endorser-005-PsBabyM1:
+opam:79:tezos-endorser-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-endorser-005-PsBabyM1
 
-opam:84:tezos-mempool-005-PsBabyM1:
+opam:80:tezos-mempool-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-mempool-005-PsBabyM1
 
-opam:85:tezos-accuser-006-PtCartha:
+opam:81:tezos-endorser-006-PsCARTHA:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-006-PtCartha
+    package: tezos-endorser-006-PsCARTHA
 
-opam:86:tezos-baker-006-PtCartha:
+opam:82:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
   variables:
-    package: tezos-baker-006-PtCartha
+    package: tezos-006-PsCARTHA-test-helpers
 
-opam:87:tezos-006-PtCartha-test-helpers:
+opam:83:tezos-baker-006-PsCARTHA:
   <<: *opam_definition
   variables:
-    package: tezos-006-PtCartha-test-helpers
+    package: tezos-baker-006-PsCARTHA
 
-opam:88:tezos-signer:
+opam:84:tezos-accuser-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-006-PsCARTHA-commands
+
+opam:85:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
-opam:89:tezos-baker-005-PsBabyM1:
+opam:86:tezos-baker-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-baker-005-PsBabyM1
+
+opam:87:tezos-protocol-006-PsCARTHA-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-006-PsCARTHA-tests
+
+opam:88:tezos-mempool-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-006-PsCARTHA
+
+opam:89:tezos-accuser-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-006-PsCARTHA
 
 opam:90:tezos-protocol-005-PsBabyM1-tests:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBabyM1-tests
 
-opam:91:tezos-accuser-005-PsBabyM1:
+opam:91:tezos-endorser-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-006-PsCARTHA-commands
+
+opam:92:tezos-accuser-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-accuser-005-PsBabyM1
 
-opam:92:tezos-node:
+opam:93:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:93:tezos-005-PsBabyM1-test-helpers:
+opam:94:tezos-005-PsBabyM1-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-005-PsBabyM1-test-helpers
-
-opam:94:tezos-protocol-006-PtCartha-tests:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-006-PtCartha-tests
 
 
 ##END_OPAM##

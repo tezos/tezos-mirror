@@ -111,8 +111,8 @@ let default () =
   ; dictator
     (* ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)] *)
   ; expected_pow= 1
-  ; name= "006_PtCartha"
-  ; hash= "PtCarthavAMoXqbjBPVgDCRd5LgT7qqKWUPXnYii3xCaHRBMfHH"
+  ; name= "006_PsCARTHA"
+  ; hash= "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
   ; time_between_blocks= [2; 3]
   ; blocks_per_roll_snapshot= 4
   ; blocks_per_voting_period= 16

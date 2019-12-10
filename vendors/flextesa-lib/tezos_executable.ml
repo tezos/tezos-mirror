@@ -26,9 +26,9 @@ let make ?binary ?unix_files_sink ?(environment = []) (kind : [< kind]) =
 
 let kind_string (kind : [< kind]) =
   match kind with
-  | `Accuser -> "accuser-006-PtCartha"
-  | `Baker -> "baker-006-PtCartha"
-  | `Endorser -> "endorser-006-PtCartha"
+  | `Accuser -> "accuser-006-PsCARTHA"
+  | `Baker -> "baker-006-PsCARTHA"
+  | `Endorser -> "endorser-006-PsCARTHA"
   | `Node -> "node"
   | `Client -> "client"
   | `Admin -> "admin-client"

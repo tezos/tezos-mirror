@@ -1,5 +1,5 @@
 (rule
- (copy %{lib:tezos-protocol-006-PtCartha-parameters:test-parameters.json}
+ (copy %{lib:tezos-protocol-006-PsCARTHA-parameters:test-parameters.json}
        protocol_parameters.json))
 
 (alias

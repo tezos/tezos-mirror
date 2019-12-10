@@ -16,15 +16,15 @@ depends: [
   "tezos-client-005-PsBabyM1-commands"
   "tezos-baking-005-PsBabyM1"
   "tezos-baking-005-PsBabyM1-commands"
-  "tezos-client-006-PtCartha"
-  "tezos-client-006-PtCartha-commands"
-  "tezos-baking-006-PtCartha"
-  "tezos-baking-006-PtCartha-commands"
+  "tezos-client-006-PsCARTHA"
+  "tezos-client-006-PsCARTHA-commands"
+  "tezos-baking-006-PsCARTHA"
+  "tezos-baking-006-PsCARTHA-commands"
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }
-  "tezos-protocol-006-PtCartha-parameters" { with-test }
+  "tezos-protocol-006-PsCARTHA-parameters" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
