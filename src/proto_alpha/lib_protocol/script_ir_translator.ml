@@ -2718,25 +2718,20 @@ and parse_returning :
             : (arg, ret) lambda ),
           ctxt )
 
-and parse_int32 (n : (location, prim) Micheline.node) : int tzresult =
+and parse_uint30 (n : (location, prim) Micheline.node) : int tzresult =
+  let max_uint30 = 0x3fffffff in
   let error' () =
     Invalid_syntactic_constant
       ( location n,
         strip_locations n,
-        "a positive 32-bit integer (between 0 and "
-        ^ Int32.to_string Int32.max_int
+        "a positive 31-bit integer (between 0 and " ^ string_of_int max_uint30
         ^ ")" )
   in
   match n with
-  | Micheline.Int (_, n') -> (
-    try
-      let n'' = Z.to_int n' in
-      if
-        Compare.Int.(0 <= n'')
-        && Compare.Int.(n'' <= Int32.to_int Int32.max_int)
-      then ok n''
+  | Micheline.Int (_, n') ->
+      if Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint30) then
+        ok (Z.to_int n')
       else error @@ error' ()
-    with _ -> error @@ error' () )
   | _ ->
       error @@ error' ()
 
@@ -2814,7 +2809,7 @@ and parse_instr :
       ( fail_unexpected_annot loc annot >>=? fun () -> typed ctxt loc Drop rest
         : (bef judgement * context) tzresult Lwt.t )
   | (Prim (loc, I_DROP, [n], result_annot), whole_stack) ->
-      Lwt.return (parse_int32 n)
+      Lwt.return (parse_uint30 n)
       >>=? fun whole_n ->
       let rec make_proof_argument :
           type tstk.
@@ -2865,7 +2860,7 @@ and parse_instr :
             >>=? fun (whole_stack, _ctxt) ->
             fail (Bad_stack (loc, I_DIG, 1, whole_stack))
       in
-      Lwt.return (parse_int32 n)
+      Lwt.return (parse_uint30 n)
       >>=? fun n ->
       fail_unexpected_annot loc result_annot
       >>=? fun () ->
@@ -2876,7 +2871,7 @@ and parse_instr :
       fail (Invalid_arity (loc, I_DIG, 1, List.length l))
   | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack, stack_annot))
     ->
-      Lwt.return (parse_int32 n)
+      Lwt.return (parse_uint30 n)
       >>=? fun whole_n ->
       let rec make_proof_argument :
           type tstk x.
@@ -3671,7 +3666,7 @@ and parse_instr :
       | Failed _ ->
           fail (Fail_not_in_tail_position loc) )
   | (Prim (loc, I_DIP, [n; code], result_annot), stack)
-    when match parse_int32 n with Ok _ -> true | Error _ -> false ->
+    when match parse_uint30 n with Ok _ -> true | Error _ -> false ->
       let rec make_proof_argument :
           type tstk.
           int
@@ -3700,7 +3695,7 @@ and parse_instr :
             >>=? fun (whole_stack, _ctxt) ->
             fail (Bad_stack (loc, I_DIP, 1, whole_stack))
       in
-      Lwt.return (parse_int32 n)
+      Lwt.return (parse_uint30 n)
       >>=? fun n ->
       fail_unexpected_annot loc result_annot
       >>=? fun () ->
