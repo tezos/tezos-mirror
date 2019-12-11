@@ -33,7 +33,7 @@ val create :
   Distributed_db.t ->
   Peer_validator.limits ->
   Block_validator.limits ->
-  Block_validator.validator_kind ->
+  Block_validator_process.t ->
   Prevalidator.limits ->
   Chain_validator.limits ->
   start_testchain:bool ->
@@ -44,8 +44,8 @@ val shutdown : t -> unit Lwt.t
 (** Start the validation scheduler of a given chain. *)
 val activate :
   t ->
-  ?max_child_ttl:int ->
   start_prevalidator:bool ->
+  validator_process:Block_validator_process.t ->
   State.Chain.t ->
   Chain_validator.t tzresult Lwt.t
 
@@ -60,7 +60,7 @@ val validate_block :
   t ->
   ?force:bool ->
   ?chain_id:Chain_id.t ->
-  MBytes.t ->
+  Bytes.t ->
   Operation.t list list ->
   (Block_hash.t * State.Block.t option tzresult Lwt.t) tzresult Lwt.t
 

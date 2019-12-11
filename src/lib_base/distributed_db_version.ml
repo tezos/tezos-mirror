@@ -30,11 +30,14 @@ type name = string
 
 let pp_name = Format.pp_print_string
 
-let name_encoding = Data_encoding.string
+let name_encoding =
+  let open Data_encoding in
+  def
+    "distributed_db_version.name"
+    ~description:"A name for the distributed DB protocol"
+    string
 
 let chain_name = "TEZOS_MAINNET"
-
-let old_chain_name = "TEZOS_BETANET_2018-06-30T16:07:32Z"
 
 let incompatible_chain_name = "INCOMPATIBLE"
 
@@ -44,6 +47,15 @@ type t = int
 
 let pp = Format.pp_print_int
 
-let encoding = Data_encoding.uint16
+let encoding =
+  let open Data_encoding in
+  def
+    "distributed_db_version"
+    ~description:"A version number for the distributed DB protocol"
+    uint16
 
 let zero = 0
+
+let () =
+  Data_encoding.Registration.register ~pp:pp_name name_encoding ;
+  Data_encoding.Registration.register ~pp encoding

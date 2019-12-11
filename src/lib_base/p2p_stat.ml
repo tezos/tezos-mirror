@@ -63,13 +63,16 @@ let pp ppf stat =
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {total_sent; total_recv; current_inflow; current_outflow} ->
-      (total_sent, total_recv, current_inflow, current_outflow))
-    (fun (total_sent, total_recv, current_inflow, current_outflow) ->
-      {total_sent; total_recv; current_inflow; current_outflow})
-    (obj4
-       (req "total_sent" int64)
-       (req "total_recv" int64)
-       (req "current_inflow" int31)
-       (req "current_outflow" int31))
+  def "p2p_stat" ~description:"Statistics about the p2p network."
+  @@ conv
+       (fun {total_sent; total_recv; current_inflow; current_outflow} ->
+         (total_sent, total_recv, current_inflow, current_outflow))
+       (fun (total_sent, total_recv, current_inflow, current_outflow) ->
+         {total_sent; total_recv; current_inflow; current_outflow})
+       (obj4
+          (req "total_sent" int64)
+          (req "total_recv" int64)
+          (req "current_inflow" int31)
+          (req "current_outflow" int31))
+
+let () = Data_encoding.Registration.register ~pp encoding

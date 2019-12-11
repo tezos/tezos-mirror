@@ -1652,6 +1652,8 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         TPrefix {l with stop = Some command}
     | (TParam ({stop = None; _} as l), Stop) ->
         TParam {l with stop = Some command}
+    | (TParam t, Prefix (_n, next)) ->
+        TParam {t with tree = insert_tree t.tree next}
     | (_, _) ->
         Pervasives.failwith
           (Format.asprintf

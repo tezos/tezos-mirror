@@ -83,7 +83,7 @@ let bench_all ?(num_iterations = 1000) name encoding value =
   bench
     ~num_iterations
     ("reading " ^ name ^ " streamed binary (small chunks)")
-    (fun () -> read_stream encoding (MBytes.cut 1 encoded_binary)) ;
+    (fun () -> read_stream encoding (Helpers.cut 1 encoded_binary)) ;
   ()
 
 type t = A of string | B of bool | I of int | F of float | R of t * t

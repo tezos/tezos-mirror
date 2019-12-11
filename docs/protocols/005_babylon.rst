@@ -394,12 +394,167 @@ do not get included in a block because of network latency will not
 survive the migration to Babylon. They will have to be emitted again
 in the new format.
 
-How to handle the migration from scriptless KT1s to ``manager.tz``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Migration from scriptless KT1s to ``manager.tz``
+------------------------------------------------------------------
 
-More details can be found
-`here <https://gitlab.com/cryptiumlabs/tezos/blob/master/specs/migration_004_to_005.md#managertz-script>`__.
+This section explains how to interact with the manager.tz contract that all existing KT1 accounts
+will have after the migration. Wallets can either urge their users to migrate to use implicit
+accounts or can support implicit accounts as well as scriptful KT1s.
 
+The ``tezos-client`` has been updated to be mostly backwards compatible, and the below explanations
+are mostly directed at RPC users and the invocation of the ``tezos-client`` are given as
+examples.
+
+To set delegate using the manager.tz script, one can use:
+
+.. code:: bash
+
+   tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'do' \
+               --arg '{ DROP ; NIL operation ; PUSH key_hash <dlgt> ; SOME ; SET_DELEGATE ; CONS }'
+
+- ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
+  i.e. its manager.
+- ``dst`` is the originated contract
+- ``dlgt`` is the ``key_hash`` of the delegate
+
+To remove delegate, use:
+
+.. code:: bash
+
+   tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'do' \
+               --arg '{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }'
+
+- ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
+  i.e. its manager.
+- ``dst`` is the originated contract
+
+To transfer (spend) tezos from originated contract to an implicit account, use:
+
+.. code:: bash
+
+   tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'do' \
+               --arg '{ DROP ; NIL operation ; PUSH key_hash <adr> ; IMPLICIT_ACCOUNT ; PUSH mutez <val> ; UNIT ; TRANSFER_TOKENS ; CONS }'
+
+- ``src``: has to be equal to the ``key_hash`` found in the contract's storage,
+  i.e. its manager.
+- ``dst``: is the originated contract
+- ``adr``: key_hash of the implicit account recieving the tokens
+- ``val``: amount of mutez to transfer
+
+To transfer tezos from originated contract to another originated contract, use:
+
+.. code:: bash
+
+   tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'do' \
+               --arg '{ DROP ; NIL operation ; PUSH address <adr> ; CONTRACT %<ent> <par> ; ASSERT_SOME ; PUSH mutez <val> ; <ppar> ; TRANSFER_TOKENS ; CONS }'
+
+- ``src``: has to be equal to the ``key_hash`` found in the left part of the
+  contract's storage ``pair``, i.e. its manager.
+- ``dst``: is the originated contract
+- ``adr``: addressee to receive the tokens
+- ``ent``: addressee script's entrypoint (omit if not used)
+- ``par``: addressee script's call parameter type
+- ``ppar``: instruction to push parameter value of call to addressee script
+- ``val``: amount of mutez to transfer
+
+Origination script transformation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``spendable`` and ``delegatable`` flags determine the template, if any:
+
+========= =========== ================
+spendable delegatable template
+========= =========== ================
+true      true        add_do
+true      false       add_do
+false     true        add_set_delegate
+false     false       none
+========= =========== ================
+
+For a complete Michelson pseudo-code showing these transformations, together
+with examples of these transformations applied to the `id.tz script <https://gitlab.com/tezos/tezos/blob/794bc16664cbed4057ffbc51631151023af835c0/src/bin_client/test/contracts/attic/id.tz>`_,
+please refer to this `Mi-cho-coq merge request <https://gitlab.com/nomadic-labs/mi-cho-coq/merge_requests/29>`_.
+
+For both ``add_do`` and ``add_set_delegate`` templates, the original script's
+storage gets wrapped in a ``pair``, with the manager of the contract being written
+into the left part of the pair. The right part of the storage is the original
+storage value of the original storage type.
+
+Template ``add_do``
+^^^^^^^^^^^^^^^^^^^
+
+The original script's parameter is wrapped in ``or`` type, with its left part
+being the newly added parameter of type ``lambda unit (list operation)`` and
+entrypoint annotation ``%do``. The right part of the parameter is the original
+parameter of the original parameter type with added ``%default`` entrypoint
+annotation.
+
+To spend and set/remove delegate one can use the same calls as for the
+[manager.tz script](#manager-tz-script).
+
+There is no change to use original script functionality, as the original
+parameter type is given ``%default`` entrypoint. Any argument you pass in
+to the call will get automatically wrapped to match the ``Right`` part of the
+transformed script's parameter.
+
+Template ``add_set_delegate``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The original script's parameter is wrapped in ``or`` type, with its left part
+being the newly added parameter of type:
+
+.. code:: tz
+
+   or
+     (key_hash %set_delegate)
+     (unit %remove_delegate)
+
+with two entrypoints - ``%set_delegate`` and ``%remove_delegate``. The right part of
+the parameter is the original parameter of the original parameter type with
+added ``%default`` entrypoint annotation.
+
+To set delegate using the added entrypoint, one can use:
+
+.. code:: bash
+
+  tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'set_delegate' \
+               --arg '<dlgt>'
+
+- ``src``: has to be equal to the ``key_hash`` found in the left part of the
+  contract's storage ``pair``, i.e. its manager.
+- ``dst`` is the originated contract
+- ``dlgt`` is the ``key_hash`` of the delegate
+
+To remove delegate, use:
+
+.. code:: bash
+
+  tezos-client transfer 0 from <src> to <dst> \
+               --entrypoint 'remove_delegate' \
+               --arg 'unit' # arg is optional, it defaults to unit when omitted
+
+- ``src``: has to be equal to the ``key_hash`` found in the left part of the
+  contract's storage ``pair``, i.e. its manager.
+- ``dst`` is the originated contract
+
+Please note, that you are not allowed to transfer tokens on ``%do``,
+``%set_delegate``, or ``%remove_delegate`` entrypoints calls. Invoke these
+entrypoints with ``tezos-client transfer 0``.
+
+Gas cost changes
+^^^^^^^^^^^^^^^^
+
+Below you can find the gas cost for each operation.
+
+tz1|tz2|tz3 -> tz1|tz2|tz3 :  10207 gas
+tz1|tz2|tz3 → manager.tz : 15285 gas
+manager.tz → tz1|tz2|tz3 : 26183 gas
+manager.tz → manager.tz : 44625 gas
 
 .. _005-bigmap-bug:
 

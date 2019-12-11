@@ -1805,13 +1805,14 @@ Constants
 There are three kinds of constants:
 
 1. Integers or naturals in decimal notation.
-2. Strings, with usual escape sequences: ``\n``, ``\t``, ``\b``,
-   ``\r``, ``\\``, ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
-   cannot appear in the middle of a string.
+2. Strings, with some usual escape sequences: ``\n``, ``\\``,
+   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
+   cannot appear in a string.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
 The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, plus the escaped characters mentioned above.
+subset of 7-bit ASCII, namely charactes with codes from within `[32, 126]`
+range, plus the escaped characters mentioned above.
 
 Primitive applications
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1963,7 +1964,7 @@ type must be unnamed.
 For instance, the following Michelson program which put its integer
 parameter in the storage is not well typed:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage (int :s) ;
@@ -1971,7 +1972,7 @@ parameter in the storage is not well typed:
 
 Whereas this one is:
 
-::
+.. code-block:: michelson
 
     parameter (int :p) ;
     storage int ;
@@ -2482,7 +2483,7 @@ Empty contract
 The simplest contract is the contract for which the ``parameter`` and
 ``storage`` are all of type ``unit``. This contract is as follows:
 
-::
+.. code-block:: michelson
 
     code { CDR ;           # keep the storage
            NIL operation ; # return no internal operation
@@ -2513,7 +2514,7 @@ been verified
 using the Coq proof assistant.
 
 
-::
+.. code-block:: michelson
 
    parameter (pair
                 (pair :payload

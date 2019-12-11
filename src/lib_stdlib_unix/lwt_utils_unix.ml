@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 let () =
   register_error_kind
     `Temporary
@@ -58,11 +60,11 @@ let read_string ~len fd =
   read_bytes fd b >>= fun () -> Lwt.return @@ Bytes.to_string b
 
 let read_mbytes ?(pos = 0) ?len fd buf =
-  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_bytes.read fd buf pos len
+      Lwt_unix.read fd buf pos len
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -73,11 +75,11 @@ let read_mbytes ?(pos = 0) ?len fd buf =
   inner pos len
 
 let write_mbytes ?(pos = 0) ?len descr buf =
-  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_bytes.write descr buf pos len
+      Lwt_unix.write descr buf pos len
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -233,87 +235,6 @@ module Json = struct
             return (Ezjsonm.from_string str :> Data_encoding.json)))
 end
 
-module Protocol = struct
-  let name = "TEZOS_PROTOCOL"
-
-  open Protocol
-
-  let ( // ) = Filename.concat
-
-  let to_file ~dir:dirname ?hash ?env_version modules =
-    let config_file =
-      Data_encoding.Json.construct
-        Meta.encoding
-        {hash; expected_env_version = env_version; modules}
-    in
-    Json.write_file (dirname // name) config_file
-
-  let of_file ~dir:dirname =
-    Json.read_file (dirname // name)
-    >>=? fun json -> return (Data_encoding.Json.destruct Meta.encoding json)
-
-  let find_component dirname module_name =
-    let name_lowercase = String.uncapitalize_ascii module_name in
-    let implementation = (dirname // name_lowercase) ^ ".ml" in
-    let interface = implementation ^ "i" in
-    match (Sys.file_exists implementation, Sys.file_exists interface) with
-    | (false, _) ->
-        Pervasives.failwith @@ "Not such file: " ^ implementation
-    | (true, false) ->
-        read_file implementation
-        >|= fun implementation ->
-        {name = module_name; interface = None; implementation}
-    | _ ->
-        read_file interface
-        >>= fun interface ->
-        read_file implementation
-        >|= fun implementation ->
-        {name = module_name; interface = Some interface; implementation}
-
-  let read_dir dir =
-    of_file ~dir
-    >>=? fun meta ->
-    Lwt_list.map_p (find_component dir) meta.modules
-    >>= fun components ->
-    let expected_env =
-      match meta.expected_env_version with None -> V1 | Some v -> v
-    in
-    return (meta.hash, {expected_env; components})
-
-  open Lwt.Infix
-
-  let create_files dir units =
-    remove_dir dir
-    >>= fun () ->
-    create_dir dir
-    >>= fun () ->
-    Lwt_list.map_s
-      (fun {name; interface; implementation} ->
-        let name = String.lowercase_ascii name in
-        let ml = dir // (name ^ ".ml") in
-        let mli = dir // (name ^ ".mli") in
-        create_file ml implementation
-        >>= fun () ->
-        match interface with
-        | None ->
-            Lwt.return [ml]
-        | Some content ->
-            create_file mli content >>= fun () -> Lwt.return [mli; ml])
-      units
-    >>= fun files ->
-    let files = List.concat files in
-    Lwt.return files
-
-  let write_dir dir ?hash (p : t) =
-    create_files dir p.components
-    >>= fun _files ->
-    to_file
-      ~dir
-      ?hash
-      ~env_version:p.expected_env
-      (List.map (fun {name; _} -> String.capitalize_ascii name) p.components)
-end
-
 let with_tempdir name f =
   let base_dir = Filename.temp_file name "" in
   Lwt_unix.unlink base_dir
@@ -435,7 +356,7 @@ module Socket = struct
     >>=? fun () ->
     (* len is the length of int16 plus the length of the message we want to send *)
     let len = message_len_size + encoded_message_len in
-    let buf = MBytes.create len in
+    let buf = Bytes.create len in
     match
       Data_encoding.Binary.write
         encoding
@@ -450,15 +371,15 @@ module Socket = struct
         fail_unless (last = len) Encoding_error
         >>=? fun () ->
         (* we set the beginning of the buf with the length of what is next *)
-        MBytes.set_int16 buf 0 encoded_message_len ;
+        TzEndian.set_int16 buf 0 encoded_message_len ;
         write_mbytes fd buf >>= fun () -> return_unit
 
   let recv fd encoding =
-    let header_buf = MBytes.create message_len_size in
+    let header_buf = Bytes.create message_len_size in
     read_mbytes ~len:message_len_size fd header_buf
     >>= fun () ->
-    let len = MBytes.get_uint16 header_buf 0 in
-    let buf = MBytes.create len in
+    let len = TzEndian.get_uint16 header_buf 0 in
+    let buf = Bytes.create len in
     read_mbytes ~len fd buf
     >>= fun () ->
     match Data_encoding.Binary.read encoding buf 0 len with

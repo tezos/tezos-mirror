@@ -75,14 +75,14 @@ let close t =
 
 let read t buf pos len =
   log t "try-read: %d" len ;
-  Lwt_bytes.read t.fd buf pos len
+  Lwt_unix.read t.fd buf pos len
   >>= fun nread ->
   t.nread <- t.nread + nread ;
   log t "read: %d (%d)" nread t.nread ;
   Lwt.return nread
 
 let write t buf =
-  let len = MBytes.length buf in
+  let len = Bytes.length buf in
   log t "try-write: %d" len ;
   Lwt_utils_unix.write_mbytes t.fd buf
   >>= fun () ->

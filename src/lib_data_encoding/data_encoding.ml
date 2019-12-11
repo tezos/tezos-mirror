@@ -63,20 +63,17 @@ module Encoding = struct
           (let open Json_encoding in
           conv
             (fun s ->
-              if MBytes.length s > length then invalid_arg "oversized string" ;
+              if Bytes.length s > length then invalid_arg "oversized string" ;
               s)
             (fun s ->
-              if MBytes.length s > length then
+              if Bytes.length s > length then
                 raise
                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
             Json.bytes_jsont)
   end
 
-  type 'a lazy_state =
-    | Value of 'a
-    | Bytes of MBytes.t
-    | Both of MBytes.t * 'a
+  type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a
 
   type 'a lazy_t = {mutable state : 'a lazy_state; encoding : 'a t}
 
@@ -131,65 +128,11 @@ module Encoding = struct
         fun_bytes bytes
     | Both (bytes, value) ->
         fun_combine (fun_value value) (fun_bytes bytes)
-
-  module With_version = struct
-    let version_case enc choose wrap name nth =
-      case
-        ~title:(Printf.sprintf "%s version %d" name nth)
-        Json_only
-        (obj1 (req (Printf.sprintf "%s.v%d" name nth) enc))
-        choose
-        wrap
-
-    let make_encoding ~name l =
-      union ~tag_size:`Uint8 (List.mapi (fun nth f -> f name nth) l)
-
-    type _ t =
-      | Version_0 : 'v0 encoding -> 'v0 t
-      | Version_S : {
-          previous : 'vn t;
-          encoding : 'vnp1 encoding;
-          upgrade : 'vn -> 'vnp1;
-        }
-          -> 'vnp1 t
-
-    let first_version e = Version_0 e
-
-    let next_version encoding upgrade previous =
-      Version_S {encoding; upgrade; previous}
-
-    let encoding : type a. name:string -> a t -> a encoding =
-     fun ~name version ->
-      match version with
-      | Version_0 e ->
-          make_encoding ~name [version_case e (fun x -> Some x) (fun x -> x)]
-      | Version_S {previous; encoding; upgrade} ->
-          let rec mk_nones :
-              type (* This function generates encoding cases for all the
-                 outdated versions.
-                 These versions are never encoded to
-                 (hence [fun _ -> None]) but are safely decoded with
-                 the use of the upgrade functions. *)
-              b.
-              (b -> a) -> b t -> (string -> int -> a case) list =
-           fun upgr -> function
-            | Version_0 e ->
-                [version_case e (fun _ -> None) (fun x -> upgr x)]
-            | Version_S {previous; encoding; upgrade} ->
-                let others = mk_nones (fun x -> upgr (upgrade x)) previous in
-                version_case encoding (fun _ -> None) (fun x -> upgr x)
-                :: others
-          in
-          let nones = mk_nones upgrade previous in
-          let cases =
-            version_case encoding (fun x -> Some x) (fun x -> x) :: nones
-            |> List.rev
-          in
-          make_encoding ~name cases
-  end
 end
 
 include Encoding
+module With_version = With_version
+module Registration = Registration
 module Json = Json
 module Bson = Bson
 module Binary_schema = Binary_schema

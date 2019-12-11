@@ -194,13 +194,13 @@ let operation_list_quota_encoding =
     (fun (max_size, max_op) -> {max_size; max_op})
     (obj2 (req "max_size" int31) (opt "max_op" int31))
 
-type raw_context = Key of MBytes.t | Dir of (string * raw_context) list | Cut
+type raw_context = Key of Bytes.t | Dir of (string * raw_context) list | Cut
 
 let rec pp_raw_context ppf = function
   | Cut ->
       Format.fprintf ppf "..."
   | Key v ->
-      Hex.pp ppf (MBytes.to_hex v)
+      Hex.pp ppf (Hex.of_bytes v)
   | Dir l ->
       Format.fprintf
         ppf

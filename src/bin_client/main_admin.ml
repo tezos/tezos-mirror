@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Log = Internal_event.Legacy_logging.Make (struct
+  let name = "admin-client.main"
+end)
+
 let select_commands _ _ =
   return
     (List.flatten
@@ -33,4 +38,8 @@ let select_commands _ _ =
          Client_rpc_commands.commands;
          Client_event_logging_commands.commands () ])
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () =
+  Client_main_run.run
+    ~log:(Log.fatal_error "%s")
+    (module Client_config)
+    ~select_commands

@@ -70,7 +70,12 @@ module Id = struct
 
   let encoding =
     let open Data_encoding in
-    obj2 (req "addr" P2p_addr.encoding) (opt "port" uint16)
+    def
+      "p2p_connection.id"
+      ~description:
+        "The identifier for a p2p connection. It includes an address and a \
+         port number."
+    @@ obj2 (req "addr" P2p_addr.encoding) (opt "port" uint16)
 end
 
 module Map = Map.Make (Id)
@@ -267,188 +272,205 @@ module Pool_event = struct
         (fun ((), x) -> x)
         (merge_objs (obj1 (req "event" (constant name))) obj)
     in
-    union
-      ~tag_size:`Uint8
-      [ case
-          (Tag 0)
-          ~title:"Too_few_connections"
-          (branch_encoding "too_few_connections" empty)
-          (function Too_few_connections -> Some () | _ -> None)
-          (fun () -> Too_few_connections);
-        case
-          (Tag 1)
-          ~title:"Too_many_connections"
-          (branch_encoding "too_many_connections" empty)
-          (function Too_many_connections -> Some () | _ -> None)
-          (fun () -> Too_many_connections);
-        case
-          (Tag 2)
-          ~title:"New_point"
-          (branch_encoding
-             "new_point"
-             (obj1 (req "point" P2p_point.Id.encoding)))
-          (function New_point p -> Some p | _ -> None)
-          (fun p -> New_point p);
-        case
-          (Tag 3)
-          ~title:"New_peer"
-          (branch_encoding
-             "new_peer"
-             (obj1 (req "peer_id" P2p_peer_id.encoding)))
-          (function New_peer p -> Some p | _ -> None)
-          (fun p -> New_peer p);
-        case
-          (Tag 4)
-          ~title:"Incoming_connection"
-          (branch_encoding
-             "incoming_connection"
-             (obj1 (req "point" P2p_point.Id.encoding)))
-          (function Incoming_connection p -> Some p | _ -> None)
-          (fun p -> Incoming_connection p);
-        case
-          (Tag 5)
-          ~title:"Outgoing_connection"
-          (branch_encoding
-             "outgoing_connection"
-             (obj1 (req "point" P2p_point.Id.encoding)))
-          (function Outgoing_connection p -> Some p | _ -> None)
-          (fun p -> Outgoing_connection p);
-        case
-          (Tag 6)
-          ~title:"Authentication_failed"
-          (branch_encoding
-             "authentication_failed"
-             (obj1 (req "point" P2p_point.Id.encoding)))
-          (function Authentication_failed p -> Some p | _ -> None)
-          (fun p -> Authentication_failed p);
-        case
-          (Tag 7)
-          ~title:"Accepting_request"
-          (branch_encoding
-             "accepting_request"
-             (obj3
-                (req "point" P2p_point.Id.encoding)
-                (req "id_point" Id.encoding)
-                (req "peer_id" P2p_peer_id.encoding)))
-          (function
-            | Accepting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
-          (fun (p, id_p, g) -> Accepting_request (p, id_p, g));
-        case
-          (Tag 8)
-          ~title:"Rejecting_request"
-          (branch_encoding
-             "rejecting_request"
-             (obj3
-                (req "point" P2p_point.Id.encoding)
-                (req "id_point" Id.encoding)
-                (req "peer_id" P2p_peer_id.encoding)))
-          (function
-            | Rejecting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
-          (fun (p, id_p, g) -> Rejecting_request (p, id_p, g));
-        case
-          (Tag 9)
-          ~title:"Request_rejected"
-          (branch_encoding
-             "request_rejected"
-             (obj2
-                (req "point" P2p_point.Id.encoding)
-                (opt "identity" (tup2 Id.encoding P2p_peer_id.encoding))))
-          (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
-          (fun (p, id) -> Request_rejected (p, id));
-        case
-          (Tag 10)
-          ~title:"Connection_established"
-          (branch_encoding
-             "connection_established"
-             (obj2
-                (req "id_point" Id.encoding)
-                (req "peer_id" P2p_peer_id.encoding)))
-          (function
-            | Connection_established (id_p, g) -> Some (id_p, g) | _ -> None)
-          (fun (id_p, g) -> Connection_established (id_p, g));
-        case
-          (Tag 11)
-          ~title:"Disconnection"
-          (branch_encoding
-             "disconnection"
-             (obj1 (req "peer_id" P2p_peer_id.encoding)))
-          (function Disconnection g -> Some g | _ -> None)
-          (fun g -> Disconnection g);
-        case
-          (Tag 12)
-          ~title:"External_disconnection"
-          (branch_encoding
-             "external_disconnection"
-             (obj1 (req "peer_id" P2p_peer_id.encoding)))
-          (function External_disconnection g -> Some g | _ -> None)
-          (fun g -> External_disconnection g);
-        case
-          (Tag 13)
-          ~title:"Gc_points"
-          (branch_encoding "gc_points" empty)
-          (function Gc_points -> Some () | _ -> None)
-          (fun () -> Gc_points);
-        case
-          (Tag 14)
-          ~title:"Gc_peer_ids"
-          (branch_encoding "gc_peer_ids" empty)
-          (function Gc_peer_ids -> Some () | _ -> None)
-          (fun () -> Gc_peer_ids);
-        case
-          (Tag 15)
-          ~title:"Swap_request_received"
-          (branch_encoding
-             "swap_request_received"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function
-            | Swap_request_received {source} -> Some source | _ -> None)
-          (fun source -> Swap_request_received {source});
-        case
-          (Tag 16)
-          ~title:"Swap_ack_received"
-          (branch_encoding
-             "swap_ack_received"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_ack_received {source} -> Some source | _ -> None)
-          (fun source -> Swap_ack_received {source});
-        case
-          (Tag 17)
-          ~title:"Swap_request_sent"
-          (branch_encoding
-             "swap_request_sent"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_request_sent {source} -> Some source | _ -> None)
-          (fun source -> Swap_request_sent {source});
-        case
-          (Tag 18)
-          ~title:"Swap_ack_sent"
-          (branch_encoding
-             "swap_ack_sent"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_ack_sent {source} -> Some source | _ -> None)
-          (fun source -> Swap_ack_sent {source});
-        case
-          (Tag 19)
-          ~title:"Swap_request_ignored"
-          (branch_encoding
-             "swap_request_ignored"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_request_ignored {source} -> Some source | _ -> None)
-          (fun source -> Swap_request_ignored {source});
-        case
-          (Tag 20)
-          ~title:"Swap_success"
-          (branch_encoding
-             "swap_success"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_success {source} -> Some source | _ -> None)
-          (fun source -> Swap_success {source});
-        case
-          (Tag 21)
-          ~title:"Swap_failure"
-          (branch_encoding
-             "swap_failure"
-             (obj1 (req "source" P2p_peer_id.encoding)))
-          (function Swap_failure {source} -> Some source | _ -> None)
-          (fun source -> Swap_failure {source}) ]
+    def
+      "p2p_connection.pool_event"
+      ~description:
+        "An event that may happen during maintenance of and other operations \
+         on the p2p connection pool. Typically, it includes connection \
+         errors, peer swaps, etc."
+    @@ union
+         ~tag_size:`Uint8
+         [ case
+             (Tag 0)
+             ~title:"Too_few_connections"
+             (branch_encoding "too_few_connections" empty)
+             (function Too_few_connections -> Some () | _ -> None)
+             (fun () -> Too_few_connections);
+           case
+             (Tag 1)
+             ~title:"Too_many_connections"
+             (branch_encoding "too_many_connections" empty)
+             (function Too_many_connections -> Some () | _ -> None)
+             (fun () -> Too_many_connections);
+           case
+             (Tag 2)
+             ~title:"New_point"
+             (branch_encoding
+                "new_point"
+                (obj1 (req "point" P2p_point.Id.encoding)))
+             (function New_point p -> Some p | _ -> None)
+             (fun p -> New_point p);
+           case
+             (Tag 3)
+             ~title:"New_peer"
+             (branch_encoding
+                "new_peer"
+                (obj1 (req "peer_id" P2p_peer_id.encoding)))
+             (function New_peer p -> Some p | _ -> None)
+             (fun p -> New_peer p);
+           case
+             (Tag 4)
+             ~title:"Incoming_connection"
+             (branch_encoding
+                "incoming_connection"
+                (obj1 (req "point" P2p_point.Id.encoding)))
+             (function Incoming_connection p -> Some p | _ -> None)
+             (fun p -> Incoming_connection p);
+           case
+             (Tag 5)
+             ~title:"Outgoing_connection"
+             (branch_encoding
+                "outgoing_connection"
+                (obj1 (req "point" P2p_point.Id.encoding)))
+             (function Outgoing_connection p -> Some p | _ -> None)
+             (fun p -> Outgoing_connection p);
+           case
+             (Tag 6)
+             ~title:"Authentication_failed"
+             (branch_encoding
+                "authentication_failed"
+                (obj1 (req "point" P2p_point.Id.encoding)))
+             (function Authentication_failed p -> Some p | _ -> None)
+             (fun p -> Authentication_failed p);
+           case
+             (Tag 7)
+             ~title:"Accepting_request"
+             (branch_encoding
+                "accepting_request"
+                (obj3
+                   (req "point" P2p_point.Id.encoding)
+                   (req "id_point" Id.encoding)
+                   (req "peer_id" P2p_peer_id.encoding)))
+             (function
+               | Accepting_request (p, id_p, g) ->
+                   Some (p, id_p, g)
+               | _ ->
+                   None)
+             (fun (p, id_p, g) -> Accepting_request (p, id_p, g));
+           case
+             (Tag 8)
+             ~title:"Rejecting_request"
+             (branch_encoding
+                "rejecting_request"
+                (obj3
+                   (req "point" P2p_point.Id.encoding)
+                   (req "id_point" Id.encoding)
+                   (req "peer_id" P2p_peer_id.encoding)))
+             (function
+               | Rejecting_request (p, id_p, g) ->
+                   Some (p, id_p, g)
+               | _ ->
+                   None)
+             (fun (p, id_p, g) -> Rejecting_request (p, id_p, g));
+           case
+             (Tag 9)
+             ~title:"Request_rejected"
+             (branch_encoding
+                "request_rejected"
+                (obj2
+                   (req "point" P2p_point.Id.encoding)
+                   (opt "identity" (tup2 Id.encoding P2p_peer_id.encoding))))
+             (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
+             (fun (p, id) -> Request_rejected (p, id));
+           case
+             (Tag 10)
+             ~title:"Connection_established"
+             (branch_encoding
+                "connection_established"
+                (obj2
+                   (req "id_point" Id.encoding)
+                   (req "peer_id" P2p_peer_id.encoding)))
+             (function
+               | Connection_established (id_p, g) -> Some (id_p, g) | _ -> None)
+             (fun (id_p, g) -> Connection_established (id_p, g));
+           case
+             (Tag 11)
+             ~title:"Disconnection"
+             (branch_encoding
+                "disconnection"
+                (obj1 (req "peer_id" P2p_peer_id.encoding)))
+             (function Disconnection g -> Some g | _ -> None)
+             (fun g -> Disconnection g);
+           case
+             (Tag 12)
+             ~title:"External_disconnection"
+             (branch_encoding
+                "external_disconnection"
+                (obj1 (req "peer_id" P2p_peer_id.encoding)))
+             (function External_disconnection g -> Some g | _ -> None)
+             (fun g -> External_disconnection g);
+           case
+             (Tag 13)
+             ~title:"Gc_points"
+             (branch_encoding "gc_points" empty)
+             (function Gc_points -> Some () | _ -> None)
+             (fun () -> Gc_points);
+           case
+             (Tag 14)
+             ~title:"Gc_peer_ids"
+             (branch_encoding "gc_peer_ids" empty)
+             (function Gc_peer_ids -> Some () | _ -> None)
+             (fun () -> Gc_peer_ids);
+           case
+             (Tag 15)
+             ~title:"Swap_request_received"
+             (branch_encoding
+                "swap_request_received"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function
+               | Swap_request_received {source} -> Some source | _ -> None)
+             (fun source -> Swap_request_received {source});
+           case
+             (Tag 16)
+             ~title:"Swap_ack_received"
+             (branch_encoding
+                "swap_ack_received"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Swap_ack_received {source} -> Some source | _ -> None)
+             (fun source -> Swap_ack_received {source});
+           case
+             (Tag 17)
+             ~title:"Swap_request_sent"
+             (branch_encoding
+                "swap_request_sent"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Swap_request_sent {source} -> Some source | _ -> None)
+             (fun source -> Swap_request_sent {source});
+           case
+             (Tag 18)
+             ~title:"Swap_ack_sent"
+             (branch_encoding
+                "swap_ack_sent"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Swap_ack_sent {source} -> Some source | _ -> None)
+             (fun source -> Swap_ack_sent {source});
+           case
+             (Tag 19)
+             ~title:"Swap_request_ignored"
+             (branch_encoding
+                "swap_request_ignored"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function
+               | Swap_request_ignored {source} -> Some source | _ -> None)
+             (fun source -> Swap_request_ignored {source});
+           case
+             (Tag 20)
+             ~title:"Swap_success"
+             (branch_encoding
+                "swap_success"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Swap_success {source} -> Some source | _ -> None)
+             (fun source -> Swap_success {source});
+           case
+             (Tag 21)
+             ~title:"Swap_failure"
+             (branch_encoding
+                "swap_failure"
+                (obj1 (req "source" P2p_peer_id.encoding)))
+             (function Swap_failure {source} -> Some source | _ -> None)
+             (fun source -> Swap_failure {source}) ]
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:Id.pp Id.encoding ;
+  Data_encoding.Registration.register ~pp:Pool_event.pp Pool_event.encoding

@@ -165,18 +165,13 @@ end
 let read_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state -> f state.chain_data_store state.data)
 
-let update_chain_data {chain_id; context_index; chain_data; _} f =
+let update_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state ->
       f state.chain_data_store state.data
       >>= fun (data, res) ->
       Lwt_utils.may data ~f:(fun data ->
           state.data <- data ;
-          Shared.use context_index (fun context_index ->
-              Context.set_head
-                context_index
-                chain_id
-                data.current_head.header.shell.context)
-          >>= fun () -> Lwt.return_unit)
+          Lwt.return_unit)
       >>= fun () -> Lwt.return res)
 
 (** The number of predecessors stored per block.
@@ -329,7 +324,7 @@ module Locked_block = struct
         context;
       }
     in
-    let header : Block_header.t = {shell; protocol_data = MBytes.create 0} in
+    let header : Block_header.t = {shell; protocol_data = Bytes.create 0} in
     Store.Block.Contents.store
       (store, genesis.block)
       {
@@ -337,7 +332,7 @@ module Locked_block = struct
         Store.Block.message = Some "Genesis";
         max_operations_ttl = 0;
         context;
-        metadata = MBytes.create 0;
+        metadata = Bytes.create 0;
         last_allowed_fork_level = 0l;
       }
     >>= fun () -> Lwt.return header
@@ -655,19 +650,18 @@ module Chain = struct
     Chain_id.Table.add data.chains chain_id chain ;
     Lwt.return chain
 
-  let create state ?allow_forked_chain genesis chain_id =
+  let create state ?allow_forked_chain ~commit_genesis genesis chain_id =
     Shared.use state.global_data (fun data ->
         let chain_store = Store.Chain.get data.global_store chain_id in
         let block_store = Store.Block.get chain_store in
         if Chain_id.Table.mem data.chains chain_id then
           Pervasives.failwith "State.Chain.create"
         else
-          Context.commit_genesis
-            data.context_index
+          commit_genesis
             ~chain_id
             ~time:genesis.time
             ~protocol:genesis.protocol
-          >>= fun commit ->
+          >>=? fun commit ->
           Locked_block.store_genesis block_store genesis commit
           >>= fun genesis_header ->
           locked_create
@@ -683,7 +677,7 @@ module Chain = struct
           Store.Forking_block_hash.remove
             data.global_store
             (Context.compute_testchain_chain_id genesis.block)
-          >>= fun () -> Lwt.return chain)
+          >>= fun () -> return chain)
 
   let locked_read global_state data chain_id =
     let chain_store = Store.Chain.get data.global_store chain_id in
@@ -745,6 +739,11 @@ module Chain = struct
   let get_exn state id =
     Shared.use state.global_data (fun data ->
         Lwt.return (Chain_id.Table.find data.chains id))
+
+  let get_opt state id =
+    Lwt.catch
+      (fun () -> get_exn state id >>= Lwt.return_some)
+      (function _ -> Lwt.return_none)
 
   let get state id =
     Lwt.catch
@@ -1000,13 +999,6 @@ module Block = struct
 
   type block = t
 
-  type validation_store = {
-    context_hash : Context_hash.t;
-    message : string option;
-    max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
-  }
-
   module Header = Header
 
   let compare b1 b2 = Block_hash.compare b1.hash b2.hash
@@ -1139,8 +1131,8 @@ module Block = struct
 
   let store ?(dont_enforce_context_hash = false) chain_state block_header
       block_header_metadata operations operations_metadata
-      {context_hash; message; max_operations_ttl; last_allowed_fork_level}
-      ~forking_testchain =
+      ({context_hash; message; max_operations_ttl; last_allowed_fork_level} :
+        Block_validation.validation_store) ~forking_testchain =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     fail_unless
@@ -1253,6 +1245,36 @@ module Block = struct
           Lwt_watcher.notify chain_state.global_state.block_watcher block ;
           return_some block)
 
+  let remove block =
+    let hash = block.hash in
+    let header = block.header in
+    protect (fun () ->
+        Shared.use block.chain_state.block_store (fun store ->
+            Store.Block.Contents.remove (store, hash)
+            >>= fun () ->
+            Store.Block.Operations.remove_all (store, hash)
+            >>= fun () ->
+            Store.Block.Operations_metadata.remove_all (store, hash)
+            >>= fun () ->
+            Store.Block.Operation_hashes.remove_all (store, hash)
+            >>= fun () ->
+            Shared.use block.chain_state.chain_data (fun chain_data ->
+                let store = chain_data.chain_data_store in
+                let predecessor = header.shell.predecessor in
+                Store.Chain_data.Known_heads.remove store hash
+                >>= fun () ->
+                Store.Chain_data.Known_heads.store store predecessor
+                >>= fun () ->
+                Store.Chain_data.In_main_branch.remove (store, hash)
+                >>= fun () ->
+                Store.Chain_data.Current_head.read_opt store
+                >>= function
+                | Some block_hash when block_hash = hash ->
+                    Store.Chain_data.Current_head.store store predecessor
+                | Some _ | None ->
+                    Lwt.return_unit)
+            >>= fun () -> return_unit))
+
   let store_invalid chain_state block_header errors =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
@@ -1337,7 +1359,7 @@ module Block = struct
             >|= Option.unopt_assert ~loc:__POS__)
           (0 -- (header.shell.validation_passes - 1)))
 
-  let context {chain_state; hash; _} =
+  let context_exn {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
         Store.Block.Contents.read_opt (block_store, hash))
     >|= Option.unopt_assert ~loc:__POS__
@@ -1345,13 +1367,43 @@ module Block = struct
     Shared.use chain_state.context_index (fun context_index ->
         Context.checkout_exn context_index commit)
 
+  let context_opt {chain_state; hash; _} =
+    Shared.use chain_state.block_store (fun block_store ->
+        Store.Block.Contents.read_opt (block_store, hash))
+    >|= Option.unopt_assert ~loc:__POS__
+    >>= fun {context = commit; _} ->
+    Shared.use chain_state.context_index (fun context_index ->
+        Context.checkout context_index commit)
+
+  let context block =
+    context_opt block
+    >>= function
+    | Some context ->
+        return context
+    | None ->
+        failwith
+          "State.Block.context failed to checkout context for block %a"
+          Block_hash.pp
+          block.hash
+
+  let context_exists {chain_state; hash; _} =
+    Shared.use chain_state.block_store (fun block_store ->
+        Store.Block.Contents.read_opt (block_store, hash))
+    >|= Option.unopt_assert ~loc:__POS__
+    >>= fun {context = commit; _} ->
+    Shared.use chain_state.context_index (fun context_index ->
+        Context.exists context_index commit)
+
   let protocol_hash block =
-    context block >>= fun context -> Context.get_protocol context
+    context block >>=? fun context -> Context.get_protocol context >>= return
+
+  let protocol_hash_exn block =
+    context_exn block >>= fun context -> Context.get_protocol context
 
   let protocol_level block = block.header.shell.proto_level
 
   let test_chain block =
-    context block
+    context_exn block
     >>= fun context ->
     Context.get_test_chain context
     >>= fun status ->
@@ -1428,7 +1480,7 @@ module Block = struct
         >>= fun (save_point_level, _) ->
         ( if Compare.Int32.(level pred < save_point_level) then
           Chain.get_level_indexed_protocol chain_state pred.header
-        else protocol_hash pred )
+        else protocol_hash_exn pred )
         >>= fun protocol ->
         match
           Protocol_hash.Table.find_opt
@@ -1438,7 +1490,7 @@ module Block = struct
         | None ->
             Lwt.return_none
         | Some map ->
-            protocol_hash block
+            protocol_hash_exn block
             >>= fun next_protocol ->
             Lwt.return (Protocol_hash.Map.find_opt next_protocol map) )
 
@@ -1446,13 +1498,13 @@ module Block = struct
     read_opt chain_state block.header.shell.predecessor
     >|= Option.unopt_assert ~loc:__POS__
     >>= fun pred ->
-    protocol_hash block
+    protocol_hash_exn block
     >>= fun next_protocol ->
     Chain.save_point chain_state
     >>= fun (save_point_level, _) ->
     ( if Compare.Int32.(level pred < save_point_level) then
       Chain.get_level_indexed_protocol chain_state (header pred)
-    else protocol_hash pred )
+    else protocol_hash_exn pred )
     >>= fun protocol ->
     let map =
       Option.unopt
@@ -1553,7 +1605,7 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol
           Store.Block.message = Some "Genesis";
           max_operations_ttl = 0;
           context = genesis_header.shell.context;
-          metadata = MBytes.create 0;
+          metadata = Bytes.create 0;
           last_allowed_fork_level = 0l;
         }
       >>= fun () ->
@@ -1704,13 +1756,18 @@ module Current_mempool = struct
         Lwt.return (Block.header data.current_head, data.current_mempool))
 end
 
-let may_create_chain state chain_id genesis =
+let may_create_chain ~commit_genesis state chain_id genesis =
   Chain.get state chain_id
   >>= function
   | Ok chain ->
-      Lwt.return chain
+      return chain
   | Error _ ->
-      Chain.create ~allow_forked_chain:true state genesis chain_id
+      Chain.create
+        ~commit_genesis
+        ~allow_forked_chain:true
+        state
+        genesis
+        chain_id
 
 let read global_store context_index main_chain =
   let global_data =
@@ -1758,18 +1815,37 @@ let () =
     (fun (previous_mode, next_mode) ->
       Incorrect_history_mode_switch {previous_mode; next_mode})
 
-let init ?patch_context ?(store_mapsize = 40_960_000_000L)
+let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
     ?(context_mapsize = 409_600_000_000L) ~store_root ~context_root
     ?history_mode genesis =
   Store.init ~mapsize:store_mapsize store_root
   >>=? fun global_store ->
-  Context.init ~mapsize:context_mapsize ?patch_context context_root
-  >>= fun context_index ->
+  ( match commit_genesis with
+  | Some commit_genesis ->
+      Context.init
+        ~readonly:true
+        ~mapsize:context_mapsize
+        ?patch_context
+        context_root
+      >>= fun context_index -> Lwt.return (context_index, commit_genesis)
+  | None ->
+      Context.init
+        ~readonly:false
+        ~mapsize:context_mapsize
+        ?patch_context
+        context_root
+      >>= fun context_index ->
+      let commit_genesis ~chain_id ~time ~protocol =
+        Context.commit_genesis context_index ~chain_id ~time ~protocol
+        >>= fun res -> return res
+      in
+      Lwt.return (context_index, commit_genesis) )
+  >>= fun (context_index, commit_genesis) ->
   let chain_id = Chain_id.of_block_hash genesis.Chain.block in
   read global_store context_index chain_id
   >>=? fun state ->
-  may_create_chain state chain_id genesis
-  >>= fun main_chain_state ->
+  may_create_chain ~commit_genesis state chain_id genesis
+  >>=? fun main_chain_state ->
   Store.Configuration.History_mode.read_opt global_store
   >>= (function
         | None ->
@@ -1800,115 +1876,3 @@ let history_mode {global_data; _} =
 let close {global_data; _} =
   Shared.use global_data (fun {global_store; _} ->
       Store.close global_store ; Lwt.return_unit)
-
-let populate_protocol_hash_table_one context_index chain_store
-    (block_contents : Store.Block.contents) =
-  Context.checkout_exn context_index block_contents.header.shell.context
-  >>= fun context ->
-  Context.get_protocol context
-  >>= fun protocol_hash ->
-  Store.Chain.Protocol_info.store
-    chain_store
-    block_contents.header.shell.proto_level
-    (protocol_hash, block_contents.header.shell.level)
-  >>= fun () -> return_unit
-
-(* we are looking for the last block with the current_protocol_level
-   in a dichotomic way *)
-let populate_protocol_hash_table context_index chain_store block_store hash
-    current_protocol_level =
-  let rec aux ~anchor_hash ~current_protocol_level ~l ~r =
-    let pivot = (l - r) / 2 in
-    predecessor_n_raw block_store anchor_hash pivot
-    >>= function
-    | None ->
-        return_unit
-    | Some new_anchor_hash ->
-        Store.Block.Contents.read (block_store, new_anchor_hash)
-        >>=? fun new_block_contents ->
-        let new_block_header = new_block_contents.header in
-        let new_block_protocol_level = new_block_header.shell.proto_level in
-        let new_block_level = Int32.to_int new_block_header.shell.level in
-        if pivot = 0 then
-          populate_protocol_hash_table_one
-            context_index
-            chain_store
-            new_block_contents
-          >>=? fun () ->
-          if current_protocol_level = 0 then return_unit
-          else
-            aux
-              ~anchor_hash:new_anchor_hash
-              ~current_protocol_level:(pred current_protocol_level)
-              ~l:(new_block_level + 1)
-              ~r:0
-        else if new_block_protocol_level <> current_protocol_level then
-          (* we have been too far, we must decrease the pivot by increasing r *)
-          aux ~anchor_hash ~current_protocol_level ~l ~r:(r + pivot)
-        else
-          (* not far enought *)
-          aux
-            ~anchor_hash:new_anchor_hash
-            ~current_protocol_level
-            ~l:(new_block_level + 1)
-            ~r
-  in
-  Store.Block.Contents.read (block_store, hash)
-  >>=? fun block_contents ->
-  let block_level = Int32.to_int block_contents.header.shell.level in
-  aux ~anchor_hash:hash ~current_protocol_level ~l:(block_level + 1) ~r:0
-
-let upgrade_0_0_1 ?(store_mapsize = 4_096_000_000_000L) ~store_root
-    ?(context_mapsize = 409_600_000_000L) ~context_root ~protocol_root:_ () =
-  Store.init ~mapsize:store_mapsize store_root
-  >>=? fun global_store ->
-  Context.init ~mapsize:context_mapsize context_root
-  >>= fun context_index ->
-  Store.Chain.list global_store
-  >>= fun chains ->
-  iter_s
-    (fun chain_id ->
-      Format.printf "Upgrading chain %a@." Chain_id.pp chain_id ;
-      let chain_store = Store.Chain.get global_store chain_id in
-      let block_store = Store.Block.get chain_store in
-      let chain_data_store = Store.Chain_data.get chain_store in
-      Format.printf "Upgrading checkpoint format..." ;
-      Store.Chain_data.Checkpoint_0_0_1.read chain_data_store
-      >>=? fun (_, checkpoint_0_0_1_hash) ->
-      Store.Chain_data.Checkpoint_0_0_1.remove chain_data_store
-      >>= fun () ->
-      Store.Block.Contents.read (block_store, checkpoint_0_0_1_hash)
-      >>=? fun {header; _} ->
-      Store.Chain_data.Checkpoint.store chain_data_store header
-      >>= fun () ->
-      Format.printf " Done !@." ;
-      Format.printf "Storing protocol table..." ;
-      Store.Chain_data.Current_head.read chain_data_store
-      >>=? fun current_head ->
-      Store.Block.Contents.read (block_store, current_head)
-      >>=? fun head_contents ->
-      let protocol_level =
-        head_contents.header.Block_header.shell.proto_level
-      in
-      populate_protocol_hash_table
-        context_index
-        chain_store
-        block_store
-        head_contents.header.shell.predecessor
-        protocol_level
-      >>=? fun () ->
-      Format.printf " Done !@." ;
-      Format.printf
-        "Initializing history mode to: %a@."
-        History_mode.pp
-        History_mode.Archive ;
-      Store.Configuration.History_mode.store global_store History_mode.Archive
-      >>= fun () ->
-      Store.Chain.Genesis_hash.read chain_store
-      >>=? fun genesis_hash ->
-      Store.Chain_data.Save_point.store chain_data_store (0l, genesis_hash)
-      >>= fun () ->
-      Store.Chain_data.Caboose.store chain_data_store (0l, genesis_hash)
-      >>= fun () -> return_unit)
-    chains
-  >>=? fun () -> return_unit

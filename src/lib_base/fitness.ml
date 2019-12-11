@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = MBytes.t list
+type t = Bytes.t list
 
 include Compare.Make (struct
   type nonrec t = t
@@ -32,15 +32,15 @@ include Compare.Make (struct
        - shortest lists are smaller ;
        - lexicographical order for lists of the same length. *)
   let compare_bytes b1 b2 =
-    let len1 = MBytes.length b1 in
-    let len2 = MBytes.length b2 in
+    let len1 = Bytes.length b1 in
+    let len2 = Bytes.length b2 in
     let c = compare len1 len2 in
     if c <> 0 then c
     else
       let rec compare_byte b1 b2 pos len =
         if pos = len then 0
         else
-          let c = compare (MBytes.get_char b1 pos) (MBytes.get_char b2 pos) in
+          let c = compare (Bytes.get b1 pos) (Bytes.get b2 pos) in
           if c <> 0 then c else compare_byte b1 b2 (pos + 1) len
       in
       compare_byte b1 b2 0 len1
@@ -64,9 +64,9 @@ let rec pp fmt = function
   | [] ->
       ()
   | [f] ->
-      Format.fprintf fmt "%a" Hex.pp (MBytes.to_hex f)
+      Format.fprintf fmt "%a" Hex.pp (Hex.of_bytes f)
   | f1 :: f ->
-      Format.fprintf fmt "%a::%a" Hex.pp (MBytes.to_hex f1) pp f
+      Format.fprintf fmt "%a::%a" Hex.pp (Hex.of_bytes f1) pp f
 
 let encoding =
   let open Data_encoding in

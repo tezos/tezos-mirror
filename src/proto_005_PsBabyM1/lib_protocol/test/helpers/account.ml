@@ -36,6 +36,7 @@ type account = t
 let known_accounts = Signature.Public_key_hash.Table.create 17
 
 let new_account ?seed () =
+  let seed = Option.map ~f:Bigstring.of_bytes seed in
   let (pkh, pk, sk) = Signature.generate_key ?seed () in
   let account = {pkh; pk; sk} in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
@@ -87,6 +88,7 @@ let commitment_secret =
     "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"
 
 let new_commitment ?seed () =
+  let seed = Option.map ~f:Bigstring.of_bytes seed in
   let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
   let unactivated_account = {pkh; pk; sk} in
   let open Commitment_repr in

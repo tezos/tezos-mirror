@@ -29,12 +29,17 @@ type mempool = t
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {known_valid; pending} -> (known_valid, pending))
-    (fun (known_valid, pending) -> {known_valid; pending})
-    (obj2
-       (req "known_valid" (list Operation_hash.encoding))
-       (req "pending" (dynamic_size Operation_hash.Set.encoding)))
+  def
+    "mempool"
+    ~description:
+      "A batch of operation. This format is used to gossip operations between \
+       peers."
+  @@ conv
+       (fun {known_valid; pending} -> (known_valid, pending))
+       (fun (known_valid, pending) -> {known_valid; pending})
+       (obj2
+          (req "known_valid" (list Operation_hash.encoding))
+          (req "pending" (dynamic_size Operation_hash.Set.encoding)))
 
 let bounded_encoding ?max_operations () =
   match max_operations with
@@ -46,3 +51,5 @@ let bounded_encoding ?max_operations () =
         encoding
 
 let empty = {known_valid = []; pending = Operation_hash.Set.empty}
+
+let () = Data_encoding.Registration.register encoding

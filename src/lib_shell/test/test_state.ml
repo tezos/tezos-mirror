@@ -62,7 +62,7 @@ let incr_timestamp timestamp =
 
 let operation op =
   let op : Operation.t =
-    {shell = {branch = genesis_block}; proto = MBytes.of_string op}
+    {shell = {branch = genesis_block}; proto = Bytes.of_string op}
   in
   (Operation.hash op, op, Data_encoding.Binary.to_bytes Operation.encoding op)
 
@@ -103,12 +103,12 @@ let parsed_block ({shell; protocol_data} : Block_header.t) =
   in
   ({shell; protocol_data} : Proto.block_header)
 
-let zero = MBytes.create 0
+let zero = Bytes.create 0
 
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
-      State.Block.context pred
+      State.Block.context_exn pred
       >>= fun predecessor_context ->
       let max_trials = 100 in
       let rec attempt trials context =
@@ -133,12 +133,13 @@ let build_valid_chain state vtbl pred names =
          Context.commit ~time:block.shell.timestamp context
          >>= fun context_hash ->
          let validation_store =
-           {
-             State.Block.context_hash;
-             message = result.message;
-             max_operations_ttl = 1;
-             last_allowed_fork_level = result.last_allowed_fork_level;
-           }
+           ( {
+               context_hash;
+               message = result.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level = result.last_allowed_fork_level;
+             }
+             : Block_validation.validation_store )
          in
          State.Block.store
            state
@@ -146,7 +147,14 @@ let build_valid_chain state vtbl pred names =
            zero
            [[op]]
            [[zero]]
-           validation_store
+           ( {
+               context_hash;
+               message = validation_store.message;
+               max_operations_ttl = 1;
+               last_allowed_fork_level =
+                 validation_store.last_allowed_fork_level;
+             }
+             : Block_validation.validation_store )
            ~forking_testchain:false
          >>=? fun _vblock ->
          State.Block.read state hash

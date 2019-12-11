@@ -23,6 +23,7 @@
 (*****************************************************************************)
 
 open Memory
+open Error_monad
 
 type Error_monad.error += Unix_system_info_failure of string
 
@@ -100,7 +101,7 @@ let linux_statm pid =
           Lwt_io.with_file ~mode:Input fname (fun ic ->
               Lwt_io.read_line ic
               >>= fun line ->
-              match List.map Int64.of_string @@ String.split ' ' line with
+              match List.map Int64.of_string @@ TzString.split ' ' line with
               | size :: resident :: shared :: text :: lib :: data :: dt :: _
                 -> (
                   page_size ()
@@ -152,7 +153,7 @@ let darwin_ps pid =
                   Lwt.return_error
                     (error_info "ps" "Unexpected ps answer (2nd line)")
               | Some ps_stats -> (
-                match String.split ' ' ps_stats with
+                match TzString.split ' ' ps_stats with
                 | _pid :: mem :: resident :: _ -> (
                     page_size ()
                     >>= function

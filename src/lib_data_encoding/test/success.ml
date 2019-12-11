@@ -34,7 +34,6 @@
 open Data_encoding
 open Helpers
 open Types
-open Utils.Infix
 
 let json ty encoding value () =
   no_exception (fun () ->
@@ -57,14 +56,13 @@ let binary ty encoding value () =
 let stream ty encoding value () =
   no_exception (fun () ->
       let bytes = Binary.to_bytes_exn encoding value in
-      let len_data = MBytes.length bytes in
+      let len_data = Bytes.length bytes in
       for sz = 1 to max 1 len_data do
         let name = Format.asprintf "stream (%d)" sz in
         match chunked_read sz encoding bytes with
         | Binary.Success {result; size; stream} ->
             if
-              size <> MBytes.length bytes
-              || not (Binary_stream.is_empty stream)
+              size <> Bytes.length bytes || not (Binary_stream.is_empty stream)
             then Alcotest.failf "%s failed: remaining data" name ;
             Alcotest.check ty name value result
         | Binary.Await _ ->
@@ -138,7 +136,9 @@ let test_z_sequence () =
   done
 
 let test_string_enum_boundary () =
-  let entries = List.rev_map (fun x -> (string_of_int x, x)) (0 -- 254) in
+  let entries =
+    List.rev_map (fun x -> (string_of_int x, x)) (List.init 255 (fun i -> i))
+  in
   let run_test cases =
     List.iter
       (fun (_, num) ->
@@ -186,23 +186,19 @@ let tests =
   @ all "string.variable" Alcotest.string Variable.string "tutu"
   @ all "string.bounded1" Alcotest.string (Bounded.string 4) "tu"
   @ all "string.bounded2" Alcotest.string (Bounded.string 4) "tutu"
-  @ all "bytes" Alcotest.bytes bytes (MBytes.of_string "titi")
-  @ all "bytes.fixed" Alcotest.bytes (Fixed.bytes 4) (MBytes.of_string "titi")
-  @ all
-      "bytes.variable"
-      Alcotest.bytes
-      Variable.bytes
-      (MBytes.of_string "titi")
+  @ all "bytes" Alcotest.bytes bytes (Bytes.of_string "titi")
+  @ all "bytes.fixed" Alcotest.bytes (Fixed.bytes 4) (Bytes.of_string "titi")
+  @ all "bytes.variable" Alcotest.bytes Variable.bytes (Bytes.of_string "titi")
   @ all
       "bytes.bounded1"
       Alcotest.bytes
       (Bounded.bytes 4)
-      (MBytes.of_string "tu")
+      (Bytes.of_string "tu")
   @ all
       "bytes.bounded2"
       Alcotest.bytes
       (Bounded.bytes 4)
-      (MBytes.of_string "tutu")
+      (Bytes.of_string "tutu")
   @ all "float" Alcotest.float float 42.
   @ all "float.max" Alcotest.float float max_float
   @ all "float.min" Alcotest.float float min_float

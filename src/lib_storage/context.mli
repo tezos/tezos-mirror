@@ -60,7 +60,7 @@ val commit_test_chain_genesis :
 (** [key] indicates a path in a context. *)
 type key = string list
 
-type value = MBytes.t
+type value = bytes
 
 val mem : context -> key -> bool Lwt.t
 
@@ -94,7 +94,7 @@ val checkout : index -> Context_hash.t -> context option Lwt.t
 
 val checkout_exn : index -> Context_hash.t -> context Lwt.t
 
-val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t
+val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
 
 val commit :
   time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
@@ -210,3 +210,5 @@ val validate_context_hash_consistency_and_commit :
   parents:Context_hash.t list ->
   index:index ->
   bool Lwt.t
+
+val upgrade_0_0_3 : context_dir:string -> unit tzresult Lwt.t

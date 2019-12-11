@@ -23,26 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* When we (or the CI) run "git archive", git substitutes the dollar-format part
+   because this file is marked as "export-subst" in ".gitattributes".
+
+   To know whether we are in a Git repository or in an archive, we check whether
+   the string was substituted. Thanks to this, we know whether we should get the
+   hash from Generated_git_info (not available in archives) or not. *)
+
 let raw_commit_hash = "$Format:%H$"
 
 let commit_hash =
-  if
-    String.equal
-      raw_commit_hash
-      ("$Format:" ^ "%H$" (*trick to avoid git-subst*))
-  then Generated_git_info.commit_hash
+  if String.equal raw_commit_hash ("$Format" ^ ":%H$") then
+    Generated_git_info.commit_hash
   else raw_commit_hash
 
-let raw_abbreviated_commit_hash = "$Format:%h$"
-
 let abbreviated_commit_hash =
-  if String.equal raw_abbreviated_commit_hash ("$Format:" ^ "%h$") then
-    Generated_git_info.abbreviated_commit_hash
-  else raw_abbreviated_commit_hash
+  if String.length commit_hash >= 8 then String.sub commit_hash 0 8
+  else commit_hash
 
 let raw_committer_date = "$Format:%ci$"
 
 let committer_date =
-  if String.equal raw_committer_date ("$Format:" ^ "%ci$") then
+  if String.equal raw_committer_date ("$Format" ^ ":%ci$") then
     Generated_git_info.committer_date
   else raw_committer_date

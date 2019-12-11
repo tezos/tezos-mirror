@@ -57,11 +57,11 @@ let short_string1 =
           Bytes.set s 3 c4 ;
           Bytes.to_string s) ]
 
-let mbytes = Crowbar.map [Crowbar.bytes] MBytes.of_string
+let mbytes = Crowbar.map [Crowbar.bytes] Bytes.of_string
 
-let short_mbytes = Crowbar.map [short_string] MBytes.of_string
+let short_mbytes = Crowbar.map [short_string] Bytes.of_string
 
-let short_mbytes1 = Crowbar.map [short_string1] MBytes.of_string
+let short_mbytes1 = Crowbar.map [short_string1] Bytes.of_string
 
 (* We need to hide the type parameter of `Encoding.t` to avoid the generator
  * combinator `choose` from complaining about different types. We use first
@@ -259,21 +259,21 @@ let map_string s : testable =
 
 let map_bytes s : testable =
   ( module struct
-    type t = MBytes.t
+    type t = Bytes.t
 
     let v = s
 
     let ding = Data_encoding.bytes
 
     let pp ppf m =
-      if MBytes.length m > 40 then
+      if Bytes.length m > 40 then
         Crowbar.pp
           ppf
           "@[<hv 1>%a … (%d more bytes)@]"
-          MBytes.pp_hex
-          (MBytes.sub m 1 30)
-          (MBytes.length m)
-      else MBytes.pp_hex ppf m
+          Hex.pp
+          (Hex.of_bytes (Bytes.sub m 1 30))
+          (Bytes.length m)
+      else Hex.pp ppf (Hex.of_bytes m)
   end )
 
 let map_float f : testable =
@@ -300,13 +300,13 @@ let map_fixed_string s : testable =
 
 let map_fixed_bytes s : testable =
   ( module struct
-    type t = MBytes.t
+    type t = Bytes.t
 
     let v = s
 
-    let ding = Data_encoding.Fixed.bytes (MBytes.length s)
+    let ding = Data_encoding.Fixed.bytes (Bytes.length s)
 
-    let pp = MBytes.pp_hex
+    let pp fmt x = Hex.pp fmt (Hex.of_bytes x)
   end )
 
 let map_variable_string s : testable =
@@ -322,13 +322,13 @@ let map_variable_string s : testable =
 
 let map_variable_bytes s : testable =
   ( module struct
-    type t = MBytes.t
+    type t = Bytes.t
 
     let v = s
 
     let ding = Data_encoding.Variable.bytes
 
-    let pp = MBytes.pp_hex
+    let pp fmt x = Hex.pp fmt (Hex.of_bytes x)
   end )
 
 (* And now combinators *)

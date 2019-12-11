@@ -116,7 +116,8 @@ module type LOGGER = sig
 
   type status =
     | WorkerEvent of Event.t
-    | Request of Request.view
+    | Request of
+        (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list

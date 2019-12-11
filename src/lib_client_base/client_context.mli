@@ -43,7 +43,7 @@ class type prompter =
   object
     method prompt : ('a, string tzresult) lwt_format -> 'a
 
-    method prompt_password : ('a, MBytes.t tzresult) lwt_format -> 'a
+    method prompt_password : ('a, Bigstring.t tzresult) lwt_format -> 'a
   end
 
 class type io =
@@ -125,3 +125,5 @@ class type full =
 class simple_printer : (string -> string -> unit Lwt.t) -> printer
 
 class proxy_context : full -> full
+
+val null_printer : printer

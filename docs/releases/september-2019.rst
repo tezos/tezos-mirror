@@ -24,7 +24,7 @@ Changelog
 ---------
 
 Changes introduced by Babylon (including RPC calls) can be found in
-`the protocol documentation <../protocols/005_babylon.rst>`_.
+:ref:`the protocol documentation <005_babylon>`.
 
 Shell
 ~~~~~

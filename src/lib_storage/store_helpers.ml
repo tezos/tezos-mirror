@@ -42,11 +42,11 @@ module Make_value (V : ENCODED_VALUE) = struct
         "Exception while serializing value %a"
         Data_encoding.Binary.pp_write_error
         error ;
-      MBytes.create 0
+      Bytes.create 0
 end
 
 module Raw_value = struct
-  type t = MBytes.t
+  type t = Bytes.t
 
   let of_bytes b = ok b
 
@@ -76,7 +76,7 @@ module Make_substore (S : STORE) (N : NAME) : STORE with type t = S.t = struct
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   let name_length = List.length N.name
 
@@ -117,7 +117,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
 
     type key = string list
 
-    type value = MBytes.t
+    type value = Bytes.t
 
     let to_key i k =
       assert (List.length (I.to_path i []) = I.path_length) ;
@@ -225,7 +225,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
 
     type elt = I.t
 
-    let inited = MBytes.of_string "inited"
+    let inited = Bytes.of_string "inited"
 
     let known s i = Store.known (s, i) N.name
 
@@ -329,7 +329,7 @@ module Make_set (S : STORE) (I : INDEX) = struct
 
   type elt = I.t
 
-  let inited = MBytes.of_string "inited"
+  let inited = Bytes.of_string "inited"
 
   let known s i = S.known s (I.to_path i [])
 

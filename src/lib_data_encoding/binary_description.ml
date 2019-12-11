@@ -264,13 +264,15 @@ let describe (type x) (encoding : x Encoding.t) =
       string * references =
    fun ref_name recursives references kind size cases ->
     let cases =
-      List.sort (fun (t1, _) (t2, _) -> Compare.Int.compare t1 t2)
-      @@ TzList.filter_map
-           (function
+      List.sort (fun (t1, _) (t2, _) -> (compare : int -> int -> int) t1 t2)
+      @@ List.fold_left
+           (fun acc case ->
+             match case with
              | Case {tag = Json_only; _} ->
-                 None
-             | Case {tag = Tag tag; _} as case ->
-                 Some (tag, case))
+                 acc
+             | Case {tag = Tag tag; _} ->
+                 (tag, case) :: acc)
+           []
            cases
     in
     let tag_field =
@@ -325,7 +327,7 @@ let describe (type x) (encoding : x Encoding.t) =
         ~maximum:(Array.length encoding_array),
       List.map
         (fun i -> (i, fst @@ Hashtbl.find tbl encoding_array.(i)))
-        Utils.Infix.(0 -- (Array.length encoding_array - 1)) )
+        (List.init (Array.length encoding_array) (fun i -> i)) )
   and fields :
       type b.
       string option ->
@@ -410,7 +412,7 @@ let describe (type x) (encoding : x Encoding.t) =
         ([Anonymous_field (kind, Ref name)], references)
     | Mu {kind; name; title; description; fix} as encoding ->
         let kind = (kind :> Kind.t) in
-        let title = Option.unopt ~default:name title in
+        let title = match title with Some title -> title | None -> name in
         if List.mem name recursives then
           ([Anonymous_field (kind, Ref name)], references)
         else
@@ -591,7 +593,7 @@ let describe (type x) (encoding : x Encoding.t) =
         in
         (Ref name, references)
     | Mu {name; title; description; fix; _} as encoding ->
-        let title = Option.unopt ~default:name title in
+        let title = match title with Some title -> title | None -> name in
         if List.mem name recursives then (Ref name, references)
         else
           let {encoding; _} = fix {encoding; json_encoding = None} in

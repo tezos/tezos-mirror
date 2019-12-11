@@ -60,10 +60,12 @@ let timespan_tag = Tag.def ~doc:"Timespan in seconds" "timespan" Ptime.Span.pp
 let filename_tag = Tag.def ~doc:"Filename" "filename" Format.pp_print_text
 
 let signed_header_tag =
-  Tag.def ~doc:"Signed header" "signed_header" MBytes.pp_hex
+  Tag.def ~doc:"Signed header" "signed_header" (fun fmt x ->
+      Hex.pp fmt (Hex.of_bytes x))
 
 let signed_operation_tag =
-  Tag.def ~doc:"Signed operation" "signed_operation" MBytes.pp_hex
+  Tag.def ~doc:"Signed operation" "signed_operation" (fun fmt x ->
+      Hex.pp fmt (Hex.of_bytes x))
 
 let operations_tag =
   Tag.def

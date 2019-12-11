@@ -85,7 +85,11 @@ module Protocol = struct
 
   let encoding =
     let open Data_encoding in
-    def "timestamp"
+    def
+      "timestamp.protocol"
+      ~description:
+        "A timestamp as seen by the protocol: second-level precision, epoch \
+         based."
     @@ splitted
          ~binary:int64
          ~json:
@@ -146,15 +150,18 @@ module System = struct
 
     let encoding =
       let open Data_encoding in
-      conv
-        Ptime.Span.to_float_s
-        (fun f ->
-          match Ptime.Span.of_float_s f with
-          | None ->
-              invalid_arg "Time.System.Span.encoding"
-          | Some s ->
-              s)
-        float
+      def
+        "timespan.system"
+        ~description:"A span of time, as seen by the local computer."
+      @@ conv
+           Ptime.Span.to_float_s
+           (fun f ->
+             match Ptime.Span.of_float_s f with
+             | None ->
+                 invalid_arg "Time.System.Span.encoding"
+             | Some s ->
+                 s)
+           float
 
     let rpc_arg =
       RPC_arg.make
@@ -241,7 +248,12 @@ module System = struct
             (fun _ -> None)
             (fun i -> of_seconds_exn i) ]
     in
-    def "timestamp" @@ splitted ~binary ~json
+    def
+      "timestamp.system"
+      ~description:
+        "A timestamp as seen by the underlying, local computer: \
+         subsecond-level precision, epoch or rfc3339 based."
+    @@ splitted ~binary ~json
 
   let rpc_arg =
     RPC_arg.make
@@ -299,3 +311,8 @@ module System = struct
     let hash = hash
   end)
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:Protocol.pp_hum Protocol.encoding ;
+  Data_encoding.Registration.register ~pp:System.pp_hum System.encoding ;
+  Data_encoding.Registration.register System.Span.encoding

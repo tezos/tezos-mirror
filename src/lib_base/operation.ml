@@ -27,12 +27,13 @@ type shell_header = {branch : Block_hash.t}
 
 let shell_header_encoding =
   let open Data_encoding in
-  conv
-    (fun {branch} -> branch)
-    (fun branch -> {branch})
-    (obj1 (req "branch" Block_hash.encoding))
+  def "operation.shell_header" ~description:"An operation's shell header."
+  @@ conv
+       (fun {branch} -> branch)
+       (fun branch -> {branch})
+       (obj1 (req "branch" Block_hash.encoding))
 
-type t = {shell : shell_header; proto : MBytes.t}
+type t = {shell : shell_header; proto : Bytes.t}
 
 include Compare.Make (struct
   type nonrec t = t
@@ -40,15 +41,21 @@ include Compare.Make (struct
   let compare o1 o2 =
     let ( >> ) x y = if x = 0 then y () else x in
     Block_hash.compare o1.shell.branch o1.shell.branch
-    >> fun () -> MBytes.compare o1.proto o2.proto
+    >> fun () -> Bytes.compare o1.proto o2.proto
 end)
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {shell; proto} -> (shell, proto))
-    (fun (shell, proto) -> {shell; proto})
-    (merge_objs shell_header_encoding (obj1 (req "data" Variable.bytes)))
+  def
+    "operation"
+    ~description:
+      "An operation. The shell_header part indicates a block an operation is \
+       meant to apply on top of. The proto part is protocol-specific and \
+       appears as a binary blob."
+  @@ conv
+       (fun {shell; proto} -> (shell, proto))
+       (fun (shell, proto) -> {shell; proto})
+       (merge_objs shell_header_encoding (obj1 (req "data" Variable.bytes)))
 
 let bounded_encoding ?max_size () =
   match max_size with
@@ -96,3 +103,7 @@ let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 let hash op = Operation_hash.hash_bytes [to_bytes op]
 
 let hash_raw bytes = Operation_hash.hash_bytes [bytes]
+
+let () =
+  Data_encoding.Registration.register ~pp encoding ;
+  Data_encoding.Registration.register shell_header_encoding

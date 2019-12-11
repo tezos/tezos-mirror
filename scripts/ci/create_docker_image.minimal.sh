@@ -39,7 +39,7 @@ cp "$src_dir"/src/bin_client/bash-completion.sh "$tmp_dir"/scripts/
 cp "$src_dir"/active_protocol_versions "$tmp_dir"/scripts/
 
 echo
-echo "### Building minimal docker image..."
+echo "### Building minimal docker images..."
 echo
 
 cat > "$tmp_dir"/Dockerfile <<EOF
@@ -48,11 +48,25 @@ FROM $base_image
 RUN sudo apk --no-cache add vim
 ENV EDITOR=/usr/bin/vi
 
-RUN sudo mkdir -p /var/run/tezos/node /var/run/tezos/client && \
-    sudo chown -R tezos /var/run/tezos
+COPY bin/* /usr/local/bin/
+COPY scripts/* /usr/local/share/tezos/
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+EOF
+
+docker build -t "$image_name-debug:$image_version" "$tmp_dir"
+
+echo
+echo "### Successfully build docker image: $image_name-debug:$image_version"
+echo
+
+echo "Stripping tezos binaries from debugging symbols"
+strip "$tmp_dir"/bin/tezos*
+
+cat > "$tmp_dir"/Dockerfile <<EOF
+FROM $base_image
 
 COPY bin/* /usr/local/bin/
-
 COPY scripts/* /usr/local/share/tezos/
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
@@ -62,4 +76,18 @@ docker build -t "$image_name:$image_version" "$tmp_dir"
 
 echo
 echo "### Successfully build docker image: $image_name:$image_version"
+echo
+
+cat > "$tmp_dir"/Dockerfile <<EOF
+FROM $base_image
+
+COPY bin/* /usr/local/bin/
+COPY scripts/* /usr/local/share/tezos/
+
+EOF
+
+docker build -t "$image_name-bare:$image_version" "$tmp_dir"
+
+echo
+echo "### Successfully build docker image: $image_name-bare:$image_version"
 echo

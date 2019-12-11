@@ -26,6 +26,13 @@
 let group =
   {Clic.name = "protocols"; title = "Commands for managing protocols"}
 
+let proto_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (Protocol_hash.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   let check_dir _ dn =
@@ -58,7 +65,7 @@ let commands () =
       (fun () dirname (cctxt : #Client_context.full) ->
         Lwt.catch
           (fun () ->
-            Lwt_utils_unix.Protocol.read_dir dirname
+            Tezos_base_unix.Protocol_files.read_dir dirname
             >>=? fun (_hash, proto) ->
             Shell_services.Injection.protocol cctxt proto
             >>= function
@@ -87,12 +94,12 @@ let commands () =
       ~desc:"Dump a protocol from the node's record of protocol."
       no_options
       ( prefixes ["dump"; "protocol"]
-      @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
+      @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop )
       (fun () ph (cctxt : #Client_context.full) ->
         Shell_services.Protocol.contents cctxt ph
         >>=? fun proto ->
-        Lwt_utils_unix.Protocol.write_dir
+        Tezos_base_unix.Protocol_files.write_dir
           (Protocol_hash.to_short_b58check ph)
           ~hash:ph
           proto
@@ -104,7 +111,7 @@ let commands () =
       ~desc:"Fetch a protocol from the network."
       no_options
       ( prefixes ["fetch"; "protocol"]
-      @@ Protocol_hash.param ~name:"protocol hash"
+      @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop )
       (fun () hash (cctxt : #Client_context.full) ->
         Shell_services.Protocol.fetch cctxt hash

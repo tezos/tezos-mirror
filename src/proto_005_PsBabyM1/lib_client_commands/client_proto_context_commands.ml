@@ -1143,9 +1143,7 @@ let commands version () =
              (cctxt : Protocol_client_context.full) ->
           Client_keys.neuterize src_sk
           >>=? fun src_pk ->
-          Client_keys.public_key_hash
-            ~interactive:(cctxt :> Client_context.io_wallet)
-            src_pk
+          Client_keys.public_key_hash src_pk
           >>=? fun (src_pkh, _) ->
           get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
           >>=? fun info ->
@@ -1278,7 +1276,7 @@ let commands version () =
       command
         ~group
         ~desc:"Submit a ballot"
-        (args1 dry_run_switch)
+        (args2 verbose_signing_switch dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
         @@ Client_keys.Secret_key.alias_param
              ~name:"delegate"
@@ -1309,16 +1307,14 @@ let commands version () =
                   | s ->
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
-        (fun dry_run
+        (fun (verbose_signing, dry_run)
              (_, src_sk)
              proposal
              ballot
              (cctxt : Protocol_client_context.full) ->
           Client_keys.neuterize src_sk
           >>=? fun src_pk ->
-          Client_keys.public_key_hash
-            ~interactive:(cctxt :> Client_context.io_wallet)
-            src_pk
+          Client_keys.public_key_hash src_pk
           >>=? fun (src_pkh, _) ->
           get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
           >>=? fun info ->
@@ -1334,6 +1330,7 @@ let commands version () =
             ~block:cctxt#block
             ~src_sk
             src_pkh
+            ~verbose_signing
             ~dry_run
             proposal
             ballot

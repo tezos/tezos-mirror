@@ -155,9 +155,9 @@ type config = {
   genesis : State.Chain.genesis;
   store_root : string;
   context_root : string;
+  protocol_root : string;
   patch_context : (Context.t -> Context.t Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
-  test_chain_max_tll : int option;
   checkpoint : Block_header.t option;
 }
 
@@ -202,9 +202,9 @@ let default_prevalidator_limits =
 
 let default_peer_validator_limits =
   {
-    block_header_timeout = Time.System.Span.of_seconds_exn 60.;
-    block_operations_timeout = Time.System.Span.of_seconds_exn 60.;
-    protocol_timeout = Time.System.Span.of_seconds_exn 120.;
+    block_header_timeout = Time.System.Span.of_seconds_exn 300.;
+    block_operations_timeout = Time.System.Span.of_seconds_exn 300.;
+    protocol_timeout = Time.System.Span.of_seconds_exn 600.;
     new_head_request_timeout = Time.System.Span.of_seconds_exn 90.;
     worker_limits = {backlog_size = 1000; backlog_level = Internal_event.Info};
   }
@@ -290,13 +290,39 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let create ?(sandboxed = false)
+let check_and_fix_storage_consistency state =
+  State.Chain.all state
+  >>= fun chains ->
+  let rec check_block n chain_state block =
+    fail_unless (n > 0) Validation_errors.Bad_data_dir
+    >>=? fun () ->
+    State.Block.context_exists block
+    >>= fun is_context_known ->
+    if is_context_known then
+      (* Found a known context for the block: setting as consistent head *)
+      Chain.set_head chain_state block >>=? fun _ -> return_unit
+    else
+      (* Did not find a known context. Need to backtrack the head up *)
+      let header = State.Block.header block in
+      State.Block.read chain_state header.shell.predecessor
+      >>=? fun pred ->
+      check_block (n - 1) chain_state pred
+      >>=? fun () ->
+      (* Make sure to remove the block only after updating the head *)
+      State.Block.remove block
+  in
+  iter_s
+    (fun chain_state ->
+      Chain.head chain_state >>= fun block -> check_block 500 chain_state block)
+    chains
+
+let create ?(sandboxed = false) ~singleprocess
     { genesis;
       store_root;
       context_root;
+      protocol_root;
       patch_context;
       p2p = p2p_params;
-      test_chain_max_tll = max_child_ttl;
       checkpoint } peer_validator_limits block_validator_limits
     prevalidator_limits chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
@@ -308,8 +334,35 @@ let create ?(sandboxed = false)
   in
   init_p2p ~sandboxed p2p_params
   >>=? fun p2p ->
-  State.init ~store_root ~context_root ?history_mode ?patch_context genesis
-  >>=? fun (state, mainchain_state, context_index, history_mode) ->
+  (let open Block_validator_process in
+  if singleprocess then
+    State.init ~store_root ~context_root ?history_mode ?patch_context genesis
+    >>=? fun (state, mainchain_state, context_index, history_mode) ->
+    init (Internal context_index)
+    >>=? fun validator_process ->
+    return (validator_process, state, mainchain_state, history_mode)
+  else
+    init
+      (External
+         {context_root; protocol_root; process_path = Sys.executable_name})
+    >>=? fun validator_process ->
+    let commit_genesis =
+      Block_validator_process.commit_genesis
+        validator_process
+        ~genesis_hash:genesis.block
+    in
+    State.init
+      ~store_root
+      ~context_root
+      ?history_mode
+      ?patch_context
+      ~commit_genesis
+      genesis
+    >>=? fun (state, mainchain_state, _context_index, history_mode) ->
+    return (validator_process, state, mainchain_state, history_mode))
+  >>=? fun (validator_process, state, mainchain_state, history_mode) ->
+  check_and_fix_storage_consistency state
+  >>=? fun () ->
   may_update_checkpoint mainchain_state checkpoint history_mode
   >>=? fun () ->
   let distributed_db = Distributed_db.create state p2p in
@@ -320,7 +373,7 @@ let create ?(sandboxed = false)
     distributed_db
     peer_validator_limits
     block_validator_limits
-    (Block_validator.Internal context_index)
+    validator_process
     prevalidator_limits
     chain_validator_limits
     ~start_testchain
@@ -328,8 +381,8 @@ let create ?(sandboxed = false)
   (* TODO : Check that the testchain is correctly activated after a node restart *)
   Validator.activate
     validator
-    ?max_child_ttl
     ~start_prevalidator
+    ~validator_process
     mainchain_state
   >>=? fun mainchain_validator ->
   let shutdown () =

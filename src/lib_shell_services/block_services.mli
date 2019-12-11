@@ -58,7 +58,7 @@ val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
-type raw_context = Key of MBytes.t | Dir of (string * raw_context) list | Cut
+type raw_context = Key of Bytes.t | Dir of (string * raw_context) list | Cut
 
 val pp_raw_context : Format.formatter -> raw_context -> unit
 
@@ -161,7 +161,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     Block_hash.t tzresult Lwt.t
 
   val raw_header :
-    #simple -> ?chain:chain -> ?block:block -> unit -> MBytes.t tzresult Lwt.t
+    #simple -> ?chain:chain -> ?block:block -> unit -> Bytes.t tzresult Lwt.t
 
   val header :
     #simple ->
@@ -193,11 +193,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       Proto.block_header_data tzresult Lwt.t
 
     val raw_protocol_data :
-      #simple ->
-      ?chain:chain ->
-      ?block:block ->
-      unit ->
-      MBytes.t tzresult Lwt.t
+      #simple -> ?chain:chain -> ?block:block -> unit -> Bytes.t tzresult Lwt.t
   end
 
   module Operations : sig
@@ -265,7 +261,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ?chain:chain ->
         ?block:block ->
         Block_header.t ->
-        MBytes.t tzresult Lwt.t
+        Bytes.t tzresult Lwt.t
     end
 
     module Preapply : sig
@@ -342,7 +338,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
 
     val raw_header :
-      ([`GET], prefix, prefix, unit, unit, MBytes.t) RPC_service.t
+      ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
 
     val metadata :
       ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
@@ -370,7 +366,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         RPC_service.t
 
       val raw_protocol_data :
-        ([`GET], prefix, prefix, unit, unit, MBytes.t) RPC_service.t
+        ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
     end
 
     module Operations : sig
@@ -444,7 +440,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
             prefix,
             unit,
             Block_header.t,
-            MBytes.t )
+            Bytes.t )
           RPC_service.service
       end
 

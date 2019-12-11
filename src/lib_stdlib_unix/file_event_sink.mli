@@ -38,6 +38,8 @@
     ["section-<section-name>"].
 *)
 
+open Error_monad
+
 (** The module {!Query} provides a {!fold} function over the events
     stored by a given instantiation of the [SINK.t]. *)
 module Query : sig

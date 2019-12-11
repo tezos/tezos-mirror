@@ -9,11 +9,14 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.0.1" }
+  "dune" { >= "1.0.1" }
   "tezos-stdlib"
   "tezos-data-encoding"
   "tezos-error-monad"
   "lwt_log"
 ]
-build: [[ "dune" "build" "-p" name "-j" jobs ]]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
 synopsis: "Tezos event logging library"

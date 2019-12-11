@@ -70,6 +70,13 @@ let may_lock_pidfile = function
       trace (failure "Failed to create the pidfile: %s" pidfile)
       @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
 
+let block_param t =
+  Clic.param
+    ~name:"block"
+    ~desc:"commitment blocks whose nonce should be revealed"
+    (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
+    t
+
 let delegate_commands () =
   let open Clic in
   [ command
@@ -116,7 +123,7 @@ let delegate_commands () =
       ~group
       ~desc:"Forge and inject a seed-nonce revelation operation."
       no_options
-      (prefixes ["reveal"; "nonce"; "for"] @@ seq_of_param Block_hash.param)
+      (prefixes ["reveal"; "nonce"; "for"] @@ seq_of_param block_param)
       (fun () block_hashes cctxt ->
         reveal_block_nonces
           cctxt
@@ -220,19 +227,6 @@ let delegate_commands () =
               block_hashes
             >>= fun () -> return_unit)) ]
 
-let init_signal () =
-  let handler name id =
-    try
-      Format.eprintf "Received the %s signal, triggering shutdown.@." name ;
-      Lwt_exit.exit id
-    with _ -> ()
-  in
-  ignore
-    (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
-  ignore
-    ( Lwt_unix.on_signal Sys.sigterm (handler "TERM")
-      : Lwt_unix.signal_handler_id )
-
 let baker_commands () =
   let open Clic in
   let group =
@@ -264,7 +258,6 @@ let baker_commands () =
            node_path
            delegates
            cctxt ->
-        init_signal () ;
         may_lock_pidfile pidfile
         >>=? fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
@@ -295,7 +288,6 @@ let endorser_commands () =
       (args2 pidfile_arg endorsement_delay_arg)
       (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (pidfile, endorsement_delay) delegates cctxt ->
-        init_signal () ;
         may_lock_pidfile pidfile
         >>=? fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
@@ -332,7 +324,6 @@ let accuser_commands () =
       (args2 pidfile_arg preserved_levels_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels) cctxt ->
-        init_signal () ;
         may_lock_pidfile pidfile
         >>=? fun () ->
         Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt)

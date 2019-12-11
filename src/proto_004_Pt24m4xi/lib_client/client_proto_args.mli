@@ -35,4 +35,4 @@ val no_print_source_flag : (bool, full) Clic.arg
 val tez_arg :
   default:string -> parameter:string -> doc:string -> (Tez.t, full) Clic.arg
 
-val bytes_parameter : (MBytes.t, full) Clic.parameter
+val bytes_parameter : (Bytes.t, full) Clic.parameter

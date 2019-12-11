@@ -150,4 +150,4 @@ val close : ?wait:bool -> ('msg, 'meta) t -> unit Lwt.t
 (**/**)
 
 (** for testing only *)
-val raw_write_sync : ('msg, 'meta) t -> MBytes.t -> unit tzresult Lwt.t
+val raw_write_sync : ('msg, 'meta) t -> Bytes.t -> unit tzresult Lwt.t

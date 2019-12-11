@@ -98,7 +98,7 @@ type 'a desc =
   | RangedInt : {minimum : int; maximum : int} -> int desc
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
-  | Bytes : Kind.length -> MBytes.t desc
+  | Bytes : Kind.length -> Bytes.t desc
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc

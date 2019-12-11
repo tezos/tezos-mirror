@@ -100,3 +100,155 @@ let register_error_kind category ~id ~title ~description ?pp encoding
     encoding
     from_error
     to_error
+
+let () =
+  let open Tezos_data_encoding.Data_encoding.Registration in
+  let open Tezos_data_encoding.Data_encoding in
+  let stamp_proto id ids = String.concat "." (Protocol.name :: id :: ids) in
+  register
+  @@ def (stamp_proto "parameters" []) Protocol.Parameters_repr.encoding ;
+  register @@ def (stamp_proto "tez" []) Protocol.Alpha_context.Tez.encoding ;
+  register @@ def (stamp_proto "roll" []) Protocol.Alpha_context.Roll.encoding ;
+  register ~pp:Protocol.Alpha_context.Fitness.pp
+  @@ def (stamp_proto "fitness" []) Protocol.Alpha_context.Fitness.encoding ;
+  register ~pp:Protocol.Alpha_context.Timestamp.pp
+  @@ def (stamp_proto "timestamp" []) Protocol.Alpha_context.Timestamp.encoding ;
+  register ~pp:Protocol.Alpha_context.Raw_level.pp
+  @@ def (stamp_proto "raw_level" []) Protocol.Alpha_context.Raw_level.encoding ;
+  register
+  @@ def
+       (stamp_proto "vote" ["ballot"])
+       Protocol.Alpha_context.Vote.ballot_encoding ;
+  register
+  @@ def
+       (stamp_proto "vote" ["ballots"])
+       Protocol.Alpha_context.Vote.ballots_encoding ;
+  register
+  @@ def
+       (stamp_proto "vote" ["listings"])
+       Protocol.Alpha_context.Vote.listings_encoding ;
+  register
+  @@ def (stamp_proto "seed" []) Protocol.Alpha_context.Seed.seed_encoding ;
+  register ~pp:Protocol.Alpha_context.Gas.pp
+  @@ def (stamp_proto "gas" []) Protocol.Alpha_context.Gas.encoding ;
+  register ~pp:Protocol.Alpha_context.Gas.pp_cost
+  @@ def (stamp_proto "gas" ["cost"]) Protocol.Alpha_context.Gas.cost_encoding ;
+  register
+  @@ def (stamp_proto "script" []) Protocol.Alpha_context.Script.encoding ;
+  register
+  @@ def
+       (stamp_proto "script" ["expr"])
+       Protocol.Alpha_context.Script.expr_encoding ;
+  register
+  @@ def
+       (stamp_proto "script" ["prim"])
+       Protocol.Alpha_context.Script.prim_encoding ;
+  register
+  @@ def
+       (stamp_proto "script" ["lazy_expr"])
+       Protocol.Alpha_context.Script.lazy_expr_encoding ;
+  register
+  @@ def
+       (stamp_proto "script" ["loc"])
+       Protocol.Alpha_context.Script.location_encoding ;
+  register ~pp:Protocol.Alpha_context.Contract.pp
+  @@ def (stamp_proto "contract" []) Protocol.Alpha_context.Contract.encoding ;
+  register
+  @@ def
+       (stamp_proto "contract" ["big_map_diff"])
+       Protocol.Alpha_context.Contract.big_map_diff_encoding ;
+  register
+  @@ def
+       (stamp_proto "delegate" ["frozen_balance"])
+       Protocol.Alpha_context.Delegate.frozen_balance_encoding ;
+  register
+  @@ def
+       (stamp_proto "delegate" ["balance_updates"])
+       Protocol.Alpha_context.Delegate.balance_updates_encoding ;
+  register
+  @@ def
+       (stamp_proto "delegate" ["frozen_balance_by_cycles"])
+       Protocol.Alpha_context.Delegate.frozen_balance_by_cycle_encoding ;
+  register ~pp:Protocol.Alpha_context.Level.pp_full
+  @@ def (stamp_proto "level" []) Protocol.Alpha_context.Level.encoding ;
+  register
+  @@ def (stamp_proto "operation" []) Protocol.Alpha_context.Operation.encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["contents"])
+       Protocol.Alpha_context.Operation.contents_encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["contents_list"])
+       Protocol.Alpha_context.Operation.contents_list_encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["protocol_data"])
+       Protocol.Alpha_context.Operation.protocol_data_encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["raw"])
+       Protocol.Alpha_context.Operation.raw_encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["internal"])
+       Protocol.Alpha_context.Operation.internal_operation_encoding ;
+  register
+  @@ def
+       (stamp_proto "operation" ["unsigned"])
+       Protocol.Alpha_context.Operation.unsigned_encoding ;
+  register ~pp:Protocol.Alpha_context.Period.pp
+  @@ def (stamp_proto "period" []) Protocol.Alpha_context.Period.encoding ;
+  register ~pp:Protocol.Alpha_context.Cycle.pp
+  @@ def (stamp_proto "cycle" []) Protocol.Alpha_context.Cycle.encoding ;
+  register
+  @@ def (stamp_proto "constants" []) Protocol.Alpha_context.Constants.encoding ;
+  register
+  @@ def
+       (stamp_proto "constants" ["fixed"])
+       Protocol.Alpha_context.Constants.fixed_encoding ;
+  register
+  @@ def
+       (stamp_proto "constants" ["parametric"])
+       Protocol.Alpha_context.Constants.parametric_encoding ;
+  register
+  @@ def (stamp_proto "nonce" []) Protocol.Alpha_context.Nonce.encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" [])
+       Protocol.Alpha_context.Block_header.encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" ["unsigned"])
+       Protocol.Alpha_context.Block_header.unsigned_encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" ["raw"])
+       Protocol.Alpha_context.Block_header.raw_encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" ["contents"])
+       Protocol.Alpha_context.Block_header.contents_encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" ["shell_header"])
+       Protocol.Alpha_context.Block_header.shell_header_encoding ;
+  register
+  @@ def
+       (stamp_proto "block_header" ["protocol_data"])
+       Protocol.Alpha_context.Block_header.protocol_data_encoding ;
+  register ~pp:Protocol.Alpha_context.Voting_period.pp
+  @@ def
+       (stamp_proto "voting_period" [])
+       Protocol.Alpha_context.Voting_period.encoding ;
+  register
+  @@ def
+       (stamp_proto "voting_period" ["kind"])
+       Protocol.Alpha_context.Voting_period.kind_encoding ;
+  register
+  @@ Data_encoding.def
+       (stamp_proto "errors" [])
+       ~description:
+         "The full list of RPC errors would be too long to include.It is\n\
+          available through the RPC `/errors` (GET)."
+       error_encoding

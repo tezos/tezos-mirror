@@ -43,20 +43,20 @@ val increment_nonce : ?step:int -> nonce -> nonce
     the messages. The sent message should contains a random nonce,
     and we should never send the exact same message twice. *)
 val generate_nonces :
-  incoming:bool -> sent_msg:MBytes.t -> recv_msg:MBytes.t -> nonce * nonce
+  incoming:bool -> sent_msg:Bytes.t -> recv_msg:Bytes.t -> nonce * nonce
 
 module Secretbox : sig
   type key
 
-  val unsafe_of_bytes : MBytes.t -> key
+  val unsafe_of_bytes : Bigstring.t -> key
 
-  val box_noalloc : key -> nonce -> MBytes.t -> unit
+  val box_noalloc : key -> nonce -> Bigstring.t -> unit
 
-  val box_open_noalloc : key -> nonce -> MBytes.t -> bool
+  val box_open_noalloc : key -> nonce -> Bigstring.t -> bool
 
-  val box : key -> MBytes.t -> nonce -> MBytes.t
+  val box : key -> Bytes.t -> nonce -> Bigstring.t
 
-  val box_open : key -> MBytes.t -> nonce -> MBytes.t option
+  val box_open : key -> Bigstring.t -> nonce -> Bytes.t option
 end
 
 type target
@@ -83,27 +83,23 @@ val random_keypair : unit -> secret_key * public_key * Public_key_hash.t
 
 val precompute : secret_key -> public_key -> channel_key
 
-val fast_box : channel_key -> MBytes.t -> nonce -> MBytes.t
+val fast_box : channel_key -> Bigstring.t -> nonce -> Bigstring.t
 
-val fast_box_open : channel_key -> MBytes.t -> nonce -> MBytes.t option
+val fast_box_open : channel_key -> Bigstring.t -> nonce -> Bigstring.t option
 
-val fast_box_noalloc : channel_key -> nonce -> MBytes.t -> unit
+val fast_box_noalloc : channel_key -> nonce -> Bytes.t -> unit
 
-val fast_box_open_noalloc : channel_key -> nonce -> MBytes.t -> bool
+val fast_box_open_noalloc : channel_key -> nonce -> Bytes.t -> bool
 
 val check_proof_of_work : public_key -> nonce -> target -> bool
 
 val generate_proof_of_work : ?max:int -> public_key -> target -> nonce
 
-val public_key_to_bigarray : public_key -> Cstruct.buffer
+val public_key_to_bytes : public_key -> Bytes.t
 
-val public_key_of_bigarray : Cstruct.buffer -> public_key
+val public_key_of_bytes : Bytes.t -> public_key
 
 val public_key_size : int
-
-val secret_key_to_bigarray : secret_key -> Cstruct.buffer
-
-val secret_key_of_bigarray : Cstruct.buffer -> secret_key
 
 val secret_key_size : int
 

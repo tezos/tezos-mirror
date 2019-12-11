@@ -28,7 +28,7 @@ val sign :
     unit,
     unit * Signature.Public_key_hash.t,
     Signature.t option,
-    MBytes.t,
+    Bytes.t,
     Signature.t )
   RPC_service.t
 
@@ -37,8 +37,8 @@ val deterministic_nonce :
     unit,
     unit * Signature.Public_key_hash.t,
     Signature.t option,
-    MBytes.t,
-    MBytes.t )
+    Bytes.t,
+    Bigstring.t )
   RPC_service.t
 
 val deterministic_nonce_hash :
@@ -46,8 +46,8 @@ val deterministic_nonce_hash :
     unit,
     unit * Signature.Public_key_hash.t,
     Signature.t option,
-    MBytes.t,
-    MBytes.t )
+    Bytes.t,
+    Bytes.t )
   RPC_service.t
 
 val supports_deterministic_nonces :

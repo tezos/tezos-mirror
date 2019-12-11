@@ -60,7 +60,7 @@ type 'a desc =
   | RangedInt : {minimum : int; maximum : int} -> int desc
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
-  | Bytes : Kind.length -> MBytes.t desc
+  | Bytes : Kind.length -> Bytes.t desc
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
@@ -192,7 +192,7 @@ val bool : bool encoding
 
 val string : string encoding
 
-val bytes : MBytes.t encoding
+val bytes : Bytes.t encoding
 
 val float : float encoding
 
@@ -209,7 +209,7 @@ val is_tup : 'a encoding -> bool
 module Fixed : sig
   val string : int -> string encoding
 
-  val bytes : int -> MBytes.t encoding
+  val bytes : int -> Bytes.t encoding
 
   val add_padding : 'a encoding -> int -> 'a encoding
 end
@@ -217,7 +217,7 @@ end
 module Variable : sig
   val string : string encoding
 
-  val bytes : MBytes.t encoding
+  val bytes : Bytes.t encoding
 
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 

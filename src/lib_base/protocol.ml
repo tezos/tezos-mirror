@@ -48,8 +48,8 @@ let component_encoding =
       {name; interface; implementation})
     (obj3
        (req "name" string)
-       (opt "interface" (conv MBytes.of_string MBytes.to_string bytes))
-       (req "implementation" (conv MBytes.of_string MBytes.to_string bytes)))
+       (opt "interface" string)
+       (req "implementation" string))
 
 let env_version_encoding =
   let open Data_encoding in
@@ -60,12 +60,17 @@ let env_version_encoding =
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {expected_env; components} -> (expected_env, components))
-    (fun (expected_env, components) -> {expected_env; components})
-    (obj2
-       (req "expected_env_version" env_version_encoding)
-       (req "components" (list component_encoding)))
+  def
+    "protocol"
+    ~description:
+      "The environment a protocol relies on and the components a protocol is \
+       made of."
+  @@ conv
+       (fun {expected_env; components} -> (expected_env, components))
+       (fun (expected_env, components) -> {expected_env; components})
+       (obj2
+          (req "expected_env_version" env_version_encoding)
+          (req "components" (list component_encoding)))
 
 let bounded_encoding ?max_size () =
   match max_size with
@@ -118,11 +123,13 @@ module Meta = struct
 
   let encoding =
     let open Data_encoding in
-    conv
-      (fun {hash; expected_env_version; modules} ->
-        (hash, expected_env_version, modules))
-      (fun (hash, expected_env_version, modules) ->
-        {hash; expected_env_version; modules})
+    def "protocol.meta"
+    (* FIXME: add ~description argument *)
+    @@ conv
+         (fun {hash; expected_env_version; modules} ->
+           (hash, expected_env_version, modules))
+         (fun (hash, expected_env_version, modules) ->
+           {hash; expected_env_version; modules})
     @@ obj3
          (opt
             "hash"
@@ -134,3 +141,7 @@ module Meta = struct
             ~description:"Modules comprising the protocol"
             (list string))
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:pp_ocaml encoding ;
+  Data_encoding.Registration.register Meta.encoding

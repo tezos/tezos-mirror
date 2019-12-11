@@ -403,11 +403,9 @@ module Points = struct
         Lwt.async (fun () -> P2p_answerer.shutdown (Lazy.force conn.answerer)))
       (connections_of_addr pool addr)
 
-  let unban pool (addr, _port) = P2p_acl.IPBlacklist.remove pool.acl addr
+  let unban pool (addr, _port) = P2p_acl.unban_addr pool.acl addr
 
-  let trust pool ((addr, _port) as point) =
-    P2p_acl.IPBlacklist.remove pool.acl addr ;
-    set_trusted pool point
+  let trust pool point = unban pool point ; set_trusted pool point
 
   let untrust pool point = unset_trusted pool point
 end
@@ -463,7 +461,7 @@ module Peers = struct
         conn.wait_close <- false ;
         Lwt.async (fun () -> P2p_answerer.shutdown (Lazy.force conn.answerer)))
 
-  let unban pool peer = P2p_acl.PeerBlacklist.remove pool.acl peer
+  let unban pool peer = P2p_acl.unban_peer pool.acl peer
 
   let trust pool peer = unban pool peer ; set_trusted pool peer
 

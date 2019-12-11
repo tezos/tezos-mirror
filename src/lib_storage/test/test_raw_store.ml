@@ -42,22 +42,22 @@ let entries s k =
   fold s k ~init:[] ~f:(fun e acc -> Lwt.return (e :: acc)) >|= List.rev
 
 let test_fold st =
-  store st ["a"; "b"] (MBytes.of_string "Novembre")
+  store st ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun _ ->
-  store st ["a"; "c"] (MBytes.of_string "Juin")
+  store st ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun _ ->
-  store st ["a"; "d"; "e"] (MBytes.of_string "Septembre")
+  store st ["a"; "d"; "e"] (Bytes.of_string "Septembre")
   >>= fun _ ->
-  store st ["f"] (MBytes.of_string "Avril")
+  store st ["f"] (Bytes.of_string "Avril")
   >>= fun _ ->
   (* The code of '.' is just below the one of '/' ! *)
-  store st ["g"; ".12"; "a"] (MBytes.of_string "Mai")
+  store st ["g"; ".12"; "a"] (Bytes.of_string "Mai")
   >>= fun _ ->
-  store st ["g"; ".12"; "b"] (MBytes.of_string "Février")
+  store st ["g"; ".12"; "b"] (Bytes.of_string "Février")
   >>= fun _ ->
-  store st ["g"; "123"; "456"] (MBytes.of_string "Mars")
+  store st ["g"; "123"; "456"] (Bytes.of_string "Mars")
   >>= fun _ ->
-  store st ["g"; "1230"] (MBytes.of_string "Janvier")
+  store st ["g"; "1230"] (Bytes.of_string "Janvier")
   >>= fun _ ->
   entries st []
   >>= fun l ->

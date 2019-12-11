@@ -27,18 +27,6 @@ let ( // ) = Filename.concat
 
 type t = string
 
-let data_version = "0.0.3"
-
-(* List of upgrade functions from each still supported previous
-   version to the current [data_version] above. If this list grows too
-   much, an idea would be to have triples (version, version,
-   converter), and to sequence them dynamically instead of
-   statically. *)
-let upgradable_data_version =
-  [ ( "0.0.1",
-      fun ~store_root ~context_root ~protocol_root ->
-        State.upgrade_0_0_1 ~store_root ~context_root ~protocol_root () ) ]
-
 let store_dir data_dir = data_dir // "store"
 
 let context_dir data_dir = data_dir // "context"
@@ -52,6 +40,18 @@ let default_identity_file_name = "identity.json"
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 let version_file_name = "version.json"
+
+let data_version = "0.0.4"
+
+(* List of upgrade functions from each still supported previous
+   version to the current [data_version] above. If this list grows too
+   much, an idea would be to have triples (version, version,
+   converter), and to sequence them dynamically instead of
+   statically. *)
+let upgradable_data_version =
+  [ ( "0.0.3",
+      fun ~data_dir ->
+        Context.upgrade_0_0_3 ~context_dir:(context_dir data_dir) ) ]
 
 let pp ppf version = Format.pp_print_string ppf version
 
@@ -84,7 +84,8 @@ let () =
     ~pp:(fun ppf (exp, got) ->
       Format.fprintf
         ppf
-        "Invalid data directory version '%s' (expected '%s')."
+        "Invalid data directory version '%s' (expected '%s').@,\
+         Your data directory is outdated and cannot be automatically upgraded."
         got
         exp)
     Data_encoding.(
@@ -132,9 +133,9 @@ let () =
         ppf
         "The data directory version is too old.@,\
          Found '%s', expected '%s'.@,\
-         It needs to be upgraded with `tezos-node upgrade storage`.You should \
-         consider backuping your node storage before upgrading it to avoid \
-         corruption due to unexpected interruption."
+         It needs to be upgraded with `tezos-node upgrade storage`. You \
+         should consider to make a backup of your node storage before \
+         upgrading it to avoid corruption due to unexpected interruption."
         got
         exp)
     Data_encoding.(
@@ -226,21 +227,25 @@ let upgrade_data_dir data_dir =
   | None ->
       Format.printf "Node data dir is up-to-date.@." ;
       return_unit
-  | Some (version, upgrade) ->
+  | Some (version, upgrade) -> (
       Format.printf
         "Upgrading node data dir from %s to %s...@.Please, do not interupt \
          the process.@."
         version
         data_version ;
-      upgrade
-        ~store_root:(store_dir data_dir)
-        ~context_root:(context_dir data_dir)
-        ~protocol_root:(protocol_dir data_dir)
-      >>=? fun () ->
-      write_version data_dir
-      >>=? fun () ->
-      Format.printf "The node data dir is now up-to-date!@." ;
-      write_version data_dir
+      upgrade ~data_dir
+      >>= function
+      | Ok () ->
+          write_version data_dir
+          >>=? fun () ->
+          Format.printf "The node data dir is now up-to-date!@." ;
+          return_unit
+      | Error e ->
+          Format.printf
+            "%a@.Aborting upgrade. The storage was not upgraded.@."
+            Error_monad.pp_print_error
+            e ;
+          return_unit )
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir

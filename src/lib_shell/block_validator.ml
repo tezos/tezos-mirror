@@ -32,9 +32,6 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
-type validator_kind = Block_validator_process.validator_kind =
-  | Internal of Context.index
-
 module Name = struct
   type t = unit
 
@@ -56,7 +53,7 @@ module Types = struct
   }
 
   type parameters =
-    limits * bool * Distributed_db.t * Block_validator_process.validator_kind
+    limits * bool * Distributed_db.t * Block_validator_process.t
 
   let view _state _parameters = ()
 end
@@ -103,15 +100,28 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
   | None | Some _ ->
       return_unit
 
+let should_validate_block w chain_state hash =
+  State.Block.read_opt chain_state hash
+  >>= function
+  | None ->
+      Lwt.return_none
+  | Some block ->
+      State.Block.context_exists block
+      >>= fun context_exists ->
+      if not context_exists then
+        debug w "could not find context for block %a" Block_hash.pp_short hash ;
+      let should_validate = not context_exists in
+      Lwt.return_some (block, should_validate)
+
 let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
  fun w
      (Request.Request_validation
        {chain_db; notify_new_block; canceler; peer; hash; header; operations}) ->
   let bv = Worker.state w in
   let chain_state = Distributed_db.chain_state chain_db in
-  State.Block.read_opt chain_state hash
+  should_validate_block w chain_state hash
   >>= function
-  | Some block ->
+  | Some (block, false) ->
       debug
         w
         "previously validated block %a (after pipe)"
@@ -123,7 +133,7 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
         ~timeout:bv.limits.protocol_timeout
         block ;
       return (Ok None)
-  | None -> (
+  | Some (_, true) | None -> (
       State.Block.read_invalid chain_state hash
       >>= function
       | Some {errors; _} ->
@@ -162,21 +172,20 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                             operations
                       | Error _ as x ->
                           Lwt.return x)
-                  >>=? fun { validation_result;
+                  >>=? fun { validation_store;
                              block_metadata;
                              ops_metadata;
-                             context_hash;
                              forking_testchain } ->
                   let validation_store =
                     ( {
-                        context_hash;
-                        message = validation_result.message;
+                        context_hash = validation_store.context_hash;
+                        message = validation_store.message;
                         max_operations_ttl =
-                          validation_result.max_operations_ttl;
+                          validation_store.max_operations_ttl;
                         last_allowed_fork_level =
-                          validation_result.last_allowed_fork_level;
+                          validation_store.last_allowed_fork_level;
                       }
-                      : State.Block.validation_store )
+                      : Block_validation.validation_store )
                   in
                   Distributed_db.commit_block
                     chain_db
@@ -189,7 +198,12 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                     ~forking_testchain
                   >>=? function
                   | None ->
-                      assert false (* should not happen *)
+                      (* This case can be reached if the block was
+                         previously validated but its associated
+                         context has not been written on disk and
+                         therefore it means that it already exists in
+                         the store. *)
+                      State.Block.read chain_state hash
                   | Some block ->
                       return block) )
             >>= function
@@ -226,10 +240,8 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                     err ;
                   return error ) ) )
 
-let on_launch _ _ (limits, start_testchain, db, validation_kind) =
+let on_launch _ _ (limits, start_testchain, db, validation_process) =
   let protocol_validator = Protocol_validator.create db in
-  Block_validator_process.init validation_kind
-  >>= fun validation_process ->
   return
     {Types.protocol_validator; validation_process; limits; start_testchain}
 
@@ -259,7 +271,7 @@ let on_close w =
 
 let table = Worker.create_table Queue
 
-let create limits db validation_process_kind ~start_testchain =
+let create limits db validation_process ~start_testchain =
   let module Handlers = struct
     type self = t
 
@@ -279,7 +291,7 @@ let create limits db validation_process_kind ~start_testchain =
     table
     limits.worker_limits
     ()
-    (limits, start_testchain, db, validation_process_kind)
+    (limits, start_testchain, db, validation_process)
     (module Handlers)
 
 let shutdown = Worker.shutdown
@@ -288,9 +300,9 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
     (header : Block_header.t) operations =
   let bv = Worker.state w in
   let chain_state = Distributed_db.chain_state chain_db in
-  State.Block.read_opt chain_state hash
+  should_validate_block w chain_state hash
   >>= function
-  | Some block ->
+  | Some (block, false) ->
       debug
         w
         "previously validated block %a (before pipe)"
@@ -302,7 +314,7 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ()) chain_db hash
         ~timeout:bv.limits.protocol_timeout
         block ;
       return_none
-  | None ->
+  | Some (_, true) | None ->
       map_p
         (map_p (fun op ->
              let op_hash = Operation.hash op in

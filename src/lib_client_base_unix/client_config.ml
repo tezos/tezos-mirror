@@ -601,7 +601,7 @@ type t =
 
 module type Remote_params = sig
   val authenticate :
-    Signature.public_key_hash list -> MBytes.t -> Signature.t tzresult Lwt.t
+    Signature.public_key_hash list -> Bytes.t -> Signature.t tzresult Lwt.t
 
   val logger : RPC_client_unix.logger
 end

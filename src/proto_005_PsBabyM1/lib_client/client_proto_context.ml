@@ -160,7 +160,7 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
 let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
   >>=? fun contracts ->
-  map_s
+  rev_map_s
     (fun h ->
       ( match Contract.is_implicit h with
       | Some m -> (
@@ -191,6 +191,7 @@ let list_contract_labels cctxt ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
+  >>|? List.rev
 
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
@@ -337,10 +338,10 @@ let read_key key =
   | Some t ->
       (* TODO: unicode normalization (NFKD)... *)
       let passphrase =
-        MBytes.(concat "" [of_string key.email; of_string key.password])
+        Bigstring.(concat "" [of_string key.email; of_string key.password])
       in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = MBytes.sub sk 0 32 in
+      let sk = Bigstring.sub_bytes sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)

@@ -180,7 +180,9 @@ let main {compile_ml; pack_objects; link_shared} =
         Pervasives.exit 1
   in
   let (announced_hash, protocol) =
-    match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
+    match
+      Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir)
+    with
     | Ok (hash, proto) ->
         (hash, proto)
     | Error err ->

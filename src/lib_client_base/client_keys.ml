@@ -171,13 +171,15 @@ module type SIGNER = sig
 
   val neuterize : sk_uri -> pk_uri tzresult Lwt.t
 
-  val public_key :
-    ?interactive:Client_context.io_wallet ->
+  val import_secret_key :
+    io:Client_context.io_wallet ->
     pk_uri ->
-    Signature.Public_key.t tzresult Lwt.t
+    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
+    Lwt.t
+
+  val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
 
   val public_key_hash :
-    ?interactive:Client_context.io_wallet ->
     pk_uri ->
     (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
     Lwt.t
@@ -185,12 +187,12 @@ module type SIGNER = sig
   val sign :
     ?watermark:Signature.watermark ->
     sk_uri ->
-    MBytes.t ->
+    Bytes.t ->
     Signature.t tzresult Lwt.t
 
-  val deterministic_nonce : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce : sk_uri -> Bytes.t -> Bigstring.t tzresult Lwt.t
 
-  val deterministic_nonce_hash : sk_uri -> MBytes.t -> MBytes.t tzresult Lwt.t
+  val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
@@ -240,13 +242,17 @@ let neuterize sk_uri =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
       Signer.neuterize sk_uri)
 
-let public_key ?interactive pk_uri =
+let public_key pk_uri =
   with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
-      Signer.public_key ?interactive pk_uri)
+      Signer.public_key pk_uri)
 
-let public_key_hash ?interactive pk_uri =
+let public_key_hash pk_uri =
   with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
-      Signer.public_key_hash ?interactive pk_uri)
+      Signer.public_key_hash pk_uri)
+
+let import_secret_key ~io pk_uri =
+  with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
+      Signer.import_secret_key ~io pk_uri)
 
 let sign cctxt ?watermark sk_uri buf =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->

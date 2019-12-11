@@ -125,7 +125,9 @@ module Id = struct
   let to_string saddr = Format.asprintf "%a" pp saddr
 
   let encoding =
-    Data_encoding.conv to_string of_string_exn Data_encoding.string
+    let open Data_encoding in
+    def "p2p_point.id" ~description:"Identifier for a peer point"
+    @@ conv to_string of_string_exn string
 
   let rpc_arg =
     RPC_arg.make
@@ -217,36 +219,42 @@ module State = struct
         (fun ((), x) -> x)
         (merge_objs (obj1 (req "event_kind" (constant name))) obj)
     in
-    union
-      ~tag_size:`Uint8
-      [ case
-          (Tag 0)
-          ~title:"Requested"
-          (branch_encoding "requested" empty)
-          (function Requested -> Some () | _ -> None)
-          (fun () -> Requested);
-        case
-          (Tag 1)
-          ~title:"Accepted"
-          (branch_encoding
-             "accepted"
-             (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
-          (function Accepted p2p_peer_id -> Some p2p_peer_id | _ -> None)
-          (fun p2p_peer_id -> Accepted p2p_peer_id);
-        case
-          (Tag 2)
-          ~title:"Running"
-          (branch_encoding
-             "running"
-             (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
-          (function Running p2p_peer_id -> Some p2p_peer_id | _ -> None)
-          (fun p2p_peer_id -> Running p2p_peer_id);
-        case
-          (Tag 3)
-          ~title:"Disconnected"
-          (branch_encoding "disconnected" empty)
-          (function Disconnected -> Some () | _ -> None)
-          (fun () -> Disconnected) ]
+    def
+      "p2p_point.state"
+      ~description:
+        "The state a connection to a peer point can be in: requested \
+         (connection open from here), accepted (handshake), running \
+         (connection already established), disconnected (no connection)."
+    @@ union
+         ~tag_size:`Uint8
+         [ case
+             (Tag 0)
+             ~title:"Requested"
+             (branch_encoding "requested" empty)
+             (function Requested -> Some () | _ -> None)
+             (fun () -> Requested);
+           case
+             (Tag 1)
+             ~title:"Accepted"
+             (branch_encoding
+                "accepted"
+                (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
+             (function Accepted p2p_peer_id -> Some p2p_peer_id | _ -> None)
+             (fun p2p_peer_id -> Accepted p2p_peer_id);
+           case
+             (Tag 2)
+             ~title:"Running"
+             (branch_encoding
+                "running"
+                (obj1 (req "p2p_peer_id" P2p_peer_id.encoding)))
+             (function Running p2p_peer_id -> Some p2p_peer_id | _ -> None)
+             (fun p2p_peer_id -> Running p2p_peer_id);
+           case
+             (Tag 3)
+             ~title:"Disconnected"
+             (branch_encoding "disconnected" empty)
+             (function Disconnected -> Some () | _ -> None)
+             (fun () -> Disconnected) ]
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
@@ -285,28 +293,23 @@ module Info = struct
 
   let encoding =
     let open Data_encoding in
-    conv
-      (fun { trusted;
-             greylisted_until;
-             state;
-             last_failed_connection;
-             last_rejected_connection;
-             last_established_connection;
-             last_disconnection;
-             last_seen;
-             last_miss } ->
-        let p2p_peer_id = State.of_p2p_peer_id state in
-        ( trusted,
-          greylisted_until,
-          state,
-          p2p_peer_id,
-          last_failed_connection,
-          last_rejected_connection,
-          last_established_connection,
-          last_disconnection,
-          last_seen,
-          last_miss ))
-      (fun ( trusted,
+    def
+      "p2p_point.info"
+      ~description:
+        "Information about a peer point. Includes flags, state, and records \
+         about past events."
+    @@ conv
+         (fun { trusted;
+                greylisted_until;
+                state;
+                last_failed_connection;
+                last_rejected_connection;
+                last_established_connection;
+                last_disconnection;
+                last_seen;
+                last_miss } ->
+           let p2p_peer_id = State.of_p2p_peer_id state in
+           ( trusted,
              greylisted_until,
              state,
              p2p_peer_id,
@@ -315,36 +318,46 @@ module Info = struct
              last_established_connection,
              last_disconnection,
              last_seen,
-             last_miss ) ->
-        let state = State.of_peerid_state state p2p_peer_id in
-        {
-          trusted;
-          greylisted_until;
-          state;
-          last_failed_connection;
-          last_rejected_connection;
-          last_established_connection;
-          last_disconnection;
-          last_seen;
-          last_miss;
-        })
-      (obj10
-         (req "trusted" bool)
-         (dft "greylisted_until" Time.System.encoding Time.System.epoch)
-         (req "state" State.encoding)
-         (opt "p2p_peer_id" P2p_peer_id.encoding)
-         (opt "last_failed_connection" Time.System.encoding)
-         (opt
-            "last_rejected_connection"
-            (tup2 P2p_peer_id.encoding Time.System.encoding))
-         (opt
-            "last_established_connection"
-            (tup2 P2p_peer_id.encoding Time.System.encoding))
-         (opt
-            "last_disconnection"
-            (tup2 P2p_peer_id.encoding Time.System.encoding))
-         (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
-         (opt "last_miss" Time.System.encoding))
+             last_miss ))
+         (fun ( trusted,
+                greylisted_until,
+                state,
+                p2p_peer_id,
+                last_failed_connection,
+                last_rejected_connection,
+                last_established_connection,
+                last_disconnection,
+                last_seen,
+                last_miss ) ->
+           let state = State.of_peerid_state state p2p_peer_id in
+           {
+             trusted;
+             greylisted_until;
+             state;
+             last_failed_connection;
+             last_rejected_connection;
+             last_established_connection;
+             last_disconnection;
+             last_seen;
+             last_miss;
+           })
+         (obj10
+            (req "trusted" bool)
+            (dft "greylisted_until" Time.System.encoding Time.System.epoch)
+            (req "state" State.encoding)
+            (opt "p2p_peer_id" P2p_peer_id.encoding)
+            (opt "last_failed_connection" Time.System.encoding)
+            (opt
+               "last_rejected_connection"
+               (tup2 P2p_peer_id.encoding Time.System.encoding))
+            (opt
+               "last_established_connection"
+               (tup2 P2p_peer_id.encoding Time.System.encoding))
+            (opt
+               "last_disconnection"
+               (tup2 P2p_peer_id.encoding Time.System.encoding))
+            (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
+            (opt "last_miss" Time.System.encoding))
 end
 
 module Pool_event = struct
@@ -436,5 +449,18 @@ module Pool_event = struct
 
   type t = kind Time.System.stamped
 
-  let encoding = Time.System.stamped_encoding kind_encoding
+  let encoding =
+    Data_encoding.def
+      "p2p_point.pool_event"
+      ~description:
+        "Events happening during maintenance of and operations on a peer \
+         point pool (such as connections, disconnections, connection \
+         requests)."
+    @@ Time.System.stamped_encoding kind_encoding
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:Id.pp Id.encoding ;
+  Data_encoding.Registration.register ~pp:State.pp_digram State.encoding ;
+  Data_encoding.Registration.register Info.encoding ;
+  Data_encoding.Registration.register Pool_event.encoding

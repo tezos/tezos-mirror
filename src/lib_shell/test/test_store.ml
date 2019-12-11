@@ -87,11 +87,11 @@ let chain_id = Chain_id.of_block_hash genesis_block
 
 let make proto : Operation.t = {shell = {branch = genesis_block}; proto}
 
-let op1 = make (MBytes.of_string "Capadoce")
+let op1 = make (Bytes.of_string "Capadoce")
 
 let oph1 = Operation.hash op1
 
-let op2 = make (MBytes.of_string "Kivu")
+let op2 = make (Bytes.of_string "Kivu")
 
 let oph2 = Operation.hash op2
 
@@ -114,17 +114,17 @@ let lolblock ?(operations = []) header =
           predecessor = genesis_block;
           operations_hash;
           fitness =
-            [ MBytes.of_string @@ string_of_int @@ String.length header;
-              MBytes.of_string @@ string_of_int @@ 12 ];
+            [ Bytes.of_string @@ string_of_int @@ String.length header;
+              Bytes.of_string @@ string_of_int @@ 12 ];
           context = Context_hash.zero;
         };
-      protocol_data = MBytes.of_string header;
+      protocol_data = Bytes.of_string header;
     }
   in
   let block_contents =
     {
       header = block_header;
-      Store.Block.metadata = MBytes.create 0;
+      Store.Block.metadata = Bytes.create 0;
       max_operations_ttl = 0;
       message = None;
       context = Context_hash.zero;
@@ -245,18 +245,18 @@ let check (type t) (module Store : Store_sigs.STORE with type t = t)
     (s : Store.t) k d =
   Store.read_opt s k
   >|= function
-  | Some d' when MBytes.equal d d' ->
+  | Some d' when Bytes.equal d d' ->
       ()
   | Some d' ->
       Assert.fail_msg
-        ~expected:(MBytes.to_string d)
-        ~given:(MBytes.to_string d')
+        ~expected:(Bytes.to_string d)
+        ~given:(Bytes.to_string d')
         "Error while reading key %d %S\n%!"
-        Cstruct.(compare (of_bigarray d) (of_bigarray d'))
+        Bytes.(compare d d')
         (String.concat Filename.dir_sep k)
   | None ->
       Assert.fail_msg
-        ~expected:(MBytes.to_string d)
+        ~expected:(Bytes.to_string d)
         ~given:""
         "Error while reading key %S\n%!"
         (String.concat Filename.dir_sep k)
@@ -274,15 +274,15 @@ let check_none (type t) (module Store : Store_sigs.STORE with type t = t)
 
 let test_generic (type t) (module Store : Store_sigs.STORE with type t = t)
     (s : Store.t) =
-  Store.store s ["day"; "current"] (MBytes.of_string "Mercredi")
+  Store.store s ["day"; "current"] (Bytes.of_string "Mercredi")
   >>= fun () ->
-  Store.store s ["day"; "next"] (MBytes.of_string "Jeudi")
+  Store.store s ["day"; "next"] (Bytes.of_string "Jeudi")
   >>= fun () ->
-  Store.store s ["day"; "truc"; "chose"] (MBytes.of_string "Vendredi")
+  Store.store s ["day"; "truc"; "chose"] (Bytes.of_string "Vendredi")
   >>= fun () ->
-  check (module Store) s ["day"; "current"] (MBytes.of_string "Mercredi")
+  check (module Store) s ["day"; "current"] (Bytes.of_string "Mercredi")
   >>= fun () ->
-  check (module Store) s ["day"; "next"] (MBytes.of_string "Jeudi")
+  check (module Store) s ["day"; "next"] (Bytes.of_string "Jeudi")
   >>= fun () -> check_none (module Store) s ["day"]
 
 let list (type t) (module Store : Store_sigs.STORE with type t = t)
@@ -291,15 +291,15 @@ let list (type t) (module Store : Store_sigs.STORE with type t = t)
 
 let test_generic_list (type t)
     (module Store : Store_sigs.STORE with type t = t) (s : Store.t) =
-  Store.store s ["a"; "b"] (MBytes.of_string "Novembre")
+  Store.store s ["a"; "b"] (Bytes.of_string "Novembre")
   >>= fun () ->
-  Store.store s ["a"; "c"] (MBytes.of_string "Juin")
+  Store.store s ["a"; "c"] (Bytes.of_string "Juin")
   >>= fun () ->
-  Store.store s ["a"; "d"; "e"] (MBytes.of_string "Septembre")
+  Store.store s ["a"; "d"; "e"] (Bytes.of_string "Septembre")
   >>= fun () ->
-  Store.store s ["f"] (MBytes.of_string "Avril")
+  Store.store s ["f"] (Bytes.of_string "Avril")
   >>= fun () ->
-  Store.store s ["g"; "h"] (MBytes.of_string "Avril")
+  Store.store s ["g"; "h"] (Bytes.of_string "Avril")
   >>= fun () ->
   list (module Store) s []
   >>= fun l ->
@@ -357,14 +357,14 @@ let test_hashset (type t) (module Store : Store_sigs.STORE with type t = t)
       Lwt.return (BlockSet.add bh acc))
   >>= fun bhset2'' ->
   Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2'' ;
-  Store.store s ["day"; "current"] (MBytes.of_string "Mercredi")
+  Store.store s ["day"; "current"] (Bytes.of_string "Mercredi")
   >>= fun () ->
   StoreSet.remove_all s
   >>= fun () ->
   StoreSet.read_all s
   >>= fun empty ->
   Assert.equal_block_set ~msg:__LOC__ BlockSet.empty empty ;
-  check (module Store) s ["day"; "current"] (MBytes.of_string "Mercredi")
+  check (module Store) s ["day"; "current"] (Bytes.of_string "Mercredi")
   >>= fun () -> Lwt.return_unit
 
 (** HashMap *)

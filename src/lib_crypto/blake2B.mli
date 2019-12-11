@@ -79,7 +79,7 @@ end)
 (K : PrefixedName) (Contents : sig
   type t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 end) : S.MERKLE_TREE with type elt = Contents.t
 
 module Generic_Merkle_tree (H : sig

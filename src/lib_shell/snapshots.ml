@@ -24,15 +24,203 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "shell.snapshots"
-end)
+type status =
+  | Export_unspecified_hash of Block_hash.t
+  | Export_info of History_mode.t * Block_hash.t * Int32.t
+  | Export_success of string
+  | Set_history_mode of History_mode.t
+  | Import_info of string
+  | Import_unspecified_hash
+  | Import_loading
+  | Set_head of Block_hash.t
+  | Import_success of string
+  | Reconstruct_start_default
+  | Reconstruct_end_default of Block_hash.t
+  | Reconstruct_enum
+  | Reconstruct_success
 
-let ( // ) = Filename.concat
+let status_pp ppf = function
+  | Export_unspecified_hash h ->
+      Format.fprintf
+        ppf
+        "There is no block hash specified with the `--block` option. Using %a \
+         (last checkpoint)"
+        Block_hash.pp
+        h
+  | Export_info (hm, h, l) ->
+      Format.fprintf
+        ppf
+        "Exporting a snapshot in %a mode, targeting block hash %a at level %a"
+        History_mode.pp
+        hm
+        Block_hash.pp
+        h
+        Format.pp_print_int
+        (Int32.to_int l)
+  | Export_success filename ->
+      Format.fprintf ppf "@[Successful export: %s@]" filename
+  | Set_history_mode hm ->
+      Format.fprintf ppf "Setting history-mode to %a" History_mode.pp hm
+  | Import_info filename ->
+      Format.fprintf ppf "Importing data from snapshot file %s" filename
+  | Import_unspecified_hash ->
+      Format.fprintf
+        ppf
+        "You may consider using the --block <block_hash> argument to verify \
+         that the block imported is the one you expected"
+  | Import_loading ->
+      Format.fprintf
+        ppf
+        "Retrieving and validating data. This can take a while, please bear \
+         with us"
+  | Set_head h ->
+      Format.fprintf ppf "Setting current head to block %a" Block_hash.pp h
+  | Import_success filename ->
+      Format.fprintf ppf "@[Successful import from file %s@]" filename
+  | Reconstruct_start_default ->
+      Format.fprintf ppf "Starting reconstruct from genesis"
+  | Reconstruct_end_default h ->
+      Format.fprintf
+        ppf
+        "Starting reconstruct toward the predecessor of the current head (%a)"
+        Block_hash.pp
+        h
+  | Reconstruct_enum ->
+      Format.fprintf ppf "Enumerating all blocks to reconstruct"
+  | Reconstruct_success ->
+      Format.fprintf ppf "The storage was successfully reconstructed."
 
-let context_dir data_dir = data_dir // "context"
+type t = status Time.System.stamped
 
-let store_dir data_dir = data_dir // "store"
+module Definition = struct
+  let name = "snapshot"
+
+  type nonrec t = t
+
+  let encoding =
+    let open Data_encoding in
+    Time.System.stamped_encoding
+    @@ union
+         [ case
+             (Tag 0)
+             ~title:"Export_unspecified_hash"
+             Block_hash.encoding
+             (function Export_unspecified_hash h -> Some h | _ -> None)
+             (fun h -> Export_unspecified_hash h);
+           case
+             (Tag 1)
+             ~title:"Export_info"
+             (obj3
+                (req "history_mode" History_mode.encoding)
+                (req "block_hash" Block_hash.encoding)
+                (req "level" int32))
+             (function Export_info (hm, h, l) -> Some (hm, h, l) | _ -> None)
+             (fun (hm, h, l) -> Export_info (hm, h, l));
+           case
+             (Tag 2)
+             ~title:"Export_success"
+             string
+             (function Export_success s -> Some s | _ -> None)
+             (fun s -> Export_success s);
+           case
+             (Tag 3)
+             ~title:"Set_history_mode"
+             History_mode.encoding
+             (function Set_history_mode hm -> Some hm | _ -> None)
+             (fun hm -> Set_history_mode hm);
+           case
+             (Tag 4)
+             ~title:"Import_info"
+             string
+             (function Import_info s -> Some s | _ -> None)
+             (fun s -> Import_info s);
+           case
+             (Tag 5)
+             ~title:"Import_unspecified_hash"
+             empty
+             (function Import_unspecified_hash -> Some () | _ -> None)
+             (fun () -> Import_unspecified_hash);
+           case
+             (Tag 6)
+             ~title:"Import_loading"
+             empty
+             (function Import_loading -> Some () | _ -> None)
+             (fun () -> Import_loading);
+           case
+             (Tag 7)
+             ~title:"Set_head"
+             Block_hash.encoding
+             (function Set_head h -> Some h | _ -> None)
+             (fun h -> Set_head h);
+           case
+             (Tag 8)
+             ~title:"Import_success"
+             string
+             (function Import_success s -> Some s | _ -> None)
+             (fun s -> Import_success s);
+           case
+             (Tag 9)
+             ~title:"Reconstruct_start_default"
+             empty
+             (function Reconstruct_start_default -> Some () | _ -> None)
+             (fun () -> Reconstruct_start_default);
+           case
+             (Tag 10)
+             ~title:"Reconstruct_end_default"
+             Block_hash.encoding
+             (function Reconstruct_end_default h -> Some h | _ -> None)
+             (fun h -> Reconstruct_end_default h);
+           case
+             (Tag 11)
+             ~title:"Reconstruct_enum"
+             empty
+             (function Reconstruct_enum -> Some () | _ -> None)
+             (fun () -> Reconstruct_enum);
+           case
+             (Tag 12)
+             ~title:"Reconstruct_success"
+             empty
+             (function Reconstruct_success -> Some () | _ -> None)
+             (fun () -> Reconstruct_success) ]
+
+  let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+
+  let doc = "Snapshots status."
+
+  let level (status : t) =
+    match status.data with
+    | Export_unspecified_hash _
+    | Export_info _
+    | Export_success _
+    | Set_history_mode _
+    | Import_info _
+    | Import_unspecified_hash
+    | Import_loading
+    | Set_head _
+    | Import_success _
+    | Reconstruct_start_default
+    | Reconstruct_end_default _
+    | Reconstruct_enum
+    | Reconstruct_success ->
+        Internal_event.Notice
+end
+
+module Event_snapshot = Internal_event.Make (Definition)
+
+let lwt_emit (status : status) =
+  let time = Systime_os.now () in
+  Event_snapshot.emit
+    ~section:(Internal_event.Section.make_sanitized [Definition.name])
+    (fun () -> Time.System.stamp ~time status)
+  >>= function
+  | Ok () ->
+      Lwt.return_unit
+  | Error el ->
+      Format.kasprintf
+        Lwt.fail_with
+        "Snapshot_event.emit: %a"
+        pp_print_error
+        el
 
 type error += Wrong_snapshot_export of History_mode.t * History_mode.t
 
@@ -49,6 +237,8 @@ type error += Wrong_protocol_hash of Protocol_hash.t
 type error +=
   | Inconsistent_operation_hashes of
       (Operation_list_list_hash.t * Operation_list_list_hash.t)
+
+type error += Cannot_reconstruct of History_mode.t
 
 let () =
   let open Data_encoding in
@@ -76,7 +266,7 @@ let () =
       | `Pruned ->
           "is pruned"
       | `Too_few_predecessors ->
-          "has not enough predecessors"
+          "does not have enough predecessors"
       | `Cannot_be_found ->
           "cannot be found"
     in
@@ -96,7 +286,7 @@ let () =
     ~pp:(fun ppf (bh, kind) ->
       Format.fprintf
         ppf
-        "Fails to export snapshot as the block with block hash %a %a."
+        "Fails to export snapshot using the block %a because it %a."
         Block_hash.pp
         bh
         pp_wrong_block_export_error
@@ -174,7 +364,27 @@ let () =
           Some (oph, oph')
       | _ ->
           None)
-    (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph'))
+    (fun (oph, oph') -> Inconsistent_operation_hashes (oph, oph')) ;
+  register_error_kind
+    `Permanent
+    ~id:"CannotReconstruct"
+    ~title:"Cannot reconstruct"
+    ~description:"Cannot reconstruct"
+    ~pp:(fun ppf hm ->
+      Format.fprintf
+        ppf
+        "Cannot reconstruct storage from %a mode."
+        History_mode.pp
+        hm)
+    (obj1 (req "history_mode " History_mode.encoding))
+    (function Cannot_reconstruct hm -> Some hm | _ -> None)
+    (fun hm -> Cannot_reconstruct hm)
+
+let ( // ) = Filename.concat
+
+let context_dir data_dir = data_dir // "context"
+
+let store_dir data_dir = data_dir // "store"
 
 let compute_export_limit block_store chain_data_store block_header
     export_rolling =
@@ -230,10 +440,6 @@ let pruned_block_iterator index block_store limit header =
       >>= fun proto_data -> return (Some pruned_block, Some proto_data)
     else return (Some pruned_block, None)
 
-let filename_tag = Tag.def "filename" Format.pp_print_string
-
-let block_level_tag = Tag.def "block_level" Format.pp_print_int
-
 let export ?(export_rolling = false) ~context_index ~store ~genesis filename
     block =
   let chain_id = Chain_id.of_block_hash genesis in
@@ -259,13 +465,7 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
         fail (Wrong_block_export (genesis, `Too_few_predecessors))
       else
         let last_checkpoint_hash = Block_header.hash last_checkpoint in
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f
-                "There is no block hash specified with the `--block` option. \
-                 Using %a (last checkpoint)"
-              -% a Block_hash.Logging.tag last_checkpoint_hash)
+        lwt_emit (Export_unspecified_hash last_checkpoint_hash)
         >>= fun () -> return last_checkpoint_hash )
   >>=? fun checkpoint_block_hash ->
   State.Block.Header.read_opt (block_store, checkpoint_block_hash)
@@ -276,15 +476,9 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             let export_mode =
               if export_rolling then History_mode.Rolling else Full
             in
-            lwt_log_notice
-              Tag.DSL.(
-                fun f ->
-                  f
-                    "Exporting a snapshot in mode %a, targeting block hash %a \
-                     at level %a"
-                  -% a History_mode.tag export_mode
-                  -% a Block_hash.Logging.tag checkpoint_block_hash
-                  -% a block_level_tag (Int32.to_int block_header.shell.level))
+            lwt_emit
+              (Export_info
+                 (export_mode, checkpoint_block_hash, block_header.shell.level))
             >>= fun () ->
             (* Get block precessor's block header *)
             Store.Block.Predecessors.read
@@ -314,13 +508,8 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             let block_data = {Context.Block_data.block_header; operations} in
             return (pred_block_header, block_data, export_mode, iterator))
   >>=? fun data_to_dump ->
-  lwt_log_notice (fun f -> f "Now loading data")
-  >>= fun () ->
   Context.dump_contexts context_index data_to_dump ~filename
-  >>=? fun () ->
-  lwt_log_notice
-    Tag.DSL.(fun f -> f "@[Successful export: %a@]" -% a filename_tag filename)
-  >>= fun () -> return_unit
+  >>=? fun () -> lwt_emit (Export_success filename) >>= fun () -> return_unit
 
 let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
@@ -328,8 +517,7 @@ let check_operations_consistency block_header operations operation_hashes =
     (fun (_, op) (_, oph) ->
       let expected_op_hash = List.map Operation.hash op in
       List.iter2
-        (fun expected found ->
-          assert (Operation_hash.equal expected found) (* paul:here *))
+        (fun expected found -> assert (Operation_hash.equal expected found))
         expected_op_hash
         oph)
     operations
@@ -370,34 +558,16 @@ let check_context_hash_consistency block_validation_result block_header =
     (Snapshot_import_failure "resulting context hash does not match")
 
 let set_history_mode store history_mode =
-  match history_mode with
-  | History_mode.Full | History_mode.Rolling ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Setting history-mode to %a" -% a History_mode.tag history_mode)
-      >>= fun () ->
-      Store.Configuration.History_mode.store store history_mode
-      >>= fun () -> return_unit
-  | History_mode.Archive ->
-      fail (Snapshot_import_failure "cannot import an archive context")
+  lwt_emit (Set_history_mode history_mode)
+  >>= fun () ->
+  Store.Configuration.History_mode.store store history_mode
+  >>= fun () -> return_unit
 
 let store_new_head chain_state chain_data ~genesis block_header operations
     block_validation_result =
-  let { Tezos_validation.Block_validation.validation_result;
-        block_metadata;
-        ops_metadata;
-        forking_testchain;
-        context_hash } =
+  let ({validation_store; block_metadata; ops_metadata; forking_testchain}
+        : Tezos_validation.Block_validation.result) =
     block_validation_result
-  in
-  let validation_store =
-    {
-      State.Block.context_hash;
-      message = validation_result.message;
-      max_operations_ttl = validation_result.max_operations_ttl;
-      last_allowed_fork_level = validation_result.last_allowed_fork_level;
-    }
   in
   State.Block.store
     chain_state
@@ -412,7 +582,8 @@ let store_new_head chain_state chain_data ~genesis block_header operations
   | None ->
       (* Should not happen as the data-dir must be empty *)
       fail
-        (Snapshot_import_failure "a chain head is already present in the store")
+        (Snapshot_import_failure
+           "a chain head is already registered in the store")
   | Some new_head ->
       (* New head is set*)
       Store.Chain_data.Known_heads.remove chain_data genesis
@@ -520,7 +691,7 @@ let verify_predecessors header_opt pred_hash =
       fail_unless
         ( header.Block_header.shell.level >= 2l
         && Block_hash.equal header.shell.predecessor pred_hash )
-        (Snapshot_import_failure "inconsistent predecessors")
+        (Snapshot_import_failure "predecessors inconsistency")
 
 let verify_oldest_header oldest_header genesis_hash =
   let oldest_level = oldest_header.Block_header.shell.level in
@@ -530,7 +701,7 @@ let verify_oldest_header oldest_header genesis_hash =
        && Block_hash.equal
             oldest_header.Block_header.shell.predecessor
             genesis_hash )
-    (Snapshot_import_failure "inconsistent oldest level")
+    (Snapshot_import_failure "oldest level inconsistency")
 
 let block_validation succ_header_opt header_hash
     {Context.Pruned_block.block_header; operations; operation_hashes} =
@@ -539,35 +710,172 @@ let block_validation succ_header_opt header_hash
   check_operations_consistency block_header operations operation_hashes
   >>=? fun () -> return_unit
 
-let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "Importing data from snapshot file %a" -% a filename_tag filename)
+(* Reconstruct the storage (without checking if the context/store is already populated) *)
+let reconstruct_storage store context_index chain_id block_store chain_state
+    chain_store (history_list : Block_hash.t list) =
+  let history = Array.of_list history_list in
+  let limit = Array.length history in
+  let rec reconstruct_chunks level =
+    Store.with_atomic_rw store (fun () ->
+        let rec reconstruct_chunks level =
+          Tezos_stdlib_unix.Utils.display_progress
+            "Reconstructing contexts: %i/%i"
+            level
+            limit ;
+          if level = limit then return level
+          else
+            let block_hash = history.(level) in
+            State.Block.Header.read (block_store, block_hash)
+            >>=? fun block_header ->
+            let validations_passes = block_header.shell.validation_passes in
+            map_s
+              (fun i ->
+                Store.Block.Operations.read (block_store, block_hash) i)
+              (0 -- (validations_passes - 1))
+            >>=? fun operations ->
+            let predecessor_block_hash = block_header.shell.predecessor in
+            State.Block.Header.read (block_store, predecessor_block_hash)
+            >>=? fun pred_block_header ->
+            let context_hash = pred_block_header.shell.context in
+            Context.checkout_exn context_index context_hash
+            >>= fun pred_context ->
+            Tezos_validation.Block_validation.apply
+              chain_id
+              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
+              ~predecessor_block_header:pred_block_header
+              ~predecessor_context:pred_context
+              ~block_header
+              operations
+            >>=? fun block_validation_result ->
+            check_context_hash_consistency
+              block_validation_result.validation_store
+              block_header
+            >>=? fun () ->
+            let { Tezos_validation.Block_validation.validation_store;
+                  block_metadata;
+                  ops_metadata;
+                  _ } =
+              block_validation_result
+            in
+            let contents =
+              {
+                header = block_header;
+                Store.Block.message = validation_store.message;
+                max_operations_ttl = validation_store.max_operations_ttl;
+                last_allowed_fork_level =
+                  validation_store.last_allowed_fork_level;
+                context = validation_store.context_hash;
+                metadata = block_metadata;
+              }
+            in
+            let st = (block_store, block_hash) in
+            Store.Block.Pruned_contents.remove st
+            >>= fun () ->
+            Store.Block.Contents.store st contents
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops ->
+                Store.Block.Operation_hashes.store
+                  st
+                  i
+                  (List.map Operation.hash ops))
+              operations
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops -> Store.Block.Operations.store st i ops)
+              operations
+            >>= fun () ->
+            Lwt_list.iteri_p
+              (fun i ops -> Store.Block.Operations_metadata.store st i ops)
+              ops_metadata
+            >>= fun () -> reconstruct_chunks (level + 1)
+        in
+        if (level + 1) mod 1000 = 0 then return level
+        else reconstruct_chunks level)
+    >>=? fun level ->
+    if level = limit then return_unit else reconstruct_chunks limit
+  in
+  set_history_mode store History_mode.Archive
+  >>=? fun () ->
+  reconstruct_chunks 0
+  >>=? fun _cpt ->
+  Tezos_stdlib_unix.Utils.display_progress_end () ;
+  Store.Chain.Genesis_hash.read chain_store
+  >>=? fun genesis_hash ->
+  let new_savepoint = (0l, genesis_hash) in
+  update_savepoint chain_state new_savepoint
+  >>= fun () ->
+  let chain_data = Store.Chain_data.get chain_store in
+  Store.Chain_data.Caboose.store chain_data (0l, genesis_hash)
+  >>= fun () -> return_unit
+
+let reconstruct chain_id store chain_state context_index =
+  let chain_store = Store.Chain.get store chain_id in
+  let block_store = Store.Block.get chain_store in
+  let chain_data_store = Store.Chain_data.get chain_store in
+  Store.Configuration.History_mode.read store
+  >>=? fun history_mode ->
+  fail_unless
+    (history_mode = History_mode.Full)
+    (Cannot_reconstruct history_mode)
+  >>=? fun () ->
+  let low_limit = 1l in
+  lwt_emit Reconstruct_start_default
+  >>= fun () ->
+  Store.Chain_data.Save_point.read chain_data_store
+  >>=? fun (_, savepoint_hash) ->
+  lwt_emit (Reconstruct_end_default savepoint_hash)
+  >>= fun () ->
+  State.Block.Header.read (block_store, savepoint_hash)
+  >>=? fun savepoint_header ->
+  let high_limit = savepoint_header.Block_header.shell.predecessor in
+  lwt_emit Reconstruct_enum
+  >>= fun () ->
+  let rec gather_history low_limit block_hash acc =
+    Store.Block.Pruned_contents.read_opt (block_store, block_hash)
+    >>= function
+    | Some {header; _} ->
+        if header.shell.level = low_limit then return (block_hash :: acc)
+        else
+          gather_history low_limit header.shell.predecessor (block_hash :: acc)
+    | None ->
+        Store.Block.Contents.known (block_store, block_hash)
+        >>= fun is_contents_known ->
+        if is_contents_known then return acc
+        else
+          failwith
+            "Unexpected missing block in store: %a"
+            Block_hash.pp
+            block_hash
+  in
+  gather_history low_limit high_limit []
+  >>=? fun hash_history ->
+  reconstruct_storage
+    store
+    context_index
+    chain_id
+    block_store
+    chain_state
+    chain_store
+    hash_history
+  >>=? fun () -> lwt_emit Reconstruct_success >>= fun () -> return_unit
+
+let import ?(reconstruct = false) ?patch_context ~data_dir ~dir_cleaner
+    ~genesis filename block =
+  lwt_emit (Import_info filename)
   >>= fun () ->
   ( match block with
   | None ->
-      lwt_log_notice (fun f ->
-          f
-            "You may consider using the --block <block_hash> argument to \
-             verify that the block imported is the one you expect")
+      lwt_emit Import_unspecified_hash
   | Some _ ->
       Lwt.return_unit )
   >>= fun () ->
-  lwt_log_notice (fun f ->
-      f
-        "Retrieving and validating data. This can take a while, please bear \
-         with us")
+  lwt_emit Import_loading
   >>= fun () ->
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
   let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
-  (* FIXME: use config value ? *)
-  State.init
-    ~context_root
-    ~store_root
-    genesis
-    ~patch_context:(patch_context None)
+  State.init ~context_root ~store_root genesis ?patch_context
   >>=? fun (state, chain_state, context_index, _history_mode) ->
   Store.init store_root
   >>=? fun store ->
@@ -677,11 +985,7 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
       | None ->
           return_unit )
       >>=? fun () ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Setting current head to block %a"
-            -% a Block_hash.Logging.tag (Block_header.hash block_header))
+      lwt_emit (Set_head (Block_header.hash block_header))
       >>= fun () ->
       let pred_context_hash = predecessor_block_header.shell.context in
       checkout_exn context_index pred_context_hash
@@ -695,12 +999,14 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
         ~block_header
         operations
       >>=? fun block_validation_result ->
-      check_context_hash_consistency block_validation_result block_header
+      check_context_hash_consistency
+        block_validation_result.validation_store
+        block_header
       >>=? fun () ->
       verify_oldest_header oldest_header genesis.block
       >>=? fun () ->
-      (* ... we set the history mode regarding the snapshot version hint ... *)
-      set_history_mode store history_mode
+      ( if not reconstruct then set_history_mode store history_mode
+      else return_unit )
       >>=? fun () ->
       (* ... and we import protocol data...*)
       import_protocol_data_list
@@ -729,18 +1035,30 @@ let import ~data_dir ~dir_cleaner ~patch_context ~genesis filename block =
         ~genesis:genesis.block
         block_header
         oldest_header
-        block_validation_result.validation_result.max_operations_ttl
+        block_validation_result.validation_store.max_operations_ttl
+      >>=? fun () ->
+      ( match reconstruct with
+      | true ->
+          if history_mode = History_mode.Full then
+            reconstruct_storage
+              store
+              context_index
+              chain_id
+              block_store
+              chain_state
+              chain_store
+              rev_block_hashes
+            >>=? fun () ->
+            lwt_emit Reconstruct_success >>= fun () -> return_unit
+          else fail (Cannot_reconstruct history_mode)
+      | false ->
+          return_unit )
       >>=? fun () ->
       Store.close store ;
       State.close state >>= fun () -> return_unit)
     (function
       | Ok () ->
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f "@[Successful import from file %a@]"
-                -% a filename_tag filename)
-          >>= fun () -> return_unit
+          lwt_emit (Import_success filename) >>= fun () -> return_unit
       | Error errors ->
           dir_cleaner data_dir >>= fun () -> Lwt.return (Error errors))
     (fun exn -> dir_cleaner data_dir >>= fun () -> Lwt.fail exn)

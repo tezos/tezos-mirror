@@ -34,8 +34,6 @@ val name_encoding : name Data_encoding.t
 
 val chain_name : name
 
-val old_chain_name : name
-
 val incompatible_chain_name : name
 
 val sandboxed_chain_name : name

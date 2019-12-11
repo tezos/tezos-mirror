@@ -709,7 +709,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                    Some Proto.{shell = op.shell; protocol_data}
              in
              let fold_op _k (op, _error) acc =
-               match map_op op with None -> acc | Some op -> op :: acc
+               match map_op op with Some op -> op :: acc | None -> acc
              in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
@@ -756,28 +756,25 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                    >>= function
                    | Some (kind, shell, protocol_data) when filter_result kind
                      -> (
-                       (* NOTE: Should the protocol change, a new Prevalidation
-                        * context would be created. Thus, we use the same Proto. *)
-                       let bytes =
-                         Data_encoding.Binary.to_bytes
+                     (* NOTE: Should the protocol change, a new Prevalidation
+                      * context would  be created. Thus, we use the same Proto. *)
+                     match
+                       Data_encoding.Binary.to_bytes
+                         Proto.operation_data_encoding
+                         protocol_data
+                     with
+                     | None ->
+                         Lwt.return_none
+                     | Some bytes -> (
+                       match
+                         Data_encoding.Binary.of_bytes
                            Proto.operation_data_encoding
-                           protocol_data
-                       in
-                       match bytes with
+                           bytes
+                       with
                        | None ->
                            Lwt.return_none
-                       | Some bytes -> (
-                           let protocol_data =
-                             Data_encoding.Binary.of_bytes
-                               Proto.operation_data_encoding
-                               bytes
-                           in
-                           match protocol_data with
-                           | None ->
-                               Lwt.return_none
-                           | Some protocol_data ->
-                               Lwt.return_some [{Proto.shell; protocol_data}] )
-                       )
+                       | Some protocol_data ->
+                           Lwt.return_some [{Proto.shell; protocol_data}] ) )
                    | Some _ ->
                        next ()
                    | None ->

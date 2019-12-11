@@ -8,13 +8,14 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "tezos-base"
   "tezos-version"
   "tezos-rpc-http-server"
   "tezos-p2p"
   "tezos-shell"
   "tezos-protocol-updater"
+  "tezos-validator"
   "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-001-PtCJ7pwo"
@@ -29,9 +30,7 @@ depends: [
   "cstruct"
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: `tezos-node` binary"

@@ -9,6 +9,7 @@
                    -open Tezos_client_005_PsBabyM1
                    -open Tezos_client_commands
                    -open Tezos_baking_005_PsBabyM1_commands
+                   -open Tezos_stdlib_unix
                    -open Tezos_client_base_unix)))
 
 (alias

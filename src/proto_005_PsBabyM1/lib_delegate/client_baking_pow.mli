@@ -27,7 +27,7 @@ open Protocol
 
 (** A null proof-of-work nonce. This should only be used to non-sensical blocks
     of the correct size and shape. *)
-val empty_proof_of_work_nonce : Cstruct.buffer
+val empty_proof_of_work_nonce : Bytes.t
 
 (** [mine cctxt chain block header builder] returns a block with a valid
     proof-of-work nonce. The function [builder], provided by the caller, is used
@@ -38,5 +38,5 @@ val mine :
   Shell_services.chain ->
   Block_services.block ->
   Block_header.shell_header ->
-  (Cstruct.buffer -> Alpha_context.Block_header.contents) ->
+  (Bytes.t -> Alpha_context.Block_header.contents) ->
   Alpha_context.Block_header.contents tzresult Lwt.t

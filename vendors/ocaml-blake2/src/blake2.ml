@@ -4,32 +4,32 @@
   ---------------------------------------------------------------------------*)
 
 module Blake2b = struct
-  type t = Bigstring.t
+  type t = Bytes.t
 
   external sizeof_state : unit -> int =
     "sizeof_blake2b_state" [@@noalloc]
 
   let bytes = sizeof_state ()
 
-  external init : Bigstring.t -> int -> int =
+  external init : Bytes.t -> int -> int =
     "ml_blake2b_init" [@@noalloc]
 
-  external outlen : Bigstring.t -> int =
+  external outlen : Bytes.t -> int =
     "blake2b_state_outlen" [@@noalloc]
 
   let outlen t = outlen t
 
-  external init_key : Bigstring.t -> int -> Bigstring.t -> int =
+  external init_key : Bytes.t -> int -> Bytes.t -> int =
     "ml_blake2b_init_key" [@@noalloc]
 
-  external update : Bigstring.t -> Bigstring.t -> int =
+  external update : Bytes.t -> Bytes.t -> int =
     "ml_blake2b_update" [@@noalloc]
 
-  external final : Bigstring.t -> Bigstring.t -> int =
+  external final : Bytes.t -> Bytes.t -> int =
     "ml_blake2b_final" [@@noalloc]
 
   external direct :
-    Bigstring.t -> Bigstring.t -> Bigstring.t -> int =
+    Bytes.t -> Bytes.t -> Bytes.t -> int =
     "ml_blake2b" [@@noalloc]
 
   let or_fail ~msg f =
@@ -40,7 +40,7 @@ module Blake2b = struct
   let init ?key size =
     if size < 1 || size > 64 then
       invalid_arg "Blake2b.init: size must be between 1 and 64" ;
-    let t = Bigstring.create bytes in
+    let t = Bytes.create bytes in
     begin match key with
       | Some key ->
           or_fail ~msg:"Blake2b.init"
@@ -54,18 +54,18 @@ module Blake2b = struct
   let update t buf =
     or_fail ~msg:"Blake2b.update" (fun () -> update t buf)
 
-  type hash = Hash of Bigstring.t
+  type hash = Hash of Bytes.t
 
   let final t =
     let len = outlen t in
-    let buf = Bigstring.create len in
+    let buf = Bytes.create len in
     or_fail ~msg:"Blake2b.final" (fun () -> final t buf) ;
     Hash buf
 
-  let direct ?(key=Bigstring.create 0) inbuf len =
+  let direct ?(key=Bytes.create 0) inbuf len =
     if len < 1 || len > 64 then
       invalid_arg "Blake2b.direct: size must be between 1 and 64" ;
-    let outbuf = Bigstring.create len in
+    let outbuf = Bytes.create len in
     or_fail ~msg:"Blake2b.direct" (fun () -> direct outbuf inbuf key) ;
     Hash outbuf
 end

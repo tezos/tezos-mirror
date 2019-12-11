@@ -48,7 +48,7 @@ let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
 let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
   >>=? fun contracts ->
-  map_s
+  rev_map_s
     (fun h ->
       ( match Contract.is_implicit h with
       | Some m -> (
@@ -79,6 +79,7 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
     contracts
+  >>|? List.rev
 
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source

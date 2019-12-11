@@ -459,6 +459,14 @@ struct
     in
     mapi_s f 0 l
 
+  let rec rev_map_append_s acc f = function
+    | [] ->
+        return acc
+    | hd :: tl ->
+        f hd >>=? fun v -> rev_map_append_s (v :: acc) f tl
+
+  let rev_map_s f l = rev_map_append_s [] f l
+
   let rec map_p f l =
     match l with
     | [] ->
@@ -841,6 +849,8 @@ let () =
     ~id:"canceled"
     ~title:"Canceled"
     ~description:"A promise was unexpectedly canceled"
+    ~pp:(fun f () ->
+      Format.pp_print_string f "The promise was unexpectedly canceled")
     Data_encoding.unit
     (function Canceled -> Some () | _ -> None)
     (fun () -> Canceled)
@@ -877,6 +887,7 @@ let () =
     ~id:"utils.Timeout"
     ~title:"Timeout"
     ~description:"Timeout"
+    ~pp:(fun f () -> Format.pp_print_string f "The request has timed out")
     Data_encoding.unit
     (function Timeout -> Some () | _ -> None)
     (fun () -> Timeout)

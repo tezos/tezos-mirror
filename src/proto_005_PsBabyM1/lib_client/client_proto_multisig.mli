@@ -33,7 +33,7 @@ type multisig_action =
   | Change_keys of Z.t * public_key list
 
 type multisig_prepared_action = {
-  bytes : MBytes.t;
+  bytes : Bytes.t;
   threshold : Z.t;
   keys : public_key list;
   counter : Z.t;
@@ -105,7 +105,7 @@ val call_multisig_on_bytes :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   multisig_contract:Contract.t ->
-  bytes:MBytes.t ->
+  bytes:Bytes.t ->
   signatures:Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->

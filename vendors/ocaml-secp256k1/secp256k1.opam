@@ -7,10 +7,15 @@ homepage: "https://github.com/vbmithr/ocaml-secp256k1-internal"
 bug-reports: "https://github.com/vbmithr/ocaml-secp256k1-internal/issues"
 dev-repo: "git://github.com/vbmithr/ocaml-secp256k1-internal"
 synopsis: "Bindings to secp256k1 internal functions"
-build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+build: [
+  ["dune" "build" "-j" jobs "-p" name "@install"]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
 depends: [
   "conf-gmp" {build}
   "dune" {build & >= "1.7"}
   "cstruct" {>= "3.2.1"}
   "bigstring" {>= "0.1.1"}
+  "hex"
+  "alcotest"
 ]

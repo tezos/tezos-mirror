@@ -31,7 +31,8 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
 
   type status =
     | WorkerEvent of Event.t
-    | Request of Request.view
+    | Request of
+        (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -54,9 +55,12 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
            case
              (Tag 1)
              ~title:"Request"
-             Request.encoding
-             (function Request r -> Some r | _ -> None)
-             (fun r -> Request r);
+             (obj3
+                (req "request_view" (dynamic_size Request.encoding))
+                (req "request_status" Worker_types.request_status_encoding)
+                (req "errors" (option (list error_encoding))))
+             (function Request (v, s, e) -> Some (v, s, e) | _ -> None)
+             (fun (v, s, e) -> Request (v, s, e));
            case
              (Tag 2)
              ~title:"Terminated"
@@ -97,8 +101,24 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
   let pp base_name ppf = function
     | WorkerEvent evt ->
         Format.fprintf ppf "%a" Event.pp evt
-    | Request req ->
-        Format.fprintf ppf "@[<v 2>Request:@,%a@]" Request.pp req
+    | Request (view, {pushed; treated; completed}, None) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%a@, %a@]"
+          Request.pp
+          view
+          Worker_types.pp_status
+          {pushed; treated; completed}
+    | Request (view, {pushed; treated; completed}, Some errors) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%a@, %a, %a@]"
+          Request.pp
+          view
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errors
     | Terminated ->
         Format.fprintf ppf "@[Worker terminated [%s] @]" base_name
     | Timeout ->
@@ -136,12 +156,7 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
       With_version.(encoding ~name (first_version v0_encoding))
 
     let pp ppf (status : t) =
-      Format.fprintf
-        ppf
-        "%s : %a"
-        name
-        (Time.System.pp_stamped (pp Static.worker_name))
-        status
+      Format.fprintf ppf "%a" (pp Static.worker_name) status.data
 
     let doc = "Worker status."
 

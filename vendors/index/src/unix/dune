@@ -1,0 +1,5 @@
+(library
+ (public_name index.unix)
+ (name index_unix)
+ (c_names pread pwrite)
+ (libraries index logs logs.threaded threads unix))

@@ -50,7 +50,7 @@ type t = {
   locator : Block_locator.t;
   block_validator : Block_validator.t;
   notify_new_block : State.Block.t -> unit;
-  fetched_headers : (Block_hash.t * Block_header.t) Lwt_pipe.t;
+  fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.t;
   fetched_blocks :
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
     Lwt_pipe.t;
@@ -95,18 +95,43 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
   else return_unit
 
 let fetch_step pipeline (step : Block_locator.step) =
-  lwt_log_info
-    Tag.DSL.(
-      fun f ->
-        f "fetching step %a -> %a (%a) from peer %a."
-        -% t event "fetching_step_from_peer"
-        -% a Block_hash.Logging.tag step.block
-        -% a Block_hash.Logging.predecessor_tag step.predecessor
-        -% a (Tag.def ~doc:"" "" Block_locator.pp_step) step
-        -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+  ( if step.step > 2000 then
+    lwt_log_notice
+      Tag.DSL.(
+        fun f ->
+          f
+            "fetching a large bootstrap step (%a headers) from peer %a, this \
+             may take a while."
+          -% t event "fetching_large_step_from_peer"
+          -% a (Tag.def ~doc:"" "length" Format.pp_print_int) step.step
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+  else
+    lwt_log_info
+      Tag.DSL.(
+        fun f ->
+          f "fetching step %a -> %a (%a) from peer %a."
+          -% t event "fetching_step_from_peer"
+          -% a Block_hash.Logging.tag step.block
+          -% a Block_hash.Logging.predecessor_tag step.predecessor
+          -% a (Tag.def ~doc:"" "" Block_locator.pp_step) step
+          -% a P2p_peer.Id.Logging.tag pipeline.peer_id) )
   >>= fun () ->
   let rec fetch_loop acc hash cpt =
     Lwt_unix.yield ()
+    >>= fun () ->
+    ( if step.step > 2000 && step.step <> cpt && (step.step - cpt) mod 1000 = 0
+    then
+      lwt_log_notice
+        Tag.DSL.(
+          fun f ->
+            f "fetched %a/%a headers from peer %a, and continuing."
+            -% t event "still_fetching_large_step_from_peer"
+            -% a
+                 (Tag.def ~doc:"" "fetched" Format.pp_print_int)
+                 (step.step - cpt)
+            -% a (Tag.def ~doc:"" "length" Format.pp_print_int) step.step
+            -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+    else Lwt.return_unit )
     >>= fun () ->
     if cpt < 0 then
       lwt_log_info
@@ -128,42 +153,40 @@ let fetch_step pipeline (step : Block_locator.step) =
         fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else return acc
     else
-      lwt_debug
-        Tag.DSL.(
-          fun f ->
-            f "fetching block header %a from peer %a."
-            -% t event "fetching_block_header_from_peer"
-            -% a Block_hash.Logging.tag hash
-            -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
-      >>= fun () ->
-      protect ~canceler:pipeline.canceler (fun () ->
-          Distributed_db.Block_header.fetch
-            ~timeout:pipeline.block_header_timeout
-            pipeline.chain_db
-            ~peer:pipeline.peer_id
-            hash
-            ())
-      >>=? fun header ->
-      assert_acceptable_header pipeline hash header
-      >>=? fun () ->
-      lwt_debug
-        Tag.DSL.(
-          fun f ->
-            f "fetched block header %a from peer %a."
-            -% t event "fetched_block_header_from_peer"
-            -% a Block_hash.Logging.tag hash
-            -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
-      >>= fun () ->
-      fetch_loop ((hash, header) :: acc) header.shell.predecessor (cpt - 1)
+      let chain_state = Distributed_db.chain_state pipeline.chain_db in
+      Chain.mem chain_state hash
+      >>= fun in_chain ->
+      if in_chain then return acc
+      else
+        lwt_log_info
+          Tag.DSL.(
+            fun f ->
+              f "fetching block header %a from peer %a."
+              -% t event "fetching_block_header_from_peer"
+              -% a Block_hash.Logging.tag hash
+              -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+        >>= fun () ->
+        protect ~canceler:pipeline.canceler (fun () ->
+            Distributed_db.Block_header.fetch
+              ~timeout:pipeline.block_header_timeout
+              pipeline.chain_db
+              ~peer:pipeline.peer_id
+              hash
+              ())
+        >>=? fun header ->
+        assert_acceptable_header pipeline hash header
+        >>=? fun () ->
+        lwt_log_info
+          Tag.DSL.(
+            fun f ->
+              f "fetched block header %a from peer %a."
+              -% t event "fetched_block_header_from_peer"
+              -% a Block_hash.Logging.tag hash
+              -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+        >>= fun () ->
+        fetch_loop ((hash, header) :: acc) header.shell.predecessor (cpt - 1)
   in
   fetch_loop [] step.block step.step
-  >>=? fun headers ->
-  iter_s
-    (fun header ->
-      protect ~canceler:pipeline.canceler (fun () ->
-          Lwt_pipe.push pipeline.fetched_headers header
-          >>= fun () -> return_unit))
-    headers
 
 let headers_fetch_worker_loop pipeline =
   (let sender_id = Distributed_db.my_peer_id pipeline.chain_db in
@@ -210,7 +233,45 @@ let headers_fetch_worker_loop pipeline =
        fail_unless
          predecessor_known
          (Too_short_locator (sender_id, pipeline.locator))
-       >>=? fun () -> iter_s (fetch_step pipeline) steps)
+       >>=? fun () ->
+       let rec process_headers headers =
+         let (batch, remaining_headers) = List.split_n 20 headers in
+         protect ~canceler:pipeline.canceler (fun () ->
+             Lwt_pipe.push pipeline.fetched_headers batch
+             >>= fun () -> return_unit)
+         >>=? fun () ->
+         match remaining_headers with
+         | [] ->
+             return_unit
+         | _ ->
+             process_headers remaining_headers
+       in
+       let rec pipe ?pred = function
+         | [] ->
+             return_unit
+         | first :: (second :: _ as rest) ->
+             let fetch =
+               match pred with
+               | None ->
+                   fetch_step pipeline first
+               | Some fetch ->
+                   fetch
+             in
+             let pred = fetch_step pipeline second in
+             fetch
+             >>=? fun headers ->
+             process_headers headers >>=? fun () -> pipe ~pred rest
+         | [last] ->
+             let fetch =
+               match pred with
+               | None ->
+                   fetch_step pipeline last
+               | Some fetch ->
+                   fetch
+             in
+             fetch >>=? process_headers
+       in
+       pipe steps)
   >>= function
   | Ok () ->
       lwt_log_info
@@ -269,39 +330,48 @@ let rec operations_fetch_worker_loop pipeline =
   >>= (fun () ->
         protect ~canceler:pipeline.canceler (fun () ->
             Lwt_pipe.pop pipeline.fetched_headers >>= return)
-        >>=? fun (hash, header) ->
-        lwt_log_info
-          Tag.DSL.(
-            fun f ->
-              f "fetching operations of block %a from peer %a."
-              -% t event "fetching_operations"
-              -% a Block_hash.Logging.tag hash
-              -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
-        >>= fun () ->
-        let operations =
-          map_p
-            (fun i ->
-              protect ~canceler:pipeline.canceler (fun () ->
-                  Distributed_db.Operations.fetch
-                    ~timeout:pipeline.block_operations_timeout
-                    pipeline.chain_db
-                    ~peer:pipeline.peer_id
-                    (hash, i)
-                    header.shell.operations_hash))
-            (0 -- (header.shell.validation_passes - 1))
-          >>=? fun operations ->
-          lwt_log_info
-            Tag.DSL.(
-              fun f ->
-                f "fetched operations of block %a from peer %a."
-                -% t event "fetched_operations"
-                -% a Block_hash.Logging.tag hash
-                -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
-          >>= fun () -> return operations
-        in
-        protect ~canceler:pipeline.canceler (fun () ->
-            Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
-            >>= fun () -> return_unit))
+        >>=? fun batch ->
+        map_p
+          (fun (hash, header) ->
+            lwt_log_info
+              Tag.DSL.(
+                fun f ->
+                  f "fetching operations of block %a from peer %a."
+                  -% t event "fetching_operations"
+                  -% a Block_hash.Logging.tag hash
+                  -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+            >>= fun () ->
+            let operations =
+              map_p
+                (fun i ->
+                  protect ~canceler:pipeline.canceler (fun () ->
+                      Distributed_db.Operations.fetch
+                        ~timeout:pipeline.block_operations_timeout
+                        pipeline.chain_db
+                        ~peer:pipeline.peer_id
+                        (hash, i)
+                        header.Block_header.shell.operations_hash
+                      >>= fun res -> Lwt.return res))
+                (0 -- (header.shell.validation_passes - 1))
+              >>=? fun operations ->
+              lwt_log_info
+                Tag.DSL.(
+                  fun f ->
+                    f "fetched operations of block %a from peer %a."
+                    -% t event "fetched_operations"
+                    -% a Block_hash.Logging.tag hash
+                    -% a P2p_peer.Id.Logging.tag pipeline.peer_id)
+              >>= fun () -> return operations
+            in
+            return (hash, header, operations))
+          batch
+        >>=? fun operationss ->
+        iter_s
+          (fun (hash, header, operations) ->
+            protect ~canceler:pipeline.canceler (fun () ->
+                Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
+                >>= fun () -> return_unit))
+          operationss)
   >>= function
   | Ok () ->
       operations_fetch_worker_loop pipeline

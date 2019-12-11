@@ -226,7 +226,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         (depth >= 0)
         (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
       >>=? fun () ->
-      State.Block.context block
+      State.Block.context_exn block
       >>= fun context ->
       Context.mem context path
       >>= fun mem ->
@@ -288,7 +288,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         ~protocol_data
         operations) ;
   register0 S.Helpers.Preapply.operations (fun block () ops ->
-      State.Block.context block
+      State.Block.context_exn block
       >>= fun ctxt ->
       let predecessor = State.Block.hash block in
       let header = State.Block.shell_header block in
@@ -313,7 +313,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       >>=? fun (state, acc) ->
       Next_proto.finalize_block state >>=? fun _ -> return (List.rev acc)) ;
   register1 S.Helpers.complete (fun block prefix () () ->
-      State.Block.context block
+      State.Block.context_exn block
       >>= fun ctxt ->
       Base58.complete prefix
       >>= fun l1 ->
@@ -331,7 +331,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   merge
     (RPC_directory.map
        (fun block ->
-         State.Block.context block
+         State.Block.context_exn block
          >|= fun context ->
          let context = Shell_context.wrap_disk_context context in
          {
@@ -355,7 +355,7 @@ let get_directory chain_state block =
   | Some dir ->
       Lwt.return dir
   | None -> (
-      State.Block.protocol_hash block
+      State.Block.protocol_hash_exn block
       >>= fun next_protocol_hash ->
       let next_protocol = get_protocol next_protocol_hash in
       State.Block.predecessor block
@@ -372,7 +372,7 @@ let get_directory chain_state block =
             State.Chain.get_level_indexed_protocol
               chain_state
               (State.Block.header pred)
-          else State.Block.protocol_hash pred )
+          else State.Block.protocol_hash_exn pred )
           >>= fun protocol_hash ->
           let (module Proto) = get_protocol protocol_hash in
           State.Block.get_rpc_directory block

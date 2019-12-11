@@ -2,9 +2,11 @@
  (name tezos_p2p)
  (public_name tezos-p2p)
  (libraries tezos-base
+            tezos-stdlib
             tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix)))
+                   -open Tezos_stdlib_unix
+                   -open Tezos_stdlib)))
 
 (alias
  (name runtest_lint)

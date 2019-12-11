@@ -44,6 +44,10 @@ let sign =
     ~output:Data_encoding.(obj1 (req "signature" Signature.encoding))
     RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
 
+let bigstring =
+  let open Data_encoding in
+  conv Bigstring.to_bytes Bigstring.of_bytes bytes
+
 let deterministic_nonce =
   RPC_service.post_service
     ~description:
@@ -51,7 +55,7 @@ let deterministic_nonce =
        data with a given remote key"
     ~query
     ~input:Data_encoding.bytes
-    ~output:Data_encoding.(obj1 (req "deterministic_nonce" bytes))
+    ~output:Data_encoding.(obj1 (req "deterministic_nonce" bigstring))
     RPC_path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
 
 let deterministic_nonce_hash =

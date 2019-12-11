@@ -185,16 +185,115 @@ let is_decoding_error = function
       log_notice "Error: %a" pp_print_error err ;
       false
 
+module Crypto_test = struct
+  (* maximal size of the buffer *)
+  let bufsize = (1 lsl 16) - 1
+
+  let header_length = 2
+
+  let max_content_length = bufsize - Crypto_box.zerobytes
+
+  (* The size of extra data added by encryption. *)
+  let boxextrabytes = Crypto_box.zerobytes - Crypto_box.boxzerobytes
+
+  (* The number of bytes added by encryption + header *)
+  let extrabytes = header_length + boxextrabytes
+
+  type data = {
+    channel_key : Crypto_box.channel_key;
+    mutable local_nonce : Crypto_box.nonce;
+    mutable remote_nonce : Crypto_box.nonce;
+  }
+
+  let () = assert (Crypto_box.boxzerobytes >= header_length)
+
+  let write_chunk fd cryptobox_data msg =
+    let msglen = Bytes.length msg in
+    fail_unless (msglen <= max_content_length) P2p_errors.Invalid_message_size
+    >>=? fun () ->
+    let buf_length = msglen + Crypto_box.zerobytes in
+    let buf = Bytes.make buf_length '\x00' in
+    Bytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
+    let local_nonce = cryptobox_data.local_nonce in
+    cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
+    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce buf ;
+    let encrypted_length = buf_length - Crypto_box.boxzerobytes in
+    let header_pos = Crypto_box.boxzerobytes - header_length in
+    TzEndian.set_int16 buf header_pos encrypted_length ;
+    let payload = Bytes.sub buf header_pos (buf_length - header_pos) in
+    return (Unix.write fd payload 0 (buf_length - header_pos))
+    >>=? fun i ->
+    _assert (buf_length - header_pos = i) __LOC__ "" >>=? fun () -> return_unit
+
+  let read_chunk fd cryptobox_data =
+    let header_buf = Bytes.create header_length in
+    return (Unix.read fd header_buf 0 header_length)
+    >>=? fun i ->
+    _assert (header_length = i) __LOC__ ""
+    >>=? fun () ->
+    let encrypted_length = TzEndian.get_uint16 header_buf 0 in
+    let buf_length = encrypted_length + Crypto_box.boxzerobytes in
+    let buf = Bytes.make buf_length '\x00' in
+    return (Unix.read fd buf Crypto_box.boxzerobytes encrypted_length)
+    >>=? fun i ->
+    _assert (encrypted_length = i) __LOC__ ""
+    >>=? fun () ->
+    let remote_nonce = cryptobox_data.remote_nonce in
+    cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
+    match
+      Crypto_box.fast_box_open_noalloc
+        cryptobox_data.channel_key
+        remote_nonce
+        buf
+    with
+    | false ->
+        fail P2p_errors.Decipher_error
+    | true ->
+        return
+          (Bytes.sub
+             buf
+             Crypto_box.zerobytes
+             (buf_length - Crypto_box.zerobytes))
+
+  let (sk, pk, pkh) = Crypto_box.random_keypair ()
+
+  let zero_nonce = Crypto_box.zero_nonce
+
+  let channel_key = Crypto_box.precompute sk pk
+
+  let (in_fd, out_fd) = Unix.pipe ()
+
+  let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
+
+  let wrap () =
+    Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
+        let msg = Bytes.of_string "test" in
+        write_chunk out_fd data msg
+        >>= fun _ ->
+        read_chunk in_fd data
+        >>= function
+        | Ok res when Bytes.equal msg res ->
+            Lwt.return_unit
+        | Ok res ->
+            Format.kasprintf
+              Pervasives.failwith
+              "Error : %s <> %s"
+              (Bytes.to_string res)
+              (Bytes.to_string msg)
+        | Error error ->
+            Format.kasprintf Pervasives.failwith "%a" pp_print_error error)
+end
+
 module Low_level = struct
   let simple_msg = Rand.generate (1 lsl 4)
 
   let client _ch sched addr port =
-    let msg = MBytes.create (MBytes.length simple_msg) in
+    let msg = Bytes.create (Bytes.length simple_msg) in
     raw_connect sched addr port
     >>= fun fd ->
     P2p_io_scheduler.read_full fd msg
     >>=? fun () ->
-    _assert (MBytes.compare simple_msg msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
     >>=? fun () -> P2p_io_scheduler.close fd >>=? fun () -> return_unit
 
   let server _ch sched socket =
@@ -269,7 +368,7 @@ module Simple_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -282,7 +381,7 @@ module Simple_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -305,7 +404,7 @@ module Chunked_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -318,7 +417,7 @@ module Chunked_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -341,7 +440,7 @@ module Oversized_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg2 msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -354,7 +453,7 @@ module Oversized_message = struct
     >>=? fun () ->
     P2p_socket.read conn
     >>=? fun (_msg_size, msg) ->
-    _assert (MBytes.compare simple_msg msg = 0) __LOC__ ""
+    _assert (Bytes.compare simple_msg msg = 0) __LOC__ ""
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
@@ -425,11 +524,11 @@ module Garbled_data = struct
   (* generate a fixed garbled_msg to avoid 'Data_encoding.Binary.Await
      _', which blocks 'make test' *)
   let garbled_msg =
-    let buf = MBytes.create (1 lsl 4) in
-    MBytes.set_int32 buf 0 (Int32.of_int 4) ;
-    MBytes.set_int32 buf 4 (Int32.of_int (-1)) ;
-    MBytes.set_int32 buf 8 (Int32.of_int (-1)) ;
-    MBytes.set_int32 buf 12 (Int32.of_int (-1)) ;
+    let buf = Bytes.create (1 lsl 4) in
+    TzEndian.set_int32 buf 0 (Int32.of_int 4) ;
+    TzEndian.set_int32 buf 4 (Int32.of_int (-1)) ;
+    TzEndian.set_int32 buf 8 (Int32.of_int (-1)) ;
+    TzEndian.set_int32 buf 12 (Int32.of_int (-1)) ;
     buf
 
   let server _ch sched socket =
@@ -513,7 +612,8 @@ let main () =
           wrap "oversized-message" Oversized_message.run;
           wrap "close-on-read" Close_on_read.run;
           wrap "close-on-write" Close_on_write.run;
-          wrap "garbled-data" Garbled_data.run ] ) ]
+          wrap "garbled-data" Garbled_data.run;
+          Crypto_test.wrap () ] ) ]
 
 let () =
   Sys.catch_break true ;

@@ -30,9 +30,9 @@ end
 module type VALUE = sig
   type t
 
-  val of_bytes : MBytes.t -> t tzresult
+  val of_bytes : Bytes.t -> t tzresult
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 end
 
 module type ENCODED_VALUE = sig
@@ -72,7 +72,7 @@ module type STORE = sig
 
   type key = string list
 
-  type value = MBytes.t
+  type value = Bytes.t
 
   val known : t -> key -> bool Lwt.t
 

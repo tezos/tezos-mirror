@@ -35,7 +35,12 @@ type t =
 
 let encoding =
   let open Data_encoding in
-  def "test_chain_status"
+  def
+    "test_chain_status"
+    ~description:
+      "The status of the test chain: not_running (there is no test chain at \
+       the moment), forking (the test chain is being setup), running (the \
+       test chain is running)."
   @@ union
        [ case
            (Tag 0)
@@ -96,3 +101,5 @@ let pp ppf = function
         chain_id
         Time.System.pp_hum
         (Time.System.of_protocol_exn expiration)
+
+let () = Data_encoding.Registration.register ~pp encoding

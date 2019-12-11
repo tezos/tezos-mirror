@@ -27,9 +27,10 @@ type t = Ipaddr.V6.t
 
 let encoding =
   let open Data_encoding in
-  splitted
-    ~json:(conv Ipaddr.V6.to_string Ipaddr.V6.of_string_exn string)
-    ~binary:(conv Ipaddr.V6.to_bytes Ipaddr.V6.of_bytes_exn string)
+  def "p2p_address" ~description:"An address for locating peers."
+  @@ splitted
+       ~json:(conv Ipaddr.V6.to_string Ipaddr.V6.of_string_exn string)
+       ~binary:(conv Ipaddr.V6.to_octets Ipaddr.V6.of_octets_exn string)
 
 type port = int
 
@@ -57,3 +58,5 @@ let of_string_exn str =
       t
 
 let to_string saddr = Format.asprintf "%a" pp saddr
+
+let () = Data_encoding.Registration.register ~pp encoding

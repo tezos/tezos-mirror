@@ -1,12 +1,12 @@
 (library
  (name tezos_data_encoding)
  (public_name tezos-data-encoding)
- (libraries tezos-stdlib
+ (libraries lwt
             ocplib-json-typed
             ocplib-json-typed-bson
             zarith
             ezjsonm)
- (flags (:standard -open Tezos_stdlib)))
+ (flags (:standard)))
 
 (alias
  (name runtest_lint)

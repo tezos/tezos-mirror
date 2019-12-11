@@ -280,16 +280,16 @@ let commands () =
                Raw Sha256 hash: 0x%a@,\
                Raw Sha512 hash: 0x%a@,\
                Gas remaining: %a"
-              MBytes.pp_hex
-              bytes
+              Hex.pp
+              (Hex.of_bytes bytes)
               Script_expr_hash.pp
               hash
-              MBytes.pp_hex
-              (Script_expr_hash.to_bytes hash)
-              MBytes.pp_hex
-              (Environment.Raw_hashes.sha256 bytes)
-              MBytes.pp_hex
-              (Environment.Raw_hashes.sha512 bytes)
+              Hex.pp
+              (Hex.of_bytes (Script_expr_hash.to_bytes hash))
+              Hex.pp
+              (Hex.of_bytes (Environment.Raw_hashes.sha256 bytes))
+              Hex.pp
+              (Hex.of_bytes (Environment.Raw_hashes.sha512 bytes))
               Alpha_context.Gas.pp
               remaining_gas
             >>= fun () -> return_unit

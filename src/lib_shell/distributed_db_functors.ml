@@ -547,11 +547,7 @@ end = struct
             | Some peer ->
                 P2p_peer.Set.add peer data.peers
           in
-          let next_request =
-            Option.unopt
-              ~default:Ptime.max
-              (Ptime.add_span now Request.initial_delay)
-          in
+          let next_request = now in
           Table.replace
             state.pending
             key
@@ -646,12 +642,7 @@ end = struct
         let requests =
           Table.fold
             (fun key {peers; next_request; delay} acc ->
-              let later =
-                Option.unopt
-                  ~default:Ptime.max
-                  (Ptime.add_span now (Time.System.Span.of_seconds_exn 0.2))
-              in
-              if Ptime.is_later next_request ~than:later then acc
+              if Ptime.is_later next_request ~than:now then acc
               else
                 let remaining_peers = P2p_peer.Set.inter peers active_peers in
                 if

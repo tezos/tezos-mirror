@@ -42,7 +42,7 @@ type error += Not_enough_signatures of int * int
 
 type error += Action_deserialisation_error of Script.expr
 
-type error += Bytes_deserialisation_error of MBytes.t
+type error += Bytes_deserialisation_error of Bytes.t
 
 type error += Bad_deserialized_contract of (Contract.t * Contract.t)
 
@@ -81,8 +81,8 @@ let () =
          of known multisig script hashes."
         Michelson_v1_printer.print_expr
         script
-        MBytes.pp_hex
-        (Script_expr_hash.to_bytes hash))
+        Hex.pp
+        (Hex.of_bytes (Script_expr_hash.to_bytes hash)))
     Data_encoding.(
       obj2
         (req "hash" Script_expr_hash.encoding)
@@ -181,7 +181,7 @@ let () =
       "When trying to deserialise an action from a sequence of bytes, we got \
        an error"
     ~pp:(fun ppf b ->
-      Format.fprintf ppf "Bytes deserialisation error %s." (MBytes.to_string b))
+      Format.fprintf ppf "Bytes deserialisation error %s." (Bytes.to_string b))
     Data_encoding.(obj1 (req "expr" bytes))
     (function Bytes_deserialisation_error b -> Some b | _ -> None)
     (fun b -> Bytes_deserialisation_error b) ;
@@ -698,7 +698,7 @@ let multisig_bytes ~counter ~action ~contract ~chain_id ~descr () =
     Data_encoding.Binary.to_bytes_exn Script.expr_encoding
     @@ Tezos_micheline.Micheline.strip_locations @@ triple
   in
-  return @@ MBytes.concat "" [MBytes.of_string "\005"; bytes]
+  return @@ Bytes.concat (Bytes.of_string "") [Bytes.of_string "\005"; bytes]
 
 let check_threshold ~threshold ~keys () =
   let nkeys = List.length keys in
@@ -739,7 +739,7 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ()
 
 type multisig_prepared_action = {
-  bytes : MBytes.t;
+  bytes : Bytes.t;
   threshold : Z.t;
   keys : public_key list;
   counter : Z.t;
@@ -836,10 +836,10 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
 
 let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
   if
-    Compare.Int.(MBytes.length bytes >= 1)
-    && Compare.Int.(MBytes.get_uint8 bytes 0 = 0x05)
+    Compare.Int.(Bytes.length bytes >= 1)
+    && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
   then
-    let nbytes = MBytes.sub bytes 1 (MBytes.length bytes - 1) in
+    let nbytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
     match Data_encoding.Binary.of_bytes Script.expr_encoding nbytes with
     | None ->
         fail (Bytes_deserialisation_error bytes)

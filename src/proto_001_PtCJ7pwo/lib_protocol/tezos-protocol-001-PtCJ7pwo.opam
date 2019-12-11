@@ -17,12 +17,13 @@ depends: [
   "bip39" { with-test }
 ]
 build: [
-  [ "%{tezos-protocol-compiler:lib}%/replace"
-      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "dune" "001_PtCJ7pwo" ]
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  [
+    "%{tezos-protocol-compiler:lib}%/replace"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "dune"
+    "001_PtCJ7pwo"
+  ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: 001_PtCJ7pwo (economic-protocol definition, functor version)"

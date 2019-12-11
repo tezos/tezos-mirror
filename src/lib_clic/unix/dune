@@ -1,0 +1,14 @@
+(library
+ (name tezos_clic_unix)
+ (public_name tezos-clic.unix)
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_clic
+                   -open Tezos_error_monad))
+ (libraries tezos-clic
+            tezos-stdlib-unix
+            tezos-error-monad))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -13,6 +13,7 @@ docs/api/tezos-client.html
 docs/api/tezos-admin-client.html
 
 tezos-node
+tezos-validator
 tezos-protocol-compiler
 tezos-client
 tezos-admin-client
@@ -47,4 +48,3 @@ src/bin_client/test/LOG.*
 .git
 .gitignore
 .gitlab-ci.yml
-

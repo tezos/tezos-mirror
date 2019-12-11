@@ -101,8 +101,8 @@ let bytes_jsont =
   in
   conv
     ~schema
-    MBytes.to_hex
-    (wrap_error MBytes.of_hex)
+    Hex.of_bytes
+    (wrap_error Hex.to_bytes)
     (conv (fun (`Hex h) -> h) (fun h -> `Hex h) string)
 
 let check_utf8 s =
@@ -306,7 +306,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
       get_json e
   | Bytes (`Fixed expected) ->
       let check s =
-        let found = MBytes.length s in
+        let found = Bytes.length s in
         if found <> expected then
           raise
             (Cannot_destruct

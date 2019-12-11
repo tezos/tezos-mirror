@@ -42,20 +42,20 @@ module type Dump_interface = sig
 
   type commit_info
 
+  type batch
+
+  val batch : index -> (batch -> 'a Lwt.t) -> 'a Lwt.t
+
   val commit_info_encoding : commit_info Data_encoding.t
 
   val hash_encoding : hash Data_encoding.t
 
-  val blob_encoding : [`Blob of MBytes.t] Data_encoding.t
-
-  val node_encoding : [`Node of MBytes.t] Data_encoding.t
-
   module Block_header : sig
     type t = Block_header.t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val equal : t -> t -> bool
 
@@ -65,9 +65,9 @@ module type Dump_interface = sig
   module Pruned_block : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -77,9 +77,9 @@ module type Dump_interface = sig
   module Block_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val header : t -> Block_header.t
 
@@ -89,9 +89,9 @@ module type Dump_interface = sig
   module Protocol_data : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t option
+    val of_bytes : Bytes.t -> t option
 
     val encoding : t Data_encoding.t
   end
@@ -99,29 +99,18 @@ module type Dump_interface = sig
   module Commit_hash : sig
     type t
 
-    val to_bytes : t -> MBytes.t
+    val to_bytes : t -> Bytes.t
 
-    val of_bytes : MBytes.t -> t tzresult
+    val of_bytes : Bytes.t -> t tzresult
 
     val encoding : t Data_encoding.t
   end
 
-  (* hash manipulation *)
-  val hash_export : hash -> [`Node | `Blob] * MBytes.t
-
-  val hash_import : [`Node | `Blob] -> MBytes.t -> hash tzresult
-
-  val hash_equal : hash -> hash -> bool
-
   (* commit manipulation (for parents) *)
-  val context_parents : context -> Commit_hash.t list Lwt.t
+  val context_parents : context -> Commit_hash.t list
 
   (* Commit info *)
   val context_info : context -> commit_info
-
-  val context_info_export : commit_info -> Int64.t * string * string
-
-  val context_info_import : Int64.t * string * string -> commit_info
 
   (* block header manipulation *)
   val get_context : index -> Block_header.t -> context option Lwt.t
@@ -136,24 +125,22 @@ module type Dump_interface = sig
   (* for dumping *)
   val context_tree : context -> tree
 
-  val tree_hash : context -> tree -> hash Lwt.t
+  val tree_hash : tree -> hash
 
   val sub_tree : tree -> key -> tree option Lwt.t
 
   val tree_list : tree -> (step * [`Contents | `Node]) list Lwt.t
 
-  val tree_content : tree -> MBytes.t option Lwt.t
+  val tree_content : tree -> string option Lwt.t
 
   (* for restoring *)
   val make_context : index -> context
 
   val update_context : context -> tree -> context
 
-  val add_hash : index -> tree -> key -> hash -> tree option Lwt.t
+  val add_string : batch -> string -> tree Lwt.t
 
-  val add_mbytes : index -> MBytes.t -> tree Lwt.t
-
-  val add_dir : index -> (step * hash) list -> tree option Lwt.t
+  val add_dir : batch -> (step * hash) list -> tree option Lwt.t
 end
 
 module type S = sig
@@ -199,9 +186,9 @@ end
 
 type error += System_write_error of string
 
-type error += Bad_hash of string * MBytes.t * MBytes.t
+type error += Bad_hash of string * Bytes.t * Bytes.t
 
-type error += Context_not_found of MBytes.t
+type error += Context_not_found of Bytes.t
 
 type error += System_read_error of string
 
@@ -237,8 +224,8 @@ let () =
         ppf
         "Wrong hash [%s] given: %s, should be %s"
         ty
-        (MBytes.to_string his)
-        (MBytes.to_string hshould))
+        (Bytes.to_string his)
+        (Bytes.to_string hshould))
     (obj3
        (req "hash_ty" string)
        (req "hash_is" bytes)
@@ -252,7 +239,7 @@ let () =
     ~title:"Context not found"
     ~description:"Cannot find context corresponding to hash"
     ~pp:(fun ppf mb ->
-      Format.fprintf ppf "No context with hash: %s" (MBytes.to_string mb))
+      Format.fprintf ppf "No context with hash: %s" (Bytes.to_string mb))
     (obj1 (req "context_not_found" bytes))
     (function Context_not_found mb -> Some mb | _ -> None)
     (fun mb -> Context_not_found mb) ;
@@ -344,7 +331,7 @@ module Make (I : Dump_interface) = struct
         block_data : I.Block_data.t;
       }
     | Node of (string * I.hash) list
-    | Blob of MBytes.t
+    | Blob of string
     | Proot of I.Pruned_block.t
     | Loot of I.Protocol_data.t
     | End
@@ -356,9 +343,9 @@ module Make (I : Dump_interface) = struct
     case
       ~title:"blob"
       (Tag (Char.code 'b'))
-      bytes
-      (function Blob bytes -> Some bytes | _ -> None)
-      (function bytes -> Blob bytes)
+      string
+      (function Blob string -> Some string | _ -> None)
+      (function string -> Blob string)
 
   let node_encoding =
     let open Data_encoding in
@@ -448,9 +435,9 @@ module Make (I : Dump_interface) = struct
       return res
 
   let read_mbytes rbuf b =
-    read_string rbuf ~len:(MBytes.length b)
+    read_string rbuf ~len:(Bytes.length b)
     >>=? fun string ->
-    MBytes.blit_of_string string 0 b 0 (MBytes.length b) ;
+    Bytes.blit_string string 0 b 0 (Bytes.length b) ;
     return ()
 
   let set_int64 buf i =
@@ -463,13 +450,13 @@ module Make (I : Dump_interface) = struct
     >>=? fun s -> return @@ EndianString.BigEndian.get_int64 s 0
 
   let set_mbytes buf b =
-    set_int64 buf (Int64.of_int (MBytes.length b)) ;
-    Buffer.add_bytes buf (MBytes.to_bytes b)
+    set_int64 buf (Int64.of_int (Bytes.length b)) ;
+    Buffer.add_bytes buf b
 
   let get_mbytes rbuf =
     get_int64 rbuf >>|? Int64.to_int
     >>=? fun l ->
-    let b = MBytes.create l in
+    let b = Bytes.create l in
     read_mbytes rbuf b >>=? fun () -> return b
 
   (* Getter and setters *)
@@ -574,8 +561,7 @@ module Make (I : Dump_interface) = struct
             | None ->
                 assert false
             | Some sub_tree ->
-                I.tree_hash ctxt sub_tree
-                >>= fun hash ->
+                let hash = I.tree_hash sub_tree in
                 ( if visited hash then Lwt.return_unit
                 else (
                   Tezos_stdlib_unix.Utils.display_progress
@@ -596,7 +582,7 @@ module Make (I : Dump_interface) = struct
                           assert false
                       | Some data ->
                           set_blob buf data ; maybe_flush () ) ) )
-                >>= fun () -> Lwt.return (name, hash))
+                >|= fun () -> (name, hash))
           keys
         >>= fun sub_keys -> set_node buf sub_keys ; maybe_flush ()
       in
@@ -615,8 +601,7 @@ module Make (I : Dump_interface) = struct
             fold_tree_path ctxt tree
             >>= fun () ->
             Tezos_stdlib_unix.Utils.display_progress_end () ;
-            I.context_parents ctxt
-            >>= fun parents ->
+            let parents = I.context_parents ctxt in
             set_root buf bh (I.context_info ctxt) parents block_data ;
             (* Dump pruned blocks *)
             let dump_pruned cpt pruned =
@@ -672,14 +657,14 @@ module Make (I : Dump_interface) = struct
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
-    let add_blob blob = I.add_mbytes index blob >>= fun tree -> return tree in
-    let add_dir keys =
-      I.add_dir index keys
+    let add_blob t blob = I.add_string t blob >>= fun tree -> return tree in
+    let add_dir t keys =
+      I.add_dir t keys
       >>= function
       | None -> fail Restore_context_failure | Some tree -> return tree
     in
     let restore history_mode =
-      let rec first_pass ctxt cpt =
+      let rec first_pass batch ctxt cpt =
         Tezos_stdlib_unix.Utils.display_progress
           ~refresh_rate:(cpt, 1_000)
           "Context: %dK elements, %dMiB read"
@@ -695,11 +680,13 @@ module Make (I : Dump_interface) = struct
             | Some block_header ->
                 return (block_header, block_data) )
         | Node contents ->
-            add_dir contents
-            >>=? fun tree -> first_pass (I.update_context ctxt tree) (cpt + 1)
+            add_dir batch contents
+            >>=? fun tree ->
+            first_pass batch (I.update_context ctxt tree) (cpt + 1)
         | Blob data ->
-            add_blob data
-            >>=? fun tree -> first_pass (I.update_context ctxt tree) (cpt + 1)
+            add_blob batch data
+            >>=? fun tree ->
+            first_pass batch (I.update_context ctxt tree) (cpt + 1)
         | _ ->
             fail Inconsistent_snapshot_data
       in
@@ -744,7 +731,7 @@ module Make (I : Dump_interface) = struct
         | _ ->
             fail Inconsistent_snapshot_data
       in
-      first_pass (I.make_context index) 0
+      I.batch index (fun batch -> first_pass batch (I.make_context index) 0)
       >>=? fun (block_header, block_data) ->
       Tezos_stdlib_unix.Utils.display_progress_end () ;
       second_pass None ([], []) [] 0

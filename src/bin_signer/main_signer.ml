@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Log = Internal_event.Legacy_logging.Make (struct
+  let name = "signer.main"
+end)
+
 let default_tcp_host =
   match Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST" with
   | None ->
@@ -109,19 +113,6 @@ let pidfile_arg =
     ~placeholder:"filename"
     (parameter (fun _ s -> return s))
 
-let init_signal () =
-  let handler name id =
-    try
-      Format.eprintf "Received the %s signal, triggering shutdown.@." name ;
-      exit id
-    with _ -> ()
-  in
-  ignore
-    (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
-  ignore
-    ( Lwt_unix.on_signal Sys.sigterm (handler "TERM")
-      : Lwt_unix.signal_handler_id )
-
 let may_setup_pidfile = function
   | None ->
       return_unit
@@ -155,7 +146,6 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          init_signal () ;
           may_setup_pidfile pidfile
           >>=? fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt
@@ -183,7 +173,6 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "local"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
-          init_signal () ;
           may_setup_pidfile pidfile
           >>=? fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt
@@ -220,7 +209,6 @@ let commands base_dir require_auth : Client_context.full command list =
                    with Failure _ -> failwith "Invalid port %s" x))))
         (prefixes ["launch"; "http"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          init_signal () ;
           may_setup_pidfile pidfile
           >>=? fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt
@@ -275,7 +263,6 @@ let commands base_dir require_auth : Client_context.full command list =
              cert
              key
              cctxt ->
-          init_signal () ;
           may_setup_pidfile pidfile
           >>=? fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt
@@ -386,4 +373,7 @@ module C = struct
 end
 
 let () =
-  Client_main_run.run (module C) ~select_commands:(fun _ _ -> return_nil)
+  Client_main_run.run
+    ~log:(Log.fatal_error "%s")
+    (module C)
+    ~select_commands:(fun _ _ -> return_nil)

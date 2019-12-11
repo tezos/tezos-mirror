@@ -40,7 +40,7 @@ let print_expr ppf expr =
     | String (_, value) ->
         Micheline_printer.print_string ppf value
     | Bytes (_, value) ->
-        Format.fprintf ppf "0x%a" MBytes.pp_hex value
+        Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bytes value)
     | Seq (_, items) ->
         Format.fprintf
           ppf

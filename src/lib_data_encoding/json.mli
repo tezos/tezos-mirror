@@ -84,4 +84,4 @@ val to_string : ?newline:bool -> ?minify:bool -> json -> string
 
 val pp : Format.formatter -> json -> unit
 
-val bytes_jsont : MBytes.t Json_encoding.encoding
+val bytes_jsont : Bytes.t Json_encoding.encoding

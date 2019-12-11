@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "ocamlfind" { build }
-  "dune" { build & >= "1.7" }
+  "dune" { >= "1.7" }
   "tezos-stdlib"
   "tezos-data-encoding"
   "tezos-error-monad"
@@ -23,9 +23,7 @@ depends: [
   "alcotest" { with-test & >= "0.8.3" }
 ]
 build: [
-  [ "dune" "build" "-p" name "-j" jobs ]
-]
-run-test: [
-  [ "dune" "runtest" "-p" name "-j" jobs ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: library with all the cryptographic primitives used by Tezos"

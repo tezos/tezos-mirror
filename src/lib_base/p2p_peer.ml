@@ -67,10 +67,16 @@ module State = struct
 
   let encoding =
     let open Data_encoding in
-    string_enum
-      [ ("accepted", Accepted);
-        ("running", Running);
-        ("disconnected", Disconnected) ]
+    def
+      "p2p_peer.state"
+      ~description:
+        "The state a peer connection can be in: accepted (when the connection \
+         is being established), running (when the connection is already \
+         established), disconnected (otherwise)."
+    @@ string_enum
+         [ ("accepted", Accepted);
+           ("running", Running);
+           ("disconnected", Disconnected) ]
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
@@ -213,14 +219,23 @@ module Pool_event = struct
 
   let encoding =
     let open Data_encoding in
-    conv
-      (fun {kind; timestamp; point = (addr, port)} ->
-        (kind, timestamp, addr, port))
-      (fun (kind, timestamp, addr, port) ->
-        {kind; timestamp; point = (addr, port)})
-      (obj4
-         (req "kind" kind_encoding)
-         (req "timestamp" Time.System.encoding)
-         (req "addr" P2p_addr.encoding)
-         (opt "port" uint16))
+    def
+      "p2p_peer.pool_event"
+      ~description:
+        "An event that may happen during maintenance of and other operations \
+         on the connection to a specific peer."
+    @@ conv
+         (fun {kind; timestamp; point = (addr, port)} ->
+           (kind, timestamp, addr, port))
+         (fun (kind, timestamp, addr, port) ->
+           {kind; timestamp; point = (addr, port)})
+         (obj4
+            (req "kind" kind_encoding)
+            (req "timestamp" Time.System.encoding)
+            (req "addr" P2p_addr.encoding)
+            (opt "port" uint16))
 end
+
+let () =
+  Data_encoding.Registration.register ~pp:State.pp_digram State.encoding ;
+  Data_encoding.Registration.register Pool_event.encoding

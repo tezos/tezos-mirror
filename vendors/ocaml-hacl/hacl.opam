@@ -17,5 +17,7 @@ depends: [
   "base"
   "stdio"
 ]
-build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
-run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
+build: [
+  ["dune" "build" "-j" jobs "-p" name "@install"]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]

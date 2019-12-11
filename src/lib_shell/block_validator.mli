@@ -31,12 +31,10 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
-type validator_kind = Internal of Context.index
-
 val create :
   limits ->
   Distributed_db.t ->
-  validator_kind ->
+  Block_validator_process.t ->
   start_testchain:bool ->
   t tzresult Lwt.t
 

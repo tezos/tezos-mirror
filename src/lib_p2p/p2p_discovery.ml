@@ -73,9 +73,9 @@ module Answer = struct
     >>=? fun socket ->
     (* Infinite loop, should never exit. *)
     let rec aux () =
-      let buf = MBytes.create Message.length in
+      let buf = Bytes.create Message.length in
       protect ~canceler:st.canceler (fun () ->
-          Lwt_bytes.recvfrom socket buf 0 Message.length []
+          Lwt_unix.recvfrom socket buf 0 Message.length []
           >>= fun content ->
           lwt_debug "Received discovery message..."
           >>= fun () -> return content)
@@ -184,7 +184,7 @@ module Sender = struct
         >>= fun () ->
         lwt_debug "Broadcasting discovery message..."
         >>= fun () ->
-        Lwt_bytes.sendto socket msg 0 Message.length [] addr
+        Lwt_unix.sendto socket msg 0 Message.length [] addr
         >>= fun _len -> Lwt_utils_unix.safe_close socket)
       (fun _exn -> lwt_debug "Error broadcasting a discovery request")
 

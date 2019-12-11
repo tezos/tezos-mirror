@@ -60,12 +60,18 @@ module Chain : sig
   val create :
     global_state ->
     ?allow_forked_chain:bool ->
+    commit_genesis:(chain_id:Chain_id.t ->
+                   time:Time.Protocol.t ->
+                   protocol:Protocol_hash.t ->
+                   Context_hash.t tzresult Lwt.t) ->
     genesis ->
     Chain_id.t ->
-    chain_state Lwt.t
+    chain_state tzresult Lwt.t
 
   (** Look up for a chain by the hash of its genesis block. *)
   val get : global_state -> Chain_id.t -> chain_state tzresult Lwt.t
+
+  val get_opt : global_state -> Chain_id.t -> chain_state option Lwt.t
 
   val get_exn : global_state -> Chain_id.t -> chain_state Lwt.t
 
@@ -152,13 +158,6 @@ module Block : sig
 
   type block = t
 
-  type validation_store = {
-    context_hash : Context_hash.t;
-    message : string option;
-    max_operations_ttl : int;
-    last_allowed_fork_level : Int32.t;
-  }
-
   (** Abstract view over block header storage.
       This module aims to abstract over block header's [read], [read_opt] and [known]
       functions by calling the adequate function depending on the block being pruned or not. *)
@@ -206,15 +205,20 @@ module Block : sig
     ?dont_enforce_context_hash:bool ->
     Chain.t ->
     Block_header.t ->
-    MBytes.t ->
+    Bytes.t ->
     Operation.t list list ->
-    MBytes.t list list ->
-    validation_store ->
+    Bytes.t list list ->
+    Block_validation.validation_store ->
     forking_testchain:bool ->
     block option tzresult Lwt.t
 
   val store_invalid :
     Chain.t -> Block_header.t -> error list -> bool tzresult Lwt.t
+
+  (** [remove block] deletes every occurrence of [block] in the
+      different stores. If [block] is the current head, the head is
+      also backtracked to the [block] predecessor *)
+  val remove : t -> unit tzresult Lwt.t
 
   val compare : t -> t -> int
 
@@ -244,7 +248,7 @@ module Block : sig
 
   val max_operations_ttl : t -> int tzresult Lwt.t
 
-  val metadata : t -> MBytes.t tzresult Lwt.t
+  val metadata : t -> Bytes.t tzresult Lwt.t
 
   val last_allowed_fork_level : t -> Int32.t tzresult Lwt.t
 
@@ -256,9 +260,17 @@ module Block : sig
 
   val is_valid_for_checkpoint : t -> Block_header.t -> bool Lwt.t
 
-  val context : t -> Context.t Lwt.t
+  val context : t -> Context.t tzresult Lwt.t
 
-  val protocol_hash : t -> Protocol_hash.t Lwt.t
+  val context_opt : t -> Context.t option Lwt.t
+
+  val context_exn : t -> Context.t Lwt.t
+
+  val context_exists : t -> bool Lwt.t
+
+  val protocol_hash : t -> Protocol_hash.t tzresult Lwt.t
+
+  val protocol_hash_exn : t -> Protocol_hash.t Lwt.t
 
   val test_chain : t -> (Test_chain_status.t * t option) Lwt.t
 
@@ -274,9 +286,9 @@ module Block : sig
 
   val all_operations : t -> Operation.t list list Lwt.t
 
-  val operations_metadata : t -> int -> MBytes.t list Lwt.t
+  val operations_metadata : t -> int -> Bytes.t list Lwt.t
 
-  val all_operations_metadata : t -> MBytes.t list list Lwt.t
+  val all_operations_metadata : t -> Bytes.t list list Lwt.t
 
   val watcher : Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
@@ -373,9 +385,9 @@ module Protocol : sig
   val read_opt : global_state -> Protocol_hash.t -> Protocol.t option Lwt.t
 
   (** Read a value in the local database (without parsing). *)
-  val read_raw : global_state -> Protocol_hash.t -> MBytes.t tzresult Lwt.t
+  val read_raw : global_state -> Protocol_hash.t -> Bytes.t tzresult Lwt.t
 
-  val read_raw_opt : global_state -> Protocol_hash.t -> MBytes.t option Lwt.t
+  val read_raw_opt : global_state -> Protocol_hash.t -> Bytes.t option Lwt.t
 
   val store : global_state -> Protocol.t -> Protocol_hash.t option Lwt.t
 
@@ -405,19 +417,14 @@ type error +=
 
 val history_mode : global_state -> History_mode.t Lwt.t
 
-val upgrade_0_0_1 :
-  ?store_mapsize:Int64.t ->
-  store_root:string ->
-  ?context_mapsize:Int64.t ->
-  context_root:string ->
-  protocol_root:string ->
-  unit ->
-  unit tzresult Lwt.t
-
 (** Read the internal state of the node and initialize
     the databases. *)
 val init :
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?commit_genesis:(chain_id:Chain_id.t ->
+                  time:Time.Protocol.t ->
+                  protocol:Protocol_hash.t ->
+                  Context_hash.t tzresult Lwt.t) ->
   ?store_mapsize:int64 ->
   ?context_mapsize:int64 ->
   store_root:string ->

@@ -31,6 +31,8 @@ type error += Non_private_sandbox of P2p_addr.t
 
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
+type error += Invalid_sandbox_file of string
+
 let () =
   register_error_kind
     `Permanent
@@ -63,28 +65,22 @@ let () =
         addrlist)
     Data_encoding.(obj1 (req "addrlist" (list P2p_point.Id.encoding)))
     (function RPC_Port_already_in_use addrlist -> Some addrlist | _ -> None)
-    (fun addrlist -> RPC_Port_already_in_use addrlist)
+    (fun addrlist -> RPC_Port_already_in_use addrlist) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.run.invalid_sandbox_file"
+    ~title:"Invalid sandbox file"
+    ~description:"The provided sandbox file is not a valid sandbox JSON file."
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "The file '%s' is not a valid JSON sandbox file" s)
+    Data_encoding.(obj1 (req "sandbox_file" string))
+    (function Invalid_sandbox_file s -> Some s | _ -> None)
+    (fun s -> Invalid_sandbox_file s)
 
 let ( // ) = Filename.concat
 
-let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
-  ( match sandbox with
-  | None ->
-      Lwt.return_none
-  | Some sandbox_param -> (
-    match sandbox_param with
-    | None ->
-        Lwt.return_none
-    | Some file -> (
-        Lwt_utils_unix.Json.read_file file
-        >>= function
-        | Error err ->
-            lwt_warn "Cannot parse sandbox parameters: %s" file
-            >>= fun () ->
-            lwt_debug "%a" pp_print_error err >>= fun () -> Lwt.return_none
-        | Ok json ->
-            Lwt.return_some json ) ) )
-  >>= fun sandbox_param ->
+let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
+    =
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.p2p.discovery_addr with
   | None ->
@@ -138,29 +134,38 @@ let init_node ?sandbox ?checkpoint (config : Node_config_file.t) =
           identity;
           proof_of_work_target = Crypto_box.make_target config.p2p.expected_pow;
           disable_mempool = config.p2p.disable_mempool;
-          trust_discovered_peers = sandbox_param <> None;
+          trust_discovered_peers = sandbox <> None;
           disable_testchain = not config.p2p.enable_testchain;
         }
       in
       return_some (p2p_config, config.p2p.limits) )
   >>=? fun p2p_config ->
-  let sandbox_param =
-    Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_param
-  in
+  Option.unopt_map
+    ~default:return_none
+    ~f:(fun filename ->
+      Lwt_utils_unix.Json.read_file filename
+      >>= function
+      | Error _err ->
+          fail (Invalid_sandbox_file filename)
+      | Ok json ->
+          return_some ("sandbox_parameter", json))
+    sandbox
+  >>=? fun sandbox_param ->
+  let patch_context = Some (Patch_context.patch_context sandbox_param) in
   let node_config : Node.config =
     {
       genesis;
-      patch_context = Some (Patch_context.patch_context sandbox_param);
+      patch_context;
       store_root = Node_data_version.store_dir config.data_dir;
       context_root = Node_data_version.context_dir config.data_dir;
+      protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
-      test_chain_max_tll = Some (48 * 3600);
-      (* 2 days *)
       checkpoint;
     }
   in
   Node.create
     ~sandboxed:(sandbox <> None)
+    ~singleprocess
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
@@ -229,27 +234,15 @@ let init_rpc (rpc_config : Node_config_file.rpc) node =
     rpc_config.listen_addrs
     []
 
-let init_signal () =
-  let handler name id =
-    try
-      fatal_error "Received the %s signal, triggering shutdown." name ;
-      Lwt_exit.exit id
-    with _ -> ()
-  in
-  ignore
-    (Lwt_unix.on_signal Sys.sigint (handler "INT") : Lwt_unix.signal_handler_id) ;
-  ignore
-    ( Lwt_unix.on_signal Sys.sigterm (handler "TERM")
-      : Lwt_unix.signal_handler_id )
-
-let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
+let run ?verbosity ?sandbox ?checkpoint ~singleprocess
+    (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir
   >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true
     (Node_data_version.lock_file config.data_dir)
   >>=? fun () ->
-  init_signal () ;
+  (* Main loop *)
   let log_cfg =
     match verbosity with
     | None ->
@@ -265,7 +258,7 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..."
   >>= fun () ->
-  init_node ?sandbox ?checkpoint config
+  init_node ?sandbox ?checkpoint ~singleprocess config
   >>= (function
         | Ok node ->
             return node
@@ -287,6 +280,10 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   >>=? fun rpc ->
   lwt_log_notice "The Tezos node is now running!"
   >>= fun () ->
+  Lwt_exit.(
+    wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
+  >>= fun retcode ->
+  (* Clean-shutdown code *)
   Lwt_exit.termination_thread
   >>= fun x ->
   lwt_log_notice "Shutting down the Tezos node..."
@@ -298,9 +295,9 @@ let run ?verbosity ?sandbox ?checkpoint (config : Node_config_file.t) =
   Lwt_list.iter_p RPC_server.shutdown rpc
   >>= fun () ->
   lwt_log_notice "BYE (%d)" x
-  >>= fun () -> Internal_event_unix.close () >>= fun () -> return_unit
+  >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
 
-let process sandbox verbosity checkpoint args =
+let process sandbox verbosity checkpoint singleprocess args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -335,7 +332,7 @@ let process sandbox verbosity checkpoint args =
     >>=? function
     | false ->
         Lwt.catch
-          (fun () -> run ?sandbox ?verbosity ?checkpoint config)
+          (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
                 Lwt_list.fold_right_s
@@ -351,8 +348,11 @@ let process sandbox verbosity checkpoint args =
         failwith "Data directory is locked by another process"
   in
   match Lwt_main.run run with
-  | Ok () ->
+  | Ok (0 | 2) ->
+      (* 2 means that we exit by a signal that was handled *)
       `Ok ()
+  | Ok _ ->
+      `Error (false, "")
   | Error err ->
       `Error (false, Format.asprintf "%a" pp_print_error err)
 
@@ -380,7 +380,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt ~vopt:(Some None) (some (some string)) None
+      & opt (some non_dir_file) None
       & info
           ~docs:Node_shared_arg.Manpage.misc_section
           ~doc
@@ -403,10 +403,21 @@ module Term = struct
           ~docv:"<level>,<block_hash>"
           ["checkpoint"])
 
+  let singleprocess =
+    let open Cmdliner in
+    let doc =
+      "When enabled, it deactivates block validation using an external \
+       process. Thus, the validation procedure is done in the same process as \
+       the node and might not be responding when doing extensive I/Os."
+    in
+    Arg.(
+      value & flag
+      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["singleprocess"])
+
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ sandbox $ verbosity $ checkpoint
+        ( const process $ sandbox $ verbosity $ checkpoint $ singleprocess
         $ Node_shared_arg.Term.args ))
 end
 

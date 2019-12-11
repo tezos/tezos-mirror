@@ -53,7 +53,7 @@ let do_compile hash p =
     // Protocol_hash.to_short_b58check hash
     // Format.asprintf "protocol_%a" Protocol_hash.pp hash
   in
-  Lwt_utils_unix.Protocol.write_dir source_dir ~hash p
+  Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p
   >>=? (fun () ->
          let compiler_command =
            ( Sys.executable_name,

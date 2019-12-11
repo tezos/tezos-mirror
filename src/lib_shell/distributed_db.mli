@@ -158,10 +158,10 @@ val commit_block :
   chain_db ->
   Block_hash.t ->
   Block_header.t ->
-  MBytes.t ->
+  Bytes.t ->
   Operation.t list list ->
-  MBytes.t list list ->
-  State.Block.validation_store ->
+  Bytes.t list list ->
+  Block_validation.validation_store ->
   forking_testchain:bool ->
   State.Block.t option tzresult Lwt.t
 

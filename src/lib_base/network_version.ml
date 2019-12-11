@@ -43,15 +43,20 @@ let pp ppf {chain_name; distributed_db_version; p2p_version} =
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {chain_name; distributed_db_version; p2p_version} ->
-      (chain_name, distributed_db_version, p2p_version))
-    (fun (chain_name, distributed_db_version, p2p_version) ->
-      {chain_name; distributed_db_version; p2p_version})
-    (obj3
-       (req "chain_name" Distributed_db_version.name_encoding)
-       (req "distributed_db_version" Distributed_db_version.encoding)
-       (req "p2p_version" P2p_version.encoding))
+  def
+    "network_version"
+    ~description:
+      "A version number for the network protocol (includes distributed DB \
+       version and p2p version)"
+  @@ conv
+       (fun {chain_name; distributed_db_version; p2p_version} ->
+         (chain_name, distributed_db_version, p2p_version))
+       (fun (chain_name, distributed_db_version, p2p_version) ->
+         {chain_name; distributed_db_version; p2p_version})
+       (obj3
+          (req "chain_name" Distributed_db_version.name_encoding)
+          (req "distributed_db_version" Distributed_db_version.encoding)
+          (req "p2p_version" P2p_version.encoding))
 
 let greatest = function
   | [] ->
@@ -85,3 +90,5 @@ let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
     may_select_version p2p_versions remote.p2p_version
     >>= fun p2p_version ->
     some {chain_name; distributed_db_version; p2p_version}
+
+let () = Data_encoding.Registration.register ~pp encoding

@@ -11,7 +11,6 @@ Where <action> can be:
 * check.dune: check formatting while assuming running under Dune's
   rule (\`dune build @runtest_lint\`).
 * check.ci: check formatting using git (for GitLabCI's verbose run).
-* check_scripts: check the .sh files
 * format: format all the files, see also \`make fmt\`.
 * help: display this and return 0.
 
@@ -73,7 +72,6 @@ update_all_dot_ocamlformats () {
         ofmt=$d/.ocamlformat
         say "Dealing with $ofmt"
         case "$d" in
-            src/proto_alpha/lib_protocol | \
             src/proto_demo_noops/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
                 ;;
@@ -95,7 +93,6 @@ update_all_dot_ocamlformats () {
 check_with_dune () {
     for f in $* ; do
         case "$PWD" in
-            */src/proto_alpha/lib_protocol$ | \
             */src/proto_demo_noops/lib_protocol$ )
                 make_dot_ocamlformat .ocamlformat
                 ocamlformat --check $f
@@ -111,18 +108,6 @@ check_with_dune () {
     done
 }
 
-check_scripts () {
-    scripts=$(find $source_directories tests_python/ scripts/ -name "*.sh" -type f -print)
-    exit_code=0
-    for f in $scripts ; do
-        if [ $f != src/tooling/lint.sh ] && grep -q "	" $f
-        then
-            say "$f has tab character(s)"
-            exit_code=1
-        fi
-    done
-    exit $exit_code
-}
 
 if [ -f "$1" ] ; then
     action=check.dune
@@ -145,8 +130,6 @@ case "$action" in
         say "Formatting for CI-test $files"
         ocamlformat --inplace $files
         git diff --exit-code ;;
-    "check_scripts" )
-        check_scripts ;;
     "format" )
         say "Formatting $files"
         ocamlformat --inplace $files ;;

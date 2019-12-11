@@ -59,11 +59,11 @@ module Types = struct
     chain_state : State.Chain.t;
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
+    block_validator_process : Block_validator_process.t;
     global_valid_block_input : State.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     prevalidator_limits : Prevalidator.limits;
     peer_validator_limits : Peer_validator.limits;
-    max_child_ttl : int option;
     limits : limits;
   }
 
@@ -223,41 +223,25 @@ let may_switch_test_chain w active_chains spawn_child block =
             (State.Chain.genesis child.parameters.chain_state).block
             genesis
     in
-    ( match nv.parameters.max_child_ttl with
-    | None ->
-        Lwt.return_false
-    | Some ttl ->
-        let forking_block_timestamp =
-          (State.Block.shell_header forking_block).Block_header.timestamp
-        in
-        let expiration =
-          let open Time.Protocol in
-          min expiration (add forking_block_timestamp (Int64.of_int ttl))
-        in
-        Lwt.return (expiration < block_header.shell.timestamp) )
-    >>= fun locally_expired ->
-    if locally_expired && activated then
+    let expired = expiration < block_header.shell.timestamp in
+    if expired && activated then
       shutdown_child nv active_chains >>= fun () -> return_unit
     else if
-      activated || locally_expired
+      activated || expired
       || not (State.Chain.allow_forked_chain nv.parameters.chain_state)
     then return_unit
     else
-      State.Chain.get
+      State.Chain.get_opt
         (State.Chain.global_state nv.parameters.chain_state)
         chain_id
       >>= (function
-            | Ok chain_state ->
+            | Some chain_state ->
                 State.update_testchain block ~testchain_state:chain_state
                 >>= fun () -> return chain_state
-            | Error _ ->
-                (* TODO proper error matching (Not_found ?) or use `get_opt` ? *)
-                State.Block.context forking_block
-                >>= fun context ->
+            | None ->
                 let try_init_test_chain cont =
-                  Block_validation.init_test_chain
-                    context
-                    (State.Block.header forking_block)
+                  let bvp = nv.parameters.block_validator_process in
+                  Block_validator_process.init_test_chain bvp forking_block
                   >>= function
                   | Ok genesis_header ->
                       State.fork_testchain
@@ -398,7 +382,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     ( match nv.prevalidator with
     | Some old_prevalidator ->
         State.Block.protocol_hash block
-        >>= fun new_protocol ->
+        >>=? fun new_protocol ->
         let old_protocol = Prevalidator.protocol_hash old_prevalidator in
         if not (Protocol_hash.equal old_protocol new_protocol) then (
           safe_get_prevalidator_filter new_protocol
@@ -430,7 +414,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
-      return Event.Head_incrememt
+      return Event.Head_increment
     else return Event.Branch_switch
 
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
@@ -472,7 +456,7 @@ let on_launch start_prevalidator w _ parameters =
       (fun _ {State.current_head; _} -> Lwt.return current_head)
     >>= fun head ->
     State.Block.protocol_hash head
-    >>= fun head_hash ->
+    >>=? fun head_hash ->
     safe_get_prevalidator_filter head_hash
     >>= function
     | Ok (module Proto) -> (
@@ -555,8 +539,8 @@ let on_launch start_prevalidator w _ parameters =
     } ;
   return nv
 
-let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
-    ~active_chains ?parent peer_validator_limits prevalidator_limits
+let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
+    ~block_validator_process peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_chains_input db chain_state
     limits =
   let spawn_child ~parent pvl pl bl gvbi gci db n l =
@@ -565,6 +549,7 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
       ~start_testchain
       ~active_chains
       ~parent
+      ~block_validator_process
       pvl
       pl
       bl
@@ -592,11 +577,11 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
   end in
   let parameters =
     {
-      max_child_ttl;
       parent;
       peer_validator_limits;
       prevalidator_limits;
       block_validator;
+      block_validator_process;
       global_valid_block_input;
       global_chains_input;
       db;
@@ -620,15 +605,16 @@ let rec create ?max_child_ttl ~start_prevalidator ~start_testchain
 
 (** Current block computation *)
 
-let create ?max_child_ttl ~start_prevalidator ~start_testchain ~active_chains
-    peer_validator_limits prevalidator_limits block_validator
-    global_valid_block_input global_chains_input global_db state limits =
+let create ~start_prevalidator ~start_testchain ~active_chains
+    ~block_validator_process peer_validator_limits prevalidator_limits
+    block_validator global_valid_block_input global_chains_input global_db
+    state limits =
   (* hide the optional ?parent *)
   create
-    ?max_child_ttl
     ~start_prevalidator
     ~start_testchain
     ~active_chains
+    ~block_validator_process
     peer_validator_limits
     prevalidator_limits
     block_validator

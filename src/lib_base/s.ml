@@ -32,9 +32,9 @@ module type T = sig
 
   val encoding : t Data_encoding.t
 
-  val to_bytes : t -> MBytes.t
+  val to_bytes : t -> Bytes.t
 
-  val of_bytes : MBytes.t -> t option
+  val of_bytes : Bytes.t -> t option
 end
 
 module type HASHABLE = sig
@@ -44,7 +44,7 @@ module type HASHABLE = sig
 
   val hash : t -> hash
 
-  val hash_raw : MBytes.t -> hash
+  val hash_raw : Bytes.t -> hash
 end
 
 module type SET = sig

@@ -65,10 +65,10 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
           >>= fun fd ->
           Lwt_unix.lockf fd Unix.F_LOCK 0
           >>= fun () ->
-          Lwt.return
-            ( fd,
-              Lwt_unix.on_signal Sys.sigint (fun _s ->
-                  unlock fd ; exit 0 (* exit code? *)) )
+          let sighandler =
+            Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd)
+          in
+          Lwt.return (fd, sighandler)
         in
         lock ()
         >>= fun (fd, sh) ->
@@ -123,11 +123,11 @@ class unix_prompter : Client_context.prompter =
           return line)
 
     method prompt_password : type a.
-        (a, MBytes.t tzresult) Client_context.lwt_format -> a =
+        (a, Bigstring.t tzresult) Client_context.lwt_format -> a =
       Format.kasprintf (fun msg ->
           print_string msg ;
           let line = Lwt_utils_unix.getpass () in
-          return (MBytes.of_string line))
+          return (Bigstring.of_string line))
   end
 
 class unix_logger ~base_dir : Client_context.printer =

@@ -38,7 +38,12 @@ type shell_header = {
 
 let shell_header_encoding =
   let open Data_encoding in
-  def "block_header.shell"
+  def
+    "block_header.shell"
+    ~title:"Shell header"
+    ~description:
+      "Block header's shell-related content. It contains information such as \
+       the block level, its predecessor and timestamp."
   @@ conv
        (fun { level;
               proto_level;
@@ -84,7 +89,7 @@ let shell_header_encoding =
           (req "fitness" Fitness.encoding)
           (req "context" Context_hash.encoding))
 
-type t = {shell : shell_header; protocol_data : MBytes.t}
+type t = {shell : shell_header; protocol_data : Bytes.t}
 
 include Compare.Make (struct
   type nonrec t = t
@@ -116,12 +121,17 @@ end)
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {shell; protocol_data} -> (shell, protocol_data))
-    (fun (shell, protocol_data) -> {shell; protocol_data})
-    (merge_objs
-       shell_header_encoding
-       (obj1 (req "protocol_data" Variable.bytes)))
+  def
+    "block_header"
+    ~title:"Block header"
+    ~description:
+      "Block header. It contains both shell and protocol specific data."
+  @@ conv
+       (fun {shell; protocol_data} -> (shell, protocol_data))
+       (fun (shell, protocol_data) -> {shell; protocol_data})
+       (merge_objs
+          shell_header_encoding
+          (obj1 (req "protocol_data" Variable.bytes)))
 
 let bounded_encoding ?max_size () =
   match max_size with
@@ -139,11 +149,11 @@ let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
-let to_b58check v = Base58.safe_encode (MBytes.to_string (to_bytes v))
+let to_b58check v = Base58.safe_encode (Bytes.to_string (to_bytes v))
 
 let of_b58check b =
   Option.apply (Base58.safe_decode b) ~f:(fun s ->
-      Data_encoding.Binary.of_bytes encoding (MBytes.of_string s))
+      Data_encoding.Binary.of_bytes encoding (Bytes.of_string s))
 
 let hash block = Block_hash.hash_bytes [to_bytes block]
 
@@ -181,3 +191,7 @@ let get_forced_protocol_upgrade =
 
 let get_voted_protocol_overrides proto_hash =
   List.assoc_opt proto_hash voted_protocol_overrides
+
+let () =
+  Data_encoding.Registration.register shell_header_encoding ;
+  Data_encoding.Registration.register encoding

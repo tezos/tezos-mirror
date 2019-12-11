@@ -56,6 +56,11 @@ type block_error =
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
 
+type validation_process_error =
+  | Missing_handshake
+  | Inconsistent_handshake of string
+  | Protocol_dynlink_failure of string
+
 type error +=
   | Invalid_block of {block : Block_hash.t; error : block_error}
   | Unavailable_protocol of {block : Block_hash.t; protocol : Protocol_hash.t}
@@ -67,5 +72,6 @@ type error +=
   | Failed_to_checkout_context of Context_hash.t
   | System_error of {errno : Unix.error; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
+  | Validation_process_failed of validation_process_error
 
 val invalid_block : Block_hash.t -> block_error -> error

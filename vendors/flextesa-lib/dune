@@ -1,0 +1,19 @@
+(library
+ (name flextesa)
+ (public_name flextesa)
+ (flags (:standard -safe-string))
+ (libraries
+    fmt
+    cohttp-lwt-unix
+    lwt.unix
+    cmdliner
+    easy-format
+    dum
+    base
+    genspio
+    ezjsonm
+    tezos-stdlib-unix
+    tezos-crypto
+    tezos-base
+    ))
+
