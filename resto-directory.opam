@@ -1,0 +1,18 @@
+version: "dev"
+opam-version: "2.0"
+maintainer: "contact@nomadic-labs.com"
+authors: [ "Nomadic Labs" "Ocamlpro" ]
+license: "LGPL-2.1-with-OCaml-exception"
+homepage: "https://gitlab.com/nomadic-labs/resto"
+bug-reports: "https://gitlab.com/nomadic-labs/resto/issues"
+dev-repo: "git+https://gitlab.com/nomadic-labs/resto"
+synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
+
+build: [[ "dune" "build" "-p" name "-j" jobs "@install" ]]
+depends: [
+  "ocamlfind" {build}
+  "dune" {build}
+  "resto" {= "dev" }
+  "resto-json" {= "dev" & with-test }
+  "lwt" { >= "3.0.0" }
+]

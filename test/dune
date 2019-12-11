@@ -2,7 +2,7 @@
  (name ezResto_test)
  (modules ezDirectory ezResto_test ezServices)
  (flags (:standard -safe-string))
- (libraries ocplib-ezresto-directory lwt.unix))
+ (libraries ezresto-directory lwt.unix))
 
 (alias
  (name runtest_ezresto)
@@ -12,7 +12,7 @@
  (name resto_test)
  (modules directory resto_test services)
  (flags (:standard -safe-string))
- (libraries ocplib-resto-directory ocplib-resto-json ocplib-json-typed ocplib-json-typed-bson lwt.unix))
+ (libraries resto-directory resto-json ocplib-json-typed ocplib-json-typed-bson lwt.unix))
 
 (alias
  (name runtest_resto)

@@ -1,18 +1,18 @@
-In the following, "ocplib-resto" refers to all files marked
-"Copyright OCamlPro" in this distribution.
+In the following, "resto" refers to all files marked
+"Copyright OCamlPro" and "Copyright Nomadic Labs" in this distribution.
 
-ocplib-resto is distributed under the terms of the
+resto is distributed under the terms of the
 GNU Lesser General Public License (LGPL) version 2.1 (included below).
 
 As a special exception to the GNU Lesser General Public License, you
-may link, statically or dynamically, a "work that uses ocplib-resto"
-with a publicly distributed version of ocplib-resto to produce an
-executable file containing portions of ocplib-resto, and distribute
+may link, statically or dynamically, a "work that uses resto"
+with a publicly distributed version of resto to produce an
+executable file containing portions of resto, and distribute
 that executable file under terms of your choice, without any of the
 additional requirements listed in clause 6 of the GNU Lesser General
-Public License. By "a publicly distributed version of ocplib-resto",
-we mean either the unmodified ocplib-resto as distributed by OCamlPro,
-or a modified version of ocplib-resto that is distributed under the
+Public License. By "a publicly distributed version of resto",
+we mean either the unmodified resto as distributed by OCamlPro,
+or a modified version of resto that is distributed under the
 conditions defined in clause 2 of the GNU Lesser General Public
 License. This exception does not however invalidate any other reasons
 why the executable file might be covered by the GNU Lesser General

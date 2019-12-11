@@ -1,9 +1,11 @@
-# ocplib-resto (WIP)
+# Resto
 
-This is a minimal OCaml library for type-safe HTTP/JSON RPCs.
+A small OCaml library for type-safe HTTP/JSON RPCs based on service *à la*
+Eliom.
 
-This is based on a notion of service, *à la* Eliom, and it uses
-`ocplib-json-typed` for self-documenting JSON encoders.
 
-See `test_ezresto-directory/ezResto_test.ml`
-or `test_resto-directory/resto_test.ml` for example.`
+## Context and further reading
+
+- [The Tezos project](https://gitlab.com/tezos/tezos) which uses resto to define RPC services.
+- [The Eliom project](https://github.com/ocsigen/eliom) which notion of services is the basis for `resto`.
+- [`ocplib-json-typed`](https://github.com/OCamlPro/ocplib-json-typed/) which defines self-documenting JSON codecs.

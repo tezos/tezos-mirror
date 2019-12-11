@@ -1,13 +1,13 @@
 
 all:
-	dune build --dev
+	dune build
 
 .PHONY: test
 test:
-	dune runtest --dev
+	dune runtest
 
 doc-html:
-	dune build @doc --dev
+	dune build @doc
 
 clean:
 	dune clean
