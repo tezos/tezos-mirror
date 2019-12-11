@@ -11,14 +11,13 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
+packages=$(echo $packages | sed -e 's/ /\n/' | sort)
+
 sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
 
-cpt=0
 for package in $packages; do
-    num=$(printf "%02d" $cpt)
-    cpt=$((cpt+1))
     cat >> $tmp <<EOF
-opam:$num:$package:
+opam:$package:
   <<: *opam_definition
   variables:
     package: $package
