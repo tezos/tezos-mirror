@@ -45,7 +45,7 @@ let default_config_file_name = "config.json"
 
 let version_file_name = "version.json"
 
-(* Data_version hitory:
+(* Data_version history:
  *  - 0.0.1 : original storage
  *  - 0.0.2 : never released
  *  - 0.0.3 : store upgrade (introducing history mode)
