@@ -152,7 +152,7 @@ registration scheme. In the actual error monad, this involves the
 which is how all data is encoded/decoded in Tezos. Since you can declare
 arbitrary new errors, we’ll have a way of adding a printer for each error.
 
-When we add a new error handler, we’ll use the ``register_handler``
+When we add a new error handler, we’ll use the ``register_error``
 function. This function will take a function that takes an error and
 returns a ``string option``. These functions will look something like
 this:
