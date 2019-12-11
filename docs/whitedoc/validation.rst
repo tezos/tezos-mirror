@@ -14,9 +14,10 @@ the :ref:`distributed DB<DDB_component>`.
 
 |Tezos validation diagram|
 
+.. _validator_component:
+
 Validator
 ---------
-.. _validator_component:
 
 The validator is the component responsible for checking that blocks
 coming from the network or a baker are valid, w.r.t. the rules defined

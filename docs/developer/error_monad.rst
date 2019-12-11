@@ -298,7 +298,7 @@ categories of errors:
    notation.
 
 The registration scheme also uses data encodings. Here’s an example from
-the `validator <../api/odoc/tezos-node-shell/Tezos_node_shell/Validator/index.html>`__:
+the :ref:`validator<validator_component>`:
 
 .. code-block:: ocaml
 
