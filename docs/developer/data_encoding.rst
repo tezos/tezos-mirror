@@ -30,7 +30,7 @@ depending on what binary serialization you want to achieve:
 For example, an encoding that represents a 31 bit integer has type
 ``Data_encoding.int31 = int Data_encoding.encoding``.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     let int31_encoding = Data_encoding.int31
 
@@ -42,13 +42,13 @@ library provides a number of combinators that can be used to build more
 complicated objects. Consider the type that represents an interval from
 the first number to the second:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type interval = int64 * int64
 
 We can define an encoding for this type as:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     let interval_encoding =
       Data_encoding.(obj2 (req "min" int64) (req "max" int64))
@@ -70,7 +70,7 @@ Lists, arrays, and options
 
 List, arrays and options types can by built on top of ground data types.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type interval_list = interval list
 
@@ -80,7 +80,7 @@ List, arrays and options types can by built on top of ground data types.
 
 And the encoders for these types as
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     let interval_list_encoding = Data_encoding.list interval_encoding
     let interval_array_encoding = Data_encoding.array interval_encoding
@@ -92,14 +92,14 @@ Union types
 The Tezos codebase makes heavy use of variant types. Consider the
 following variant type:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type variant = B of bool
                  | S of string
 
 Encoding for this types can be expressed as:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     let variant_encoding =
       Data_encoding.(union ~tag_size:`Uint8
@@ -141,7 +141,7 @@ JSON objects is parsed into the type-safe version.
 
 First we define an untyped JSON AST:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type json =
       [ `O of (string * json) list
@@ -154,7 +154,7 @@ First we define an untyped JSON AST:
 This is then parsed into a typed AST (we eliminate several cases for
 clarity):
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type 'a desc =
       | Null : unit desc

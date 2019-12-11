@@ -39,7 +39,7 @@ A simple version of the error monad
 
 Here’s a very simple error monad.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     module Error : sig
       type 'a t
@@ -82,7 +82,7 @@ this enough of an improvement? Not really. We don’t have any flexibility
 about how the printing works. We still can’t create error traces and we
 can’t handle errors and resume executing the program.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     module Error : sig
       type 'a t
@@ -113,7 +113,7 @@ lists of error messages. If you have a call you think might fail, and
 you want to provide a series of errors, you can wrap that result in the
 ``trace`` function. If that call fails, an additional error is added.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     module Error : sig
       type 'a t
@@ -158,7 +158,7 @@ function. This function will take a function that takes an error and
 returns a ``string option``. These functions will look something like
 this:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     type error += Explosion_failure of string * int;;
 
@@ -173,7 +173,7 @@ convention used by the actual `Error_monad` module. I’m also exposing the
 ``'a t`` type so that you can dispatch on it if you need to. This is
 used several times in the Tezos codebase.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     module Error : sig
       type error = ..
@@ -224,7 +224,7 @@ to add some extra combinators and reexport some functions from Lwt.
 I’m also renaming the type ``t`` to ``tzresult``, as used in the Tezos
 codebase.
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     module Error : sig
       type error = ..
@@ -301,7 +301,7 @@ categories of errors:
 The registration scheme also uses data encodings. Here’s an example from
 the `validator <../api/odoc/tezos-node-shell/Tezos_node_shell/Validator/index.html>`__:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     register_error_kind
         `Permanent
@@ -326,7 +326,7 @@ may also be omitted.
 The actual error monad and its tracing features can be seen in this
 function which parses contracts:
 
-.. code:: ocaml
+.. code-block:: ocaml
 
     let parse_script
       : ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->

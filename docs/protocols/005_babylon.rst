@@ -407,7 +407,7 @@ examples.
 
 To set delegate using the manager.tz script, one can use:
 
-.. code:: bash
+.. code-block:: bash
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
@@ -420,7 +420,7 @@ To set delegate using the manager.tz script, one can use:
 
 To remove delegate, use:
 
-.. code:: bash
+.. code-block:: bash
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
@@ -432,7 +432,7 @@ To remove delegate, use:
 
 To transfer (spend) tezos from originated contract to an implicit account, use:
 
-.. code:: bash
+.. code-block:: bash
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
@@ -446,7 +446,7 @@ To transfer (spend) tezos from originated contract to an implicit account, use:
 
 To transfer tezos from originated contract to another originated contract, use:
 
-.. code:: bash
+.. code-block:: bash
 
    tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'do' \
@@ -519,7 +519,7 @@ added ``%default`` entrypoint annotation.
 
 To set delegate using the added entrypoint, one can use:
 
-.. code:: bash
+.. code-block:: bash
 
   tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'set_delegate' \
@@ -532,7 +532,7 @@ To set delegate using the added entrypoint, one can use:
 
 To remove delegate, use:
 
-.. code:: bash
+.. code-block:: bash
 
   tezos-client transfer 0 from <src> to <dst> \
                --entrypoint 'remove_delegate' \

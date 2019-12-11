@@ -10,7 +10,7 @@ Building instructions
 
 To build the documentation, you can use the main Makefile target ``doc-html``
 
-.. code:: bash
+.. code-block:: bash
 
     make doc-html
 
@@ -18,7 +18,7 @@ The documentation is built by Sphinx, and uses the Read The Docs theme.
 
 On a debian system, you can install the needed dependencies with:
 
-.. code:: bash
+.. code-block:: bash
 
     sudo apt install \
       python3-recommonmark \
@@ -60,7 +60,7 @@ OCaml documentation
 
 Odoc is used for OCaml API generation, that you can install with:
 
-.. code:: bash
+.. code-block:: bash
 
     opam install odoc
 
