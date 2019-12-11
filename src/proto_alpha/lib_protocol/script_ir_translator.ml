@@ -2589,38 +2589,51 @@ let rec parse_data :
       parse_items ?type_logger ctxt expr tk tv vs (fun x -> x)
   | (Map_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
-  | (Big_map_t (tk, tv, _ty_name), (Seq (_loc, vs) as expr)) ->
-      parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
-      >|=? fun (diff, ctxt) ->
-      ( {id = None; diff; key_type = ty_of_comparable_ty tk; value_type = tv},
-        ctxt )
-  | (Big_map_t (tk, tv, _ty_name), Int (loc, id)) -> (
-      let id = Big_map.Id.parse_z id in
-      Big_map.exists ctxt id
-      >>=? function
-      | (_, None) ->
-          traced_fail (Invalid_big_map (loc, id))
-      | (ctxt, Some (btk, btv)) ->
-          Lwt.return
-            ( parse_comparable_ty ctxt (Micheline.root btk)
-            >>? fun (Ex_comparable_ty btk, ctxt) ->
-            parse_packable_ty ctxt ~legacy (Micheline.root btv)
-            >>? fun (Ex_ty btv, ctxt) ->
-            comparable_ty_eq ctxt tk btk
-            >>? fun (Eq, ctxt) ->
-            ty_eq ctxt loc tv btv
-            >>? fun (Eq, ctxt) ->
-            ok
-              ( {
-                  id = Some id;
-                  diff = empty_map tk;
-                  key_type = ty_of_comparable_ty tk;
-                  value_type = tv;
-                },
-                ctxt ) ) )
-  | (Big_map_t (_tk, _tv, _), expr) ->
-      traced_fail
-        (Invalid_kind (location expr, [Seq_kind; Int_kind], kind expr))
+  | (Big_map_t (tk, tv, _ty_name), expr) ->
+      ( match expr with
+      | Int (loc, id) ->
+          return (Some (id, loc), empty_map tk, ctxt)
+      | Seq (_, vs) ->
+          parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
+          >|=? fun (diff, ctxt) -> (None, diff, ctxt)
+      | Prim (loc, D_Pair, [Int (loc_id, id); Seq (_, vs)], annot) ->
+          error_unexpected_annot loc annot
+          >>?= fun () ->
+          let tv_opt = Option_t (tv, None) in
+          parse_items ?type_logger ctxt expr tk tv_opt vs (fun x -> x)
+          >|=? fun (diff, ctxt) -> (Some (id, loc_id), diff, ctxt)
+      | Prim (_, D_Pair, [Int _; expr], _) ->
+          traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
+      | Prim (_, D_Pair, [expr; _], _) ->
+          traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
+      | Prim (loc, D_Pair, l, _) ->
+          traced_fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
+      | _ ->
+          traced_fail
+            (unexpected expr [Seq_kind; Int_kind] Constant_namespace [D_Pair])
+      )
+      >>=? fun (id_opt, diff, ctxt) ->
+      ( match id_opt with
+      | None ->
+          return @@ (None, ctxt)
+      | Some (id, loc) -> (
+          let id = Big_map.Id.parse_z id in
+          Big_map.exists ctxt id
+          >>=? function
+          | (_, None) ->
+              traced_fail (Invalid_big_map (loc, id))
+          | (ctxt, Some (btk, btv)) ->
+              Lwt.return
+                ( parse_comparable_ty ctxt (Micheline.root btk)
+                >>? fun (Ex_comparable_ty btk, ctxt) ->
+                parse_packable_ty ctxt ~legacy (Micheline.root btv)
+                >>? fun (Ex_ty btv, ctxt) ->
+                comparable_ty_eq ctxt tk btk
+                >>? fun (Eq, ctxt) ->
+                ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) -> ok (Some id, ctxt)
+                ) ) )
+      >|=? fun (id, ctxt) ->
+      ({id; diff; key_type = ty_of_comparable_ty tk; value_type = tv}, ctxt)
   | (Never_t _, expr) ->
       traced_fail (Invalid_never_expr (location expr))
 
@@ -5375,35 +5388,56 @@ let rec unparse_data :
         ([], ctxt)
         (map_fold (fun k v acc -> (k, v) :: acc) map [])
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
-  | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
-      (* this branch is to allow roundtrip of big map literals *)
+  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = (module Diff); _})
+    when Diff.OPS.is_empty (fst Diff.boxed) ->
+      return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
+  | (Big_map_t (kt, vt, _), {id = Some id; diff = (module Diff); _}) ->
       let kt = ty_of_comparable_ty kt in
-      fold_left_s
-        (fun (l, ctxt) (k, v) ->
-          non_terminal_recursion ctxt mode kt k
-          >>=? fun (key, ctxt) ->
-          non_terminal_recursion ctxt mode vt v
-          >|=? fun (value, ctxt) ->
-          (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
-        ([], ctxt)
-        (Diff.OPS.fold
-           (fun k v acc ->
-             match v with None -> acc | Some v -> (k, v) :: acc)
-           (fst Diff.boxed)
-           [])
+      let items =
+        Diff.OPS.fold (fun k v acc -> (k, v) :: acc) (fst Diff.boxed) []
+      in
+      let vt = Option_t (vt, None) in
+      unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
+      >|=? fun (items, ctxt) ->
+      ( Micheline.Prim
+          ( -1,
+            D_Pair,
+            [Int (-1, Big_map.Id.unparse_to_z id); Seq (-1, items)],
+            [] ),
+        ctxt )
+  | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
+      let kt = ty_of_comparable_ty kt in
+      let items =
+        Diff.OPS.fold
+          (fun k v acc -> match v with None -> acc | Some v -> (k, v) :: acc)
+          (fst Diff.boxed)
+          []
+      in
+      unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
-  | (Big_map_t (_kt, _kv, _), {id = Some id; diff = (module Diff); _}) ->
-      if Compare.Int.(Diff.OPS.cardinal (fst Diff.boxed) = 0) then
-        let id = Big_map.Id.unparse_to_z id in
-        return (Micheline.Int (-1, id), ctxt)
-      else
-        (* this can only be the result of an execution and the map
-             must have been flushed at this point *)
-        assert false
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
   | (Never_t _, _) ->
       .
+
+and unparse_items :
+    type k v.
+    context ->
+    stack_depth:int ->
+    unparsing_mode ->
+    k ty ->
+    v ty ->
+    (k * v) list ->
+    (Script.node list * context) tzresult Lwt.t =
+ fun ctxt ~stack_depth mode kt vt items ->
+  fold_left_s
+    (fun (l, ctxt) (k, v) ->
+      unparse_data ctxt ~stack_depth:(stack_depth + 1) mode kt k
+      >>=? fun (key, ctxt) ->
+      unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
+      >|=? fun (value, ctxt) -> (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
+    ([], ctxt)
+    items
 
 and unparse_code ctxt ~stack_depth mode code =
   let legacy = true in
