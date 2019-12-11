@@ -17,6 +17,63 @@ RPC calls. This behavior can be disable using command-line flag ``--singleproces
 The node also features a new ``reconstruct`` command.
 It converts a node in ``full`` history mode into an ``archive`` node.
 
+Changelog
+---------
+
+Shell
+~~~~~
+
+- Improve storage efficiency by switching from LMDB to new ``pack`` backend
+
+- Add new ``reconstruct`` command to convert a ``full`` node into an ``archive`` node
+
+- Make validation run in an external process (can be disabled with --singleprocess)
+
+- Improve bootstrap efficiency
+
+- Slightly improve log readability
+
+- Remove hardcoded testchain TTL
+
+- The unban RPC now also removes the requested address or peer from the greylist
+
+Docker Images
+~~~~~~~~~~~~~
+
+- Default Docker image is now stripped of debug symbols, reducing size by 70Mb
+
+- New ``bare`` image is also stripped and does not have the ``alphanet.sh`` entrypoint
+
+- New ``debug`` image is the old default image, i.e. not stripped
+
+Codec
+~~~~~
+
+- New binary: ``tezos-codec`` to encode and decode Tezos values
+
+Baker
+~~~~~
+
+- Use ``preserved_cycles`` from configuration instead of hard-coded constant
+
+Client
+~~~~~~
+
+- Add ``--verbose-signing`` to client for consistency
+
+- Change output of command ``hash data`` (replace ``Hash`` with ``Script-expression-ID-Hash``
+  and ``Raw Script-expression-ID-Hash``)
+
+All Binaries
+~~~~~~~~~~~~
+
+- Handle ``SIGINT`` and ``SIGTERM`` more consistently
+
+Build System
+~~~~~~~~~~~~
+
+- Fix ``make build-dev-deps`` so that installing merlin does not change other packages
+
 Storage Upgrade
 ---------------
 
