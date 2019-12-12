@@ -43,7 +43,7 @@ endif
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json sandbox-parameters.json ; \
 	 done
 
-PROTOCOLS := genesis genesis_alphanet genesis_babylonnet genesis_carthagenet alpha demo_noops 000_Ps9mPmXa 001_PtCJ7pwo 002_PsYLVpVv 003_PsddFKi3 004_Pt24m4xi 005_PsBABY5H 005_PsBabyM1
+PROTOCOLS := genesis genesis_alphanet genesis_babylonnet genesis_carthagenet alpha demo_noops 000_Ps9mPmXa 001_PtCJ7pwo 002_PsYLVpVv 003_PsddFKi3 004_Pt24m4xi 005_PsBABY5H 005_PsBabyM1 006_PsCARTHA
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 generate_dune: ${DUNE_INCS}
