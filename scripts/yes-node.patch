@@ -11,7 +11,7 @@ index 8aec1057e..5b47714e4 100644
    let watermark = Option.map ~f:bytes_of_watermark watermark in
    match secret_key with
    | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -572,6 +572,27 @@ let check ?watermark public_key signature message =
+@@ -572,6 +572,25 @@ let check ?watermark public_key signature message =
        P256.check ?watermark pk signature message
    | _ -> false
  
@@ -24,14 +24,12 @@ index 8aec1057e..5b47714e4 100644
 +  of_bytes_exn tmp
 +
 +let fake_check ?watermark pk signature msg =
-+  let pk_bytes = Data_encoding.Binary.to_bytes_exn
-+      Public_key.encoding pk in
-+  if equal signature (fake_sign pk_bytes msg) then true else
-+    check ?watermark pk signature msg
++  let pk_bytes = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
++  if equal signature (fake_sign pk_bytes msg) then true
++  else check ?watermark pk signature msg
 +
 +let sign ?watermark:_ sk msg =
-+  let pk_bytes = Data_encoding.Binary.to_bytes_exn
-+      Secret_key.encoding sk in
++  let pk_bytes = Data_encoding.Binary.to_bytes_exn Secret_key.encoding sk in
 +  fake_sign pk_bytes msg
 +
 +let check = fake_check
