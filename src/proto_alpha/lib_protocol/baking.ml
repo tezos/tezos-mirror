@@ -375,15 +375,15 @@ let dawn_of_a_new_cycle ctxt =
 let minimum_allowed_endorsements ctxt ~block_delay =
   let minimum = Constants.initial_endorsers ctxt in
   let delay_per_missing_endorsement =
-    Int64.to_int
-      (Period.to_seconds (Constants.delay_per_missing_endorsement ctxt))
+    Period.to_seconds (Constants.delay_per_missing_endorsement ctxt)
   in
   let reduced_time_constraint =
-    let delay = Int64.to_int (Period.to_seconds block_delay) in
-    if Compare.Int.(delay_per_missing_endorsement = 0) then delay
-    else delay / delay_per_missing_endorsement
+    let delay = Period.to_seconds block_delay in
+    if Compare.Int64.(delay_per_missing_endorsement = 0L) then delay
+    else Int64.div delay delay_per_missing_endorsement
   in
-  Compare.Int.max 0 (minimum - reduced_time_constraint)
+  if Compare.Int64.(Int64.of_int minimum < reduced_time_constraint) then 0
+  else minimum - Int64.to_int reduced_time_constraint
 
 let minimal_valid_time ctxt ~priority ~endorsing_power =
   let predecessor_timestamp = Timestamp.current ctxt in
