@@ -17,10 +17,10 @@ index 8aec1057e..5b47714e4 100644
  
 +let fake_sign pk_bytes msg =
 +  let half = size / 2 in
-+  let tmp = MBytes.init size (fun _ -> '0') in
-+  let all_or_half buf = Pervasives.min (MBytes.length buf) half in
-+  MBytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
-+  MBytes.blit msg 0 tmp half (all_or_half msg) ;
++  let tmp = Bytes.init size (fun _ -> '0') in
++  let all_or_half buf = Pervasives.min (Bytes.length buf) half in
++  Bytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
++  Bytes.blit msg 0 tmp half (all_or_half msg) ;
 +  of_bytes_exn tmp
 +
 +let fake_check ?watermark pk signature msg =
@@ -37,5 +37,5 @@ index 8aec1057e..5b47714e4 100644
 +let check = fake_check
 +
  let append ?watermark sk msg =
-   MBytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
+   Bytes.concat "" [msg; (to_bytes (sign ?watermark sk msg))]
  
