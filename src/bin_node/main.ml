@@ -24,6 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This can be removed once the protocol is fixed
+   (currently there is [to_int Int32.max_int] which is obviously invalid). *)
+let () =
+  if Sys.word_size <> 64 then (
+    prerr_endline "Non-64 bit architectures are not supported." ;
+    exit 1 )
+
 let () =
   let log s = Node_logging.fatal_error "%s" s in
   Lwt_exit.exit_on ~log Sys.sigint ;
