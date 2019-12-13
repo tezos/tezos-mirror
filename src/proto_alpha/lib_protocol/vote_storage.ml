@@ -58,7 +58,30 @@ let clear_proposals ctxt =
   Storage.Vote.Proposals_count.clear ctxt
   >>= fun ctxt -> Storage.Vote.Proposals.clear ctxt
 
+let has_recorded_ballot = Storage.Vote.Ballots.mem
+
+let record_ballot = Storage.Vote.Ballots.init
+
+let try_get_ballot ctxt contract =
+  let try_get_delegate_ballot contract =
+    Storage.Contract.Delegate.get_option ctxt contract
+    >>=? function
+    | Some baker_hash ->
+        Contract_repr.baker_contract baker_hash
+        |> Storage.Vote.Ballots.get_option ctxt
+    | None ->
+        return None
+  in
+  Storage.Vote.Ballots.get_option ctxt contract
+  >>=? function
+  | Some contract_ballot ->
+      return_some contract_ballot
+  | None ->
+      try_get_delegate_ballot contract
+
 type ballots = {yay : int32; nay : int32; pass : int32}
+
+let zero_ballots = {yay = 0l; nay = 0l; pass = 0l}
 
 let ballots_encoding =
   let open Data_encoding in
@@ -67,29 +90,81 @@ let ballots_encoding =
     (fun (yay, nay, pass) -> {yay; nay; pass})
   @@ obj3 (req "yay" int32) (req "nay" int32) (req "pass" int32)
 
-let has_recorded_ballot = Storage.Vote.Ballots.mem
+(* get a map associating contracts to their total votes *)
+let get_votes_map ctxt =
+  let open Int64 in
+  let constants = Raw_context.constants ctxt in
+  let tokens_per_roll = Tez_repr.to_int64 constants.tokens_per_roll in
+  let incr contract x =
+    Contract_repr.Map.update contract (fun maybe_voting_balance ->
+        Option.value ~default:0L maybe_voting_balance |> add x |> Option.some)
+  in
+  Storage.Contract.Balance.fold
+    ctxt
+    ~init:(ok (ctxt, Contract_repr.Map.empty))
+    ~f:(fun contract balance acc ->
+      Lwt.return acc
+      >>=? fun (ctxt, votes_map) ->
+      let balance = Tez_repr.to_int64 balance in
+      let change = rem balance tokens_per_roll in
+      let voting_balance = sub balance change in
+      let votes_map = incr contract voting_balance votes_map in
+      (* If there is a delegate, assign the change to the delegate *)
+      Storage.Contract.Delegate.get_option ctxt contract
+      >|=? Option.map Contract_repr.baker_contract
+      >>=? function
+      | None ->
+          return (ctxt, votes_map)
+      | Some baker ->
+          incr baker change votes_map
+          |> fun votes_map -> return (ctxt, votes_map))
+  (* Add frozen balances *)
+  >>=? fun (ctxt, votes_map) ->
+  Storage.Baker.Registered.fold
+    ctxt
+    ~init:(ok (ctxt, votes_map))
+    ~f:(fun baker_hash acc ->
+      Lwt.return acc
+      >>=? fun (ctxt, votes_map) ->
+      Baker_storage.frozen_balance ctxt baker_hash
+      >>=? fun frozen_balance ->
+      let baker = Contract_repr.baker_contract baker_hash in
+      incr baker (Tez_repr.to_int64 frozen_balance) votes_map
+      |> fun votes_map -> return (ctxt, votes_map))
+  (* Divide all balances by tokens_per_roll *)
+  >>=? fun (_, votes_map) ->
+  Contract_repr.Map.map
+    (fun votes -> to_int32 (div votes tokens_per_roll))
+    votes_map
+  (* Remove zeros *)
+  |> Contract_repr.Map.filter (fun _ -> Compare.Int32.( <> ) 0l)
+  |> return
 
-let record_ballot = Storage.Vote.Ballots.init
+let count (ballot : Vote_repr.ballot) weight ballots =
+  let allocate fraction total =
+    Int32.(add (mul weight (of_int fraction)) total)
+  in
+  {
+    yay = allocate ballot.yays_per_roll ballots.yay;
+    nay = allocate ballot.nays_per_roll ballots.nay;
+    pass = allocate ballot.passes_per_roll ballots.pass;
+  }
 
 let get_ballots ctxt =
-  Storage.Vote.Ballots.fold
-    ctxt
-    ~f:(fun baker ballot (ballots : ballots tzresult) ->
-      (* Assuming the same listings is used at votings *)
-      Storage.Vote.Listings.get ctxt baker
-      >>=? fun weight ->
-      let allocate fraction total =
-        Int32.(add (mul weight (of_int fraction)) total)
-      in
-      Lwt.return
-        ( ballots
-        >|? fun ballots ->
-        {
-          yay = allocate ballot.yays_per_roll ballots.yay;
-          nay = allocate ballot.nays_per_roll ballots.nay;
-          pass = allocate ballot.passes_per_roll ballots.pass;
-        } ))
-    ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
+  get_votes_map ctxt
+  >>=? fun votes_map ->
+  Contract_repr.Map.fold
+    (fun contract votes ballots ->
+      ballots
+      >>=? fun ballots ->
+      try_get_ballot ctxt contract
+      >>=? function
+      | None ->
+          return ballots
+      | Some ballot ->
+          count ballot votes ballots |> return)
+    votes_map
+    (return zero_ballots)
 
 let get_ballot_list = Storage.Vote.Ballots.bindings
 
@@ -97,7 +172,7 @@ let clear_ballots = Storage.Vote.Ballots.clear
 
 let listings_encoding =
   Data_encoding.(
-    list (obj2 (req "baker" Baker_hash.encoding) (req "rolls" int32)))
+    list (obj2 (req "contract" Contract_repr.encoding) (req "votes" int32)))
 
 let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt
@@ -114,9 +189,17 @@ let update_listings ctxt =
 
 let listing_size = Storage.Vote.Listings_size.get
 
-let in_listings = Storage.Vote.Listings.mem
+let in_listings ctxt contract =
+  match Contract_repr.is_baker contract with
+  | Some baker_hash ->
+      Storage.Vote.Listings.mem ctxt baker_hash
+  | None ->
+      Lwt.return false
 
-let get_listings = Storage.Vote.Listings.bindings
+let get_listings ctxt =
+  Storage.Vote.Listings.bindings ctxt
+  >|= List.map (fun (baker_hash, votes) ->
+          (Contract_repr.baker_contract baker_hash, votes))
 
 let get_voting_power_free ctxt owner =
   Storage.Vote.Listings.get_option ctxt owner >|=? Option.value ~default:0l

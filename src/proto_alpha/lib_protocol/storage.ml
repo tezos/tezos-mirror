@@ -1017,7 +1017,7 @@ module Vote = struct
          (struct
            let name = ["ballots"]
          end))
-         (Make_index (Baker_hash))
+         (Make_index (Contract_repr.Index))
          (struct
            type t = Vote_repr.ballot
 

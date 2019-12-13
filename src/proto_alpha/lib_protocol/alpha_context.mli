@@ -1034,15 +1034,15 @@ module Vote : sig
   val recorded_proposal_count_for_baker :
     context -> baker_hash -> int tzresult Lwt.t
 
-  val listings_encoding : (baker_hash * int32) list Data_encoding.t
+  val listings_encoding : (Contract.t * int32) list Data_encoding.t
 
   val update_listings : context -> context tzresult Lwt.t
 
   val listing_size : context -> int32 tzresult Lwt.t
 
-  val in_listings : context -> baker_hash -> bool Lwt.t
+  val in_listings : context -> Contract.t -> bool Lwt.t
 
-  val get_listings : context -> (baker_hash * int32) list Lwt.t
+  val get_listings : context -> (Contract.t * int32) list Lwt.t
 
   type ballot = {
     yays_per_roll : int;
@@ -1063,15 +1063,19 @@ module Vote : sig
 
   type ballots = {yay : int32; nay : int32; pass : int32}
 
+  val zero_ballots : ballots
+
   val ballots_encoding : ballots Data_encoding.t
 
-  val has_recorded_ballot : context -> baker_hash -> bool Lwt.t
-
-  val record_ballot : context -> baker_hash -> ballot -> context tzresult Lwt.t
+  val count : ballot -> int32 -> ballots -> ballots
 
   val get_ballots : context -> ballots tzresult Lwt.t
 
-  val get_ballot_list : context -> (baker_hash * ballot) list Lwt.t
+  val has_recorded_ballot : context -> Contract.t -> bool Lwt.t
+
+  val record_ballot : context -> Contract.t -> ballot -> context tzresult Lwt.t
+
+  val get_ballot_list : context -> (Contract.t * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
 
@@ -1179,6 +1183,7 @@ module Kind : sig
     | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
+    | Ballot_manager_kind : ballot manager
 
   type 'a baker =
     | Baker_proposals_kind : proposals baker
@@ -1285,6 +1290,12 @@ and _ manager_operation =
       owner_keys : Signature.Public_key.t list;
     }
       -> Kind.baker_registration manager_operation
+  | Ballot_override : {
+      period : Voting_period.t;
+      proposal : Protocol_hash.t;
+      ballot : Vote.ballot;
+    }
+      -> Kind.ballot manager_operation
 
 and _ baker_operation =
   | Baker_proposals : {
@@ -1473,6 +1484,8 @@ module Operation : sig
 
     val baker_registration_case : Kind.baker_registration Kind.manager case
 
+    val ballot_override_case : Kind.ballot Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -1499,6 +1512,8 @@ module Operation : sig
       val delegation_case : Kind.delegation case
 
       val baker_registration_case : Kind.baker_registration case
+
+      val ballot_override_case : Kind.ballot case
     end
 
     module Baker_operations : sig

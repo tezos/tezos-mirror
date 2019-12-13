@@ -470,7 +470,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           Lwt.return acc
           >>=? fun ctxt ->
           Storage.Baker.Consensus_key_rev.get ctxt pkh
-          >>=? fun baker ->
+          >>=? fun baker_hash ->
+          let baker = Contract_repr.baker_contract baker_hash in
           Storage.Vote.Ballots_006.delete ctxt pkh
           >>=? fun ctxt -> Storage.Vote.Ballots.init ctxt baker ballot)
       >>=? fun ctxt ->

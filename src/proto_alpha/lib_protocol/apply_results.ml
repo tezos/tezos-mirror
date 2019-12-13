@@ -96,6 +96,10 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.baker_registration successful_manager_operation_result
+  | Ballot_override_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.ballot successful_manager_operation_result
 
 type _ successful_baker_operation_result =
   | Baker_proposals_result : {
@@ -552,6 +556,25 @@ module Manager_result = struct
             paid_storage_size_diff;
           })
 
+  let ballot_override_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.ballot_override_case
+      ~encoding:Data_encoding.(obj1 (dft "consumed_gas" z Z.zero))
+      ~iselect:(function
+        | Internal_manager_operation_result
+            (({operation = Ballot_override _; _} as op), res) ->
+            Some (op, res)
+        | _ ->
+            None)
+      ~select:(function
+        | Successful_manager_result (Ballot_override_result _ as op) ->
+            Some op
+        | _ ->
+            None)
+      ~proj:(function Ballot_override_result {consumed_gas} -> consumed_gas)
+      ~kind:Kind.Ballot_manager_kind
+      ~inj:(fun consumed_gas -> Ballot_override_result {consumed_gas})
+
   let encoding =
     let make_manager (type kind) (MCase res_case : kind case) =
       let (Operation.Encoding.Manager_operations.MCase op_case) =
@@ -584,7 +607,8 @@ module Manager_result = struct
            make_manager origination_case;
            make_manager delegation_legacy_case;
            make_manager delegation_case;
-           make_manager baker_registration_case ]
+           make_manager baker_registration_case;
+           make_manager ballot_override_case ]
 end
 
 module Baker_result = struct
@@ -902,6 +926,10 @@ let equal_manager_kind :
     ->
       Some Eq
   | (Kind.Baker_registration_manager_kind, _) ->
+      None
+  | (Kind.Ballot_manager_kind, Kind.Ballot_manager_kind) ->
+      Some Eq
+  | (Kind.Ballot_manager_kind, _) ->
       None
 
 module Encoding = struct
@@ -1265,6 +1293,18 @@ module Encoding = struct
             Some (op, res)
         | _ ->
             None)
+
+  let ballot_override_case =
+    make_manager_case
+      Operation.Encoding.ballot_override_case
+      Manager_result.ballot_override_case
+      (function
+        | Contents_and_result
+            ((Manager_operation {operation = Ballot_override _; _} as op), res)
+          ->
+            Some (op, res)
+        | _ ->
+            None)
 end
 
 let contents_result_encoding =
@@ -1299,7 +1339,8 @@ let contents_result_encoding =
          make delegation_legacy_case;
          make delegation_case;
          make failing_noop_case;
-         make baker_registration_case ]
+         make baker_registration_case;
+         make ballot_override_case ]
 
 let contents_and_result_encoding =
   let open Encoding in
@@ -1338,7 +1379,8 @@ let contents_and_result_encoding =
          make delegation_legacy_case;
          make delegation_case;
          make failing_noop_case;
-         make baker_registration_case ]
+         make baker_registration_case;
+         make ballot_override_case ]
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -1634,6 +1676,22 @@ let kind_equal :
           _ } ) ->
       Some Eq
   | (Manager_operation {operation = Baker_registration _; _}, _) ->
+      None
+  | ( Manager_operation {operation = Ballot_override _; _},
+      Manager_operation_result
+        {operation_result = Applied (Ballot_override_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Ballot_override _; _},
+      Manager_operation_result
+        { operation_result = Failed (Alpha_context.Kind.Ballot_manager_kind, _);
+          _ } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Ballot_override _; _},
+      Manager_operation_result
+        {operation_result = Skipped Alpha_context.Kind.Ballot_manager_kind; _}
+    ) ->
+      Some Eq
+  | (Manager_operation {operation = Ballot_override _; _}, _) ->
       None
 
 let rec kind_equal_list :

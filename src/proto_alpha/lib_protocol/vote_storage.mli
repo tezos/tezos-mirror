@@ -41,30 +41,33 @@ val get_proposals : Raw_context.t -> int32 Protocol_hash.Map.t tzresult Lwt.t
 
 val clear_proposals : Raw_context.t -> Raw_context.t Lwt.t
 
-(** Counts of the votes *)
 type ballots = {yay : int32; nay : int32; pass : int32}
+
+val zero_ballots : ballots
 
 val ballots_encoding : ballots Data_encoding.t
 
-val has_recorded_ballot : Raw_context.t -> Baker_hash.t -> bool Lwt.t
+val count : Vote_repr.ballot -> int32 -> ballots -> ballots
+
+(** Computes the sum of the current ballots weighted by stake. *)
+val get_ballots : Raw_context.t -> ballots tzresult Lwt.t
+
+val has_recorded_ballot : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** Records a vote for a baker, returns a {!Storage_error Existing_key} if
     the vote was already registered *)
 val record_ballot :
   Raw_context.t ->
-  Baker_hash.t ->
+  Contract_repr.t ->
   Vote_repr.ballot ->
   Raw_context.t tzresult Lwt.t
 
-(** Computes the sum of the current ballots weighted by stake. *)
-val get_ballots : Raw_context.t -> ballots tzresult Lwt.t
-
 val get_ballot_list :
-  Raw_context.t -> (Baker_hash.t * Vote_repr.ballot) list Lwt.t
+  Raw_context.t -> (Contract_repr.t * Vote_repr.ballot) list Lwt.t
 
 val clear_ballots : Raw_context.t -> Raw_context.t Lwt.t
 
-val listings_encoding : (Baker_hash.t * int32) list Data_encoding.t
+val listings_encoding : (Contract_repr.t * int32) list Data_encoding.t
 
 (** Populates [!Storage.Vote.Listings] using the currently existing rolls and
     sets Listings_size. Bakers without rolls are not included in the listing. *)
@@ -74,9 +77,9 @@ val update_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val listing_size : Raw_context.t -> int32 tzresult Lwt.t
 
 (** Verifies the presence of a baker in the listing. *)
-val in_listings : Raw_context.t -> Baker_hash.t -> bool Lwt.t
+val in_listings : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
-val get_listings : Raw_context.t -> (Baker_hash.t * int32) list Lwt.t
+val get_listings : Raw_context.t -> (Contract_repr.t * int32) list Lwt.t
 
 val get_voting_power_free :
   Raw_context.t -> Baker_hash.t -> int32 tzresult Lwt.t

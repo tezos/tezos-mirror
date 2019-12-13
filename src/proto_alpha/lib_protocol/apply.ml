@@ -715,6 +715,18 @@ let apply_manager_operation_content :
           }
       in
       (ctxt, result, [])
+  | Ballot_override {period; proposal; ballot} ->
+      let level = Level.current ctxt in
+      fail_unless
+        Voting_period.(level.voting_period = period)
+        (Wrong_voting_period (level.voting_period, period))
+      >>=? fun () ->
+      Amendment.record_ballot ctxt source proposal ballot
+      >|=? fun ctxt ->
+      ( ctxt,
+        Ballot_override_result
+          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+        [] )
 
 type success_or_failure = Success of context | Failure
 
@@ -774,6 +786,7 @@ let apply_baker_operation_content :
             : kind successful_baker_operation_result ),
           [] )
   | Baker_ballot {period; proposal; ballot} ->
+      let baker_contract = Contract.baker_contract baker in
       let level = Level.current ctxt in
       fail_unless
         Voting_period.(level.voting_period = period)
@@ -785,7 +798,7 @@ let apply_baker_operation_content :
       | Some proposal ->
           return proposal )
       >>=? fun proposal ->
-      Amendment.record_ballot ctxt baker proposal ballot
+      Amendment.record_ballot ctxt baker_contract proposal ballot
       >>=? fun ctxt ->
       return
         ( ctxt,
@@ -1377,9 +1390,10 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       >|=? fun ctxt -> (ctxt, Single_result Proposals_result)
   | Single (Ballot {source; period; proposal; ballot}) ->
       map_delegate ctxt source
-      >>=? fun baker ->
-      Baker.get_consensus_key ctxt baker
+      >>=? fun baker_hash ->
+      Baker.get_consensus_key ctxt baker_hash
       >>=? fun key ->
+      let baker_contract = Contract.baker_contract baker_hash in
       Operation.check_signature key chain_id operation
       >>?= fun () ->
       let level = Level.current ctxt in
@@ -1387,7 +1401,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period))
       >>?= fun () ->
-      Amendment.record_ballot ctxt baker proposal ballot
+      Amendment.record_ballot ctxt baker_contract proposal ballot
       >|=? fun ctxt -> (ctxt, Single_result Ballot_result)
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)

@@ -72,6 +72,7 @@ module Kind : sig
     | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
+    | Ballot_manager_kind : ballot manager
 
   type 'a baker =
     | Baker_proposals_kind : proposals baker
@@ -186,6 +187,12 @@ and _ manager_operation =
       owner_keys : Signature.Public_key.t list;
     }
       -> Kind.baker_registration manager_operation
+  | Ballot_override : {
+      period : Voting_period_repr.t;
+      proposal : Protocol_hash.t;
+      ballot : Vote_repr.ballot;
+    }
+      -> Kind.ballot manager_operation
 
 (* baker operations can only be internal *)
 and _ baker_operation =
@@ -338,6 +345,8 @@ module Encoding : sig
 
   val baker_registration_case : Kind.baker_registration Kind.manager case
 
+  val ballot_override_case : Kind.ballot Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -363,6 +372,8 @@ module Encoding : sig
     val delegation_case : Kind.delegation case
 
     val baker_registration_case : Kind.baker_registration case
+
+    val ballot_override_case : Kind.ballot case
   end
 
   module Baker_operations : sig

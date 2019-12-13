@@ -254,30 +254,31 @@ let rec longer_than l n =
         else (* n > 0 *)
           longer_than rest (n - 1)
 
-let record_proposals ctxt baker proposals =
+let record_proposals ctxt baker_hash proposals =
   (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
   >>?= fun () ->
   Vote.get_current_period_kind ctxt
   >>=? function
   | Proposal ->
+      let baker = Contract.baker_contract baker_hash in
       Vote.in_listings ctxt baker
       >>= fun in_listings ->
       if in_listings then
-        Vote.recorded_proposal_count_for_baker ctxt baker
+        Vote.recorded_proposal_count_for_baker ctxt baker_hash
         >>=? fun count ->
         error_when
           (longer_than proposals (Constants.max_proposals_per_delegate - count))
           Too_many_proposals
         >>?= fun () ->
         fold_left_s
-          (fun ctxt proposal -> Vote.record_proposal ctxt proposal baker)
+          (fun ctxt proposal -> Vote.record_proposal ctxt proposal baker_hash)
           ctxt
           proposals
       else fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote | Adoption ->
       fail Unexpected_proposal
 
-let record_ballot ctxt baker proposal ballot =
+let record_ballot ctxt contract proposal ballot =
   Vote.get_current_period_kind ctxt
   >>=? function
   | Testing_vote | Promotion_vote ->
@@ -287,14 +288,10 @@ let record_ballot ctxt baker proposal ballot =
         (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal
       >>?= fun () ->
-      Vote.has_recorded_ballot ctxt baker
+      Vote.has_recorded_ballot ctxt contract
       >>= fun has_ballot ->
       error_when has_ballot Unauthorized_ballot
-      >>?= fun () ->
-      Vote.in_listings ctxt baker
-      >>= fun in_listings ->
-      if in_listings then Vote.record_ballot ctxt baker ballot
-      else fail Unauthorized_ballot
+      >>?= fun () -> Vote.record_ballot ctxt contract ballot
   | Testing | Proposal | Adoption ->
       fail Unexpected_ballot
 

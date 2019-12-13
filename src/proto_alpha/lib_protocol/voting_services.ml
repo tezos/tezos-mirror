@@ -43,7 +43,7 @@ module S = struct
         Data_encoding.(
           list
             (obj2
-               (req "baker" Baker_hash.encoding)
+               (req "voter" Contract.encoding)
                (req "ballot" Vote.ballot_encoding)))
       RPC_path.(path / "ballot_list")
 

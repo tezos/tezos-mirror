@@ -157,6 +157,10 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
     }
       -> Kind.baker_registration successful_manager_operation_result
+  | Ballot_override_result : {
+      consumed_gas : Z.t;
+    }
+      -> Kind.ballot successful_manager_operation_result
 
 (** Result of applying a {!baker_operation}, only internal. *)
 and _ successful_baker_operation_result =

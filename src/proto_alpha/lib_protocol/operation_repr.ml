@@ -72,6 +72,7 @@ module Kind = struct
     | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
     | Baker_registration_manager_kind : baker_registration manager
+    | Ballot_manager_kind : ballot manager
 
   type 'a baker =
     | Baker_proposals_kind : proposals baker
@@ -182,6 +183,12 @@ and _ manager_operation =
       owner_keys : Signature.Public_key.t list;
     }
       -> Kind.baker_registration manager_operation
+  | Ballot_override : {
+      period : Voting_period_repr.t;
+      proposal : Protocol_hash.t;
+      ballot : Vote_repr.ballot;
+    }
+      -> Kind.ballot manager_operation
 
 and _ baker_operation =
   | Baker_proposals : {
@@ -224,6 +231,8 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
       Kind.Delegation_manager_kind
   | Baker_registration _ ->
       Kind.Baker_registration_manager_kind
+  | Ballot_override _ ->
+      Kind.Ballot_manager_kind
 
 let baker_kind : type kind. kind baker_operation -> kind Kind.baker = function
   | Baker_proposals _ ->
@@ -517,6 +526,29 @@ module Encoding = struct
               Baker_registration {credit; consensus_key; threshold; owner_keys});
         }
 
+    let ballot_override_case =
+      MCase
+        {
+          tag = 5;
+          (* TODO: Review this! *)
+          name = "ballot_override";
+          encoding =
+            obj3
+              (req "period" Voting_period_repr.encoding)
+              (req "proposal" Protocol_hash.encoding)
+              (req "ballot" Vote_repr.ballot_encoding);
+          select =
+            (function
+            | Manager (Ballot_override _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Ballot_override {period; proposal; ballot} ->
+                (period, proposal, ballot));
+          inj =
+            (fun (period, proposal, ballot) ->
+              Ballot_override {period; proposal; ballot});
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -535,7 +567,8 @@ module Encoding = struct
           make origination_case;
           make delegation_legacy_case;
           make delegation_case;
-          make baker_registration_case ]
+          make baker_registration_case;
+          make ballot_override_case ]
   end
 
   type 'b case =
@@ -774,6 +807,9 @@ module Encoding = struct
   let baker_registration_case =
     make_manager_case 111 Manager_operations.baker_registration_case
 
+  let ballot_override_case =
+    make_manager_case 112 Manager_operations.ballot_override_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -799,7 +835,8 @@ module Encoding = struct
            make delegation_legacy_case;
            make delegation_case;
            make failing_noop_case;
-           make baker_registration_case ]
+           make baker_registration_case;
+           make ballot_override_case ]
 
   let contents_list_encoding =
     conv to_list of_list (Variable.list contents_encoding)
@@ -1164,6 +1201,10 @@ let equal_manager_operation_kind :
   | (Baker_registration _, Baker_registration _) ->
       Some Eq
   | (Baker_registration _, _) ->
+      None
+  | (Ballot_override _, Ballot_override _) ->
+      Some Eq
+  | (Ballot_override _, _) ->
       None
 
 let equal_contents_kind :

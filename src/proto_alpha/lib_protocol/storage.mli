@@ -480,7 +480,7 @@ module Vote : sig
   (** Contains for each delegate its ballot *)
   module Ballots :
     Indexed_data_storage
-      with type key = Baker_hash.t
+      with type key = Contract_repr.t
        and type value = Vote_repr.ballot
        and type t := Raw_context.t
 

@@ -71,7 +71,7 @@ type error += Invalid_proposal | Unexpected_ballot | Unauthorized_ballot
 
 val record_ballot :
   context ->
-  baker_hash ->
+  Contract.t ->
   Protocol_hash.t ->
   Vote.ballot ->
   context tzresult Lwt.t
