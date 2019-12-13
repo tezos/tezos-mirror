@@ -92,60 +92,50 @@ build:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
-unit:error_monad:
+unit:src/proto_005_PsBabyM1/lib_client:
   <<: *test_definition
   script:
-    - dune build @src/lib_error_monad/runtest
+    - dune build @src/proto_005_PsBabyM1/lib_client/runtest
 
-unit:shell:
+unit:src/proto_005_PsBabyM1/lib_protocol:
   <<: *test_definition
   script:
-    - dune build @src/lib_shell/runtest
+    - dune build @src/proto_005_PsBabyM1/lib_protocol/runtest
 
-unit:src/bin_client:
+unit:src/proto_004_Pt24m4xi/lib_client:
   <<: *test_definition
   script:
-    - dune build @src/bin_client/runtest
+    - dune build @src/proto_004_Pt24m4xi/lib_client/runtest
+
+unit:stdlib:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_stdlib/runtest
 
 unit:storage:
   <<: *test_definition
   script:
     - dune build @src/lib_storage/runtest
 
-unit:signer_backends/unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/unix/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
-
-unit:crypto:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_crypto/runtest
-
-unit:micheline:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_micheline/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
-
 unit:data_encoding:
   <<: *test_definition
   script:
     - dune build @src/lib_data_encoding/runtest
 
-unit:stdlib:
+unit:error_monad:
   <<: *test_definition
   script:
-    - dune build @src/lib_stdlib/runtest
+    - dune build @src/lib_error_monad/runtest
+
+unit:src/proto_003_PsddFKi3/lib_client:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_003_PsddFKi3/lib_client/runtest
+
+unit:shell:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_shell/runtest
 
 unit:p2p:
   <<: *test_definition
@@ -162,35 +152,55 @@ unit:src/proto_alpha/lib_protocol:
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
 
-unit:ocplib-resto/lib_resto-directory:
+unit:src/proto_006_PsCARTHA/lib_client:
   <<: *test_definition
   script:
-    - dune build @vendors/ocplib-resto/lib_resto-directory/runtest
+    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
+
+unit:src/proto_006_PsCARTHA/lib_protocol:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
+
+unit:signer_backends:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/runtest
+
+unit:signer_backends/unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/unix/runtest
+
+unit:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
+
+unit:protocol_environment:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_environment/runtest
+
+unit:src/bin_client:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest
+
+unit:crypto:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_crypto/runtest
 
 unit:ocplib-resto/lib_ezresto-directory:
   <<: *test_definition
   script:
     - dune build @vendors/ocplib-resto/lib_ezresto-directory/runtest
 
-unit:ocaml-ledger-wallet:
+unit:ocplib-resto/lib_resto-directory:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
-
-unit:ocaml-blake2:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-blake2/runtest
-
-unit:ocaml-bip39:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-bip39/runtest
-
-unit:ocaml-hacl:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-hacl/runtest
+    - dune build @vendors/ocplib-resto/lib_resto-directory/runtest
 
 unit:ocaml-pbkdf:
   <<: *test_definition
@@ -207,10 +217,30 @@ unit:ocaml-uecc:
   script:
     - dune build @vendors/ocaml-uecc/runtest
 
+unit:ocaml-bip39:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-bip39/runtest
+
+unit:ocaml-hacl:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-hacl/runtest
+
 unit:ocaml-secp256k1:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-secp256k1/runtest
+
+unit:ocaml-ledger-wallet:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-ledger-wallet/runtest
+
+unit:ocaml-blake2:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-blake2/runtest
 
 
 ##END_UNITEST##
@@ -694,40 +724,130 @@ opam:tezos-client-base-unix:
   variables:
     package: tezos-client-base-unix
 
+opam:tezos-protocol-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-005-PsBabyM1
+
+opam:tezos-protocol-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-006-PsCARTHA
+
 opam:tezos-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-protocol-alpha
+
+opam:tezos-protocol-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-004-Pt24m4xi
 
 opam:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:tezos-client-alpha:
+opam:tezos-client-005-PsBabyM1:
   <<: *opam_definition
   variables:
-    package: tezos-client-alpha
+    package: tezos-client-005-PsBabyM1
 
 opam:tezos-version:
   <<: *opam_definition
   variables:
     package: tezos-version
 
+opam:tezos-client-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-006-PsCARTHA
+
+opam:tezos-client-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-alpha
+
+opam:tezos-protocol-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-001-PtCJ7pwo
+
+opam:tezos-protocol-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-002-PsYLVpVv
+
+opam:tezos-protocol-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-003-PsddFKi3
+
+opam:tezos-client-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-004-Pt24m4xi
+
 opam:tezos-validation:
   <<: *opam_definition
   variables:
     package: tezos-validation
+
+opam:tezos-baking-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-005-PsBabyM1
+
+opam:tezos-baking-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-006-PsCARTHA
 
 opam:tezos-baking-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baking-alpha
 
+opam:tezos-protocol-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-000-Ps9mPmXa
+
+opam:tezos-client-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PtCJ7pwo
+
+opam:tezos-client-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-002-PsYLVpVv
+
+opam:tezos-client-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-003-PsddFKi3
+
 opam:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
+
+opam:tezos-protocol-genesis-alphanet:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis-alphanet
+
+opam:tezos-protocol-genesis-babylonnet:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis-babylonnet
+
+opam:tezos-protocol-genesis-carthagenet:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis-carthagenet
 
 opam:ocplib-resto-json:
   <<: *opam_definition
@@ -739,20 +859,80 @@ opam:ocplib-resto-cohttp-server:
   variables:
     package: ocplib-resto-cohttp-server
 
+opam:tezos-protocol-005-PsBABY5H:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-005-PsBABY5H
+
 opam:tezos-protocol-demo-noops:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo-noops
+
+opam:tezos-embedded-protocol-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-005-PsBabyM1
 
 opam:tezos-shell:
   <<: *opam_definition
   variables:
     package: tezos-shell
 
+opam:tezos-embedded-protocol-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-006-PsCARTHA
+
+opam:tezos-baking-005-PsBabyM1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-005-PsBabyM1-commands
+
+opam:tezos-baking-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-baking-006-PsCARTHA-commands
+
 opam:tezos-baking-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-baking-alpha-commands
+
+opam:tezos-client-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-000-Ps9mPmXa
+
+opam:tezos-client-001-PtCJ7pwo-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-001-PtCJ7pwo-commands
+
+opam:tezos-client-002-PsYLVpVv-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-002-PsYLVpVv-commands
+
+opam:tezos-client-003-PsddFKi3-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-003-PsddFKi3-commands
+
+opam:tezos-client-004-Pt24m4xi-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-004-Pt24m4xi-commands
+
+opam:tezos-client-005-PsBabyM1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-005-PsBabyM1-commands
+
+opam:tezos-client-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-006-PsCARTHA-commands
 
 opam:tezos-client-alpha-commands:
   <<: *opam_definition
@@ -764,10 +944,30 @@ opam:tezos-client-genesis:
   variables:
     package: tezos-client-genesis
 
+opam:tezos-client-genesis-alphanet:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis-alphanet
+
+opam:tezos-client-genesis-babylonnet:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis-babylonnet
+
+opam:tezos-client-genesis-carthagenet:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis-carthagenet
+
 opam:ocplib-ezresto:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto
+
+opam:tezos-embedded-protocol-004-Pt24m4xi:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-004-Pt24m4xi
 
 opam:tezos-embedded-protocol-alpha:
   <<: *opam_definition
@@ -779,10 +979,40 @@ opam:tezos-protocol-alpha-parameters:
   variables:
     package: tezos-protocol-alpha-parameters
 
+opam:tezos-protocol-006-PsCARTHA-parameters:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-006-PsCARTHA-parameters
+
 opam:tezos-rpc-http-server:
   <<: *opam_definition
   variables:
     package: tezos-rpc-http-server
+
+opam:tezos-embedded-protocol-000-Ps9mPmXa:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-000-Ps9mPmXa
+
+opam:tezos-embedded-protocol-001-PtCJ7pwo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-001-PtCJ7pwo
+
+opam:tezos-embedded-protocol-002-PsYLVpVv:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-002-PsYLVpVv
+
+opam:tezos-embedded-protocol-003-PsddFKi3:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-003-PsddFKi3
+
+opam:tezos-embedded-protocol-005-PsBABY5H:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-005-PsBABY5H
 
 opam:tezos-embedded-protocol-demo-noops:
   <<: *opam_definition
@@ -794,10 +1024,40 @@ opam:tezos-embedded-protocol-genesis:
   variables:
     package: tezos-embedded-protocol-genesis
 
+opam:tezos-embedded-protocol-genesis-alphanet:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis-alphanet
+
+opam:tezos-embedded-protocol-genesis-babylonnet:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis-babylonnet
+
+opam:tezos-embedded-protocol-genesis-carthagenet:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis-carthagenet
+
+opam:tezos-mempool-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-005-PsBabyM1
+
+opam:tezos-mempool-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-mempool-006-PsCARTHA
+
 opam:tezos-validator:
   <<: *opam_definition
   variables:
     package: tezos-validator
+
+opam:tezos-protocol-005-PsBabyM1-parameters:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-005-PsBabyM1-parameters
 
 opam:tezos-endorser-alpha-commands:
   <<: *opam_definition
@@ -809,10 +1069,20 @@ opam:tezos-client:
   variables:
     package: tezos-client
 
+opam:tezos-accuser-005-PsBabyM1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-005-PsBabyM1-commands
+
 opam:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
+
+opam:tezos-endorser-005-PsBabyM1-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-005-PsBabyM1-commands
 
 opam:tezos-accuser-alpha:
   <<: *opam_definition
@@ -854,6 +1124,11 @@ opam:tezos-alpha-test-helpers:
   variables:
     package: tezos-alpha-test-helpers
 
+opam:tezos-endorser-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-005-PsBabyM1
+
 opam:tezos-endorser-alpha:
   <<: *opam_definition
   variables:
@@ -864,20 +1139,75 @@ opam:tezos-accuser-alpha-commands:
   variables:
     package: tezos-accuser-alpha-commands
 
+opam:tezos-endorser-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-006-PsCARTHA
+
 opam:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
+
+opam:tezos-006-PsCARTHA-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-006-PsCARTHA-test-helpers
+
+opam:tezos-baker-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-006-PsCARTHA
+
+opam:tezos-accuser-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-006-PsCARTHA-commands
 
 opam:tezos-signer:
   <<: *opam_definition
   variables:
     package: tezos-signer
 
+opam:tezos-baker-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-baker-005-PsBabyM1
+
+opam:tezos-protocol-006-PsCARTHA-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-006-PsCARTHA-tests
+
+opam:tezos-accuser-006-PsCARTHA:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-006-PsCARTHA
+
+opam:tezos-protocol-005-PsBabyM1-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-005-PsBabyM1-tests
+
+opam:tezos-endorser-006-PsCARTHA-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-endorser-006-PsCARTHA-commands
+
+opam:tezos-accuser-005-PsBabyM1:
+  <<: *opam_definition
+  variables:
+    package: tezos-accuser-005-PsBabyM1
+
 opam:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
+
+opam:tezos-005-PsBabyM1-test-helpers:
+  <<: *opam_definition
+  variables:
+    package: tezos-005-PsBabyM1-test-helpers
 
 
 ##END_OPAM##
