@@ -147,10 +147,25 @@ let clean_directory files =
   in
   Format.sprintf "Please provide a clean directory by removing:@ %s" to_delete
 
-let write_version data_dir =
+let write_version_file data_dir =
   Lwt_utils_unix.Json.write_file
     (version_file data_dir)
     (Data_encoding.Json.construct version_encoding data_version)
+
+let read_version_file version_file =
+  Lwt_utils_unix.Json.read_file version_file
+  |> trace (Could_not_read_data_dir_version version_file)
+  >>=? fun json ->
+  try return (Data_encoding.Json.destruct version_encoding json)
+  with
+  | Data_encoding.Json.Cannot_destruct _
+  | Data_encoding.Json.Unexpected _
+  | Data_encoding.Json.No_case_matched _
+  | Data_encoding.Json.Bad_array_size _
+  | Data_encoding.Json.Missing_field _
+  | Data_encoding.Json.Unexpected_field _
+  ->
+    fail (Could_not_read_data_dir_version version_file)
 
 let check_data_dir_version files data_dir =
   let version_file = version_file data_dir in
@@ -159,19 +174,7 @@ let check_data_dir_version files data_dir =
   | false ->
       fail (Invalid_data_dir (clean_directory files))
   | true -> (
-      Lwt_utils_unix.Json.read_file version_file
-      |> trace (Could_not_read_data_dir_version version_file)
-      >>=? fun json ->
-      ( try return (Data_encoding.Json.destruct version_encoding json)
-        with
-        | Data_encoding.Json.Cannot_destruct _
-        | Data_encoding.Json.Unexpected _
-        | Data_encoding.Json.No_case_matched _
-        | Data_encoding.Json.Bad_array_size _
-        | Data_encoding.Json.Missing_field _
-        | Data_encoding.Json.Unexpected_field _
-        ->
-          fail (Could_not_read_data_dir_version version_file) )
+      read_version_file version_file
       >>=? fun version ->
       if String.equal version data_version then return_none
       else
@@ -186,7 +189,9 @@ let check_data_dir_version files data_dir =
             fail (Invalid_data_dir_version (data_version, version)) )
 
 let ensure_data_dir bare data_dir =
-  let write_version () = write_version data_dir >>=? fun () -> return_none in
+  let write_version () =
+    write_version_file data_dir >>=? fun () -> return_none
+  in
   Lwt.catch
     (fun () ->
       Lwt_unix.file_exists data_dir
@@ -229,7 +234,7 @@ let upgrade_data_dir data_dir =
       upgrade ~data_dir
       >>= function
       | Ok () ->
-          write_version data_dir
+          write_version_file data_dir
           >>=? fun () ->
           Format.printf "The node data dir is now up-to-date!@." ;
           return_unit
