@@ -191,3 +191,39 @@ let write file identity =
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)
+
+let generate_with_animation ppf target =
+  let duration = 1200 / Animation.number_of_frames in
+  Animation.make_with_animation
+    ppf
+    ~make:(fun count ->
+      Lwt.catch
+        (fun () ->
+          P2p_identity.generate_with_bound ~max:count target
+          >|= fun id -> Ok id)
+        (function
+          | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
+    ~on_retry:(fun time count ->
+      let ms = int_of_float (Mtime.Span.to_ms time) in
+      let count =
+        if ms <= 1 then max 10 (count * 10) else count * duration / ms
+      in
+      Lwt.pause () >>= fun () -> Lwt.return count)
+    10000
+
+let generate identity_file expected_pow =
+  if Sys.file_exists identity_file then
+    fail (Existent_identity_file identity_file)
+  else
+    let target = Crypto_box.make_target expected_pow in
+    Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
+    generate_with_animation Format.err_formatter target
+    >>= fun id ->
+    write identity_file id
+    >>=? fun () ->
+    Format.eprintf
+      "Stored the new identity (%a) into '%s'.@."
+      P2p_peer.Id.pp
+      id.peer_id
+      identity_file ;
+    return id
