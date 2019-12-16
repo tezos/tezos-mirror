@@ -103,6 +103,22 @@ module Event = struct
       ~level:Notice
       ("peer_id", P2p_peer.Id.encoding)
 
+  let generating_identity =
+    declare_0
+      ~section
+      ~name:"generating_identity"
+      ~msg:"generating an identity file"
+      ~level:Notice
+      ()
+
+  let identity_generated =
+    declare_1
+      ~section
+      ~name:"identity_generated"
+      ~msg:"identity file generated"
+      ~level:Notice
+      ("peer_id", P2p_peer.Id.encoding)
+
   let starting_rpc_server =
     declare_3
       ~section
@@ -158,8 +174,24 @@ end
 
 let ( // ) = Filename.concat
 
-let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
-    =
+let init_identity_file (config : Node_config_file.t) =
+  let identity_file =
+    config.data_dir // Node_data_version.default_identity_file_name
+  in
+  if Sys.file_exists identity_file then
+    Node_identity_file.read identity_file
+    >>=? fun identity ->
+    Event.(emit read_identity) identity.peer_id >>= fun () -> return identity
+  else
+    Event.(emit generating_identity) ()
+    >>= fun () ->
+    Node_identity_file.generate identity_file config.p2p.expected_pow
+    >>=? fun identity ->
+    Event.(emit identity_generated) identity.peer_id
+    >>= fun () -> return identity
+
+let init_node ?sandbox ?checkpoint ~identity ~singleprocess
+    (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.p2p.discovery_addr with
   | None ->
@@ -194,11 +226,6 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
       >>= fun trusted_points ->
-      Node_identity_file.read
-        (config.data_dir // Node_data_version.default_identity_file_name)
-      >>=? fun identity ->
-      Event.(emit read_identity) identity.peer_id
-      >>= fun () ->
       let p2p_config : P2p.config =
         {
           listening_addr;
@@ -343,10 +370,12 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
+  init_identity_file config
+  >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Event.(emit starting_node) config.blockchain_network.chain_name
   >>= fun () ->
-  init_node ?sandbox ?checkpoint ~singleprocess config
+  init_node ?sandbox ?checkpoint ~identity ~singleprocess config
   >>= (function
         | Ok node ->
             return node
