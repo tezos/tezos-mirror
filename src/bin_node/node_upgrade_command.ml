@@ -47,6 +47,8 @@ module Term = struct
     match subcommand with
     | Storage -> (
         let run =
+          Internal_event_unix.init ()
+          >>= fun () ->
           ( match data_dir with
           | Some data_dir ->
               return data_dir

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let lwt_emit = Node_data_version_state.lwt_emit
+
 let ( // ) = Filename.concat
 
 type t = string
@@ -223,27 +225,22 @@ let upgrade_data_dir data_dir =
   ensure_data_dir false data_dir
   >>=? function
   | None ->
-      Format.printf "Node data dir is up-to-date.@." ;
-      return_unit
+      lwt_emit Dir_is_up_to_date >>= fun () -> return_unit
   | Some (version, upgrade) -> (
-      Format.printf
-        "Upgrading node data dir from %s to %s...@.Please, do not interupt \
-         the process.@."
-        version
-        data_version ;
+      lwt_emit (Upgrading_node (version, data_version))
+      >>= fun () ->
       upgrade ~data_dir
       >>= function
       | Ok () ->
           write_version_file data_dir
-          >>=? fun () ->
-          Format.printf "The node data dir is now up-to-date!@." ;
-          return_unit
+          >>=? fun () -> lwt_emit Update_success >>= fun () -> return_unit
       | Error e ->
-          Format.printf
-            "%a@.Aborting upgrade. The storage was not upgraded.@."
+          Format.kasprintf
+            (fun errs -> lwt_emit (Aborting_upgrade errs))
+            "%a"
             Error_monad.pp_print_error
-            e ;
-          return_unit )
+            e
+          >>= fun () -> return_unit )
 
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir
