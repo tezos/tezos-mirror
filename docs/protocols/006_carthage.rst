@@ -39,7 +39,8 @@ The formula to calculate baking and endorsing rewards was improved
 in order to provide more accurate results.
 
 The formula was further modified in order to make it more resistant
-to certain types of attacks.
+to certain types of attacks. A full explanation can be found
+`here <https://blog.nomadic-labs.com/a-new-reward-formula-for-carthage.html>`_.
 
 Accounts
 --------
@@ -142,13 +143,31 @@ Annotations are enforced to only contain valid JSON.
 Changes to RPCs
 ---------------
 
-The RPC ``baking_rights`` is the only one affected, its behavior is
-improved and compatible with the old one.
-In Babylon the argument ``max_priority`` causes the RPC to return the
-rights up to ``max_priority`` excluded, for example setting
+Below you can find all the RPC changes.
+
+Baking_rights
+~~~~~~~~~~~~~
+
+In Babylon the argument ``max_priority`` causes the RPC to return
+the rights up to ``max_priority`` excluded, for example setting
 ``max_priority=0`` returns the empty list.
 In Carthage the value of ``max_priority`` is included, for example
 ``max_priority=0`` returns the rights of priority zero.
+
+Block_reward
+~~~~~~~~~~~~
+
+This constant is accessed by calling ``/chains/main/blocks/head/constants``,
+which returns a JSON object where the field ``block_reward`` was renamed to
+``baking_reward_per_endorsement`` and its value was changed from a single
+value to a list of values.
+
+Endorsement_reward
+~~~~~~~~~~~~~~~~~~
+
+This constant is accessed by calling ``/chains/main/blocks/head/constants``,
+which returns a JSON object where the value of the field ``endorsement_reward``
+was changed from a single value to a list of values.
 
 
 Changes to the binary format of operations
