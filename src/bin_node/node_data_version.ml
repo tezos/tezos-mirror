@@ -249,3 +249,20 @@ let ensure_data_dir ?(bare = false) data_dir =
       return_unit
   | Some (version, _) ->
       fail (Data_dir_needs_upgrade {expected = data_version; actual = version})
+
+let upgrade_status data_dir =
+  read_version_file (version_file data_dir)
+  >>=? fun data_dir_version ->
+  let upgradable_status =
+    match List.assoc_opt data_dir_version upgradable_data_version with
+    | Some _upgr ->
+        true
+    | None ->
+        false
+  in
+  let available_version =
+    if upgradable_status then Some data_version else None
+  in
+  lwt_emit
+    (Upgrade_status (upgradable_status, data_dir_version, available_version))
+  >>= fun () -> return_unit

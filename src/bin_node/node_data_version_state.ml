@@ -28,6 +28,7 @@ type status =
   | Upgrading_node of string * string
   | Update_success
   | Aborting_upgrade of string
+  | Upgrade_status of bool * string * string option
 
 let status_pp ppf = function
   | Dir_is_up_to_date ->
@@ -46,6 +47,17 @@ let status_pp ppf = function
         ppf
         "%s@.Aborting upgrade. The storage was not upgraded."
         errs
+  | Upgrade_status (upgradable_status, data_dir_version, available_version) ->
+      Format.fprintf
+        ppf
+        "Upgrade available: %a@.Current version: %a%a"
+        Format.pp_print_bool
+        upgradable_status
+        Format.pp_print_string
+        data_dir_version
+        (Option.pp ~default:"" (fun ppf ->
+             Format.fprintf ppf "@.Available version: %s"))
+        available_version
 
 type s = status Time.System.stamped
 
@@ -81,7 +93,14 @@ module Definition = struct
              ~title:"Aborting_upgrade"
              string
              (function Aborting_upgrade errs -> Some errs | _ -> None)
-             (fun errs -> Aborting_upgrade errs) ]
+             (fun errs -> Aborting_upgrade errs);
+           case
+             (Tag 4)
+             ~title:"Upgrade_status"
+             (tup3 bool string (option string))
+             (function
+               | Upgrade_status (s, cv, av) -> Some (s, cv, av) | _ -> None)
+             (fun (s, cv, av) -> Upgrade_status (s, cv, av)) ]
 
   let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
 
@@ -91,7 +110,7 @@ module Definition = struct
     match status.data with
     | Dir_is_up_to_date | Upgrading_node _ | Update_success ->
         Internal_event.Notice
-    | Aborting_upgrade _ ->
+    | Upgrade_status _ | Aborting_upgrade _ ->
         Internal_event.Error
 end
 

@@ -43,48 +43,58 @@ module Term = struct
     & pos 0 (some (parser, printer)) None
     & info [] ~docv:"UPGRADE" ~doc
 
-  let process subcommand data_dir config_file =
-    match subcommand with
-    | Storage -> (
-        let run =
-          Internal_event_unix.init ()
-          >>= fun () ->
-          ( match data_dir with
-          | Some data_dir ->
-              return data_dir
-          | None -> (
-            match config_file with
-            | None ->
-                let default_config =
-                  Node_config_file.default_data_dir // "config.json"
-                in
-                if Sys.file_exists default_config then
-                  Node_config_file.read default_config
-                  >>=? fun cfg -> return cfg.data_dir
-                else return Node_config_file.default_data_dir
-            | Some config_file ->
-                Node_config_file.read config_file
-                >>=? fun cfg -> return cfg.data_dir ) )
+  let process subcommand data_dir config_file status =
+    let load_data_dir data_dir =
+      match data_dir with
+      | Some data_dir ->
+          return data_dir
+      | None -> (
+        match config_file with
+        | None ->
+            let default_config =
+              Node_config_file.default_data_dir // "config.json"
+            in
+            if Sys.file_exists default_config then
+              Node_config_file.read default_config
+              >>=? fun cfg -> return cfg.data_dir
+            else return Node_config_file.default_data_dir
+        | Some config_file ->
+            Node_config_file.read config_file
+            >>=? fun cfg -> return cfg.data_dir )
+    in
+    let run =
+      Internal_event_unix.init ()
+      >>= fun () ->
+      match subcommand with
+      | Storage ->
+          load_data_dir data_dir
           >>=? fun data_dir ->
-          trace
-            (failure
-               "Fail to lock the data directory. Is a `tezos-node` running?")
-          @@ Lwt_lock_file.create
-               ~unlink_on_exit:true
-               (Node_data_version.lock_file data_dir)
-          >>=? fun () -> Node_data_version.upgrade_data_dir data_dir
-        in
-        match Lwt_main.run run with
-        | Ok () ->
-            `Ok ()
-        | Error err ->
-            `Error (false, Format.asprintf "%a" pp_print_error err) )
+          if status then Node_data_version.upgrade_status data_dir
+          else
+            trace
+              (failure
+                 "Fail to lock the data directory. Is a `tezos-node` running?")
+            @@ Lwt_lock_file.create
+                 ~unlink_on_exit:true
+                 (Node_data_version.lock_file data_dir)
+            >>=? fun () -> Node_data_version.upgrade_data_dir data_dir
+    in
+    match Lwt_main.run run with
+    | Ok () ->
+        `Ok ()
+    | Error err ->
+        `Error (false, Format.asprintf "%a" pp_print_error err)
+
+  let status =
+    let open Cmdliner.Arg in
+    let doc = "Displays available upgardes." in
+    value & flag & info ~doc ["status"]
 
   let term =
     Cmdliner.Term.(
       ret
         ( const process $ subcommand_arg $ Node_shared_arg.Term.data_dir
-        $ Node_shared_arg.Term.config_file ))
+        $ Node_shared_arg.Term.config_file $ status ))
 end
 
 module Manpage = struct

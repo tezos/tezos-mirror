@@ -82,3 +82,5 @@ val protocol_dir : string -> string
 *)
 
 val lock_file : string -> string
+
+val upgrade_status : string -> unit tzresult Lwt.t
