@@ -222,9 +222,49 @@ let lwt_emit (status : status) =
 
 type error += Wrong_snapshot_export of History_mode.t * History_mode.t
 
-type error +=
-  | Wrong_block_export of
-      Block_hash.t * [`Pruned | `Too_few_predecessors | `Cannot_be_found]
+type wrong_block_export_kind =
+  | Pruned of Block_hash.t
+  | Too_few_predecessors of Block_hash.t
+  | Unknown_hash of Block_hash.t
+
+let pp_wrong_block_export_kind ppf kind =
+  let str =
+    match kind with
+    | Pruned h ->
+        Format.asprintf "block %a because it is pruned" Block_hash.pp h
+    | Too_few_predecessors h ->
+        Format.asprintf
+          "block %a because it does not have enough predecessors"
+          Block_hash.pp
+          h
+    | Unknown_hash h ->
+        Format.asprintf "block %a because it cannot be found" Block_hash.pp h
+  in
+  Format.fprintf ppf "%s" str
+
+let wrong_block_export_kind_encoding =
+  let open Data_encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"pruned"
+        Block_hash.encoding
+        (function Pruned h -> Some h | _ -> None)
+        (fun h -> Pruned h);
+      case
+        (Tag 1)
+        ~title:"too_few_predecessors"
+        Block_hash.encoding
+        (function Too_few_predecessors h -> Some h | _ -> None)
+        (fun h -> Too_few_predecessors h);
+      case
+        (Tag 2)
+        ~title:"unknown_hash"
+        Block_hash.encoding
+        (function Unknown_hash h -> Some h | _ -> None)
+        (fun h -> Unknown_hash h) ]
+
+type error += Wrong_block_export of wrong_block_export_kind
 
 type error += Inconsistent_imported_block of Block_hash.t * Block_hash.t
 
@@ -258,42 +298,20 @@ let () =
     (function
       | Wrong_snapshot_export (src, dst) -> Some (src, dst) | _ -> None)
     (fun (src, dst) -> Wrong_snapshot_export (src, dst)) ;
-  let pp_wrong_block_export_error ppf kind =
-    let str =
-      match kind with
-      | `Pruned ->
-          "is pruned"
-      | `Too_few_predecessors ->
-          "does not have enough predecessors"
-      | `Cannot_be_found ->
-          "cannot be found"
-    in
-    Format.fprintf ppf "%s" str
-  in
-  let error_kind_encoding =
-    string_enum
-      [ ("pruned", `Pruned);
-        ("too_few_predecessors", `Too_few_predecessors);
-        ("cannot_be_found", `Cannot_be_found) ]
-  in
   register_error_kind
     `Permanent
     ~id:"WrongBlockExport"
     ~title:"Wrong block export"
     ~description:"The block to export in the snapshot is not valid."
-    ~pp:(fun ppf (bh, kind) ->
+    ~pp:(fun ppf kind ->
       Format.fprintf
         ppf
-        "Fails to export snapshot using the block %a because it %a."
-        Block_hash.pp
-        bh
-        pp_wrong_block_export_error
+        "Fails to export snapshot using the %a."
+        pp_wrong_block_export_kind
         kind)
-    (obj2
-       (req "block_hash" Block_hash.encoding)
-       (req "kind" error_kind_encoding))
-    (function Wrong_block_export (bh, kind) -> Some (bh, kind) | _ -> None)
-    (fun (bh, kind) -> Wrong_block_export (bh, kind)) ;
+    (obj1 (req "wrong_block_export" wrong_block_export_kind_encoding))
+    (function Wrong_block_export kind -> Some kind | _ -> None)
+    (fun kind -> Wrong_block_export kind) ;
   register_error_kind
     `Permanent
     ~id:"InconsistentImportedBlock"
@@ -392,7 +410,7 @@ let compute_export_limit block_store chain_data_store block_header
         | Some contents ->
             return contents
         | None ->
-            fail (Wrong_block_export (block_hash, `Pruned)))
+            fail (Wrong_block_export (Pruned block_hash)))
   >>=? fun {max_operations_ttl; _} ->
   if not export_rolling then
     Store.Chain_data.Caboose.read chain_data_store
@@ -406,7 +424,7 @@ let compute_export_limit block_store chain_data_store block_header
        included in the export limit *)
     fail_when
       (limit <= 0l)
-      (Wrong_block_export (block_hash, `Too_few_predecessors))
+      (Wrong_block_export (Too_few_predecessors block_hash))
     >>=? fun () -> return limit
 
 (** When called with a block, returns its predecessor if it exists and
@@ -463,7 +481,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
       >|= Option.unopt_assert ~loc:__POS__
       >>= fun last_checkpoint ->
       if last_checkpoint.shell.level = 0l then
-        fail (Wrong_block_export (genesis.block, `Too_few_predecessors))
+        fail (Wrong_block_export (Too_few_predecessors genesis.block))
       else
         let last_checkpoint_hash = Block_header.hash last_checkpoint in
         lwt_emit (Export_unspecified_hash last_checkpoint_hash)
@@ -472,7 +490,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
   State.Block.Header.read_opt (block_store, block_hash)
   >>= (function
         | None ->
-            fail (Wrong_block_export (block_hash, `Cannot_be_found))
+            fail (Wrong_block_export (Unknown_hash block_hash))
         | Some block_header ->
             let export_mode =
               if export_rolling then History_mode.Rolling else Full
