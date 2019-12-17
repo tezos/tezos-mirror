@@ -429,6 +429,7 @@ val init :
   store_root:string ->
   context_root:string ->
   ?history_mode:History_mode.t ->
+  ?readonly:bool ->
   Chain.genesis ->
   (global_state * Chain.t * Context.index * History_mode.t) tzresult Lwt.t
 

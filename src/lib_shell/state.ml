@@ -1808,7 +1808,7 @@ let () =
 
 let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
     ?(context_mapsize = 409_600_000_000L) ~store_root ~context_root
-    ?history_mode genesis =
+    ?history_mode ?(readonly = false) genesis =
   Store.init ~mapsize:store_mapsize store_root
   >>=? fun global_store ->
   ( match commit_genesis with
@@ -1821,7 +1821,7 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
       >>= fun context_index -> Lwt.return (context_index, commit_genesis)
   | None ->
       Context.init
-        ~readonly:false
+        ~readonly
         ~mapsize:context_mapsize
         ?patch_context
         context_root
