@@ -214,6 +214,32 @@ let ensure_data_dir bare data_dir =
       | exc ->
           raise exc)
 
+let upgrade_data_dir data_dir =
+  ensure_data_dir false data_dir
+  >>=? function
+  | None ->
+      Format.printf "Node data dir is up-to-date.@." ;
+      return_unit
+  | Some (version, upgrade) -> (
+      Format.printf
+        "Upgrading node data dir from %s to %s...@.Please, do not interupt \
+         the process.@."
+        version
+        data_version ;
+      upgrade ~data_dir
+      >>= function
+      | Ok () ->
+          write_version data_dir
+          >>=? fun () ->
+          Format.printf "The node data dir is now up-to-date!@." ;
+          return_unit
+      | Error e ->
+          Format.printf
+            "%a@.Aborting upgrade. The storage was not upgraded.@."
+            Error_monad.pp_print_error
+            e ;
+          return_unit )
+
 let ensure_data_dir ?(bare = false) data_dir =
   ensure_data_dir bare data_dir
   >>=? function

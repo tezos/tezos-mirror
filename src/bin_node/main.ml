@@ -63,6 +63,7 @@ let description =
     `P Node_identity_command.Manpage.command_description;
     `P Node_run_command.Manpage.command_description;
     `P Node_config_command.Manpage.command_description;
+    `P Node_upgrade_command.Manpage.command_description;
     `P Node_snapshot_command.Manpage.command_description;
     `P Node_reconstruct_command.Manpage.command_description ]
 
@@ -79,6 +80,7 @@ let commands =
   [ Node_run_command.cmd;
     Node_config_command.cmd;
     Node_identity_command.cmd;
+    Node_upgrade_command.cmd;
     Node_snapshot_command.cmd;
     Node_reconstruct_command.cmd ]
 

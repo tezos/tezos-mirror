@@ -23,62 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The abstract type for data versions. *)
-type t
+val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
 
-(** Errors related to checks related to the data dir. *)
-
-type error += Invalid_data_dir_version of t * t
-
-type error += Could_not_read_data_dir_version of string
-
-(** The current data version. *)
-
-val data_version : t
-
-(** Default file names to store the informations about the node's network
-    identity, peers and configuration. *)
-
-val default_identity_file_name : string
-
-val default_config_file_name : string
-
-val default_peers_file_name : string
-
-(** [ensure_data_dir ~bare dir] performs a sanity check on [dir]. This check
-    returns successfully if either:
-    - [bare] is [false] (default) and [dir] contains a file that indicates the
-      data serialization format equal to [data_version], or
-    - [bare] is [true] and [dir] is empty (except for an [identity.json] file).
-*)
-
-val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
-
-(** Upgrade data directory from an older version.
-
-    Usage: [upgrade_data_dir dir] *)
-val upgrade_data_dir : string -> unit tzresult Lwt.t
-
-(** [store_dir dir] is a directory within [dir] that the node uses for its
-    store. In order for [store_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
-val store_dir : string -> string
-
-(** [context_dir dir] is a directory within [dir] that the node uses for its
-    context. In order for [context_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
-val context_dir : string -> string
-
-(** [protocol_dir dir] is a directory within [dir] that the node uses for its
-    protocol. In order for [protocol_dir dir] to be valid, [dir] must be a valid
-    directory name. *)
-
-val protocol_dir : string -> string
-
-(** [lock_file dir] is a file within [dir] that the node uses for its lock. In
-    order for [lock_file dir] to be valid, [dir] must be a valid directory name.
-*)
-
-val lock_file : string -> string
+module Manpage : sig
+  val command_description : string
+end
