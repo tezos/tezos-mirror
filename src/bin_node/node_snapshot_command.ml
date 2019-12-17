@@ -73,7 +73,7 @@ module Term = struct
             ~store_root
             ~genesis
             snapshot_file
-            block
+            ~block
       | Import ->
           Node_data_version.ensure_data_dir ~bare:true data_dir
           >>=? fun () ->
@@ -106,7 +106,7 @@ module Term = struct
             ~user_activated_protocol_overrides:
               node_config.blockchain_network.user_activated_protocol_overrides
             snapshot_file
-            block
+            ~block
     in
     match Lwt_main.run run with
     | Ok () ->
@@ -140,10 +140,18 @@ module Term = struct
     let open Cmdliner.Arg in
     required & pos 1 (some string) None & info [] ~docv:"FILE"
 
-  let blocks =
+  let block =
     let open Cmdliner.Arg in
-    let doc = "Block hash of the block to export/import." in
-    value & opt (some string) None & info ~docv:"<block_hash>" ~doc ["block"]
+    let doc =
+      "The block to export/import. When exporting, either the block_hash, the \
+       level or an alias (such as $(i,caboose), $(i,checkpoint), \
+       $(i,save_point) or $(i,head) in combination with ~ and + operators) \
+       can be used. When importing, only the block hash you are expected to \
+       restore is allowed."
+    in
+    value
+    & opt (some string) None
+    & info ~docv:"<block_hash, level, alias>" ~doc ["block"]
 
   let export_rolling =
     let open Cmdliner in
@@ -188,7 +196,7 @@ module Term = struct
     let open Cmdliner.Term in
     ret
       ( const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
-      $ blocks $ export_rolling $ reconstruct $ sandbox )
+      $ block $ export_rolling $ reconstruct $ sandbox )
 end
 
 module Manpage = struct
@@ -211,8 +219,19 @@ module Manpage = struct
         ( "$(b,Export a snapshot using the rolling mode)",
           "$(mname) snapshot export latest.rolling --rolling" );
       `I
+        ( "$(b,Export a snapshot up to and including the given block hash)",
+          "$(mname) snapshot export file.full --block <BLOCK_HASH>" );
+      `I
+        ( "$(b,Export a snapshot up to and including the 10th predecessor of \
+           the current head)",
+          "$(mname) snapshot export file.full --block head~10" );
+      `I
         ( "$(b,Import a snapshot located in file.full)",
           "$(mname) snapshot import file.full" );
+      `I
+        ( "$(b,Import a snapshot and ensure that the imported data targets \
+           the given block hash (recommended))",
+          "$(mname) snapshot import file.full --block <BLOCK_HASH>" );
       `I
         ( "$(b,Import a full mode snapshot and then reconstruct the whole \
            storage to obtain an archive mode storage)",

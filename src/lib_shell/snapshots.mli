@@ -32,7 +32,7 @@ val export :
   store_root:string ->
   genesis:State.Chain.genesis ->
   string ->
-  string option ->
+  block:string option ->
   unit tzresult Lwt.t
 
 val import :
@@ -44,7 +44,7 @@ val import :
   dir_cleaner:(string -> unit Lwt.t) ->
   genesis:State.Chain.genesis ->
   string ->
-  string option ->
+  block:string option ->
   unit tzresult Lwt.t
 
 val reconstruct :

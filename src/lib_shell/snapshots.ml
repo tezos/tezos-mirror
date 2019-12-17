@@ -225,22 +225,19 @@ type error += Wrong_snapshot_export of History_mode.t * History_mode.t
 type wrong_block_export_kind =
   | Pruned of Block_hash.t
   | Too_few_predecessors of Block_hash.t
-  | Unknown_hash of Block_hash.t
+  | Unknown_block of string
 
-let pp_wrong_block_export_kind ppf kind =
-  let str =
-    match kind with
-    | Pruned h ->
-        Format.asprintf "block %a because it is pruned" Block_hash.pp h
-    | Too_few_predecessors h ->
-        Format.asprintf
-          "block %a because it does not have enough predecessors"
-          Block_hash.pp
-          h
-    | Unknown_hash h ->
-        Format.asprintf "block %a because it cannot be found" Block_hash.pp h
-  in
-  Format.fprintf ppf "%s" str
+let pp_wrong_block_export_kind ppf = function
+  | Pruned h ->
+      Format.fprintf ppf "block %a because it is pruned" Block_hash.pp h
+  | Too_few_predecessors h ->
+      Format.fprintf
+        ppf
+        "block %a because it does not have enough predecessors"
+        Block_hash.pp
+        h
+  | Unknown_block str ->
+      Format.fprintf ppf "block %s because it cannot be found" str
 
 let wrong_block_export_kind_encoding =
   let open Data_encoding in
@@ -260,9 +257,9 @@ let wrong_block_export_kind_encoding =
       case
         (Tag 2)
         ~title:"unknown_hash"
-        Block_hash.encoding
-        (function Unknown_hash h -> Some h | _ -> None)
-        (fun h -> Unknown_hash h) ]
+        string
+        (function Unknown_block s -> Some s | _ -> None)
+        (fun s -> Unknown_block s) ]
 
 type error += Wrong_block_export of wrong_block_export_kind
 
@@ -277,6 +274,8 @@ type error +=
       (Operation_list_list_hash.t * Operation_list_list_hash.t)
 
 type error += Cannot_reconstruct of History_mode.t
+
+type error += Invalid_block_specification of string
 
 let () =
   let open Data_encoding in
@@ -394,7 +393,21 @@ let () =
         hm)
     (obj1 (req "history_mode " History_mode.encoding))
     (function Cannot_reconstruct hm -> Some hm | _ -> None)
-    (fun hm -> Cannot_reconstruct hm)
+    (fun hm -> Cannot_reconstruct hm) ;
+  register_error_kind
+    `Permanent
+    ~id:"InvalidBlockSpecification"
+    ~title:"Invalid block specification"
+    ~description:"Invalid specification of block to import"
+    ~pp:(fun ppf str ->
+      Format.fprintf
+        ppf
+        "Cannot check the given block to import based on %s. You must specify \
+         a valid block hash."
+        str)
+    (obj1 (req "str" string))
+    (function Invalid_block_specification s -> Some s | _ -> None)
+    (fun s -> Invalid_block_specification s)
 
 let ( // ) = Filename.concat
 
@@ -456,10 +469,20 @@ let pruned_block_iterator index block_store limit header =
       >>= fun proto_data -> return (Some pruned_block, Some proto_data)
     else return (Some pruned_block, None)
 
+let parse_block_arg = function
+  | None ->
+      return_none
+  | Some str -> (
+    match Block_services.parse_block str with
+    | Ok v ->
+        return_some v
+    | Error err ->
+        failwith "Invalid value for `--block`: %s" err )
+
 let export ?(export_rolling = false) ~context_root ~store_root ~genesis
-    filename block =
+    filename ~block =
   State.init ~context_root ~store_root genesis ~readonly:true
-  >>=? fun (state, _chain_state, context_index, history_mode) ->
+  >>=? fun (state, chain_state, context_index, history_mode) ->
   Store.init store_root
   >>=? fun store ->
   let chain_id = Chain_id.of_block_hash genesis.block in
@@ -473,24 +496,34 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
       if export_rolling then return_unit
       else fail (Wrong_snapshot_export (history_mode, History_mode.Full)) )
   >>=? fun () ->
-  ( match block with
-  | Some block_hash ->
-      Lwt.return (Block_hash.of_b58check block_hash)
-  | None ->
-      Store.Chain_data.Checkpoint.read_opt chain_data_store
-      >|= Option.unopt_assert ~loc:__POS__
-      >>= fun last_checkpoint ->
-      if last_checkpoint.shell.level = 0l then
-        fail (Wrong_block_export (Too_few_predecessors genesis.block))
-      else
-        let last_checkpoint_hash = Block_header.hash last_checkpoint in
-        lwt_emit (Export_unspecified_hash last_checkpoint_hash)
-        >>= fun () -> return last_checkpoint_hash )
+  parse_block_arg block
+  >>=? (function
+         | Some block -> (
+             Block_directory.get_block chain_state block
+             >>= function
+             | None ->
+                 fail
+                   (Wrong_block_export
+                      (Unknown_block (Block_services.to_string block)))
+             | Some bh ->
+                 return (State.Block.hash bh) )
+         | None ->
+             Store.Chain_data.Checkpoint.read_opt chain_data_store
+             >|= Option.unopt_assert ~loc:__POS__
+             >>= fun last_checkpoint ->
+             if last_checkpoint.shell.level = 0l then
+               fail (Wrong_block_export (Too_few_predecessors genesis.block))
+             else
+               let last_checkpoint_hash = Block_header.hash last_checkpoint in
+               lwt_emit (Export_unspecified_hash last_checkpoint_hash)
+               >>= fun () -> return last_checkpoint_hash)
   >>=? fun block_hash ->
   State.Block.Header.read_opt (block_store, block_hash)
   >>= (function
         | None ->
-            fail (Wrong_block_export (Unknown_hash block_hash))
+            fail
+              (Wrong_block_export
+                 (Unknown_block (Block_hash.to_b58check block_hash)))
         | Some block_header ->
             let export_mode =
               if export_rolling then History_mode.Rolling else Full
@@ -889,7 +922,7 @@ let reconstruct chain_id ~user_activated_upgrades
 
 let import ?(reconstruct = false) ?patch_context ~data_dir
     ~user_activated_upgrades ~user_activated_protocol_overrides ~dir_cleaner
-    ~genesis filename block =
+    ~genesis filename ~block =
   lwt_emit (Import_info filename)
   >>= fun () ->
   ( match block with
@@ -1004,14 +1037,20 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       let {Block_data.block_header; operations} = meta in
       let block_hash = Block_header.hash block_header in
       (* Checks that the block hash imported by the snapshot is the expected one *)
-      ( match block with
-      | Some str ->
-          let bh = Block_hash.of_b58check_exn str in
-          fail_unless
-            (Block_hash.equal bh block_hash)
-            (Inconsistent_imported_block (bh, block_hash))
-      | None ->
-          return_unit )
+      parse_block_arg block
+      >>=? (function
+             | Some str -> (
+               match str with
+               | `Hash (bh, _) ->
+                   fail_unless
+                     (Block_hash.equal bh block_hash)
+                     (Inconsistent_imported_block (bh, block_hash))
+               | _ ->
+                   fail
+                     (Invalid_block_specification
+                        (Block_services.to_string str)) )
+             | None ->
+                 return_unit)
       >>=? fun () ->
       lwt_emit (Set_head (Block_header.hash block_header))
       >>= fun () ->
