@@ -27,20 +27,6 @@ let ( // ) = Filename.concat
 
 type t = string
 
-(* Data_version hitory:
- *  - 0.0.1 : original storage
- *  - 0.0.2 : never released
- *  - 0.0.3 : store upgrade (introducing history mode)
- *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2) *)
-let data_version = "0.0.4"
-
-(* List of upgrade functions from each still supported previous
-   version to the current [data_version] above. If this list grows too
-   much, an idea would be to have triples (version, version,
-   converter), and to sequence them dynamically instead of
-   statically. *)
-let upgradable_data_version = []
-
 let store_dir data_dir = data_dir // "store"
 
 let context_dir data_dir = data_dir // "context"
@@ -56,6 +42,23 @@ let default_peers_file_name = "peers.json"
 let default_config_file_name = "config.json"
 
 let version_file_name = "version.json"
+
+(* Data_version hitory:
+ *  - 0.0.1 : original storage
+ *  - 0.0.2 : never released
+ *  - 0.0.3 : store upgrade (introducing history mode)
+ *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2) *)
+let data_version = "0.0.4"
+
+(* List of upgrade functions from each still supported previous
+   version to the current [data_version] above. If this list grows too
+   much, an idea would be to have triples (version, version,
+   converter), and to sequence them dynamically instead of
+   statically. *)
+let upgradable_data_version =
+  [ ( "0.0.3",
+      fun ~data_dir ->
+        Context.upgrade_0_0_3 ~context_dir:(context_dir data_dir) ) ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
@@ -86,7 +89,8 @@ let () =
     ~pp:(fun ppf (exp, got) ->
       Format.fprintf
         ppf
-        "Invalid data directory version '%s' (expected '%s')."
+        "Invalid data directory version '%s' (expected '%s').@,\
+         Your data directory is outdated and cannot be automatically upgraded."
         got
         exp)
     Data_encoding.(

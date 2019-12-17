@@ -210,3 +210,5 @@ val validate_context_hash_consistency_and_commit :
   parents:Context_hash.t list ->
   index:index ->
   bool Lwt.t
+
+val upgrade_0_0_3 : context_dir:string -> unit tzresult Lwt.t
