@@ -1381,7 +1381,7 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  context tzresult Lwt.t
+  (context * Receipt.balance_updates) tzresult Lwt.t
 
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 

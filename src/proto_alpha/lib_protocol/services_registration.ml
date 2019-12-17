@@ -41,7 +41,8 @@ let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
     ~timestamp
     ~fitness
     context
-  >>=? fun context -> return {block_hash; block_header; context}
+  >>=? fun (context, _balance_updates) ->
+  return {block_hash; block_header; context}
 
 let rpc_services =
   ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)

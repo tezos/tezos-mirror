@@ -115,6 +115,7 @@ type validation_state = {
   chain_id : Chain_id.t;
   ctxt : Alpha_context.t;
   op_count : int;
+  migration_balance_updates : Alpha_context.Receipt.balance_updates;
 }
 
 let current_context {ctxt; _} = return (Alpha_context.finalize ctxt).context
@@ -126,14 +127,14 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun ctxt ->
+  >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >>=? fun (ctxt, baker, block_delay) ->
   let mode =
     Partial_application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0}
+  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_application ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_fitness
@@ -142,14 +143,14 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun ctxt ->
+  >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >>=? fun (ctxt, baker, block_delay) ->
   let mode =
     Application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0}
+  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_level:pred_level
@@ -158,7 +159,7 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun ctxt ->
+  >>=? fun (ctxt, migration_balance_updates) ->
   ( match protocol_data with
   | None ->
       Apply.begin_partial_construction ctxt
@@ -176,7 +177,8 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
         Full_construction {predecessor; baker; protocol_data; block_delay}
       in
       return (mode, ctxt) )
-  >>=? fun (mode, ctxt) -> return {mode; chain_id; ctxt; op_count = 0}
+  >>=? fun (mode, ctxt) ->
+  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
@@ -214,7 +216,7 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
       let op_count = op_count + 1 in
       return ({data with ctxt; op_count}, Operation_metadata result)
 
-let finalize_block {mode; ctxt; op_count} =
+let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
   match mode with
   | Partial_construction _ ->
       let level = Alpha_context.Level.current ctxt in
@@ -240,7 +242,7 @@ let finalize_block {mode; ctxt; op_count} =
               nonce_hash = None;
               consumed_gas = Z.zero;
               deactivated = [];
-              balance_updates = [];
+              balance_updates = migration_balance_updates;
             } )
   | Partial_application {block_header; baker; block_delay} ->
       let level = Alpha_context.Level.current ctxt in
@@ -264,14 +266,19 @@ let finalize_block {mode; ctxt; op_count} =
               nonce_hash = None;
               consumed_gas = Z.zero;
               deactivated = [];
-              balance_updates = [];
+              balance_updates = migration_balance_updates;
             } )
   | Application
       { baker;
         block_delay;
         block_header = {protocol_data = {contents = protocol_data; _}; _} }
   | Full_construction {protocol_data; baker; block_delay; _} ->
-      Apply.finalize_application ctxt protocol_data baker ~block_delay
+      Apply.finalize_application
+        ctxt
+        protocol_data
+        baker
+        ~block_delay
+        migration_balance_updates
       >>=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in

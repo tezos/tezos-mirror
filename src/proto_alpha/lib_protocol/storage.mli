@@ -401,3 +401,8 @@ module Ramp_up : sig
       (* baking * endorsement *)
        and type t := Raw_context.t
 end
+
+module Pending_migration_balance_updates :
+  Single_data_storage
+    with type value = Receipt_repr.balance_updates
+     and type t := Raw_context.t

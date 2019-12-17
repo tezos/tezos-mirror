@@ -1124,7 +1124,8 @@ let check_minimum_endorsements ctxt protocol_data block_delay
          timestamp;
        })
 
-let finalize_application ctxt protocol_data delegate ~block_delay =
+let finalize_application ctxt protocol_data delegate ~block_delay
+    migration_balance_updates =
   let included_endorsements = included_endorsements ctxt in
   check_minimum_endorsements
     ctxt
@@ -1166,6 +1167,7 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
   >>=? fun ctxt ->
   may_start_new_cycle ctxt
   >>=? fun (ctxt, balance_updates, deactivated) ->
+  let balance_updates = migration_balance_updates @ balance_updates in
   Amendment.may_start_new_voting_period ctxt
   >>=? fun ctxt ->
   let cycle = (Level.current ctxt).cycle in

@@ -896,3 +896,14 @@ module Ramp_up = struct
              Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
          end)
 end
+
+module Pending_migration_balance_updates =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["pending_migration_balance_updates"]
+    end)
+    (struct
+      type t = Receipt_repr.balance_updates
+
+      let encoding = Receipt_repr.balance_updates_encoding
+    end)
