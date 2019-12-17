@@ -1485,7 +1485,8 @@ let check_minimum_endorsements ctxt protocol_data block_delay
          timestamp;
        })
 
-let finalize_application ctxt protocol_data delegate ~block_delay =
+let finalize_application ctxt protocol_data delegate ~block_delay
+    migration_balance_updates =
   let included_endorsements = included_endorsements ctxt in
   check_minimum_endorsements
     ctxt
@@ -1533,7 +1534,8 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
   let balance_updates =
     Receipt.(
       cleanup_balance_updates
-        ( [ ( Contract (Contract.implicit_contract delegate),
+        ( migration_balance_updates
+        @ [ ( Contract (Contract.implicit_contract delegate),
               Debited deposit,
               Block_application );
             (Deposits (delegate, cycle), Credited deposit, Block_application);

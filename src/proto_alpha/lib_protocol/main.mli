@@ -49,6 +49,7 @@ type validation_state = {
   chain_id : Chain_id.t;
   ctxt : Alpha_context.t;
   op_count : int;
+  migration_balance_updates : Alpha_context.Receipt.balance_updates;
 }
 
 type operation_data = Alpha_context.packed_protocol_data

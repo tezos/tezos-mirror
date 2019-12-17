@@ -55,7 +55,24 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Edo_008 ->
-      return ctxt
+      (* Add balance updates receipts to be attached on the first block of this
+         protocol - see [[prepare]] function below. Any balance updates attached
+         in the migration should use the [[Receipt_repr.Migration]] constructor.
+      *)
+      let balance_updates = [] in
+      Storage.Pending_migration_balance_updates.init ctxt balance_updates
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
+  >>=? fun ctxt ->
+  Storage.Pending_migration_balance_updates.get_option ctxt
+  >>=? function
+  | Some balance_updates ->
+      Storage.Pending_migration_balance_updates.remove ctxt
+      >>= fun ctxt ->
+      (* When applying balance updates in a migration, we must attach receipts.
+         The balance updates returned from here will be applied in the first
+         block of the new protocol. *)
+      return (ctxt, balance_updates)
+  | None ->
+      return (ctxt, [])
