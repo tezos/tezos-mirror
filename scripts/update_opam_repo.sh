@@ -51,9 +51,13 @@ src_dir="$(dirname "$script_dir")"
 
 opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
 
-## Full snapshot of the opam repository
-git clone https://github.com/ocaml/opam-repository -b master "$tmp_dir"
-
+## Shallow clone of opam repository (requires git protocol version 2)
+export GIT_WORK_TREE="$tmp_dir"
+export GIT_DIR="$GIT_WORK_TREE/.git"
+git init
+git config --local protocol.version 2
+git remote add origin https://github.com/ocaml/opam-repository
+git fetch --depth 1 origin "$full_opam_repository_tag"
 
 ## Adding the various tezos packages
 packages=
@@ -105,7 +109,7 @@ opam admin add-hashes sha256 sha512
 
 ## Generating the diff!
 git remote add tezos $opam_repository_url
-git fetch tezos
+git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
 git add packages
 git diff HEAD -- packages > "$target"
