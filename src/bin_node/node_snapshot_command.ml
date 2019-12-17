@@ -26,12 +26,6 @@
 
 open Node_logging
 
-let ( // ) = Filename.concat
-
-let context_dir data_dir = data_dir // "context"
-
-let store_dir data_dir = data_dir // "store"
-
 type error += Invalid_sandbox_file of string
 
 let () =
@@ -54,8 +48,9 @@ module Term = struct
   let dir_cleaner data_dir =
     lwt_log_notice "Cleaning directory %s because of failure" data_dir
     >>= fun () ->
-    Lwt_utils_unix.remove_dir @@ store_dir data_dir
-    >>= fun () -> Lwt_utils_unix.remove_dir @@ context_dir data_dir
+    Lwt_utils_unix.remove_dir @@ Node_data_version.store_dir data_dir
+    >>= fun () ->
+    Lwt_utils_unix.remove_dir @@ Node_data_version.context_dir data_dir
 
   let process subcommand args snapshot_file block export_rolling reconstruct
       sandbox_file =
@@ -70,20 +65,15 @@ module Term = struct
       | Export ->
           Node_data_version.ensure_data_dir data_dir
           >>=? fun () ->
-          let context_root = context_dir data_dir in
-          let store_root = store_dir data_dir in
-          Store.init store_root
-          >>=? fun store ->
-          Context.init ~readonly:true context_root
-          >>= fun context_index ->
+          let context_root = Node_data_version.context_dir data_dir in
+          let store_root = Node_data_version.store_dir data_dir in
           Snapshots.export
             ~export_rolling
-            ~context_index
-            ~store
-            ~genesis:genesis.block
+            ~context_root
+            ~store_root
+            ~genesis
             snapshot_file
             block
-          >>=? fun () -> Store.close store |> return
       | Import ->
           Node_data_version.ensure_data_dir ~bare:true data_dir
           >>=? fun () ->

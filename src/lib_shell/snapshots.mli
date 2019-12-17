@@ -28,9 +28,9 @@ type error += Cannot_reconstruct of History_mode.t
 
 val export :
   ?export_rolling:bool ->
-  context_index:Context.index ->
-  store:Store.t ->
-  genesis:Block_hash.t ->
+  context_root:string ->
+  store_root:string ->
+  genesis:State.Chain.genesis ->
   string ->
   string option ->
   unit tzresult Lwt.t

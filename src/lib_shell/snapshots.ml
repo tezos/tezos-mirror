@@ -438,19 +438,22 @@ let pruned_block_iterator index block_store limit header =
       >>= fun proto_data -> return (Some pruned_block, Some proto_data)
     else return (Some pruned_block, None)
 
-let export ?(export_rolling = false) ~context_index ~store ~genesis filename
-    block =
-  let chain_id = Chain_id.of_block_hash genesis in
+let export ?(export_rolling = false) ~context_root ~store_root ~genesis
+    filename block =
+  State.init ~context_root ~store_root genesis ~readonly:true
+  >>=? fun (state, _chain_state, context_index, history_mode) ->
+  Store.init store_root
+  >>=? fun store ->
+  let chain_id = Chain_id.of_block_hash genesis.block in
   let chain_store = Store.Chain.get store chain_id in
   let chain_data_store = Store.Chain_data.get chain_store in
   let block_store = Store.Block.get chain_store in
-  Store.Configuration.History_mode.read_opt store
-  >>= (function
-        | Some (Archive | Full) | None ->
-            return_unit
-        | Some (Rolling as history_mode) ->
-            if export_rolling then return_unit
-            else fail (Wrong_snapshot_export (history_mode, History_mode.Full)))
+  ( match history_mode with
+  | Archive | Full ->
+      return_unit
+  | Rolling as history_mode ->
+      if export_rolling then return_unit
+      else fail (Wrong_snapshot_export (history_mode, History_mode.Full)) )
   >>=? fun () ->
   ( match block with
   | Some block_hash ->
@@ -460,28 +463,25 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
       >|= Option.unopt_assert ~loc:__POS__
       >>= fun last_checkpoint ->
       if last_checkpoint.shell.level = 0l then
-        fail (Wrong_block_export (genesis, `Too_few_predecessors))
+        fail (Wrong_block_export (genesis.block, `Too_few_predecessors))
       else
         let last_checkpoint_hash = Block_header.hash last_checkpoint in
         lwt_emit (Export_unspecified_hash last_checkpoint_hash)
         >>= fun () -> return last_checkpoint_hash )
-  >>=? fun checkpoint_block_hash ->
-  State.Block.Header.read_opt (block_store, checkpoint_block_hash)
+  >>=? fun block_hash ->
+  State.Block.Header.read_opt (block_store, block_hash)
   >>= (function
         | None ->
-            fail (Wrong_block_export (checkpoint_block_hash, `Cannot_be_found))
+            fail (Wrong_block_export (block_hash, `Cannot_be_found))
         | Some block_header ->
             let export_mode =
               if export_rolling then History_mode.Rolling else Full
             in
             lwt_emit
-              (Export_info
-                 (export_mode, checkpoint_block_hash, block_header.shell.level))
+              (Export_info (export_mode, block_hash, block_header.shell.level))
             >>= fun () ->
             (* Get block precessor's block header *)
-            Store.Block.Predecessors.read
-              (block_store, checkpoint_block_hash)
-              0
+            Store.Block.Predecessors.read (block_store, block_hash) 0
             >>=? fun pred_block_hash ->
             State.Block.Header.read (block_store, pred_block_hash)
             >>=? fun pred_block_header ->
@@ -489,9 +489,7 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             let validations_passes = block_header.shell.validation_passes in
             map_s
               (fun i ->
-                Store.Block.Operations.read
-                  (block_store, checkpoint_block_hash)
-                  i)
+                Store.Block.Operations.read (block_store, block_hash) i)
               (0 -- (validations_passes - 1))
             >>=? fun operations ->
             compute_export_limit
@@ -507,7 +505,11 @@ let export ?(export_rolling = false) ~context_index ~store ~genesis filename
             return (pred_block_header, block_data, export_mode, iterator))
   >>=? fun data_to_dump ->
   Context.dump_contexts context_index data_to_dump ~filename
-  >>=? fun () -> lwt_emit (Export_success filename) >>= fun () -> return_unit
+  >>=? fun () ->
+  lwt_emit (Export_success filename)
+  >>= fun () ->
+  Store.close store ;
+  State.close state >>= fun () -> return_unit
 
 let check_operations_consistency block_header operations operation_hashes =
   (* Compute operations hashes and compare *)
