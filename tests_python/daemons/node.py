@@ -1,5 +1,4 @@
 from typing import Dict, List, Tuple
-import time
 import subprocess
 import os
 import tempfile
@@ -116,7 +115,6 @@ class Node:
                                            overwrite_log)
         self._process = subprocess.Popen(self._node_run, stdout=stdout,
                                          stderr=stderr, env=self._new_env)
-        time.sleep(0.1)  # make sure node is launched when we access it later
         self._run_called_before = True
 
     def init_config(self):

@@ -660,13 +660,25 @@ class Client:
                'signatures'] + signatures
         return self.run(cmd)
 
-    def check_node_listening(self):
-        timeout = 0.5
-        attempts = 5
+    def check_node_listening(self,
+                             timeout: float = 0.5,
+                             attempts: int = 10) -> bool:
+        """ Checks whether the node is reponsive, by polling it
+        using the `version` rpc.
+
+        Args:
+            timeout (float): time (sec) to wait between retries
+            attempts (int): maximal number of attempts
+        Returns:
+            True iff the node is running, and successfully answered the
+            `version` rpc.
+        """
         for _ in range(attempts):
             try:
-                self.get_protocol()
+                time.sleep(timeout)
+                # any shell RPC will do, this one is light-weight
+                self.rpc('get', '/network/version')
                 return True
             except Exception:  # pylint: disable=broad-except
-                time.sleep(timeout)
+                pass
         return False

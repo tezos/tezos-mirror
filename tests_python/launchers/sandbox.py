@@ -197,10 +197,9 @@ class Sandbox:
                         use_tls=bool(use_tls))
 
         if not client.check_node_listening():
+            assert node.poll() is None, '# Node {node_id} failed at startup'
             node.kill()
-            assert False, f"# Node {node_id} isn't listening to RPC"
-        # make sure node didn't fail at startup
-        assert node.poll() is None, 'Seems node failed at startup'
+            assert False, f"# Node {node_id} isn't responding to RPC"
 
         # don't wait for confirmation
         client.run(['-w', 'none', 'config', 'update'])
