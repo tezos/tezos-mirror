@@ -90,12 +90,10 @@ let status_pp ppf = function
   | Reconstruct_success ->
       Format.fprintf ppf "The storage was successfully reconstructed."
 
-type t = status Time.System.stamped
-
 module Definition = struct
   let name = "snapshot"
 
-  type nonrec t = t
+  type t = status Time.System.stamped
 
   let encoding =
     let open Data_encoding in
