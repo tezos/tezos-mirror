@@ -1,4 +1,3 @@
-import time
 import pytest
 from tools import utils
 
@@ -56,7 +55,7 @@ class TestFork:
 
     def test_restart_node_2(self, sandbox):
         sandbox.node(2).run()
-        time.sleep(2)
+        assert sandbox.client(2).check_node_listening()
 
     def test_bake_node_2(self, sandbox):
         """Client 2 bakes block B at level 2, not communicated to 0 and 1"""
@@ -75,7 +74,8 @@ class TestFork:
     def test_restart_all(self, sandbox):
         sandbox.node(0).run()
         sandbox.node(1).run()
-        time.sleep(2)
+        assert sandbox.client(0).check_node_listening()
+        assert sandbox.client(1).check_node_listening()
 
 #    def test_check_head(self, sandbox, session):
 #        """All nodes are at level 3, head should be hash1"""

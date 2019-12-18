@@ -195,7 +195,10 @@ class Sandbox:
         node.run()
         client = Client(local_client, local_admin_client, rpc_port=rpc_node,
                         use_tls=bool(use_tls))
-        time.sleep(0.1)
+
+        if not client.check_node_listening():
+            node.kill()
+            assert False, f"# Node {node_id} isn't listening to RPC"
         # make sure node didn't fail at startup
         assert node.poll() is None, 'Seems node failed at startup'
 

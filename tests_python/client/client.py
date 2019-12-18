@@ -1,4 +1,5 @@
 import datetime
+import time
 import json
 import os
 import shutil
@@ -658,3 +659,14 @@ class Client:
                'on', 'behalf', 'of', src, 'with',
                'signatures'] + signatures
         return self.run(cmd)
+
+    def check_node_listening(self):
+        timeout = 0.5
+        attempts = 5
+        for _ in range(attempts):
+            try:
+                self.get_protocol()
+                return True
+            except Exception:  # pylint: disable=broad-except
+                time.sleep(timeout)
+        return False

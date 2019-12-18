@@ -80,7 +80,7 @@ class TestMultiNodeStorageReconstruction:
         time.sleep(2)
         sandbox.node(2).reconstruct()
         sandbox.node(2).run()
-        time.sleep(2)
+        assert sandbox.client(2).check_node_listening()
 
     def test_available_blocks(self, sandbox, session):
         # We should now success requesting those reconstructed blocks

@@ -1,4 +1,3 @@
-import time
 import pytest
 from tools import utils, constants
 
@@ -47,7 +46,7 @@ class TestDoubleEndorsement:
 
     def test_restart_node_2(self, sandbox):
         sandbox.node(2).run()
-        time.sleep(2)
+        assert sandbox.client(2).check_node_listening()
 
     def test_bake_node_2(self, sandbox):
         """Client 2 bakes block B at level 3, not communicated to 0 and 1"""
@@ -65,7 +64,8 @@ class TestDoubleEndorsement:
     def test_restart_all(self, sandbox):
         sandbox.node(0).run()
         sandbox.node(1).run()
-        time.sleep(4)
+        sandbox.client(0).check_node_listening()
+        sandbox.client(1).check_node_listening()
 
     def test_check_level(self, sandbox):
         """All nodes are at level 3, head is either block A or B"""
