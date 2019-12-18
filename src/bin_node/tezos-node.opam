@@ -13,6 +13,7 @@ depends: [
   "tezos-rpc-http-server"
   "tezos-p2p"
   "tezos-shell"
+  "tezos-workers"
   "tezos-protocol-updater"
   "tezos-validator"
   "tezos-embedded-protocol-genesis"

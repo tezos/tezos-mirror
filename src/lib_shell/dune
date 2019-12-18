@@ -9,8 +9,9 @@
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-updater
-            tezos-validation
-            tezos-requester)
+            tezos-requester
+            tezos-workers
+            tezos-validation)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_shell_context
@@ -18,8 +19,9 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_protocol_updater
-                   -open Tezos_validation
-                   -open Tezos_requester)))
+                   -open Tezos_requester
+                   -open Tezos_workers
+                   -open Tezos_validation)))
 
 (alias
  (name runtest_lint)

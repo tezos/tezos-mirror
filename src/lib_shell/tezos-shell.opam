@@ -17,6 +17,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-requester"
   "alcotest-lwt" { with-test }
+  "tezos-workers"
   "tezos-embedded-protocol-demo-noops" { with-test }
 ]
 build: [

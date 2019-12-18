@@ -5,6 +5,7 @@
             tezos-version
             tezos-stdlib-unix
             tezos-shell-services
+            tezos-workers
             tezos-rpc-http-server
             tezos-p2p
             tezos-shell
@@ -40,6 +41,7 @@
                    -open Tezos_storage
                    -open Tezos_validator
                    -open Tezos_shell_context
+                   -open Tezos_workers
                    -open Tezos_protocol_updater
                    -linkall)))
 

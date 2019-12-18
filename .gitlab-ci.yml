@@ -1210,6 +1210,11 @@ opam:tezos-version:
   variables:
     package: tezos-version
 
+opam:tezos-workers:
+  <<: *opam_definition
+  variables:
+    package: tezos-workers
+
 opam:uecc:
   <<: *opam_definition
   variables:
