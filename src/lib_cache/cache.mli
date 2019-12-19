@@ -42,7 +42,7 @@
     Notified values are validated before being inserted in the cache,
     using the [Precheck] module.
 
-    The cache service offers two interface. [FULL_CACHE] is the full view, which
+    The cache service offers two interfaces. [FULL_CACHE] is the full view, which
     includes the creation, shutdown, and reception notification functions.
     [CACHE] is a restricted view which essentially offers a *read-through*
     cache interface. *)
@@ -117,7 +117,7 @@ module type FULL_CACHE = sig
   (** type of values notified to the cache *)
   type notified_value
 
-  (** [pending t k] returns [true] iff a the key status is pending *)
+  (** [pending t k] returns [true] iff the key status is pending *)
   val pending : t -> key -> bool
 
   (** Monitor all the fetched data. A given data will appear only
@@ -210,6 +210,8 @@ module type REQUEST = sig
       to broadcast a query to a set of peers. *)
   val active : param -> P2p_peer.Set.t
 
+  (** [send param peer_id kl] queries peer with id [peer_id] for the values
+      associated with the keys in [kl]. *)
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 

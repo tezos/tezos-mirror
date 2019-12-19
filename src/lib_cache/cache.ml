@@ -568,7 +568,7 @@ end = struct
       `Permanent
       ~id:("cache." ^ Hash.name ^ ".missing")
       ~title:("Missing " ^ Hash.name)
-      ~description:("Some " ^ Hash.name ^ " is missing from the chache")
+      ~description:("Some " ^ Hash.name ^ " is missing from the cache")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
       (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
