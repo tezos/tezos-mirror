@@ -80,12 +80,6 @@ type config = {
       (** The proof of work target we require from peers. *)
 }
 
-type 'msg message_config = {
-  encoding : 'msg P2p_message.encoding list;
-  chain_name : Distributed_db_version.Name.t;
-  distributed_db_versions : Distributed_db_version.t list;
-}
-
 (** [create ?p2p_version config pool message_config socket_meta_config
      scheduler triggers log answerer] returns a connection handler.
 
@@ -98,8 +92,8 @@ val create :
   ?p2p_versions:P2p_version.t list ->
   config ->
   ('msg, 'peer, 'conn) P2p_pool.t ->
-  'msg message_config ->
-  'conn P2p_socket.metadata_config ->
+  'msg P2p_params.message_config ->
+  'conn P2p_params.conn_meta_config ->
   P2p_io_scheduler.t ->
   P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->

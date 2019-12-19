@@ -24,17 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type 'msg encoding =
-  | Encoding : {
-      tag : int;
-      title : string;
-      encoding : 'a Data_encoding.t;
-      wrap : 'a -> 'msg;
-      unwrap : 'msg -> 'a option;
-      max_length : int option;
-    }
-      -> 'msg encoding
-
 type 'msg t =
   | Bootstrap
   | Advertise of P2p_point.Id.t list
@@ -95,7 +84,7 @@ let encoding msg_encoding =
                    None)
              (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ]
        @ ListLabels.map msg_encoding ~f:(function
-             | Encoding
+             | P2p_params.Encoding
                  {tag; title; encoding; wrap; unwrap; max_length = _ (* ?? *)}
              ->
              Data_encoding.case

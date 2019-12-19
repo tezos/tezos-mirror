@@ -172,7 +172,7 @@ type t =
 let encoding =
   let open Data_encoding in
   let case ?max_length ~tag ~title encoding unwrap wrap =
-    P2p_message.Encoding {tag; title; encoding; wrap; unwrap; max_length}
+    P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
   in
   [ case
       ~tag:0x10
@@ -318,7 +318,7 @@ let encoding =
 
 let distributed_db_versions = [Distributed_db_version.zero]
 
-let cfg chain_name : _ P2p.message_config =
+let cfg chain_name : _ P2p_params.message_config =
   {encoding; chain_name; distributed_db_versions}
 
 let raw_encoding = P2p_message.encoding encoding

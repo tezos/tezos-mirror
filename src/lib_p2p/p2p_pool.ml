@@ -45,15 +45,9 @@ type config = {
   max_known_peer_ids : (int * int) option;
 }
 
-type 'peer peer_meta_config = {
-  peer_meta_encoding : 'peer Data_encoding.t;
-  peer_meta_initial : unit -> 'peer;
-  score : 'peer -> float;
-}
-
 type ('msg, 'peer, 'conn) t = {
   config : config;
-  peer_meta_config : 'peer peer_meta_config;
+  peer_meta_config : 'peer P2p_params.peer_meta_config;
   (* Set of points corresponding to this peer *)
   my_id_points : unit P2p_point.Table.t;
   known_peer_ids :

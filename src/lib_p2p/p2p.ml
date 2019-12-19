@@ -28,35 +28,6 @@ include Internal_event.Legacy_logging.Make (struct
   let name = "p2p"
 end)
 
-type 'peer_meta peer_meta_config = 'peer_meta P2p_pool.peer_meta_config = {
-  peer_meta_encoding : 'peer_meta Data_encoding.t;
-  peer_meta_initial : unit -> 'peer_meta;
-  score : 'peer_meta -> float;
-}
-
-type 'conn_meta conn_meta_config = 'conn_meta P2p_socket.metadata_config = {
-  conn_meta_encoding : 'conn_meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta;
-  private_node : 'conn_meta -> bool;
-}
-
-type 'msg app_message_encoding = 'msg P2p_message.encoding =
-  | Encoding : {
-      tag : int;
-      title : string;
-      encoding : 'a Data_encoding.t;
-      wrap : 'a -> 'msg;
-      unwrap : 'msg -> 'a option;
-      max_length : int option;
-    }
-      -> 'msg app_message_encoding
-
-type 'msg message_config = 'msg P2p_connect_handler.message_config = {
-  encoding : 'msg app_message_encoding list;
-  chain_name : Distributed_db_version.Name.t;
-  distributed_db_versions : Distributed_db_version.t list;
-}
-
 type config = {
   listening_port : P2p_addr.port option;
   listening_addr : P2p_addr.t option;
@@ -602,7 +573,8 @@ let activate t =
   log_info "activate P2P layer !" ;
   t.activate ()
 
-let faked_network (msg_cfg : 'msg message_config) peer_cfg faked_metadata =
+let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
+    faked_metadata =
   let announced_version =
     Network_version.announced
       ~chain_name:msg_cfg.chain_name
@@ -624,7 +596,7 @@ let faked_network (msg_cfg : 'msg message_config) peer_cfg faked_metadata =
     connection_remote_metadata = (fun _ -> faked_metadata);
     connection_stat = (fun _ -> Fake.empty_stat);
     global_stat = (fun () -> Fake.empty_stat);
-    get_peer_metadata = (fun _ -> peer_cfg.peer_meta_initial ());
+    get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());

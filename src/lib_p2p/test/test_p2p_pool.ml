@@ -30,10 +30,10 @@ end)
 
 type message = Ping
 
-let msg_config : message P2p_connect_handler.message_config =
+let msg_config : message P2p_params.message_config =
   {
     encoding =
-      [ P2p_message.Encoding
+      [ P2p_params.Encoding
           {
             tag = 0x10;
             title = "Ping";
@@ -48,14 +48,14 @@ let msg_config : message P2p_connect_handler.message_config =
 
 type metadata = unit
 
-let peer_meta_config : metadata P2p_pool.peer_meta_config =
+let peer_meta_config : metadata P2p_params.peer_meta_config =
   {
     peer_meta_encoding = Data_encoding.empty;
     peer_meta_initial = (fun _ -> ());
     score = (fun () -> 0.);
   }
 
-let conn_meta_config : metadata P2p_socket.metadata_config =
+let conn_meta_config : metadata P2p_params.conn_meta_config =
   {
     conn_meta_encoding = Data_encoding.empty;
     conn_meta_value = (fun _ -> ());

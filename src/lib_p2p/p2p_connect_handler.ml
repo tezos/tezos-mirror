@@ -27,12 +27,6 @@ include Internal_event.Legacy_logging.Make (struct
   let name = "p2p.connect_handler"
 end)
 
-type 'msg message_config = {
-  encoding : 'msg P2p_message.encoding list;
-  chain_name : Distributed_db_version.Name.t;
-  distributed_db_versions : Distributed_db_version.t list;
-}
-
 type config = {
   incoming_app_message_queue_size : int option;
   private_mode : bool;
@@ -57,8 +51,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   triggers : P2p_trigger.t;
   io_sched : P2p_io_scheduler.t;
   announced_version : Network_version.t;
-  conn_meta_config : 'conn_meta P2p_socket.metadata_config;
-  message_config : 'msg message_config;
+  conn_meta_config : 'conn_meta P2p_params.conn_meta_config;
+  message_config : 'msg P2p_params.message_config;
   custom_p2p_versions : P2p_version.t list;
   encoding : 'msg P2p_message.t Data_encoding.t;
   incoming : Lwt_canceler.t P2p_point.Table.t;
@@ -75,13 +69,14 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     message_config;
     announced_version =
       Network_version.announced
-        ~chain_name:message_config.chain_name
-        ~distributed_db_versions:message_config.distributed_db_versions
+        ~chain_name:message_config.P2p_params.chain_name
+        ~distributed_db_versions:
+          message_config.P2p_params.distributed_db_versions
         ~p2p_versions;
     custom_p2p_versions = p2p_versions;
     incoming = P2p_point.Table.create 53;
     io_sched;
-    encoding = P2p_message.encoding message_config.encoding;
+    encoding = P2p_message.encoding message_config.P2p_params.encoding;
     triggers;
     new_connection_hook = [];
     log;

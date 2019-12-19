@@ -65,15 +65,9 @@ type config = {
       (** Like [max_known_points], but for known peer_ids. *)
 }
 
-type 'peer peer_meta_config = {
-  peer_meta_encoding : 'peer Data_encoding.t;
-  peer_meta_initial : unit -> 'peer;
-  score : 'peer -> float;
-}
-
 val create :
   config ->
-  'peer peer_meta_config ->
+  'peer P2p_params.peer_meta_config ->
   P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->
   ('msg, 'peer, 'conn) t Lwt.t

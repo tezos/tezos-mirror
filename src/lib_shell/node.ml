@@ -97,14 +97,14 @@ type t = {
   shutdown : unit -> unit Lwt.t;
 }
 
-let peer_metadata_cfg : _ P2p.peer_meta_config =
+let peer_metadata_cfg : _ P2p_params.peer_meta_config =
   {
     peer_meta_encoding = Peer_metadata.encoding;
     peer_meta_initial = Peer_metadata.empty;
     score = Peer_metadata.score;
   }
 
-let connection_metadata_cfg cfg : _ P2p.conn_meta_config =
+let connection_metadata_cfg cfg : _ P2p_params.conn_meta_config =
   {
     conn_meta_encoding = Connection_metadata.encoding;
     private_node = (fun {private_node; _} -> private_node);

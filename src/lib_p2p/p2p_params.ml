@@ -24,36 +24,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines the messages of the P2p layers.
+(** Types of the abstract data types (ADT) which parameterize the P2p layer.
 
-    P2p messages are parameterized by a generic upper-layer message type
-    ['msg]. The P2p layer serializes these ['msg] using a ['msg encoding']
-    provided by the client of this lib.
+  Many types used in the P2p layer are parameterized by three type parameters:
+    - ['msg]: type of messages exchanged between peers
+    - ['peer_meta]: type of the metadata associated with peers (score, etc.)
+    - ['conn_meta]: type of the metadata associated with connections
 
-    The P2p protocol is simple and can be deduced mostly from the message type.
-    To make the network topology more dynamic, it implements a simple peer
-    swapping mechanism which works as follows.
+  These types are kept abstract from the P2p layer. It can only operate on
+  them via a set of functions packed in a "configuration" record
+  passed by the upper layer (see also [P2p] and [P2p.create]).
 
-    Peer A sends a message : [Swap_request (point, peer)] to B.
-    If B is already connected to the peer, the message is ignored.
-    Otherwise B picks a peer [peer'] at point [point'] and connect to [peer]. If
-    successful, it sends a response [Swap_ack (point', peer')] to A. Upon
-    reception of [Swap_ack]. B tries to connected to [peer']. If successful,
-    it disconnect from [peer]. *)
+  This module defines the type of these configuration records. *)
 
-(* TODO: It would be interesting to measure the effect of the swap request
-         mechanism on an actual network. Is it the added complexity
-         worth it, wouldn't it  be enough to rely on [Advertise]? *)
+(** Metadata for a peer *)
+type 'peer_meta peer_meta_config = {
+  peer_meta_encoding : 'peer_meta Data_encoding.t;
+  peer_meta_initial : unit -> 'peer_meta;  (** Constructor *)
+  score : 'peer_meta -> float;  (** Score of a peer, used for ordering *)
+}
 
-type 'msg t =
-  | Bootstrap  (** Welcome message sent by a peer upon connection *)
-  | Advertise of P2p_point.Id.t list
-      (** Response to a [Bootstrap] message, contains list of known points *)
-  | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
-      (** Propose new peer/point and ask a peer/point to swap with *)
-  | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
-      (** Response to a swap request and propose peer/point to swap with. *)
-  | Message of 'msg  (** Generic upper-layer message *)
-  | Disconnect  (** Ending of connection *)
+(** Metadata for a connection. *)
+type 'conn_meta conn_meta_config = {
+  conn_meta_encoding : 'conn_meta Data_encoding.t;
+  conn_meta_value : P2p_peer.Id.t -> 'conn_meta;  (** Constructor *)
+  private_node : 'conn_meta -> bool;
+      (** Returns true if peer at the other end of the connection is in private
+      mode *)
+}
 
-val encoding : 'a P2p_params.app_message_encoding list -> 'a t Data_encoding.t
+type 'msg app_message_encoding =
+  | Encoding : {
+      tag : int;
+      title : string;
+      encoding : 'a Data_encoding.t;
+      wrap : 'a -> 'msg;
+      unwrap : 'msg -> 'a option;
+      max_length : int option;
+    }
+      -> 'msg app_message_encoding
+
+(** Application-level messages encoding, and version parameters *)
+type 'msg message_config = {
+  encoding : 'msg app_message_encoding list;  (** Encoding of the messages. *)
+  chain_name : Distributed_db_version.Name.t;
+      (** Identifier for this P2p protocol when establishing session. *)
+  distributed_db_versions : Distributed_db_version.t list;
+      (* TODO these last two fields aren't logically related to the `msg type,
+         they should be moved somewhere else *)
+      (** List of versions supported by this P2p protocol. *)
+}

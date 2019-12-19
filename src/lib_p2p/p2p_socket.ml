@@ -185,16 +185,12 @@ module Connection_message = struct
         else return (message, buf)
 end
 
-type 'meta metadata_config = {
-  conn_meta_encoding : 'meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'meta;
-  private_node : 'meta -> bool;
-}
-
 module Metadata = struct
   let write ~canceler metadata_config cryptobox_data fd message =
     let encoded_message_len =
-      Data_encoding.Binary.length metadata_config.conn_meta_encoding message
+      Data_encoding.Binary.length
+        metadata_config.P2p_params.conn_meta_encoding
+        message
     in
     let buf = Bytes.create encoded_message_len in
     match
@@ -215,7 +211,7 @@ module Metadata = struct
     Crypto.read_chunk ~canceler fd cryptobox_data
     >>=? fun buf ->
     let length = Bytes.length buf in
-    let encoding = metadata_config.conn_meta_encoding in
+    let encoding = metadata_config.P2p_params.conn_meta_encoding in
     match Data_encoding.Binary.read encoding buf 0 length with
     | None ->
         fail P2p_errors.Decoding_error
@@ -328,7 +324,9 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
     Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
   in
   let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
-  let local_metadata = metadata_config.conn_meta_value remote_peer_id in
+  let local_metadata =
+    metadata_config.P2p_params.conn_meta_value remote_peer_id
+  in
   Metadata.write ~canceler metadata_config fd cryptobox_data local_metadata
   >>=? fun () ->
   Metadata.read ~canceler metadata_config fd cryptobox_data

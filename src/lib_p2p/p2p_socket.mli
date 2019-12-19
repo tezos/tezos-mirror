@@ -44,22 +44,6 @@
 
 (** {1 Types} *)
 
-(** This defines an abstract data type ['meta]. Mainly a placeholder to be
-    used by the calling layer. ['meta] objects are communicated at session
-    initiation and both ends ['meta'] are known once session is set up. ['meta]
-    object should at least contain the private status of the node. *)
-
-(* TODO:
-   - this type is duplicated at several places. Define it once for all in a
-     separate module (with [msg_config] and [peer_config]).
-   - the parameter [P2p_peer.Id.t] provides more control when constructing a
-     ['meta] but may not be useful. *)
-type 'meta metadata_config = {
-  conn_meta_encoding : 'meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'meta;
-  private_node : 'meta -> bool;
-}
-
 (** Type of a connection that successfully passed the authentication
     phase, but has not been accepted yet. Parametrized by the type
     of expected parameter in the `ack` message. *)
@@ -130,7 +114,7 @@ val authenticate :
   ?listening_port:int ->
   P2p_identity.t ->
   Network_version.t ->
-  'meta metadata_config ->
+  'meta P2p_params.conn_meta_config ->
   ('meta P2p_connection.Info.t * 'meta authenticated_connection) tzresult Lwt.t
 
 (** [kick ac] sends a [Nack] message to the remote peer, notifying it

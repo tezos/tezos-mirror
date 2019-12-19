@@ -62,39 +62,15 @@
 
     Addresses or peers can be *greylisted*. As for banning, greylisting
     can be enforced via the API, but also dynamically when the peer isn't
-    able to authenticate. Eventually greylisted peers are whitelisted again. *)
+    able to authenticate. Eventually greylisted peers are whitelisted again.
 
-(** Most types of the P2p layer are parameterized by three types ['peer_meta],
-    ['conn_meta], [`msg]. The concrete types, and function operating on them,
-    are defined by the calling layer. *)
+    Many types used in the P2p layer are parameterized by three type parameters:
+    - ['msg]: type of messages exchanged between peers
+    - ['peer_meta]: type of the metadata associated with peers (score, etc.)
+    - ['conn_meta]: type of the metadata associated with connections
 
-(** Metadata for a peer. Typically contains information used to compute the
-    score of a peer. This is used to classify peers when choosing "good"
-    neighbors. *)
-type 'peer_meta peer_meta_config = {
-  peer_meta_encoding : 'peer_meta Data_encoding.t;
-      (** Encoding of the peer meta data. *)
-  peer_meta_initial : unit -> 'peer_meta;
-      (** Initial value for this peer meta-data *)
-  score : 'peer_meta -> float;  (** Score of a peer. *)
-}
-
-(* Metadata for a connection. *)
-type 'conn_meta conn_meta_config = {
-  conn_meta_encoding : 'conn_meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta;
-  private_node : 'conn_meta -> bool;
-}
-
-(* Configuration for the application protocol. ['msg] represents
-   the type of the application level protocol *)
-type 'msg message_config = {
-  encoding : 'msg P2p_message.encoding list;  (** Encoding of the messages. *)
-  chain_name : Distributed_db_version.Name.t;
-      (** Identifier for this P2p protocol when establishing session. *)
-  distributed_db_versions : Distributed_db_version.t list;
-      (** List of versions supported by this P2p protocol. *)
-}
+    The concrete types, and functions operating on them, are defined by the
+    calling layer, and passed to [P2p.create]. See module [P2p_params]. *)
 
 (** Network configuration *)
 type config = {
@@ -180,11 +156,7 @@ type limits = {
       peers. Default value is 64 kB. Max value is 64kB. *)
 }
 
-(** Type of a P2P layer instance, parametrized by:
-    ['msg]: type of messages exchanged between peers
-    ['peer_meta]: type of the metadata associated with peers (score, etc.)
-    ['conn_meta]: type of the metadata associated with connection (ack_cfg)
-*)
+(** Type of a P2P layer instance *)
 type ('msg, 'peer_meta, 'conn_meta) t
 
 type ('msg, 'peer_meta, 'conn_meta) net = ('msg, 'peer_meta, 'conn_meta) t
@@ -202,8 +174,8 @@ val connect_handler :
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
 val faked_network :
-  'msg message_config ->
-  'peer_meta peer_meta_config ->
+  'msg P2p_params.message_config ->
+  'peer_meta P2p_params.peer_meta_config ->
   'conn_meta ->
   ('msg, 'peer_meta, 'conn_meta) net
 
@@ -211,9 +183,9 @@ val faked_network :
 val create :
   config:config ->
   limits:limits ->
-  'peer_meta peer_meta_config ->
-  'conn_meta conn_meta_config ->
-  'msg message_config ->
+  'peer_meta P2p_params.peer_meta_config ->
+  'conn_meta P2p_params.conn_meta_config ->
+  'msg P2p_params.message_config ->
   ('msg, 'peer_meta, 'conn_meta) net tzresult Lwt.t
 
 val activate : ('msg, 'peer_meta, 'conn_meta) net -> unit
