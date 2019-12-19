@@ -350,15 +350,6 @@ module Block_header = struct
            and type param := unit )
 end
 
-module Operation_hashes =
-  Make
-    (Distributed_db_requester.Raw_operation_hashes)
-    (struct
-      type t = chain_db
-
-      let proj chain = chain.reader_chain_db.operation_hashes_db
-    end)
-
 module Operations =
   Make
     (Distributed_db_requester.Raw_operations)

@@ -136,15 +136,6 @@ module Operations :
      and type value = Operation.t list
      and type param := Operation_list_list_hash.t
 
-(** Index of all the hashes of operations of a given block (per
-    validation pass). *)
-module Operation_hashes :
-  Requester.REQUESTER
-    with type t := chain_db
-     and type key = Block_hash.t * int
-     and type value = Operation_hash.t list
-     and type param := Operation_list_list_hash.t
-
 (** Store on disk all the data associated to a valid block. *)
 val commit_block :
   chain_db ->
