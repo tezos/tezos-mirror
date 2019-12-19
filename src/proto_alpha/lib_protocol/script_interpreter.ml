@@ -291,32 +291,79 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
+module type STEP_LOGGER = sig
+  val log_interp :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'bef stack ->
+    unit tzresult Lwt.t
+
+  val log_entry :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'bef stack ->
+    unit tzresult Lwt.t
+
+  val log_exit :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'aft stack ->
+    unit tzresult Lwt.t
+
+  val get_log : unit -> execution_trace option
+end
+
+type logger = (module STEP_LOGGER)
+
+module Trace_logger () = struct
+  let log = ref []
+
+  let log_interp ctxt descr stack =
+    trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.bef))
+    >>=? fun stack ->
+    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
+    return_unit
+
+  let log_entry _ctxt _descr _stack = return_unit
+
+  let log_exit ctxt descr stack =
+    trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.aft))
+    >>=? fun stack ->
+    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
+    return_unit
+
+  let get_log () = Some (List.rev !log)
+end
+
+module No_trace : STEP_LOGGER = struct
+  let log_interp _ctxt _descr _stack = return_unit
+
+  let log_entry _ctxt _descr _stack = return_unit
+
+  let log_exit _ctxt _descr _stack = return_unit
+
+  let get_log () = None
+end
+
 let rec step :
     type b a.
-    ?log:execution_trace ref ->
+    logger ->
     context ->
     step_constants ->
     (b, a) descr ->
     b stack ->
     (a stack * context) tzresult Lwt.t =
- fun ?log ctxt step_constants ({instr; loc; _} as descr) stack ->
+ fun logger ctxt step_constants ({instr; loc; _} as descr) stack ->
   Lwt.return (Gas.consume ctxt Interp_costs.cycle)
   >>=? fun ctxt ->
+  let module Log = (val logger) in
+  Log.log_entry ctxt descr stack
+  >>=? fun () ->
   let logged_return :
       type a b.
       (b, a) descr -> a stack * context -> (a stack * context) tzresult Lwt.t =
    fun descr (ret, ctxt) ->
-    match log with
-    | None ->
-        return (ret, ctxt)
-    | Some log ->
-        trace Cannot_serialize_log (unparse_stack ctxt (ret, descr.aft))
-        >>=? fun stack ->
-        log := (descr.loc, Gas.level ctxt, stack) :: !log ;
-        return (ret, ctxt)
-  in
-  let get_log (log : execution_trace ref option) =
-    Option.map ~f:(fun l -> List.rev !l) log
+    Log.log_exit ctxt descr ret >>=? fun () -> return (ret, ctxt)
   in
   let consume_gas_terop :
       type ret arg1 arg2 arg3 rest.
@@ -379,10 +426,10 @@ let rec step :
       >>=? fun ctxt -> logged_return (Item (None, rest), ctxt)
   | (If_none (bt, _), Item (None, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bt rest
+      >>=? fun ctxt -> step logger ctxt step_constants bt rest
   | (If_none (_, bf), Item (Some v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bf (Item (v, rest))
+      >>=? fun ctxt -> step logger ctxt step_constants bf (Item (v, rest))
   (* pairs *)
   | (Cons_pair, Item (a, Item (b, rest))) ->
       Lwt.return (Gas.consume ctxt Interp_costs.pair)
@@ -402,10 +449,10 @@ let rec step :
       >>=? fun ctxt -> logged_return (Item (R v, rest), ctxt)
   | (If_left (bt, _), Item (L v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bt (Item (v, rest))
+      >>=? fun ctxt -> step logger ctxt step_constants bt (Item (v, rest))
   | (If_left (_, bf), Item (R v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bf (Item (v, rest))
+      >>=? fun ctxt -> step logger ctxt step_constants bf (Item (v, rest))
   (* lists *)
   | (Cons_list, Item (hd, Item (tl, rest))) ->
       Lwt.return (Gas.consume ctxt Interp_costs.cons)
@@ -415,11 +462,11 @@ let rec step :
       >>=? fun ctxt -> logged_return (Item ([], rest), ctxt)
   | (If_cons (_, bf), Item ([], rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bf rest
+      >>=? fun ctxt -> step logger ctxt step_constants bf rest
   | (If_cons (bt, _), Item (hd :: tl, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
       >>=? fun ctxt ->
-      step ?log ctxt step_constants bt (Item (hd, Item (tl, rest)))
+      step logger ctxt step_constants bt (Item (hd, Item (tl, rest)))
   | (List_map body, Item (l, rest)) ->
       let rec loop rest ctxt l acc =
         Lwt.return (Gas.consume ctxt Interp_costs.loop_map)
@@ -428,7 +475,7 @@ let rec step :
         | [] ->
             return (Item (List.rev acc, rest), ctxt)
         | hd :: tl ->
-            step ?log ctxt step_constants body (Item (hd, rest))
+            step logger ctxt step_constants body (Item (hd, rest))
             >>=? fun (Item (hd, rest), ctxt) -> loop rest ctxt tl (hd :: acc)
       in
       loop rest ctxt l [] >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -452,7 +499,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step ?log ctxt step_constants body (Item (hd, stack))
+            step logger ctxt step_constants body (Item (hd, stack))
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -471,7 +518,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step ?log ctxt step_constants body (Item (hd, stack))
+            step logger ctxt step_constants body (Item (hd, stack))
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -505,7 +552,7 @@ let rec step :
         | [] ->
             return (Item (acc, rest), ctxt)
         | ((k, _) as hd) :: tl ->
-            step ?log ctxt step_constants body (Item (hd, rest))
+            step logger ctxt step_constants body (Item (hd, rest))
             >>=? fun (Item (hd, rest), ctxt) ->
             loop rest ctxt tl (map_update k (Some hd) acc)
       in
@@ -522,7 +569,7 @@ let rec step :
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step ?log ctxt step_constants body (Item (hd, stack))
+            step logger ctxt step_constants body (Item (hd, stack))
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
@@ -672,7 +719,7 @@ let rec step :
       >>=? fun ctxt ->
       match Script_int.to_int64 y with
       | None ->
-          fail (Overflow (loc, get_log log))
+          fail (Overflow (loc, Log.get_log ()))
       | Some y ->
           Lwt.return Tez.(x *? y)
           >>=? fun res -> logged_return (Item (res, rest), ctxt) )
@@ -683,7 +730,7 @@ let rec step :
       >>=? fun ctxt ->
       match Script_int.to_int64 y with
       | None ->
-          fail (Overflow (loc, get_log log))
+          fail (Overflow (loc, Log.get_log ()))
       | Some y ->
           Lwt.return Tez.(x *? y)
           >>=? fun res -> logged_return (Item (res, rest), ctxt) )
@@ -828,7 +875,7 @@ let rec step :
       >>=? fun ctxt ->
       match Script_int.shift_left_n x y with
       | None ->
-          fail (Overflow (loc, get_log log))
+          fail (Overflow (loc, Log.get_log ()))
       | Some x ->
           logged_return (Item (x, rest), ctxt) )
   | (Lsr_nat, Item (x, Item (y, rest))) -> (
@@ -836,7 +883,7 @@ let rec step :
       >>=? fun ctxt ->
       match Script_int.shift_right_n x y with
       | None ->
-          fail (Overflow (loc, get_log log))
+          fail (Overflow (loc, Log.get_log ()))
       | Some r ->
           logged_return (Item (r, rest), ctxt) )
   | (Or_nat, Item (x, Item (y, rest))) ->
@@ -883,38 +930,38 @@ let rec step :
         ctxt
   (* control *)
   | (Seq (hd, tl), stack) ->
-      step ?log ctxt step_constants hd stack
-      >>=? fun (trans, ctxt) -> step ?log ctxt step_constants tl trans
+      step logger ctxt step_constants hd stack
+      >>=? fun (trans, ctxt) -> step logger ctxt step_constants tl trans
   | (If (bt, _), Item (true, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bt rest
+      >>=? fun ctxt -> step logger ctxt step_constants bt rest
   | (If (_, bf), Item (false, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step ?log ctxt step_constants bf rest
+      >>=? fun ctxt -> step logger ctxt step_constants bf rest
   | (Loop body, Item (true, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
       >>=? fun ctxt ->
-      step ?log ctxt step_constants body rest
-      >>=? fun (trans, ctxt) -> step ?log ctxt step_constants descr trans
+      step logger ctxt step_constants body rest
+      >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
   | (Loop _, Item (false, rest)) ->
       logged_return (rest, ctxt)
   | (Loop_left body, Item (L v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
       >>=? fun ctxt ->
-      step ?log ctxt step_constants body (Item (v, rest))
-      >>=? fun (trans, ctxt) -> step ?log ctxt step_constants descr trans
+      step logger ctxt step_constants body (Item (v, rest))
+      >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
   | (Loop_left _, Item (R v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
       >>=? fun ctxt -> logged_return (Item (v, rest), ctxt)
   | (Dip b, Item (ign, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.stack_op)
       >>=? fun ctxt ->
-      step ?log ctxt step_constants b rest
+      step logger ctxt step_constants b rest
       >>=? fun (res, ctxt) -> logged_return (Item (ign, res), ctxt)
   | (Exec, Item (arg, Item (lam, rest))) ->
       Lwt.return (Gas.consume ctxt Interp_costs.exec)
       >>=? fun ctxt ->
-      interp ?log ctxt step_constants lam arg
+      interp logger ctxt step_constants lam arg
       >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
   | (Apply capture_ty, Item (capture, Item (lam, rest))) -> (
       Lwt.return (Gas.consume ctxt Interp_costs.apply)
@@ -982,7 +1029,7 @@ let rec step :
       trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
       >>=? fun (v, _ctxt) ->
       let v = Micheline.strip_locations v in
-      fail (Reject (loc, v, get_log log))
+      fail (Reject (loc, v, Log.get_log ()))
   | (Nop, stack) ->
       logged_return (stack, ctxt)
   (* comparison *)
@@ -1383,7 +1430,7 @@ let rec step :
       >>=? fun ctxt ->
       interp_stack_prefix_preserving_operation
         (fun stk ->
-          step ?log ctxt step_constants b stk
+          step logger ctxt step_constants b stk
           >>=? fun (res, ctxt') -> return (res, ctxt'))
         n'
         stack
@@ -1403,28 +1450,22 @@ let rec step :
 
 and interp :
     type p r.
-    ?log:execution_trace ref ->
+    logger ->
     context ->
     step_constants ->
     (p, r) lambda ->
     p ->
     (r * context) tzresult Lwt.t =
- fun ?log ctxt step_constants (Lam (code, _)) arg ->
+ fun logger ctxt step_constants (Lam (code, _)) arg ->
   let stack = Item (arg, Empty) in
-  ( match log with
-  | None ->
-      return_unit
-  | Some log ->
-      trace Cannot_serialize_log (unparse_stack ctxt (stack, code.bef))
-      >>=? fun stack ->
-      log := (code.loc, Gas.level ctxt, stack) :: !log ;
-      return_unit )
+  let module Log = (val logger) in
+  Log.log_interp ctxt code stack
   >>=? fun () ->
-  step ?log ctxt step_constants code stack
+  step logger ctxt step_constants code stack
   >>=? fun (Item (ret, Empty), ctxt) -> return (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
-and execute ?log ctxt mode step_constants ~entrypoint unparsed_script arg :
+and execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     ( Script.expr
     * packed_internal_operation list
     * context
@@ -1449,7 +1490,7 @@ and execute ?log ctxt mode step_constants ~entrypoint unparsed_script arg :
   >>=? fun (to_update, ctxt) ->
   trace
     (Runtime_contract_error (step_constants.self, script_code))
-    (interp ?log ctxt step_constants code (arg, storage))
+    (interp logger ctxt step_constants code (arg, storage))
   >>=? fun ((ops, storage), ctxt) ->
   Script_ir_translator.extract_big_map_diff
     ctxt
@@ -1483,9 +1524,10 @@ type execution_result = {
 }
 
 let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
-  let log = ref [] in
+  let module Logger = Trace_logger () in
+  let logger = (module Logger : STEP_LOGGER) in
   execute
-    ~log
+    logger
     ctxt
     mode
     step_constants
@@ -1493,11 +1535,19 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     script
     (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map_diff) ->
-  let trace = List.rev !log in
+  let trace =
+    match Logger.get_log () with
+    | None ->
+        (* absurd *) []
+    | Some trace ->
+        trace
+  in
   return ({ctxt; storage; big_map_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
+  let logger = (module No_trace : STEP_LOGGER) in
   execute
+    logger
     ctxt
     mode
     step_constants

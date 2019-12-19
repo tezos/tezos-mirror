@@ -62,8 +62,47 @@ type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
   | Empty : Script_typed_ir.end_of_stack stack
 
+(** [STEP_LOGGER] is the module type of logging
+    modules as passed to the Michelson interpreter.
+    Note that logging must be performed by side-effects
+    on an underlying log structure. *)
+module type STEP_LOGGER = sig
+  (** [log_interp] is called at each call of the internal
+      function [interp]. [interp] is called when starting
+      the interpretation of a script and subsequently
+      at each [Exec] instruction. *)
+  val log_interp :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'bef stack ->
+    unit tzresult Lwt.t
+
+  (** [log_entry] is called {i before} executing
+      each instruction but {i after} gas for
+      this instruction has been successfully consumed. *)
+  val log_entry :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'bef stack ->
+    unit tzresult Lwt.t
+
+  (** [log_exit] is called {i after} executing each
+      instruction. *)
+  val log_exit :
+    context ->
+    ('bef, 'aft) Script_typed_ir.descr ->
+    'aft stack ->
+    unit tzresult Lwt.t
+
+  (** [get_log] allows to obtain an execution trace, if
+      any was produced. *)
+  val get_log : unit -> execution_trace option
+end
+
+type logger = (module STEP_LOGGER)
+
 val step :
-  ?log:execution_trace ref ->
+  logger ->
   context ->
   step_constants ->
   ('bef, 'aft) Script_typed_ir.descr ->
