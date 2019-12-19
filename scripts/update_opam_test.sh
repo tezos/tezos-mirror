@@ -11,21 +11,26 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-packages=$(echo $packages | sed -e 's/ /\n/' | sort)
+packages=$(echo "$packages" | sort)
 
-sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\1/' "$src_dir/.gitlab-ci.yml" > $tmp
+(
+  sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\1/' "$src_dir/.gitlab-ci.yml"
 
-for package in $packages; do
-    cat >> $tmp <<EOF
+  echo "# this section is updated using the script $(basename $script_dir)/$(basename $0)"
+  echo
+
+  for package in $packages; do
+      cat <<EOF
 opam:$package:
   <<: *opam_definition
   variables:
     package: $package
 
 EOF
-done
+  done
 
-sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\2/' "$src_dir/.gitlab-ci.yml" >> $tmp
+  sed -z 's/^\(.*##BEGIN_OPAM##\n\).*\(\n##END_OPAM##.*\)$/\2/' "$src_dir/.gitlab-ci.yml"
+) > $tmp
 
 mv $tmp "$src_dir/.gitlab-ci.yml"
 
