@@ -456,41 +456,36 @@ let rec step :
   (* lists *)
   | (Cons_list, Item (hd, Item (tl, rest))) ->
       Lwt.return (Gas.consume ctxt Interp_costs.cons)
-      >>=? fun ctxt -> logged_return (Item (hd :: tl, rest), ctxt)
+      >>=? fun ctxt -> logged_return (Item (list_cons hd tl, rest), ctxt)
   | (Nil, rest) ->
       Lwt.return (Gas.consume ctxt Interp_costs.variant_no_data)
-      >>=? fun ctxt -> logged_return (Item ([], rest), ctxt)
-  | (If_cons (_, bf), Item ([], rest)) ->
+      >>=? fun ctxt -> logged_return (Item (list_empty, rest), ctxt)
+  | (If_cons (_, bf), Item ({elements = []; _}, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
       >>=? fun ctxt -> step logger ctxt step_constants bf rest
-  | (If_cons (bt, _), Item (hd :: tl, rest)) ->
+  | (If_cons (bt, _), Item ({elements = hd :: tl; length}, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.branch)
       >>=? fun ctxt ->
+      let tl = {elements = tl; length = length - 1} in
       step logger ctxt step_constants bt (Item (hd, Item (tl, rest)))
-  | (List_map body, Item (l, rest)) ->
+  | (List_map body, Item (list, rest)) ->
       let rec loop rest ctxt l acc =
         Lwt.return (Gas.consume ctxt Interp_costs.loop_map)
         >>=? fun ctxt ->
         match l with
         | [] ->
-            return (Item (List.rev acc, rest), ctxt)
+            let result = {elements = List.rev acc; length = list.length} in
+            return (Item (result, rest), ctxt)
         | hd :: tl ->
             step logger ctxt step_constants body (Item (hd, rest))
             >>=? fun (Item (hd, rest), ctxt) -> loop rest ctxt tl (hd :: acc)
       in
-      loop rest ctxt l [] >>=? fun (res, ctxt) -> logged_return (res, ctxt)
+      loop rest ctxt list.elements []
+      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (List_size, Item (list, rest)) ->
-      Lwt.return
-        (List.fold_left
-           (fun acc _ ->
-             acc
-             >>? fun (size, ctxt) ->
-             Gas.consume ctxt Interp_costs.loop_size
-             >>? fun ctxt -> ok (size + 1 (* FIXME: overflow *), ctxt))
-           (ok (0, ctxt))
-           list)
-      >>=? fun (len, ctxt) ->
-      logged_return (Item (Script_int.(abs (of_int len)), rest), ctxt)
+      Lwt.return (Gas.consume ctxt Interp_costs.push)
+      >>=? fun ctxt ->
+      logged_return (Item (Script_int.(abs (of_int list.length)), rest), ctxt)
   | (List_iter body, Item (l, init)) ->
       let rec loop ctxt l stack =
         Lwt.return (Gas.consume ctxt Interp_costs.loop_iter)
@@ -502,7 +497,8 @@ let rec step :
             step logger ctxt step_constants body (Item (hd, stack))
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
-      loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
+      loop ctxt l.elements init
+      >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   (* sets *)
   | (Empty_set t, rest) ->
       Lwt.return (Gas.consume ctxt Interp_costs.empty_set)
@@ -648,9 +644,9 @@ let rec step :
       let s = String.concat "" [x; y] in
       logged_return (Item (s, rest), ctxt)
   | (Concat_string, Item (ss, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_string ss))
+      Lwt.return (Gas.consume ctxt (Interp_costs.concat_string ss.elements))
       >>=? fun ctxt ->
-      let s = String.concat "" ss in
+      let s = String.concat "" ss.elements in
       logged_return (Item (s, rest), ctxt)
   | (Slice_string, Item (offset, Item (length, Item (s, rest)))) ->
       let s_length = Z.of_int (String.length s) in
@@ -678,9 +674,9 @@ let rec step :
       let s = MBytes.concat "" [x; y] in
       logged_return (Item (s, rest), ctxt)
   | (Concat_bytes, Item (ss, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss))
+      Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss.elements))
       >>=? fun ctxt ->
-      let s = MBytes.concat "" ss in
+      let s = MBytes.concat "" ss.elements in
       logged_return (Item (s, rest), ctxt)
   | (Slice_bytes, Item (offset, Item (length, Item (s, rest)))) ->
       let s_length = Z.of_int (MBytes.length s) in
@@ -1503,7 +1499,7 @@ and execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   >>=? fun (storage, big_map_diff, ctxt) ->
   trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
   >>=? fun (storage, ctxt) ->
-  let (ops, op_diffs) = List.split ops in
+  let (ops, op_diffs) = List.split ops.elements in
   let big_map_diff =
     match
       List.flatten
