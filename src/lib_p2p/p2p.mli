@@ -140,11 +140,11 @@ type limits = {
   connection_timeout : Time.System.Span.t;
       (** Maximum time allowed to the establishment of a connection. *)
   authentication_timeout : Time.System.Span.t;
-      (** Delay granted to a peer to perform authentication, in seconds. *)
+      (** Delay granted to a peer to perform authentication. *)
   greylist_timeout : Time.System.Span.t;
-      (** GC delay for the grelists tables, in seconds. *)
+      (** GC delay for the grelists tables. *)
   maintenance_idle_time : Time.System.Span.t;
-      (** How long to wait at most, in seconds, before running a maintenance loop. *)
+      (** How long to wait at most before running a maintenance loop. *)
   min_connections : int;
       (** Strict minimum number of connections (triggers an urgent maintenance) *)
   expected_connections : int;
@@ -174,7 +174,7 @@ type limits = {
       (** Optional limitation of internal hashtables (max, target) *)
   swap_linger : Time.System.Span.t;
       (** Peer swapping does not occur more than once during a timespan of
-      [swap_linger] seconds. *)
+      [swap_linger]. *)
   binary_chunks_size : int option;
       (** Size (in bytes) of binary blocks that are sent to other
       peers. Default value is 64 kB. Max value is 64kB. *)

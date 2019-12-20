@@ -73,7 +73,7 @@ type config = {
   authentication_timeout : Time.System.Span.t;
       (** Maximum time allowed to the establishment of a connection. *)
   greylisting_config : P2p_point_state.Info.greylisting_config;
-      (** Delay granted to a peer to perform authentication, in seconds. *)
+      (** Delay granted to a peer to perform authentication. *)
   proof_of_work_target : Crypto_box.target;
       (** The greylisting configuration. *)
   listening_port : P2p_addr.port option;
@@ -107,7 +107,7 @@ val create :
   ('msg, 'peer, 'conn) t
 
 (** [connect ?timeout t point] tries to add a connection to [point]
-    in [t] in less than [timeout] seconds. *)
+    in [t] in less than [timeout]. *)
 val connect :
   ?timeout:Time.System.Span.t ->
   ('msg, 'peer, 'conn) t ->

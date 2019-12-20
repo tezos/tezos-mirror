@@ -30,30 +30,30 @@
     or/and the configuration file.
 
     The maintenance process is launched:
-    . If not launched within [maintenance_idle_time] seconds
     . When any of the following future  is resolved
-        [P2p_pool.Pool_event.wait_too_few_connections]
-        [P2p_pool.Pool_event.wait_too_many_connections]
-        [P2p_pool.Pool_event.wait_too_few_trusted_connections]
+        [P2p_trigger.wait_too_few_connections]
+        [P2p_trigger.wait_too_many_connections]
     . When [maintain] is called
+    . After [maintenance_idle_time] if none of the other conditions have been
+      met.
 
     If the number of connections is above the limit, the maintainer
-    kill existing connections.
+    kills existing connections.
 
     If below the limit, it tries to connect to points available from [P2p_pool].
-    If not enough connections can be obtained, it requires new points from
+    If not enough connections can be obtained, it requests new points from
     [P2p_pool] using [P2p_pool.broadcast msg], and wakes up the
     [P2p_discovery] worker. It then waits for new peers or points by waiting
     on futures
-      [P2p_pool.Pool_event.wait_new_peer]
-      [P2p_pool.Pool_event.wait_new_point pool]
-    This is reiterated indefinitely every [require_new_points_time] seconds. *)
+      [P2p_trigger.wait_new_peer]
+      [P2p_trigger.wait_new_point]
+    This is reiterated indefinitely every [require_new_points_time]. *)
 
 type config = {
   maintenance_idle_time : Time.System.Span.t;
-      (** How long to wait at most, in seconds, before running a maintenance loop. *)
+      (** How long to wait at most before running a maintenance loop. *)
   greylist_timeout : Time.System.Span.t;
-      (** GC delay for the greylists tables, in seconds. *)
+      (** GC delay for the greylists tables. *)
   private_mode : bool;
       (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform

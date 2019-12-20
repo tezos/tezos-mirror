@@ -154,8 +154,7 @@ module Default_answerer = struct
     log (Swap_request_received {source = source_peer_id}) ;
     lwt_log_info "Swap request received from %a" P2p_peer.Id.pp source_peer_id
     >>= fun () ->
-    (* Ignore if already connected to peer or already swapped less
-       than <swap_linger> seconds ago. *)
+    (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
       Ptime.diff
         (Systime_os.now ())

@@ -82,7 +82,7 @@ module type DISTRIBUTED_DB = sig
       provided peer. By default, the resulting promise will block
       forever if the data is never received. If [timeout] is provided
       the promise will be resolved with the error [Timeout] after the
-      provided amount of seconds.
+      provided timespan.
 
       A internal scheduler is able to re-send the request with an
       exponential back-off until the data is received. If the function
