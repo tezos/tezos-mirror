@@ -65,7 +65,12 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   unit
 
-(* ---- Sets and Maps -------------------------------------------------------*)
+(* ---- Lists, Sets and Maps ----------------------------------------------- *)
+
+val list_empty : 'a Script_typed_ir.boxed_list
+
+val list_cons :
+  'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
 
 val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
 

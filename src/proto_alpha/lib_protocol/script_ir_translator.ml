@@ -586,7 +586,17 @@ let check_kind kinds expr =
     let loc = location expr in
     fail (Invalid_kind (loc, kinds, kind))
 
-(* ---- Sets and Maps -------------------------------------------------------*)
+(* ---- Lists, Sets and Maps ----------------------------------------------- *)
+
+let list_empty : 'a Script_typed_ir.boxed_list =
+  let open Script_typed_ir in
+  {elements = []; length = 0}
+
+let list_cons :
+    'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list =
+ fun elt l ->
+  let open Script_typed_ir in
+  {length = 1 + l.length; elements = elt :: l.elements}
 
 let wrap_compare compare a b =
   let res = compare a b in
@@ -2663,9 +2673,9 @@ let rec parse_data :
              Lwt.return (Gas.consume ctxt Typecheck_costs.list_element)
              >>=? fun ctxt ->
              parse_data ?type_logger ctxt ~legacy t v
-             >>=? fun (v, ctxt) -> return (v :: rest, ctxt))
+             >>=? fun (v, ctxt) -> return (list_cons v rest, ctxt))
            items
-           ([], ctxt)
+           (list_empty, ctxt)
   | (List_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Sets *)
@@ -5594,7 +5604,7 @@ let rec unparse_data :
           unparse_data ctxt mode t element
           >>=? fun (unparsed, ctxt) -> return (unparsed :: l, ctxt))
         ([], ctxt)
-        items
+        items.elements
       >>=? fun (items, ctxt) ->
       return (Micheline.Seq (-1, List.rev items), ctxt)
   | (Set_t (t, _), set) ->
@@ -5911,10 +5921,12 @@ let rec extract_big_map_updates :
           Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
           >>=? fun ctxt ->
           extract_big_map_updates ctxt fresh mode ids acc ty x
-          >>=? fun (ctxt, x, ids, acc) -> return (ctxt, x :: l, ids, acc))
-        (ctxt, [], ids, acc)
-        l
-      >>=? fun (ctxt, l, ids, acc) -> return (ctxt, List.rev l, ids, acc)
+          >>=? fun (ctxt, x, ids, acc) -> return (ctxt, list_cons x l, ids, acc))
+        (ctxt, list_empty, ids, acc)
+        l.elements
+      >>=? fun (ctxt, l, ids, acc) ->
+      let reversed = {length = l.length; elements = List.rev l.elements} in
+      return (ctxt, reversed, ids, acc)
   | (Map_t (_, ty, _, true), ((module M) as m)) ->
       Lwt.return
         (Gas.consume ctxt (Michelson_v1_gas.Cost_of.Legacy.map_to_list m))
@@ -6016,7 +6028,7 @@ let collect_big_maps ctxt ty x =
         List.fold_left
           (fun acc x -> acc >>? fun (acc, ctxt) -> collect ctxt ty x acc)
           (ok (acc, ctxt))
-          l
+          l.elements
     | (Map_t (_, ty, _, true), m) ->
         map_fold
           (fun _ v acc -> acc >>? fun (acc, ctxt) -> collect ctxt ty v acc)
