@@ -62,8 +62,6 @@ module type S = sig
 
   val unlock : lock -> unit
 
-  exception Bad_Read
-
   module Mutex : sig
     type t
 
@@ -76,5 +74,13 @@ module type S = sig
     val with_lock : t -> (unit -> 'a) -> 'a
   end
 
-  val async : (unit -> 'a) -> unit
+  type async
+
+  val async : (unit -> 'a) -> async
+
+  val await : async -> unit
+
+  val return : unit -> async
+
+  val yield : unit -> unit
 end

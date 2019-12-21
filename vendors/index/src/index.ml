@@ -15,17 +15,7 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software. *)
 
-module Private = struct
-  module Fan = Fan
-  module Io_array = Io_array
-  module Search = Search
-
-  module Hook = struct
-    type 'a t = 'a -> unit
-
-    let v f = f
-  end
-end
+module Stats = Stats
 
 module type Key = sig
   type t
@@ -82,8 +72,6 @@ module type S = sig
 
   val iter : (key -> value -> unit) -> t -> unit
 
-  val force_merge : ?hook:[ `After | `Before ] Private.Hook.t -> t -> unit
-
   val flush : t -> unit
 
   val close : t -> unit
@@ -97,7 +85,11 @@ exception RO_not_allowed
 
 exception Closed
 
-module Make (K : Key) (V : Value) (IO : IO) = struct
+module Make_private (K : Key) (V : Value) (IO : IO) = struct
+  type async = IO.async
+
+  let await = IO.await
+
   type key = K.t
 
   type value = V.t
@@ -204,13 +196,13 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
 
   let page_size = Int64.mul entry_sizeL 1_000L
 
-  let iter_io_off ?(min = 0L) ?max f io =
-    let max = match max with None -> IO.offset io | Some m -> m in
+  let iter_io_off ?min:(min_off = 0L) ?max:max_off f io =
+    let max_off = match max_off with None -> IO.offset io | Some m -> m in
     let rec aux offset =
-      let remaining = Int64.sub max offset in
+      let remaining = Int64.sub max_off offset in
       if remaining <= 0L then ()
       else
-        let len = Int64.to_int (Stdlib.min remaining page_size) in
+        let len = Int64.to_int (min remaining page_size) in
         let raw = Bytes.create len in
         let n = IO.read io ~off:offset ~len raw in
         let rec read_page page off =
@@ -223,7 +215,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
         read_page raw 0;
         (aux [@tailcall]) Int64.(add offset page_size)
     in
-    (aux [@tailcall]) min
+    (aux [@tailcall]) min_off
 
   let iter_io ?min ?max f io = iter_io_off ?min ?max (fun _ e -> f e) io
 
@@ -411,37 +403,28 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
           l "[%s] no changes detected" (Filename.basename t.root))
     in
     let add_log_entry log e = Tbl.replace log.mem e.key e.value in
+    let sync_log_async ?(generation_change = false) () =
+      match t.log_async with
+      | None -> t.log_async <- try_load_log t (log_async_path t.root)
+      | Some log ->
+          let offset = IO.offset log.io in
+          let new_offset = IO.force_offset log.io in
+          if generation_change || offset <> new_offset then (
+            Tbl.clear log.mem;
+            iter_io (add_log_entry log) log.io )
+          else ()
+    in
     ( match t.log with
     | None -> t.log <- try_load_log t (log_path t.root)
     | Some _ -> () );
-    ( match t.log_async with
-    | None -> t.log_async <- try_load_log t (log_async_path t.root)
-    | Some log -> (
-        try
-          let log_offset = IO.offset log.io in
-          IO.close log.io;
-          let path = log_async_path t.root in
-          if Sys.file_exists path then (
-            let io =
-              IO.v ~fresh:false ~readonly:true ~generation:0L ~fan_size:0L path
-            in
-            t.log_async <- Some { log with io };
-            let new_log_offset = IO.offset io in
-            if log_offset <> new_log_offset then (
-              Tbl.clear log.mem;
-              iter_io (add_log_entry log) io ) )
-          else ()
-        with IO.Bad_Read ->
-          (* if log_async does not exist anymore, then its contents have been
-             moved to log and the generation has changed *)
-          () ) );
     match t.log with
-    | None -> no_changes ()
+    | None -> sync_log_async ()
     | Some log ->
         let generation = IO.get_generation log.io in
         let log_offset = IO.offset log.io in
         let new_log_offset = IO.force_offset log.io in
         let add_log_entry e = add_log_entry log e in
+        sync_log_async ~generation_change:(t.generation <> generation) ();
         if t.generation <> generation then (
           Log.debug (fun l ->
               l "[%s] generation has changed, reading log and index from disk"
@@ -552,6 +535,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
         let key_e = K.decode buf_str 0 in
         let hash_e = K.hash key_e in
         let log_i = merge_from_log fan_out log log_i hash_e dst_io in
+        IO.yield ();
         if
           log_i >= Array.length log
           ||
@@ -572,6 +556,7 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
   let merge ?hook ~witness t =
     IO.Mutex.lock t.merge_lock;
     Log.info (fun l -> l "[%s] merge" (Filename.basename t.root));
+    Stats.incr_nb_merge ();
     flush_instance t;
     let log_async =
       let io =
@@ -679,7 +664,8 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
     let witness = IO.Mutex.with_lock t.rename_lock (fun () -> get_witness t) in
     match witness with
     | None ->
-        Log.debug (fun l -> l "[%s] index is empty" (Filename.basename t.root))
+        Log.debug (fun l -> l "[%s] index is empty" (Filename.basename t.root));
+        IO.return ()
     | Some witness -> merge ?hook ~witness t
 
   let replace t key value =
@@ -698,7 +684,8 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
           Tbl.replace log.mem key value;
           Int64.compare (IO.offset log.io) (Int64.of_int t.config.log_size) > 0)
     in
-    if do_merge then merge ~witness:{ key; key_hash = K.hash key; value } t
+    if do_merge then
+      ignore (merge ~witness:{ key; key_hash = K.hash key; value } t : async)
 
   let iter f t =
     let t = check_open t in
@@ -737,4 +724,30 @@ module Make (K : Key) (V : Value) (IO : IO) = struct
                 t.log;
               may (fun (i : index) -> IO.close i.io) t.index;
               may (fun lock -> IO.unlock lock) t.writer_lock ))
+end
+
+module Make = Make_private
+
+module Private = struct
+  module Fan = Fan
+  module Io_array = Io_array
+  module Search = Search
+
+  module Hook = struct
+    type 'a t = 'a -> unit
+
+    let v f = f
+  end
+
+  module type S = sig
+    include S
+
+    type async
+
+    val force_merge : ?hook:[ `After | `Before ] Hook.t -> t -> async
+
+    val await : async -> unit
+  end
+
+  module Make = Make_private
 end

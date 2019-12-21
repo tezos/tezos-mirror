@@ -65,21 +65,7 @@ module type Key = sig
   (** Formatter for keys *)
 end
 
-(** These modules should not be used. They are exposed purely for testing
-    purposes. *)
-module Private : sig
-  module Search : module type of Search
-
-  module Io_array : module type of Io_array
-
-  module Fan : module type of Fan
-
-  module Hook : sig
-    type 'a t
-
-    val v : ('a -> unit) -> 'a t
-  end
-end
+module Stats = Stats
 
 (** The input of [Make] for values. The same requirements as for [Key] apply. *)
 module type Value = sig
@@ -142,12 +128,13 @@ module type S = sig
       [k]. *)
 
   val iter : (key -> value -> unit) -> t -> unit
-  (** Iterates over the index bindings. Order is not specified. In case of
-      recent replacements of existing values (after the last merge), this will
-      hit both the new and old bindings. *)
+  (** Iterates over the index bindings. Limitations:
 
-  val force_merge : ?hook:[ `After | `Before ] Private.Hook.t -> t -> unit
-  (** [force_merge t] forces a merge for [t]. *)
+      - Order is not specified.
+      - In case of recent replacements of existing values (since the last
+        merge), this will hit both the new and old bindings.
+      - May not observe recent concurrent updates to the index by other
+        processes. *)
 
   val flush : t -> unit
   (** Flushes all buffers to the supplied [IO] instance. *)
@@ -158,3 +145,39 @@ end
 
 module Make (K : Key) (V : Value) (IO : IO) :
   S with type key = K.t and type value = V.t
+
+(** These modules should not be used. They are exposed purely for testing
+    purposes. *)
+module Private : sig
+  module Hook : sig
+    type 'a t
+
+    val v : ('a -> unit) -> 'a t
+  end
+
+  module Search : module type of Search
+
+  module Io_array : module type of Io_array
+
+  module Fan : module type of Fan
+
+  module type S = sig
+    include S
+
+    type async
+    (** The type of asynchronous computation. *)
+
+    val force_merge : ?hook:[ `After | `Before ] Hook.t -> t -> async
+    (** [force_merge t] forces a merge for [t]. Optionally, a hook can be passed
+        that will be called twice:
+
+        - [`Before]: immediately before merging (while holding the merge lock);
+        - [`After]: immediately after merging (while holding the merge lock). *)
+
+    val await : async -> unit
+    (** Wait for an asynchronous computation to finish. *)
+  end
+
+  module Make (K : Key) (V : Value) (IO : IO) :
+    S with type key = K.t and type value = V.t
+end
