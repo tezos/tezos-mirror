@@ -147,7 +147,7 @@ let rec pop_with_timeout timeout q =
     if q.closed then (Lwt.cancel timeout ; Lwt.fail Closed)
     else
       let waiter = wait_push q in
-      Lwt.choose [timeout; Lwt.protected waiter]
+      Lwt.pick [timeout; Lwt.protected waiter]
       >>= fun () -> pop_with_timeout timeout q
   else Lwt.return_none
 

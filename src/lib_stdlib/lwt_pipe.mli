@@ -25,7 +25,7 @@
 
 (** Data queues similar to the [Pipe] module in Jane Street's [Async]
     library. They are implemented with [Queue]s, limited in size, and
-    use lwt primitives for concurrent access. *)
+    use Lwt primitives for concurrent access. *)
 
 (** Type of queues holding values of type ['a]. *)
 type 'a t
@@ -37,32 +37,35 @@ type 'a t
     When no [size] argument is provided, the queue is unbounded. *)
 val create : ?size:int * ('a -> int) -> unit -> 'a t
 
-(** [push q v] is a thread that blocks while [q] contains more
+(** [push q v] is a promise that blocks while [q] contains more
     than [size] elements, then adds [v] at the end of [q]. *)
 val push : 'a t -> 'a -> unit Lwt.t
 
-(** [pop q] is a thread that blocks while [q] is empty, then
+(** [pop q] is a promise that blocks while [q] is empty, then
     removes and returns the first element in [q]. *)
 val pop : 'a t -> 'a Lwt.t
 
-(** [pop t q] is a thread that blocks while [q] is empty, then
-    removes and returns the first element [v] in [q] and
-    to return [Some v], unless no message could be popped
-    in [t] seconds, in which case it returns [None].
+(** [pop_with_timeout t q] is a promise that blocks while [q] is empty, then
+    removes the first element [v] in [q] and returns [Some v].
+
+    If no message can be popped before [t] resolves, it returns [None].
     As concurrent readers are allowed, [None] does not
-    necessarily mean that no value has been pushed. *)
+    necessarily mean that no value has been pushed.
+
+    [t] is canceled (i.e., it fails with [Canceled]) if an element is returned.
+*)
 val pop_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 
-(** [pop_all q] is a thread that blocks while [q] is empty, then
-    removes and returns all the element in [q] (in the order they
+(** [pop_all q] is a promise that blocks while [q] is empty, then
+    removes and returns all the elements in [q] (in the order in which they
     were inserted). *)
 val pop_all : 'a t -> 'a list Lwt.t
 
-(** [pop_all_now q] returns all the element in [q] (in the order they
-    were inserted), or [[]] if [q] is empty. *)
+(** [pop_all_now q] removes and returns all the element in [q] (in the order in
+    which they were inserted). If [q] is empty, [[]] is returned. *)
 val pop_all_now : 'a t -> 'a list
 
-(** [peek] is like [pop] except it does not removes the first
+(** [peek q] returns the same value as [pop q] but does not remove the first
     element. *)
 val peek : 'a t -> 'a Lwt.t
 
@@ -70,32 +73,36 @@ val peek : 'a t -> 'a Lwt.t
     or [[]] if empty. *)
 val peek_all : 'a t -> 'a list
 
-(** [values_available] is like [peek] but it ignores the value
-    returned. *)
+(** [values_available q] is a promise that blocks while [q] is empty. *)
 val values_available : 'a t -> unit Lwt.t
 
-(** [push_now q v] adds [v] at the ends of [q] immediately and returns
-    [false] if [q] is currently full, [true] otherwise. *)
+(** [push_now q v] either
+    - adds [v] at the ends of [q] immediately and returns [true], or
+    - if [q] is full, returns [false]. *)
 val push_now : 'a t -> 'a -> bool
 
 exception Full
 
-(** [push_now q v] adds [v] at the ends of [q] immediately or
-    raise [Full] if [q] is currently full. *)
+(** [push_now q v] either
+    - adds [v] at the ends of [q] immediately, or
+    - if [q] is full, raises [Full].
+
+    @raise [Full] if [q] does not have enough space to hold [v]. *)
 val push_now_exn : 'a t -> 'a -> unit
 
-(** [safe_push_now q v] may adds [v] at the ends of [q]. It does
-    nothing if the queue is fulled or closed. *)
+(** [safe_push_now q v] may or may not add [v] at the ends of [q]. *)
 val safe_push_now : 'a t -> 'a -> unit
 
-(** [pop_now q] maybe removes and returns the first element in [q] if
+(** [pop_now q] may remove and return the first element in [q] if
     [q] contains at least one element. *)
 val pop_now : 'a t -> 'a option
 
 exception Empty
 
 (** [pop_now_exn q] removes and returns the first element in [q] if
-    [q] contains at least one element, or raise [Empty] otherwise. *)
+    [q] contains at least one element, or raise [Empty] otherwise.
+
+    @raise [Empty] if [q] holds no elements. *)
 val pop_now_exn : 'a t -> 'a
 
 (** [length q] is the number of elements in [q]. *)
@@ -104,7 +111,7 @@ val length : 'a t -> int
 (** [is_empty q] is [true] if [q] is empty, [false] otherwise. *)
 val is_empty : 'a t -> bool
 
-(** [empty q] returns when [q] becomes empty. *)
+(** [empty q] is a promise that resolves when [q] becomes empty. *)
 val empty : 'a t -> unit Lwt.t
 
 (** [iter q ~f] pops all elements of [q] and applies [f] on them. *)
@@ -112,14 +119,14 @@ val iter : 'a t -> f:('a -> unit Lwt.t) -> unit Lwt.t
 
 exception Closed
 
-(** [close q] the write end of [q]:
+(** [close q] the write-end of [q]:
 
     * Future write attempts will fail with [Closed].
     * If there are reads blocked, they will unblock and fail with [Closed].
     * Future read attempts will drain the data until there is no data left.
 
     Thus, after a pipe has been closed, reads never block.
-    Close is idempotent.
+    The [close] function is idempotent.
 *)
 val close : 'a t -> unit
 

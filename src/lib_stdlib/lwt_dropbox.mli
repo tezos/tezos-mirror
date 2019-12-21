@@ -28,34 +28,46 @@
 (** Type of dropbox holding a value of type ['a] *)
 type 'a t
 
-(** Create an empty dropbox. *)
-val create : unit -> 'a t
-
-(** Put an element inside the dropbox. If the dropbox was already
-    containing an element, the old element is replaced by the new one.
-
-    @raise [Closed] if the dropbox has been closed with [close]. *)
-val put : 'a t -> 'a -> unit
-
-(** Wait until the dropbox contains an element, then returns the elements.
-    The elements is removed from the dropbox.
-
-    @raise [Closed] if the dropbox has been closed with [close] and is empty. *)
-val take : 'a t -> 'a Lwt.t
-
-(** Like [take] except that it returns [None] after [timeout seconds]
-    if the dropbox is still empty. *)
-val take_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
-
-(** Read the current element of the dropbox without removing it. It
-    immediately returns [None] if the dropbox is empty. *)
-val peek : 'a t -> 'a option
-
 (** The exception returned when trying to access a 'closed' dropbox. *)
 exception Closed
 
-(** Close the dropbox. It terminates all the waiting reader with the
-    exception [Closed]. All further read or write will also immediately
+(** Create an empty dropbox. *)
+val create : unit -> 'a t
+
+(** [put t e] puts the element [e] inside the dropbox [t]. If the dropbox
+    already held an element, the old element is discarded and replaced by the
+    new one.
+
+    @raise [Close] if [close t] has been called. *)
+val put : 'a t -> 'a -> unit
+
+(** [take t] is a promise that resolves as soon as an element is held by [t].
+    The element is removed from [t] when the promise resolves.
+
+    If [t] already holds an element when [take t] is called, the promise
+    resolves immediately. Otherwise, the promise resolves when an element is
+    [put] there.
+
+    @raise [Close] if [close t] has been called. *)
+val take : 'a t -> 'a Lwt.t
+
+(** [take_with_timeout timeout t] behaves like [take t] except that it returns
+    [None] if [timeout] resolves before an element is [put].
+
+    Note that [timeout] is canceled (i.e., fails with [Canceled]) if an element
+    is [put] in time (or if one is already present).
+
+    @raise [Close] if [close t] has been called. *)
+val take_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
+
+(** [peek t] is [Some e] if [t] holds [e] and [None] if [t] does not hold any
+    element.
+
+    @raise [Close] if [close t] has been called. *)
+val peek : 'a t -> 'a option
+
+(** [close t] closes the dropbox [t]. It terminates all the waiting reader with
+    the exception [Closed]. All further read or write will also immediately
     fail with [Closed], except if the dropbox is not empty when
     [close] is called. In that case, a single (and last) [take] will
     succeed. *)

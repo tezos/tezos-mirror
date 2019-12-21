@@ -49,7 +49,7 @@ let put dropbox elt =
     dropbox.data <- Some elt ;
     notify_put dropbox )
 
-let peek dropbox = dropbox.data
+let peek dropbox = if dropbox.closed then raise Closed else dropbox.data
 
 let close dropbox =
   if not dropbox.closed then (
@@ -59,11 +59,11 @@ let close dropbox =
 let wait_put ~timeout dropbox =
   match dropbox.put_waiter with
   | Some (waiter, _wakener) ->
-      Lwt.choose [timeout; Lwt.protected waiter]
+      Lwt.pick [timeout; Lwt.protected waiter]
   | None ->
       let (waiter, wakener) = Lwt.wait () in
       dropbox.put_waiter <- Some (waiter, wakener) ;
-      Lwt.choose [timeout; Lwt.protected waiter]
+      Lwt.pick [timeout; Lwt.protected waiter]
 
 let rec take dropbox =
   match dropbox.data with
