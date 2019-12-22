@@ -275,7 +275,8 @@ module WriteScheduler = Scheduler (struct
   let pop p =
     Lwt.catch
       (fun () -> Lwt_pipe.pop p >>= return)
-      (fun _ -> fail (Exn Lwt_pipe.Closed))
+      (function
+        | Lwt_pipe.Closed -> fail (Exn Lwt_pipe.Closed) | _ -> assert false)
 
   type out_param = P2p_fd.t
 

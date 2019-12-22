@@ -153,8 +153,8 @@ let create conn point_info peer_info messages canceler callback
 let pipe_exn_handler = function
   | Lwt_pipe.Closed ->
       fail P2p_errors.Connection_closed
-  | _ ->
-      assert false
+  | exc ->
+      Lwt.fail exc
 
 (* see [Lwt_pipe.pop] *)
 
