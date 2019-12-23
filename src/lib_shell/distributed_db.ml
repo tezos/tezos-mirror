@@ -1085,12 +1085,6 @@ let watch_block_header {block_input; _} = Lwt_watcher.create_stream block_input
 let watch_operation {operation_input; _} =
   Lwt_watcher.create_stream operation_input
 
-module Raw = struct
-  let encoding = P2p_message.encoding Message.encoding
-
-  let distributed_db_versions = Message.distributed_db_versions
-end
-
 module Make
     (Table : Distributed_db_functors.DISTRIBUTED_DB) (Kind : sig
       type t

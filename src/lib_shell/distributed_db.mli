@@ -216,11 +216,3 @@ end
 (** Store on disk protocol sources. *)
 val commit_protocol :
   db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t
-
-(**/**)
-
-module Raw : sig
-  val encoding : Message.t P2p_message.t Data_encoding.t
-
-  val distributed_db_versions : Distributed_db_version.t list
-end
