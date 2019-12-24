@@ -1119,7 +1119,7 @@ let commands version () =
               ~long:"force"
               ()))
         ( prefixes ["submit"; "proposals"; "for"]
-        @@ Client_keys.Secret_key.alias_param
+        @@ ContractAlias.destination_param
              ~name:"delegate"
              ~desc:"the delegate who makes the proposal"
         @@ seq_of_param
@@ -1133,147 +1133,156 @@ let commands version () =
                      | Some hash ->
                          return hash))) )
         (fun (dry_run, verbose_signing, force)
-             (src_name, src_sk)
+             (_name, source)
              proposals
              (cctxt : Protocol_client_context.full) ->
-          Client_keys.neuterize src_sk
-          >>=? fun src_pk ->
-          Client_keys.public_key_hash src_pk
-          >>=? fun (src_pkh, _) ->
-          get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun info ->
-          ( match info.current_period_kind with
-          | Proposal ->
-              return_unit
-          | _ ->
-              cctxt#error "Not in a proposal period" )
-          >>=? fun () ->
-          Shell_services.Protocol.list cctxt
-          >>=? fun known_protos ->
-          get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun known_proposals ->
-          Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
-          >>=? fun listings ->
-          (* for a proposal to be valid it must either a protocol that was already
+          match Contract.is_implicit source with
+          | None ->
+              failwith "only implicit accounts can submit proposals"
+          | Some src_pkh -> (
+              Client_keys.get_key cctxt src_pkh
+              >>=? fun (src_name, _src_pk, src_sk) ->
+              get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+              >>=? fun info ->
+              ( match info.current_period_kind with
+              | Proposal ->
+                  return_unit
+              | _ ->
+                  cctxt#error "Not in a proposal period" )
+              >>=? fun () ->
+              Shell_services.Protocol.list cctxt
+              >>=? fun known_protos ->
+              get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
+              >>=? fun known_proposals ->
+              Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
+              >>=? fun listings ->
+              (* for a proposal to be valid it must either a protocol that was already
            proposed by somebody else or a protocol known by the node, because
            the user is the first proposer and just injected it with
            tezos-admin-client *)
-          let check_proposals proposals : bool tzresult Lwt.t =
-            let n = List.length proposals in
-            let errors = ref [] in
-            let error ppf =
-              Format.kasprintf (fun s -> errors := s :: !errors) ppf
-            in
-            if n = 0 then error "Empty proposal list." ;
-            if n > Constants.fixed.max_proposals_per_delegate then
-              error
-                "Too many proposals: %d > %d."
-                n
-                Constants.fixed.max_proposals_per_delegate ;
-            ( match
-                Base.List.find_all_dups
-                  ~compare:Protocol_hash.compare
-                  proposals
-              with
-            | [] ->
-                ()
-            | dups ->
-                error
-                  "There %s: %a."
-                  ( if List.length dups = 1 then "is a duplicate proposal"
-                  else "are duplicate proposals" )
-                  Format.(
-                    pp_print_list
-                      ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                      Protocol_hash.pp)
-                  dups ) ;
-            List.iter
-              (fun (p : Protocol_hash.t) ->
-                if
-                  List.mem p known_protos
-                  || Environment.Protocol_hash.Map.mem p known_proposals
-                then ()
-                else
+              let check_proposals proposals : bool tzresult Lwt.t =
+                let n = List.length proposals in
+                let errors = ref [] in
+                let error ppf =
+                  Format.kasprintf (fun s -> errors := s :: !errors) ppf
+                in
+                if n = 0 then error "Empty proposal list." ;
+                if n > Constants.fixed.max_proposals_per_delegate then
                   error
-                    "Protocol %a is not a known proposal."
-                    Protocol_hash.pp
-                    p)
-              proposals ;
-            if
-              not
-                (List.exists
-                   (fun (pkh, _) ->
-                     Signature.Public_key_hash.equal pkh src_pkh)
-                   listings)
-            then
-              error
-                "Public-key-hash `%a` from account `%s` does not appear to \
-                 have voting rights."
-                Signature.Public_key_hash.pp
-                src_pkh
-                src_name ;
-            if !errors <> [] then
-              cctxt#message
-                "There %s with the submission:%t"
-                ( if List.length !errors = 1 then "is an issue"
-                else "are issues" )
-                Format.(
-                  fun ppf ->
-                    pp_print_cut ppf () ;
-                    pp_open_vbox ppf 0 ;
-                    List.iter
-                      (fun msg ->
-                        pp_open_hovbox ppf 2 ;
-                        pp_print_string ppf "* " ;
-                        pp_print_text ppf msg ;
-                        pp_close_box ppf () ;
-                        pp_print_cut ppf ())
-                      !errors ;
-                    pp_close_box ppf ())
-              >>= fun () -> return_false
-            else return_true
-          in
-          check_proposals proposals
-          >>=? fun all_valid ->
-          ( if all_valid then cctxt#message "All proposals are valid."
-          else if force then
-            cctxt#message
-              "Some proposals are not valid, but `--force` was used."
-          else cctxt#error "Submission failed because of invalid proposals." )
-          >>= fun () ->
-          submit_proposals
-            ~dry_run
-            ~verbose_signing
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~src_sk
-            src_pkh
-            proposals
-          >>= function
-          | Ok _res ->
-              return_unit
-          | Error errs ->
-              ( match errs with
-              | [ Unregistred_error
-                    (`O [("kind", `String "generic"); ("error", `String msg)])
-                ] ->
+                    "Too many proposals: %d > %d."
+                    n
+                    Constants.fixed.max_proposals_per_delegate ;
+                ( match
+                    Base.List.find_all_dups
+                      ~compare:Protocol_hash.compare
+                      proposals
+                  with
+                | [] ->
+                    ()
+                | dups ->
+                    error
+                      "There %s: %a."
+                      ( if List.length dups = 1 then "is a duplicate proposal"
+                      else "are duplicate proposals" )
+                      Format.(
+                        pp_print_list
+                          ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                          Protocol_hash.pp)
+                      dups ) ;
+                List.iter
+                  (fun (p : Protocol_hash.t) ->
+                    if
+                      List.mem p known_protos
+                      || Environment.Protocol_hash.Map.mem p known_proposals
+                    then ()
+                    else
+                      error
+                        "Protocol %a is not a known proposal."
+                        Protocol_hash.pp
+                        p)
+                  proposals ;
+                if
+                  not
+                    (List.exists
+                       (fun (pkh, _) ->
+                         Signature.Public_key_hash.equal pkh src_pkh)
+                       listings)
+                then
+                  error
+                    "Public-key-hash `%a` from account `%s` does not appear \
+                     to have voting rights."
+                    Signature.Public_key_hash.pp
+                    src_pkh
+                    src_name ;
+                if !errors <> [] then
                   cctxt#message
-                    "Error:@[<hov>@.%a@]"
-                    Format.pp_print_text
-                    ( String.split_on_char ' ' msg
-                    |> List.filter (function "" | "\n" -> false | _ -> true)
-                    |> String.concat " "
-                    |> String.map (function '\n' | '\t' -> ' ' | c -> c) )
-              | el ->
-                  cctxt#message "Error:@ %a" pp_print_error el )
-              >>= fun () -> failwith "Failed to submit proposals");
+                    "There %s with the submission:%t"
+                    ( if List.length !errors = 1 then "is an issue"
+                    else "are issues" )
+                    Format.(
+                      fun ppf ->
+                        pp_print_cut ppf () ;
+                        pp_open_vbox ppf 0 ;
+                        List.iter
+                          (fun msg ->
+                            pp_open_hovbox ppf 2 ;
+                            pp_print_string ppf "* " ;
+                            pp_print_text ppf msg ;
+                            pp_close_box ppf () ;
+                            pp_print_cut ppf ())
+                          !errors ;
+                        pp_close_box ppf ())
+                  >>= fun () -> return_false
+                else return_true
+              in
+              check_proposals proposals
+              >>=? fun all_valid ->
+              ( if all_valid then cctxt#message "All proposals are valid."
+              else if force then
+                cctxt#message
+                  "Some proposals are not valid, but `--force` was used."
+              else
+                cctxt#error "Submission failed because of invalid proposals."
+              )
+              >>= fun () ->
+              submit_proposals
+                ~dry_run
+                ~verbose_signing
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~src_sk
+                src_pkh
+                proposals
+              >>= function
+              | Ok _res ->
+                  return_unit
+              | Error errs ->
+                  ( match errs with
+                  | [ Unregistred_error
+                        (`O
+                          [("kind", `String "generic"); ("error", `String msg)])
+                    ] ->
+                      cctxt#message
+                        "Error:@[<hov>@.%a@]"
+                        Format.pp_print_text
+                        ( String.split_on_char ' ' msg
+                        |> List.filter (function
+                               | "" | "\n" ->
+                                   false
+                               | _ ->
+                                   true)
+                        |> String.concat " "
+                        |> String.map (function '\n' | '\t' -> ' ' | c -> c) )
+                  | el ->
+                      cctxt#message "Error:@ %a" pp_print_error el )
+                  >>= fun () -> failwith "Failed to submit proposals" ));
       command
         ~group
         ~desc:"Submit a ballot"
         (args2 verbose_signing_switch dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
-        @@ Client_keys.Secret_key.alias_param
+        @@ ContractAlias.destination_param
              ~name:"delegate"
              ~desc:"the delegate who votes"
         @@ param
@@ -1303,33 +1312,36 @@ let commands version () =
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
         (fun (verbose_signing, dry_run)
-             (_, src_sk)
+             (_name, source)
              proposal
              ballot
              (cctxt : Protocol_client_context.full) ->
-          Client_keys.neuterize src_sk
-          >>=? fun src_pk ->
-          Client_keys.public_key_hash src_pk
-          >>=? fun (src_pkh, _) ->
-          get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun info ->
-          ( match info.current_period_kind with
-          | Testing_vote | Promotion_vote ->
-              return_unit
-          | _ ->
-              cctxt#error "Not in a Testing_vote or Promotion_vote period" )
-          >>=? fun () ->
-          submit_ballot
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~src_sk
-            src_pkh
-            ~verbose_signing
-            ~dry_run
-            proposal
-            ballot
-          >>=? fun _res -> return_unit);
+          match Contract.is_implicit source with
+          | None ->
+              failwith "only implicit accounts can submit ballot"
+          | Some src_pkh ->
+              Client_keys.get_key cctxt src_pkh
+              >>=? fun (_src_name, _src_pk, src_sk) ->
+              get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+              >>=? fun info ->
+              ( match info.current_period_kind with
+              | Testing_vote | Promotion_vote ->
+                  return_unit
+              | _ ->
+                  cctxt#error "Not in a Testing_vote or Promotion_vote period"
+              )
+              >>=? fun () ->
+              submit_ballot
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~src_sk
+                src_pkh
+                ~verbose_signing
+                ~dry_run
+                proposal
+                ballot
+              >>=? fun _res -> return_unit);
       command
         ~group
         ~desc:"Summarize the current voting period"
