@@ -90,7 +90,8 @@ exception Full
     @raise [Full] if [q] does not have enough space to hold [v]. *)
 val push_now_exn : 'a t -> 'a -> unit
 
-(** [safe_push_now q v] may or may not add [v] at the ends of [q]. *)
+(** [safe_push_now q v] adds [v] to [q] if [q] is not [Closed] and has enough
+    space available, otherwise it does nothing. *)
 val safe_push_now : 'a t -> 'a -> unit
 
 (** [pop_now q] may remove and return the first element in [q] if

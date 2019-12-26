@@ -127,7 +127,7 @@ exception Full
 
 let push_now_exn q elt = if not (push_now q elt) then raise Full
 
-let safe_push_now q elt = try push_now_exn q elt with _ -> ()
+let safe_push_now q elt = try push_now_exn q elt with Full | Closed -> ()
 
 let rec pop ({closed; queue; empty; current_size; _} as q) =
   if not (Queue.is_empty queue) then (
