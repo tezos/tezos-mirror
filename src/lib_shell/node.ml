@@ -108,7 +108,7 @@ let connection_metadata_cfg cfg : _ P2p_params.conn_meta_config =
   {
     conn_meta_encoding = Connection_metadata.encoding;
     private_node = (fun {private_node; _} -> private_node);
-    conn_meta_value = (fun _ -> cfg);
+    conn_meta_value = (fun () -> cfg);
   }
 
 let init_connection_metadata opt =

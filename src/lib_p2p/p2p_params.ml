@@ -47,7 +47,7 @@ type 'peer_meta peer_meta_config = {
 (** Metadata for a connection. *)
 type 'conn_meta conn_meta_config = {
   conn_meta_encoding : 'conn_meta Data_encoding.t;
-  conn_meta_value : P2p_peer.Id.t -> 'conn_meta;  (** Constructor *)
+  conn_meta_value : unit -> 'conn_meta;  (** Constructor *)
   private_node : 'conn_meta -> bool;
       (** Returns true if peer at the other end of the connection is in private
       mode *)

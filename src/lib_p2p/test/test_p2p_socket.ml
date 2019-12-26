@@ -55,7 +55,7 @@ type metadata = unit
 let conn_meta_config : metadata P2p_params.conn_meta_config =
   {
     conn_meta_encoding = Data_encoding.empty;
-    conn_meta_value = (fun _ -> ());
+    conn_meta_value = (fun () -> ());
     private_node = (fun _ -> false);
   }
 

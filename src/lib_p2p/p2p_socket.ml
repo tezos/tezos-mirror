@@ -324,9 +324,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
     Crypto_box.generate_nonces ~incoming ~sent_msg ~recv_msg
   in
   let cryptobox_data = {Crypto.channel_key; local_nonce; remote_nonce} in
-  let local_metadata =
-    metadata_config.P2p_params.conn_meta_value remote_peer_id
-  in
+  let local_metadata = metadata_config.P2p_params.conn_meta_value () in
   Metadata.write ~canceler metadata_config fd cryptobox_data local_metadata
   >>=? fun () ->
   Metadata.read ~canceler metadata_config fd cryptobox_data
