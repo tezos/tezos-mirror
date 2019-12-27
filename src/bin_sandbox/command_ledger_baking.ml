@@ -33,7 +33,7 @@ let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 let assert_ a = if a then return () else failf "Assertion failed"
 
 let assert_eq to_string ~expected ~actual =
-  if expected = actual then return ()
+  if Poly.equal expected actual then return ()
   else
     failf
       "Assertion failed: expected %s but got %s"
@@ -84,8 +84,8 @@ let assert_hwms state ~client ~uri ~main ~test =
   >>= fun () ->
   Tezos_client.Ledger.get_hwm state ~client ~uri
   >>= fun {main = main_actual; test = test_actual; _} ->
-  assert_eq string_of_int ~actual:main_actual ~expected:main
-  >>= fun () -> assert_eq string_of_int ~actual:test_actual ~expected:test
+  assert_eq Int.to_string ~actual:main_actual ~expected:main
+  >>= fun () -> assert_eq Int.to_string ~actual:test_actual ~expected:test
 
 let get_chain_id state ~client =
   Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id"
@@ -115,7 +115,7 @@ let forge_endorsement state ~client ~chain_id ~level () =
           `A
             [ `O
                 [ ("kind", `String "endorsement");
-                  ("level", `Float (float_of_int level)) ] ] ) ]
+                  ("level", `Float (Float.of_int level)) ] ] ) ]
   in
   Tezos_client.rpc
     state
@@ -144,11 +144,11 @@ let forge_delegation state ~client ~src ~dest ?(fee = 0.00126) () =
                 [ ("kind", `String "delegation");
                   ("source", `String src);
                   ( "fee",
-                    `String (string_of_int (int_of_float (fee *. 1000000.))) );
-                  ("counter", `String (string_of_int 30713));
-                  ("gas_limit", `String (string_of_int 10100));
+                    `String (Int.to_string (Int.of_float (fee *. 1000000.))) );
+                  ("counter", `String (Int.to_string 30713));
+                  ("gas_limit", `String (Int.to_string 10100));
                   ("delegate", `String dest);
-                  ("storage_limit", `String (string_of_int 277)) ] ] ) ]
+                  ("storage_limit", `String (Int.to_string 277)) ] ] ) ]
   in
   Tezos_client.rpc
     state
@@ -182,11 +182,11 @@ let originate_account_from state ~client ~account =
       "for";
       Tezos_protocol.Account.name account;
       "transferring";
-      string_of_int 1000;
+      Int.to_string 1000;
       "from";
       Tezos_protocol.Account.name account;
       "--burn-cap";
-      string_of_float 0.257 ]
+      Float.to_string 0.257 ]
   >>= fun _ -> return orig_account_name
 
 let setup_baking_ledger state uri ~client ~protocol =
@@ -400,7 +400,7 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     assert_eq (fun x -> x) ~expected:thisNonce1 ~actual:thisNonce2
     >>= fun () ->
     assert_eq (fun x -> x) ~expected:thatNonce1 ~actual:thatNonce2
-    >>= fun () -> assert_ (thisNonce1 <> thatNonce1)
+    >>= fun () -> assert_ Poly.(thisNonce1 <> thatNonce1)
   else return () )
   >>= fun () ->
   assert_failure
@@ -486,37 +486,46 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
         "endorsing after deauthorization should fail"
         endorse
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure
-        (fun uri
-             node_exec
-             client_exec
-             admin_exec
-             size
-             (`Base_port base_port)
-             no_deterministic_nonce_tests
-             protocol
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"ledger-baking"
+      ()
+  in
+  let docs = Manpage_builder.section_test_scenario base_state in
+  let term =
+    pure
+      (fun uri
+           node_exec
+           client_exec
+           admin_exec
+           size
+           (`Base_port base_port)
+           no_deterministic_nonce_tests
+           protocol
+           state
+           ->
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (Interactive_test.Pauser.run_test
+             ~pp_error
              state
-             ->
-          ( state,
-            Interactive_test.Pauser.run_test
-              ~pp_error
-              state
-              (run
-                 state
-                 ~protocol
-                 ~node_exec
-                 ~size
-                 ~admin_exec
-                 ~base_port
-                 ~client_exec
-                 ~enable_deterministic_nonce_tests:
-                   (not no_deterministic_nonce_tests)
-                 ~uri) ))
+             (run
+                state
+                ~protocol
+                ~node_exec
+                ~size
+                ~admin_exec
+                ~base_port
+                ~client_exec
+                ~enable_deterministic_nonce_tests:
+                  (not no_deterministic_nonce_tests)
+                ~uri)))
     $ Arg.(
         required
           (pos
@@ -524,24 +533,33 @@ let cmd ~pp_error () =
              (some string)
              None
              (info [] ~docv:"LEDGER-URI" ~doc:"ledger:// URI")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Admin "tezos"
-    $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network")))
+    $ Tezos_executable.cli_term base_state `Node "tezos"
+    $ Tezos_executable.cli_term base_state `Client "tezos"
+    $ Tezos_executable.cli_term base_state `Admin "tezos"
+    $ Arg.(
+        value (opt int 5 (info ["size"; "S"] ~docs ~doc:"Size of the Network")))
     $ Arg.(
         pure (fun p -> `Base_port p)
         $ value
             (opt
                int
                46_000
-               (info ["base-port"; "P"] ~doc:"Base port number to build upon")))
+               (info
+                  ["base-port"; "P"]
+                  ~docs
+                  ~doc:"Base port number to build upon")))
     $ Arg.(
         value
           (flag
              (info
                 ["no-deterministic-nonce-tests"]
+                ~docs
                 ~doc:"Disable tests for deterministic nonces")))
-    $ Tezos_protocol.cli_term ()
-    $ Test_command_line.cli_state ~name:"ledger-baking" () )
-    (let doc = "Interactive test exercising the Ledger Baking app features" in
-     info ~doc "ledger-baking")
+    $ Tezos_protocol.cli_term base_state
+    $ Test_command_line.cli_state ~name:"ledger-baking" ()
+  in
+  let info =
+    let doc = "Interactive test exercising the Ledger Baking app features" in
+    info ~doc "ledger-baking"
+  in
+  (term, info)

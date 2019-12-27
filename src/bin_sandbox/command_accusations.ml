@@ -22,7 +22,8 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
         time_between_blocks = [block_interval; 0];
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if List.exists bakers ~f:(fun baker -> n = fst baker) then (n, v)
+              if List.exists bakers ~f:(fun baker -> Poly.equal n (fst baker))
+              then (n, v)
               else (n, 1_000L));
       },
       bakers )
@@ -30,7 +31,18 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
   let net_size = 3 in
   let topology = Test_scenario.Topology.(mesh "Simple" net_size) in
   let all_nodes =
-    Test_scenario.Topology.build ~protocol ~exec:node_exec topology ?base_port
+    Test_scenario.Topology.build
+      topology
+      ?base_port
+      ~make_node:(fun id ~expected_connections ~rpc_port ~p2p_port peers ->
+        Tezos_node.make
+          ~exec:node_exec
+          ~protocol
+          id
+          ~expected_connections
+          ~rpc_port
+          ~p2p_port
+          peers)
   in
   Helpers.dump_connections state all_nodes
   >>= fun () ->
@@ -42,7 +54,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
   Test_scenario.Network.(start_up state ~client_exec (make all_nodes))
   >>= fun () ->
   let baker nth_node =
-    let nth_baker = nth_node mod List.length baker_list in
+    let nth_baker = nth_node % List.length baker_list in
     let key_name = sprintf "b%d" nth_baker in
     let node = List.nth_exn all_nodes nth_node in
     let client = Tezos_client.of_node node ~exec:client_exec in
@@ -82,7 +94,7 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
         kiln_config
         ~peers:
           (List.map all_nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
-        ~sandbox_json:(Tezos_protocol.sandbox_path ~config:state protocol)
+        ~sandbox_json:(Tezos_protocol.sandbox_path state protocol)
         ~nodes:
           (List.map all_nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port))
@@ -299,6 +311,7 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
   >>= fun () -> say state EF.(af "Test done.")
 
 let find_endorsement_in_mempool state ~client =
+  let open Poly in
   Helpers.wait_for state ~attempts:4 ~seconds:2. (fun _ ->
       Tezos_client.find_applied_in_mempool state ~client ~f:(fun o ->
           Jqo.field o ~k:"contents"
@@ -327,8 +340,8 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
   (* 2 bakers ⇒ baker_0 and baker_2 are for the same key on ≠ nodes *)
   assert (
     Tezos_client.Keyed.(
-      baker_0.key_name = baker_2.key_name
-      && baker_0.secret_key = baker_2.secret_key) ) ;
+      String.equal baker_0.key_name baker_2.key_name
+      && String.equal baker_0.secret_key baker_2.secret_key) ) ;
   let node_0 = List.nth_exn all_nodes 0 in
   let node_1 = List.nth_exn all_nodes 1 in
   let node_2 = List.nth_exn all_nodes 2 in
@@ -491,7 +504,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
         time_between_blocks = [block_interval; block_interval * 2];
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if n = fst baker then (n, v) else (n, 1_000L));
+              if Poly.(n = fst baker) then (n, v) else (n, 1_000L));
       },
       baker )
   in
@@ -500,7 +513,18 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
       net_in_the_middle "AT-" (mesh "Mid" 3) (mesh "Main" 4) (mesh "Acc" 4))
   in
   let (mesh_nodes, intermediary_nodes, accuser_nodes) =
-    Test_scenario.Topology.build ~protocol ~exec:node_exec topology ~base_port
+    Test_scenario.Topology.build
+      topology
+      ~base_port
+      ~make_node:(fun id ~expected_connections ~rpc_port ~p2p_port peers ->
+        Tezos_node.make
+          ~exec:node_exec
+          ~protocol
+          id
+          ~expected_connections
+          ~rpc_port
+          ~p2p_port
+          peers)
   in
   let all_nodes = mesh_nodes @ intermediary_nodes @ accuser_nodes in
   Helpers.dump_connections state all_nodes
@@ -510,7 +534,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
   let start_accuser nod =
     let client = Tezos_client.of_node nod ~exec:client_exec in
     let acc = Tezos_daemon.accuser_of_node ~exec:accuser_exec ~client nod in
-    Running_processes.start state (Tezos_daemon.process acc ~state)
+    Running_processes.start state (Tezos_daemon.process state acc)
     >>= fun _ -> return ()
   in
   List_sequential.iter accuser_nodes ~f:start_accuser
@@ -661,7 +685,9 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
       prev >>= fun () -> Helpers.restart_node state ~client_exec x)
   >>= fun () ->
   let node_0 = List.nth_exn mesh_nodes 0 in
-  let except_0 l = List.filter l ~f:Tezos_node.(fun n -> n.id <> node_0.id) in
+  let except_0 l =
+    List.filter l ~f:Tezos_node.(fun n -> Poly.(n.id <> node_0.id))
+  in
   List_sequential.iter
     (except_0 mesh_nodes)
     ~f:(Helpers.restart_node state ~client_exec)
@@ -733,9 +759,17 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
     all_nodes
     (`At_least (starting_level + number_of_lonely_bakes + 1))
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"mininet"
+      ()
+  in
+  let docs = Manpage_builder.section_test_scenario base_state in
   let pf fmt = ksprintf (fun s -> `P s) fmt in
   let tests =
     let test variant name title man = (variant, name, title, man) in
@@ -762,68 +796,70 @@ let cmd ~pp_error () =
             double endorse and $(i,manually) inserts a double-baking \
             accusation.") ]
   in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure
-        (fun test
-             base_port
-             (`Starting_level starting_level)
-             bnod
-             bcli
-             accex
-             generate_kiln_config
-             protocol
-             state
-             ->
-          let checks () =
-            let acc = if test = `With_accusers then [accex] else [] in
-            Helpers.System_dependencies.precheck
-              state
-              `Or_fail
-              ~executables:(acc @ [bnod; bcli])
-          in
-          let actual_test () =
-            match test with
-            | `With_accusers ->
-                checks ()
-                >>= fun () ->
-                with_accusers ~state bnod accex bcli ~base_port () ~protocol
-            | `Simple_double_baking ->
-                checks ()
-                >>= fun () ->
-                simple_double_baking
-                  ~state
-                  bnod
-                  bcli
-                  ~base_port
-                  ?generate_kiln_config
-                  ~starting_level
-                  ~protocol
-                  ()
-            | `Simple_double_endorsing ->
-                checks ()
-                >>= fun () ->
-                simple_double_endorsement
-                  ~state
-                  bnod
-                  bcli
-                  ~base_port
-                  ?generate_kiln_config
-                  ~starting_level
-                  ~protocol
-                  ()
-          in
-          (state, Interactive_test.Pauser.run_test ~pp_error state actual_test))
+  let term =
+    pure
+      (fun test
+           base_port
+           (`Starting_level starting_level)
+           bnod
+           bcli
+           accex
+           generate_kiln_config
+           protocol
+           state
+           ->
+        let checks () =
+          let acc = if Poly.(test = `With_accusers) then [accex] else [] in
+          Helpers.System_dependencies.precheck
+            state
+            `Or_fail
+            ~executables:(acc @ [bnod; bcli])
+        in
+        let actual_test () =
+          match test with
+          | `With_accusers ->
+              checks ()
+              >>= fun () ->
+              with_accusers ~state bnod accex bcli ~base_port () ~protocol
+          | `Simple_double_baking ->
+              checks ()
+              >>= fun () ->
+              simple_double_baking
+                ~state
+                bnod
+                bcli
+                ~base_port
+                ?generate_kiln_config
+                ~starting_level
+                ~protocol
+                ()
+          | `Simple_double_endorsing ->
+              checks ()
+              >>= fun () ->
+              simple_double_endorsement
+                ~state
+                bnod
+                bcli
+                ~base_port
+                ?generate_kiln_config
+                ~starting_level
+                ~protocol
+                ()
+        in
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (Interactive_test.Pauser.run_test ~pp_error state actual_test))
     $ Arg.(
         required
           (pos
              0
              (some (enum (List.map tests ~f:(fun (v, n, _, _) -> (n, v)))))
              None
-             (info [] ~docv:"TEST-NAME" ~doc:"Choose which test to run.")))
+             (info [] ~docs ~docv:"TEST-NAME" ~doc:"Choose which test to run.")))
     $ Arg.(
         value & opt int 30_000
-        & info ["base-port"] ~doc:"Base port number to build upon.")
+        & info ["base-port"] ~docs ~doc:"Base port number to build upon.")
     $ Arg.(
         pure (fun l -> `Starting_level l)
         $ value
@@ -831,25 +867,30 @@ let cmd ~pp_error () =
                int
                5
                (info
+                  ~docs
                   ["starting-level"]
                   ~doc:
                     "Initial block-level to reach before actually starting \
                      the test.")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Accuser "tezos"
-    $ Kiln.Configuration_directory.cli_term ()
-    $ Tezos_protocol.cli_term ()
-    $ Test_command_line.cli_state ~name:"accusing" () )
-    (let doc = "Sandbox networks which record double-bakings." in
-     let man : Manpage.block list =
-       [ `S "ACCUSATION TESTS";
-         pf
-           "This command provides %d tests which use network sandboxes to \
-            make double-bakings and double-endorsements happen."
-           (List.length tests);
-         `Blocks
-           (List.map tests ~f:(fun (_, n, tit, m) ->
-                `Blocks [pf "* $(b,`%s`): $(i,%s)." n tit; `Noblank; m])) ]
-     in
-     info ~man ~doc "accusations")
+    $ Tezos_executable.cli_term base_state `Node "tezos"
+    $ Tezos_executable.cli_term base_state `Client "tezos"
+    $ Tezos_executable.cli_term base_state `Accuser "tezos"
+    $ Kiln.Configuration_directory.cli_term base_state
+    $ Tezos_protocol.cli_term base_state
+    $ Test_command_line.cli_state ~name:"accusing" ()
+  in
+  let info =
+    let doc = "Sandbox networks which record double-bakings." in
+    let man : Manpage.block list =
+      [ `S "ACCUSATION TESTS";
+        pf
+          "This command provides %d tests which use network sandboxes to make \
+           double-bakings and double-endorsements happen."
+          (List.length tests);
+        `Blocks
+          (List.map tests ~f:(fun (_, n, tit, m) ->
+               `Blocks [pf "* $(b,`%s`): $(i,%s)." n tit; `Noblank; m])) ]
+    in
+    info ~man ~doc "accusations"
+  in
+  (term, info)

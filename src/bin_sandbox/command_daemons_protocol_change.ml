@@ -36,7 +36,7 @@ let wait_for_voting_period ?level_within_period state ~client ~attempts period
           with e ->
             failf
               "Cannot get level.voting_period_position: %s"
-              (Printexc.to_string e))
+              (Exn.to_string e))
       >>= fun lvl_ok ->
       Tezos_client.rpc
         state
@@ -44,8 +44,9 @@ let wait_for_voting_period ?level_within_period state ~client ~attempts period
         `Get
         ~path:"/chains/main/blocks/head/votes/current_period_kind"
       >>= function
-      | `String p when p = period_name && (lvl_ok = None || lvl_ok = Some true)
-        ->
+      | `String p
+        when String.equal p period_name
+             && Poly.(lvl_ok = None || lvl_ok = Some true) ->
           return (`Done (nth - 1))
       | _ ->
           Tezos_client.successful_client_cmd
@@ -114,12 +115,12 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             ~name_tag:"second" ])
   in
   List_sequential.iter accusers ~f:(fun acc ->
-      Running_processes.start state (Tezos_daemon.process acc ~state)
+      Running_processes.start state (Tezos_daemon.process state acc)
       >>= fun _ -> return ())
   >>= fun () ->
   let keys_and_daemons =
     let pick_a_node_and_client idx =
-      match List.nth nodes ((1 + idx) mod List.length nodes) with
+      match List.nth nodes ((1 + idx) % List.length nodes) with
       | Some node ->
           (node, Tezos_client.of_node node ~exec:client_exec)
       | None ->
@@ -160,10 +161,10 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
                      ~key ] ))
   in
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
-      Tezos_client.bootstrapped ~state client
+      Tezos_client.wait_for_node_bootstrap state client
       >>= fun () ->
       let (key, priv) = Tezos_protocol.Account.(name acc, private_key acc) in
-      Tezos_client.import_secret_key ~state client key priv
+      Tezos_client.import_secret_key state client ~name:key ~key:priv
       >>= fun () ->
       say
         state
@@ -173,7 +174,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             [ desc (af "Client:") (af "%S" client.Tezos_client.id);
               desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
-      Tezos_client.register_as_delegate ~state client key
+      Tezos_client.register_as_delegate state client ~key_name:key
       >>= fun () ->
       say
         state
@@ -184,7 +185,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
               desc (af "Key:") (af "%S" key) ])
       >>= fun () ->
       List_sequential.iter daemons ~f:(fun daemon ->
-          Running_processes.start state (Tezos_daemon.process daemon ~state)
+          Running_processes.start state (Tezos_daemon.process state daemon)
           >>= fun _ -> return ()))
   >>= fun () ->
   let client_0 =
@@ -215,14 +216,18 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
           failf
             "Cannot parse %s/TEZOS_PROTOCOL: %s"
             new_protocol_path
-            (Printexc.to_string e) )
+            (Exn.to_string e) )
       >>= fun hash ->
       let client = Tezos_client.of_node ~exec:client_exec nod in
       Tezos_client.rpc state ~client `Get ~path:"/protocols"
       >>= fun protocols ->
       match protocols with
       | `A l
-        when List.exists l ~f:(function `String h -> h = hash | _ -> false) ->
+        when List.exists l ~f:(function
+                 | `String h ->
+                     String.equal h hash
+                 | _ ->
+                     false) ->
           Console.say
             state
             EF.(
@@ -238,7 +243,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             state
             ~path:new_protocol_path
           >>= fun (_, new_protocol_hash) ->
-          ( if new_protocol_hash = hash then
+          ( if String.equal new_protocol_hash hash then
             Console.say
               state
               EF.(
@@ -264,7 +269,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         state
         kiln_config
         ~peers:(List.map nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
-        ~sandbox_json:(Tezos_protocol.sandbox_path ~config:state protocol)
+        ~sandbox_json:(Tezos_protocol.sandbox_path state protocol)
         ~nodes:
           (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
                sprintf "http://localhost:%d" rpc_port))
@@ -453,9 +458,9 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         ~path:"/chains/main/blocks/head/metadata"
       >>= fun json ->
       ( try Jqo.field ~k:"protocol" json |> Jqo.get_string |> return
-        with e -> failf "Cannot parse metadata: %s" (Printexc.to_string e) )
+        with e -> failf "Cannot parse metadata: %s" (Exn.to_string e) )
       >>= fun proto_hash ->
-      if proto_hash <> protocol_to_wait_for then
+      if not (String.equal proto_hash protocol_to_wait_for) then
         return
           (`Not_done
             (sprintf
@@ -473,9 +478,17 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         markdown_verbatim (String.concat ~sep:"\n" res#out) ]
     ~force:true
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"daemons-upgrade"
+      ()
+  in
+  let docs = Manpage_builder.section_test_scenario base_state in
   let variants =
     [ ( "full-upgrade",
         `Full_upgrade,
@@ -485,64 +498,65 @@ let cmd ~pp_error () =
         "Go through the whole voting process but vote Nay at the last period \
          and hence stay on the same protocol." ) ]
   in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure
-        (fun size
-             base_port
-             (`Attempts waiting_attempts)
-             (`External_peers external_peer_ports)
-             (`No_daemons_for no_daemons_for)
-             protocol
-             node_exec
-             client_exec
-             admin_exec
-             first_baker_exec
-             first_endorser_exec
-             first_accuser_exec
-             second_baker_exec
-             second_endorser_exec
-             second_accuser_exec
-             (`Protocol_path new_protocol_path)
-             (`Extra_dummy_proposals_batch_size
-               extra_dummy_proposals_batch_size)
-             (`Extra_dummy_proposals_batch_levels
-               extra_dummy_proposals_batch_levels)
-             generate_kiln_config
-             test_variant
-             state
-             ->
-          let actual_test =
-            run
-              state
-              ~size
-              ~base_port
-              ~protocol
-              ~node_exec
-              ~client_exec
-              ~first_baker_exec
-              ~first_endorser_exec
-              ~first_accuser_exec
-              ~second_baker_exec
-              ~second_endorser_exec
-              ~second_accuser_exec
-              ~admin_exec
-              ?generate_kiln_config
-              ~external_peer_ports
-              ~no_daemons_for
-              ~new_protocol_path
-              test_variant
-              ~waiting_attempts
-              ~extra_dummy_proposals_batch_size
-              ~extra_dummy_proposals_batch_levels
-          in
-          (state, Interactive_test.Pauser.run_test ~pp_error state actual_test))
+  let term =
+    pure
+      (fun size
+           base_port
+           (`Attempts waiting_attempts)
+           (`External_peers external_peer_ports)
+           (`No_daemons_for no_daemons_for)
+           protocol
+           node_exec
+           client_exec
+           admin_exec
+           first_baker_exec
+           first_endorser_exec
+           first_accuser_exec
+           second_baker_exec
+           second_endorser_exec
+           second_accuser_exec
+           (`Protocol_path new_protocol_path)
+           (`Extra_dummy_proposals_batch_size extra_dummy_proposals_batch_size)
+           (`Extra_dummy_proposals_batch_levels
+             extra_dummy_proposals_batch_levels)
+           generate_kiln_config
+           test_variant
+           state
+           ->
+        let actual_test =
+          run
+            state
+            ~size
+            ~base_port
+            ~protocol
+            ~node_exec
+            ~client_exec
+            ~first_baker_exec
+            ~first_endorser_exec
+            ~first_accuser_exec
+            ~second_baker_exec
+            ~second_endorser_exec
+            ~second_accuser_exec
+            ~admin_exec
+            ?generate_kiln_config
+            ~external_peer_ports
+            ~no_daemons_for
+            ~new_protocol_path
+            test_variant
+            ~waiting_attempts
+            ~extra_dummy_proposals_batch_size
+            ~extra_dummy_proposals_batch_levels
+        in
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (Interactive_test.Pauser.run_test ~pp_error state actual_test))
     $ Arg.(
         value & opt int 5
-        & info ["size"; "S"] ~doc:"Set the size of the network.")
+        & info ["size"; "S"] ~docs ~doc:"Set the size of the network.")
     $ Arg.(
         value & opt int 20_000
-        & info ["base-port"; "P"] ~doc:"Base port number to build upon.")
+        & info ["base-port"; "P"] ~docs ~doc:"Base port number to build upon.")
     $ Arg.(
         pure (fun n -> `Attempts n)
         $ value
@@ -551,6 +565,7 @@ let cmd ~pp_error () =
                60
                (info
                   ["waiting-attempts"]
+                  ~docs
                   ~doc:
                     "Number of attempts done while waiting for voting periods")))
     $ Arg.(
@@ -562,6 +577,7 @@ let cmd ~pp_error () =
                (info
                   ["add-external-peer-port"]
                   ~docv:"PORT-NUMBER"
+                  ~docs
                   ~doc:"Add $(docv) to the peers of the network nodes.")))
     $ Arg.(
         pure (fun l -> `No_daemons_for l)
@@ -572,17 +588,18 @@ let cmd ~pp_error () =
                (info
                   ["no-daemons-for"]
                   ~docv:"ACCOUNT-NAME"
+                  ~docs
                   ~doc:"Do not start daemons for $(docv).")))
-    $ Tezos_protocol.cli_term ()
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Admin "tezos"
-    $ Tezos_executable.cli_term `Baker "first"
-    $ Tezos_executable.cli_term `Endorser "first"
-    $ Tezos_executable.cli_term `Accuser "first"
-    $ Tezos_executable.cli_term `Baker "second"
-    $ Tezos_executable.cli_term `Endorser "second"
-    $ Tezos_executable.cli_term `Accuser "second"
+    $ Tezos_protocol.cli_term base_state
+    $ Tezos_executable.cli_term base_state `Node "tezos"
+    $ Tezos_executable.cli_term base_state `Client "tezos"
+    $ Tezos_executable.cli_term base_state `Admin "tezos"
+    $ Tezos_executable.cli_term base_state `Baker "first"
+    $ Tezos_executable.cli_term base_state `Endorser "first"
+    $ Tezos_executable.cli_term base_state `Accuser "first"
+    $ Tezos_executable.cli_term base_state `Baker "second"
+    $ Tezos_executable.cli_term base_state `Endorser "second"
+    $ Tezos_executable.cli_term base_state `Accuser "second"
     $ Arg.(
         pure (fun p -> `Protocol_path p)
         $ required
@@ -592,6 +609,7 @@ let cmd ~pp_error () =
                None
                (info
                   []
+                  ~docs
                   ~doc:"The protocol to inject and vote on."
                   ~docv:"PROTOCOL-PATH")))
     $ Arg.(
@@ -601,6 +619,7 @@ let cmd ~pp_error () =
                int
                0
                (info
+                  ~docs
                   ["extra-dummy-proposals-batch-size"]
                   ~docv:"NUMBER"
                   ~doc:"Submit $(docv) extra proposals per batch.")))
@@ -612,11 +631,12 @@ let cmd ~pp_error () =
                []
                (info
                   ["extra-dummy-proposals-batch-levels"]
+                  ~docs
                   ~docv:"NUMBER"
                   ~doc:
                     "Set the levels within the proposal period where batches \
                      of extra proposals appear, e.g. `3,5,7`.")))
-    $ Kiln.Configuration_directory.cli_term ()
+    $ Kiln.Configuration_directory.cli_term base_state
     $ Arg.(
         let doc =
           sprintf
@@ -628,39 +648,43 @@ let cmd ~pp_error () =
           (opt
              (enum (List.map variants ~f:(fun (n, v, _) -> (n, v))))
              `Full_upgrade
-             (info ["test-variant"] ~doc)))
-    $ Test_command_line.cli_state ~name:"daemons-upgrade" () )
-    (let doc =
-       "Vote and Protocol-upgrade with bakers, endorsers, and accusers."
-     in
-     let man : Manpage.block list =
-       [ `S "DAEMONS-UPGRADE TEST";
-         `P
-           "This test builds and runs a sandbox network to do a full voting \
-            round followed by a protocol change while all the daemons.";
-         `P
-           (sprintf
-              "There are for now %d variants (see option `--test-variant`):"
-              (List.length variants));
-         `Blocks
-           (List.concat_map variants ~f:(fun (n, _, desc) ->
-                [`Noblank; `P (sprintf "* `%s`: %s" n desc)]));
-         `P "The test is interactive-only:";
-         `Blocks
-           (List.concat_mapi
-              ~f:(fun i s -> [`Noblank; `P (sprintf "%d) %s" (i + 1) s)])
-              [ "It starts a sandbox assuming the protocol of the `--first-*` \
-                 executables (use the `--protocol-hash` option to make sure \
-                 it matches).";
-                "An interactive pause is done to let the user play with the \
-                 `first` protocol.";
-                "Once the user quits the prompt (`q` or `quit` command), a \
-                 full voting round happens with a single proposal: the one at \
-                 `PROTOCOL-PATH` (which should be the one understood by the \
-                 `--second-*` executables).";
-                "Once the potential protocol switch has happened (and been \
-                 verified), the test re-enters an interactive prompt to let \
-                 the user play with the protocol (the first or second one, \
-                 depending on the `--test-variant` option)." ]) ]
-     in
-     info "daemons-upgrade" ~man ~doc)
+             (info ~docs ["test-variant"] ~doc)))
+    $ Test_command_line.cli_state ~name:"daemons-upgrade" ()
+  in
+  let info =
+    let doc =
+      "Vote and Protocol-upgrade with bakers, endorsers, and accusers."
+    in
+    let man : Manpage.block list =
+      [ `S "DAEMONS-UPGRADE TEST";
+        `P
+          "This test builds and runs a sandbox network to do a full voting \
+           round followed by a protocol change while all the daemons.";
+        `P
+          (sprintf
+             "There are for now %d variants (see option `--test-variant`):"
+             (List.length variants));
+        `Blocks
+          (List.concat_map variants ~f:(fun (n, _, desc) ->
+               [`Noblank; `P (sprintf "* `%s`: %s" n desc)]));
+        `P "The test is interactive-only:";
+        `Blocks
+          (List.concat_mapi
+             ~f:(fun i s -> [`Noblank; `P (sprintf "%d) %s" (i + 1) s)])
+             [ "It starts a sandbox assuming the protocol of the `--first-*` \
+                executables (use the `--protocol-hash` option to make sure it \
+                matches).";
+               "An interactive pause is done to let the user play with the \
+                `first` protocol.";
+               "Once the user quits the prompt (`q` or `quit` command), a \
+                full voting round happens with a single proposal: the one at \
+                `PROTOCOL-PATH` (which should be the one understood by the \
+                `--second-*` executables).";
+               "Once the potential protocol switch has happened (and been \
+                verified), the test re-enters an interactive prompt to let \
+                the user play with the protocol (the first or second one, \
+                depending on the `--test-variant` option)." ]) ]
+    in
+    info "daemons-upgrade" ~man ~doc
+  in
+  (term, info)

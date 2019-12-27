@@ -7,8 +7,8 @@ let client_async_cmd state ~client args ~f =
     state
     ~f
     "sh -c %s"
-    ( Tezos_client.client_command client ~state args
-    |> Genspio.Compile.to_one_liner |> Filename.quote )
+    ( Tezos_client.client_command state client args
+    |> Genspio.Compile.to_one_liner |> Caml.Filename.quote )
   >>= fun (status, res) ->
   return
     ( object
@@ -62,7 +62,7 @@ let find_and_print_signature_hash ?(display_expectation = true) state process =
   >>= fun (output, error, _) ->
   return (String.split ~on:'\n' output, String.split ~on:'\n' error)
 
-module MFmt = Experiments.More_fmt
+module MFmt = More_fmt
 
 let failf ?attach fmt =
   ksprintf (fun s -> fail ?attach (`Scenario_error s)) fmt
@@ -166,13 +166,13 @@ let forge_batch_transactions state ~client ~src ~dest:_ ~n ?(fee = 0.00126) ()
                      ("source", `String src);
                      ( "destination",
                        `String "tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F" );
-                     ("amount", `String (string_of_int 100));
+                     ("amount", `String (Int.to_string 100));
                      ( "fee",
-                       `String (string_of_int (int_of_float (fee *. 1000000.)))
+                       `String (Int.to_string (Float.to_int (fee *. 1000000.)))
                      );
-                     ("counter", `String (string_of_int i));
-                     ("gas_limit", `String (string_of_int 127));
-                     ("storage_limit", `String (string_of_int 277)) ])) ) ]
+                     ("counter", `String (Int.to_string i));
+                     ("gas_limit", `String (Int.to_string 127));
+                     ("storage_limit", `String (Int.to_string 277)) ])) ) ]
   in
   Tezos_client.rpc
     state
@@ -208,7 +208,7 @@ let expect_from_output ~expectation ~message (proc_res : Process_result.t) =
       exp
       s
   in
-  let success = proc_res#status = Unix.WEXITED 0 in
+  let success = Poly.equal proc_res#status (Unix.WEXITED 0) in
   match expectation with
   | `Success when success ->
       return ()
@@ -351,7 +351,7 @@ let show_command_message command =
           sp ppf () ;
           const
             (list ~sep:sp string)
-            ("<tezos-client>" :: command |> List.map ~f:Filename.quote)
+            ("<tezos-client>" :: command |> List.map ~f:Caml.Filename.quote)
             ppf
             ()))
 
@@ -403,7 +403,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
           ~client
           ~f:(fun _ proc ->
             find_and_print_signature_hash
-              ~display_expectation:(protocol_kind = `Babylon)
+              ~display_expectation:Poly.(protocol_kind = `Babylon)
               state
               proc)
           command
@@ -458,7 +458,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
           ~client
           ~f:(fun _ proc ->
             find_and_print_signature_hash
-              ~display_expectation:(protocol_kind = `Babylon)
+              ~display_expectation:Poly.(protocol_kind = `Babylon)
               state
               proc)
           command
@@ -667,7 +667,7 @@ let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
           ~f:(fun _ proc ->
             find_and_print_signature_hash
               ~display_expectation:
-                (protocol_kind = `Babylon || arguments <> None)
+                Poly.(protocol_kind = `Babylon || arguments <> None)
               state
               proc)
           command
@@ -748,7 +748,7 @@ let prepare_origination_of_id_script ?(spendable = false)
                        ith))
             |> String.concat ~sep:"\n    " ) )
   in
-  let tmp = Filename.temp_file "little-id-script" ".tz" in
+  let tmp = Caml.Filename.temp_file "little-id-script" ".tz" in
   System.write_file state tmp ~content:(id_script parameter)
   >>= fun () ->
   Dbg.e EF.(wf "id_script %s: %s" parameter tmp) ;
@@ -845,7 +845,7 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
               wf ppf "Origination: %s (ledger: %s)" name ledger_pkh);
             show_command_message origination;
             please_check_the_hash;
-            ( if push_drops <> None then
+            ( if Poly.(push_drops <> None) then
               pp_warning_ledger_takes_a_while ~adjective:"huge"
             else const string "" ) ]
       (fun ~user_answer ->
@@ -957,12 +957,12 @@ module Wallet_scenario = struct
     match root t with
     | `All ->
         yes ~with_rejections
-    | other when other = v ->
+    | other when Poly.(other = v) ->
         yes ~with_rejections
     | _other ->
         no
           (List.find_map_exn enum_assoc ~f:(function
-              | (k, this) when v = this ->
+              | (k, this) when Poly.(v = this) ->
                   Some k
               | _ ->
                   None))
@@ -1027,7 +1027,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
         time_between_blocks = [1; 0];
         bootstrap_accounts =
           List.map d.bootstrap_accounts ~f:(fun (n, v) ->
-              if fst baker = n then (n, v) else (n, 1_000L));
+              if Poly.(fst baker = n) then (n, v) else (n, 1_000L));
       },
       fst baker,
       snd baker )
@@ -1263,33 +1263,27 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
   in
   let bake_command =
     Console.Prompt.unit_and_loop
-      EF.(wf "Bake a block with the default baker.")
+      ~description:"Bake a block with the default baker."
       ["bake"]
       (fun _sexps ->
         Asynchronous_result.transform_error
           ~f:(fun e ->
-            Format.kasprintf
-              (fun s -> `Command_line s)
-              "run-test-error: %a"
-              pp_error
-              e)
+            Fmt.kstr (fun s -> `Command_line s) "run-test-error: %a" pp_error e)
           (bake "Interactive"))
   in
   let run_test_command =
     Console.Prompt.unit_and_loop
-      EF.(
-        wf
-          "Run a test (%s)."
-          (List.map Wallet_scenario.enum_assoc ~f:fst |> String.concat ~sep:"|"))
+      ~description:
+        Fmt.(
+          str
+            "Run a test (%s)."
+            ( List.map Wallet_scenario.enum_assoc ~f:fst
+            |> String.concat ~sep:"|" ))
       ["rt"; "run-test"]
       (fun sexps ->
         Asynchronous_result.transform_error
           ~f:(fun e ->
-            Format.kasprintf
-              (fun s -> `Command_line s)
-              "run-test-error: %a"
-              pp_error
-              e)
+            Fmt.kstr (fun s -> `Command_line s) "run-test-error: %a" pp_error e)
           ( match sexps with
           | [Atom a] -> (
               let run f = f ~with_rejections:true in
@@ -1340,48 +1334,57 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     ~no:skipping
   >>= fun () -> Interactive_test.Pauser.generic state EF.[af "Tests done."]
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure
-        (fun uri
-             node_exec
-             client_exec
-             admin_exec
-             size
-             (`Base_port base_port)
-             protocol
-             wallet_scenario
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"ledger-wallet"
+      ()
+  in
+  let docs = Manpage_builder.section_test_scenario base_state in
+  let term =
+    pure
+      (fun uri
+           node_exec
+           client_exec
+           admin_exec
+           size
+           (`Base_port base_port)
+           protocol
+           wallet_scenario
+           state
+           ->
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (Interactive_test.Pauser.run_test
+             ~pp_error
              state
-             ->
-          ( state,
-            Interactive_test.Pauser.run_test
-              ~pp_error
-              state
-              (run
-                 state
-                 ~protocol_kind:protocol.kind
-                 ~node_exec
-                 ~size
-                 ~admin_exec
-                 ~base_port
-                 ~pp_error
-                 ~wallet_scenario
-                 ~protocol
-                 ~client_exec
-                 ~uri) ))
+             (run
+                state
+                ~protocol_kind:protocol.kind
+                ~node_exec
+                ~size
+                ~admin_exec
+                ~base_port
+                ~pp_error
+                ~wallet_scenario
+                ~protocol
+                ~client_exec
+                ~uri)))
     $ Arg.(
         required
           (pos
              0
              (some string)
              None
-             (info [] ~docv:"LEDGER-URI" ~doc:"ledger:// URI")))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Tezos_executable.cli_term `Admin "tezos"
+             (info [] ~docv:"LEDGER-URI" ~docs ~doc:"ledger:// URI")))
+    $ Tezos_executable.cli_term base_state `Node "tezos"
+    $ Tezos_executable.cli_term base_state `Client "tezos"
+    $ Tezos_executable.cli_term base_state `Admin "tezos"
     $ Arg.(value (opt int 2 (info ["size"; "S"] ~doc:"Size of the Network")))
     $ Arg.(
         pure (fun p -> `Base_port p)
@@ -1390,8 +1393,12 @@ let cmd ~pp_error () =
                int
                32_000
                (info ["base-port"; "P"] ~doc:"Base port number to build upon")))
-    $ Tezos_protocol.cli_term ()
+    $ Tezos_protocol.cli_term base_state
     $ Wallet_scenario.cli_term ()
-    $ Test_command_line.cli_state ~name:"ledger-wallet" () )
-    (let doc = "Interactive test exercising the Ledger Wallet app features" in
-     info ~doc "ledger-wallet")
+    $ Test_command_line.cli_state ~name:"ledger-wallet" ()
+  in
+  let info =
+    let doc = "Interactive test exercising the Ledger Wallet app features" in
+    info ~doc "ledger-wallet"
+  in
+  (term, info)

@@ -8,7 +8,7 @@ module Small_utilities = struct
     ( ( pure (fun n ->
             let open Tezos_protocol.Account in
             let account = of_name n in
-            Printf.printf
+            Fmt.pr
               "%s,%s,%s,%s\n%!"
               (name account)
               (pubkey account)
@@ -41,7 +41,7 @@ module Small_utilities = struct
       ( pure (fun state ->
             ( state,
               fun () ->
-                Test_scenario.Network.netstat_listening_ports state
+                Helpers.Netstat.used_listening_ports state
                 >>= fun ports ->
                 let to_display =
                   List.map ports ~f:(fun (p, _) -> p)
@@ -73,34 +73,15 @@ end
 let () =
   let open Cmdliner in
   let help = Term.(ret (pure (`Help (`Auto, None))), info "help") in
-  let pp_error fmt = function
-    | `Scenario_error s ->
-        Format.fprintf fmt "%s" s
-    | #Test_scenario.Inconsistency_error.t as e ->
-        Format.fprintf fmt "%a" Test_scenario.Inconsistency_error.pp e
-    | #Process_result.Error.t as e ->
-        Format.fprintf fmt "%a" Process_result.Error.pp e
-    | #System_error.t as e ->
-        Format.fprintf fmt "%a" System_error.pp e
-    | `Client_command_error _ as e ->
-        Tezos_client.Command_error.pp fmt e
-    | `Admin_command_error _ as e ->
-        Tezos_admin_client.Command_error.pp fmt e
-    | `Waiting_for (msg, `Time_out) ->
-        Format.fprintf fmt "WAITING-FOR “%s”: Time-out" msg
-    | `Precheck_failure _ as p ->
-        Helpers.System_dependencies.Error.pp fmt p
-    | `Die _ ->
-        ()
-  in
+  let pp_error = Flextesa.Test_command_line.Common_errors.pp in
   Term.exit
   @@ Term.eval_choice
        (help : unit Term.t * _)
        ( Small_utilities.all ~pp_error ()
-       @ [ Command_daemons_protocol_change.cmd () ~pp_error;
-           Command_voting.cmd () ~pp_error;
-           Command_accusations.cmd () ~pp_error;
-           Command_prevalidation.cmd () ~pp_error;
-           Command_ledger_baking.cmd () ~pp_error;
-           Command_ledger_wallet.cmd () ~pp_error;
-           Flextesa.Interactive_mini_network.cmd ~pp_error () ] )
+       @ [ Command_daemons_protocol_change.cmd ();
+           Command_voting.cmd ();
+           Command_accusations.cmd ();
+           Command_prevalidation.cmd ();
+           Command_ledger_baking.cmd ();
+           Command_ledger_wallet.cmd ();
+           Flextesa.Interactive_mini_network.cmd () ] )

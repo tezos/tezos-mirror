@@ -18,21 +18,30 @@ let run state node_exec client_exec () =
 
          TODO: non-interactive test for propagation
          TODO: commands for interactivea use *)
-      Pervasives.ignore c1 ;
-      Pervasives.ignore c2 ;
+      Caml.Pervasives.ignore c1 ;
+      Caml.Pervasives.ignore c2 ;
       return ()
       >>= fun () ->
       let commands = Interactive_test.Commands.all_defaults state ~nodes in
       Prompt.command state ~commands
       >>= fun () -> Running_processes.wait_all state
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure (fun bnod bcli state -> (state, run state bnod bcli))
-    $ Tezos_executable.cli_term `Node "tezos"
-    $ Tezos_executable.cli_term `Client "tezos"
-    $ Test_command_line.cli_state ~name:"prevalidation" () )
-    (info ~doc:"Work-in-progress." "prevalidation")
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"prevalidation"
+      ()
+  in
+  ( pure (fun bnod bcli state ->
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (run state bnod bcli))
+    $ Tezos_executable.cli_term base_state `Node "tezos"
+    $ Tezos_executable.cli_term base_state `Client "tezos"
+    $ Test_command_line.cli_state ~name:"prevalidation" (),
+    info ~doc:"Work-in-progress." "prevalidation" )

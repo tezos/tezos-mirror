@@ -101,7 +101,7 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
         `Get
         ~path:"/chains/main/blocks/head/votes/current_period_kind"
       >>= function
-      | `String p when p = period_name ->
+      | `String p when String.equal p period_name ->
           return (`Done (nth - 1))
       | _ ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
@@ -136,7 +136,7 @@ let check_understood_protocols state ~chain ~client ~protocol_hash
             return `Expected_misunderstanding
         | None ->
             return `Failure_to_understand )
-      | Error (`Client_command_error _) when expect_clueless_client ->
+      | Error (`Process_error _) when expect_clueless_client ->
           return `Expected_misunderstanding
       | Error e ->
           fail e)
@@ -165,7 +165,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
         time_between_blocks = [1; 0];
         bootstrap_accounts =
           List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
-              if fst baker = n then (n, v) else (n, 1_000L));
+              if Poly.(fst baker = n) then (n, v) else (n, 1_000L));
       },
       fst baker,
       snd baker )
@@ -255,7 +255,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   transfer
     state (* Tezos_client.successful_client_cmd state *)
     ~client:(client 0)
-    ~amount:(Int64.div baker_0_balance 2_000_000L)
+    ~amount:(Int64.( / ) baker_0_balance 2_000_000L)
     ~src:"baker-0"
     ~dst:special_baker.Tezos_client.Keyed.key_name
   >>= fun res ->
@@ -359,15 +359,15 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     Running_processes.run_successful_cmdf
       state
       "cp -L -R %s %s"
-      (Filename.quote path)
-      (Filename.quote tmpdir)
+      (Caml.Filename.quote path)
+      (Caml.Filename.quote tmpdir)
     >>= fun _ ->
     ( if make_different then
       Running_processes.run_successful_cmdf
         state
         "echo '(* Protocol %s *)' >> %s/main.mli"
         name
-        (Filename.quote tmpdir)
+        (Caml.Filename.quote tmpdir)
       >>= fun _ -> return ()
     else return () )
     >>= fun () ->
@@ -383,7 +383,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   make_and_inject_protocol "winner" winner_path
   >>= fun winner_hash ->
   make_and_inject_protocol
-    ~make_different:(winner_path = demo_path)
+    ~make_different:Poly.(winner_path = demo_path)
     "demo"
     demo_path
   >>= fun demo_hash ->
@@ -404,9 +404,9 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                       "previously known"
                     else
                       match p with
-                      | _ when p = winner_hash ->
+                      | _ when String.equal p winner_hash ->
                           "injected winner"
-                      | _ when p = demo_hash ->
+                      | _ when String.equal p demo_hash ->
                           "injected demo"
                       | _ ->
                           "injected unknown" ))) ]
@@ -474,7 +474,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
         `Get
         ~path:"/chains/main/blocks/head/votes/current_proposal"
       >>= fun current_proposal_json ->
-      if current_proposal_json <> `String winner_hash then
+      if Poly.(current_proposal_json <> `String winner_hash) then
         return
           (`Not_done
             (sprintf
@@ -542,8 +542,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
             let testing_bakes = 5 in
             Loop.n_times testing_bakes (fun ith ->
                 let baker =
-                  if ith mod 2 = 0 then winner_baker_0
-                  else winner_special_baker
+                  if ith % 2 = 0 then winner_baker_0 else winner_special_baker
                 in
                 Tezos_client.Keyed.bake
                   ~chain
@@ -585,7 +584,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           Jqo.field metadata_json ~k:"test_chain_status"
           |> Jqo.field ~k:"protocol"
         with
-        | `String s when s = winner_hash ->
+        | `String s when String.equal s winner_hash ->
             return (`Done ())
         | other ->
             return
@@ -683,7 +682,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       let json_string = curl_res#out |> String.concat ~sep:"\n" in
       let json_metadata = Ezjsonm.from_string json_string in
       match Jqo.field json_metadata ~k:"next_protocol" with
-      | `String p when p = winner_hash ->
+      | `String p when String.equal p winner_hash ->
           return (`Done (nth - 1))
       | other ->
           transfer
@@ -783,7 +782,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
               ~path:"/chains/main/blocks/head/metadata"
             >>= fun json_metadata ->
             match Jqo.field json_metadata ~k:"protocol" with
-            | `String p when p = winner_hash ->
+            | `String p when String.equal p winner_hash ->
                 return ()
             | other ->
                 failf
@@ -800,65 +799,76 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           (markdown_verbatim (Counter_log.to_table_string level_counter)) ]
   >>= fun () -> return ()
 
-let cmd ~pp_error () =
+let cmd () =
   let open Cmdliner in
   let open Term in
-  Test_command_line.Run_command.make
-    ~pp_error
-    ( pure
-        (fun winner_path
-             demo_path
-             node_exec
-             client_exec
-             admin_exec
-             winner_client_exec
-             size
-             (`Clueless_winner clueless_winner)
-             (`Base_port base_port)
-             (`With_ledger with_ledger)
-             (`Serialize_proposals serialize_proposals)
-             protocol
+  let pp_error = Test_command_line.Common_errors.pp in
+  let base_state =
+    Test_command_line.Command_making_state.make
+      ~application_name:"Flextesa"
+      ~command_name:"voting"
+      ()
+  in
+  let docs = Manpage_builder.section_test_scenario base_state in
+  let term =
+    pure
+      (fun winner_path
+           demo_path
+           node_exec
+           client_exec
+           admin_exec
+           winner_client_exec
+           size
+           (`Clueless_winner clueless_winner)
+           (`Base_port base_port)
+           (`With_ledger with_ledger)
+           (`Serialize_proposals serialize_proposals)
+           protocol
+           state
+           ->
+        Test_command_line.Run_command.or_hard_fail
+          state
+          ~pp_error
+          (Interactive_test.Pauser.run_test
              state
-             ->
-          ( state,
-            Interactive_test.Pauser.run_test
-              state
-              ~pp_error
-              (run
-                 state
-                 ~serialize_proposals
-                 ~winner_path
-                 ~clueless_winner
-                 ~demo_path
-                 ~node_exec
-                 ~size
-                 ~admin_exec
-                 ~base_port
-                 ~client_exec
-                 ~winner_client_exec
-                 ~protocol
-                 ?with_ledger) ))
+             ~pp_error
+             (run
+                state
+                ~serialize_proposals
+                ~winner_path
+                ~clueless_winner
+                ~demo_path
+                ~node_exec
+                ~size
+                ~admin_exec
+                ~base_port
+                ~client_exec
+                ~winner_client_exec
+                ~protocol
+                ?with_ledger)))
     $ Arg.(
-        pure Filename.dirname
+        pure Caml.Filename.dirname
         $ required
             (pos
                0
                (some string)
                None
                (info
+                  ~docs
                   []
                   ~docv:"WINNER-PROTOCOL-PATH"
                   ~doc:
                     "The protocol to inject and make win the election, e.g. \
                      `src/proto_004_Pt24m4xi/lib_protocol/src/TEZOS_PROTOCOL`.")))
     $ Arg.(
-        pure Filename.dirname
+        pure Caml.Filename.dirname
         $ required
             (pos
                1
                (some string)
                None
                (info
+                  ~docs
                   []
                   ~docv:"LOSER-PROTOCOL-PATH"
                   ~doc:
@@ -866,16 +876,17 @@ let cmd ~pp_error () =
                      `./src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL` \
                      (if same as `WINNER-PROTOCOL-PATH` the scenario will \
                      make them automatically & artificially different).")))
-    $ Tezos_executable.cli_term `Node "current"
-    $ Tezos_executable.cli_term `Client "current"
-    $ Tezos_executable.cli_term `Admin "current"
-    $ Tezos_executable.cli_term `Client "winner"
+    $ Tezos_executable.cli_term base_state `Node "current"
+    $ Tezos_executable.cli_term base_state `Client "current"
+    $ Tezos_executable.cli_term base_state `Admin "current"
+    $ Tezos_executable.cli_term base_state `Client "winner"
     $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network.")))
     $ Arg.(
         pure (fun b -> `Clueless_winner b)
         $ value
             (flag
                (info
+                  ~docs
                   ["winning-client-is-clueless"]
                   ~doc:
                     "Do not fail if the client does not know about “next” \
@@ -897,7 +908,7 @@ $ Arg.(
             (opt
                int
                46_000
-               (info ["base-port"] ~doc:"Base port number to build upon.")))
+               (info ~docs ["base-port"] ~doc:"Base port number to build upon.")))
     $ Arg.(
         pure (fun x -> `With_ledger x)
         $ value
@@ -906,6 +917,7 @@ $ Arg.(
                None
                (info
                   ["with-ledger"]
+                  ~docs
                   ~docv:"ledger://..."
                   ~doc:
                     "Do the test with a Ledger Nano device as one of the \
@@ -916,47 +928,51 @@ $ Arg.(
             (flag
                (info
                   ["serialize-proposals"]
+                  ~docs
                   ~doc:
                     "Run the proposals one-by-one instead of all together \
                      (preferred by the Ledger).")))
-    $ Tezos_protocol.cli_term ()
-    $ Test_command_line.cli_state ~name:"voting" () )
-    (let doc = "Sandbox network with a full round of voting." in
-     let man : Manpage.block list =
-       [ `S "VOTING TEST";
-         `P
-           "This command provides a test which uses a network sandbox to \
-            perform a full round of protocol vote and upgrade, including \
-            voting and baking on the test chain with or without a Ledger Nano \
-            device.";
-         `P "There are two main test behaviors:";
-         `P
-           "* $(b,SIMPLE:) The simple one does as much as possible with any \
-            dummy protocol candidates and a Tezos code-base which doesn't \
-            handle them: it tests all the voting periods until baking the \
-            last block of the currently understood protocol.";
-         `Noblank;
-         `P
-           "To allow the test to succeed in this case, the option \
-            `--winning-client-is-clueless` is required; it is meant to signal \
-            that the “winner” `tezos-client` executable (from the \
-            `--winner-client-binary` option) is expected to not understand \
-            the winning protocol.";
-         `Noblank;
-         `P
-           "This is the version running in Gitlab-CI, see `bin_flextesa/dune`.";
-         `P
-           "* $(b,FULL:) Without the `--winning-client-is-clueless` option, \
-            the test will try to bake on the test chain as well as after the \
-            protocol switch (with the winner-client). This requires the \
-            winning protocol to be a working one and, of course, the \
-            winning-client to understand it.";
-         `P
-           "The test can run fully automated unless one uses the \
-            `\"--with-ledger=ledger://...\"` option in which case some steps \
-            have to be interactive. In this case, the option \
-            `--serialize-proposals` is recommended, because if it is not \
-            provided, the proposal vote will be a “Sign Unverfied” \
-            operation." ]
-     in
-     info ~doc ~man "voting")
+    $ Tezos_protocol.cli_term base_state
+    $ Test_command_line.cli_state ~name:"voting" ()
+  in
+  let info =
+    let doc = "Sandbox network with a full round of voting." in
+    let man : Manpage.block list =
+      [ `S "VOTING TEST";
+        `P
+          "This command provides a test which uses a network sandbox to \
+           perform a full round of protocol vote and upgrade, including \
+           voting and baking on the test chain with or without a Ledger Nano \
+           device.";
+        `P "There are two main test behaviors:";
+        `P
+          "* $(b,SIMPLE:) The simple one does as much as possible with any \
+           dummy protocol candidates and a Tezos code-base which doesn't \
+           handle them: it tests all the voting periods until baking the last \
+           block of the currently understood protocol.";
+        `Noblank;
+        `P
+          "To allow the test to succeed in this case, the option \
+           `--winning-client-is-clueless` is required; it is meant to signal \
+           that the “winner” `tezos-client` executable (from the \
+           `--winner-client-binary` option) is expected to not understand the \
+           winning protocol.";
+        `Noblank;
+        `P "This is the version running in Gitlab-CI, see `bin_flextesa/dune`.";
+        `P
+          "* $(b,FULL:) Without the `--winning-client-is-clueless` option, \
+           the test will try to bake on the test chain as well as after the \
+           protocol switch (with the winner-client). This requires the \
+           winning protocol to be a working one and, of course, the \
+           winning-client to understand it.";
+        `P
+          "The test can run fully automated unless one uses the \
+           `\"--with-ledger=ledger://...\"` option in which case some steps \
+           have to be interactive. In this case, the option \
+           `--serialize-proposals` is recommended, because if it is not \
+           provided, the proposal vote will be a “Sign Unverfied” \
+           operation." ]
+    in
+    info ~doc ~man "voting"
+  in
+  (term, info)
