@@ -77,7 +77,7 @@ module Make (P : COMPARABLE) = struct
   let min x y = if x <= y then x else y
 end
 
-module List (P : COMPARABLE) = struct
+module List (P : COMPARABLE) = Make (struct
   type t = P.t list
 
   let rec compare xs ys =
@@ -91,27 +91,9 @@ module List (P : COMPARABLE) = struct
     | (x :: xs, y :: ys) ->
         let hd = P.compare x y in
         if hd <> 0 then hd else compare xs ys
+end)
 
-  let ( = ) xs ys = compare xs ys = 0
-
-  let ( <> ) xs ys = compare xs ys <> 0
-
-  let ( < ) xs ys = compare xs ys < 0
-
-  let ( <= ) xs ys = compare xs ys <= 0
-
-  let ( >= ) xs ys = compare xs ys >= 0
-
-  let ( > ) xs ys = compare xs ys > 0
-
-  let equal = ( = )
-
-  let max x y = if x >= y then x else y
-
-  let min x y = if x <= y then x else y
-end
-
-module Option (P : COMPARABLE) = struct
+module Option (P : COMPARABLE) = Make (struct
   type t = P.t option
 
   let compare xs ys =
@@ -124,25 +106,7 @@ module Option (P : COMPARABLE) = struct
         1
     | (Some x, Some y) ->
         P.compare x y
-
-  let ( = ) xs ys = compare xs ys = 0
-
-  let ( <> ) xs ys = compare xs ys <> 0
-
-  let ( < ) xs ys = compare xs ys < 0
-
-  let ( <= ) xs ys = compare xs ys <= 0
-
-  let ( >= ) xs ys = compare xs ys >= 0
-
-  let ( > ) xs ys = compare xs ys > 0
-
-  let equal = ( = )
-
-  let max x y = if x >= y then x else y
-
-  let min x y = if x <= y then x else y
-end
+end)
 
 module Char = Make (Char)
 
