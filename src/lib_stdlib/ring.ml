@@ -83,10 +83,6 @@ module Ring = struct
         !acc
 
   let elements t = fold t ~init:[] ~f:(fun acc elt -> elt :: acc)
-
-  exception Empty
-
-  let last_exn r = match last r with None -> raise Empty | Some d -> d
 end
 
 include Ring

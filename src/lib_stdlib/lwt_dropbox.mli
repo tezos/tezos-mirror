@@ -33,13 +33,14 @@ val create : unit -> 'a t
 
 (** Put an element inside the dropbox. If the dropbox was already
     containing an element, the old element is replaced by the new one.
-    The function might return [Closed] if the dropbox has been closed
-    with [close]. *)
+
+    @raise [Closed] if the dropbox has been closed with [close]. *)
 val put : 'a t -> 'a -> unit
 
 (** Wait until the dropbox contains an element, then returns the elements.
-    The elements is removed from the dropbox. The function might return
-    [Closed] if the dropbox is empty and closed. *)
+    The elements is removed from the dropbox.
+
+    @raise [Closed] if the dropbox has been closed with [close] and is empty. *)
 val take : 'a t -> 'a Lwt.t
 
 (** Like [take] except that it returns [None] after [timeout seconds]
@@ -56,6 +57,6 @@ exception Closed
 (** Close the dropbox. It terminates all the waiting reader with the
     exception [Closed]. All further read or write will also immediately
     fail with [Closed], except if the dropbox is not empty when
-    [close] is called. In that can, a single (and last) [take] will
+    [close] is called. In that case, a single (and last) [take] will
     succeed. *)
 val close : 'a t -> unit

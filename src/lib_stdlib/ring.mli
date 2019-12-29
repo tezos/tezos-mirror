@@ -25,12 +25,6 @@
 
 (** Imperative Ring Buffer *)
 
-(** An imperative ring buffer: a mutable structure that holds at most
-    a fixed number of values of a same type. Values are never removed,
-    once the limit is reached, adding a value replaces the oldest one
-    in the ring buffer.  *)
-exception Empty
-
 type 'a t
 
 (** Allocates a ring buffer for a given number of values. *)
@@ -50,9 +44,6 @@ val clear : 'a t -> unit
 
 (** Retrieves the most recent value, or [None] when empty. *)
 val last : 'a t -> 'a option
-
-(** Same as {!last}, but raises {!Empty} when empty. *)
-val last_exn : 'a t -> 'a
 
 (** Iterates over the elements, oldest to newest. *)
 val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b
