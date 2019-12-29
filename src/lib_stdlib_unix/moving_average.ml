@@ -50,14 +50,12 @@ let update_hook = ref []
 let on_update f = update_hook := f :: !update_hook
 
 let worker_loop () =
-  let prev = ref @@ Mtime_clock.elapsed () in
-  let rec inner sleep =
+  let rec inner sleep time_at_entry =
     sleep
     >>= fun () ->
     let sleep = Lwt_unix.sleep 1. in
     let now = Mtime_clock.elapsed () in
-    let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms !prev) in
-    prev := now ;
+    let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms time_at_entry) in
     Inttbl.iter
       (fun _ c ->
         c.average <-
@@ -67,18 +65,18 @@ let worker_loop () =
       counters ;
     List.iter (fun f -> f ()) !update_hook ;
     Lwt_condition.broadcast updated () ;
-    inner sleep
+    inner sleep now
   in
-  inner (Lwt_unix.sleep 1.)
+  inner (Lwt_unix.sleep 1.) (Mtime_clock.elapsed ())
 
 let worker =
   lazy
-    (Lwt.async (fun () ->
-         Lwt_utils.worker
-           "counter"
-           ~on_event:Internal_event.Lwt_worker_event.on_event
-           ~run:worker_loop
-           ~cancel:(fun _ -> Lwt.return_unit)))
+    (Lwt.ignore_result
+       (Lwt_utils.worker
+          "counter"
+          ~on_event:Internal_event.Lwt_worker_event.on_event
+          ~run:worker_loop
+          ~cancel:(fun _ -> Lwt.return_unit)))
 
 let create =
   let cpt = ref 0 in

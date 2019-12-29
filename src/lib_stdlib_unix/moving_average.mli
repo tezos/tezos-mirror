@@ -38,17 +38,17 @@
 type t
 
 (** [create ~init ~alpha] is a counter with initial value [init] and
-    factor [alpha]. *)
+    factor [alpha]. The counter is added to the internal hash table. It is not
+    removed automatically: it must be removed manually. *)
 val create : init:int -> alpha:float -> t
 
 (** [destroy t] removes counter [t] from the internal hash table. *)
 val destroy : t -> unit
 
-(** [add t id] adds [t] in the internal hash table under identifies
-    [id]. *)
+(** [add t v] adds [v] to the counter [t]. *)
 val add : t -> int -> unit
 
-(** [of_update f] registers [f] to be called on each update of the
+(** [on_update f] registers [f] to be called on each update of the
     internal worker (currently every 1s). *)
 val on_update : (unit -> unit) -> unit
 

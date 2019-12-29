@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module LC = Lwt_condition
 open Lwt.Infix
 
 let may ~f = function None -> Lwt.return_unit | Some x -> f x
@@ -60,18 +59,21 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
 
 (* A worker launcher, takes a cancel callback to call upon *)
 let worker name ~on_event ~run ~cancel =
-  let stop = LC.create () in
+  let stop = Lwt_condition.create () in
   let fail e =
     on_event
       name
       (`Failed (Printf.sprintf "Exception: %s" (Printexc.to_string e)))
     >>= fun () -> cancel ()
   in
-  let waiter = LC.wait stop in
+  let waiter = Lwt_condition.wait stop in
   on_event name `Started
   >>= fun () ->
-  Lwt.async (fun () ->
-      Lwt.catch run fail >>= fun () -> LC.signal stop () ; Lwt.return_unit) ;
+  Lwt.ignore_result
+    ( Lwt.catch run fail
+    >>= fun () ->
+    Lwt_condition.signal stop () ;
+    Lwt.return_unit ) ;
   waiter >>= fun () -> on_event name `Ended >>= fun () -> Lwt.return_unit
 
 let rec chop k l =
