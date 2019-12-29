@@ -1027,9 +1027,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Lwt.return (State.Block.fitness pv.predecessor)
 end
 
-module ChainProto_registry = Registry.Make (struct
-  type v = t
-
+module ChainProto_registry = Map.Make (struct
   type t = Chain_id.t * Protocol_hash.t
 
   let compare (c1, p1) (c2, p2) =
@@ -1037,10 +1035,17 @@ module ChainProto_registry = Registry.Make (struct
     if pc = 0 then Chain_id.compare c1 c2 else pc
 end)
 
+let chain_proto_registry : t ChainProto_registry.t ref =
+  ref ChainProto_registry.empty
+
 let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
   let chain_state = Distributed_db.chain_state chain_db in
   let chain_id = State.Chain.id chain_state in
-  match ChainProto_registry.query (chain_id, Filter.Proto.hash) with
+  match
+    ChainProto_registry.find_opt
+      (chain_id, Filter.Proto.hash)
+      !chain_proto_registry
+  with
   | None ->
       let module Prevalidator =
         Make
@@ -1057,7 +1062,11 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
        * `worker` value to caller. *)
       Prevalidator.initialization_errors
       >>=? fun () ->
-      ChainProto_registry.register Prevalidator.name (module Prevalidator : T) ;
+      chain_proto_registry :=
+        ChainProto_registry.add
+          Prevalidator.name
+          (module Prevalidator : T)
+          !chain_proto_registry ;
       return (module Prevalidator : T)
   | Some p ->
       return p
@@ -1065,7 +1074,8 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 let shutdown (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  ChainProto_registry.remove Prevalidator.name ;
+  chain_proto_registry :=
+    ChainProto_registry.remove Prevalidator.name !chain_proto_registry ;
   Prevalidator.Worker.shutdown w
 
 let flush (t : t) head =
@@ -1113,7 +1123,10 @@ let status (t : t) =
   Prevalidator.Worker.status w
 
 let running_workers () =
-  ChainProto_registry.fold (fun (id, proto) t acc -> (id, proto, t) :: acc) []
+  ChainProto_registry.fold
+    (fun (id, proto) t acc -> (id, proto, t) :: acc)
+    !chain_proto_registry
+    []
 
 let pending_requests (t : t) =
   let module Prevalidator : T = (val t) in
