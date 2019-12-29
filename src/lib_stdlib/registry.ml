@@ -30,13 +30,9 @@ module type S = sig
 
   val register : k -> v -> unit
 
-  val alter : k -> (v -> v) -> unit
-
   val remove : k -> unit
 
   val query : k -> v option
-
-  val iter_p : (k -> v -> unit Lwt.t) -> unit Lwt.t
 
   val fold : (k -> v -> 'a -> 'a) -> 'a -> 'a
 end
@@ -56,18 +52,9 @@ end) : S with type k = M.t and type v = M.v = struct
 
   let register k v = registry := Reg.add k v !registry
 
-  let alter k f =
-    match Reg.find_opt k !registry with
-    | None ->
-        ()
-    | Some v ->
-        registry := Reg.add k (f v) !registry
-
   let remove k = registry := Reg.remove k !registry
 
   let query k = Reg.find_opt k !registry
-
-  let iter_p f = Lwt.join (Reg.fold (fun k v acc -> f k v :: acc) !registry [])
 
   let fold f a = Reg.fold f !registry a
 end

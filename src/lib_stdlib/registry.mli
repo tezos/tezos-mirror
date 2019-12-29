@@ -32,13 +32,9 @@ module type S = sig
 
   val register : k -> v -> unit
 
-  val alter : k -> (v -> v) -> unit
-
   val remove : k -> unit
 
   val query : k -> v option
-
-  val iter_p : (k -> v -> unit Lwt.t) -> unit Lwt.t
 
   val fold : (k -> v -> 'a -> 'a) -> 'a -> 'a
 end
