@@ -80,12 +80,8 @@ let is_hex s =
   len mod 2 = 0
   &&
   try
-    for i = 0 to len - 1 do
-      match s.[i] with
-      | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' ->
-          ()
-      | _ ->
-          raise Exit
-    done ;
+    String.iter
+      (function '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> () | _ -> raise Exit)
+      s ;
     true
   with Exit -> false
