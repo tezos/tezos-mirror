@@ -54,9 +54,6 @@ val unopt_assert : loc:string * int * int * 'a -> 'b option -> 'b
 (** First input of form [Some x], or [None] if both are [None] *)
 val first_some : 'a option -> 'a option -> 'a option
 
-(** [Some (f ())] if [f] does not raise, [None] otherwise *)
-val try_with : (unit -> 'a) -> 'a option
-
 (** Make an option of a value *)
 val some : 'a -> 'a option
 

@@ -331,7 +331,14 @@ struct
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-  module Option = Option
+
+  module Option = struct
+    include Option
+
+    (* For compatibility with sigs.v1. It is not used and it shouldn't be used. *)
+    let try_with f = try Some (f ()) with _ -> None
+  end
+
   module MBytes = MBytes
 
   module Raw_hashes = struct

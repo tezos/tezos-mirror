@@ -46,16 +46,7 @@ let unopt_assert ~loc:(name, line, pos, _) = function
   | None ->
       raise (Assert_failure (name, line, pos))
 
-let first_some a b =
-  match (a, b) with
-  | (None, None) ->
-      None
-  | (None, Some v) ->
-      Some v
-  | (Some v, _) ->
-      Some v
-
-let try_with f = try Some (f ()) with _ -> None
+let first_some a b = match a with Some _ -> a | None -> b
 
 let some x = Some x
 
