@@ -27,10 +27,10 @@
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
   >>=? fun (previous_protocol, ctxt) ->
-  Storage.Big_map.Next.init ctxt
-  >>=? fun ctxt ->
   match previous_protocol with
   | Genesis param ->
+      Storage.Big_map.Next.init ctxt
+      >>=? fun ctxt ->
       Commitment_storage.init ctxt param.commitments
       >>=? fun ctxt ->
       Roll_storage.init ctxt
@@ -55,6 +55,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Vote_storage.freeze_listings ctxt >>=? fun ctxt -> return ctxt
   | Alpha_previous ->
+      return ctxt
+  | Babylon_005 ->
       return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
