@@ -68,6 +68,8 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
     ~extra_dummy_proposals_batch_size ~extra_dummy_proposals_batch_levels
     ~waiting_attempts test_variant () =
+  Helpers.clear_root state
+  >>= fun () ->
   Helpers.System_dependencies.precheck
     state
     `Or_fail
@@ -310,7 +312,6 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       [ wf "Test becomes interactive.";
         Option.value kiln_info_opt ~default:(wf "");
         wf "Please type `q` to start a voting/protocol-change period." ]
-    ~force:true
   >>= fun () ->
   wait_for_voting_period
     state
@@ -476,7 +477,6 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
           "Test finished, protocol is now %s, things should keep baking."
           protocol_to_wait_for;
         markdown_verbatim (String.concat ~sep:"\n" res#out) ]
-    ~force:true
 
 let cmd () =
   let open Cmdliner in
@@ -601,7 +601,7 @@ let cmd () =
     $ Tezos_executable.cli_term base_state `Endorser "second"
     $ Tezos_executable.cli_term base_state `Accuser "second"
     $ Arg.(
-        pure (fun p -> `Protocol_path p)
+        pure (fun p -> `Protocol_path (Caml.Filename.dirname p))
         $ required
             (pos
                0

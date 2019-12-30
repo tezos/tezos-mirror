@@ -271,11 +271,11 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
             match protocol_kind with
             | `Athens ->
                 ()
-            | `Babylon ->
+            | `Babylon | `Carthage ->
                 wf
                   ppf
-                  "On Babylon, You will first be asked to provide the public \
-                   key." ;
+                  "From Babylon on, You will first be asked to provide the \
+                   public key." ;
                 cut ppf () ;
                 wf
                   ppf
@@ -317,11 +317,11 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                 match protocol_kind with
                 | `Athens ->
                     ()
-                | `Babylon ->
+                | `Babylon | `Carthage ->
                     wf
                       ppf
-                      "On Babylon, You will first be asked to provide the \
-                       public key." ;
+                      "On Babylon and Carthage, You will first be asked to \
+                       provide the public key." ;
                     cut ppf () ;
                     wf
                       ppf
@@ -622,7 +622,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
   match protocol_kind with
   | `Athens ->
       self_delegation () >>= fun () -> delegate_with_scriptless_account ()
-  | `Babylon ->
+  | `Babylon | `Carthage ->
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
@@ -755,7 +755,11 @@ let prepare_origination_of_id_script ?(spendable = false)
   let origination =
     let opt = Option.value_map ~default:[] in
     ["--wait"; "none"; "originate"; "contract"; name]
-    @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
+    @ ( match protocol_kind with
+      | `Athens ->
+          ["for"; from]
+      | `Babylon | `Carthage ->
+          [] )
     @ [ "transferring";
         amount;
         "from";
@@ -906,7 +910,7 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
         ~init_storage:"\"delegatable contract\""
         ~delegatable:true
         ()
-  | `Babylon ->
+  | `Babylon | `Carthage ->
       return () )
   >>= fun () ->
   let push_drops =

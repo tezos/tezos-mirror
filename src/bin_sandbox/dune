@@ -68,6 +68,38 @@
          --hard-fork-accuser %{bin:tezos-accuser-alpha}
          )))
 
+
+(alias
+  (name runtest_sandbox_daemons_upgrade)
+  (locks /tcp-port/50000_range)
+  (action
+    (run %{exe:main.exe} daemons-upgrade
+         %{lib:tezos-protocol-alpha:raw/TEZOS_PROTOCOL}
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-daemons-upgrade/}
+         --base-port 50_000
+         --extra-dummy-proposals-batch-size 2
+         --extra-dummy-proposals-batch-levels 3,5
+         --size 2
+         --number-of-b 2
+         --time-betw 3
+         --blocks-per-vot 14
+         --with-timestamp
+         --protocol-hash PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS
+         --protocol-kind Babylon
+         --tezos-client %{bin:tezos-client}
+         --tezos-admin %{bin:tezos-admin-client}
+         --tezos-node %{bin:tezos-node}
+         --first-baker %{bin:tezos-baker-005-PsBabyM1}
+         --first-endorser %{bin:tezos-endorser-005-PsBabyM1}
+         --first-accuser %{bin:tezos-accuser-005-PsBabyM1}
+         --second-baker %{bin:tezos-baker-alpha}
+         --second-endorser %{bin:tezos-endorser-alpha}
+         --second-accuser %{bin:tezos-accuser-alpha}
+         )))
+
+
+
+
 (alias
  (name runtest)
  (deps
@@ -75,4 +107,5 @@
   (alias runtest_sandbox_accusations_simple_double_endorsing)
   (alias runtest_sandbox_voting_demo_noops)
   (alias runtest_sandbox_user_activated_upgrade)
+  (alias runtest_sandbox_daemons_upgrade)
   ))

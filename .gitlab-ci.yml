@@ -314,6 +314,16 @@ integration:sandboxes:u-a-u:
     expire_in: 1 day
     when: on_failure
 
+integration:sandboxes:daemons-upgrade:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade
+  artifacts:
+    paths:
+    - flextesa-daemons-upgrade
+    expire_in: 1 day
+    when: on_failure
+
 ############################################################
 ## Stage: run python integration tests                    ##
 ############################################################
