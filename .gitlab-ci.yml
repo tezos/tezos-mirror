@@ -304,6 +304,16 @@ integration:sandboxes:acc-endorsement:
     expire_in: 1 day
     when: on_failure
 
+integration:sandboxes:u-a-u:
+  <<: *integration_definition
+  script:
+    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade
+  artifacts:
+    paths:
+    - flextesa-hard-fork
+    expire_in: 1 day
+    when: on_failure
+
 ############################################################
 ## Stage: run python integration tests                    ##
 ############################################################
