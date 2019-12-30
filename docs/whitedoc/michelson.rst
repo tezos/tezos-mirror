@@ -2675,8 +2675,8 @@ demonstrates their use for instruction ``CAR``.
    CAR @%%
    :: @p (pair ('a %fst) ('b %snd)) : 'S   ->   @p.fst 'a : 'S
 
-The special variable annotation ``%@`` can be used on instructions
-``PAIR``, ``SOME``, ``LEFT``, ``RIGHT``. It means to use the variable
+The special field annotation ``%@`` can be used on instructions
+``PAIR``, ``LEFT`` and ``RIGHT``. It means to use the variable
 name annotation in the stack as a field name for the constructed
 element. Two examples with ``PAIR`` follows, notice the special
 treatment of annotations with ``.``.
