@@ -65,6 +65,8 @@ module type Size = sig
   val size : int
 end
 
+module Int2_64 : Bits with type t = int64 * int64
+
 module Bits (S : Size) : sig
   include Bits
 
@@ -167,3 +169,6 @@ module Make_BE_gen (V : Value) (B : Bits) :
 
 module Make_BE_sized (V : Value) (S : Size) :
   S with type key = Bits(S).t and type value = V.t and type mask = Bits(S).t
+
+module Make_BE_int2_64 (V : Value) :
+  S with type key = Int2_64.t and type value = V.t and type mask = Int2_64.t

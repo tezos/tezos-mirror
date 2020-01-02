@@ -449,6 +449,57 @@ module type Bits = sig
   val power_2 : int -> t
 end
 
+module Int2_64 : Bits with type t = int64 * int64 = struct
+  type t = int64 * int64
+
+  let zero = (0L, 0L)
+
+  let one = (0L, 1L)
+
+  let hash v = Hashtbl.hash v
+
+  let lnot (a, b) = (Int64.lognot a, Int64.lognot b)
+
+  let ( land ) (a1, b1) (a2, b2) = (Int64.logand a1 a2, Int64.logand b1 b2)
+
+  let ( lxor ) (a1, b1) (a2, b2) = (Int64.logxor a1 a2, Int64.logxor b1 b2)
+
+  let ( lor ) (a1, b1) (a2, b2) = (Int64.logor a1 a2, Int64.logor b1 b2)
+
+  let less_than ((a1, b1) : t) ((a2, b2) : t) =
+    let cmp_a = Compare.Uint64.compare a1 a2 in
+    if cmp_a = 0 then Compare.Uint64.(b1 < b2) else cmp_a < 0
+
+  let equal ((a1, b1) : t) ((a2, b2) : t) = a1 = a2 && b1 = b2
+
+  module Int64_infix = struct
+    let ( lor ) = Int64.logor
+
+    let ( lsr ) = Int64.shift_right_logical
+
+    let ( - ) = Int64.sub
+  end
+
+  let highest_bit_int64 x =
+    Int64_infix.(
+      let x = x lor (x lsr 1) in
+      let x = x lor (x lsr 2) in
+      let x = x lor (x lsr 4) in
+      let x = x lor (x lsr 8) in
+      let x = x lor (x lsr 16) in
+      let x = x lor (x lsr 32) in
+      x - (x lsr 1))
+
+  let highest_bit (a, b) =
+    if a <> 0L then (highest_bit_int64 a, 0L) else (0L, highest_bit_int64 b)
+
+  let pred (a, b) = if b <> 0L then (a, Int64.pred b) else (Int64.pred a, -1L)
+
+  let power_2 n =
+    if n < 64 then (0L, Int64.shift_left 1L n)
+    else (Int64.shift_left 1L (n - 64), 0L)
+end
+
 module type Size = sig
   val size : int
 end
@@ -1188,3 +1239,4 @@ module Make_BE (V : Value) = Make (BE_gen_prefix (BE_int)) (V)
 module Make_BE_gen (V : Value) (B : Bits) = Make (BE_gen_prefix (B)) (V)
 module Make_BE_sized (V : Value) (S : Size) =
   Make (BE_gen_prefix (Bits (S))) (V)
+module Make_BE_int2_64 (V : Value) = Make (BE_gen_prefix (Int2_64)) (V)
