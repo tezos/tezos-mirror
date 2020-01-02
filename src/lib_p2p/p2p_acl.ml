@@ -28,54 +28,21 @@ module PeerRing = Ring.MakeTable (struct
 end)
 
 module PatriciaTree (V : HashPtree.Value) = struct
-  module Size = struct
-    let size = 128
-  end
-
-  module Bits = HashPtree.Bits (Size)
-  module M = HashPtree.Make_BE_sized (V) (Size)
+  module M = HashPtree.Make_BE_int2_64 (V)
+  module Bits = HashPtree.Int2_64
 
   type t = M.t
 
   let empty = M.empty
 
-  (* take into consideration the fact that the int64
-   * returned by Ipaddr.V6.to_int64 is signed *)
-  let z_of_bytes i =
-    let i = Z.of_int64 i in
-    Z.(if i < zero then i + (of_int 2 ** 64) else i)
+  let key_of_ipv6 ip = Ipaddr.V6.to_int64 ip
 
-  let z_of_ipv6 ip =
-    let (hi_x, lo_x) = Ipaddr.V6.to_int64 ip in
-    let hi = z_of_bytes hi_x in
-    let lo = z_of_bytes lo_x in
-    Z.((hi lsl 64) + lo)
-
-  let key_of_ipv6 ip = Bits.of_z (z_of_ipv6 ip)
-
-  let z_mask_of_ipv6_prefix p =
-    let ip = Ipaddr.V6.Prefix.network p in
-    let len = Ipaddr.V6.Prefix.bits p in
-    ( z_of_ipv6 ip,
-      if len = 0 then Bits.zero
-      else Bits.lnot (Bits.pred (Bits.power_2 (128 - len))) )
+  let key_to_ipv6 key = Ipaddr.V6.of_int64 key
 
   let key_mask_of_ipv6_prefix p =
-    let (z, m) = z_mask_of_ipv6_prefix p in
-    (Bits.of_z z, m)
-
-  let z_to_ipv6 z =
-    (* assumes z is a 128 bit value *)
-    let hi_z = Z.(z asr 64) in
-    let hi =
-      if Z.(hi_z >= of_int 2 ** 63) then
-        (* If overflows int64, then returns the bit equivalent
-           representation (which is negative) *)
-        Int64.add 0x8000000000000000L Z.(to_int64 (hi_z - (of_int 2 ** 63)))
-      else Z.(to_int64 hi_z)
-    in
-    let lo = Z.(to_int64 (z mod pow ~$2 64)) in
-    Ipaddr.V6.of_int64 (hi, lo)
+    let ip = Ipaddr.V6.Prefix.network p in
+    let mask = Ipaddr.V6.Prefix.netmask p in
+    (key_of_ipv6 ip, key_of_ipv6 mask)
 
   let remove key t = M.remove (key_of_ipv6 key) t
 
@@ -94,11 +61,7 @@ module PatriciaTree (V : HashPtree.Value) = struct
   let mem key t = M.mem (key_of_ipv6 key) t
 
   let key_mask_to_prefix key mask =
-    let len =
-      if Bits.(equal mask zero) then 0
-      else 128 - Z.trailing_zeros (Bits.to_z mask)
-    in
-    Ipaddr.V6.Prefix.make len (z_to_ipv6 (Bits.to_z key))
+    Ipaddr.V6.Prefix.of_netmask (key_to_ipv6 mask) (key_to_ipv6 key)
 
   let fold f t acc =
     let f key mask value acc =
