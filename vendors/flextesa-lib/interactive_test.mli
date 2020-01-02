@@ -6,7 +6,7 @@ open Internal_pervasives
 module Commands : sig
   val cmdline_fail :
        ( 'a
-       , Format.formatter
+       , Caml.Format.formatter
        , unit
        , ('b, [> `Command_line of string]) Asynchronous_result.t )
        format4
@@ -18,7 +18,7 @@ module Commands : sig
   val flag : string -> Sexplib0.Sexp.t list -> bool
 
   val unit_loop_no_args :
-       Easy_format.t
+       description:string
     -> string list
     -> (   unit
         -> ( unit
@@ -125,11 +125,22 @@ module Commands : sig
     -> protocol:Tezos_protocol.t
     -> Console.Prompt.item
 
+  val better_call_dev :
+       < application_name: string
+       ; console: Console.t
+       ; env_config: Environment_configuration.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> default_port:int
+    -> Console.Prompt.item
+
   val arbitrary_command_on_all_clients :
        ?make_admin:(Tezos_client.t -> Tezos_admin_client.t)
     -> ?command_names:string list
     -> < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
@@ -141,6 +152,7 @@ module Commands : sig
     -> ?make_command_names:(int -> string list)
     -> < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
@@ -154,6 +166,7 @@ module Commands : sig
     -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> clients:Tezos_client.t list
@@ -163,6 +176,7 @@ module Commands : sig
        < application_name: string
        ; console: Console.t
        ; operations_log: Log_recorder.Operations.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
@@ -172,7 +186,9 @@ module Commands : sig
   val all_defaults :
        < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> nodes:Tezos_node.t list
@@ -225,7 +241,7 @@ module Pauser : sig
        ; test_interactivity: Interactivity.t
        ; .. >
     -> (unit -> (unit, ([> System_error.t] as 'errors)) Asynchronous_result.t)
-    -> pp_error:(Format.formatter -> 'errors -> unit)
+    -> pp_error:(Caml.Format.formatter -> 'errors -> unit)
     -> unit
     -> (unit, [> System_error.t | `Die of int]) Asynchronous_result.t
   (** Run a test-scenario and deal with potential errors according

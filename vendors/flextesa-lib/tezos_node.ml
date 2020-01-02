@@ -1,5 +1,7 @@
 open Internal_pervasives
 
+type custom_network = [`Json of Ezjsonm.value]
+
 type t =
   { id: string
   ; expected_connections: int
@@ -9,7 +11,10 @@ type t =
     peers: int list
   ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t
-  ; history_mode: [`Full | `Archive | `Rolling] option }
+  ; history_mode: [`Full | `Archive | `Rolling] option
+  ; single_process: bool
+  ; cors_origin: string option
+  ; custom_network: custom_network option }
 
 let compare a b = Base.String.compare a.id b.id
 let equal a b = Base.String.equal a.id b.id
@@ -24,7 +29,8 @@ let ef t =
 let pp fmt t = Easy_format.Pretty.to_formatter fmt (ef t)
 let id t = t.id
 
-let make ~exec ?(protocol = Tezos_protocol.default ()) ?history_mode id
+let make ?cors_origin ~exec ?(protocol = Tezos_protocol.default ())
+    ?custom_network ?(single_process = true) ?history_mode id
     ~expected_connections ~rpc_port ~p2p_port peers =
   { id
   ; expected_connections
@@ -33,16 +39,19 @@ let make ~exec ?(protocol = Tezos_protocol.default ()) ?history_mode id
   ; peers
   ; exec
   ; protocol
-  ; history_mode }
+  ; history_mode
+  ; single_process
+  ; cors_origin
+  ; custom_network }
 
 let make_path p ~config t = Paths.root config // sprintf "node-%s" t.id // p
 
 (* Data-dir should not exist OR be fully functional. *)
-let data_dir ~config t = make_path "data-dir" ~config t
-let config_file ~config t = data_dir ~config t // "config.json"
-let identity_file ~config t = data_dir ~config t // "identity.json"
-let log_output ~config t = make_path "node-output.log" ~config t
-let exec_path ~config t = make_path ~config "exec" t
+let data_dir config t = make_path "data-dir" ~config t
+let config_file config t = data_dir config t // "config.json"
+let identity_file config t = data_dir config t // "identity.json"
+let log_output config t = make_path "node-output.log" ~config t
+let exec_path config t = make_path ~config "exec" t
 
 module Config_file = struct
   (* 
@@ -50,6 +59,22 @@ module Config_file = struct
      want the sandbox to be able to configure ≥ 1 versions of the
      node.
   *)
+
+  let default_network =
+    let open Ezjsonm in
+    [ ( "genesis"
+      , dict
+          [ ("timestamp", string "2018-06-30T16:07:32Z")
+          ; ( "block"
+            , string "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" )
+          ; ( "protocol"
+            , string "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ) ]
+      )
+    ; ("chain_name", string "TEZOS_MAINNET")
+    ; ("old_chain_name", string "TEZOS_BETANET_2018-06-30T16:07:32Z")
+    ; ("incompatible_chain_name", string "INCOMPATIBLE")
+    ; ("sandboxed_chain_name", string "SANDBOXED_TEZOS_MAINNET") ]
+
   let of_node state t =
     let open Ezjsonm in
     let shell =
@@ -63,7 +88,10 @@ module Config_file = struct
                     | `Archive -> string "archive"
                     | `Full -> string "full"
                     | `Rolling -> string "rolling" ) ] ) ] in
-    [ ("data-dir", data_dir ~config:state t |> string)
+    let network =
+      Option.value_map t.custom_network ~default:[] ~f:(function `Json j ->
+          [("network", j)]) in
+    [ ("data-dir", data_dir state t |> string)
     ; ( "rpc"
       , dict [("listen-addrs", strings [sprintf "0.0.0.0:%d" t.rpc_port])] )
     ; ( "p2p"
@@ -76,54 +104,59 @@ module Config_file = struct
                 [ ("maintenance-idle-time", int 3)
                 ; ("swap-linger", int 2)
                 ; ("connection-timeout", int 2) ] ) ] )
-    ; ("log", dict [("output", string (log_output ~config:state t))]) ]
-    @ shell
+    ; ("log", dict [("output", string (log_output state t))]) ]
+    @ shell @ network
     |> dict |> to_string ~minify:false
 end
 
 open Tezos_executable.Make_cli
 
-let node_command t ~config cmd options =
-  Tezos_executable.call t.exec ~path:(exec_path t ~config)
+let node_command state t cmd options =
+  Tezos_executable.call state t.exec ~path:(exec_path state t)
     ( cmd
-    @ opt "config-file" (config_file ~config t)
-    @ opt "data-dir" (data_dir ~config t)
+    @ opt "config-file" (config_file state t)
+    @ opt "data-dir" (data_dir state t)
     @ options )
 
-let run_command t ~config =
+let run_command state t =
   let peers = List.concat_map t.peers ~f:(optf "peer" "127.0.0.1:%d") in
-  node_command
-    t
-    ~config
-    ["run"]
-    ( flag "private-mode" @ flag "no-bootstrap-peers"
-    @ peers
+  let cors_origin =
+    match t.cors_origin with
+    | Some _ as s -> s
+    | None -> Environment_configuration.default_cors_origin state in
+  node_command state t ["run"]
+    ( flag "private-mode" @ flag "no-bootstrap-peers" @ peers
     @ optf "bootstrap-threshold" "0"
     @ optf "connections" "%d" t.expected_connections
-    @ opt "sandbox" (Tezos_protocol.sandbox_path ~config t.protocol) )
+    @ (if t.single_process then flag "singleprocess" else [])
+    @ Option.value_map cors_origin
+        ~f:(fun s ->
+          flag "cors-header=content-type" @ Fmt.kstr flag "cors-origin=%s" s)
+        ~default:[]
+    @ opt "sandbox" (Tezos_protocol.sandbox_path state t.protocol) )
 
-let start_script t ~config =
+let start_script state t =
   let open Genspio.EDSL in
   let gen_id =
-    node_command t ~config
+    node_command state t
       [ "identity"; "generate"
       ; sprintf "%d" (Tezos_protocol.expected_pow t.protocol) ]
       [] in
-  let tmp_config = tmp_file (config_file t ~config) in
+  let tmp_config = tmp_file (config_file state t) in
   check_sequence ~verbosity:`Output_all
-    [ ("reset-config", node_command t ~config ["config"; "reset"] [])
+    [ ("reset-config", node_command state t ["config"; "reset"] [])
     ; ( "write-config"
       , seq
-          [ tmp_config#set (Config_file.of_node config t |> str)
-          ; call [str "mv"; tmp_config#path; str (config_file t ~config)] ] )
+          [ tmp_config#set (Config_file.of_node state t |> str)
+          ; call [str "mv"; tmp_config#path; str (config_file state t)] ] )
     ; ( "ensure-identity"
       , ensure "node-id"
-          ~condition:(file_exists (str (identity_file t ~config)))
+          ~condition:(file_exists (str (identity_file state t)))
           ~how:[("gen-id", gen_id)] )
-    ; ("start", run_command t ~config) ]
+    ; ("start", run_command state t) ]
 
-let process config t =
-  Running_processes.Process.genspio t.id (start_script t ~config)
+let process state t =
+  Running_processes.Process.genspio t.id (start_script state t)
 
 let protocol t = t.protocol
 
@@ -143,7 +176,7 @@ let connections node_list =
       | _, `Duplex _ -> 1
       | _, _ -> Caml.Pervasives.compare a b
   end in
-  let module Connection_set = Set.Make (Connection) in
+  let module Connection_set = Caml.Set.Make (Connection) in
   let res = ref Connection_set.empty in
   List.iter node_list ~f:(fun node ->
       let peer_nodes =
@@ -167,11 +200,16 @@ let connections node_list =
 module History_modes = struct
   type 'error edit = t list -> (t list, 'error) Asynchronous_result.t
 
-  let cmdliner_term () : _ edit Cmdliner.Term.t =
+  let cmdliner_term state : _ edit Cmdliner.Term.t =
     let open Cmdliner in
     let open Term in
     let history_mode_converter =
       Arg.enum [("archive", `Archive); ("full", `Full); ("rolling", `Rolling)]
+    in
+    let docs =
+      Manpage_builder.section state ~rank:2 ~name:"NODE HISTORY MODES"
+        ~man:
+          [`P "One can specify history modes for a given subset of the nodes."]
     in
     pure (fun edits node_list ->
         try
@@ -205,6 +243,8 @@ module History_modes = struct
           (opt_all
              (pair ~sep:':' string history_mode_converter)
              []
-             (info ["set-history-mode"]
-                ~doc:"Set the history mode for a given (named) node.")))
+             (info ["set-history-mode"] ~docs ~docv:"NODEPREFIX:MODE"
+                ~doc:
+                  "Set the history mode for a given (named) node, e.g. \
+                   `N000:archive`.")))
 end

@@ -39,9 +39,9 @@ module Configuration_directory = struct
       (path // "kiln-node-net-port")
       ~content:(sprintf "%d" p2p_port)
     >>= fun () ->
-    let pwd = Sys.getenv "PWD" in
+    let pwd = Caml.Sys.getenv "PWD" in
     let absolutize path =
-      if Filename.is_relative path then pwd // path else path in
+      if Caml.Filename.is_relative path then pwd // path else path in
     System.write_file state ~perm:0o777
       (path // "kiln-node-custom-args")
       ~content:
@@ -82,15 +82,15 @@ module Configuration_directory = struct
               , list
                   (fun (p, bak, endo) ->
                     strings [p; absolutize bak; absolutize endo])
-                  protocol_execs );
-            ]
+                  protocol_execs ) ]
           |> to_string ~minify:false)
     >>= fun () ->
     Running_processes.run_cmdf state " chmod -R 777 %s" path
     >>= fun _ -> return ()
 
-  let cli_term () =
+  let cli_term state =
     let open Cmdliner in
+    let docs = Manpage_builder.section state ~rank:4 ~name:"TOOLS: KILN" in
     Term.(
       pure (fun x clean ->
           Option.map x ~f:(fun (path, p2p_port) -> {path; p2p_port; clean}))
@@ -99,14 +99,14 @@ module Configuration_directory = struct
             (opt
                (some (pair ~sep:',' string int))
                None
-               (info
+               (info ~docs
                   ["generate-kiln-configuration-path"]
                   ~docv:"PATH,PORT"
                   ~doc:"Generate a kiln configuration at $(docv)")))
       $ Arg.(
           value
             (flag
-               (info
+               (info ~docs
                   ["clean-kiln-configuration"]
                   ~doc:"Delete configuration path before generating it"))))
 end

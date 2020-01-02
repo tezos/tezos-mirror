@@ -1,5 +1,5 @@
 open Internal_pervasives
-module IFmt = Experiments.More_fmt
+module IFmt = More_fmt
 
 let failf ?attach fmt =
   ksprintf (fun s -> fail ?attach (`Scenario_error s)) fmt
@@ -38,7 +38,8 @@ let call ?comment ?(expect = `Status `OK) ?(show_body = `All)
     ()
   >>= fun (coresp, cobody) ->
   ( match expect with
-  | `Status status when Cohttp.Response.status coresp = status -> return `Ok
+  | `Status status when Poly.equal (Cohttp.Response.status coresp) status ->
+      return `Ok
   | `Status status ->
       return
         (`Failed
@@ -77,7 +78,7 @@ let call ?comment ?(expect = `Status `OK) ?(show_body = `All)
         Sexplib0.Sexp.pp_hum_indent 4 ppf (Cohttp.Response.sexp_of_t coresp)
       in
       let rec un_option_show f = function
-        | `On_error _ when test_status = `Ok -> ()
+        | `On_error _ when Poly.equal test_status `Ok -> ()
         | `On_error l -> un_option_show f l
         | `No -> ()
         | `All -> f None
@@ -87,7 +88,7 @@ let call ?comment ?(expect = `Status `OK) ?(show_body = `All)
             pf ppf "# Called %s /%s → %s `%s`:"
               (Cohttp.Code.string_of_method http_method)
               path
-              (if test_status = `Ok then "Expected" else "UNEXPECTED")
+              (if Poly.equal test_status `Ok then "Expected" else "UNEXPECTED")
               (Cohttp.Response.status coresp |> Cohttp.Code.string_of_status) ;
             Option.iter comment ~f:(fun c ->
                 cut ppf () ; string ppf "* " ; c ppf) ;

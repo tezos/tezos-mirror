@@ -15,10 +15,8 @@ module Operations = struct
 
   let show_all state =
     let t = from_state state in
-    Console.Prompt.unit_and_loop
-      EF.(af "Show all manual operations")
-      ["ao"; "all-ops"; "all-operations"]
-      (fun _ ->
+    Console.Prompt.unit_and_loop ~description:"Show all manual operations"
+      ["ao"; "all-ops"; "all-operations"] (fun _ ->
         Console.say state
           EF.(
             desc_list (haf "Operations:")

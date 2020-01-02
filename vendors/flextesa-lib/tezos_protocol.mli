@@ -39,11 +39,11 @@ module Voting_period : sig
 end
 
 module Protocol_kind : sig
-  type t = [`Athens | `Babylon]
+  type t = [`Athens | `Babylon | `Carthage]
 
   val names : (string * t) list
-  val cmdliner_term : unit -> t Cmdliner.Term.t
-  val pp : Format.formatter -> t -> unit
+  val cmdliner_term : docs:string -> unit -> t Cmdliner.Term.t
+  val pp : t Fmt.t
 end
 
 type t =
@@ -61,6 +61,7 @@ type t =
   ; blocks_per_cycle: int
   ; preserved_cycles: int
   ; proof_of_work_threshold: int
+  ; timestamp_delay: int option
   ; custom_protocol_parameters: Ezjsonm.t option }
 (** [t] wraps bootstrap parameters for sandboxed protocols. *)
 
@@ -75,21 +76,23 @@ val bootstrap_accounts : t -> Account.t list
 val kind : t -> Protocol_kind.t
 val dictator_name : t -> string
 val dictator_secret_key : t -> string
-val sandbox_path : config:< paths: Paths.t ; .. > -> t -> string
-val protocol_parameters_path : config:< paths: Paths.t ; .. > -> t -> string
+val sandbox_path : < paths: Paths.t ; .. > -> t -> string
+val protocol_parameters_path : < paths: Paths.t ; .. > -> t -> string
 
-val ensure_script :
-  config:< paths: Paths.t ; .. > -> t -> unit Genspio.Language.t
+val ensure_script : < paths: Paths.t ; .. > -> t -> unit Genspio.Language.t
 (** Build a {!Genspio.EDSL.t} script which generates the
     bootstrap-parameters JSON file. *)
 
 val ensure :
-     t
-  -> config:< paths: Paths.t ; .. >
-  -> (unit, [> System_error.t]) Asynchronous_result.t
+     < application_name: string
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; .. >
+  -> t
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 (** Run the script created by [ensure_script], i.e. create the JSON
     bootstrap parameters. *)
 
-val cli_term : unit -> t Cmdliner.Term.t
+val cli_term : < manpager: Manpage_builder.State.t ; .. > -> t Cmdliner.Term.t
 (** Create a [Cmdliner] term which configures protocol-parameters
     (e.g. options like ["--time-between-blocks"]). *)

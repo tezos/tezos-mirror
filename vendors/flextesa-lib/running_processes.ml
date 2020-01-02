@@ -11,7 +11,7 @@ module Process = struct
 
   let genspio id script =
     let script_content =
-      Format.asprintf "%a" Genspio.Compile.To_slow_flow.Script.pp_posix
+      Fmt.str "%a" Genspio.Compile.To_slow_flow.Script.pp_posix
         (Genspio.Compile.To_slow_flow.compile script) in
     let command = ["sh"] in
     make_in_session id (`Process_group_script script_content) command
@@ -26,24 +26,26 @@ end
 
 module State = struct
   type process_state = {process: Process.t; lwt: Lwt_process.process_none}
-  type t = {processes: (string, process_state) Hashtbl.t}
+  type t = {processes: (string, process_state) Caml.Hashtbl.t}
 
   let pp fmt {processes} =
-    let open Format in
+    let open Caml.Format in
     fprintf fmt "Processes:@ [@[" ;
-    Hashtbl.iter (fun s {lwt; _} -> fprintf fmt "%S:%d" s lwt#pid) processes ;
+    Caml.Hashtbl.iter
+      (fun s {lwt; _} -> fprintf fmt "%S:%d" s lwt#pid)
+      processes ;
     fprintf fmt "]@]"
 
-  let make () = {processes= Hashtbl.create 42}
+  let make () = {processes= Caml.Hashtbl.create 42}
   let processes o = (o#runner : t).processes
 
   let add_process o process lwt =
-    Hashtbl.add (processes o) process.Process.id {process; lwt} ;
+    Caml.Hashtbl.add (processes o) process.Process.id {process; lwt} ;
     return ()
 
   let all_processes t =
     let res = ref [] in
-    Hashtbl.iter (fun _ t -> res := t :: !res) (processes t) ;
+    Caml.Hashtbl.iter (fun _ t -> res := t :: !res) (processes t) ;
     return !res
 end
 
@@ -86,7 +88,7 @@ let ef_lwt_state =
 let ef ?(all = false) state =
   EF.(
     let all_procs =
-      Hashtbl.fold
+      Caml.Hashtbl.fold
         (fun _ {process; lwt} prev ->
           match (all, lwt#state) with
           | true, _ | false, Lwt_process.Running ->
@@ -117,7 +119,7 @@ let start t process =
       Lwt.Infix.(
         fun () ->
           Tezos_stdlib_unix.Lwt_utils_unix.create_dir ~perm:0o700
-            (Filename.dirname f)
+            (Caml.Filename.dirname f)
           >>= fun () ->
           Lwt_unix.file_exists f
           >>= fun exists ->
@@ -181,7 +183,7 @@ let kill _t {lwt; process} =
       System_error.catch
         (fun () ->
           Dbg.e EF.(wf "Killing %S" process.id) ;
-          let signal = Sys.sigkill in
+          let signal = Caml.Sys.sigkill in
           let pid = ~-(lwt#pid) (* Assumes “in session” *) in
           ( try Unix.kill pid signal with
           | Unix.Unix_error (Unix.ESRCH, _, _) -> ()
@@ -221,18 +223,19 @@ let find_process_by_id ?(only_running = false) t ~f =
   >>= fun all ->
   return
     (List.filter all ~f:(fun {process= {id; _}; lwt} ->
-         if only_running && not (lwt#state = Lwt_process.Running) then false
+         if only_running && not Poly.(lwt#state = Lwt_process.Running) then
+           false
          else f id))
 
 let cmds = ref 0
 
 let fresh_id _state prefix ~seed =
-  incr cmds ;
+  Caml.incr cmds ;
   sprintf "%s-%05d-%s-%08d" prefix !cmds
-    Digest.(string seed |> to_hex)
+    Caml.Digest.(string seed |> to_hex)
     Random.(int 10_000_000)
 
-let run_cmdf state fmt =
+let run_cmdf ?(id_prefix = "cmd") state fmt =
   let get_file path =
     System_error.catch
       Lwt.(
@@ -245,7 +248,7 @@ let run_cmdf state fmt =
       () in
   ksprintf
     (fun s ->
-      let id = fresh_id state "cmd" ~seed:s in
+      let id = fresh_id state id_prefix ~seed:s in
       let proc = Process.make_in_session id `Process_group ["sh"; "-c"; s] in
       start state proc
       >>= fun proc ->

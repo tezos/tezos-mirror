@@ -2,14 +2,9 @@
 
 See also ["docs/tutorials/flextesa.rst"]. *)
 
-module List = Base.List
-module String = Base.String
-module Option = Base.Option
-module Int = Base.Int
-module Float = Base.Float
-module Exn = Base.Exn
+include Base
 
-let ( // ) = Filename.concat
+let ( // ) = Caml.Filename.concat
 let ksprintf, sprintf = Printf.(ksprintf, sprintf)
 
 (** Wrapper around the [EasyFormat] library to use for console display. *)
@@ -40,20 +35,20 @@ module EF = struct
   let prompt = atom ~param:{atom_style= Some "prompt"}
   let highlight = atom ~param:{atom_style= Some "prompt"}
   let custom pr = Custom pr
-  let pr f = custom (fun ppf -> f (Format.fprintf ppf))
+  let pr f = custom (fun ppf -> f (Fmt.pf ppf))
   let desc_list s l = label s (list ~sep:"," l)
   let desc s v = label s v
-  let af ?param fmt = Format.kasprintf (atom ?param) fmt
+  let af ?param fmt = Fmt.kstr (atom ?param) fmt
 
   let wrap s =
     String.split ~on:' ' s |> List.map ~f:String.strip
-    |> List.filter ~f:(( <> ) "")
+    |> List.filter ~f:(Fn.non (String.equal ""))
     |> List.map ~f:atom |> list
 
-  let wf fmt = Format.kasprintf wrap fmt
-  let haf fmt = Format.kasprintf highlight fmt
+  let wf fmt = Fmt.kstr wrap fmt
+  let haf fmt = Fmt.kstr highlight fmt
   let opt f = function None -> atom "-" | Some o -> f o
-  let ocaml_string_list l = ocaml_list (ListLabels.map l ~f:(af "%S"))
+  let ocaml_string_list l = ocaml_list (List.map l ~f:(af "%S"))
   let exn e = wf "%a" Exn.pp e
 
   let markdown_verbatim ?(guard_length = 80) s =
@@ -70,7 +65,7 @@ module Dbg = struct
   let on = ref false
 
   let () =
-    Option.iter (Sys.getenv_opt "FLEXTESA_DEBUG") ~f:(function
+    Option.iter (Caml.Sys.getenv_opt "FLEXTESA_DEBUG") ~f:(function
       | "true" -> on := true
       | _ -> ())
 
@@ -86,7 +81,7 @@ module Dbg = struct
             ; space_before_closing= true }
           [ef]
         |> Easy_format.Pretty.to_stderr) ;
-      Printf.eprintf "\n%!" )
+      Fmt.epr "\n%!" )
 
   let i (e : EF.t) = ignore e
   let f f = e (EF.pr f)
@@ -94,62 +89,94 @@ module Dbg = struct
   let pp_any fmt v = Dum.to_formatter fmt v
 end
 
+module More_fmt = struct
+  include Fmt
+  (** Little experiment for fun … *)
+
+  let vertical_box ?indent ppf f = vbox ?indent (fun ppf () -> f ppf) ppf ()
+  let wrapping_box ?indent ppf f = box ?indent (fun ppf () -> f ppf) ppf ()
+
+  let wf ppf fmt =
+    Fmt.kstr (fun s -> box (fun ppf () -> text ppf s) ppf ()) fmt
+
+  let markdown_verbatim_list ppf l =
+    vertical_box ~indent:0 ppf (fun ppf ->
+        cut ppf () ;
+        string ppf (String.make 45 '`') ;
+        List.iter l ~f:(fun l -> cut ppf () ; string ppf l) ;
+        cut ppf () ;
+        string ppf (String.make 45 '`'))
+
+  let tag tag ppf f =
+    Caml.Format.pp_open_tag ppf tag ;
+    (f ppf : unit) ;
+    Caml.Format.pp_close_tag ppf ()
+
+  let shout = tag "shout"
+  let prompt = tag "prompt"
+
+  let long_string ?(max = 30) ppf s =
+    match String.sub s ~pos:0 ~len:(max - 2) with
+    | s -> pf ppf "%S" (s ^ "...")
+    | exception _ -> pf ppf "%S" s
+end
+
 (** An “decorated result type” based on polymorphic variants *)
 module Attached_result = struct
   type content =
-    [`Text of string | `String_value of string | `Verbatim of string list]
+    [ `Text of string
+    | `String_value of string
+    | `Verbatim of string list
+    | `String_list of string list ]
 
   type ('ok, 'error) t =
-    {result: ('ok, 'error) result; attachments: (string * content) list}
+    {result: ('ok, 'error) Result.t; attachments: (string * content) list}
     constraint 'error = [> ]
 
   let ok ?(attachments = []) o = {result= Ok o; attachments}
   let error ?(attachments = []) o = {result= Error o; attachments}
 
-  let pp ppf ?pp_ok ?pp_error {result; attachments} =
-    let open Format in
-    pp_open_hovbox ppf 4 ;
-    ( match result with
-    | Ok o ->
-        pp_open_hvbox ppf 2 ;
-        pp_open_tag ppf "success" ;
-        pp_print_string ppf "OK" ;
-        pp_close_tag ppf () ;
-        Option.iter pp_ok ~f:(fun pp -> pp ppf o) ;
-        pp_close_box ppf () ;
-        ()
-    | Error e ->
-        pp_open_hvbox ppf 2 ;
-        pp_open_tag ppf "shout" ;
-        pp_print_string ppf "ERROR:" ;
-        pp_print_space ppf () ;
-        pp_close_tag ppf () ;
-        Option.iter pp_error ~f:(fun pp -> pp ppf e) ;
-        pp_close_box ppf () ) ;
-    ( match attachments with
-    | [] -> ()
+  let pp ppf ?pp_ok ?pp_error {result= the_result; attachments} =
+    let open More_fmt in
+    let result_part ppf =
+      match the_result with
+      | Ok o ->
+          wrapping_box ~indent:4 ppf (fun ppf ->
+              prompt ppf (fun ppf -> pf ppf "OK") ;
+              Option.iter pp_ok ~f:(fun ppo -> pf ppf ":@ %a." ppo o))
+      | Error e ->
+          wrapping_box ~indent:4 ppf (fun ppf ->
+              shout ppf (fun ppf -> pf ppf "Error") ;
+              Option.iter pp_error ~f:(fun ppe -> pf ppf ":@ %a." ppe e)) in
+    match attachments with
+    | [] -> result_part ppf
     | more ->
-        pp_open_vbox ppf 4 ;
-        List.iter more ~f:(fun (k, v) ->
-            pp_print_cut ppf () ;
-            pp_open_hovbox ppf 2 ;
-            pp_print_string ppf "* " ;
-            fprintf ppf "%s:@ " k ;
-            ( match v with
-            | `Text s -> pp_print_text ppf s
-            | `String_value s -> fprintf ppf "%S" s
-            | `Verbatim lines ->
-                pp_open_vbox ppf 0 ;
-                pp_print_cut ppf () ;
-                fprintf ppf "```````````````" ;
-                List.iter lines ~f:(fun s ->
-                    pp_print_cut ppf () ; pp_print_string ppf s) ;
-                pp_print_cut ppf () ;
-                fprintf ppf "```````````````" ;
-                pp_close_box ppf () ) ;
-            pp_close_box ppf ()) ;
-        pp_close_box ppf () ) ;
-    pp_close_box ppf ()
+        vertical_box ~indent:0 ppf (fun ppf ->
+            result_part ppf ;
+            List.iter more ~f:(fun (k, v) ->
+                cut ppf () ;
+                wrapping_box ppf ~indent:2 (fun ppf ->
+                    pf ppf "* " ;
+                    prompt ppf (fun ppf -> string ppf k) ;
+                    match v with
+                    | `Text t -> pf ppf ": %a" text t
+                    | `String_value s -> pf ppf ": %S" s
+                    | `String_list sl ->
+                        pf ppf ": [" ;
+                        cut ppf () ;
+                        wrapping_box ~indent:2 ppf (fun ppf ->
+                            list ~sep:sp (fun ppf -> pf ppf "%S;") ppf sl ;
+                            pf ppf "]")
+                    | `Verbatim [] -> pf ppf ": EMPTY"
+                    | `Verbatim sl ->
+                        pf ppf ":" ;
+                        let lines =
+                          let sep = String.make 50 '`' in
+                          (sep :: List.drop sl (List.length sl - 20)) @ [sep]
+                        in
+                        cut ppf () ;
+                        vertical_box ~indent:0 ppf (fun ppf ->
+                            list ~sep:cut string ppf lines))))
 end
 
 (** A wrapper around [('ok, 'a Error.t) result Lwt.t]. *)
@@ -197,7 +224,9 @@ module Asynchronous_result = struct
         >>= fun {result; attachments} ->
         Lwt.return
           { result
-          ; attachments= List.dedup_and_sort ~compare (attachments @ attach) }
+          ; attachments=
+              List.dedup_and_sort ~compare:Poly.compare (attachments @ attach)
+          }
 
   let transform_error o ~f =
     let open Lwt.Infix in
@@ -224,7 +253,7 @@ module Asynchronous_result = struct
 
   let bind_on_result :
          ('ok, 'error) t
-      -> f:(('ok, 'error) result -> ('ok2, 'error2) t)
+      -> f:(('ok, 'error) Result.t -> ('ok2, 'error2) t)
       -> ('ok2, 'error2) t =
    fun o ~f ->
     let open Lwt.Infix in
@@ -287,7 +316,7 @@ module Asynchronous_result = struct
               | Ok x -> f x elt
               | Error _ ->
                   error := Some prevm ;
-                  Lwt.fail Not_found)
+                  Lwt.fail Caml.Not_found)
             stream (Attached_result.ok init))
         (fun e ->
           match !error with
@@ -311,8 +340,8 @@ module Asynchronous_result = struct
           Dbg.e EF.(wf "Lwt_main.run") ;
           r ())
     with
-    | {result= Ok (); _} -> exit 0
-    | {result= Error (`Die ret); _} -> exit ret
+    | {result= Ok (); _} -> Caml.exit 0
+    | {result= Error (`Die ret); _} -> Caml.exit ret
 end
 
 include Asynchronous_result.Std
@@ -333,12 +362,12 @@ module System_error = struct
       (fun exn -> fail_fatal ?attach (Exception exn))
 
   let fail_fatalf ?attach fmt =
-    Format.kasprintf (fun e -> fail_fatal ?attach (Message e)) fmt
+    Fmt.kstr (fun e -> fail_fatal ?attach (Message e)) fmt
 
   let pp fmt (e : [< t]) =
     match e with
     | `System_error (`Fatal, e) ->
-        Format.fprintf fmt "@[<2>Fatal-system-error:@ %a@]"
+        Fmt.pf fmt "@[<2>Fatal-system-error:@ %a@]"
           (fun ppf -> function Exception e -> Fmt.exn ppf e
             | Message e -> Fmt.string ppf e)
           e
@@ -358,27 +387,42 @@ module Process_result = struct
       | WSTOPPED n -> sprintf "was stopped: %d" n)
 
   module Error = struct
-    type output = t
-    type t = [`Wrong_status of output * string]
+    type error =
+      | Wrong_status of {status: Unix.process_status; message: string}
+      | Wrong_behavior of {message: string}
 
-    let wrong_status (res : output) msgf =
-      ksprintf (fun msg -> fail (`Wrong_status (res, msg) : [> t])) msgf
+    type res = t
+    type t = [`Process_error of error]
 
-    let pp fmt = function
-      | (`Wrong_status (res, msg) : [< t]) ->
-          Format.(
-            fprintf fmt "Process-error, wrong status:@ '%s':@ %s"
-              (status_to_string res#status)
-              msg ;
-            fprintf fmt "@.```out@." ;
-            List.iter res#out ~f:(fprintf fmt "  | %s@.") ;
-            fprintf fmt "@.```@." ;
-            fprintf fmt "@.```err@." ;
-            List.iter res#err ~f:(fprintf fmt "  | %s@.") ;
-            fprintf fmt "@.```@.")
+    let make error = (`Process_error error : [> t])
+    let fail ?attach error = Asynchronous_result.fail ?attach (make error)
 
-    let fail_if_non_zero (res : output) msg =
-      if res#status <> Unix.WEXITED 0 then
+    let wrong_status ?attach result msgf =
+      Fmt.kstr
+        (fun message ->
+          let attach =
+            Option.value attach ~default:[]
+            @ [ ("stdout", `Verbatim result#out)
+              ; ("stderr", `Verbatim result#err) ] in
+          fail ~attach (Wrong_status {status= result#status; message}))
+        msgf
+
+    let wrong_behavior ?attach msgf =
+      Fmt.kstr (fun message -> fail ?attach (Wrong_behavior {message})) msgf
+
+    let pp ppf (`Process_error the_error) =
+      let open More_fmt in
+      wrapping_box ppf (fun ppf ->
+          pf ppf "Process-error:" ;
+          sp ppf () ;
+          match the_error with
+          | Wrong_status {status; message} ->
+              text ppf message ;
+              pf ppf "; wrong-status: '%s'." (status_to_string status)
+          | Wrong_behavior {message} -> text ppf message)
+
+    let fail_if_non_zero (res : res) msg =
+      if Poly.( <> ) res#status (Unix.WEXITED 0) then
         wrong_status res "Non-zero exit status: %s" msg
       else return ()
   end
@@ -390,6 +434,64 @@ end
 module Base_state = struct
   type base = < application_name: string >
   type 'a t = 'a constraint 'a = < base ; .. >
+end
+
+module Manpage_builder = struct
+  module Section = struct
+    let test_scenario = "TEST SCENARIO OPTIONS"
+    let environment_variables = Cmdliner.Manpage.s_environment
+    let executables = "EXECUTABLE PATHS"
+  end
+
+  module Env_variables = struct
+    type doc = Lines of string list
+
+    let man all_known : Cmdliner.Manpage.block list =
+      [`S Section.environment_variables]
+      @ List.map all_known ~f:(fun (name, Lines lines) ->
+            `I (name, String.concat ~sep:"\n" lines))
+  end
+
+  module State = struct
+    type t =
+      { mutable used_sections: (int * string * Cmdliner.Manpage.block list) list
+      ; mutable env_variables: (string * Env_variables.doc) list }
+
+    let make () = {used_sections= []; env_variables= []}
+    let _state state = state#manpager
+
+    let add_section ?(man = []) state ~rank ~name =
+      let t = _state state in
+      match
+        List.find t.used_sections ~f:(fun (_, n, _) -> String.equal n name)
+      with
+      | None -> t.used_sections <- (rank, name, man) :: t.used_sections
+      | Some _ -> ()
+
+    let all_sections state : Cmdliner.Manpage.block list list =
+      let t = _state state in
+      List.sort t.used_sections ~compare:Base.Poly.ascending
+      |> List.map ~f:(fun (_, s, man) -> `S s :: man)
+
+    let register_env_variable state name lines =
+      let t = _state state in
+      t.env_variables <- (name, Env_variables.Lines lines) :: t.env_variables
+  end
+
+  let section ?man state ~rank ~name =
+    State.add_section ?man state ~rank ~name ;
+    name
+
+  let section_test_scenario state =
+    State.add_section state ~rank:0 ~name:Section.test_scenario ;
+    Section.test_scenario
+
+  let make state ~intro_blob extra : Cmdliner.Manpage.block list =
+    let sections = State.all_sections state in
+    List.concat
+      [ [`P intro_blob]; extra; List.concat sections
+      ; Env_variables.man state#manpager.State.env_variables
+      ; [`S Cmdliner.Manpage.s_options] ]
 end
 
 (** Some {!Lwt_unix} functions. *)
@@ -431,7 +533,7 @@ module Jqo = struct
 
   let remove_field o ~name =
     match o with
-    | `O l -> `O (List.filter l ~f:(fun (k, _) -> k <> name))
+    | `O l -> `O (List.filter l ~f:Poly.(fun (k, _) -> k <> name))
     | other ->
         ksprintf failwith "Jqo.remove_field %S: No an object: %s" name
           (to_string other)

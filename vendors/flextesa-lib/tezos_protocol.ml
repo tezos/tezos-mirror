@@ -64,21 +64,24 @@ module Voting_period = struct
 end
 
 module Protocol_kind = struct
-  type t = [`Athens | `Babylon]
+  type t = [`Athens | `Babylon | `Carthage]
 
-  let names = [("Athens", `Athens); ("Babylon", `Babylon)]
+  let names =
+    [("Athens", `Athens); ("Babylon", `Babylon); ("Carthage", `Carthage)]
 
-  let cmdliner_term () : t Cmdliner.Term.t =
+  let default = `Babylon
+
+  let cmdliner_term ~docs () : t Cmdliner.Term.t =
     let open Cmdliner in
     Arg.(
       value
-        (opt (enum names) `Babylon
-           (info ["protocol-kind"] ~doc:"Set the protocol family.")))
+        (opt (enum names) default
+           (info ["protocol-kind"] ~docs ~doc:"Set the protocol family.")))
 
   let pp ppf n =
     Fmt.string ppf
       (List.find_map_exn names ~f:(function
-        | s, x when x = n -> Some s
+        | s, x when Poly.equal x n -> Some s
         | _ -> None))
 end
 
@@ -97,17 +100,19 @@ type t =
   ; blocks_per_cycle: int
   ; preserved_cycles: int
   ; proof_of_work_threshold: int
+  ; timestamp_delay: int option
   ; custom_protocol_parameters: Ezjsonm.t option }
 
 let compare a b = String.compare a.id b.id
 
+let make_bootstrap_accounts ~balance n =
+  List.init n ~f:(fun n -> (Account.of_namef "bootacc-%d" n, balance))
+
 let default () =
   let dictator = Account.of_name "dictator-default" in
   { id= "default-bootstrap"
-  ; kind= `Babylon
-  ; bootstrap_accounts=
-      List.init 4 ~f:(fun n ->
-          (Account.of_namef "bootacc-%d" n, 4_000_000_000_000L))
+  ; kind= Protocol_kind.default
+  ; bootstrap_accounts= make_bootstrap_accounts ~balance:4_000_000_000_000L 4
   ; dictator
     (* ; bootstrap_contracts= [(dictator, 10_000_000, `Sandbox_faucet)] *)
   ; expected_pow= 1
@@ -119,40 +124,48 @@ let default () =
   ; blocks_per_cycle= 8
   ; preserved_cycles= 2
   ; proof_of_work_threshold= -1
+  ; timestamp_delay= None
   ; custom_protocol_parameters= None }
 
 let protocol_parameters_json t : Ezjsonm.t =
   let open Ezjsonm in
   let make_account (account, amount) =
     strings [Account.pubkey account; sprintf "%Ld" amount] in
-  (* let make_contract (deleg, amount, script) = dict
-      [ ("delegate", string (Account.pubkey_hash deleg))
-      ; ("amount", ksprintf string "%d" amount)
-      ; ("script", (Script.load script :> Ezjsonm.value)) ] in
-  *)
-  let extra_babylon_stuff_to_put =
-    Ezjsonm.
-      [ ("blocks_per_commitment", int 4)
-      ; ("endorsers_per_block", int 32)
-      ; ("hard_gas_limit_per_operation", string (Int.to_string 100_000_000_000))
-      ; ("hard_gas_limit_per_block", string (Int.to_string 10_000_000_000_000))
-      ; ("tokens_per_roll", string (Int.to_string 8_000_000_000))
-      ; ("michelson_maximum_type_size", int 1_000)
-      ; ("seed_nonce_revelation_tip", string (Int.to_string 125_000))
-      ; ("origination_size", int 257)
-      ; ("block_security_deposit", string (Int.to_string 512_000_000))
-      ; ("endorsement_security_deposit", string (Int.to_string 64_000_000))
-      ; ("block_reward", string (Int.to_string 16_000_000))
-      ; ("endorsement_reward", string (Int.to_string 2_000_000))
-      ; ( "hard_storage_limit_per_operation"
-        , string (Int.to_string 10_000_000_000) )
-      ; ("cost_per_byte", string (Int.to_string 100))
-      ; ("test_chain_duration", string (Int.to_string 1_966_080))
-      ; ("quorum_min", int 3_000)
-      ; ("quorum_max", int 7_000)
-      ; ("min_proposal_quorum", int 500)
-      ; ("initial_endorsers", int 1)
-      ; ("delay_per_missing_endorsement", string (Int.to_string 1)) ] in
+  let extra_post_babylon_stuff subkind =
+    (* `src/proto_005_PsBabyM1/lib_protocol/parameters_repr.ml`
+       `src/proto_006_PsCARTHA/lib_parameters/default_parameters.ml` *)
+    let op_gas_limit, block_gas_limit =
+      match subkind with
+      | `Babylon -> (800_000, 8_000_000)
+      | `Carthage -> (1_040_000, 10_400_000) in
+    let open Ezjsonm in
+    let list_of_zs = list (fun i -> string (Int.to_string i)) in
+    [ ("blocks_per_commitment", int 4)
+    ; ("endorsers_per_block", int 32)
+    ; ("hard_gas_limit_per_operation", string (Int.to_string op_gas_limit))
+    ; ("hard_gas_limit_per_block", string (Int.to_string block_gas_limit))
+    ; ("tokens_per_roll", string (Int.to_string 8_000_000_000))
+    ; ("michelson_maximum_type_size", int 1_000)
+    ; ("seed_nonce_revelation_tip", string (Int.to_string 125_000))
+    ; ("origination_size", int 257)
+    ; ("block_security_deposit", string (Int.to_string 512_000_000))
+    ; ("endorsement_security_deposit", string (Int.to_string 64_000_000))
+    ; ( match subkind with
+      | `Babylon -> ("block_reward", string (Int.to_string 16_000_000))
+      | `Carthage ->
+          ("baking_reward_per_endorsement", list_of_zs [1_250_000; 187_500]) )
+    ; ( "endorsement_reward"
+      , match subkind with
+        | `Babylon -> string (Int.to_string 2_000_000)
+        | `Carthage -> list_of_zs [1_250_000; 833_333] )
+    ; ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
+    ; ("cost_per_byte", string (Int.to_string 1_000))
+    ; ("test_chain_duration", string (Int.to_string 1_966_080))
+    ; ("quorum_min", int 3_000)
+    ; ("quorum_max", int 7_000)
+    ; ("min_proposal_quorum", int 500)
+    ; ("initial_endorsers", int 1)
+    ; ("delay_per_missing_endorsement", string (Int.to_string 1)) ] in
   let common =
     [ ( "bootstrap_accounts"
       , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
@@ -170,7 +183,7 @@ let protocol_parameters_json t : Ezjsonm.t =
   | None ->
       dict
         ( match t.kind with
-        | `Babylon -> common @ extra_babylon_stuff_to_put
+        | (`Babylon | `Carthage) as sk -> common @ extra_post_babylon_stuff sk
         | `Athens -> common )
 
 let sandbox {dictator; _} =
@@ -187,53 +200,47 @@ let bootstrap_accounts t = List.map ~f:fst t.bootstrap_accounts
 let dictator_name {dictator; _} = Account.name dictator
 let dictator_secret_key {dictator; _} = Account.private_key dictator
 let make_path config t = Paths.root config // sprintf "protocol-%s" (id t)
-let sandbox_path ~config t = make_path config t // "sandbox.json"
+let sandbox_path config t = make_path config t // "sandbox.json"
 
-let protocol_parameters_path ~config t =
+let protocol_parameters_path config t =
   make_path config t // "protocol_parameters.json"
 
-let ensure_script ~config t =
+let ensure_script state t =
   let open Genspio.EDSL in
   let file string p =
-    let path = p ~config t in
-    ( Filename.basename path
+    let path = p state t in
+    ( Caml.Filename.basename path
     , write_stdout ~path:(str path)
         (feed ~string:(str (string t)) (exec ["cat"])) ) in
   check_sequence
     ~verbosity:(`Announce (sprintf "Ensure-protocol-%s" (id t)))
-    [ ("directory", exec ["mkdir"; "-p"; make_path config t])
+    [ ("directory", exec ["mkdir"; "-p"; make_path state t])
     ; file sandbox sandbox_path
     ; file protocol_parameters protocol_parameters_path ]
 
-let ensure t ~config =
-  match
-    Sys.command (Genspio.Compile.to_one_liner (ensure_script ~config t))
-  with
-  | 0 -> return ()
-  | _other ->
-      System_error.fail_fatalf "sys.command non-zero"
-        ~attach:[("location", `String_value "Tezos_protocol.ensure")]
+let ensure state t =
+  Running_processes.run_successful_cmdf state "sh -c %s"
+    ( Genspio.Compile.to_one_liner (ensure_script state t)
+    |> Caml.Filename.quote )
+  >>= fun _ -> return ()
 
-let cli_term () =
+let cli_term state =
   let open Cmdliner in
   let open Term in
   let def = default () in
-  let docs = "PROTOCOL OPTIONS" in
+  let docs = Manpage_builder.section state ~rank:2 ~name:"PROTOCOL OPTIONS" in
   pure
-    (fun remove_default_bas
+    (fun bootstrap_accounts
          (`Blocks_per_voting_period blocks_per_voting_period)
          (`Protocol_hash hash)
          (`Time_between_blocks time_between_blocks)
          (`Blocks_per_cycle blocks_per_cycle)
          (`Preserved_cycles preserved_cycles)
+         (`Timestamp_delay timestamp_delay)
          (`Protocol_parameters custom_protocol_parameters)
          kind
-         add_bootstraps
          ->
       let id = "default-and-command-line" in
-      let bootstrap_accounts =
-        add_bootstraps
-        @ if remove_default_bas then [] else def.bootstrap_accounts in
       { def with
         id
       ; kind
@@ -243,13 +250,55 @@ let cli_term () =
       ; bootstrap_accounts
       ; time_between_blocks
       ; preserved_cycles
+      ; timestamp_delay
       ; blocks_per_voting_period })
   $ Arg.(
-      value
-        (flag
-           (info ~doc:"Do not create any of the default bootstrap accounts."
-              ~docs
-              ["remove-default-bootstrap-accounts"])))
+      pure (fun remove_all nb balance add_bootstraps ->
+          add_bootstraps
+          @ make_bootstrap_accounts ~balance (if remove_all then 0 else nb))
+      $ value
+          (flag
+             (info
+                ~doc:
+                  "Do not create any of the default bootstrap accounts (this \
+                   overrides `--number-of-bootstrap-accounts` with 0)."
+                ~docs
+                ["remove-default-bootstrap-accounts"]))
+      $ value
+          (opt int 4
+             (info
+                ["number-of-bootstrap-accounts"]
+                ~docs ~doc:"Set the number of generated bootstrap accounts."))
+      $ ( pure (function
+            | `Tez, f -> f *. 1_000_000. |> Int64.of_float
+            | `Mutez, f -> f |> Int64.of_float)
+        $ value
+            (opt
+               (pair ~sep:':'
+                  (enum [("tz", `Tez); ("tez", `Tez); ("mutez", `Mutez)])
+                  float)
+               (`Tez, 4_000_000.)
+               (info
+                  ["balance-of-bootstrap-accounts"]
+                  ~docv:"UNIT:FLOAT" ~docs
+                  ~doc:
+                    "Set the initial balance of bootstrap accounts, for \
+                     instance: `tz:2_000_000.42` or \
+                     `mutez:42_000_000_000_000`.")) )
+      $ Arg.(
+          pure (fun l ->
+              List.map l
+                ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
+                  (Account.key_pair name ~pubkey ~pubkey_hash ~private_key, tez)))
+          $ value
+              (opt_all
+                 (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
+                 []
+                 (info ["add-bootstrap-account"] ~docs
+                    ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
+                    ~doc:
+                      "Add a custom bootstrap account, e.g. \
+                       `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`."))))
   $ Arg.(
       pure (fun x -> `Blocks_per_voting_period x)
       $ value
@@ -287,10 +336,16 @@ let cli_term () =
                   "Base constant for baking rights (search for \
                    `PRESERVED_CYCLES` in the white paper).")))
   $ Arg.(
+      pure (fun x -> `Timestamp_delay x)
+      $ value
+          (opt (some int) def.timestamp_delay
+             (info ["timestamp-delay"] ~docv:"NUMBER" ~docs
+                ~doc:"Protocol activation timestamp delay in seconds.")))
+  $ Arg.(
       pure (fun f ->
           `Protocol_parameters
             (Option.map f ~f:(fun path ->
-                 let i = open_in path in
+                 let i = Caml.open_in path in
                  Ezjsonm.from_channel i)))
       $ value
           (opt (some file) None
@@ -301,17 +356,4 @@ let cli_term () =
                    ones (technically this invalidates most other options from \
                    a tezos-node point of view, use at your own risk)."
                 ~docv:"JSON-FILE" ~docs)))
-  $ Protocol_kind.cmdliner_term ()
-  $ Arg.(
-      pure (fun l ->
-          List.map l ~f:(fun ((name, pubkey, pubkey_hash, private_key), tez) ->
-              (Account.key_pair name ~pubkey ~pubkey_hash ~private_key, tez)))
-      $ value
-          (opt_all
-             (pair ~sep:'@' (t4 ~sep:',' string string string string) int64)
-             []
-             (info ["add-bootstrap-account"] ~docs
-                ~docv:"NAME,PUBKEY,PUBKEY-HASH,PRIVATE-URI@MUTEZ-AMOUNT"
-                ~doc:
-                  "Add a custom bootstrap account, e.g. \
-                   `LedgerBaker,edpku...,tz1YPS...,ledger://crouching-tiger.../ed25519/0'/0'@20_000_000_000`.")))
+  $ Protocol_kind.cmdliner_term () ~docs

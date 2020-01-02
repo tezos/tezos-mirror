@@ -13,7 +13,7 @@ depends: [
   "dum"
   "tezos-stdlib-unix"
   "lwt"
-  "fmt" { >= "0.8.6" }
+  "fmt"
   "cohttp-lwt-unix"
   "tezos-base"
 ]

@@ -1,7 +1,7 @@
 (library
  (name flextesa)
  (public_name flextesa)
- (flags (:standard ))
+ (flags (:standard -safe-string))
  (libraries
     fmt
     cohttp-lwt-unix

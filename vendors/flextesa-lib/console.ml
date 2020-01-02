@@ -5,13 +5,14 @@ type t =
   ; buffer: Buffer.t
   ; channel: Lwt_io.output_channel
   ; with_timestamp: bool
-  ; formatter: Format.formatter }
+  ; formatter: Caml.Format.formatter }
 
 let make with_timestamp color =
   let channel = Lwt_io.stderr in
   let b = Buffer.create 42 in
   let formatter =
-    Format.make_formatter (Buffer.add_substring b) (fun () -> ()) in
+    Caml.Format.make_formatter (Caml.Buffer.add_substring b) (fun () -> ())
+  in
   let bold = "\027[01m" in
   let red = "\027[31m" in
   let reset = "\027[m" in
@@ -20,7 +21,7 @@ let make with_timestamp color =
       | "prompt" -> Some bold
       | "shout" -> Some red
       | _ -> None in
-    Format.(
+    Caml.Format.(
       pp_set_formatter_tag_functions formatter
         { mark_open_tag= (fun _ -> "")
         ; mark_close_tag= (fun _ -> "")
@@ -31,17 +32,18 @@ let make with_timestamp color =
               | None -> ())
         ; print_close_tag=
             (fun tag ->
-              if color_of_tag tag <> None then fprintf formatter "%s" reset) } ;
+              if Poly.(color_of_tag tag <> None) then
+                fprintf formatter "%s" reset) } ;
       pp_set_tags formatter true) ) ;
   {color; buffer= b; channel; formatter; with_timestamp}
 
-let pp fmt {color; _} = Format.fprintf fmt "@[<2>{Console:@ color: %b}@]" color
+let pp fmt {color; _} = Fmt.pf fmt "@[<2>{Console:@ color: %b}@]" color
 
 let cli_term () =
   let guess =
     let dumb =
-      try match Sys.getenv "TERM" with "dumb" | "" -> true | _ -> false
-      with Not_found -> true in
+      try match Caml.Sys.getenv "TERM" with "dumb" | "" -> true | _ -> false
+      with Caml.Not_found -> true in
     let isatty = try Unix.(isatty stderr) with Unix.Unix_error _ -> false in
     if (not dumb) && isatty then true else false in
   Cmdliner.(
@@ -67,7 +69,7 @@ let do_output t =
       Lwt_io.write t.channel (Buffer.contents t.buffer)
       >>= fun () -> Buffer.clear t.buffer ; return_unit)
 
-let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
+let sayf (o : _ Base_state.t) (fmt : Caml.Format.formatter -> unit -> unit) :
     (_, _) Asynchronous_result.t =
   let date =
     if o#console.with_timestamp then
@@ -77,7 +79,7 @@ let sayf (o : _ Base_state.t) (fmt : Format.formatter -> unit -> unit) :
       sprintf "[%s]" date
     else "" in
   let ppf = o#console.formatter in
-  Format.(
+  Caml.Format.(
     pp_open_hvbox ppf 2 ;
     pp_open_tag ppf "prompt" ;
     fprintf ppf "%s%s:" o#application_name date ;
@@ -99,7 +101,7 @@ let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
     else "" in
   let msg = EF.(label (ksprintf prompt "%s%s:" o#application_name date) ef) in
   let fmt = o#console.formatter in
-  Format.(
+  Caml.Format.(
     fprintf fmt "%a" Easy_format.Pretty.to_formatter msg ;
     pp_print_newline fmt () ;
     pp_print_flush fmt ()) ;
@@ -108,23 +110,26 @@ let say (o : _ Base_state.t) ef : (_, _) Asynchronous_result.t =
 module Prompt = struct
   type item =
     { commands: string list
-    ; doc: EF.t
+    ; description: string
+    ; details: unit Fmt.t option
     ; action:
            Base.Sexp.t list
         -> ( [`Help | `Quit | `Loop]
            , [System_error.t | `Command_line of string] )
            Asynchronous_result.t }
 
-  let item doc commands action = {commands; doc; action}
+  let item ?details ~description commands action =
+    {commands; description; details; action}
 
-  let quit ?(doc = EF.(af "Quit this prompt and continue")) commands =
-    item doc commands (fun _ -> return `Quit)
+  let quit ?(description = "Quit this prompt and continue.") commands =
+    item ~description commands (fun _ -> return `Quit)
 
-  let help ?(doc = EF.(af "Display command help")) commands =
-    item doc commands (fun _ -> return `Help)
+  let help ?(description = "Display help on all commands.") commands =
+    item ~description commands (fun _ -> return `Help)
 
-  let unit_and_loop doc commands f =
-    item doc commands (fun x -> f x >>= fun () -> return `Loop)
+  let unit_and_loop ?details ~description commands f =
+    item ?details ~description commands (fun x ->
+        f x >>= fun () -> return `Loop)
 
   let default_commands () = [quit ["q"; "quit"]; help ["h"; "help"]]
 
@@ -157,28 +162,27 @@ module Prompt = struct
                              function
                              | #System_error.t as e -> System_error.pp fmt e
                              | `Command_line s ->
-                                 Format.fprintf fmt "Wrong command line: %s" s))))
+                                 Fmt.pf fmt "Wrong command line: %s" s))))
                 >>= fun () -> return `Loop)
             >>= function
             | `Loop -> loop ()
             | `Help ->
-                say state
-                  EF.(
-                    let cmdlist =
-                      list ~sep:"|" ~delimiters:("[", "]")
-                        ~param:
-                          { default_list with
-                            space_after_separator= false
-                          ; space_before_closing= false
-                          ; space_after_opening= false } in
-                    label (haf "Commands:")
-                      (list
-                         (List.map commands ~f:(fun {commands; doc; _} ->
-                              label
-                                ~param:
-                                  {default_label with space_after_label= false}
-                                (cmdlist (List.map ~f:(af "%S") commands))
-                                (list [haf "->"; doc])))))
+                sayf state
+                  More_fmt.(
+                    fun ppf () ->
+                      vertical_box ~indent:2 ppf (fun ppf ->
+                          pf ppf "Available commands:" ;
+                          cut ppf () ;
+                          List.iter commands
+                            ~f:(fun {commands; description; details; _} ->
+                              wrapping_box ~indent:2 ppf (fun ppf ->
+                                  pf ppf "* {%a}:@ %a"
+                                    (list ~sep:(const string "|") (fun ppf s ->
+                                         prompt ppf (fun ppf -> string ppf s)))
+                                    commands text description ;
+                                  Option.iter details ~f:(fun pp ->
+                                      cut ppf () ; pp ppf ())) ;
+                              cut ppf ())))
                 >>= fun () -> loop ()
             | `Quit -> return () )
         | None ->
@@ -208,9 +212,10 @@ module Prompt = struct
 end
 
 let display_errors_of_command state ?(should_output = false) cmd =
-  let outputs () = List.exists cmd#out ~f:(fun s -> String.strip s <> "") in
+  let outputs () =
+    List.exists cmd#out ~f:Poly.(fun s -> String.strip s <> "") in
   let success =
-    let unix_success = cmd#status = Lwt_unix.WEXITED 0 in
+    let unix_success = Poly.equal cmd#status (Lwt_unix.WEXITED 0) in
     if should_output then unix_success && outputs () else unix_success in
   ( if success then return ()
   else

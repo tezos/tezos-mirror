@@ -42,5 +42,13 @@ val accuser_of_node :
   -> t
 
 val arg_to_string : args -> string
-val to_script : t -> state:< paths: Paths.t ; .. > -> unit Genspio.Language.t
-val process : t -> state:< paths: Paths.t ; .. > -> Running_processes.Process.t
+
+val to_script :
+     < env_config: Environment_configuration.t ; paths: Paths.t ; .. >
+  -> t
+  -> unit Genspio.Language.t
+
+val process :
+     < env_config: Environment_configuration.t ; paths: Paths.t ; .. >
+  -> t
+  -> Running_processes.Process.t

@@ -5,17 +5,17 @@ let failf ?attach fmt =
   ksprintf (fun s -> fail ?attach (`Scenario_error s)) fmt
 
 module Data = struct
-  type t = Fmt of (Format.formatter -> unit)
+  type t = Fmt of (Caml.Format.formatter -> unit)
 
   let to_string = function
-    | Fmt f -> Format.asprintf "%a" (fun ppf () -> f ppf) ()
+    | Fmt f -> Caml.Format.asprintf "%a" (fun ppf () -> f ppf) ()
 
   let pp ppf (Fmt f) =
     let open Fmt in
     box (fun ppf () -> f ppf) ppf ()
 
   let rawf fmt =
-    Format.kasprintf (fun s -> Fmt (fun ppf -> Fmt.string ppf s)) fmt
+    Caml.Format.kasprintf (fun s -> Fmt (fun ppf -> Fmt.string ppf s)) fmt
 
   let fmt f = Fmt f
   let address s = rawf "%s" s
@@ -35,7 +35,7 @@ module Data = struct
 
   let tez (`Mutez d) =
     let million = 1_000_000. in
-    rawf "%ftz" (float d /. million)
+    rawf "%ftz" (Float.of_int d /. million)
 
   let semi_colon = Fmt.(fun ppf () -> string ppf ";" ; sp ppf ())
   let list l = list_like ~sep:semi_colon ~delimiter:Fmt.brackets l
@@ -73,12 +73,12 @@ module Contract = struct
   let ensure_build_dir state t =
     let dir = build_dir state t in
     Running_processes.run_successful_cmdf state "mkdir -p %s"
-      (Filename.quote dir)
+      (Caml.Filename.quote dir)
     >>= fun _ -> return dir
 
   let base_liquidity_command _state t =
     sprintf "liquidity %s %s"
-      (List.map t.paths ~f:Filename.quote |> String.concat ~sep:" ")
+      (List.map t.paths ~f:Caml.Filename.quote |> String.concat ~sep:" ")
       (Option.value_map t.main_name ~default:"" ~f:(sprintf "--main %s"))
 
   let michelson state t =
@@ -87,7 +87,7 @@ module Contract = struct
     >>= fun _ ->
     Running_processes.run_successful_cmdf state "%s --no-annot -o %s"
       (base_liquidity_command state t)
-      (Filename.quote f)
+      (Caml.Filename.quote f)
     >>= fun _ -> return f
 
   let storage_initialization state t ~tezos_node ~storage =
@@ -97,17 +97,18 @@ module Contract = struct
     Running_processes.run_successful_cmdf state
       "%s -o %s --tezos-node %s --init-storage %s"
       (base_liquidity_command state t)
-      (Filename.quote out)
-      (Filename.quote tezos_node)
-      ( List.map storage ~f:(fun item -> Filename.quote (Data.to_string item))
+      (Caml.Filename.quote out)
+      (Caml.Filename.quote tezos_node)
+      ( List.map storage ~f:(fun item ->
+            Caml.Filename.quote (Data.to_string item))
       |> String.concat ~sep:" " )
     >>= fun _ -> System.read_file state out >>= fun content -> return content
 
   let arguments state t ~entry_point ~data =
     Running_processes.run_successful_cmdf state "%s --data %s %s"
       (base_liquidity_command state t)
-      (Filename.quote entry_point)
-      (Filename.quote (Data.to_string data))
+      (Caml.Filename.quote entry_point)
+      (Caml.Filename.quote (Data.to_string data))
     >>= fun res -> return (String.concat ~sep:" " res#out)
 
   let cmdliner_term ~prefix ~name () =
@@ -186,10 +187,10 @@ module On_chain = struct
   (* This should go to flextesa soon... *)
   let silent_client_cmd state ~client args =
     Running_processes.run_cmdf state "sh -c %s"
-      ( Tezos_client.client_command client ~state args
-      |> Genspio.Compile.to_one_liner |> Filename.quote )
+      ( Tezos_client.client_command state client args
+      |> Genspio.Compile.to_one_liner |> Caml.Filename.quote )
     >>= fun res ->
-    let success = res#status = Lwt_unix.WEXITED 0 in
+    let success = Poly.equal res#status (Lwt_unix.WEXITED 0) in
     return (success, res)
 
   let call ?msg ?(should = `Be_ok) ?(transferring = 0) ?(burn_cap = 0.3) state
@@ -217,7 +218,7 @@ module On_chain = struct
             return (`Expected `Failure)
           else return (`Failed `With_error_does_not_match)
       | `Be_ok -> return (`Failed `Not_ok) )
-    | true when should = `Be_ok ->
+    | true when Poly.equal should `Be_ok ->
         silent_client_cmd state ~client:keyed_client.client
           [ "bake"; "for"; keyed_client.key_name; "--force"
           ; "--minimal-timestamp" ]
@@ -287,12 +288,11 @@ module On_chain = struct
 
   let show_contract_command state ~client ~name ~address ~pp_error =
     Console.Prompt.unit_and_loop
-      EF.(wf "Show status of the contract %s." address)
-      [sprintf "show-%s" name]
-      (fun _sexps ->
+      ~description:(Fmt.str "Show status of the contract %s." address)
+      [sprintf "show-%s" name] (fun _sexps ->
         Asynchronous_result.transform_error
           ~f:(fun e ->
-            Format.kasprintf
+            Caml.Format.kasprintf
               (fun s -> `Command_line s)
               "show-contract: %a" pp_error e)
           ( List.fold ["storage"; "balance"] ~init:(return [])
@@ -320,13 +320,12 @@ module On_chain = struct
   let big_map_get_command state ~names ~thing ~client ~name ~address
       ~key_of_string ~pp_error =
     Console.Prompt.unit_and_loop
-      EF.(
-        wf "Get %s from the big-map of the contract %s@%s." thing name address)
-      names
-      (fun sexps ->
+      ~description:
+        (Fmt.str "Get %s from the big-map of the contract %s@%s." thing name
+           address) names (fun sexps ->
         Asynchronous_result.transform_error
           ~f:(fun e ->
-            Format.kasprintf
+            Caml.Format.kasprintf
               (fun s -> `Command_line s)
               "%s: %a" (List.hd_exn names) pp_error e)
           ( match sexps with

@@ -23,9 +23,9 @@ module State : sig
   type process_state = private
     {process: Process.t; lwt: Lwt_process.process_none}
 
-  type t = private {processes: (string, process_state) Hashtbl.t}
+  type t = private {processes: (string, process_state) Caml.Hashtbl.t}
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t Fmt.t
   val make : unit -> t
 end
 
@@ -67,7 +67,8 @@ val find_process_by_id :
   -> (State.process_state list, [> ]) Asynchronous_result.t
 
 val run_cmdf :
-     < paths: Paths.t ; runner: State.t ; .. > Base_state.t
+     ?id_prefix:string
+  -> < paths: Paths.t ; runner: State.t ; .. > Base_state.t
   -> ( 'a
      , unit
      , string

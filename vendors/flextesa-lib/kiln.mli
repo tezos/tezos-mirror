@@ -22,5 +22,6 @@ module Configuration_directory : sig
     -> client_exec:Tezos_executable.t
     -> (unit, [> System_error.t]) Asynchronous_result.t
 
-  val cli_term : unit -> t option Cmdliner.Term.t
+  val cli_term :
+    < manpager: Manpage_builder.State.t ; .. > -> t option Cmdliner.Term.t
 end

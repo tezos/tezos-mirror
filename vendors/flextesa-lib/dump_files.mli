@@ -16,8 +16,6 @@ val write :
   -> name:string
   -> path:string
   -> (string * string) list
-  -> ( unit
-     , [> System_error.t | `Wrong_status of Process_result.t * string] )
-     Asynchronous_result.t
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 
-val pp : Format.formatter -> t -> unit
+val pp : t Fmt.t

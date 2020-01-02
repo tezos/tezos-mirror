@@ -45,13 +45,23 @@ val default_binary : t -> string
 val get : t -> string
 (** The path to the executable. *)
 
-val call : t -> path:string -> string list -> unit Genspio.EDSL.t
+val call :
+     < env_config: Environment_configuration.t ; .. >
+  -> t
+  -> path:string
+  -> string list
+  -> unit Genspio.EDSL.t
 (** Build a [Genspio.EDSL.t] script to run a tezos command, the
     [~path] argument is used as a toplevel path for the unix-files
     event-sink (event-logging-framework) and for other local logging
     files. *)
 
-val cli_term : kind -> string -> t Cmdliner.Term.t
+val cli_term :
+     ?extra_doc:string
+  -> < manpager: Internal_pervasives.Manpage_builder.State.t ; .. >
+  -> kind
+  -> string
+  -> t Cmdliner.Term.t
 (** Build a [Cmdliner] term which creates tezos-executables, the
     second argument is a prefix of option names (e.g. ["tezos"] for the
     option ["--tezos-accuser-alpha-binary"]). *)

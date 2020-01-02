@@ -1,18 +1,32 @@
 open Internal_pervasives
 
 module Inconsistency_error = struct
-  type t = [`Empty_protocol_list | `Too_many_protocols of Tezos_protocol.t list]
+  type t =
+    [ `Empty_protocol_list
+    | `Too_many_protocols of Tezos_protocol.t list
+    | `Too_many_timestamp_delays of Tezos_protocol.t list ]
 
   let should_be_one_protocol = function
     | [one] -> return one
     | [] -> fail `Empty_protocol_list
     | more -> fail (`Too_many_protocols more)
 
+  let should_be_one_timestamp_delay = function
+    | [_] -> return ()
+    | [] -> fail `Empty_protocol_list
+    | more -> fail (`Too_many_timestamp_delays more)
+
   let pp fmt err =
-    Format.fprintf fmt "Wrong number of protocols in network: %d"
-      ( match err with
-      | `Empty_protocol_list -> 0
-      | `Too_many_protocols p -> List.length p )
+    match err with
+    | `Empty_protocol_list ->
+        Caml.Format.fprintf fmt "Wrong number of protocols in network: 0"
+    | `Too_many_protocols p ->
+        Caml.Format.fprintf fmt "Wrong number of protocols in network: %d"
+          (List.length p)
+    | `Too_many_timestamp_delays p ->
+        Caml.Format.fprintf fmt
+          "Wrong number of protocol timestamp delays in network: %d"
+          (List.length p)
 end
 
 module Topology = struct
@@ -67,12 +81,12 @@ module Topology = struct
     | Net_in_the_middle {left; right; middle} ->
         continue middle @ continue left @ continue right
 
-  let build ?(external_peer_ports = []) ?protocol ?(base_port = 15_001) ~exec
+  let build ?(external_peer_ports = []) ?(base_port = 15_001) ~make_node
       network =
     let all_ports = ref [] in
-    let next_port = ref (base_port + (base_port mod 2)) in
+    let next_port = ref (base_port + Int.rem base_port 2) in
     let rpc name =
-      match List.find !all_ports ~f:(fun (n, _) -> n = name) with
+      match List.find !all_ports ~f:(fun (n, _) -> String.equal n name) with
       | Some (_, p) -> p
       | None ->
           let p = !next_port in
@@ -87,14 +101,14 @@ module Topology = struct
         List.length peers + List.length external_peer_ports in
       let peers =
         List.filter_map peers ~f:(fun p ->
-            if p <> id then Some (p2p p) else None) in
-      Tezos_node.make ?protocol ~exec id ~expected_connections ~rpc_port
-        ~p2p_port
+            if not (String.equal p id) then Some (p2p p) else None) in
+      make_node id ~expected_connections ~rpc_port ~p2p_port
         (external_peer_ports @ peers) in
     let dbgp prefx names =
-      Printf.eprintf "%s:\n  %s\n%!" prefx
-        (String.concat ~sep:"\n  "
-           (List.map names ~f:(fun n -> sprintf "%s:%d" n (p2p n)))) in
+      Dbg.f (fun pf ->
+          pf "%s:\n  %s\n%!" prefx
+            (String.concat ~sep:"\n  "
+               (List.map names ~f:(fun n -> sprintf "%s:%d" n (p2p n))))) in
     let rec make :
         type a. ?extra_peers:string list -> prefix:string -> a network -> a =
      fun ?(extra_peers = []) ~prefix network ->
@@ -142,39 +156,9 @@ module Network = struct
 
   let make nodes = {nodes}
 
-  let netstat state =
-    Running_processes.run_cmdf state "netstat -nut"
-    >>= fun res ->
-    Process_result.Error.fail_if_non_zero res "netstat -nut command"
-    >>= fun () ->
-    let rows =
-      List.filter_mapi res#out ~f:(fun idx line ->
-          match
-            String.split line ~on:' '
-            |> List.filter_map ~f:(fun s ->
-                   match String.strip s with "" -> None | s -> Some s)
-          with
-          | ("tcp" | "tcp6") :: _ as row -> Some (`Tcp (idx, row))
-          | _ -> Some (`Wrong (idx, line))) in
-    return rows
-
-  let all_listening_ports rows =
-    List.filter_map rows ~f:(function
-      | `Tcp (_, _ :: _ :: _ :: addr :: _) as row -> (
-        match String.split addr ~on:':' with
-        | [_; port] -> ( try Some (Int.of_string port, row) with _ -> None )
-        | _ -> None )
-      | _ -> None)
-
-  let netstat_listening_ports state =
-    netstat state
-    >>= fun rows ->
-    let all_used = all_listening_ports rows in
-    return all_used
-
   let start_up ?(check_ports = true) state ~client_exec {nodes} =
     ( if check_ports then
-      netstat_listening_ports state
+      Helpers.Netstat.used_listening_ports state
       >>= fun all_used ->
       let taken port = List.find all_used ~f:(fun (p, _) -> Int.equal p port) in
       List_sequential.iter nodes
@@ -183,7 +167,8 @@ module Network = struct
             System_error.fail_fatalf
               "Node: %S's %s port %d already in use {%s}" id s p
               (String.concat ~sep:"|" row) in
-          let time_wait (_, `Tcp (_, row)) = List.last row = Some "TIME_WAIT" in
+          let time_wait (_, `Tcp (_, row)) =
+            Poly.equal (List.last row) (Some "TIME_WAIT") in
           match (taken rpc_port, taken p2p_port) with
           | None, None -> return ()
           | Some p, _ -> if time_wait p then return () else fail "RPC" p
@@ -195,7 +180,9 @@ module Network = struct
       |> List.dedup_and_sort ~compare:Tezos_protocol.compare in
     Inconsistency_error.should_be_one_protocol protocols
     >>= fun protocol ->
-    Tezos_protocol.ensure protocol ~config:state
+    Inconsistency_error.should_be_one_timestamp_delay protocols
+    >>= fun () ->
+    Tezos_protocol.ensure state protocol
     >>= fun () ->
     List.fold nodes ~init:(return ()) ~f:(fun prev_m node ->
         prev_m
@@ -206,20 +193,24 @@ module Network = struct
     let node_0 = List.hd_exn nodes in
     let client = Tezos_client.of_node node_0 ~exec:client_exec in
     Dbg.e EF.(af "Trying to bootstrap client") ;
-    Tezos_client.bootstrapped client ~state
+    Tezos_client.wait_for_node_bootstrap state client
     >>= fun () ->
-    Tezos_client.activate_protocol client ~state protocol
+    Tezos_client.activate_protocol state client protocol
     >>= fun () ->
     Dbg.e EF.(af "Waiting for all nodes to be bootstrapped") ;
     List_sequential.iter nodes ~f:(fun node ->
         let client = Tezos_client.of_node node ~exec:client_exec in
-        Tezos_client.bootstrapped client ~state)
+        Tezos_client.wait_for_node_bootstrap state client)
 end
 
-let network_with_protocol ?external_peer_ports ?base_port ?(size = 5) ?protocol
-    ?(nodes_history_mode_edits = return) state ~node_exec ~client_exec =
+let network_with_protocol ?node_custom_network ?external_peer_ports ?base_port
+    ?(size = 5) ?protocol ?(nodes_history_mode_edits = return) state ~node_exec
+    ~client_exec =
   let pre_edit_nodes =
-    Topology.build ?base_port ?protocol ~exec:node_exec ?external_peer_ports
+    Topology.build ?base_port ?external_peer_ports
+      ~make_node:(fun id ~expected_connections ~rpc_port ~p2p_port peers ->
+        Tezos_node.make ?protocol ~exec:node_exec id ~expected_connections
+          ?custom_network:node_custom_network ~rpc_port ~p2p_port peers)
       (Topology.mesh "N" size) in
   nodes_history_mode_edits pre_edit_nodes
   >>= fun nodes ->
@@ -228,6 +219,8 @@ let network_with_protocol ?external_peer_ports ?base_port ?(size = 5) ?protocol
     |> List.dedup_and_sort ~compare:Tezos_protocol.compare in
   Inconsistency_error.should_be_one_protocol protocols
   >>= fun protocol ->
+  Inconsistency_error.should_be_one_timestamp_delay protocols
+  >>= fun () ->
   Network.start_up state ~client_exec (Network.make nodes)
   >>= fun () -> return (nodes, protocol)
 

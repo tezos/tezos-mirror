@@ -15,70 +15,78 @@ val base_dir : t -> state:< paths: Paths.t ; .. > -> string
 
 (** {3 Build Scripts } *)
 
+val client_call :
+     ?wait:string
+  -> < paths: Paths.t ; .. >
+  -> client
+  -> string list
+  -> string list
+(** Build the arguments for a given default tezos-client (not
+    including the executable). *)
+
 val client_command :
      ?wait:string
+  -> < env_config: Environment_configuration.t ; paths: Paths.t ; .. >
   -> client
-  -> state:< paths: Paths.t ; .. >
   -> string list
-  -> unit Genspio.EDSL.t
+  -> unit Genspio.Language.t
 (** Build a tezos-client command, the default [?wait] is ["none"]. *)
-
-val bootstrapped_script :
-  t -> state:< paths: Paths.t ; .. > -> unit Genspio.EDSL.t
-
-val import_secret_key_script :
-  t -> state:< paths: Paths.t ; .. > -> string -> string -> unit Genspio.EDSL.t
-
-val activate_protocol_script :
-  t -> state:< paths: Paths.t ; .. > -> Tezos_protocol.t -> unit Genspio.EDSL.t
 
 (** {3 Run Specific Client Commands } *)
 
-val bootstrapped :
-     t
-  -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
-           Base_state.t
-  -> (unit, [> System_error.t]) Asynchronous_result.t
+val wait_for_node_bootstrap :
+     < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
+     ; .. >
+  -> client
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 (** Wait for the node to be bootstrapped. *)
 
 val import_secret_key :
-     t
-  -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
-           Base_state.t
-  -> string
-  -> string
-  -> (unit, [> System_error.t]) Asynchronous_result.t
+     < paths: Paths.t
+     ; console: Console.t
+     ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
+     ; .. >
+     Base_state.t
+  -> t
+  -> name:string
+  -> key:string
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 
 val register_as_delegate :
-     t
-  -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
-           Base_state.t
-  -> string
-  -> (unit, [> System_error.t]) Asynchronous_result.t
+     < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
+     ; .. >
+  -> client
+  -> key_name:string
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 
 val activate_protocol :
-     t
-  -> state:< paths: Paths.t ; runner: Running_processes.State.t ; .. >
-           Base_state.t
+     < application_name: string
+     ; console: Console.t
+     ; paths: Paths.t
+     ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
+     ; .. >
+  -> client
   -> Tezos_protocol.t
-  -> (unit, [> System_error.t]) Asynchronous_result.t
-
-module Command_error : sig
-  type t = [`Client_command_error of string * string list option]
-
-  val failf :
-       ?args:string list
-    -> ('a, unit, string, ('b, [> t]) Asynchronous_result.t) format4
-    -> 'a
-
-  val pp : Format.formatter -> t -> unit
-end
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 
 val client_cmd :
-     ?wait:string
+     ?id_prefix:string
+  -> ?verbose:bool
+  -> ?wait:string
   -> < application_name: string
      ; console: Console.t
      ; paths: Paths.t
+     ; env_config: Environment_configuration.t
      ; runner: Running_processes.State.t
      ; .. >
   -> client:client
@@ -86,17 +94,20 @@ val client_cmd :
   -> (bool * Process_result.t, [> System_error.t]) Asynchronous_result.t
 
 val successful_client_cmd :
-     ?wait:string
+     ?id_prefix:string
+  -> ?verbose:bool
+  -> ?wait:string
   -> < application_name: string
      ; console: Console.t
      ; paths: Paths.t
      ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
      ; .. >
      Base_state.t
   -> client:t
   -> string list
   -> ( < err: string list ; out: string list ; status: Unix.process_status >
-     , [> Command_error.t | System_error.t] )
+     , [> Process_result.Error.t | System_error.t] )
      Asynchronous_result.t
 
 val rpc :
@@ -104,25 +115,27 @@ val rpc :
      ; console: Console.t
      ; paths: Paths.t
      ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
      ; .. >
      Base_state.t
   -> client:t
   -> [< `Get | `Post of string]
   -> path:string
   -> ( Ezjsonm.value
-     , [> Command_error.t | System_error.t] )
+     , [> Process_result.Error.t | System_error.t] )
      Asynchronous_result.t
 
 val find_applied_in_mempool :
      < application_name: string
      ; console: Console.t
      ; paths: Paths.t
+     ; env_config: Environment_configuration.t
      ; runner: Running_processes.State.t
      ; .. >
   -> client:client
   -> f:(Ezjsonm.value -> bool)
   -> ( Ezjsonm.value option
-     , [> Command_error.t | System_error.t] )
+     , [> Process_result.Error.t | System_error.t] )
      Asynchronous_result.t
 (** Use RPCs to find an operation matching [~f] in the node's mempool. *)
 
@@ -131,22 +144,24 @@ val mempool_has_operation :
      ; console: Console.t
      ; paths: Paths.t
      ; runner: Running_processes.State.t
+     ; env_config: Environment_configuration.t
      ; .. >
   -> client:t
   -> kind:string
-  -> (bool, [> Command_error.t | System_error.t]) Asynchronous_result.t
+  -> (bool, [> Process_result.Error.t | System_error.t]) Asynchronous_result.t
 (** Use RPCs to find an operation of kind [~kind] in the node's mempool. *)
 
 val block_has_operation :
      < application_name: string
      ; console: Console.t
+     ; env_config: Environment_configuration.t
      ; paths: Paths.t
      ; runner: Running_processes.State.t
      ; .. >
   -> client:t
   -> level:int
   -> kind:string
-  -> (bool, [> Command_error.t | System_error.t]) Asynchronous_result.t
+  -> (bool, [> Process_result.Error.t | System_error.t]) Asynchronous_result.t
 (** Use RPCs to find an operation of kind [~kind] in the node's chain
     at a given level. *)
 
@@ -154,12 +169,13 @@ val get_block_header :
      < application_name: string
      ; console: Console.t
      ; paths: Paths.t
+     ; env_config: Environment_configuration.t
      ; runner: Running_processes.State.t
      ; .. >
   -> client:t
   -> [`Head | `Level of int]
   -> ( Ezjsonm.value
-     , [> Command_error.t | System_error.t] )
+     , [> Process_result.Error.t | System_error.t] )
      Asynchronous_result.t
 (** Call the RPC ["/chains/main/blocks/<block>/header"]. *)
 
@@ -167,11 +183,12 @@ val list_known_addresses :
      < application_name: string
      ; console: Console.t
      ; paths: Paths.t
+     ; env_config: Environment_configuration.t
      ; runner: Running_processes.State.t
      ; .. >
   -> client:t
   -> ( (string * string) list
-     , [> Command_error.t | System_error.t] )
+     , [> Process_result.Error.t | System_error.t] )
      Asynchronous_result.t
 
 module Ledger : sig
@@ -181,55 +198,64 @@ module Ledger : sig
        < application_name: string
        ; console: Console.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> client:t
     -> uri:string
-    -> (hwm, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> (hwm, [> Process_result.Error.t | System_error.t]) Asynchronous_result.t
 
   val set_hwm :
        < application_name: string
        ; console: Console.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> client:t
     -> uri:string
     -> level:int
-    -> (unit, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
 
   val show_ledger :
        < application_name: string
        ; console: Console.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> client:t
     -> uri:string
     -> ( Tezos_protocol.Account.t
-       , [> Command_error.t | System_error.t] )
+       , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t
 
   val deauthorize_baking :
        < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
     -> client:t
     -> uri:string
-    -> (unit, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
 
   val get_authorized_key :
        < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
     -> client:t
     -> uri:string
     -> ( string option
-       , [> Command_error.t | System_error.t] )
+       , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t
 end
 
@@ -242,11 +268,12 @@ module Keyed : sig
        < application_name: string
        ; console: Console.t
        ; paths: Paths.t
+       ; env_config: Environment_configuration.t
        ; runner: Running_processes.State.t
        ; .. >
     -> t
     -> ( < err: string list ; out: string list ; status: Unix.process_status >
-       , [> Command_error.t | System_error.t] )
+       , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t
   (** Get the keyed-client ready to use (i.e. import the secret key). *)
 
@@ -255,37 +282,47 @@ module Keyed : sig
     -> < application_name: string
        ; console: Console.t
        ; operations_log: Log_recorder.Operations.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
     -> t
     -> string
-    -> (unit, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
 
   val endorse :
        < application_name: string
        ; console: Console.t
+       ; env_config: Environment_configuration.t
        ; operations_log: Log_recorder.Operations.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
     -> t
     -> string
-    -> (unit, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> ( unit
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
 
   val generate_nonce :
        < application_name: string
        ; console: Console.t
        ; operations_log: Log_recorder.Operations.t
+       ; env_config: Environment_configuration.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
        ; .. >
     -> t
     -> string
-    -> (string, [> Command_error.t | System_error.t]) Asynchronous_result.t
+    -> ( string
+       , [> Process_result.Error.t | System_error.t] )
+       Asynchronous_result.t
 
   val forge_and_inject :
        < application_name: string
+       ; env_config: Environment_configuration.t
        ; console: Console.t
        ; paths: Paths.t
        ; runner: Running_processes.State.t
@@ -293,7 +330,6 @@ module Keyed : sig
     -> t
     -> json:Ezjsonm.t
     -> ( Ezjsonm.value
-       , [> `Client_command_error of string * string list option
-         | System_error.t ] )
+       , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t
 end

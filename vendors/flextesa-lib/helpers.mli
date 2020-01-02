@@ -36,11 +36,12 @@ val restart_node :
      client_exec:Tezos_executable.t
   -> < application_name: string
      ; console: Console.t
+     ; env_config: Environment_configuration.t
      ; paths: Paths.t
      ; runner: Running_processes.State.t
      ; .. >
   -> Tezos_node.t
-  -> (unit, [> System_error.t]) Asynchronous_result.t
+  -> (unit, [> System_error.t | Process_result.Error.t]) Asynchronous_result.t
 (** Restart a killed node. *)
 
 (** Stateful “message × count” log, see its use in, e.g.,
@@ -56,11 +57,24 @@ module Counter_log : sig
   val to_table_string : t -> string
 end
 
+module Netstat : sig
+  val used_listening_ports :
+       < application_name: string
+       ; console: Console.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> ( (int * [> `Tcp of int * string list]) list
+       , [> System_error.t | Process_result.Error.t] )
+       Asynchronous_result.t
+  (** Call ["netstat"] to find TCP ports already in use. *)
+end
+
 module System_dependencies : sig
   module Error : sig
     type t = [`Precheck_failure of string]
 
-    val pp : Format.formatter -> [< `Precheck_failure of string] -> unit
+    val pp : Caml.Format.formatter -> [< `Precheck_failure of string] -> unit
   end
 
   val precheck :
@@ -74,4 +88,25 @@ module System_dependencies : sig
        ; .. >
     -> [< `Or_fail]
     -> (unit, [> System_error.t | Error.t]) Asynchronous_result.t
+end
+
+module Shell_environement : sig
+  type t
+
+  val make : aliases:(string * string * string) list -> t
+  (** Aliases are [(name, command, doc)] tuples. *)
+
+  val build : < paths: Paths.t ; .. > -> clients:Tezos_client.t list -> t
+
+  val write :
+       < application_name: string ; .. >
+    -> t
+    -> path:string
+    -> (unit, [> System_error.t]) Attached_result.t Lwt.t
+
+  val help_command :
+       < application_name: string ; console: Console.t ; .. >
+    -> t
+    -> path:string
+    -> Console.Prompt.item
 end

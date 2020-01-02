@@ -7,10 +7,10 @@ type t =
   ; buffer: Buffer.t
   ; channel: Lwt_io.output_channel
   ; with_timestamp: bool
-  ; formatter: Format.formatter }
+  ; formatter: Caml.Format.formatter }
 
 val make : bool -> bool -> t
-val pp : Format.formatter -> t -> unit
+val pp : Caml.Format.formatter -> t -> unit
 
 val cli_term : unit -> t Cmdliner.Term.t
 (** {!Cmdliner.Term.t} which configures the console interaction
@@ -23,14 +23,15 @@ val say :
 
 val sayf :
      < application_name: string ; console: t ; .. >
-  -> (Format.formatter -> unit -> unit)
+  -> (Caml.Format.formatter -> unit -> unit)
   -> (unit, [> System_error.t]) Asynchronous_result.t
 
 (** Create interactive prompts. *)
 module Prompt : sig
-  type item =
+  type item = private
     { commands: string list
-    ; doc: Easy_format.t
+    ; description: string
+    ; details: unit Fmt.t option
     ; action:
            Sexplib0.Sexp.t list
         -> ( [`Help | `Loop | `Quit]
@@ -38,7 +39,8 @@ module Prompt : sig
            Asynchronous_result.t }
 
   val item :
-       Easy_format.t
+       ?details:unit Fmt.t
+    -> description:string
     -> string list
     -> (   Sexplib0.Sexp.t list
         -> ( [`Help | `Loop | `Quit]
@@ -49,11 +51,12 @@ module Prompt : sig
       which performs [action]; action gets all the arguments parsed as
       S-Expressions. *)
 
-  val quit : ?doc:Easy_format.t -> string list -> item
-  val help : ?doc:Easy_format.t -> string list -> item
+  val quit : ?description:string -> string list -> item
+  val help : ?description:string -> string list -> item
 
   val unit_and_loop :
-       Easy_format.t
+       ?details:unit Fmt.t
+    -> description:string
     -> string list
     -> (   Sexplib0.Sexp.t list
         -> ( unit

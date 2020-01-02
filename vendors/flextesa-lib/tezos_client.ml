@@ -14,113 +14,85 @@ let base_dir t ~state = Paths.root state // sprintf "Client-base-%s" t.id
 
 open Tezos_executable.Make_cli
 
-let client_command ?(wait = "none") t ~state args =
-  Tezos_executable.call t.exec
+let client_call ?(wait = "none") state t args =
+  ("--wait" :: wait :: optf "port" "%d" t.port)
+  @ opt "base-dir" (base_dir ~state t)
+  @ args
+
+let client_command ?wait state t args =
+  Tezos_executable.call state t.exec
     ~path:(base_dir t ~state // "exec-client")
-    ( ("--wait" :: wait :: optf "port" "%d" t.port)
-    @ opt "base-dir" (base_dir ~state t)
-    @ args )
-
-let bootstrapped_script t ~state =
-  let open Genspio.EDSL in
-  let cmd =
-    loop_until_true ~attempts:5 ~sleep:1
-      ~on_failed_attempt:(fun _ ->
-        eprintf (str "Bootstrap attempt failed\\n") [])
-      (succeeds (client_command t ~state ["bootstrapped"])) in
-  seq
-    [ exec ["mkdir"; "-p"; base_dir ~state t]
-    ; if_seq cmd ~t:[eprintf (str "Node Bootstrapped\\n") []] ]
-
-let bootstrapped t ~state =
-  let genspio = bootstrapped_script t ~state in
-  Running_processes.run_genspio state (sprintf "bootstrap-%s" t.id) genspio
-  >>= fun _ -> return ()
-
-let import_secret_key_script t ~state name key =
-  client_command t ~state ["import"; "secret"; "key"; name; key; "--force"]
-
-let activate_protocol_script t ~state protocol =
-  let open Genspio.EDSL in
-  check_sequence ~verbosity:(`Announce "activating-protocol")
-    [ ( "add-activator-key"
-      , import_secret_key_script t ~state
-          (Tezos_protocol.dictator_name protocol)
-          (Tezos_protocol.dictator_secret_key protocol) )
-    ; ( "activate-protocol"
-      , ensure "activate-alpha-only-once"
-          ~condition:
-            (greps_to
-               (str protocol.Tezos_protocol.hash)
-               (client_command t ~state
-                  ["rpc"; "get"; "/chains/main/blocks/head/metadata"]))
-          ~how:
-            [ ( "activate"
-              , client_command t ~state @@ opt "block" "genesis"
-                @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"
-                  ; "fitness"
-                  ; sprintf "%d" protocol.Tezos_protocol.expected_pow
-                  ; "and"; "key"
-                  ; Tezos_protocol.dictator_name protocol
-                  ; "and"; "parameters"
-                  ; Tezos_protocol.protocol_parameters_path ~config:state
-                      protocol ] ) ] ) ]
-
-let import_secret_key t ~state name key =
-  Running_processes.run_genspio state
-    (sprintf "client-%s-import-key-%s-as-%s" t.id name key)
-    (import_secret_key_script t ~state name key)
-  >>= fun _ -> return ()
-
-let register_as_delegate t ~state keyname =
-  Running_processes.run_genspio state
-    (sprintf "client-%s-register-as-delegate-for-%s" t.id keyname)
-    Genspio.EDSL.(
-      if_seq
-        ( succeeds
-        @@ client_command t ~state
-             ["register"; "key"; keyname; "as"; "delegate"] )
-        ~t:[say "SUCCESS: Registering %s as delegate" [str keyname]]
-        ~e:[say "FAILURE: Registering %s as delegate" [str keyname]])
-  >>= fun _ -> return ()
-
-let activate_protocol t ~state protocol =
-  Running_processes.run_genspio state
-    (sprintf "activate_protocol-%s-%s" t.id protocol.Tezos_protocol.id)
-    (activate_protocol_script t ~state protocol)
-  >>= fun _ -> return ()
+    (client_call ?wait state t args)
 
 module Command_error = struct
-  type t = [`Client_command_error of string * string list option]
-
-  let failf ?args fmt =
-    ksprintf (fun s -> fail (`Client_command_error (s, args) : [> t])) fmt
-
-  let pp fmt (`Client_command_error (msg, args) : t) =
-    Format.fprintf fmt "Client-command-error:@ %s%s" msg
-      (Option.value_map args ~default:"" ~f:(fun l ->
-           sprintf " (args: %s)"
-             (List.map ~f:(sprintf "%S") l |> String.concat ~sep:", ")))
+  let failf ?result ?client ?args fmt =
+    let attach =
+      Option.value_map ~default:[] args ~f:(fun l ->
+          [("arguments", `String_list l)])
+      @ Option.value_map ~default:[] client ~f:(fun c ->
+            [("client-id", `String_value c.id)])
+      @ Option.value_map ~default:[] result ~f:(fun res ->
+            [("stdout", `Verbatim res#out); ("stderr", `Verbatim res#err)])
+    in
+    Process_result.Error.wrong_behavior ~attach fmt
 end
 
 open Command_error
 open Console
 
-let client_cmd ?wait state ~client args =
-  Running_processes.run_cmdf state "sh -c %s"
-    ( client_command ?wait client ~state args
-    |> Genspio.Compile.to_one_liner |> Filename.quote )
-  >>= fun res ->
-  Console.display_errors_of_command state res
-  >>= fun success -> return (success, res)
+let run_client_cmd ?id_prefix ?wait state client args =
+  Running_processes.run_cmdf ?id_prefix state "sh -c %s"
+    ( client_command ?wait state client args
+    |> Genspio.Compile.to_one_liner |> Caml.Filename.quote )
 
-let successful_client_cmd ?wait state ~client args =
-  client_cmd state ?wait ~client args
-  >>= fun (success, res) ->
+let client_cmd ?id_prefix ?(verbose = true) ?wait state ~client args =
+  Running_processes.run_cmdf ?id_prefix state "sh -c %s"
+    ( client_command ?wait state client args
+    |> Genspio.Compile.to_one_liner |> Caml.Filename.quote )
+  >>= fun res ->
+  let unix_success = Poly.equal res#status (Lwt_unix.WEXITED 0) in
+  ( if verbose then
+    Console.display_errors_of_command state res >>= fun _ -> return ()
+  else return () )
+  >>= fun () -> return (unix_success, res)
+
+let successful_client_cmd ?id_prefix ?(verbose = true) ?wait state ~client args
+    =
+  client_cmd ?id_prefix ~verbose state ?wait ~client args
+  >>= fun (success, result) ->
   match success with
-  | true -> return res
+  | true -> return result
   | false ->
-      failf ~args "Client-command failure: %s" (String.concat ~sep:" " args)
+      failf ~result ~client ~args "Client-command failure: %s"
+        (String.concat ~sep:" " args)
+
+let wait_for_node_bootstrap state client =
+  let try_once () =
+    run_client_cmd
+      ~id_prefix:(client.id ^ "-bootstrapped")
+      state client ["bootstrapped"]
+    >>= fun res -> return Poly.(res#status = Unix.WEXITED 0) in
+  let attempts = 8 in
+  let rec loop nth =
+    if nth >= attempts then failf "Bootstrapping failed %d times." nth
+    else
+      try_once ()
+      >>= function
+      | true -> return ()
+      | false ->
+          System.sleep Float.(0.3 + (of_int nth * 0.5))
+          >>= fun () -> loop (nth + 1) in
+  loop 1
+
+let import_secret_key state client ~name ~key =
+  successful_client_cmd state ~client
+    ["import"; "secret"; "key"; name; key; "--force"]
+  >>= fun _ -> return ()
+
+let register_as_delegate state client ~key_name =
+  successful_client_cmd state ~client
+    ["register"; "key"; key_name; "as"; "delegate"]
+  >>= fun _ -> return ()
 
 let rpc state ~client meth ~path =
   let args =
@@ -147,6 +119,46 @@ let rpc state ~client meth ~path =
       >>= fun () ->
       failf ~args "RPC failure cannot parse json: %s" Exn.(to_string e) )
 
+let activate_protocol state client protocol =
+  let timestamp =
+    match protocol.Tezos_protocol.timestamp_delay with
+    | None -> []
+    | Some delay -> (
+        let now = Ptime_clock.now () in
+        match Ptime.add_span now (Ptime.Span.of_int_s delay) with
+        | None ->
+            invalid_arg "activate_protocol_script: protocol.timestamp_delay"
+        | Some x -> ["--timestamp"; Ptime.to_rfc3339 x] ) in
+  Console.say state
+    EF.(wf "Activating protocol %s" protocol.Tezos_protocol.hash)
+  >>= fun () ->
+  import_secret_key state client
+    ~name:(Tezos_protocol.dictator_name protocol)
+    ~key:(Tezos_protocol.dictator_secret_key protocol)
+  >>= fun () ->
+  successful_client_cmd state ~client
+    ( opt "block" "genesis"
+    @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"; "fitness"
+      ; sprintf "%d" protocol.Tezos_protocol.expected_pow
+      ; "and"; "key"
+      ; Tezos_protocol.dictator_name protocol
+      ; "and"; "parameters"
+      ; Tezos_protocol.protocol_parameters_path state protocol ]
+    @ timestamp )
+  >>= fun _ ->
+  rpc state ~client `Get ~path:"/chains/main/blocks/head/metadata"
+  >>= fun metadata_json ->
+  ( match Jqo.field metadata_json ~k:"next_protocol" with
+  | `String hash when String.equal hash protocol.Tezos_protocol.hash ->
+      return ()
+  | exception e ->
+      System_error.fail_fatalf "Error getting protocol metadata: %a" Exn.pp e
+  | other_value ->
+      System_error.fail_fatalf "Error activating protocol: %s Vs %s"
+        (Ezjsonm.value_to_string other_value)
+        protocol.Tezos_protocol.hash )
+  >>= fun () -> return ()
+
 let find_applied_in_mempool state ~client ~f =
   successful_client_cmd state ~client
     ["rpc"; "get"; "/chains/main/mempool/pending_operations"]
@@ -168,8 +180,9 @@ let find_applied_in_mempool state ~client ~f =
 let mempool_has_operation state ~client ~kind =
   find_applied_in_mempool state ~client ~f:(fun o ->
       Jqo.field o ~k:"contents"
-      |> Jqo.list_exists ~f:(fun op -> Jqo.field op ~k:"kind" = `String kind))
-  >>= fun found_or_not -> return (found_or_not <> None)
+      |> Jqo.list_exists
+           ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind))
+  >>= fun found_or_not -> return Poly.(found_or_not <> None)
 
 let block_has_operation state ~client ~level ~kind =
   successful_client_cmd state ~client
@@ -181,8 +194,9 @@ let block_has_operation state ~client ~level ~kind =
       Jqo.list_exists json ~f:(fun olist ->
           Jqo.list_exists olist ~f:(fun o ->
               Jqo.field o ~k:"contents"
-              |> Jqo.list_exists ~f:(fun op ->
-                     Jqo.field op ~k:"kind" = `String kind))) in
+              |> Jqo.list_exists
+                   ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind)))
+    in
     say state
       EF.(
         desc
@@ -230,7 +244,7 @@ module Ledger = struct
   let set_hwm state ~client ~uri ~level =
     successful_client_cmd state ~client
       [ "set"; "ledger"; "high"; "watermark"; "for"; uri; "to"
-      ; string_of_int level ]
+      ; Int.to_string level ]
     >>= fun _ -> return ()
 
   let get_hwm state ~client ~uri =
@@ -254,12 +268,12 @@ module Ledger = struct
     let matches = Re.exec re (String.concat ~sep:" " res#out) in
     try
       return
-        { main= int_of_string (Re.Group.get matches 1)
+        { main= Int.of_string (Re.Group.get matches 1)
         ; chain=
             (let v = Re.Group.get matches 2 in
-             if v = "'Unspecified'" then None
+             if String.equal v "'Unspecified'" then None
              else Some (Tezos_crypto.Chain_id.of_b58check_exn v))
-        ; test= int_of_string (Re.Group.get matches 3) }
+        ; test= Int.of_string (Re.Group.get matches 3) }
     with e ->
       failf
         "Couldn't understand result of 'get high watermark for %S': error %S: \
@@ -282,7 +296,8 @@ module Ledger = struct
       let pubkey_hash = Re.(Group.get (exec addr_re out) 1) in
       let name =
         match
-          List.find known_addresses ~f:(fun (_, pkh) -> pkh = pubkey_hash)
+          List.find known_addresses ~f:(fun (_, pkh) ->
+              String.equal pkh pubkey_hash)
         with
         | None -> ""
         | Some (alias, _) -> alias in

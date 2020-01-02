@@ -1,36 +1,5 @@
 open Internal_pervasives
 
-module More_fmt = struct
-  include Fmt
-  (** Little experiment for fun … *)
-
-  let vertical_box ?indent ppf f = vbox ?indent (fun ppf () -> f ppf) ppf ()
-  let wrapping_box ?indent ppf f = box ?indent (fun ppf () -> f ppf) ppf ()
-
-  let wf ppf fmt =
-    Format.kasprintf (fun s -> box (fun ppf () -> text ppf s) ppf ()) fmt
-
-  let markdown_verbatim_list ppf l =
-    vertical_box ~indent:0 ppf (fun ppf ->
-        cut ppf () ;
-        string ppf (String.make 45 '`') ;
-        List.iter l ~f:(fun l -> cut ppf () ; string ppf l) ;
-        cut ppf () ;
-        string ppf (String.make 45 '`'))
-
-  let tag tag ppf f =
-    Format.pp_open_tag ppf tag ;
-    (f ppf : unit) ;
-    Format.pp_close_tag ppf ()
-
-  let shout = tag "shout"
-
-  let long_string ?(max = 30) ppf s =
-    match String.sub s ~pos:0 ~len:(max - 2) with
-    | s -> pf ppf "%S" (s ^ "...")
-    | exception _ -> pf ppf "%S" s
-end
-
 module Markup_fmt = struct
   (** An alternative experiment. *)
 
@@ -61,10 +30,10 @@ module Markup_fmt = struct
     verbatim_raw (Ezjsonm.value_to_string ~minify:false json)
 
   let t s : in_par list = [`Text s]
-  let tf fmt = Format.kasprintf t fmt
+  let tf fmt = Fmt.kstr t fmt
   let hl l : in_par list = [`Highlight (`Concat l)]
   let concat l = `Concat l
-  let hlf fmt = Format.kasprintf (fun s -> hl (t s)) fmt
+  let hlf fmt = Fmt.kstr (fun s -> hl (t s)) fmt
   let itemize l : t list = [`Itemize (List.map l ~f:(fun l -> `Concat l))]
 
   let to_fmt (x : t list) ppf () =
@@ -73,9 +42,9 @@ module Markup_fmt = struct
       | `Text s -> text ppf s
       | `Concat l -> List.iter l ~f:(pp_in_par ppf)
       | `Highlight s ->
-          Format.pp_open_tag ppf "prompt" ;
+          Caml.Format.pp_open_tag ppf "prompt" ;
           pp_in_par ppf s ;
-          Format.pp_close_tag ppf () in
+          Caml.Format.pp_close_tag ppf () in
     vertical_box ppf (fun ppf ->
         list ~sep:cut
           (fun ppf item ->

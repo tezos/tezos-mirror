@@ -14,31 +14,28 @@ let of_node ~exec n =
   let port = n.Tezos_node.rpc_port in
   {id; port; exec}
 
-let make_command t state args =
+let make_command state t args =
   let open Tezos_executable.Make_cli in
-  Tezos_executable.call t.exec
+  Tezos_executable.call state t.exec
     ~path:(base_dir t ~state // "exec-admin")
     (optf "port" "%d" t.port @ opt "base-dir" (base_dir ~state t) @ args)
 
 module Command_error = struct
-  type t = [`Admin_command_error of string * string list option]
-
-  let failf ?args fmt =
-    ksprintf (fun s -> fail (`Admin_command_error (s, args) : [> t])) fmt
-
-  let pp fmt (`Admin_command_error (msg, args) : t) =
-    Format.fprintf fmt "Admin-command-error:@ %s%s" msg
-      (Option.value_map args ~default:"" ~f:(fun l ->
-           sprintf " (args: %s)"
-             (List.map ~f:(sprintf "%S") l |> String.concat ~sep:", ")))
+  let failf ?client ?args fmt =
+    let attach =
+      Option.value_map ~default:[] args ~f:(fun l ->
+          [("arguments", `String_list l)])
+      @ Option.value_map ~default:[] client ~f:(fun c ->
+            [("client-id", `String_value c.id)]) in
+    Process_result.Error.wrong_behavior ~attach fmt
 end
 
 open Command_error
 
 let successful_command admin state args =
   Running_processes.run_cmdf state "sh -c %s"
-    ( make_command admin state args
-    |> Genspio.Compile.to_one_liner |> Filename.quote )
+    ( make_command state admin args
+    |> Genspio.Compile.to_one_liner |> Caml.Filename.quote )
   >>= fun res ->
   Console.display_errors_of_command state res
   >>= function
@@ -52,7 +49,7 @@ let inject_protocol admin state ~path =
   String.concat ~sep:" " res#out
   |> String.split ~on:' ' |> List.map ~f:String.strip
   |> (function
-       | _ :: _ :: hash :: _ when hash.[0] = 'P' -> return hash
+       | _ :: _ :: hash :: _ when Char.equal hash.[0] 'P' -> return hash
        | _ ->
            failf "inject protocol: cannot parse hash of protocol: %s"
              (String.concat ~sep:", " (List.map ~f:(sprintf "%S") res#out)))
