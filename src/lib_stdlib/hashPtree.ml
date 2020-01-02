@@ -500,52 +500,6 @@ module Int2_64 : Bits with type t = int64 * int64 = struct
     else (Int64.shift_left 1L (n - 64), 0L)
 end
 
-module type Size = sig
-  val size : int
-end
-
-module Bits (S : Size) = struct
-  type t = Z.t
-
-  let higher_bit = Z.shift_left Z.one S.size
-
-  let mark n = Z.logor higher_bit n
-
-  let unmark n = Z.logxor higher_bit n
-
-  let one = mark Z.one
-
-  let zero = higher_bit
-
-  let hash = Z.hash
-
-  let equal = Z.equal
-
-  let less_than = Z.lt
-
-  let highest_bit_unmarked n =
-    if Z.equal Z.zero n then Z.zero
-    else Z.(Z.one lsl Pervasives.pred (numbits n))
-
-  let highest_bit n = mark (highest_bit_unmarked (unmark n))
-
-  let lnot x = Z.logor (Z.lognot x) higher_bit
-
-  let ( land ) = Z.logand
-
-  let ( lxor ) a b = Z.logor (Z.logxor a b) higher_bit
-
-  let ( lor ) = Z.logor
-
-  let pred = Z.pred
-
-  let power_2 n = Z.( lsl ) Z.one n
-
-  let of_z n = mark n
-
-  let to_z n = unmark n
-end
-
 module BE_gen_prefix (Bits : Bits) :
   Ptree_sig.Prefix
     with type key = Bits.t
@@ -1236,7 +1190,4 @@ end
 
 module Make_LE (V : Value) = Make (LE_prefix) (V)
 module Make_BE (V : Value) = Make (BE_gen_prefix (BE_int)) (V)
-module Make_BE_gen (V : Value) (B : Bits) = Make (BE_gen_prefix (B)) (V)
-module Make_BE_sized (V : Value) (S : Size) =
-  Make (BE_gen_prefix (Bits (S))) (V)
 module Make_BE_int2_64 (V : Value) = Make (BE_gen_prefix (Int2_64)) (V)
