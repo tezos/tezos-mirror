@@ -432,10 +432,6 @@ module type Bits = sig
 
   val ( lor ) : t -> t -> t
 
-  val ( lsr ) : t -> int -> t
-
-  val ( lsl ) : t -> int -> t
-
   val pred : t -> t
 
   val less_than : t -> t -> bool
@@ -450,7 +446,7 @@ module type Bits = sig
 
   val one : t
 
-  val size : int
+  val power_2 : int -> t
 end
 
 module type Size = sig
@@ -460,11 +456,7 @@ end
 module Bits (S : Size) = struct
   type t = Z.t
 
-  let size = S.size
-
-  let higher_bit = Z.shift_left Z.one size
-
-  let mask = Z.pred higher_bit
+  let higher_bit = Z.shift_left Z.one S.size
 
   let mark n = Z.logor higher_bit n
 
@@ -494,12 +486,9 @@ module Bits (S : Size) = struct
 
   let ( lor ) = Z.logor
 
-  let ( lsr ) a n =
-    Z.logor (Z.shift_right_trunc (Z.logxor a higher_bit) n) higher_bit
-
-  let ( lsl ) a n = Z.logor (Z.logand (Z.shift_left a n) mask) higher_bit
-
   let pred = Z.pred
+
+  let power_2 n = Z.( lsl ) Z.one n
 
   let of_z n = mark n
 
