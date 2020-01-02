@@ -44,10 +44,6 @@ module type Bits = sig
 
   val ( lor ) : t -> t -> t
 
-  val ( lsr ) : t -> int -> t
-
-  val ( lsl ) : t -> int -> t
-
   val pred : t -> t
 
   val less_than : t -> t -> bool
@@ -62,7 +58,7 @@ module type Bits = sig
 
   val one : t
 
-  val size : int
+  val power_2 : int -> t
 end
 
 module type Size = sig
