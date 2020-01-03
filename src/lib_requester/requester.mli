@@ -23,31 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Generic cache / request scheduling service.
+(** Generic resource fetching/requesting service.
 
-    This module defines a generic key-value cache service [Cache].
+    This module defines a generic resource fetching service [Requester].
     It is parameterized by abstract services [Disk], [Request], [Memory_table]
     and [Precheck].
 
-    Values are looked up in [Disk.store] and are cached in [Memory_table.t].
+    It offers a key/value store interface. Values are looked up successively
+    in [Memory_table.t], then in [Disk.store]. If not found, they are
+    *requested* using the [Request] service. Ultimately, values are *cached* in
+    the [Memory_table] for faster retrieval on subsequent queries. This is
+    similar to a *read-through* cache except that values are never evicted
+    from the [Memory_table].
+
     Internally, the service schedules requests to an abstract external
-    sources (e.g. network) for missing keys. The key is then *pending* and
-    while the caller waits the value to be available.
+    source (e.g. network) for missing keys. The key is then *pending*
+    and the caller waits for the value to be available.
 
-    When a value is missing, the cache sends a request via
-    [Request.send] to query a value to the network, but it is the
-    responsibility of the client to *notify* the cache with
-    [Cache.notify] when the requested value is available.
+    When a value is missing, the requester sends a request via
+    [Request.send] to query a value to the network. The requester must be
+    *notified* by an external component when the requested value is available
+    using [Requester.notify].
 
-    Notified values are validated before being inserted in the cache,
+    Notified values are validated before being inserted in the requester,
     using the [Precheck] module.
 
-    The cache service offers two interfaces. [FULL_CACHE] is the full view, which
-    includes the creation, shutdown, and reception notification functions.
-    [CACHE] is a restricted view which essentially offers a *read-through*
-    cache interface. *)
+    The full resource fetching service is realized by the conjunction of
+    two components. The requester component, defined by this library, and
+    a notifying component (for instance, a worker thread waiting for network
+    messages).
 
-module type CACHE = sig
+    The requester offers two interfaces. [FULL_REQUESTER] is the full
+    view, which includes the creation, shutdown, and notification
+    functions. It is to be used by the controller setting up the service,
+    and the notifying component. [REQUESTER] is the restricted view, exported
+    to the service final user. *)
+
+module type REQUESTER = sig
   type t
 
   (** The index key *)
@@ -83,8 +95,8 @@ module type CACHE = sig
 
       The key is first looked up in memory, then on disk. If not present and
       not already requested, it schedules a request, and blocks until
-      the cache is notified with [notify]. [param] is used to validate the
-      notified value once it is received. (see also [PRECHECK] and [notify].
+      the requester is notified with [notify]. [param] is used to validate the
+      notified value once it is received. (see also [PRECHECK] and [notify]).
 
       Requests are re-sent via a 1.5 exponential back-off, with initial
       delay set to [Request.initial_delay]. If the function
@@ -105,8 +117,8 @@ module type CACHE = sig
   val clear_or_cancel : t -> key -> unit
 end
 
-module type FULL_CACHE = sig
-  include CACHE
+module type FULL_REQUESTER = sig
+  include REQUESTER
 
   (** The "disk" storage *)
   type store
@@ -114,7 +126,7 @@ module type FULL_CACHE = sig
   (** Configuration parameter to the [Request] service *)
   type request_param
 
-  (** type of values notified to the cache *)
+  (** type of values notified to the requester *)
   type notified_value
 
   (** [pending t k] returns [true] iff the key status is pending *)
@@ -124,13 +136,13 @@ module type FULL_CACHE = sig
       once. *)
   val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
-  (** [inject t k v] returns [false] if [k] is already present in the memory table
-      or in the disk, or has already been request.  Otherwise it updates the
-      memory table and return [true] *)
+  (** [inject t k v] returns [false] if [k] is already present in the memory
+      table or in the disk, or has already been requested. Otherwise it
+      updates the memory table and return [true] *)
   val inject : t -> key -> value -> bool Lwt.t
 
-  (** [notify t peer k nv] notifies the cache that a value has been received
-      for key [k], from peer [peer]. [nv] is a *notified value*. The
+  (** [notify t peer k nv] notifies the requester that a value has been
+      received for key [k], from peer [peer]. [nv] is a *notified value*. The
       notified value is validated using [Precheck.precheck], and the
       [param] provided at fetching time (see [PRECHECK]). If valid,
       the memory table is updated and all promises waiting on this key are
@@ -146,7 +158,7 @@ module type FULL_CACHE = sig
   (** Returns the number of requests currently pending *)
   val pending_requests : t -> int
 
-  (** [create ?global_input r s] creates a cache. [r] is the
+  (** [create ?global_input r s] creates a requester. [r] is the
       configuration parameter passed to [Request] functions.  *)
   val create :
     ?global_input:(key * value) Lwt_watcher.input ->
@@ -194,7 +206,7 @@ module type MEMORY_TABLE = sig
   val length : 'a t -> int
 end
 
-(** [Requests] abstracts a service used to sends asynchronous key requests
+(** [Requests] abstracts a service used to send asynchronous key requests
     to peers. *)
 module type REQUEST = sig
   type key
@@ -202,7 +214,7 @@ module type REQUEST = sig
   (** [param] represents the state/configuration of the service. *)
   type param
 
-  (** [initial_delay] is a service configuration time constant. Typically, use
+  (** [initial_delay] is a service configuration time constant. Typically, used
       to set up a retry time interval. *)
   val initial_delay : Time.System.Span.t
 
@@ -254,7 +266,7 @@ end)
 (Request : REQUEST with type key := Hash.t)
 (Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
   include
-    FULL_CACHE
+    FULL_REQUESTER
       with type key = Hash.t
        and type value = Disk_table.value
        and type param = Precheck.param

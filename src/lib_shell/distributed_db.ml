@@ -55,8 +55,8 @@ module Make_raw (Hash : sig
     val tag : t Tag.def
   end
 end)
-(Disk_table : Cache.DISK_TABLE with type key := Hash.t)
-(Memory_table : Cache.MEMORY_TABLE with type key := Hash.t)
+(Disk_table : Requester.DISK_TABLE with type key := Hash.t)
+(Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
 (Request_message : sig
   type param
 
@@ -66,7 +66,7 @@ end)
 
   val forge : param -> Hash.t list -> Message.t
 end)
-(Precheck : Cache.PRECHECK
+(Precheck : Requester.PRECHECK
               with type key := Hash.t
                and type value := Disk_table.value) =
 struct
@@ -107,7 +107,7 @@ struct
   end
 
   module Table =
-    Cache.Make (Hash) (Disk_table) (Memory_table) (Request) (Precheck)
+    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Precheck)
 
   type t = Table.t
 
@@ -123,7 +123,7 @@ struct
     Table.create ?global_input request_param disk
 
   let shutdown t =
-    Logging.lwt_log_notice "Shutting down the cache..."
+    Logging.lwt_log_notice "Shutting down the requester..."
     >>= fun () -> Table.shutdown t
 end
 
@@ -1071,7 +1071,7 @@ let watch_operation {operation_input; _} =
   Lwt_watcher.create_stream operation_input
 
 module Make
-    (Table : Cache.CACHE) (Kind : sig
+    (Table : Requester.REQUESTER) (Kind : sig
       type t
 
       val proj : t -> Table.t
@@ -1109,7 +1109,7 @@ module Block_header = struct
 
         let proj chain = chain.block_header_db
       end) :
-        Cache.CACHE
+        Requester.REQUESTER
           with type t := chain_db
            and type key := Block_hash.t
            and type value := Block_header.t
@@ -1145,7 +1145,7 @@ module Operation = struct
 
         let proj chain = chain.operation_db
       end) :
-        Cache.CACHE
+        Requester.REQUESTER
           with type t := chain_db
            and type key := Operation_hash.t
            and type value := Operation.t
@@ -1163,7 +1163,7 @@ module Protocol = struct
 
         let proj db = db.protocol_db
       end) :
-        Cache.CACHE
+        Requester.REQUESTER
           with type t := db
            and type key := Protocol_hash.t
            and type value := Protocol.t

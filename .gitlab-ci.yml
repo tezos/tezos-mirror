@@ -1059,15 +1059,15 @@ opam:tezos-protocol-005-PsBabyM1-parameters:
   variables:
     package: tezos-protocol-005-PsBabyM1-parameters
 
+opam:tezos-requester:
+  <<: *opam_definition
+  variables:
+    package: tezos-requester
+
 opam:tezos-endorser-alpha-commands:
   <<: *opam_definition
   variables:
     package: tezos-endorser-alpha-commands
-
-opam:tezos-cache:
-  <<: *opam_definition
-  variables:
-    package: tezos-cache
 
 opam:tezos-client:
   <<: *opam_definition

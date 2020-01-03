@@ -1,6 +1,6 @@
 (library
- (name tezos_cache)
- (public_name tezos-cache)
+ (name tezos_requester)
+ (public_name tezos-requester)
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-shell-services)

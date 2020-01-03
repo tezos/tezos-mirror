@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CACHE = sig
+module type REQUESTER = sig
   type t
 
   type key
@@ -55,8 +55,8 @@ module type CACHE = sig
   val clear_or_cancel : t -> key -> unit
 end
 
-module type FULL_CACHE = sig
-  include CACHE
+module type FULL_REQUESTER = sig
+  include REQUESTER
 
   type store
 
@@ -171,8 +171,8 @@ module type REQUEST = sig
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
-(** The cache uses a generic scheduler to schedule its requests.
-    The [Memory_table] must be shared between the scheduler and the cache
+(** The requester uses a generic scheduler to schedule its requests.
+    The [Memory_table] must be shared between the scheduler and the requester
     as it used to store both pending requests and found values. *)
 
 module Make_request_scheduler (Hash : sig
@@ -189,7 +189,7 @@ end)
   include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
   include Internal_event.Legacy_logging.Make_semantic (struct
-    let name = "node.cache.scheduler." ^ Hash.name
+    let name = "node.requester.scheduler." ^ Hash.name
   end)
 
   type key = Hash.t
@@ -499,7 +499,7 @@ end)
 (Request : REQUEST with type key := Hash.t)
 (Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
   include
-    FULL_CACHE
+    FULL_REQUESTER
       with type key = Hash.t
        and type value = Disk_table.value
        and type param = Precheck.param
@@ -566,9 +566,9 @@ end = struct
     (* Missing data key *)
     register_error_kind
       `Permanent
-      ~id:("cache." ^ Hash.name ^ ".missing")
+      ~id:("requester." ^ Hash.name ^ ".missing")
       ~title:("Missing " ^ Hash.name)
-      ~description:("Some " ^ Hash.name ^ " is missing from the cache")
+      ~description:("Some " ^ Hash.name ^ " is missing from the requester")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
       (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
@@ -579,7 +579,7 @@ end = struct
       `Permanent
       ~title:("Canceled fetch of a " ^ Hash.name)
       ~description:("The fetch of a " ^ Hash.name ^ " has been canceled")
-      ~id:("cache." ^ Hash.name ^ ".fetch_canceled")
+      ~id:("requester." ^ Hash.name ^ ".fetch_canceled")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Fetch of %s %a canceled" Hash.name Hash.pp key)
       Data_encoding.(obj1 (req "key" Hash.encoding))
@@ -590,7 +590,7 @@ end = struct
       `Permanent
       ~title:("Timed out fetch of a " ^ Hash.name)
       ~description:("The fetch of a " ^ Hash.name ^ " has timed out")
-      ~id:("cache." ^ Hash.name ^ ".fetch_timeout")
+      ~id:("requester." ^ Hash.name ^ ".fetch_timeout")
       ~pp:(fun ppf key ->
         Format.fprintf ppf "Fetch of %s %a timed out" Hash.name Hash.pp key)
       Data_encoding.(obj1 (req "key" Hash.encoding))
