@@ -644,13 +644,16 @@ struct
                  Handlers.on_no_request w
              | Some (pushed, Message (request, u)) -> (
                  let current_request = Request.view request in
-                 let treated = Systime_os.now () in
-                 w.current_request <- Some (pushed, treated, current_request) ;
+                 let treated_time = Systime_os.now () in
+                 w.current_request <-
+                   Some (pushed, treated_time, current_request) ;
                  match u with
                  | None ->
                      Handlers.on_request w request
                      >>=? fun res ->
-                     let completed = Systime_os.now () in
+                     let completed_time = Systime_os.now () in
+                     let treated = Ptime.diff treated_time pushed in
+                     let completed = Ptime.diff completed_time treated_time in
                      w.current_request <- None ;
                      let status = Worker_types.{pushed; treated; completed} in
                      Handlers.on_completion w request res status
@@ -669,7 +672,9 @@ struct
                      Lwt.wakeup_later u res ;
                      Lwt.return res
                      >>=? fun res ->
-                     let completed = Systime_os.now () in
+                     let completed_time = Systime_os.now () in
+                     let treated = Ptime.diff treated_time pushed in
+                     let completed = Ptime.diff completed_time treated_time in
                      let status = Worker_types.{pushed; treated; completed} in
                      w.current_request <- None ;
                      Handlers.on_completion w request res status
@@ -692,8 +697,10 @@ struct
           lwt_emit w Terminated >>= fun () -> do_close None
       | Error errs -> (
           ( match w.current_request with
-          | Some (pushed, treated, request) ->
-              let completed = Systime_os.now () in
+          | Some (pushed, treated_time, request) ->
+              let completed_time = Systime_os.now () in
+              let treated = Ptime.diff treated_time pushed in
+              let completed = Ptime.diff completed_time treated_time in
               w.current_request <- None ;
               Handlers.on_error
                 w

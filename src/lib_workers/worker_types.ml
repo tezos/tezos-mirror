@@ -100,8 +100,8 @@ let worker_information_encoding error_encoding =
 
 type request_status = {
   pushed : Time.System.t;
-  treated : Time.System.t;
-  completed : Time.System.t;
+  treated : Time.System.Span.t;
+  completed : Time.System.Span.t;
 }
 
 let request_status_encoding =
@@ -111,8 +111,8 @@ let request_status_encoding =
     (fun (pushed, treated, completed) -> {pushed; treated; completed})
     (obj3
        (req "pushed" Time.System.encoding)
-       (req "treated" Time.System.encoding)
-       (req "completed" Time.System.encoding))
+       (req "treated" Time.System.Span.encoding)
+       (req "completed" Time.System.Span.encoding))
 
 type ('req, 'evt) full_status = {
   status : worker_status;
@@ -153,8 +153,6 @@ let full_status_encoding req_encoding evt_encoding error_encoding =
        (opt "current_request" current_request_encoding))
 
 let pp_status ppf {pushed; treated; completed} =
-  let completed = Ptime.diff completed treated
-  and treated = Ptime.diff treated pushed in
   Format.fprintf
     ppf
     "Request pushed on %a, treated in %a, completed in %a "
