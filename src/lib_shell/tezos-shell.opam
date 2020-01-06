@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-updater"
   "tezos-validation"
   "tezos-stdlib-unix"
+  "tezos-requester"
   "alcotest-lwt" { with-test }
   "tezos-embedded-protocol-demo-noops" { with-test }
 ]

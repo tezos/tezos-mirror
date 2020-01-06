@@ -2,8 +2,7 @@
  (name tezos_requester)
  (public_name tezos-requester)
  (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-shell-services)
+            tezos-stdlib-unix)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix)))
 

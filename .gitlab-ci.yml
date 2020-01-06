@@ -784,6 +784,11 @@ opam:tezos-protocol-004-Pt24m4xi:
   variables:
     package: tezos-protocol-004-Pt24m4xi
 
+opam:tezos-requester:
+  <<: *opam_definition
+  variables:
+    package: tezos-requester
+
 opam:tezos-validation:
   <<: *opam_definition
   variables:
@@ -1058,11 +1063,6 @@ opam:tezos-protocol-005-PsBabyM1-parameters:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBabyM1-parameters
-
-opam:tezos-requester:
-  <<: *opam_definition
-  variables:
-    package: tezos-requester
 
 opam:tezos-endorser-alpha-commands:
   <<: *opam_definition
