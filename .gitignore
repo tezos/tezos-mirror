@@ -39,7 +39,6 @@ __pycache__
 
 /src/bin_client/test/LOG.*
 
-dune-project
 *.install
 .merlin
 
