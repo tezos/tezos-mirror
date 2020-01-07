@@ -445,22 +445,24 @@ let get_block chain_state = function
       >>= fun hash ->
       if n < 0 then
         State.Block.read_opt chain_state hash
-        >|= Option.unopt_assert ~loc:__POS__
-        >>= fun block ->
-        Chain.head chain_state
-        >>= fun head ->
-        let head_level = State.Block.level head in
-        let block_level = State.Block.level block in
-        let target =
-          Int32.(to_int (sub head_level (sub block_level (of_int n))))
-        in
-        if target < 0 then Lwt.return_none
-        else
-          State.Block.read_predecessor
-            chain_state
-            ~pred:target
-            ~below_save_point:true
-            (State.Block.hash head)
+        >>= function
+        | None ->
+            Lwt.fail Not_found
+        | Some block ->
+            Chain.head chain_state
+            >>= fun head ->
+            let head_level = State.Block.level head in
+            let block_level = State.Block.level block in
+            let target =
+              Int32.(to_int (sub head_level (sub block_level (of_int n))))
+            in
+            if target < 0 then Lwt.return_none
+            else
+              State.Block.read_predecessor
+                chain_state
+                ~pred:target
+                ~below_save_point:true
+                (State.Block.hash head)
       else if n = 0 then
         Chain.genesis chain_state
         >>= fun genesis ->
