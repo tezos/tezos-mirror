@@ -341,21 +341,21 @@ let multisig_script_string =
   \    PAIR }\n"
 
 (* Client_proto_context.originate expects the contract script as a Script.expr *)
-let multisig_script : Script.expr tzresult =
-  Tezos_micheline.Micheline_parser.no_parsing_error
-  @@ Michelson_v1_parser.parse_toplevel
-       ?check:(Some true)
-       multisig_script_string
-  >>? fun parsing_result -> ok parsing_result.Michelson_v1_parser.expanded
+let multisig_script : Script.expr =
+  Michelson_v1_parser.parse_toplevel ?check:(Some true) multisig_script_string
+  |> Tezos_micheline.Micheline_parser.no_parsing_error
+  |> function
+  | Error _ ->
+      assert false
+      (* This is a top level assertion, it is asserted when the client's process runs. *)
+  | Ok parsing_result ->
+      parsing_result.Michelson_v1_parser.expanded
 
 let multisig_script_hash =
-  multisig_script
-  >>? fun mcontract ->
   let bytes =
-    Data_encoding.Binary.to_bytes_exn Script.expr_encoding mcontract
+    Data_encoding.Binary.to_bytes_exn Script.expr_encoding multisig_script
   in
-  let hash = Script_expr_hash.hash_bytes [bytes] in
-  ok hash
+  Script_expr_hash.hash_bytes [bytes]
 
 (* The previous multisig script is the only one that the client can
    originate but the client knows how to interact with several
@@ -378,48 +378,36 @@ let script_hash_of_hex_string s =
   Script_expr_hash.of_bytes_exn @@ MBytes.of_hex @@ `Hex s
 
 (* List of known multisig contracts hashes with their kinds *)
-let known_multisig_contracts : multisig_contract_description list tzresult =
-  multisig_script_hash
-  >>? fun hash ->
-  ok
-    [ {hash; requires_chain_id = true; generic = false};
-      {
-        hash =
-          script_hash_of_hex_string
-            "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
-        requires_chain_id = true;
-        generic = false;
-      };
-      {
-        hash =
-          script_hash_of_hex_string
-            "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
-        requires_chain_id = false;
-        generic = false;
-      } ]
+let known_multisig_contracts : multisig_contract_description list =
+  let hash = multisig_script_hash in
+  [ {hash; requires_chain_id = true; generic = false};
+    {
+      hash =
+        script_hash_of_hex_string
+          "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
+      requires_chain_id = true;
+      generic = false;
+    };
+    {
+      hash =
+        script_hash_of_hex_string
+          "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
+      requires_chain_id = false;
+      generic = false;
+    } ]
 
 let known_multisig_hashes =
-  known_multisig_contracts
-  >>? fun l -> ok (List.map (fun descr -> descr.hash) l)
+  List.map (fun descr -> descr.hash) known_multisig_contracts
 
 let check_multisig_script script : multisig_contract_description tzresult Lwt.t
     =
   let bytes = Data_encoding.force_bytes script in
   let hash = Script_expr_hash.hash_bytes [bytes] in
-  Lwt.return known_multisig_contracts
-  >>=? fun l ->
-  fold_left_s
-    (fun descr_opt d ->
-      return
-      @@
-      match descr_opt with
-      | Some descr ->
-          Some descr
-      | None ->
-          if Script_expr_hash.(d.hash = hash) then Some d else None)
-    None
-    l
-  >>=? function
+  match
+    List.find_opt
+      (fun d -> Script_expr_hash.(d.hash = hash))
+      known_multisig_contracts
+  with
   | None ->
       fail
         (Not_a_supported_multisig_contract
@@ -712,8 +700,6 @@ let check_threshold ~threshold ~keys () =
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit ~delegate
     ~threshold ~keys ~balance ~source ~src_pk ~src_sk ~fee_parameter () =
-  Lwt.return multisig_script
-  >>=? fun code ->
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
   >>=? fun initial_storage ->
   check_threshold ~threshold ~keys ()
@@ -734,7 +720,7 @@ let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~source
     ~src_pk
     ~src_sk
-    ~code
+    ~code:multisig_script
     ~fee_parameter
     ()
 
@@ -772,18 +758,14 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   let opt_sigs_arr = Array.make nkeys None in
   let matching_key_found = ref false in
   let check_signature_against_key_number signature i key =
-    _when (Signature.check key signature bytes) (fun () ->
-        return
-        @@
-        ( matching_key_found := true ;
-          opt_sigs_arr.(i) <- Some signature ))
+    if Signature.check key signature bytes then (
+      matching_key_found := true ;
+      opt_sigs_arr.(i) <- Some signature )
   in
   iter_p
     (fun signature ->
-      return @@ (matching_key_found := false)
-      >>=? fun () ->
-      iteri_p (check_signature_against_key_number signature) keys
-      >>=? fun () ->
+      matching_key_found := false ;
+      List.iteri (check_signature_against_key_number signature) keys ;
       fail_unless !matching_key_found (Invalid_signature signature))
     signatures
   >>=? fun () ->
