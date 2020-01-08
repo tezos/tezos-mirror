@@ -639,44 +639,6 @@ end
 
 include module type of Encoding with type 'a t = 'a Encoding.t
 
-module Registration : sig
-  type id = string
-
-  (** A encoding that has been {!register}ed. It can be retreived using either
-      {!list} or {!find}. *)
-  type t
-
-  (** Descriptions and schemas of registered encodings. *)
-  val binary_schema : t -> Binary_schema.t
-
-  val json_schema : t -> Json.schema
-
-  val description : t -> string option
-
-  (** Printers for the encodings. *)
-  val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
-
-  val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
-
-  (** [register ~id encoding] registers the [encoding] with the [id]. It can
-      later be found using {!find} and providing the matching [id]. It will
-      also appear in the results of {!list}. *)
-  val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
-
-  (** [find id] is [Some r] if [register id e] has been called, in which
-      case [r] matches [e]. Otherwise, it is [None]. *)
-  val find : id -> t option
-
-  (** [list ()] is a list of pairs [(id, r)] where [r] is
-      a registered encoding for the [id]. *)
-  val list : unit -> (id * t) list
-
-  (** Conversion functions from/to json to/from bytes. *)
-  val bytes_of_json : t -> Json.t -> Bytes.t option
-
-  val json_of_bytes : t -> Bytes.t -> Json.t option
-end
-
 module With_version : sig
   (** An encapsulation of consecutive encoding versions. *)
   type _ t
@@ -921,3 +883,41 @@ type json_schema = Json.schema
 val json_schema : json_schema Encoding.t
 
 type bson = Bson.t
+
+module Registration : sig
+  type id = string
+
+  (** A encoding that has been {!register}ed. It can be retreived using either
+      {!list} or {!find}. *)
+  type t
+
+  (** Descriptions and schemas of registered encodings. *)
+  val binary_schema : t -> Binary_schema.t
+
+  val json_schema : t -> Json.schema
+
+  val description : t -> string option
+
+  (** Printers for the encodings. *)
+  val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
+
+  val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
+
+  (** [register ~id encoding] registers the [encoding] with the [id]. It can
+      later be found using {!find} and providing the matching [id]. It will
+      also appear in the results of {!list}. *)
+  val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
+
+  (** [find id] is [Some r] if [register id e] has been called, in which
+      case [r] matches [e]. Otherwise, it is [None]. *)
+  val find : id -> t option
+
+  (** [list ()] is a list of pairs [(id, r)] where [r] is
+      a registered encoding for the [id]. *)
+  val list : unit -> (id * t) list
+
+  (** Conversion functions from/to json to/from bytes. *)
+  val bytes_of_json : t -> Json.t -> Bytes.t option
+
+  val json_of_bytes : t -> Bytes.t -> Json.t option
+end

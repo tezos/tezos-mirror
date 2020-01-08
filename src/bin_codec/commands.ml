@@ -206,7 +206,8 @@ let commands () =
         let schema =
           Data_encoding.Registration.binary_schema registered_encoding
         in
-        cctxt#message "%a" Binary_schema.pp schema >>= fun () -> return_unit);
+        cctxt#message "%a" Data_encoding.Binary_schema.pp schema
+        >>= fun () -> return_unit);
     command
       ~group
       ~desc:
