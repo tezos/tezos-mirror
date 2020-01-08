@@ -7,6 +7,18 @@ active_protocol_directories := $(shell tr -- - _ < active_protocol_versions)
 current_opam_version := $(shell opam --version)
 include scripts/version.sh
 
+DOCKER_IMAGE_NAME := tezos
+DOCKER_IMAGE_VERSION := latest
+DOCKER_BUILD_IMAGE_NAME := $(DOCKER_IMAGE_NAME)_build
+DOCKER_BUILD_IMAGE_VERSION := latest
+DOCKER_BARE_IMAGE_NAME := $(DOCKER_IMAGE_NAME)-bare
+DOCKER_BARE_IMAGE_VERSION := latest
+DOCKER_DEBUG_IMAGE_NAME := $(DOCKER_IMAGE_NAME)-debug
+DOCKER_DEBUG_IMAGE_VERSION := latest
+DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
+DOCKER_DEPS_IMAGE_VERSION := ${opam_repository_tag}
+DOCKER_DEPS_MINIMAL_IMAGE_VERSION := minimal--${opam_repository_tag}
+
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
 endif
@@ -122,9 +134,51 @@ build-deps:
 build-dev-deps:
 	@./scripts/install_build_deps.sh --dev
 
+.PHONY: docker-image-build
+docker-image-build:
+	@docker build \
+		-t $(DOCKER_BUILD_IMAGE_NAME):$(DOCKER_BUILD_IMAGE_VERSION) \
+		-f build.Dockerfile \
+		--build-arg BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
+		--build-arg BASE_IMAGE_VERSION=$(DOCKER_DEPS_IMAGE_VERSION) \
+		.
+
+.PHONY: docker-image-debug
+docker-image-debug:
+	docker build \
+		-t $(DOCKER_DEBUG_IMAGE_NAME):$(DOCKER_DEBUG_IMAGE_VERSION) \
+		--build-arg BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
+		--build-arg BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
+		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
+		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
+		--target=debug \
+		.
+
+.PHONY: docker-image-bare
+docker-image-bare:
+	@docker build \
+		-t $(DOCKER_BARE_IMAGE_NAME):$(DOCKER_BARE_IMAGE_VERSION) \
+		--build-arg=BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
+		--build-arg=BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
+		--build-arg=BASE_IMAGE_VERSION_NON_MIN=$(DOCKER_DEPS_IMAGE_VERSION) \
+		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
+		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
+		--target=bare \
+		.
+
+.PHONY: docker-image-minimal
+docker-image-minimal:
+	@docker build \
+		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_VERSION) \
+		--build-arg=BASE_IMAGE=$(DOCKER_DEPS_IMAGE_NAME) \
+		--build-arg=BASE_IMAGE_VERSION=$(DOCKER_DEPS_MINIMAL_IMAGE_VERSION) \
+		--build-arg=BASE_IMAGE_VERSION_NON_MIN=$(DOCKER_DEPS_IMAGE_VERSION) \
+		--build-arg BUILD_IMAGE=$(DOCKER_BUILD_IMAGE_NAME) \
+		--build-arg BUILD_IMAGE_VERSION=$(DOCKER_BUILD_IMAGE_VERSION) \
+		.
+
 .PHONY: docker-image
-docker-image:
-	@./scripts/create_docker_image.sh
+docker-image: docker-image-build docker-image-debug docker-image-bare docker-image-minimal
 
 .PHONY: install
 install:

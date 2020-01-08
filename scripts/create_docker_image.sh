@@ -17,9 +17,9 @@ build_image_name="${image_name}_build"
 
 "$script_dir"/ci/create_docker_image.build.sh \
              "$build_image_name" "$image_version" \
-             "$build_deps_image_name:$build_deps_image_version"
+             "$build_deps_image_name" "$build_deps_image_version"
 
 "$script_dir"/ci/create_docker_image.minimal.sh \
              "$image_name" "$image_version" \
-             "$build_image_name:$image_version" \
-             "$build_deps_image_name:minimal--$build_deps_image_version"
+             "$build_image_name" \
+             "$build_deps_image_name" "minimal--$build_deps_image_version"
