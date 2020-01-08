@@ -86,6 +86,7 @@ module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
+module Node_version = Node_version
 
 include module type of struct
   include Utils.Infix
