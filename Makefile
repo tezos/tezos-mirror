@@ -13,6 +13,7 @@ endif
 
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
 
+.PHONY: all
 all: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
@@ -46,6 +47,7 @@ endif
 PROTOCOLS := genesis genesis_alphanet genesis_babylonnet genesis_carthagenet alpha demo_noops 000_Ps9mPmXa 001_PtCJ7pwo 002_PsYLVpVv 003_PsddFKi3 004_Pt24m4xi 005_PsBABY5H 005_PsBabyM1 006_PsCARTHA
 DUNE_INCS=$(patsubst %,src/proto_%/lib_protocol/dune.inc, ${PROTOCOLS})
 
+.PHONY: generate_dune
 generate_dune: ${DUNE_INCS}
 
 ${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
@@ -53,6 +55,7 @@ ${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
 	dune build @$(dir $@)/runtest_dune_template --auto-promote
 	touch $@
 
+.PHONY: all.pkg
 all.pkg: generate_dune
 	@dune build \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
@@ -65,6 +68,7 @@ $(addsuffix .test,${PACKAGES}): %.test:
 	@dune build \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
+.PHONY: doc-html
 doc-html: all
 	@dune build @doc
 	@./tezos-client -protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
@@ -81,45 +85,57 @@ doc-html: all
 	@sed -e 's/@media only screen and (max-width: 95ex) {/@media only screen and (max-width: 744px) {/' $$(pwd)/docs/_build/api/odoc/_html/odoc.css > $$(pwd)/docs/_build/api/odoc/_html/odoc.css2
 	@mv $$(pwd)/docs/_build/api/odoc/_html/odoc.css2  $$(pwd)/docs/_build/api/odoc/_html/odoc.css
 
+.PHONY: dock-html-and-linkcheck
 doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
+.PHONY: build-sandbox
 build-sandbox:
 	@dune build src/bin_sandbox/main.exe
 	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
+.PHONY: build-test
 build-test: build-sandbox
 	@dune build @check # here we build all the files required for merlin
 	@dune build @buildtest
 
+.PHONY: test
 test:
 	@dune runtest
 	@./scripts/check_opam_test.sh
 
+.PHONY: test-lint
 test-lint:
 	@dune build @runtest_lint
 	make -C tests_python lint_all
 	@src/tooling/lint.sh check_scripts
 
+.PHONY: fmt
 fmt:
 	@src/tooling/lint.sh format
 
+.PHONY: build-deps
 build-deps:
 	@./scripts/install_build_deps.sh
 
+.PHONY: build-dev-deps
 build-dev-deps:
 	@./scripts/install_build_deps.sh --dev
 
+.PHONY: docker-image
 docker-image:
 	@./scripts/create_docker_image.sh
 
+.PHONY: install
 install:
 	@dune build @install
 	@dune install
 
+.PHONY: uninstall
 uninstall:
 	@dune uninstall
 
+.PHONY: clean
 clean:
 	@-dune clean
 	@-find . -name dune-project -delete
@@ -135,5 +151,3 @@ clean:
 	  $(foreach p, $(active_protocol_versions), tezos-baker-$(p) tezos-endorser-$(p) tezos-accuser-$(p) sandbox-parameters.json)
 	@-${MAKE} -C docs clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
-
-.PHONY: all test build-deps docker-image clean
