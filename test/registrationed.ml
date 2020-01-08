@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Random.self_init () ;
-  Alcotest.run
-    "tezos-data-encoding"
-    [
-      ("success", Success.tests);
-      ("invalid_encoding", Invalid_encoding.tests);
-      ("read_failure", Read_failure.tests);
-      ("write_failure", Write_failure.tests);
-      ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests);
-      ("registration", Registrationed.tests);
-    ]
+let id = "this-is-it"
+
+let title = "this-is-the-TITLE"
+
+let description = "this-is-the-Description"
+
+let e =
+  let open Data_encoding in
+  def id ~title ~description (list string)
+
+let register_test () = Data_encoding.Registration.register e
+
+let find_test () =
+  match Data_encoding.Registration.find id with
+  | None ->
+      Alcotest.failf "Could not find %s" id
+  | Some r -> (
+    match Data_encoding.Registration.description r with
+    | None ->
+        Alcotest.failf "Expected description"
+    | Some rd ->
+        if rd = description then ()
+        else
+          Alcotest.failf
+            "Descriptions do not match (expected %s) (got %s)"
+            description
+            rd )
+
+let tests =
+  [("register-test", `Quick, register_test); ("find-test", `Quick, find_test)]
