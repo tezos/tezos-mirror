@@ -604,60 +604,31 @@ module LE_prefix :
     else Ptree_sig.Different
 end
 
-module BE_prefix :
-  Ptree_sig.Prefix
-    with type key = int
-     and type prefix = int
-     and type mask = int = struct
-  type key = int
+module BE_int = struct
+  type t = int
 
-  type mask = int (* Only a single bit set *)
+  let lnot = lnot
 
-  type prefix = int
+  let ( land ) = ( land )
 
-  let equal_key = ( == )
+  let ( lxor ) = ( lxor )
 
-  let equal_mask = ( == )
+  let ( lor ) = ( lor )
 
-  let equal_prefix = ( == )
+  let pred = pred
 
-  let hash_key x = x
-
-  let hash_mask x = x
-
-  let hash_prefix x = x
-
-  let full_length_mask = 1
-
-  let strictly_shorter_mask (m1 : mask) m2 = m1 > m2
-
-  let select_bit ~prefix ~mask = prefix land mask != 0
+  let less_than = ( <= )
 
   module Nativeint_infix = struct
     let ( lor ) = Nativeint.logor
 
-    (*let (lsl) = Nativeint.shift_left*)
     let ( lsr ) = Nativeint.shift_right_logical
-
-    (*let (asr) = Nativeint.shift_right*)
-    let ( land ) = Nativeint.logand
-
-    let lnot = Nativeint.lognot
-
-    let ( lxor ) = Nativeint.logxor
 
     let ( - ) = Nativeint.sub
   end
 
-  let apply_mask prefix mask =
-    let open Nativeint_infix in
-    let prefix = Nativeint.of_int prefix in
-    let mask = Nativeint.of_int mask in
-    Nativeint.to_int (prefix land lnot (mask - 1n))
-
-  let match_prefix ~key ~prefix ~mask = apply_mask key mask == prefix
-
   let highest_bit x =
+    let x = Nativeint.of_int x in
     Nativeint_infix.(
       let x = x lor (x lsr 1) in
       let x = x lor (x lsr 2) in
@@ -667,34 +638,15 @@ module BE_prefix :
       let x = if Sys.word_size > 32 then x lor (x lsr 32) else x in
       Nativeint.to_int (x - (x lsr 1)))
 
-  let common_mask p0 p1 =
-    let open Nativeint_infix in
-    let p0 = Nativeint.of_int p0 in
-    let p1 = Nativeint.of_int p1 in
-    highest_bit (p0 lxor p1)
+  let equal = ( = )
 
-  let key_prefix x = x
+  let hash = Hashtbl.hash
 
-  let prefix_key p _m = p
+  let zero = 0
 
-  let smaller_set_mask m1 m2 =
-    let open Nativeint_infix in
-    lnot (m1 - 1n) land lnot (m2 - 1n)
+  let one = 1
 
-  let compare_prefix m1 p1 m2 p2 =
-    let open Nativeint_infix in
-    let m1 = Nativeint.of_int m1 in
-    let m2 = Nativeint.of_int m2 in
-    let p1 = Nativeint.of_int p1 in
-    let p2 = Nativeint.of_int p2 in
-    let min_mask = smaller_set_mask m1 m2 in
-    let applied_p1 = p1 land min_mask in
-    let applied_p2 = p2 land min_mask in
-    if applied_p1 = applied_p2 then
-      if m1 > m2 then Ptree_sig.Shorter
-      else if m1 < m2 then Ptree_sig.Longer
-      else Ptree_sig.Equal
-    else Ptree_sig.Different
+  let power_2 n = 1 lsl n
 end
 
 module Make (P : Ptree_sig.Prefix) (V : Value) = struct
@@ -1226,7 +1178,7 @@ module type S = sig
 end
 
 module Make_LE (V : Value) = Make (LE_prefix) (V)
-module Make_BE (V : Value) = Make (BE_prefix) (V)
+module Make_BE (V : Value) = Make (BE_gen_prefix (BE_int)) (V)
 module Make_BE_gen (V : Value) (B : Bits) = Make (BE_gen_prefix (B)) (V)
 module Make_BE_sized (V : Value) (S : Size) =
   Make (BE_gen_prefix (Bits (S))) (V)
