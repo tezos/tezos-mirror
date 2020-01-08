@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Random.init 100 ;
+  Random.self_init () ;
   Alcotest.run
     "tezos-data-encoding"
     [
