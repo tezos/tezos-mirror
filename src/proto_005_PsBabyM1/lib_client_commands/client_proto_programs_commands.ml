@@ -539,4 +539,19 @@ let commands () =
                   ppf
                   errors)
               ()
-            >>= fun () -> cctxt#error "syntax error in program") ]
+            >>= fun () -> cctxt#error "syntax error in program");
+    command
+      ~group
+      ~desc:"Ask the node to expand the Michelson macros in a script."
+      no_options
+      (prefixes ["expand"; "macros"; "in"] @@ Program.source_param @@ stop)
+      (fun () program (cctxt : Protocol_client_context.full) ->
+        Lwt.return @@ Micheline_parser.no_parsing_error program
+        >>=? fun program ->
+        cctxt#message
+          "%a"
+          (fun ppf () ->
+            ( Michelson_v1_printer.print_expr_unwrapped ppf program.expanded
+              : unit ))
+          ()
+        >>= fun () -> return_unit) ]
