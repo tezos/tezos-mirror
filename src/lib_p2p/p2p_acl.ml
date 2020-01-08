@@ -56,11 +56,13 @@ module PatriciaTree (V : HashPtree.Value) = struct
   let z_mask_of_ipv6_prefix p =
     let ip = Ipaddr.V6.Prefix.network p in
     let len = Ipaddr.V6.Prefix.bits p in
-    (z_of_ipv6 ip, Z.( lsl ) Z.one (128 - len))
+    ( z_of_ipv6 ip,
+      if len = 0 then Bits.zero
+      else Bits.lnot (Bits.pred (Bits.power_2 (128 - len))) )
 
   let key_mask_of_ipv6_prefix p =
     let (z, m) = z_mask_of_ipv6_prefix p in
-    (Bits.of_z z, Bits.of_z m)
+    (Bits.of_z z, m)
 
   let z_to_ipv6 z =
     (* assumes z is a 128 bit value *)

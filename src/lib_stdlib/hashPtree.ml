@@ -502,7 +502,7 @@ module BE_gen_prefix (Bits : Bits) :
      and type mask = Bits.t = struct
   type key = Bits.t
 
-  type mask = Bits.t (* Only a single bit set *)
+  type mask = Bits.t (* All bits set up to a point *)
 
   type prefix = Bits.t
 
@@ -520,24 +520,28 @@ module BE_gen_prefix (Bits : Bits) :
 
   open Bits
 
-  let full_length_mask = Bits.one
+  let full_length_mask = lnot Bits.zero
 
-  let strictly_shorter_mask (m1 : mask) m2 = Bits.less_than m2 m1
+  let strictly_shorter_mask (m1 : mask) m2 = Bits.less_than m1 m2
 
-  let select_bit ~prefix ~mask = not (Bits.equal (prefix land mask) Bits.zero)
+  let select_bit ~prefix ~mask =
+    let discriminant = highest_bit (lnot mask) in
+    not (Bits.equal (prefix land discriminant) Bits.zero)
 
-  let apply_mask prefix mask = prefix land lnot (pred mask)
+  let apply_mask prefix mask = prefix land mask
 
   let match_prefix ~key ~prefix ~mask =
     equal_prefix (apply_mask key mask) prefix
 
-  let common_mask p0 p1 = Bits.highest_bit (* [@inlined] *) (p0 lxor p1)
+  let common_mask p0 p1 =
+    let discriminant = Bits.highest_bit (* [@inlined] *) (p0 lxor p1) in
+    lnot (discriminant lor pred discriminant)
 
   let key_prefix x = x
 
   let prefix_key p _m = p
 
-  let smaller_set_mask m1 m2 = lnot (pred m1) land lnot (pred m2)
+  let smaller_set_mask m1 m2 = m1 land m2
 
   let compare_prefix m1 p1 m2 p2 =
     let min_mask = smaller_set_mask m1 m2 in
@@ -557,7 +561,7 @@ module LE_prefix :
      and type mask = int = struct
   type key = int
 
-  type mask = int (* Only a single bit set *)
+  type mask = int (* All bits set from a point *)
 
   type prefix = int
 
@@ -573,25 +577,27 @@ module LE_prefix :
 
   let hash_prefix x = x
 
-  let full_length_mask = -1 lxor (-1 lsr 1)
+  let full_length_mask = -1
 
   let strictly_shorter_mask (m1 : mask) m2 = m1 < m2
 
-  let select_bit ~prefix ~mask = prefix land mask != 0
+  let select_bit ~prefix ~mask =
+    let discriminant = succ mask in
+    prefix land discriminant != 0
 
-  let apply_mask prefix mask = prefix land (mask - 1)
+  let apply_mask prefix mask = prefix land mask
 
   let match_prefix ~key ~prefix ~mask = apply_mask key mask == prefix
 
   let lowest_bit x = x land -x
 
-  let common_mask p0 p1 = lowest_bit (p0 lxor p1)
+  let common_mask p0 p1 = pred (lowest_bit (p0 lxor p1))
 
   let key_prefix x = x
 
   let prefix_key p _m = p
 
-  let smaller_set_mask m1 m2 = (m1 - 1) land (m2 - 1)
+  let smaller_set_mask m1 m2 = m1 land m2
 
   let compare_prefix m1 p1 m2 p2 =
     let min_mask = smaller_set_mask m1 m2 in
