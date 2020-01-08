@@ -33,7 +33,7 @@ let assert_equal ?(eq = ( = )) ?prn ~msg a b =
     | None ->
         msg
     | Some prn ->
-        Format.asprintf "@[<v 2>%s@,n(%a)@,<>@,(%a)@]" msg prn a prn b
+        Format.asprintf "@[<v 2>%s@,(%a)@,<>@,(%a)@]" msg prn a prn b
   in
   if not (eq a b) then Alcotest.fail msg
 
@@ -113,8 +113,11 @@ let test_contiguous _ =
 
 module PSet = Set.Make (Ipaddr.V6.Prefix)
 
+let print_pset ppf pset =
+  PSet.iter (fun p -> Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p) pset
+
 let test_fold _ =
-  let addr_list = [p "::/1"; p "8000::/1"; p "ffff:ffff::/32"] in
+  let addr_list = [p "::/1"; p "8000::/2"; p "ffff:ffff::/32"] in
   let pset = PSet.of_list addr_list in
   let ipv6set =
     P2p_acl.IpSet.fold
@@ -122,10 +125,7 @@ let test_fold _ =
       (of_list addr_list)
       PSet.empty
   in
-  assert_equal ~eq:PSet.equal ~msg:__LOC__ ipv6set pset
-
-let print_pset ppf pset =
-  PSet.iter (fun p -> Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p) pset
+  assert_equal ~eq:PSet.equal ~prn:print_pset ~msg:__LOC__ ipv6set pset
 
 let print_list ppf l =
   List.iter (fun p -> Format.fprintf ppf "%a " Ipaddr.V6.Prefix.pp p) l
