@@ -223,6 +223,11 @@ integration:proto:sandbox:
   script:
     - dune build @runtest_sandbox
 
+integration:compiler-rejections:
+  <<: *integration_definition
+  script:
+    - dune build @runtest_rejections
+
 ############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################

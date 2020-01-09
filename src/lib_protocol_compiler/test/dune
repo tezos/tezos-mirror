@@ -1,0 +1,15 @@
+(alias
+  (name runtest_rejections)
+  (deps (package tezos-protocol-demo-noops))
+  (action
+    (run
+       bash
+         %{dep:rejections.sh}
+         %{bin:tezos-protocol-compiler}
+         %{lib:tezos-protocol-demo-noops:raw/TEZOS_PROTOCOL}
+       )))
+
+(alias
+ (name runtest_out_of_opam)
+ (deps
+   (alias runtest_rejections)))

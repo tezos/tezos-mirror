@@ -134,7 +134,7 @@ test_protocol_compile:
 	@dune build  @runtest_compile_protocol
 
 test: test_protocol_compile
-	@dune build @runtest_dune_template @runtest @runtest_flextesa
+	@dune build @runtest_dune_template @runtest @runtest_flextesa @runtest_out_of_opam
 	@./scripts/check_opam_test.sh
 
 .PHONY: check-linting check-python-linting
