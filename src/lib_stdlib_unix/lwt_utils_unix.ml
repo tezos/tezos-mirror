@@ -358,7 +358,7 @@ module Socket = struct
     let len = message_len_size + encoded_message_len in
     let buf = Bytes.create len in
     match
-      Data_encoding.Binary.write
+      Data_encoding.Binary.write_opt
         encoding
         message
         buf
@@ -382,7 +382,7 @@ module Socket = struct
     let buf = Bytes.create len in
     read_mbytes ~len fd buf
     >>= fun () ->
-    match Data_encoding.Binary.read encoding buf 0 len with
+    match Data_encoding.Binary.read_opt encoding buf 0 len with
     | None ->
         fail Decoding_error
     | Some (read_len, message) ->

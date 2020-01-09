@@ -39,7 +39,9 @@ let get_contract_manager (cctxt : #full) contract =
     match root storage with
     | Prim (_, D_Pair, [Bytes (_, bytes); _], _) | Bytes (_, bytes) -> (
       match
-        Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Signature.Public_key_hash.encoding
+          bytes
       with
       | Some k ->
           return k

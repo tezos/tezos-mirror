@@ -92,7 +92,7 @@ module Public_key_hash = struct
 
   let to_bytes s = Data_encoding.Binary.to_bytes_exn raw_encoding s
 
-  let of_bytes_opt s = Data_encoding.Binary.of_bytes raw_encoding s
+  let of_bytes_opt s = Data_encoding.Binary.of_bytes_opt raw_encoding s
 
   let to_string s = Bytes.to_string (to_bytes s)
 

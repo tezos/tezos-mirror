@@ -112,7 +112,7 @@ let octet_stream =
     q = Some 200;
     pp =
       (fun enc ppf raw ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string raw) with
+        match Data_encoding.Binary.of_bytes_opt enc (Bytes.of_string raw) with
         | None ->
             Format.fprintf ppf "Invalid binary data."
         | Some v ->
@@ -125,7 +125,7 @@ let octet_stream =
       (fun enc v -> Bytes.to_string @@ Data_encoding.Binary.to_bytes_exn enc v);
     destruct =
       (fun enc s ->
-        match Data_encoding.Binary.of_bytes enc (Bytes.of_string s) with
+        match Data_encoding.Binary.of_bytes_opt enc (Bytes.of_string s) with
         | None ->
             Error "Failed to parse binary data."
         | Some data ->

@@ -82,4 +82,4 @@ let encoding =
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 
-let of_bytes b = Data_encoding.Binary.of_bytes encoding b
+let of_bytes b = Data_encoding.Binary.of_bytes_opt encoding b

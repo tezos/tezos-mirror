@@ -149,7 +149,12 @@ module Connection_message = struct
     let len = Crypto.header_length + encoded_message_len in
     let buf = Bytes.create len in
     match
-      Data_encoding.Binary.write encoding message buf Crypto.header_length len
+      Data_encoding.Binary.write_opt
+        encoding
+        message
+        buf
+        Crypto.header_length
+        len
     with
     | None ->
         fail P2p_errors.Encoding_error
@@ -177,7 +182,7 @@ module Connection_message = struct
     TzEndian.set_int16 buf 0 len ;
     P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf
     >>=? fun () ->
-    match Data_encoding.Binary.read encoding buf pos len with
+    match Data_encoding.Binary.read_opt encoding buf pos len with
     | None ->
         fail P2p_errors.Decoding_error
     | Some (next_pos, message) ->
@@ -194,7 +199,7 @@ module Metadata = struct
     in
     let buf = Bytes.create encoded_message_len in
     match
-      Data_encoding.Binary.write
+      Data_encoding.Binary.write_opt
         metadata_config.conn_meta_encoding
         message
         buf
@@ -212,7 +217,7 @@ module Metadata = struct
     >>=? fun buf ->
     let length = Bytes.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
-    match Data_encoding.Binary.read encoding buf 0 length with
+    match Data_encoding.Binary.read_opt encoding buf 0 length with
     | None ->
         fail P2p_errors.Decoding_error
     | Some (read_len, message) ->
@@ -272,7 +277,7 @@ module Ack = struct
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     let buf = Bytes.create encoded_message_len in
     match
-      Data_encoding.Binary.write encoding message buf 0 encoded_message_len
+      Data_encoding.Binary.write_opt encoding message buf 0 encoded_message_len
     with
     | None ->
         fail P2p_errors.Encoding_error
@@ -284,7 +289,7 @@ module Ack = struct
     Crypto.read_chunk ?canceler fd cryptobox_data
     >>=? fun buf ->
     let length = Bytes.length buf in
-    match Data_encoding.Binary.read encoding buf 0 length with
+    match Data_encoding.Binary.read_opt encoding buf 0 length with
     | None ->
         fail P2p_errors.Decoding_error
     | Some (read_len, message) ->

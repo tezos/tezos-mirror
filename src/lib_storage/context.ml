@@ -381,7 +381,9 @@ let get_test_chain v =
   | None ->
       Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
   | Some data -> (
-    match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+    match
+      Data_encoding.Binary.of_bytes_opt Test_chain_status.encoding data
+    with
     | None ->
         Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
     | Some r ->
@@ -521,7 +523,7 @@ module Pruned_block = struct
     Data_encoding.Binary.to_bytes_exn encoding pruned_block
 
   let of_bytes pruned_block =
-    Data_encoding.Binary.of_bytes encoding pruned_block
+    Data_encoding.Binary.of_bytes_opt encoding pruned_block
 
   let header {block_header; _} = block_header
 end
@@ -542,7 +544,7 @@ module Block_data = struct
 
   let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
 
-  let of_bytes = Data_encoding.Binary.of_bytes encoding
+  let of_bytes = Data_encoding.Binary.of_bytes_opt encoding
 end
 
 module Protocol_data = struct
@@ -588,7 +590,7 @@ module Protocol_data = struct
 
   let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
 
-  let of_bytes = Data_encoding.Binary.of_bytes encoding
+  let of_bytes = Data_encoding.Binary.of_bytes_opt encoding
 end
 
 module Dumpable_context = struct

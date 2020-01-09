@@ -29,7 +29,7 @@ module Make_value (V : ENCODED_VALUE) = struct
   type t = V.t
 
   let of_bytes b =
-    match Data_encoding.Binary.of_bytes V.encoding b with
+    match Data_encoding.Binary.of_bytes_opt V.encoding b with
     | None ->
         generic_error "Cannot parse data" (* TODO personalize *)
     | Some v ->

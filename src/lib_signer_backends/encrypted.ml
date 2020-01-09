@@ -70,7 +70,7 @@ module Raw = struct
         return_none
     | (Some bytes, Signature.Ed25519) -> (
       match
-        Data_encoding.Binary.of_bytes Ed25519.Secret_key.encoding bytes
+        Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
       with
       | Some sk ->
           return_some (Ed25519 sk : Signature.Secret_key.t)
@@ -80,7 +80,7 @@ module Raw = struct
       )
     | (Some bytes, Signature.Secp256k1) -> (
       match
-        Data_encoding.Binary.of_bytes Secp256k1.Secret_key.encoding bytes
+        Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
       with
       | Some sk ->
           return_some (Secp256k1 sk : Signature.Secret_key.t)
@@ -89,7 +89,9 @@ module Raw = struct
             "Corrupted wallet, deciphered key is not a valid Secp256k1 secret \
              key" )
     | (Some bytes, Signature.P256) -> (
-      match Data_encoding.Binary.of_bytes P256.Secret_key.encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
+      with
       | Some sk ->
           return_some (P256 sk : Signature.Secret_key.t)
       | None ->

@@ -442,7 +442,7 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
         return_none
     | Some protocol_data -> (
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Proto.block_header_data_encoding
           protocol_data
       with
@@ -497,7 +497,7 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Proto.operation_data_encoding
           raw_op.Operation.proto
       with

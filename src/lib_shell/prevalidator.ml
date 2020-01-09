@@ -232,7 +232,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   (** Centralised operation stream for the RPCs *)
   let notify_operation {operation_stream; _} result {Operation.shell; proto} =
     let protocol_data =
-      Data_encoding.Binary.of_bytes Proto.operation_data_encoding proto
+      Data_encoding.Binary.of_bytes_opt Proto.operation_data_encoding proto
     in
     match protocol_data with
     | Some protocol_data ->
@@ -354,7 +354,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let pre_filter w pv op =
     let protocol_data =
-      Data_encoding.Binary.of_bytes
+      Data_encoding.Binary.of_bytes_opt
         Proto.operation_data_encoding
         op.Operation.proto
     in
@@ -620,7 +620,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (fun pv () () ->
              let map_op op =
                let protocol_data_opt =
-                 Data_encoding.Binary.of_bytes
+                 Data_encoding.Binary.of_bytes_opt
                    Proto.operation_data_encoding
                    op.Operation.proto
                in
@@ -698,7 +698,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
              (* Convert ops *)
              let map_op op =
                let protocol_data =
-                 Data_encoding.Binary.of_bytes
+                 Data_encoding.Binary.of_bytes_opt
                    Proto.operation_data_encoding
                    op.Operation.proto
                in
@@ -759,7 +759,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                      (* NOTE: Should the protocol change, a new Prevalidation
                       * context would  be created. Thus, we use the same Proto. *)
                      match
-                       Data_encoding.Binary.to_bytes
+                       Data_encoding.Binary.to_bytes_opt
                          Proto.operation_data_encoding
                          protocol_data
                      with
@@ -767,7 +767,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                          Lwt.return_none
                      | Some bytes -> (
                        match
-                         Data_encoding.Binary.of_bytes
+                         Data_encoding.Binary.of_bytes_opt
                            Proto.operation_data_encoding
                            bytes
                        with

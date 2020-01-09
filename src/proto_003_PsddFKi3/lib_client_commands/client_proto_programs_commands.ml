@@ -327,7 +327,7 @@ let commands () =
         (* Remove first byte *)
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
         match
-          Data_encoding.Binary.of_bytes
+          Data_encoding.Binary.of_bytes_opt
             Alpha_context.Script.expr_encoding
             bytes
         with

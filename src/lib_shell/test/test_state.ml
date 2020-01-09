@@ -56,7 +56,7 @@ let incr_fitness fitness =
     match fitness with
     | [fitness] ->
         Pervasives.(
-          Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
+          Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
           |> Option.unopt ~default:0L |> Int64.succ
           |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64)
     | _ ->

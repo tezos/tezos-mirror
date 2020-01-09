@@ -822,7 +822,7 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
   then
     let nbytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
-    match Data_encoding.Binary.of_bytes Script.expr_encoding nbytes with
+    match Data_encoding.Binary.of_bytes_opt Script.expr_encoding nbytes with
     | None ->
         fail (Bytes_deserialisation_error bytes)
     | Some e -> (

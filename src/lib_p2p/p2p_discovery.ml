@@ -82,7 +82,7 @@ module Answer = struct
       >>=? function
       | (len, Lwt_unix.ADDR_INET (remote_addr, _))
         when Compare.Int.equal len Message.length -> (
-        match Data_encoding.Binary.of_bytes Message.encoding buf with
+        match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
         | Some (key, remote_peer_id, remote_port)
           when Compare.String.equal key Message.key
                && not (P2p_peer.Id.equal remote_peer_id st.my_peer_id) -> (

@@ -42,7 +42,7 @@ let inject_operation validator ?chain bytes =
   read_chain_id validator chain
   >>= fun chain_id ->
   let t =
-    match Data_encoding.Binary.of_bytes Operation.encoding bytes with
+    match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
     | None ->
         failwith "Can't parse the operation"
     | Some op ->

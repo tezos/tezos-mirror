@@ -187,7 +187,7 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let parse_block_header block_hash (block_header : Block_header.t) =
     match
-      Data_encoding.Binary.of_bytes
+      Data_encoding.Binary.of_bytes_opt
         Proto.block_header_data_encoding
         block_header.protocol_data
     with
@@ -234,7 +234,7 @@ module Make (Proto : Registered_protocol.T) = struct
         map_s (fun op ->
             let op_hash = Operation.hash op in
             match
-              Data_encoding.Binary.of_bytes
+              Data_encoding.Binary.of_bytes_opt
                 Proto.operation_data_encoding
                 op.Operation.proto
             with
