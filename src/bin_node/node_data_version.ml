@@ -70,6 +70,8 @@ type error += Invalid_data_dir of string
 
 type error += Could_not_read_data_dir_version of string
 
+type error += Could_not_write_version_file of string
+
 type error += Data_dir_needs_upgrade of {expected : t; actual : t}
 
 let () =
@@ -118,6 +120,21 @@ let () =
     (fun path -> Could_not_read_data_dir_version path) ;
   register_error_kind
     `Permanent
+    ~id:"couldNotWriteVersionFile"
+    ~title:"Could not write version file"
+    ~description:"Version file cannot be written."
+    Data_encoding.(obj1 (req "file_path" string))
+    ~pp:(fun ppf file_path ->
+      Format.fprintf
+        ppf
+        "Tried to write version file at '%s',  but the file could not be \
+         written."
+        file_path)
+    (function
+      | Could_not_write_version_file file_path -> Some file_path | _ -> None)
+    (fun file_path -> Could_not_write_version_file file_path) ;
+  register_error_kind
+    `Permanent
     ~id:"dataDirNeedsUpgrade"
     ~title:"The data directory needs to be upgraded"
     ~description:"The data directory needs to be upgraded"
@@ -150,9 +167,11 @@ let clean_directory files =
   Format.sprintf "Please provide a clean directory by removing:@ %s" to_delete
 
 let write_version_file data_dir =
+  let version_file = version_file data_dir in
   Lwt_utils_unix.Json.write_file
-    (version_file data_dir)
+    version_file
     (Data_encoding.Json.construct version_encoding data_version)
+  |> trace (Could_not_write_version_file version_file)
 
 let read_version_file version_file =
   Lwt_utils_unix.Json.read_file version_file
