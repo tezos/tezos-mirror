@@ -1136,6 +1136,20 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
   in
   return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
 
+let to_ipv4 ipv6_l =
+  let convert_or_warn (ipv6, port) =
+    let ipv4 = Ipaddr.v4_of_v6 ipv6 in
+    match ipv4 with
+    | None ->
+        Format.eprintf
+          "Warning: failed to convert %S to an ipv4 address@."
+          (Ipaddr.V6.to_string ipv6) ;
+        None
+    | Some ipv4 ->
+        Some (ipv4, port)
+  in
+  List.filter_map convert_or_warn ipv6_l
+
 let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
   let (addr, port) = P2p_point.Id.parse_addr_port peer in
   let node = if addr = "" || addr = "_" then default_addr else addr
@@ -1164,21 +1178,7 @@ let resolve_discovery_addrs discovery_addr =
     ~default_port:default_discovery_port
     ~passive:true
     discovery_addr
-  >>= fun addrs ->
-  let rec to_ipv4 acc = function
-    | [] ->
-        Lwt.return (List.rev acc)
-    | (ip, port) :: xs -> (
-      match Ipaddr.v4_of_v6 ip with
-      | Some v ->
-          to_ipv4 ((v, port) :: acc) xs
-      | None ->
-          Format.eprintf
-            "Warning: failed to convert %S to an ipv4 address@."
-            (Ipaddr.V6.to_string ip) ;
-          to_ipv4 acc xs )
-  in
-  to_ipv4 [] addrs
+  >>= fun addrs -> Lwt.return (to_ipv4 addrs)
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
