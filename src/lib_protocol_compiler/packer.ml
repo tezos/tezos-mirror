@@ -39,19 +39,56 @@ let dump_file oc file =
   in
   loop () ; close_in ic
 
+(** Check that each individual file is valid OCaml and does not use
+    ["external"]. *)
+let check_syntax kind file =
+  let ic = open_in file in
+  let lexbuf = Lexing.from_channel ic in
+  lexbuf.lex_start_p <- {lexbuf.lex_start_p with pos_fname = file} ;
+  lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = file} ;
+  let iterator =
+    (* Open recursion with records, see
+       https://caml.inria.fr/pub/docs/manual-ocaml/compilerlibref/Ast_mapper.html *)
+    Ast_iterator.
+      {
+        default_iterator with
+        structure_item =
+          (fun iterator struct_item ->
+            match struct_item.pstr_desc with
+            | Pstr_primitive _ ->
+                Format.kasprintf
+                  Pervasives.failwith
+                  "protocol-compiler: %a: use of `external` is forbidden"
+                  Location.print
+                  struct_item.pstr_loc
+            | _should_be_fine ->
+                default_iterator.structure_item iterator struct_item);
+      }
+  in
+  ( match kind with
+  | `Implementation ->
+      let impl = Parse.implementation lexbuf in
+      iterator.structure iterator impl
+  | `Interface ->
+      let intf = Parse.interface lexbuf in
+      iterator.signature iterator intf ) ;
+  close_in ic
+
 let include_ml oc file =
   let unit =
     String.capitalize_ascii (Filename.chop_extension (Filename.basename file))
   in
-  (* FIXME insert .mli... *)
   Printf.fprintf oc "module %s " unit ;
-  if Sys.file_exists (file ^ "i") then (
+  let mli = file ^ "i" in
+  if Sys.file_exists mli then (
+    check_syntax `Interface mli ;
     Printf.fprintf oc ": sig\n" ;
-    Printf.fprintf oc "# 1 %S\n" (file ^ "i") ;
-    dump_file oc (file ^ "i") ;
+    Printf.fprintf oc "# 1 %S\n" mli ;
+    dump_file oc mli ;
     Printf.fprintf oc "end " ) ;
   Printf.fprintf oc "= struct\n" ;
   Printf.fprintf oc "# 1 %S\n" file ;
+  check_syntax `Implementation file ;
   dump_file oc file ;
   Printf.fprintf oc "end\n%!"
 
