@@ -11,6 +11,7 @@
             tezos-signer-services
             tezos-client-004-Pt24m4xi
             tezos-client-005-PsBabyM1
+            tezos-client-006-PsCARTHA
  )
  (flags (:standard -open Tezos_data_encoding
                    -open Tezos_base__TzPervasives

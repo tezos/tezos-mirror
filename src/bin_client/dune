@@ -14,12 +14,15 @@
             tezos-client-003-PsddFKi3
             tezos-client-004-Pt24m4xi
             tezos-client-005-PsBabyM1
+            tezos-client-006-PsCARTHA
             tezos-client-001-PtCJ7pwo-commands.registration
             tezos-client-002-PsYLVpVv-commands.registration
             tezos-client-003-PsddFKi3-commands.registration
             tezos-client-004-Pt24m4xi-commands.registration
             tezos-client-005-PsBabyM1-commands.registration
+            tezos-client-006-PsCARTHA-commands.registration
             tezos-baking-005-PsBabyM1-commands.registration
+            tezos-baking-006-PsCARTHA-commands.registration
             tezos-signer-backends.unix)
   (flags (:standard -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http_client

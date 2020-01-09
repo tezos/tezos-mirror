@@ -19,6 +19,7 @@ depends: [
   "tezos-signer-services"
   "tezos-client-004-Pt24m4xi"
   "tezos-client-005-PsBabyM1"
+  "tezos-client-006-PsCARTHA"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
