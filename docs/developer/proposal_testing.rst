@@ -193,22 +193,25 @@ Change `src/proto_alpha/lib_protocol/init_storage.ml` like so at line 47::
 Then::
 
   $ git commit -am 'My awesome feature'
-  $ rm -rf src/proto_00* && ./scripts/snapshot_alpha.sh b_005 from athens_004
-  $ git checkout mainnet
-
-  # cherry-pick the activate_protocol.sh script in proto-proposal
-  $ git log --oneline proto-proposal | grep yes-node | head -1
-  dddf3e48a Scripts: add yes-node to activate_protocol.sh
-  $ git cherry-pick dddf3e48a
-
-  # activate using 488276 for the user-activated update
+  $ ./scripts/snapshot_alpha.sh b_005 from athens_004
+  $ git checkout master
   $ ./scripts/activate_protocol.sh src/proto_005_*
-  Link in the Node? (no if you want to test injection) (Y/n)
-  User-activated update? (Y/n)
-  At what level? (e.g. 3 for sandbox): 488276
 
   $ make
 
+  # To force activation of a protocol at a certain level, configure the node's
+  # network using the "user_activated_upgrades" field, e.g.:
+  #   "network": {
+  #     "user_activated_upgrades":
+  #       [ {
+  #           "level": 774388,
+  #           "replacement_protocol":"PscqRYywd243M2eZspXZEJGsRmNchp4ZKfKmoyEZTRHeLQvVGjp"
+  #       } ]
+  #   ...
+  # To learn more
+  $ ./tezos-node config --help
+
+  # Run the node
   $ ./tezos-node run --connections 0 --data-dir ~/tezos-node-test --rpc-addr localhost &
 
   $ curl -s localhost:8732/chains/main/blocks/head/metadata | jq '.level.level, .protocol, .next_protocol'
