@@ -209,7 +209,7 @@ let write_bytes_cost n =
     allocations = Z.zero;
     steps = Z.zero;
     reads = Z.zero;
-    writes = Z.one;
+    writes = scale Z.one;
     bytes_read = Z.zero;
     bytes_written = scale n;
   }
