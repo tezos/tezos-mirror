@@ -13,8 +13,7 @@ build: [
 ]
 
 depends: [
-  "ocamlfind" {build}
-  "dune" {build}
+  "dune"
   "resto" {= "dev" }
   "ocplib-json-typed" {= "0.7.1" }
   "ocplib-json-typed-bson" {= "0.7.1" }

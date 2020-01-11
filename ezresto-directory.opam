@@ -13,8 +13,7 @@ build: [
 ]
 
 depends: [
-  "ocamlfind" {build}
-  "dune" {build}
-  "ocplib-ezresto" {= "dev" }
+  "dune"
+  "ezresto" {= "dev" }
   "resto-directory" {= "dev" }
 ]

@@ -1,7 +1,0 @@
-S src/*
-B _obuild/*
-PKG lwt
-PKG ocplib-json-typed
-PKG result
-FLG -open Result
-FLG -w -40

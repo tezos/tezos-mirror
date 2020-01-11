@@ -1,0 +1,7 @@
+
+build-and-test:
+  image: ocaml/opam2:alpine-3.10-ocaml-4.08
+  script:
+    - opam install --deps-only .
+    - opam install .
+    - dune runtest

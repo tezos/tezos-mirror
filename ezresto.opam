@@ -16,8 +16,7 @@ run-test: [
 ]
 
 depends: [
-  "ocamlfind" {build}
-  "dune" {build}
+  "dune"
   "uri" {>= "1.9.0" }
   "resto" {= "dev" }
   "resto-json" {= "dev" }

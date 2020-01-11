@@ -1,5 +1,5 @@
 (**************************************************************************)
-(*  ocplib-resto                                                          *)
+(*  resto                                                                 *)
 (*  Copyright (C) 2016, OCamlPro.                                         *)
 (*                                                                        *)
 (*    All rights reserved.  This file is distributed under the terms      *)

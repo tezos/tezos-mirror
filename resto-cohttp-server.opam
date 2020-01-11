@@ -12,8 +12,7 @@ build: [
 ]
 
 depends: [
-  "ocamlfind" {build}
-  "dune" {build}
+  "dune"
   "resto-directory" {= "dev" }
   "resto-cohttp" {= "dev" }
   "cohttp-lwt-unix" { >= "1.0.0" }

@@ -10,8 +10,7 @@ synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 
 build: [[ "dune" "build" "-p" name "-j" jobs "@install" ]]
 depends: [
-  "ocamlfind" {build}
-  "dune" {build}
+  "dune"
   "resto-directory" {= "dev" }
   "cohttp-lwt" { >= "1.0.0" }
 ]
