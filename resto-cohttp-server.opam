@@ -6,6 +6,7 @@ license: "LGPL-2.1-with-OCaml-exception"
 homepage: "https://gitlab.com/nomadic-labs/resto"
 bug-reports: "https://gitlab.com/nomadic-labs/resto/issues"
 dev-repo: "git+https://gitlab.com/nomadic-labs/resto"
+synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs - server library"
 
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
@@ -17,4 +18,3 @@ depends: [
   "resto-cohttp" {= "dev" }
   "cohttp-lwt-unix" { >= "1.0.0" }
 ]
-synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs - server library"

@@ -2,6 +2,16 @@
 build-and-test:
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
+    - opam pin --no-action ezresto-directory .
+    - opam pin --no-action ezresto .
+    - opam pin --no-action resto-cohttp-client .
+    - opam pin --no-action resto-cohttp .
+    - opam pin --no-action resto-cohttp-server .
+    - opam pin --no-action resto-directory .
+    - opam pin --no-action resto-json .
+    - opam pin --no-action resto .
+    - opam depext ezresto-directory ezresto resto-cohttp-client resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
-    - opam install .
+    - dune build
     - dune runtest
+    - opam install .

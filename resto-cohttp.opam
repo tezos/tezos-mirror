@@ -8,7 +8,10 @@ bug-reports: "https://gitlab.com/nomadic-labs/resto/issues"
 dev-repo: "git+https://gitlab.com/nomadic-labs/resto"
 synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 
-build: [[ "dune" "build" "-p" name "-j" jobs "@install" ]]
+build: [
+  [ "dune" "build" "-p" name "-j" jobs ]
+]
+
 depends: [
   "dune"
   "resto-directory" {= "dev" }
