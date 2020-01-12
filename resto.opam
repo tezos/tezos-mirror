@@ -1,4 +1,3 @@
-version: "dev"
 opam-version: "2.0"
 maintainer: "contact@nomadic-labs.com"
 authors: [ "Nomadic Labs" "Ocamlpro" ]
@@ -10,13 +9,14 @@ synopsis: "A minimal OCaml library for type-safe HTTP/JSON RPCs"
 
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
-  [ "dune" "build" "@runtest_resto" "-j" jobs ] { with-test }
 ]
 
 depends: [
   "ocaml" { >= "4.07" }
   "dune" { >= "1.7" }
   "uri" {>= "1.9.0" }
+  "ocplib-json-typed" {with-test}
+  "ocplib-json-typed-bson" {with-test}
   "lwt" {with-test}
   "base-unix"{with-test}
 ]
