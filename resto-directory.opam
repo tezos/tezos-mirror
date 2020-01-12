@@ -13,8 +13,9 @@ build: [
 ]
 
 depends: [
-  "dune"
+  "ocaml" { >= "4.07" }
+  "dune" { >= "1.7" }
   "resto" {= "dev" }
   "resto-json" {= "dev" & with-test }
-  "lwt" { >= "3.0.0" }
+  "lwt" { >= "3.0.0" & <= "5.0.0" }
 ]

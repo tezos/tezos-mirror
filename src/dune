@@ -3,7 +3,7 @@
  (name ezresto)
  (public_name ezresto)
  (modules ezResto)
- (libraries resto-json uri)
+ (libraries resto-json resto uri)
  (wrapped false)
  (flags (:standard -safe-string)))
 
@@ -11,7 +11,7 @@
  (name ezresto_directory)
  (public_name ezresto-directory)
  (modules ezResto_directory)
- (libraries ezresto resto-directory)
+ (libraries ezresto resto-directory resto lwt)
  (flags (:standard -safe-string))
  (wrapped false))
 
@@ -33,7 +33,7 @@
 (library
  (name resto_cohttp_server)
  (public_name resto-cohttp-server)
- (libraries resto-directory resto-cohttp cohttp-lwt-unix)
+ (libraries resto-directory resto-cohttp cohttp-lwt-unix lwt)
  (modules server)
  (flags (:standard -safe-string
         -open Resto_cohttp)))
@@ -41,7 +41,7 @@
 (library
  (name resto_cohttp_client)
  (public_name resto-cohttp-client)
- (libraries resto-directory resto-cohttp uri)
+ (libraries resto-directory resto-cohttp uri lwt)
  (modules client)
  (flags (:standard -safe-string
         -open Resto_cohttp)))

@@ -13,8 +13,10 @@ build: [
 ]
 
 depends: [
-  "dune"
+  "ocaml" { >= "4.07" }
+  "dune" { >= "1.7" }
   "resto-directory" {= "dev" }
   "resto-cohttp" {= "dev" }
   "cohttp-lwt-unix" { >= "1.0.0" }
+  "lwt" { >= "3.0.0" & <= "5.0.0" }
 ]
