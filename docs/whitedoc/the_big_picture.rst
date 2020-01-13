@@ -222,7 +222,7 @@ Three economic protocols are included in the main Tezos repository.
 
   - :package:`tezos-protocol-genesis`
     (:package:`tezos-embedded-protocol-genesis`) is the protocol of
-    the genesis block. It accepts a single block, signed by a activator
+    the genesis block. It accepts a single block, signed by an activator
     whose public key is hardcoded, that single action is to switch to
     a new protocol chosen by the activator.
   - :package:`tezos-protocol-alpha`
@@ -240,10 +240,10 @@ The client is split into many packages, to enforce three separation
 lines: shell vs economic protocol, Unix dependent vs JavaScript
 compatible, and library vs command line interface.
 
-  - :package:`tezos-client-base` define the client context, which is
+  - :package:`tezos-client-base` defines the client context, which is
     an object whose methods allow for: accessing a wallet of keys,
     interacting via the user, making RPC calls, and signing data using
-    signer plug-ins. Most of the, including RPC calling functions from
+    signer plug-ins. Most of them, including RPC calling functions from
     :package:`tezos-shell-services` and
     :package:`tezos-protocol-alpha`, are abstracted over this object
     type. That way, it is possible to use the same code for different
