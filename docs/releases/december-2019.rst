@@ -1,4 +1,4 @@
-.. _mainnet-2019:
+.. _mainnet-december-2019:
 
 Mainnet December 2019
 =====================
