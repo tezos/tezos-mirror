@@ -27,7 +27,7 @@ Shell
 
 - Add new ``reconstruct`` command to convert a ``full`` node into an ``archive`` node
 
-- Make validation run in an external process (can be disabled with --singleprocess)
+- Make validation run in an external process (can be disabled with ``--singleprocess``)
 
 - Improve bootstrap efficiency
 
@@ -277,7 +277,7 @@ Now either download a full snapshot file, or create one from your Tezos node.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create a new container that will upgrade to the new storage format.
-This is going to to take multiple days.
+This is going to take multiple days.
 Run::
 
   docker run -d --name upgrader \
