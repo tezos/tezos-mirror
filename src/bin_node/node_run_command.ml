@@ -266,6 +266,10 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
+  lwt_log_notice
+    "Network chain name is: %s"
+    (config.blockchain_network.chain_name :> string)
+  >>= fun () ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   lwt_log_notice "Starting the Tezos node..."
   >>= fun () ->
