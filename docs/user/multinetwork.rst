@@ -1,8 +1,25 @@
 Multinetwork Node
 =================
 
+Tezos is run on several networks, such as Mainnet (the main network)
+and various :ref:`Test Networks<test-networks>`. Some users may also want to run
+their own networks for various reasons. Networks differ in various ways:
+
+- they start from their own genesis block;
+
+- they have different names so that nodes know not to talk to other networks;
+
+- they may run (or have run) different protocols;
+
+- protocols may run with different constants (for instance, test networks move faster);
+
+- they have different bootstrap peers (nodes that new nodes connect to initially);
+
+- they may have had user-activated upgrades or user-activated protocol overrides
+  to change the protocol without going through the voting process.
+
 The current ``master`` branch is capable of connecting to multiple networks,
-including Mainnet, Zeronet, Babylonnet and Carthagenet. By contrast,
+including Mainnet and the test networks Zeronet, Babylonnet and Carthagenet. By contrast,
 the ``mainnet`` branch is only capable of connecting to Mainnet,
 the ``babylonnet`` branch is only capable of connecting to Babylonnet,
 and so on. The goal is to remove the need for such branches.
@@ -111,7 +128,8 @@ configuration file (or to doing nothing, as Mainnet is the default).
   Inspect the genesis block using ``tezos-client rpc get /chains/main/blocks/0``
   to find these values.
 
-- ``chain_name`` is the name of the network.
+- ``chain_name`` is the name of the network (nodes only talk to other nodes which use
+  the same network name).
 
 - ``old_chain_name`` is usually the same as ``chain_name``, except for networks
   which were renamed.
