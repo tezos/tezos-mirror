@@ -393,19 +393,74 @@ end
 
 let read_config_file args =
   if Sys.file_exists args.config_file then
-    Node_config_file.read args.config_file
-  else return Node_config_file.default_config
+    Node_config_file.read args.config_file >>=? fun cfg -> return (cfg, true)
+  else return (Node_config_file.default_config, false)
 
 let read_data_dir args =
   read_config_file args
-  >>=? fun cfg ->
+  >>=? fun (cfg, _) ->
   let {data_dir; _} = args in
   let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   return data_dir
 
+type error +=
+  | Network_configuration_mismatch of {
+      configuration_file : string;
+      configuration_file_chain_name : Distributed_db_version.Name.t;
+      command_line_chain_name : Distributed_db_version.Name.t;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"node.config.network_configuration_mismatch"
+    ~title:"Network configuration mismatch"
+    ~description:
+      "You specified a --network argument on the command line, but the \
+       configuration file already contains another value"
+    ~pp:
+      (fun ppf
+           ( configuration_file,
+             configuration_file_chain_name,
+             command_line_chain_name ) ->
+      Format.fprintf
+        ppf
+        "@[Specified@ --network@ has@ chain@ name@ %s,@ but configuration \
+         file@ %s@ specifies@ chain@ name@ %s.@]"
+        command_line_chain_name
+        configuration_file
+        configuration_file_chain_name)
+    Data_encoding.(
+      obj3
+        (req "configuration_file" string)
+        (req "configuration_file_chain_name" string)
+        (req "command_line_chain_name" string))
+    (function
+      | Network_configuration_mismatch
+          { configuration_file;
+            configuration_file_chain_name;
+            command_line_chain_name } ->
+          Some
+            ( configuration_file,
+              (configuration_file_chain_name :> string),
+              (command_line_chain_name :> string) )
+      | _ ->
+          None)
+    (fun ( configuration_file,
+           configuration_file_chain_name,
+           command_line_chain_name ) ->
+      Network_configuration_mismatch
+        {
+          configuration_file;
+          configuration_file_chain_name =
+            Distributed_db_version.Name.of_string configuration_file_chain_name;
+          command_line_chain_name =
+            Distributed_db_version.Name.of_string command_line_chain_name;
+        })
+
 let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
   read_config_file args
-  >>=? fun cfg ->
+  >>=? fun (cfg, config_file_exists) ->
   let { data_dir;
         min_connections;
         expected_connections;
@@ -430,9 +485,32 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
         bootstrap_threshold;
         history_mode;
         network;
-        config_file = _ } =
+        config_file } =
     args
   in
+  (* Overriding the network with [--network] is a bad idea if the configuration
+     file already specifies it. Essentially, [--network] tells the node
+     "if there is no config file, use this network; otherwise, check that the
+     config file uses the network I expect". *)
+  ( match (network, config_file_exists) with
+  | (None, _) | (Some _, false) ->
+      return_unit
+  | (Some network, true) ->
+      if
+        Distributed_db_version.Name.equal
+          cfg.blockchain_network.chain_name
+          network.chain_name
+      then return_unit
+      else
+        fail
+          (Network_configuration_mismatch
+             {
+               configuration_file = config_file;
+               configuration_file_chain_name =
+                 cfg.blockchain_network.chain_name;
+               command_line_chain_name = network.chain_name;
+             }) )
+  >>=? fun () ->
   (* Update bootstrap peers must take into account the updated config file
      with the [--network] argument, so we cannot use [Node_config_file]. *)
   let bootstrap_peers =

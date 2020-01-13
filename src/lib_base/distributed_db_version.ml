@@ -39,6 +39,8 @@ module Name = struct
       "distributed_db_version.name"
       ~description:"A name for the distributed DB protocol"
       string
+
+  let equal = String.equal
 end
 
 type t = int

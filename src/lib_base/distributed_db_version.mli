@@ -34,6 +34,8 @@ module Name : sig
   val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
+
+  val equal : t -> t -> bool
 end
 
 (** An abstract version number for the high-level [Distributed_db] messages. *)
