@@ -1,0 +1,151 @@
+Multinetwork Node
+=================
+
+The current ``master`` branch is capable of connecting to multiple networks,
+including Mainnet, Zeronet, Babylonnet and Carthagenet. By contrast,
+the ``mainnet`` branch is only capable of connecting to Mainnet,
+the ``babylonnet`` branch is only capable of connecting to Babylonnet,
+and so on. The goal is to remove the need for such branches.
+Currently, the multinetwork node has not been released, but we hope that
+the next major Mainnet release is nothing but a tag on ``master``, or maybe
+a very small branch.
+
+By default, the multinetwork node connects to Mainnet.
+To connect to other networks, you can either
+`Select Network From Command-Line`_ or `Set Network in Configuration File`_.
+You can also configure the node to connect to `Custom Networks`_.
+
+Select Network From Command-Line
+--------------------------------
+
+The simplest way to select the network to connect to is to use the new ``--network``
+option. For instance, to run Babylonnet::
+
+  tezos-node run --data-dir ~/tezos-babylonnet --network babylonnet
+
+The ``--data-dir`` option is not mandatory, but it is a good idea to prevent
+accidentally running, say, a Mainnet data directory with the Babylonnet network.
+
+Note that this ``--network`` option must be given everytime you restart your node.
+It also must be given with the ``snapshot export`` and ``snapshot import`` commands.
+One way to avoid this is to `Set Network in Configuration File`_.
+
+The ``--network`` option can be used with the following built-in networks:
+
+- ``mainnet`` (this is the default)
+
+- ``sandbox``
+
+- ``zeronet``
+
+- ``alphanet`` (deprecated)
+
+- ``babylonnet``
+
+- ``carthagenet``
+
+Set Network in Configuration File
+---------------------------------
+
+Instead of using ``--network`` you can set the network in the configuration file.
+Here is an example configuration file to run Carthagenet::
+
+  {
+    "p2p": {},
+    "network": "Carthagenet"
+  }
+
+You can specify any built-in network from the list in `Select Network From Command-Line`_,
+but its name must be capitalized.
+
+(The ``p2p`` field is unrelated, but it is mandatory, although it can be empty.)
+
+To use this configuration file, run the node with ``--config-file FILENAME``
+where ``FILENAME`` is the name of this file. Alternatively, put the file in your
+data directory with the name ``config.json``. By default, this is
+``~/.tezos-node/config.json``.
+
+Custom Networks
+---------------
+
+If the network you want to connect to is not in the list of built-in networks,
+you can configure a custom network in the configuration file.
+Here is an example configuration file for Mainnet::
+
+  {
+    "p2p": {},
+    "network": {
+      "genesis": {
+        "timestamp": "2018-06-30T16:07:32Z",
+        "block": "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2",
+        "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+      },
+      "chain_name": "TEZOS_MAINNET",
+      "old_chain_name": "TEZOS_BETANET_2018-06-30T16:07:32Z",
+      "incompatible_chain_name": "INCOMPATIBLE",
+      "sandboxed_chain_name": "SANDBOXED_TEZOS_MAINNET",
+      "user_activated_upgrades": [
+        {
+          "level": 28082,
+          "replacement_protocol": "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
+        },
+        {
+          "level": 204761,
+          "replacement_protocol": "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
+        }
+      ],
+      "user_activated_protocol_overrides": [
+        {
+          "replaced_protocol": "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
+          "replacement_protocol": "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
+        }
+      ],
+      "default_bootstrap_peers": [ "boot.tzbeta.net" ]
+    }
+  }
+
+This is equivalent to using ``--network Mainnet``, or ``"network": "Mainnet"`` in the
+configuration file (or to doing nothing, as Mainnet is the default).
+
+- ``genesis`` is the description of the genesis block, i.e. the first block of the chain.
+  Inspect the genesis block using ``tezos-client rpc get /chains/main/blocks/0``
+  to find these values.
+
+- ``chain_name`` is the name of the network.
+
+- ``old_chain_name`` is usually the same as ``chain_name``, except for networks
+  which were renamed.
+
+- ``incompatible_chain_name`` is a name which must be different than ``chain_name``
+  and ``old_chain_name``. It is thus ensured to be incompatible. It is used for testing
+  purposes.
+
+- ``sandboxed_chain_name`` is the name of the network in sandbox mode. It can be the same
+  as ``chain_name`` but it is safer to pick a different name.
+
+- ``user_activated_upgrades`` is the list of past user-activated upgrades.
+  Each item has a field ``level``, which is the level at which the protocol must
+  be changed, and a field ``replacement_protocol``, which is the hash of the protocol
+  to switch to.
+
+- ``user_activated_protocol_overrides`` is the list of past user-activated protocol
+  overrides. Each item has a field ``replaced_protocol`` and a field ``replacement_protocol``.
+  Both are protocol hashes. If ``replaced_protocol`` is to be activated using on-chain
+  voting, ``replacement_protocol`` is activated instead.
+
+- ``default_bootstrap_peers`` is the list of addresses of default bootstrap peers.
+  They are only used if ``p2p.bootstrap_peers`` is not present in the configuration file,
+  and ``--no-bootstrap-peers`` is not given on the command-line.
+
+Development
+-----------
+
+The list of built-in networks is in ``src/bin_node/node_config_file.ml``.
+Edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
+add or remove built-in networks.
+
+To be able to connect to multiple networks without having to download the protocols,
+and to provide all the relevant baker / endorser / accuser binaries, all current and
+past protocols are compiled and linked. This means that if you patch the client commands
+for a protocol, you should patch the other protocols as well (at least the ones which
+are still in use).

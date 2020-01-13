@@ -116,6 +116,7 @@ in the :ref:`introduction <howtoget>`.
    user/snapshots
    user/various
    user/glossary
+   user/multinetwork
 
 .. toctree::
    :maxdepth: 2
