@@ -25,6 +25,15 @@ On a debian system, you can install the needed dependencies with:
       python3-sphinx \
       python3-sphinx-rtd-theme
 
+If you prefer to use a specific python environment to build the documentation, create a virtualenv with a python3 interpreter and install these PIP packages:
+
+.. code-block:: bash
+
+   pip install sphinx sphinx-rtd-theme recommonmark
+
+The HTML pages will be available in `docs/_build`.
+
+
 Sphinx extensions
 -----------------
 
