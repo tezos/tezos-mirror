@@ -182,13 +182,7 @@ let register () =
         raise Not_found
     | Some (_, value_type) -> (
         Lwt.return
-          (parse_ty
-             ctxt
-             ~legacy:true
-             ~allow_big_map:false
-             ~allow_operation:false
-             ~allow_contract:true
-             (Micheline.root value_type))
+          (parse_packable_ty ctxt ~legacy:true (Micheline.root value_type))
         >>=? fun (Ex_ty value_type, ctxt) ->
         Big_map.get_opt ctxt id key
         >>=? fun (_ctxt, value) ->
@@ -253,13 +247,7 @@ let register () =
           Lwt.return
             ( parse_toplevel ~legacy expr
             >>? fun (arg_type, _, _, root_name) ->
-            parse_ty
-              ctxt
-              ~legacy
-              ~allow_big_map:true
-              ~allow_operation:false
-              ~allow_contract:true
-              arg_type
+            parse_parameter_ty ctxt ~legacy arg_type
             >>? fun (Ex_ty arg_type, _) ->
             Script_ir_translator.find_entrypoint ~root_name arg_type entrypoint
             )
@@ -285,13 +273,7 @@ let register () =
           Lwt.return
             ( parse_toplevel ~legacy expr
             >>? fun (arg_type, _, _, root_name) ->
-            parse_ty
-              ctxt
-              ~legacy
-              ~allow_big_map:true
-              ~allow_operation:false
-              ~allow_contract:true
-              arg_type
+            parse_parameter_ty ctxt ~legacy arg_type
             >>? fun (Ex_ty arg_type, _) ->
             Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
           >>=? fun (unreachable_entrypoint, map) ->

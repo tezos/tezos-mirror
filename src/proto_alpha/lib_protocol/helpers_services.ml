@@ -486,13 +486,7 @@ module Scripts = struct
         Lwt.return
           ( parse_toplevel ~legacy expr
           >>? fun (arg_type, _, _, root_name) ->
-          parse_ty
-            ctxt
-            ~legacy
-            ~allow_big_map:true
-            ~allow_operation:false
-            ~allow_contract:true
-            arg_type
+          parse_parameter_ty ctxt ~legacy arg_type
           >>? fun (Ex_ty arg_type, _) ->
           Script_ir_translator.find_entrypoint ~root_name arg_type entrypoint
           )
@@ -506,13 +500,7 @@ module Scripts = struct
         Lwt.return
           ( parse_toplevel ~legacy expr
           >>? fun (arg_type, _, _, root_name) ->
-          parse_ty
-            ctxt
-            ~legacy
-            ~allow_big_map:true
-            ~allow_operation:false
-            ~allow_contract:true
-            arg_type
+          parse_parameter_ty ctxt ~legacy arg_type
           >>? fun (Ex_ty arg_type, _) ->
           Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
         >>=? fun (unreachable_entrypoint, map) ->
