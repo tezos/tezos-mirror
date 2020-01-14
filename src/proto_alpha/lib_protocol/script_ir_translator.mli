@@ -189,16 +189,10 @@ val parse_instr :
   'bef Script_typed_ir.stack_ty ->
   ('bef judgement * context) tzresult Lwt.t
 
-val parse_ty :
-  context ->
-  legacy:bool ->
-  allow_big_map:bool ->
-  allow_operation:bool ->
-  allow_contract:bool ->
-  Script.node ->
-  (ex_ty * context) tzresult
-
 val parse_packable_ty :
+  context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
+
+val parse_parameter_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
 val unparse_ty :
