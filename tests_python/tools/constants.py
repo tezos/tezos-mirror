@@ -108,6 +108,11 @@ IDENTITIES_SHORT = {
 ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 ALPHA_DEAMON = "alpha"  # tezos-baker-alpha
 
+BABYLON = "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
+BABYLON_DEAMON = "005-PsBabyM1"
+
+CARTHAGE = "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
+CARTHAGE_DEAMON = "006-PsCARTHA"
 
 TEZOS_CRT = """
 Certificate:

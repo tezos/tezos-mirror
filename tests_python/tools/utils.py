@@ -154,10 +154,10 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
     return count
 
 
-def activate_alpha(client, parameters=None, timestamp=None):
+def activate_alpha(client, parameters=None, timestamp=None,
+                   proto=constants.ALPHA):
     if parameters is None:
         parameters = constants.PARAMETERS
-    proto = constants.ALPHA
     client.activate_protocol_json(proto, parameters, timestamp=timestamp)
 
 

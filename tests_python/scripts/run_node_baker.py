@@ -6,7 +6,13 @@ from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
-def scenario(contract, storage, time_between_blocks):
+def scenario(contract, storage, time_between_blocks, proto):
+    if proto is None:
+        proto = 'alpha'
+    assert proto in {'alpha', 'babylon'}, 'unknown protocol'
+    protos = {'alpha': (constants.ALPHA, constants.ALPHA_DEAMON),
+              'babylon': (constants.BABYLON, constants.BABYLON_DEAMON)}
+    proto_hash, proto_deamon = protos[proto]
     if contract:
         assert os.path.isfile(contract), f'{contract} is not a file'
     if storage is None:
@@ -18,8 +24,8 @@ def scenario(contract, storage, time_between_blocks):
         parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
 
         sandbox.add_node(1)
-        utils.activate_alpha(sandbox.client(1), parameters)
-        sandbox.add_baker(1, 'bootstrap5', proto=constants.ALPHA_DEAMON)
+        utils.activate_alpha(sandbox.client(1), parameters, proto=proto_hash)
+        sandbox.add_baker(1, 'bootstrap5', proto=proto_deamon)
         client = sandbox.client(1)
         if contract:
             args = ['--init', storage, '--burn-cap', '10.0']
@@ -55,8 +61,13 @@ def main():
                         help='initial storage for contract',
                         required=False
                         )
+    parser.add_argument('--proto', dest='proto', metavar='PROTO',
+                        help='alpha, babylon (default alpha)',
+                        required=False
+                        )
     args = parser.parse_args()
-    scenario(args.contract, args.storage, int(args.time_between_blocks))
+    scenario(args.contract, args.storage, int(args.time_between_blocks),
+             args.proto)
 
 
 if __name__ == "__main__":
