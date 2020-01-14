@@ -121,7 +121,7 @@ Here is an example configuration file for Mainnet::
     }
   }
 
-This is equivalent to using ``--network Mainnet``, or ``"network": "Mainnet"`` in the
+This is equivalent to using ``--network mainnet``, or ``"network": "Mainnet"`` in the
 configuration file (or to doing nothing, as Mainnet is the default).
 
 - ``genesis`` is the description of the genesis block, i.e. the first block of the chain.
