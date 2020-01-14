@@ -1426,6 +1426,16 @@ and parse_parameter_ty :
     ~allow_operation:false
     ~allow_contract:true
 
+and parse_normal_storage_ty :
+    context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
+ fun ctxt ~legacy ->
+  parse_ty
+    ctxt
+    ~legacy
+    ~allow_big_map:true
+    ~allow_operation:false
+    ~allow_contract:legacy
+
 and parse_any_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
  fun ctxt ~legacy ->
@@ -1696,36 +1706,18 @@ and parse_storage_ty :
     when legacy -> (
     match storage_annot with
     | [] ->
-        parse_ty
-          ctxt
-          ~legacy
-          ~allow_big_map:true
-          ~allow_operation:false
-          ~allow_contract:legacy
-          node
+        parse_normal_storage_ty ctxt ~legacy node
     | [single]
       when Compare.Int.(String.length single > 0)
            && Compare.Char.(single.[0] = '%') ->
-        parse_ty
-          ctxt
-          ~legacy
-          ~allow_big_map:true
-          ~allow_operation:false
-          ~allow_contract:legacy
-          node
+        parse_normal_storage_ty ctxt ~legacy node
     | _ ->
         (* legacy semantics of big maps used the wrong annotation parser *)
         Gas.consume ctxt Typecheck_costs.cycle
         >>? fun ctxt ->
         parse_big_map_ty ctxt ~legacy big_map_loc args map_annot
         >>? fun (Ex_ty big_map_ty, ctxt) ->
-        parse_ty
-          ctxt
-          ~legacy
-          ~allow_big_map:true
-          ~allow_operation:false
-          ~allow_contract:legacy
-          remaining_storage
+        parse_normal_storage_ty ctxt ~legacy remaining_storage
         >>? fun (Ex_ty remaining_storage, ctxt) ->
         parse_composed_type_annot loc storage_annot
         >>? fun (ty_name, map_field, storage_field) ->
@@ -1738,13 +1730,7 @@ and parse_storage_ty :
                  ty_name )),
           ctxt ) )
   | _ ->
-      parse_ty
-        ctxt
-        ~legacy
-        ~allow_big_map:true
-        ~allow_operation:false
-        ~allow_contract:legacy
-        node
+      parse_normal_storage_ty ctxt ~legacy node
 
 let check_packable ~legacy loc root =
   let rec check : type t. t ty -> unit tzresult = function
