@@ -1294,7 +1294,7 @@ Operations on optional values
 
     :: 'S   ->   option 'a : 'S
 
-    > NONE / v : S  =>  None : S
+    > NONE / S  =>  None : S
 
 -  ``IF_NONE bt bf``: Inspect an optional value.
 
