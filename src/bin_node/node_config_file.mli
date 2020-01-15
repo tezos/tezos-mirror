@@ -29,6 +29,8 @@
 type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
+  alias : string option;
+      (** as given to [--network], only for built-in networks *)
   genesis : State.Chain.genesis;
   chain_name : chain_name;
   old_chain_name : chain_name option;
@@ -39,7 +41,7 @@ type blockchain_network = {
   default_bootstrap_peers : string list;
 }
 
-(** List of built-in networks with their command-line name. *)
+(** List of built-in networks with their alias. *)
 val builtin_blockchain_networks : (string * blockchain_network) list
 
 type t = {

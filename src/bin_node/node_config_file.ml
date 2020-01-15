@@ -41,6 +41,7 @@ let default_discovery_port = 10732
 type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
+  alias : string option;
   genesis : State.Chain.genesis;
   chain_name : chain_name;
   old_chain_name : chain_name option;
@@ -51,12 +52,13 @@ type blockchain_network = {
   default_bootstrap_peers : string list;
 }
 
-let make_blockchain_network ~chain_name ?old_chain_name
+let make_blockchain_network ~alias ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
     ?(default_bootstrap_peers = []) genesis =
   let of_string = Distributed_db_version.Name.of_string in
   {
+    alias = Some alias;
     genesis;
     chain_name = of_string chain_name;
     old_chain_name = Option.map old_chain_name ~f:of_string;
@@ -76,6 +78,7 @@ let make_blockchain_network ~chain_name ?old_chain_name
 
 let blockchain_network_mainnet =
   make_blockchain_network
+    ~alias:"mainnet"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
@@ -100,6 +103,7 @@ let blockchain_network_mainnet =
 
 let blockchain_network_alphanet =
   make_blockchain_network
+    ~alias:"alphanet"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z";
@@ -118,6 +122,7 @@ let blockchain_network_alphanet =
 
 let blockchain_network_zeronet =
   make_blockchain_network
+    ~alias:"zeronet"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
@@ -134,6 +139,7 @@ let blockchain_network_zeronet =
 
 let blockchain_network_babylonnet =
   make_blockchain_network
+    ~alias:"babylonnet"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2019-09-27T07:43:32Z";
@@ -151,6 +157,7 @@ let blockchain_network_babylonnet =
 
 let blockchain_network_carthagenet =
   make_blockchain_network
+    ~alias:"carthagenet"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2019-11-28T13:02:13Z";
@@ -172,6 +179,7 @@ let blockchain_network_carthagenet =
 
 let blockchain_network_sandbox =
   make_blockchain_network
+    ~alias:"sandbox"
     State.Chain.
       {
         time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
@@ -188,7 +196,8 @@ let blockchain_network_sandbox =
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { genesis;
+    (fun { alias = _;
+           genesis;
            chain_name;
            old_chain_name;
            incompatible_chain_name;
@@ -213,6 +222,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_protocol_overrides,
            default_bootstrap_peers ) ->
       {
+        alias = None;
         genesis;
         chain_name;
         old_chain_name;
@@ -242,12 +252,18 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           []))
 
 let builtin_blockchain_networks_with_tags =
-  [ (1, "sandbox", blockchain_network_sandbox);
-    (2, "zeronet", blockchain_network_zeronet);
-    (3, "alphanet", blockchain_network_alphanet);
-    (4, "mainnet", blockchain_network_mainnet);
-    (5, "babylonnet", blockchain_network_babylonnet);
-    (6, "carthagenet", blockchain_network_carthagenet) ]
+  [ (1, blockchain_network_sandbox);
+    (2, blockchain_network_zeronet);
+    (3, blockchain_network_alphanet);
+    (4, blockchain_network_mainnet);
+    (5, blockchain_network_babylonnet);
+    (6, blockchain_network_carthagenet) ]
+  |> List.map (fun (tag, network) ->
+         match network.alias with
+         | None ->
+             assert false (* all built-in networks must have aliases *)
+         | Some alias ->
+             (tag, alias, network))
 
 let builtin_blockchain_networks =
   List.map
@@ -256,24 +272,36 @@ let builtin_blockchain_networks =
 
 let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
-  let builtin_encoding (tag, name, network) =
-    let constructor = String.capitalize_ascii name in
+  let builtin_encoding (tag, network_alias, network) =
+    let constructor = String.capitalize_ascii network_alias in
     case
       (Tag tag)
       ~title:constructor
       (constant constructor)
-      (fun _ -> None)
+      (fun candidate ->
+        match candidate.alias with
+        | None ->
+            None
+        | Some candidate_alias ->
+            if String.equal candidate_alias network_alias then Some ()
+            else None)
       (fun () -> network)
   in
+  (* It is important that built-in networks are listed before the Custom case,
+     so that they have priority. Indeed, if possible we want to store the alias
+     in the configuration file, not the full network description. Not just because
+     it is prettier, but also in case user-activated upgrades are added to the built-in
+     network: by writing the alias we ensure that new upgrades are used without having
+     to update the configuration file manually. *)
   union
     ~tag_size:`Uint8
-    ( case
-        (Tag 0)
-        ~title:"Custom"
-        blockchain_network_encoding
-        (fun x -> Some x)
-        (fun x -> x)
-    :: List.map builtin_encoding builtin_blockchain_networks_with_tags )
+    ( List.map builtin_encoding builtin_blockchain_networks_with_tags
+    @ [ case
+          (Tag 0)
+          ~title:"Custom"
+          blockchain_network_encoding
+          (fun x -> Some x)
+          (fun x -> x) ] )
 
 type t = {
   data_dir : string;
