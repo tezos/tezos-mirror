@@ -32,10 +32,10 @@
 type 't num
 
 (** Flag for natural numbers. *)
-and n = Natural_tag
+type n = Natural_tag
 
 (** Flag for relative numbers. *)
-and z = Integer_tag
+type z = Integer_tag
 
 (** Natural zero. *)
 val zero_n : n num
