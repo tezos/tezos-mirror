@@ -6,6 +6,8 @@
             tezos-client-commands
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
+            tezos-mockup
+            tezos-mockup-registration
             tezos-signer-backends.unix
             tezos-shell-services)
  (flags (:standard -open Tezos_base__TzPervasives

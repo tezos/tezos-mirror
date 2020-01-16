@@ -168,7 +168,9 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
 
     inherit unix_wallet ~base_dir ~password_filename
 
-    inherit RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
+    inherit
+      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+        rpc_config Media_type.all_media_types
 
     inherit unix_ui
 
@@ -177,4 +179,26 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     method block = block
 
     method confirmations = confirmations
+  end
+
+class unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context :
+  Client_context.full =
+  object
+    inherit unix_logger ~base_dir
+
+    inherit unix_prompter
+
+    inherit unix_wallet ~base_dir ~password_filename:None
+
+    inherit
+      Tezos_mockup.RPC_client.local_ctxt
+        base_dir mem_only mockup_env rpc_context
+
+    inherit unix_ui
+
+    method chain = `Main
+
+    method block = `Head 0
+
+    method confirmations = None
   end

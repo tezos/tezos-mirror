@@ -39,5 +39,12 @@ class unix_full :
   -> block:Shell_services.block
   -> confirmations:int option
   -> password_filename:string option
-  -> rpc_config:RPC_client_unix.config
+  -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
+  -> Client_context.full
+
+class unix_mockup :
+  base_dir:string
+  -> mem_only:bool
+  -> mockup_env:Tezos_mockup_registration.Registration.mockup_environment
+  -> rpc_context:Tezos_protocol_environment.rpc_context
   -> Client_context.full
