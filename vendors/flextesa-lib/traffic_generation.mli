@@ -13,7 +13,7 @@ module Michelson : sig
     -> protocol_kind:Tezos_protocol.Protocol_kind.t
     -> parameter:string
     -> init_storage:string
-    -> (string sexp_list, [> System_error.t]) Asynchronous_result.t
+    -> (string list, [> System_error.t]) Asynchronous_result.t
 end
 
 module Random : sig
