@@ -71,6 +71,64 @@ module type M = sig
   val logger : RPC_client_unix.logger option
 end
 
+let setup_remote_signer (module C : M) client_config
+    (rpc_config : RPC_client_unix.config) parsed_config_file =
+  let module Remote_params = struct
+    let authenticate pkhs payload =
+      Client_keys.list_keys client_config
+      >>=? fun keys ->
+      match
+        List.filter_map
+          (function
+            | (_, known_pkh, _, Some known_sk_uri)
+              when List.exists
+                     (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh)
+                     pkhs ->
+                Some known_sk_uri
+            | _ ->
+                None)
+          keys
+      with
+      | sk_uri :: _ ->
+          Client_keys.sign client_config sk_uri payload
+      | [] ->
+          failwith
+            "remote signer expects authentication signature, but no \
+             authorized key was found in the wallet"
+
+    let logger =
+      (* overriding the logger we might already have with the one from
+             module C *)
+      match C.logger with Some logger -> logger | None -> rpc_config.logger
+  end in
+  let module Http =
+    Tezos_signer_backends.Http.Make (RPC_client_unix) (Remote_params)
+  in
+  let module Https =
+    Tezos_signer_backends.Https.Make (RPC_client_unix) (Remote_params)
+  in
+  let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
+  Client_keys.register_signer
+    ( module Tezos_signer_backends.Encrypted.Make (struct
+      let cctxt = (client_config :> Client_context.prompter)
+    end) ) ;
+  Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
+  Client_keys.register_signer
+    (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
+  Client_keys.register_signer (module Socket.Unix) ;
+  Client_keys.register_signer (module Socket.Tcp) ;
+  Client_keys.register_signer (module Http) ;
+  Client_keys.register_signer (module Https) ;
+  match parsed_config_file with
+  | None ->
+      ()
+  | Some parsed_config_file -> (
+    match C.other_registrations with
+    | Some r ->
+        r parsed_config_file (module Remote_params)
+    | None ->
+        () )
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
   let global_options = C.global_options () in
@@ -198,72 +256,11 @@ let main (module C : M) ~select_commands =
                  ~base_dir
                  ~rpc_config
              in
-             let module Remote_params = struct
-               let authenticate pkhs payload =
-                 Client_keys.list_keys client_config
-                 >>=? fun keys ->
-                 match
-                   List.filter_map
-                     (function
-                       | (_, known_pkh, _, Some known_sk_uri)
-                         when List.exists
-                                (fun pkh ->
-                                  Signature.Public_key_hash.equal pkh known_pkh)
-                                pkhs ->
-                           Some known_sk_uri
-                       | _ ->
-                           None)
-                     keys
-                 with
-                 | sk_uri :: _ ->
-                     Client_keys.sign client_config sk_uri payload
-                 | [] ->
-                     failwith
-                       "remote signer expects authentication signature, but \
-                        no authorized key was found in the wallet"
-
-               let logger =
-                 (* overriding the logger we might already have with the one from
-             module C *)
-                 match C.logger with
-                 | Some logger ->
-                     logger
-                 | None ->
-                     rpc_config.logger
-             end in
-             let module Http =
-               Tezos_signer_backends.Http.Make
-                 (RPC_client_unix)
-                 (Remote_params)
-             in
-             let module Https =
-               Tezos_signer_backends.Https.Make
-                 (RPC_client_unix)
-                 (Remote_params)
-             in
-             let module Socket =
-               Tezos_signer_backends_unix.Socket.Make (Remote_params) in
-             Client_keys.register_signer
-               ( module Tezos_signer_backends.Encrypted.Make (struct
-                 let cctxt = (client_config :> Client_context.prompter)
-               end) ) ;
-             Client_keys.register_signer
-               (module Tezos_signer_backends.Unencrypted) ;
-             Client_keys.register_signer
-               (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
-             Client_keys.register_signer (module Socket.Unix) ;
-             Client_keys.register_signer (module Socket.Tcp) ;
-             Client_keys.register_signer (module Http) ;
-             Client_keys.register_signer (module Https) ;
-             ( match parsed_config_file with
-             | None ->
-                 ()
-             | Some parsed_config_file -> (
-               match C.other_registrations with
-               | Some r ->
-                   r parsed_config_file (module Remote_params)
-               | None ->
-                   () ) ) ;
+             setup_remote_signer
+               (module C)
+               client_config
+               rpc_config
+               parsed_config_file ;
              ( match parsed_args with
              | Some parsed_args ->
                  select_commands
