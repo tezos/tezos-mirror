@@ -1,6 +1,5 @@
 TYPECHECK=mypy
-# pytest causes redefined-outer-name and no-self-use
-LINT=pylint -d redefined-outer-name,no-self-use,missing-docstring,too-many-arguments,too-few-public-methods,fixme,too-many-locals,too-many-public-methods,too-many-instance-attributes,R0801,c-extension-no-member
+LINT=pylint
 LINT2=pycodestyle
 PACKAGES=daemons launchers client tools scripts tests examples tests/multibranch
 LOG_DIR=tmp
