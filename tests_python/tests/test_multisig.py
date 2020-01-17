@@ -95,7 +95,6 @@ class TestMultisig:
 
 
 @pytest.mark.incremental
-@pytest.mark.xfail(reason='issue #659')
 class TestMultisigFromAddress:
 
     def test_gen_keys(self, client, session):
