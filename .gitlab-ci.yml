@@ -259,11 +259,6 @@ unit:ocaml-blake2:
   tags:
     - gitlab-org
 
-integration:contracts_macros.sh:
-  <<: *integration_definition
-  script:
-    - dune build @src/bin_client/runtest_contracts_macros.sh
-
 integration:proto:sandbox:
   <<: *integration_definition
   script:
@@ -361,10 +356,22 @@ integration:contract:
     - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
   stage: test
 
+integration:contract_annotations:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract_annotations.py -s --log-dir=tmp
+  stage: test
+
 integration:contract_baker:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py -s --log-dir=tmp
+  stage: test
+
+integration:contract_macros:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract_macros.py -s --log-dir=tmp
   stage: test
 
 integration:contract_onchain_opcodes:

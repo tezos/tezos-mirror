@@ -3,22 +3,6 @@
        protocol_parameters.json))
 
 (alias
- (name runtest_contracts_macros.sh)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files contracts/macros/*))
- (locks /tcp-port/18731
-        /tcp-port/19731)
- (action
- (run bash %{dep:test_contracts_macros.sh}
-           %{bin:tezos-sandboxed-node.sh}
-           %{bin:tezos-node}
-           %{bin:tezos-init-sandboxed-client.sh}
-           %{bin:tezos-client}
-           %{bin:tezos-admin-client})))
-
-(alias
  (name runtest_tls.sh)
  (locks /tcp-port/18731
         /tcp-port/19731)
@@ -52,6 +36,5 @@
 
 (alias
  (name runtest)
- (deps (alias runtest_contracts_macros.sh)
-       (alias runtest_tls.sh)
+ (deps (alias runtest_tls.sh)
        (alias runtest_cors.sh)))
