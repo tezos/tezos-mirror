@@ -163,6 +163,29 @@ module M = struct
     |> function Some m -> Lwt.return m | None -> assert false
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    mu "memory_context" (fun encoding ->
+        let map_encoding =
+          conv
+            (fun map -> List.of_seq (StringMap.to_seq map))
+            (fun bindings -> StringMap.of_seq (List.to_seq bindings))
+            (list (tup2 string encoding))
+        in
+        union
+          [ case
+              ~title:"directory"
+              (Tag 0)
+              map_encoding
+              (function Dir map -> Some map | Key _ -> None)
+              (fun map -> Dir map);
+            case
+              ~title:"value"
+              (Tag 1)
+              bytes
+              (function Key v -> Some v | Dir _ -> None)
+              (fun v -> Key v) ])
 end
 
 open Tezos_protocol_environment
@@ -176,3 +199,14 @@ let ops = (module M : CONTEXT with type t = 'ctxt)
 let empty =
   let ctxt = M.empty in
   Context.Context {ops; ctxt; kind = Memory}
+
+let project : Context.t -> t =
+ fun (Context.Context {ctxt; kind; _} : Context.t) ->
+  match kind with Memory -> ctxt | _ -> assert false
+
+let inject : t -> Context.t =
+ fun ctxt -> Context.Context {ops; ctxt; kind = Memory}
+
+let encoding : Context.t Data_encoding.t =
+  let open Data_encoding in
+  conv project inject M.encoding

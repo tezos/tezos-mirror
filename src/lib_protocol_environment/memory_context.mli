@@ -30,3 +30,5 @@ type t
 type _ Context.kind += Memory : t Context.kind
 
 val empty : Context.t
+
+val encoding : Context.t Data_encoding.t
