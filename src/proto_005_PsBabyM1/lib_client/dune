@@ -5,8 +5,10 @@
             tezos-protocol-005-PsBabyM1
             tezos-shell-services
             tezos-client-base
+            tezos-mockup-registration
             tezos-rpc
             tezos-signer-backends
+            tezos-protocol-005-PsBabyM1-parameters
             bip39)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives

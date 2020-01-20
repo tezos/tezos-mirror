@@ -5,8 +5,10 @@
             tezos-protocol-alpha
             tezos-shell-services
             tezos-client-base
+            tezos-mockup-registration
             tezos-rpc
             tezos-signer-backends
+            tezos-protocol-alpha-parameters
             bip39)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
