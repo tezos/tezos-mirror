@@ -8,6 +8,7 @@
             tezos-rpc-http-client-unix
             tezos-mockup
             tezos-mockup-registration
+            tezos-mockup-commands
             tezos-signer-backends.unix
             tezos-shell-services)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -17,6 +18,7 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_client_base
                    -open Tezos_client_commands
+                   -open Tezos_mockup_commands
                    -linkall)))
 
 (alias

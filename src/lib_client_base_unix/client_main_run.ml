@@ -129,6 +129,72 @@ let setup_remote_signer (module C : M) client_config
     | None ->
         () )
 
+let setup_http_rpc_client_config parsed_args base_dir rpc_config =
+  return
+  @@ new unix_full
+       ~chain:
+         ( match parsed_args with
+         | Some p ->
+             p.Client_config.chain
+         | None ->
+             Client_config.default_chain )
+       ~block:
+         ( match parsed_args with
+         | Some p ->
+             p.Client_config.block
+         | None ->
+             Client_config.default_block )
+       ~confirmations:
+         ( match parsed_args with
+         | Some p ->
+             p.Client_config.confirmations
+         | None ->
+             None )
+       ~password_filename:
+         ( match parsed_args with
+         | Some p ->
+             p.Client_config.password_filename
+         | None ->
+             None )
+       ~base_dir
+       ~rpc_config
+
+let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
+  let in_memory_mockup (args : Client_config.cli_args) =
+    match args.protocol with
+    | None ->
+        Tezos_mockup.Persistence.default_mockup_context ()
+    | Some proto_hash ->
+        Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
+          proto_hash
+  in
+  let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
+  ( match base_dir_class with
+  | Tezos_mockup.Persistence.Base_dir_is_empty
+  | Tezos_mockup.Persistence.Base_dir_is_nonempty
+  | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
+      let mem_only = true in
+      in_memory_mockup args >>=? fun res -> return (res, mem_only)
+  | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+      let mem_only = false in
+      Tezos_mockup.Persistence.get_mockup_context_from_disk ~base_dir
+      >>=? fun res -> return (res, mem_only) )
+  >>=? fun ((mockup_env, rpc_context), mem_only) ->
+  return (new unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context)
+
+let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
+    rpc_config =
+  Tezos_mockup_commands.Mockup_commands.set_base_dir base_dir ;
+  match parsed_args with
+  | None ->
+      setup_http_rpc_client_config parsed_args base_dir rpc_config
+  | Some args -> (
+    match args.Client_config.mockup_mode with
+    | None | Some Client_config.Mode_default ->
+        setup_http_rpc_client_config parsed_args base_dir rpc_config
+    | Some Client_config.Mode_mockup ->
+        setup_mockup_rpc_client_config args base_dir )
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
   let global_options = C.global_options () in
@@ -227,35 +293,8 @@ let main (module C : M) ~select_commands =
                | None ->
                    rpc_config
              in
-             let client_config =
-               new unix_full
-                 ~chain:
-                   ( match parsed_args with
-                   | Some p ->
-                       p.Client_config.chain
-                   | None ->
-                       Client_config.default_chain )
-                 ~block:
-                   ( match parsed_args with
-                   | Some p ->
-                       p.Client_config.block
-                   | None ->
-                       Client_config.default_block )
-                 ~confirmations:
-                   ( match parsed_args with
-                   | Some p ->
-                       p.Client_config.confirmations
-                   | None ->
-                       None )
-                 ~password_filename:
-                   ( match parsed_args with
-                   | Some p ->
-                       p.Client_config.password_filename
-                   | None ->
-                       None )
-                 ~base_dir
-                 ~rpc_config
-             in
+             setup_client_config parsed_args base_dir rpc_config
+             >>=? fun client_config ->
              setup_remote_signer
                (module C)
                client_config
