@@ -38,6 +38,8 @@ type error += Invalid_remote_signer_argument of string
 
 type error += Invalid_wait_arg of string
 
+type error += Invalid_mockup_arg of string
+
 let () =
   register_error_kind
     `Branch
@@ -102,7 +104,17 @@ let () =
         s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_wait_arg s -> Some s | _ -> None)
-    (fun s -> Invalid_wait_arg s)
+    (fun s -> Invalid_wait_arg s) ;
+  register_error_kind
+    `Branch
+    ~id:"invalidMockupArgument"
+    ~title:"Invalid Mockup Argument"
+    ~description:"Mockup argument could not be parsed"
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "%s is not \"default\", nor \"directory:<path>\"." s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_mockup_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_mockup_arg s)
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
@@ -209,7 +221,10 @@ type cli_args = {
   protocol : Protocol_hash.t option;
   print_timings : bool;
   log_requests : bool;
+  mockup_mode : mockup_mode option;
 }
+
+and mockup_mode = Mode_default | Mode_mockup
 
 let default_cli_args =
   {
@@ -220,6 +235,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
+    mockup_mode = None;
   }
 
 open Clic
@@ -368,6 +384,20 @@ let password_filename_arg () =
     ~doc:"path to the password filename"
     (string_parameter ())
 
+let mockup_mode_arg () =
+  let parse_mockup_mode (str : string) : mockup_mode tzresult Lwt.t =
+    if str = "default" then return Mode_default
+    else if str = "mockup" then return Mode_mockup
+    else fail (Invalid_mockup_arg str)
+  in
+  arg
+    ~long:"mode"
+    ~placeholder:"mockup mode"
+    ~doc:"default|mockup"
+    (parameter
+       ~autocomplete:(fun _ -> return ["default"; "mockup"])
+       (fun _ param -> parse_mockup_mode param))
+
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file
   >>=? fun cfg_json ->
@@ -455,7 +485,7 @@ let commands config_file cfg =
         else failwith "Config file already exists at location") ]
 
 let global_options () =
-  args13
+  args14
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -469,6 +499,7 @@ let global_options () =
     (tls_switch ())
     (remote_signer_arg ())
     (password_filename_arg ())
+    (mockup_mode_arg ())
 
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
@@ -503,7 +534,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_port,
                tls,
                remote_signer,
-               password_filename ),
+               password_filename,
+               mockup_mode ),
              remaining ) ->
   ( match base_dir with
   | None ->
@@ -579,6 +611,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
               log_requests;
               password_filename;
               protocol;
+              mockup_mode;
             };
         config_commands = commands config_file cfg;
       },
@@ -598,12 +631,13 @@ type t =
   * bool
   * Uri.t option
   * string option
+  * mockup_mode option
 
 module type Remote_params = sig
   val authenticate :
     Signature.public_key_hash list -> Bytes.t -> Signature.t tzresult Lwt.t
 
-  val logger : RPC_client_unix.logger
+  val logger : Tezos_rpc_http_client_unix.RPC_client_unix.logger
 end
 
 let other_registrations : (_ -> (module Remote_params) -> _) option =
@@ -612,7 +646,7 @@ let other_registrations : (_ -> (module Remote_params) -> _) option =
       Option.iter parsed_config_file.Cfg_file.remote_signer ~f:(fun signer ->
           Client_keys.register_signer
             ( module Tezos_signer_backends_unix.Remote.Make
-                       (RPC_client_unix)
+                       (Tezos_rpc_http_client_unix.RPC_client_unix)
                        (struct
                          let default = signer
 
