@@ -8,6 +8,7 @@
             tezos-shell-services
             tezos-client-base
             tezos-client-commands
+            tezos-mockup-commands
 
             tezos-client-genesis
             tezos-client-genesis-alphanet
@@ -43,6 +44,7 @@
                     -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_commands
+                    -open Tezos_mockup_commands
                     -open Tezos_client_base_unix
                     -linkall)))
 
