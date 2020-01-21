@@ -143,7 +143,7 @@ let () =
         ppf
         "The data directory version is too old.@,\
          Found '%s', expected '%s'.@,\
-         It needs to be upgraded with `tezos-node upgrade_storage`."
+         It needs to be upgraded with `tezos-node upgrade storage`."
         got
         exp)
     Data_encoding.(
