@@ -116,7 +116,6 @@ class Client:
 
         print(format_command(cmd))
 
-        stderr = ""
         stdout = ""
         stderr = ""
         new_env = os.environ.copy()
@@ -132,10 +131,6 @@ class Client:
             for line in process.stdout:
                 print(line, end='')
                 stdout += line
-            for line in process.stderr:
-                print(line, end='')
-                stderr += line
-
             for line in process.stderr:
                 print(line, end='', file=sys.stderr)
                 stderr += line
