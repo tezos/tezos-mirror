@@ -66,13 +66,9 @@ let pp_print_paragraph ppf description =
     (split ' ' description)
 
 let take n l =
-  let rec loop acc n = function
-    | xs when Compare.Int.(n <= 0) ->
-        Some (List.rev acc, xs)
-    | [] ->
-        None
-    | x :: xs ->
-        loop (x :: acc) (n - 1) xs
+  let rec loop acc n xs =
+    if Compare.Int.(n <= 0) then Some (List.rev acc, xs)
+    else match xs with [] -> None | x :: xs -> loop (x :: acc) (n - 1) xs
   in
   loop [] n l
 
@@ -86,7 +82,7 @@ let remove_prefix ~prefix s =
 let rec remove_elem_from_list nb = function
   | [] ->
       []
-  | l when Compare.Int.(nb <= 0) ->
+  | _ :: _ as l when Compare.Int.(nb <= 0) ->
       l
   | _ :: tl ->
       remove_elem_from_list (nb - 1) tl
