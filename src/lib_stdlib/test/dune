@@ -1,7 +1,11 @@
 (executables
  (names test_tzList
         test_lwt_pipe
-        test_lru_cache)
+        test_lru_cache
+        test_ring_basic
+        test_ring_plus
+        test_weakringtable
+        test_ring_weakness)
  (libraries tezos-stdlib
             alcotest
             lwt_log
@@ -12,7 +16,10 @@
 (alias
  (name buildtest)
  (deps test_tzList.exe
-       test_lwt_pipe.exe))
+       test_lwt_pipe.exe
+       test_ring_basic.exe
+       test_ring_plus.exe
+       test_weakringtable.exe))
 
 (alias
  (name runtest_tzList)
@@ -27,10 +34,32 @@
  (action (run %{exe:test_lru_cache.exe})))
 
 (alias
+ (name runtest_ring_basic)
+ (action (run %{exe:test_ring_basic.exe})))
+
+(alias
+ (name runtest_ring_plus)
+ (action (run %{exe:test_ring_plus.exe})))
+
+(alias
+ (name runtest_weakringtable)
+ (action (run %{exe:test_weakringtable.exe})))
+
+(alias
  (name runtest)
  (deps (alias runtest_tzList)
        (alias runtest_lwt_pipe)
-       (alias runtest_lru_cache)))
+       (alias runtest_lru_cache)
+       (alias runtest_ring_basic)
+       (alias runtest_ring_plus)
+       (alias runtest_weakringtable)))
+
+(alias
+ (name buildweaknesstest)
+ (deps test_ring_weakness.exe))
+(alias
+ (name runweaknesstest)
+ (action (setenv OCAMLRUNPARAM "o=20,h=16,s=16,i=2" (run %{exe:test_ring_weakness.exe}))))
 
 (alias
  (name runtest_lint)
