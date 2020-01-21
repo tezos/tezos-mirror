@@ -359,7 +359,7 @@ class TestGasBound:
         contract = session[name]
         storage = '{}'
         inp = ('{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1' +
-               ';1;1;1;1;1;1;1;1;1;1;1}')
+               ';1;1;1;1;1;1;1;1;1;1;1;1;1;1}')
 
         def client_cmd():
             client.run_script(contract, storage, inp)
