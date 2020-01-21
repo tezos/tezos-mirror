@@ -253,7 +253,7 @@ class TestContracts:
          r'operation type forbidden in parameter, storage and constants'),
         # big_maps cannot be PACKed
         ("pack_big_map.tz",
-         r'big_map type not allowed inside another big_map'),
+         r'big_map type not expected here'),
         ("invalid_self_entrypoint.tz",
          r'Contract has no entrypoint named D'),
     ])
