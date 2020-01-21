@@ -210,6 +210,8 @@ module Public_key_hash = struct
 
   let prefix_path _ = assert false (* unused *)
 
+  let seeded_hash = Hashtbl.seeded_hash
+
   let hash = Hashtbl.hash
 
   include Compare.Make (struct
@@ -251,6 +253,8 @@ module Public_key_hash = struct
     type nonrec t = t
 
     let hash = hash
+
+    let seeded_hash = seeded_hash
 
     let compare = compare
 

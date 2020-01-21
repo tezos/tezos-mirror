@@ -188,18 +188,29 @@ struct
     let open Data_encoding in
     conv to_bytes of_bytes_exn (Fixed.bytes size)
 
-  let hash =
-    if Compare.Int.(size >= 8) then fun h ->
+  let seeded_hash =
+    let open Compare.Int
+    (* shadowing comparators *) in
+    if size > 8 then fun seed h ->
+      Int64.to_int (TzEndian.get_int64 (to_bytes h) (seed mod (size - 8)))
+    else if size = 8 && Sys.word_size = 64 then fun _seed h ->
+      (* NOTE: we do not use the seed here because we have a _perfect_ hash: we
+         get the whole value. (Technically we ignore one bit because of the
+         conversion from Int64 to int. *)
       Int64.to_int (TzEndian.get_int64 (to_bytes h) 0)
-    else if Compare.Int.(size >= 4) then fun h ->
-      Int32.to_int (TzEndian.get_int32 (to_bytes h) 0)
-    else fun h ->
+    else if size > 4 then fun seed h ->
+      Int32.to_int (TzEndian.get_int32 (to_bytes h) (seed mod (size - 4)))
+    else fun _seed h ->
+      (* Here again we have a perfect hash. (Technically again we ignore one bit
+         on 32-bit machines if size = 4.) *)
       let r = ref 0 in
       let h = to_bytes h in
       for i = 0 to size - 1 do
         r := TzEndian.get_uint8 h i + (8 * !r)
       done ;
       !r
+
+  let hash = seeded_hash 0
 
   type Base58.data += Data of t
 
@@ -227,6 +238,8 @@ struct
     let equal = equal
 
     let hash = hash
+
+    let seeded_hash = seeded_hash
   end)
 end
 

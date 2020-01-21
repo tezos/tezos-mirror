@@ -199,10 +199,10 @@ module Raw_block_header =
       let precheck _ _ v = Some v
     end)
 
-module Operations_table = Hashtbl.Make (struct
+module Operations_table = Hashtbl.MakeSeeded (struct
   type t = Block_hash.t * int
 
-  let hash = Hashtbl.hash
+  let hash = Hashtbl.seeded_hash
 
   let equal (b1, i1) (b2, i2) = Block_hash.equal b1 b2 && i1 = i2
 end)

@@ -138,6 +138,8 @@ module type INDEXES = sig
 
   val hash : t -> int
 
+  val seeded_hash : int -> t -> int
+
   val to_path : t -> string list -> string list
 
   val of_path : string list -> t option
@@ -163,7 +165,7 @@ module type INDEXES = sig
   end
 
   module Table : sig
-    include Hashtbl.S with type key = t
+    include Hashtbl.SeededS with type key = t
 
     val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
   end

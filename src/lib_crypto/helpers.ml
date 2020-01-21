@@ -191,6 +191,10 @@ module MakeIterator (H : sig
   val equal : t -> t -> bool
 
   val hash : t -> int
+
+  (* [seeded_hash] is a seeded alternative to [hash] meant to be used to create
+     seeded hashtables. Check {!Stdlib.Hashtbl.MakeSeeded} for details. *)
+  val seeded_hash : int -> t -> int
 end) =
 struct
   module Set = struct
@@ -224,10 +228,10 @@ struct
   end
 
   module Table = struct
-    include Hashtbl.Make (struct
+    include Hashtbl.MakeSeeded (struct
       type t = H.t
 
-      let hash = H.hash
+      let hash = H.seeded_hash
 
       let equal = H.equal
     end)
@@ -295,6 +299,8 @@ module Make (H : sig
   val equal : t -> t -> bool
 
   val hash : t -> int
+
+  val seeded_hash : int -> t -> int
 end) =
 struct
   include MakeB58 (H)
