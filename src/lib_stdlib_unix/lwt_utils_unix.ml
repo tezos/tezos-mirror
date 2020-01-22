@@ -145,7 +145,7 @@ let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
   Lwt_unix.openfile name flags perm
   >>= fun fd ->
   Lwt.try_bind
-    (fun () -> Lwt_unix.write_string fd content 0 (String.length content))
+    (fun () -> write_string fd ~pos:0 ~len:(String.length content) content)
     (fun v ->
       safe_close fd
       >>= function
@@ -164,6 +164,41 @@ let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
           raise exc)
 
 let read_file fn = Lwt_io.with_file fn ~mode:Input (fun ch -> Lwt_io.read ch)
+
+let copy_file ~src ~dst =
+  Lwt_io.with_file ~mode:Output dst (fun dst_ch ->
+      Lwt_io.with_file src ~mode:Input (fun src_ch ->
+          let buff = Bytes.create 4096 in
+          let rec loop () =
+            Lwt_io.read_into src_ch buff 0 4096
+            >>= function
+            | 0 ->
+                Lwt.return_unit
+            | n ->
+                Lwt_io.write_from_exactly dst_ch buff 0 n >>= fun () -> loop ()
+          in
+          loop ()))
+
+let copy_dir ?(perm = 0o755) src dst =
+  let rec copy_dir dir dst_dir =
+    create_dir ~perm dst
+    >>= fun () ->
+    let files = Lwt_unix.files_of_directory dir in
+    Lwt_stream.iter_p
+      (fun file ->
+        if file = Filename.current_dir_name || file = Filename.parent_dir_name
+        then Lwt.return_unit
+        else
+          let basename = file in
+          let file = Filename.concat dir file in
+          if Sys.is_directory file then
+            let new_dir = Filename.concat dst_dir basename in
+            create_dir ~perm new_dir >>= fun () -> copy_dir file new_dir
+          else copy_file ~src:file ~dst:(Filename.concat dst_dir basename))
+      files
+  in
+  if Sys.file_exists src && Sys.is_directory src then copy_dir src dst
+  else Lwt.fail (Unix.Unix_error (Unix.ENOTDIR, "", "copy_dir"))
 
 let of_sockaddr = function
   | Unix.ADDR_UNIX _ ->

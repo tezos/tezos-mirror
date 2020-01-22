@@ -58,13 +58,13 @@ let create_files dir units =
       let ml = dir // (name ^ ".ml") in
       let mli = dir // (name ^ ".mli") in
       Lwt_utils_unix.create_file ml implementation
-      >>= fun (_ : int) ->
+      >>= fun () ->
       match interface with
       | None ->
           Lwt.return [ml]
       | Some content ->
           Lwt_utils_unix.create_file mli content
-          >>= fun (_ : int) -> Lwt.return [mli; ml])
+          >>= fun () -> Lwt.return [mli; ml])
     units
   >>= fun files ->
   let files = List.concat files in
