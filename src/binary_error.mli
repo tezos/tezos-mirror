@@ -41,6 +41,8 @@ type read_error =
 
 exception Read_error of read_error
 
+val read_error_encoding : read_error Encoding.t
+
 val pp_read_error : Format.formatter -> read_error -> unit
 
 type write_error =
@@ -53,6 +55,8 @@ type write_error =
   | Invalid_natural
   | List_too_long
   | Array_too_long
+
+val write_error_encoding : write_error Encoding.t
 
 val pp_write_error : Format.formatter -> write_error -> unit
 
