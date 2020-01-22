@@ -36,10 +36,3 @@ end
     unreachable (because of the 'optimized' implementation of
     [sub] used internally. *)
 val cut : ?copy:bool -> int -> Bytes.t -> Bytes.t list
-
-(** Print a paragraph in a box *)
-val display_paragraph : Format.formatter -> string -> unit
-
-(** [finalize f g] ensures [g ()] called after [f ()], even if an exception is
-    raised *)
-val finalize : (unit -> 'a) -> (unit -> unit) -> 'a
