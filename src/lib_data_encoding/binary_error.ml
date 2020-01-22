@@ -36,6 +36,78 @@ type read_error =
   | List_too_long
   | Array_too_long
 
+let read_error_encoding =
+  let open Encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Not enough data"
+        empty
+        (function Not_enough_data -> Some () | _ -> None)
+        (fun () -> Not_enough_data);
+      case
+        (Tag 1)
+        ~title:"Extra bytes"
+        empty
+        (function Extra_bytes -> Some () | _ -> None)
+        (fun () -> Extra_bytes);
+      case
+        (Tag 2)
+        ~title:"No case matched"
+        empty
+        (function No_case_matched -> Some () | _ -> None)
+        (fun () -> No_case_matched);
+      case
+        (Tag 3)
+        ~title:"Unexpected tag"
+        int31
+        (function Unexpected_tag i -> Some i | _ -> None)
+        (fun i -> Unexpected_tag i);
+      case
+        (Tag 4)
+        ~title:"Invalid size"
+        int31
+        (function Invalid_size i -> Some i | _ -> None)
+        (fun i -> Invalid_size i);
+      case
+        (Tag 5)
+        ~title:"Invalid int"
+        (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
+        (function
+          | Invalid_int {min; v; max} -> Some (min, v, max) | _ -> None)
+        (fun (min, v, max) -> Invalid_int {min; v; max});
+      case
+        (Tag 6)
+        ~title:"Invalid float"
+        (obj3 (req "min" float) (req "v" float) (req "max" float))
+        (function
+          | Invalid_float {min; v; max} -> Some (min, v, max) | _ -> None)
+        (fun (min, v, max) -> Invalid_float {min; v; max});
+      case
+        (Tag 7)
+        ~title:"Trailing zero"
+        empty
+        (function Trailing_zero -> Some () | _ -> None)
+        (fun () -> Trailing_zero);
+      case
+        (Tag 8)
+        ~title:"Size limit exceeded"
+        empty
+        (function Size_limit_exceeded -> Some () | _ -> None)
+        (fun () -> Size_limit_exceeded);
+      case
+        (Tag 9)
+        ~title:"List too long"
+        empty
+        (function List_too_long -> Some () | _ -> None)
+        (fun () -> List_too_long);
+      case
+        (Tag 10)
+        ~title:"Array too long"
+        empty
+        (function Array_too_long -> Some () | _ -> None)
+        (fun () -> Array_too_long) ]
+
 let pp_read_error ppf = function
   | Not_enough_data ->
       Format.fprintf ppf "Not enough data"
@@ -72,6 +144,74 @@ type write_error =
   | Invalid_natural
   | List_too_long
   | Array_too_long
+
+let write_error_encoding =
+  let open Encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Size limit exceeded"
+        empty
+        (function Size_limit_exceeded -> Some () | _ -> None)
+        (fun () -> Size_limit_exceeded);
+      case
+        (Tag 1)
+        ~title:"No case matched"
+        empty
+        (function No_case_matched -> Some () | _ -> None)
+        (fun () -> No_case_matched);
+      case
+        (Tag 2)
+        ~title:"Invalid int"
+        (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
+        (function
+          | Invalid_int {min; v; max} -> Some (min, v, max) | _ -> None)
+        (fun (min, v, max) -> Invalid_int {min; v; max});
+      case
+        (Tag 3)
+        ~title:"Invalid float"
+        (obj3 (req "min" float) (req "v" float) (req "max" float))
+        (function
+          | Invalid_float {min; v; max} -> Some (min, v, max) | _ -> None)
+        (fun (min, v, max) -> Invalid_float {min; v; max});
+      case
+        (Tag 4)
+        ~title:"Invalid bytes length"
+        (obj2 (req "expected" int31) (req "found" int31))
+        (function
+          | Invalid_bytes_length {expected; found} ->
+              Some (expected, found)
+          | _ ->
+              None)
+        (fun (expected, found) -> Invalid_bytes_length {expected; found});
+      case
+        (Tag 5)
+        ~title:"Invalid string length"
+        (obj2 (req "expected" int31) (req "found" int31))
+        (function
+          | Invalid_string_length {expected; found} ->
+              Some (expected, found)
+          | _ ->
+              None)
+        (fun (expected, found) -> Invalid_bytes_length {expected; found});
+      case
+        (Tag 6)
+        ~title:"Invalid natural"
+        empty
+        (function Invalid_natural -> Some () | _ -> None)
+        (fun () -> Invalid_natural);
+      case
+        (Tag 7)
+        ~title:"List too long"
+        empty
+        (function List_too_long -> Some () | _ -> None)
+        (fun () -> List_too_long);
+      case
+        (Tag 8)
+        ~title:"Array too long"
+        empty
+        (function Array_too_long -> Some () | _ -> None)
+        (fun () -> Array_too_long) ]
 
 let pp_write_error ppf = function
   | Size_limit_exceeded ->

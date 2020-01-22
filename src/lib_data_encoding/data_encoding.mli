@@ -781,6 +781,8 @@ module Binary : sig
 
   val pp_read_error : Format.formatter -> read_error -> unit
 
+  val read_error_encoding : read_error t
+
   (** All the errors that might be returned while writing a binary value *)
   type write_error =
     | Size_limit_exceeded
@@ -794,6 +796,8 @@ module Binary : sig
     | Array_too_long
 
   val pp_write_error : Format.formatter -> write_error -> unit
+
+  val write_error_encoding : write_error t
 
   exception Write_error of write_error
 
