@@ -197,20 +197,21 @@ let register () =
   register0 S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt
       >>= fun delegates ->
-      if q.active && q.inactive then return delegates
-      else if q.active then
-        filter_map_s
-          (fun pkh ->
-            Delegate.deactivated ctxt pkh
-            >>=? function true -> return_none | false -> return_some pkh)
-          delegates
-      else if q.inactive then
-        filter_map_s
-          (fun pkh ->
-            Delegate.deactivated ctxt pkh
-            >>=? function false -> return_none | true -> return_some pkh)
-          delegates
-      else return_nil) ;
+      match q with
+      | {active = true; inactive = false} ->
+          filter_map_s
+            (fun pkh ->
+              Delegate.deactivated ctxt pkh
+              >>=? function true -> return_none | false -> return_some pkh)
+            delegates
+      | {active = false; inactive = true} ->
+          filter_map_s
+            (fun pkh ->
+              Delegate.deactivated ctxt pkh
+              >>=? function false -> return_none | true -> return_some pkh)
+            delegates
+      | _ ->
+          return delegates) ;
   register1 S.info (fun ctxt pkh () () ->
       Delegate.full_balance ctxt pkh
       >>=? fun balance ->
