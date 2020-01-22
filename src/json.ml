@@ -355,17 +355,18 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
 and field_json : type a. a Encoding.field -> a Json_encoding.field =
   let open Json_encoding in
   function
-  | Encoding.Req {name; encoding = e; _} ->
-      req name (get_json e)
-  | Encoding.Opt {name; encoding = e; _} ->
-      opt name (get_json e)
-  | Encoding.Dft {name; encoding = e; default = d; _} ->
-      dft name (get_json e) d
+  | Encoding.Req {name; encoding = e; title; description} ->
+      req ?title ?description name (get_json e)
+  | Encoding.Opt {name; encoding = e; title; description; kind = _} ->
+      opt ?title ?description name (get_json e)
+  | Encoding.Dft {name; encoding = e; default = d; title; description} ->
+      dft ?title ?description name (get_json e) d
 
 and case_json : type a. a Encoding.case -> a Json_encoding.case =
   let open Json_encoding in
   function
-  | Encoding.Case {encoding = e; proj; inj; _} -> case (get_json e) proj inj
+  | Encoding.Case {encoding = e; proj; inj; tag = _; title; description} ->
+      case ~title ?description (get_json e) proj inj
 
 and get_json : type a. a Encoding.t -> a Json_encoding.encoding =
  fun e ->
