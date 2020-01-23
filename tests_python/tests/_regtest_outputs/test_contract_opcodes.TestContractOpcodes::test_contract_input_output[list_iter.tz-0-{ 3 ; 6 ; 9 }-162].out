@@ -7,35 +7,35 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 799661 units remaining)
+  - location: 7 (remaining gas: 1039661 units remaining)
     [ (Pair { 3 ; 6 ; 9 } 0)  	 ]
-  - location: 8 (remaining gas: 799661 units remaining)
+  - location: 8 (remaining gas: 1039661 units remaining)
     [ { 3 ; 6 ; 9 }  	@parameter ]
-  - location: 9 (remaining gas: 799661 units remaining)
+  - location: 9 (remaining gas: 1039661 units remaining)
     [ 1  	
       { 3 ; 6 ; 9 }  	@parameter ]
-  - location: 12 (remaining gas: 799660 units remaining)
+  - location: 12 (remaining gas: 1039660 units remaining)
     [ { 3 ; 6 ; 9 }  	@parameter
       1  	 ]
-  - location: 15 (remaining gas: 799658 units remaining)
+  - location: 15 (remaining gas: 1039658 units remaining)
     [ 3  	 ]
-  - location: 14 (remaining gas: 799658 units remaining)
+  - location: 14 (remaining gas: 1039658 units remaining)
     [ 3  	 ]
-  - location: 15 (remaining gas: 799657 units remaining)
+  - location: 15 (remaining gas: 1039657 units remaining)
     [ 18  	 ]
-  - location: 14 (remaining gas: 799657 units remaining)
+  - location: 14 (remaining gas: 1039657 units remaining)
     [ 18  	 ]
-  - location: 15 (remaining gas: 799655 units remaining)
+  - location: 15 (remaining gas: 1039655 units remaining)
     [ 162  	 ]
-  - location: 14 (remaining gas: 799655 units remaining)
+  - location: 14 (remaining gas: 1039655 units remaining)
     [ 162  	 ]
-  - location: 13 (remaining gas: 799655 units remaining)
+  - location: 13 (remaining gas: 1039655 units remaining)
     [ 162  	 ]
-  - location: 16 (remaining gas: 799654 units remaining)
+  - location: 16 (remaining gas: 1039654 units remaining)
     [ {}  	
       162  	 ]
-  - location: 18 (remaining gas: 799654 units remaining)
+  - location: 18 (remaining gas: 1039654 units remaining)
     [ (Pair {} 162)  	 ]
-  - location: -1 (remaining gas: 799654 units remaining)
+  - location: -1 (remaining gas: 1039654 units remaining)
     [ (Pair {} 162)  	 ]
 
