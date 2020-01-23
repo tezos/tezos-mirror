@@ -495,23 +495,6 @@ let get_constants ctxt =
     | Some constants ->
         return constants )
 
-(* only for migration from 005 to 006 *)
-let get_005_constants ctxt =
-  Context.get ctxt constants_key
-  >>= function
-  | None ->
-      failwith "Internal error: cannot read 005 constants in context."
-  | Some bytes -> (
-    match
-      Data_encoding.Binary.of_bytes
-        Constants_repr.Proto_005.parametric_encoding
-        bytes
-    with
-    | None ->
-        failwith "Internal error: cannot parse 005 constants in context."
-    | Some constants ->
-        return constants )
-
 let patch_constants ctxt f =
   let constants = f ctxt.constants in
   set_constants ctxt.context constants
@@ -610,43 +593,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       >>=? fun ctxt ->
       set_constants ctxt param.constants >>= fun ctxt -> return ctxt
   | Alpha_previous | Babylon_005 ->
-      get_005_constants ctxt
-      >>=? fun c ->
-      let constants =
-        Constants_repr.
-          {
-            preserved_cycles = c.preserved_cycles;
-            blocks_per_cycle = c.blocks_per_cycle;
-            blocks_per_commitment = c.blocks_per_commitment;
-            blocks_per_roll_snapshot = c.blocks_per_roll_snapshot;
-            blocks_per_voting_period = c.blocks_per_voting_period;
-            time_between_blocks = c.time_between_blocks;
-            endorsers_per_block = c.endorsers_per_block;
-            hard_gas_limit_per_operation = Z.of_int 1_040_000;
-            hard_gas_limit_per_block = Z.of_int 10_400_000;
-            proof_of_work_threshold = c.proof_of_work_threshold;
-            tokens_per_roll = c.tokens_per_roll;
-            michelson_maximum_type_size = c.michelson_maximum_type_size;
-            seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
-            origination_size = c.origination_size;
-            block_security_deposit = c.block_security_deposit;
-            endorsement_security_deposit = c.endorsement_security_deposit;
-            baking_reward_per_endorsement =
-              Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 187_500L];
-            endorsement_reward =
-              Tez_repr.[of_mutez_exn 1_250_000L; of_mutez_exn 833_333L];
-            cost_per_byte = c.cost_per_byte;
-            hard_storage_limit_per_operation =
-              c.hard_storage_limit_per_operation;
-            test_chain_duration = c.test_chain_duration;
-            quorum_min = c.quorum_min;
-            quorum_max = c.quorum_max;
-            min_proposal_quorum = c.min_proposal_quorum;
-            initial_endorsers = c.initial_endorsers;
-            delay_per_missing_endorsement = c.delay_per_missing_endorsement;
-          }
-      in
-      set_constants ctxt constants >>= fun ctxt -> return ctxt )
+      return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >>=? fun ctxt -> return (previous_proto, ctxt)
