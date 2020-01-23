@@ -2202,8 +2202,8 @@ data on the stack and to give additional type constraints. Except for
 a single exception specified just after, annotations are only here to
 add constraints, *i.e.* they cannot turn an otherwise rejected program
 into an accepted one. The notable exception to this rule is for
-entrypoints: the `CONTRACT` instruction semantics varies depending on
-its constructor annotation, and some contract origination may fail due
+entrypoints: the semantics of the `CONTRACT` and `SELF` instructions vary depending on
+their constructor annotations, and some contract origination may fail due
 to invalid entrypoint constructor annotations.
 
 Stack visualization tools like the Michelson's Emacs mode print
@@ -2835,6 +2835,16 @@ variant is forbidden in the concrete syntax.
    +---------------+---------------------+------------------------------------------+
    | "addr%_"      | CONTRACT %_ t       | None                                     |
    +---------------+---------------------+------------------------------------------+
+
+Similarly, the ``SELF`` instruction has a variant ``SELF %entrypoint``,
+that is only well-typed if the current contract has an entrypoint named ``%entrypoint``.
+
+-  ``SELF %entrypoint``
+
+::
+
+    :: 'S   ->   contract 'p : 'S
+       where   contract 'p is the type of the entrypoint %entrypoint of the current contract
 
 Implicit accounts are considered to have a single ``default``
 entrypoint of type ``Unit``.
