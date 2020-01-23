@@ -1,7 +1,7 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import List, Callable  # pylint: disable=unused-import
+from typing import List, Callable, Pattern  # pylint: disable=unused-import
 import json
 import time
 import re
@@ -282,26 +282,31 @@ def mutez_of_tez(tez: float):
     return int(tez*1000000)
 
 
-def check_run_failure(code, pattern, mode='stderr'):
+def assert_run_failure(code: Callable,
+                       pattern: Pattern,
+                       mode='stderr') -> None:
     """Executes [code()] and expects the code to fail and raise
     [subprocess.CalledProcessError]. If so, the [pattern] is searched
     in stderr. If it is found, returns True; else returns False.
     """
     try:
         code()
-        return False
-    except subprocess.CalledProcessError as exc:
-        stdout_output = exc.args[2]
-        stderr_output = exc.args[3]
-        data = []
-        if mode == 'stderr':
-            data = stderr_output.split('\n')
-        else:
-            data = stdout_output.split('\n')
-        for line in data:
-            if re.search(pattern, line):
-                return True
-        return False
+        assert False, "Code ran without throwing exception"
+    except subprocess.CalledProcessError as caught_exc:
+        exc = caught_exc
+
+    stdout_output = exc.args[2]
+    stderr_output = exc.args[3]
+    data = []
+    if mode == 'stderr':
+        data = stderr_output.split('\n')
+    else:
+        data = stdout_output.split('\n')
+    for line in data:
+        if re.search(pattern, line):
+            return
+    data_pretty = "\n".join(data)
+    assert False, f"Could not find '{pattern}' in {data_pretty}"
 
 
 def assert_storage_contains(client: Client,
@@ -356,14 +361,17 @@ def assert_run_script_failwith(client: Client,
     def cmd():
         client.run_script(contract, param, storage, None, True)
 
-    assert check_run_failure(cmd, r'script reached FAILWITH instruction')
+    assert_run_failure(cmd, r'script reached FAILWITH instruction')
 
 
-def check_typecheck_data_failure(client, data: str, typ: str) -> None:
+def assert_typecheck_data_failure(client: Client,
+                                  data: str,
+                                  typ: str,
+                                  err: Pattern = r'ill-typed data') -> None:
     def cmd():
         client.typecheck_data(data, typ)
 
-    return check_run_failure(cmd, 'ill-typed data')
+    assert_run_failure(cmd, err)
 
 
 def client_output_converter(pre):
@@ -409,3 +417,14 @@ def client_output_converter(pre):
     pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)
 
     return pre
+
+
+def assert_transfer_failwith(client: Client,
+                             amount: float,
+                             sender: str,
+                             receiver: str,
+                             args) -> None:
+    def cmd():
+        client.transfer(amount, sender, receiver, args)
+
+    assert_run_failure(cmd, r'script reached FAILWITH instruction')

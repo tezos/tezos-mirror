@@ -1,6 +1,6 @@
 import pytest
 from tools import paths
-from tools.utils import check_run_failure, assert_run_script_success, \
+from tools.utils import assert_run_failure, assert_run_script_success, \
     assert_run_script_failwith
 
 CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
@@ -833,7 +833,7 @@ class TestContractOpcodes:
 
         def cmd():
             client.run_script(contract, param, storage)
-        assert check_run_failure(cmd, r'unexpected arithmetic overflow')
+        assert_run_failure(cmd, r'unexpected arithmetic overflow')
 
     @pytest.mark.skip(reason="Bug in annotation system")
     def test_fails_annotated_set_car_cdr(self, client_regtest):
@@ -844,7 +844,7 @@ class TestContractOpcodes:
             client.run_script(f'{CONTRACT_PATH}/set_car.tz',
                               '(Pair %wrong %field "hello" 0)',
                               '""')
-        assert check_run_failure(cmd, r'The two annotations do not match')
+        assert_run_failure(cmd, r'The two annotations do not match')
 
     @pytest.mark.skip(reason="To be fixed in next protocol")
     @pytest.mark.parametrize(

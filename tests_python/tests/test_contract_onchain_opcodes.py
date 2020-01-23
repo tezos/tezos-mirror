@@ -1,6 +1,6 @@
 import pytest
 from tools import paths
-from tools.utils import check_run_failure, assert_storage_contains, bake, \
+from tools.utils import assert_run_failure, assert_storage_contains, bake, \
     init_with_transfer, assert_balance
 from tools.constants import IDENTITIES
 
@@ -155,7 +155,7 @@ class TestContractOnchainOpcodes:
                 0, 'bootstrap1', 'contract',
                 ['-arg', f'"{addr}"', '--burn-cap', '10'])
 
-        assert check_run_failure(cmd, r'script reached FAILWITH instruction')
+        assert_run_failure(cmd, r'script reached FAILWITH instruction')
 
     def test_init_proxy(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
@@ -231,7 +231,7 @@ class TestContractOnchainOpcodes:
                 0, 'bootstrap1', 'slices',
                 ['-arg', contract_arg, '--burn-cap', '10'])
 
-        assert check_run_failure(cmd, r'script reached FAILWITH instruction')
+        assert_run_failure(cmd, r'script reached FAILWITH instruction')
         # bake(client)
 
     @pytest.mark.parametrize('contract_arg',

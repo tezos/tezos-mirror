@@ -49,8 +49,7 @@ class TestMultisig:
                          r"only 1 signatures were given " +
                          r"but the threshold is currently 2")
 
-        assert utils.check_run_failure(cmd,
-                                       error_pattern)
+        utils.assert_run_failure(cmd, error_pattern)
 
     def test_transfer_success(self, client, session):
         client.msig_transfer('msig', 10, 'bootstrap2', 'bootstrap1',
