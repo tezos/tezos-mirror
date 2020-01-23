@@ -491,6 +491,118 @@ It can be run with
 Note: this test uses only one revision but it can't run
 on branch ``master`` as we need an extra protocol with bakers.
 
+Regression testing
+------------------
+
+Some tests in the test suite are regression tests.
+Regression testing is a coarse-grained testing method for detecting
+unintended changes in the system under test.
+In addition to standard assertions, a regression
+test compares the "output" of the test to a stored test log. The
+regression test fails if the output and the stored test log do not
+match. We apply regression testing using the `pytest-regtest
+<https://gitlab.com/uweschmitt/pytest-regtest>`_ plugin.
+
+To simplify the writing of regression tests, we provide a
+specialized version of the ``client`` fixture, ``client_regtest``. It
+registers all output of the ``tezos-client``.
+
+Output conversion
+~~~~~~~~~~~~~~~~~
+
+The output of the client might differ slightly from one test run to
+another, for instance due to timestamps. A specialized fixture
+``client_regtest_scrubbed`` applies a series of conversions to the
+output. For example, a timestamp such as ``2019-09-23T10:59:00Z`` is
+replaced by ``[TIMESTAMP]``. These conversions are defined in the function
+``client_output_converter`` of ``conftest.py``.
+
+
+Running regression tests
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Regression tests are run during normal tests runs.
+
+Updating regression tests
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The test logs are stored in ``tests_python/tests/_regtest_outputs/``.
+If the logs need to be updated, pass ``--regtest-reset`` to ``pytest``:
+
+::
+
+    pytest --regtest-reset <test-file>
+
+The resulting changes should be committed after thoroughly verifying
+that they are as expected.
+
+Writing regression tests
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+To write regression tests targeting the ``tezos-client``, write a test
+as usual, but request the ``client_regtest`` (or
+``client_regtest_scrubbed`` to enable output conversion) fixture
+instead of the ``client`` fixture.
+
+In this example test, we test the output of the `hash data` command of
+`tezos-client`:
+
+.. code-block:: python
+
+    import pytest
+
+    class TestDemonstrateRegtest:
+        """Tests demonstrating regression testing."""
+
+        def test_hash_regtest(self, client_regtest):
+            client_regtest.hash('(Pair 1 "foo")', '(pair nat string)').blake2b == \
+                "Hadaf2hW4QwbgTdhtAfFTofrCbmnnPhkGy2Sa5ZneUDs"
+
+
+Before running the test we must generate the test log, that contains
+the expected output.  This is done by passing the `--regtest-reset`
+flag as described above:
+
+.. code-block:: bash
+
+    $ pytest --regtest-reset tests_python/tests/test_regtest.py
+
+We find the generated test log in ``tests_python/tests/_regtest_outputs/test_regtest.TestDemonstrateRegtest\:\:test_hash_regtest.out``:
+
+.. code-block:: bash
+
+    $ cat tests_python/tests/_regtest_outputs/test_regtest.TestDemonstrateRegtest\:\:test_hash_regtest.out
+    Raw packed data: 0x05070700010100000003666f6f
+    Script-expression-ID-Hash: exprvPNUJQXpct6VrbJQCazrDgh7pN8d8SH8P1UFHMrRPmQnxC16nr
+    Raw Script-expression-ID-Hash: 0xf65884dadd3a5ff1a6f8057fa442a2e8ecdbe1217f7759512509b36c016c5bce
+    Ledger Blake2b hash: Hadaf2hW4QwbgTdhtAfFTofrCbmnnPhkGy2Sa5ZneUDs
+    Raw Sha256 hash: 0xb01925b6b6180a31a17f74d92ac87e551ab08e1890211741abde5345b38cb61f
+    Raw Sha512 hash: 0x75547d33aca115154e5a0ec22e965237ec3c32a81b64f827668bbef3b3310d8c237ae06211ee63edf743fcf0a98a970bb159782c6b75fac42d6efc20b3fa5e82
+    Gas remaining: 799862 units remaining
+
+This is exactly the output of the command that was executed by the
+test, namely ``tezos-client hash data '(Pair 1 "foo")' of type '(pair
+nat string)'``.
+
+As discussed below in the section :ref:`Pitfalls to regression testing
+<pitfalls_to_regression_testing>`, regression tests cannot be put in a test
+class where the normal ``client`` fixture is used.
+
+For other aspects of regression testing, we refer to the
+`pytest-regtest documentation
+<https://gitlab.com/uweschmitt/pytest-regtest>`_.
+
+
+.. _pitfalls_to_regression_testing:
+
+Pitfalls to regression testing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``client`` and the ``client_regtest`` fixtures cannot be used in the same
+test class.  If they are, then two nodes will be added to the
+sandbox. Their interference might cause unintended consequence
+disturbing the tests.
+
 TODO
 ----
 
