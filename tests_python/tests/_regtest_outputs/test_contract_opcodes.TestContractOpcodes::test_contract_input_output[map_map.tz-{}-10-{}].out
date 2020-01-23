@@ -7,44 +7,44 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 799392 units remaining)
+  - location: 8 (remaining gas: 799391 units remaining)
     [ (Pair 10 {})  	 ]
-  - location: 11 (remaining gas: 799392 units remaining)
+  - location: 11 (remaining gas: 799391 units remaining)
     [ (Pair 10 {})  	
       (Pair 10 {})  	 ]
-  - location: 12 (remaining gas: 799391 units remaining)
+  - location: 12 (remaining gas: 799390 units remaining)
     [ 10  	@parameter
       (Pair 10 {})  	 ]
-  - location: 15 (remaining gas: 799390 units remaining)
+  - location: 15 (remaining gas: 799389 units remaining)
     [ {}  	@storage ]
-  - location: 14 (remaining gas: 799390 units remaining)
+  - location: 14 (remaining gas: 799389 units remaining)
     [ {}  	@storage ]
-  - location: 13 (remaining gas: 799390 units remaining)
+  - location: 13 (remaining gas: 799389 units remaining)
     [ 10  	@parameter
       {}  	@storage ]
-  - location: -1 (remaining gas: 799390 units remaining)
+  - location: -1 (remaining gas: 799389 units remaining)
     [ 10  	@parameter
       {}  	@storage ]
-  - location: 9 (remaining gas: 799390 units remaining)
+  - location: 9 (remaining gas: 799389 units remaining)
     [ 10  	@parameter
       {}  	@storage ]
-  - location: 16 (remaining gas: 799389 units remaining)
+  - location: 16 (remaining gas: 799388 units remaining)
     [ {}  	@storage
       10  	@parameter ]
-  - location: 17 (remaining gas: 799389 units remaining)
+  - location: 17 (remaining gas: 799388 units remaining)
     [ {}  	
       10  	@parameter ]
-  - location: 26 (remaining gas: 799388 units remaining)
+  - location: 26 (remaining gas: 799387 units remaining)
     [  ]
-  - location: 25 (remaining gas: 799387 units remaining)
+  - location: 25 (remaining gas: 799386 units remaining)
     [  ]
-  - location: 24 (remaining gas: 799387 units remaining)
+  - location: 24 (remaining gas: 799386 units remaining)
     [ {}  	 ]
-  - location: 27 (remaining gas: 799387 units remaining)
+  - location: 27 (remaining gas: 799386 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 29 (remaining gas: 799387 units remaining)
+  - location: 29 (remaining gas: 799386 units remaining)
     [ (Pair {} {})  	 ]
-  - location: -1 (remaining gas: 799386 units remaining)
+  - location: -1 (remaining gas: 799385 units remaining)
     [ (Pair {} {})  	 ]
 

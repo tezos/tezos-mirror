@@ -1,0 +1,39 @@
+storage
+  { "a" ; "b" ; "c" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 799628 units remaining)
+    [ (Pair { "c" ; "b" ; "a" } { "" })  	 ]
+  - location: 9 (remaining gas: 799628 units remaining)
+    [ { "c" ; "b" ; "a" }  	@parameter ]
+  - location: 10 (remaining gas: 799628 units remaining)
+    [ {}  	
+      { "c" ; "b" ; "a" }  	@parameter ]
+  - location: 12 (remaining gas: 799627 units remaining)
+    [ { "c" ; "b" ; "a" }  	@parameter
+      {}  	 ]
+  - location: 15 (remaining gas: 799626 units remaining)
+    [ { "c" }  	 ]
+  - location: 14 (remaining gas: 799626 units remaining)
+    [ { "c" }  	 ]
+  - location: 15 (remaining gas: 799625 units remaining)
+    [ { "b" ; "c" }  	 ]
+  - location: 14 (remaining gas: 799625 units remaining)
+    [ { "b" ; "c" }  	 ]
+  - location: 15 (remaining gas: 799624 units remaining)
+    [ { "a" ; "b" ; "c" }  	 ]
+  - location: 14 (remaining gas: 799624 units remaining)
+    [ { "a" ; "b" ; "c" }  	 ]
+  - location: 13 (remaining gas: 799624 units remaining)
+    [ { "a" ; "b" ; "c" }  	 ]
+  - location: 16 (remaining gas: 799623 units remaining)
+    [ {}  	
+      { "a" ; "b" ; "c" }  	 ]
+  - location: 18 (remaining gas: 799623 units remaining)
+    [ (Pair {} { "a" ; "b" ; "c" })  	 ]
+  - location: -1 (remaining gas: 799623 units remaining)
+    [ (Pair {} { "a" ; "b" ; "c" })  	 ]
+

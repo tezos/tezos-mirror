@@ -1,0 +1,27 @@
+storage
+  { "1" ; "2" ; "3" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 799737 units remaining)
+    [ (Pair { "1" ; "2" ; "3" } { "" })  	 ]
+  - location: 9 (remaining gas: 799737 units remaining)
+    [ { "1" ; "2" ; "3" }  	@parameter ]
+  - location: 11 (remaining gas: 799736 units remaining)
+    [ "1"  	@parameter.elt ]
+  - location: 11 (remaining gas: 799735 units remaining)
+    [ "2"  	@parameter.elt ]
+  - location: 11 (remaining gas: 799735 units remaining)
+    [ "3"  	@parameter.elt ]
+  - location: 10 (remaining gas: 799734 units remaining)
+    [ { "1" ; "2" ; "3" }  	 ]
+  - location: 12 (remaining gas: 799734 units remaining)
+    [ {}  	
+      { "1" ; "2" ; "3" }  	 ]
+  - location: 14 (remaining gas: 799733 units remaining)
+    [ (Pair {} { "1" ; "2" ; "3" })  	 ]
+  - location: -1 (remaining gas: 799733 units remaining)
+    [ (Pair {} { "1" ; "2" ; "3" })  	 ]
+

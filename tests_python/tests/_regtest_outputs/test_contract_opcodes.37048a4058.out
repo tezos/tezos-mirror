@@ -1,0 +1,43 @@
+storage
+  0x001100
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 799561 units remaining)
+    [ (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
+  - location: 10 (remaining gas: 799561 units remaining)
+    [ (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	
+      (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
+  - location: 11 (remaining gas: 799560 units remaining)
+    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
+      (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
+  - location: 14 (remaining gas: 799559 units remaining)
+    [ 0x  	@storage ]
+  - location: 13 (remaining gas: 799559 units remaining)
+    [ 0x  	@storage ]
+  - location: 12 (remaining gas: 799559 units remaining)
+    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
+      0x  	@storage ]
+  - location: -1 (remaining gas: 799559 units remaining)
+    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
+      0x  	@storage ]
+  - location: 8 (remaining gas: 799559 units remaining)
+    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
+      0x  	@storage ]
+  - location: 15 (remaining gas: 799558 units remaining)
+    [ 0x  	@storage
+      { 0x00 ; 0x11 ; 0x00 }  	@parameter ]
+  - location: 16 (remaining gas: 799558 units remaining)
+    [ { 0x ; 0x00 ; 0x11 ; 0x00 }  	 ]
+  - location: 17 (remaining gas: 799557 units remaining)
+    [ 0x001100  	 ]
+  - location: 18 (remaining gas: 799557 units remaining)
+    [ {}  	
+      0x001100  	 ]
+  - location: 20 (remaining gas: 799556 units remaining)
+    [ (Pair {} 0x001100)  	 ]
+  - location: -1 (remaining gas: 799556 units remaining)
+    [ (Pair {} 0x001100)  	 ]
+
