@@ -44,6 +44,7 @@ _coverage_report
 **/*.orig
 
 .idea
+.venv
 
 ## Not in .gitignore
 

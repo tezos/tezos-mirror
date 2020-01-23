@@ -58,3 +58,4 @@ __pycache__
 *.orig
 
 .idea
+.venv

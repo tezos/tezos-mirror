@@ -89,6 +89,17 @@ check_precommit_hook:
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
 
+check_scripts_b58_prefix:
+  # Can be changed to a python image, but using the build docker image to keep
+  # in sync with the python version used for the tests
+  <<: *build_definition
+  before_script:
+    - cd scripts/b58_prefix
+    - poetry install
+  script:
+    - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest test_b58_prefix.py -v
+
 build:
   <<: *build_definition
   script:
