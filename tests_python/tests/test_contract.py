@@ -795,29 +795,6 @@ class TestComparablePairs:
         utils.assert_typecheck_data_failure(
             client, '{}', '(set (pair (pair nat nat) nat))')
 
-    # This should be moved to test_contract_opcodes.py once MR !1261 is merged
-    @pytest.mark.parametrize(
-        "contract,param,storage,expected",
-        [   # FORMAT: assert_output contract_file storage input expected_result
-            # Mapping over maps
-            ('map_map_sideeffect.tz',
-             '(Pair {} 0)', '10', '(Pair {} 0)'),
-            ('map_map_sideeffect.tz',
-             '(Pair { Elt "foo" 1 } 1)', '10', '(Pair { Elt "foo" 11 } 11)'),
-            ('map_map_sideeffect.tz',
-             '(Pair { Elt "bar" 5 ; Elt "foo" 1 } 6)', '15',
-             '(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)')
-        ])
-    def test_map_map_sideeffect(self,
-                                client,
-                                contract,
-                                param,
-                                storage,
-                                expected):
-        contract = f'{CONTRACT_PATH}/opcodes/{contract}'
-        run_script_res = client.run_script(contract, param, storage)
-        assert run_script_res.storage == expected
-
 
 @pytest.mark.contract
 class TestTypecheckingErrors:

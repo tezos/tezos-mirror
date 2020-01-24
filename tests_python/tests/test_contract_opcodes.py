@@ -1,10 +1,11 @@
 from os import path
+
 import pytest
-from tools.paths import OPCODES_CONTRACT_PATH, \
-    MINI_SCENARIOS_CONTRACT_PATH
-from tools.utils import assert_run_failure, assert_run_script_success, \
-    assert_run_script_failwith
+
 from tools.client_regression import ClientRegression
+from tools.paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
+from tools.utils import (assert_run_failure, assert_run_script_failwith,
+                         assert_run_script_success)
 
 
 @pytest.mark.slow
@@ -868,9 +869,8 @@ class TestContractOpcodes:
                               '(Pair %wrong %field "hello" 0)',
                               '""')
 
-    @pytest.mark.skip(reason="To be fixed in next protocol")
     @pytest.mark.parametrize(
-        "contract,param,storage,expected",
+        "contract,storage,param,expected",
         [   # FORMAT: assert_output contract_file storage input expected_result
             # Mapping over maps
             ('map_map_sideeffect.tz',
@@ -889,5 +889,5 @@ class TestContractOpcodes:
                                 expected: str):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
-        run_script_res = client.run_script(contract, param, storage)
+        run_script_res = client.run_script(contract, storage, param)
         assert run_script_res.storage == expected
