@@ -31,39 +31,39 @@ trace
   - location: 16 (remaining gas: 133037296 units remaining)
     [ { Elt "foo" 1 }  	@storage
       10  	@parameter ]
-  - location: 19 (remaining gas: 133037036 units remaining)
+  - location: 19 (remaining gas: 133037076 units remaining)
     [ 1  	@elt
       10  	@parameter ]
-  - location: 22 (remaining gas: 133036916 units remaining)
+  - location: 22 (remaining gas: 133036956 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 21 (remaining gas: 133036896 units remaining)
+  - location: 21 (remaining gas: 133036936 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 20 (remaining gas: 133036896 units remaining)
+  - location: 20 (remaining gas: 133036936 units remaining)
     [ 1  	@elt
       10  	@parameter
       10  	@parameter ]
-  - location: 23 (remaining gas: 133036754 units remaining)
+  - location: 23 (remaining gas: 133036794 units remaining)
     [ 11  	
       10  	@parameter ]
-  - location: -1 (remaining gas: 133036734 units remaining)
+  - location: -1 (remaining gas: 133036774 units remaining)
     [ 11  	
       10  	@parameter ]
-  - location: 17 (remaining gas: 133036734 units remaining)
+  - location: 17 (remaining gas: 133036774 units remaining)
     [ { Elt "foo" 11 }  	
       10  	@parameter ]
-  - location: 26 (remaining gas: 133036614 units remaining)
+  - location: 26 (remaining gas: 133036654 units remaining)
     [  ]
-  - location: 25 (remaining gas: 133036594 units remaining)
+  - location: 25 (remaining gas: 133036634 units remaining)
     [  ]
-  - location: 24 (remaining gas: 133036594 units remaining)
+  - location: 24 (remaining gas: 133036634 units remaining)
     [ { Elt "foo" 11 }  	 ]
-  - location: 27 (remaining gas: 133036534 units remaining)
+  - location: 27 (remaining gas: 133036574 units remaining)
     [ {}  	
       { Elt "foo" 11 }  	 ]
-  - location: 29 (remaining gas: 133036474 units remaining)
+  - location: 29 (remaining gas: 133036514 units remaining)
     [ (Pair {} { Elt "foo" 11 })  	 ]
-  - location: -1 (remaining gas: 133036454 units remaining)
+  - location: -1 (remaining gas: 133036494 units remaining)
     [ (Pair {} { Elt "foo" 11 })  	 ]
 
