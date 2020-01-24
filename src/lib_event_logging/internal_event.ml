@@ -400,6 +400,425 @@ module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
   let () = All_definitions.add (module E)
 end
 
+module Simple = struct
+  (* This type is mostly there to make usage less error-prone, by
+     explicitely splitting the place where the partial application
+     takes place. Indeed, it is important that events are declared
+     only once. *)
+  type 'a t = 'a -> unit tzresult Lwt.t
+
+  let emit simple_event parameters =
+    simple_event parameters
+    >>= function
+    | Ok () ->
+        Lwt.return_unit
+    | Error trace ->
+        (* Having to handle errors when sending events would make the
+           code very heavy. We are much more likely to just use [>>=?]
+           to propagate the error, assuming that sending events cannot
+           fail. But consider this example:
+           - we log that we are going to do some cleanup, like remove
+             temporary directories...
+           - and then because we failed to log, we don't actually
+             clean the temporary directories.
+           Instead we just print the error on stderr. *)
+        Format.eprintf
+          "@[<hv 2>Failed to send event:@ %a@]@."
+          Error_monad.pp_print_error
+          trace ;
+        Lwt.return_unit
+
+  let make_section = Option.map ~f:Section.make_sanitized
+
+  let declare_0 ?section ~name ~msg ?(level = Info) () =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = unit = struct
+      type t = unit
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt () = Format.fprintf fmt "%s" msg
+
+      let encoding = Data_encoding.unit
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun () -> Event.emit ?section (fun () -> ())
+
+  let declare_1 (type a) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = a = struct
+      type t = a
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt f0 =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+
+      let encoding = f0_enc
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameter -> Event.emit ?section (fun () -> parameter)
+
+  let declare_2 (type a b) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = a * b = struct
+      type t = a * b
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+
+      let encoding =
+        Data_encoding.obj2
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_3 (type a b c) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = a * b * c = struct
+      type t = a * b * c
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+
+      let encoding =
+        Data_encoding.obj3
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t))
+      (f3_name, (f3_enc : d Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = a * b * c * d =
+    struct
+      type t = a * b * c * d
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2, f3) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+          f3_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f3_enc f3)
+
+      let encoding =
+        Data_encoding.obj4
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+          (Data_encoding.req f3_name f3_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t))
+      (f3_name, (f3_enc : d Data_encoding.t))
+      (f4_name, (f4_enc : e Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition : EVENT_DEFINITION with type t = a * b * c * d * e =
+    struct
+      type t = a * b * c * d * e
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2, f3, f4) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+          f3_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f3_enc f3)
+          f4_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f4_enc f4)
+
+      let encoding =
+        Data_encoding.obj5
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+          (Data_encoding.req f3_name f3_enc)
+          (Data_encoding.req f4_name f4_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t))
+      (f3_name, (f3_enc : d Data_encoding.t))
+      (f4_name, (f4_enc : e Data_encoding.t))
+      (f5_name, (f5_enc : f Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition :
+      EVENT_DEFINITION with type t = a * b * c * d * e * f = struct
+      type t = a * b * c * d * e * f
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2, f3, f4, f5) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
+           = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+          f3_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f3_enc f3)
+          f4_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f4_enc f4)
+          f5_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f5_enc f5)
+
+      let encoding =
+        Data_encoding.obj6
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+          (Data_encoding.req f3_name f3_enc)
+          (Data_encoding.req f4_name f4_enc)
+          (Data_encoding.req f5_name f5_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t))
+      (f3_name, (f3_enc : d Data_encoding.t))
+      (f4_name, (f4_enc : e Data_encoding.t))
+      (f5_name, (f5_enc : f Data_encoding.t))
+      (f6_name, (f6_enc : g Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition :
+      EVENT_DEFINITION with type t = a * b * c * d * e * f * g = struct
+      type t = a * b * c * d * e * f * g
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2, f3, f4, f5, f6) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
+           = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+          f3_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f3_enc f3)
+          f4_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f4_enc f4)
+          f5_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f5_enc f5)
+          f6_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f6_enc f6)
+
+      let encoding =
+        Data_encoding.obj7
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+          (Data_encoding.req f3_name f3_enc)
+          (Data_encoding.req f4_name f4_enc)
+          (Data_encoding.req f5_name f5_enc)
+          (Data_encoding.req f6_name f6_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+
+  let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info)
+      (f0_name, (f0_enc : a Data_encoding.t))
+      (f1_name, (f1_enc : b Data_encoding.t))
+      (f2_name, (f2_enc : c Data_encoding.t))
+      (f3_name, (f3_enc : d Data_encoding.t))
+      (f4_name, (f4_enc : e Data_encoding.t))
+      (f5_name, (f5_enc : f Data_encoding.t))
+      (f6_name, (f6_enc : g Data_encoding.t))
+      (f7_name, (f7_enc : h Data_encoding.t)) =
+    let section = make_section section in
+    let module Definition :
+      EVENT_DEFINITION with type t = a * b * c * d * e * f * g * h = struct
+      type t = a * b * c * d * e * f * g * h
+
+      let doc = msg
+
+      let name = name
+
+      let pp fmt (f0, f1, f2, f3, f4, f5, f6, f7) =
+        Format.fprintf
+          fmt
+          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
+           = %a,@ %s = %a,@ %s = %a)@]"
+          msg
+          f0_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f0_enc f0)
+          f1_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f1_enc f1)
+          f2_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f2_enc f2)
+          f3_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f3_enc f3)
+          f4_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f4_enc f4)
+          f5_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f5_enc f5)
+          f6_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f6_enc f6)
+          f7_name
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct f7_enc f7)
+
+      let encoding =
+        Data_encoding.obj8
+          (Data_encoding.req f0_name f0_enc)
+          (Data_encoding.req f1_name f1_enc)
+          (Data_encoding.req f2_name f2_enc)
+          (Data_encoding.req f3_name f3_enc)
+          (Data_encoding.req f4_name f4_enc)
+          (Data_encoding.req f5_name f5_enc)
+          (Data_encoding.req f6_name f6_enc)
+          (Data_encoding.req f7_name f7_enc)
+
+      let level _ = level
+    end in
+    let module Event = Make (Definition) in
+    fun parameters -> Event.emit ?section (fun () -> parameters)
+end
+
 module Legacy_logging = struct
   let sections = ref []
 

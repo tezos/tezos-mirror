@@ -95,7 +95,7 @@ module type EVENT_DEFINITION = sig
       are restricted to alphanumeric characters or [".@-_+=,~"].*)
   val name : string
 
-  (** A display-friendly test which describes what the event means. *)
+  (** A display-friendly text which describes what the event means. *)
   val doc : string
 
   val pp : Format.formatter -> t -> unit
@@ -156,6 +156,154 @@ module All_definitions : sig
 
   (** Find the definition matching on the given name. *)
   val find : (string -> bool) -> Generic.definition option
+end
+
+module Simple : sig
+  (** Simple Event Definition *)
+
+  (** This module provides wrappers to declare events without having to
+      declare a module and apply the [Make] functor.
+      They are pretty-printed as [<DOC> (<PARAMETER> = <VALUE>, ...)]
+      (unless there is no parameter at all, in which case they are printed
+      as [<DOC>]).
+
+      Declare events with one of the [declare] functions, for instance:
+      [
+        let inject =
+          Internal_event.Simple.declare_2
+            ~name: "inject"
+            ~msg: "injected block"
+            ("level", int)
+            ("hash", string)
+      ]
+      You must declare events only once for a given name.
+      Usually you should thus declare them as global variables.
+
+      There is one [declare_n] function for each number [n] of parameters.
+      For instance, the above example uses [declare_2] because
+      it has two parameters: [level] and [hash].
+
+      Then emit this event with some parameters like this:
+      [Internal_event.Simple.emit inject (42, "BL654654654645654654564")]
+      This event will be printed as:
+      [injected block (level = 42, hash = "BL654654654645654654564")]
+
+      For all [declare] functions, the default value for [level] is [Info]. *)
+
+  (** Event declarations where ['a] is the type of the event parameters. *)
+  type 'a t
+
+  (** Emit an instance of an event. *)
+  val emit : 'a t -> 'a -> unit Lwt.t
+
+  (** Declare an event with no parameters. *)
+  val declare_0 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    unit ->
+    unit t
+
+  (** Declare an event with one parameter. *)
+  val declare_1 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    'a t
+
+  (** Declare an event with two parameters. *)
+  val declare_2 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    ('a * 'b) t
+
+  (** Declare an event with three parameters. *)
+  val declare_3 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    ('a * 'b * 'c) t
+
+  (** Declare an event with four parameters. *)
+  val declare_4 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    string * 'd Data_encoding.t ->
+    ('a * 'b * 'c * 'd) t
+
+  (** Declare an event with five parameters. *)
+  val declare_5 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    string * 'd Data_encoding.t ->
+    string * 'e Data_encoding.t ->
+    ('a * 'b * 'c * 'd * 'e) t
+
+  (** Declare an event with six parameters. *)
+  val declare_6 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    string * 'd Data_encoding.t ->
+    string * 'e Data_encoding.t ->
+    string * 'f Data_encoding.t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) t
+
+  (** Declare an event with seven parameters. *)
+  val declare_7 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    string * 'd Data_encoding.t ->
+    string * 'e Data_encoding.t ->
+    string * 'f Data_encoding.t ->
+    string * 'g Data_encoding.t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
+
+  (** Declare an event with eight parameters. *)
+  val declare_8 :
+    ?section:string list ->
+    name:string ->
+    msg:string ->
+    ?level:level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    string * 'd Data_encoding.t ->
+    string * 'e Data_encoding.t ->
+    string * 'f Data_encoding.t ->
+    string * 'g Data_encoding.t ->
+    string * 'h Data_encoding.t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 end
 
 (** {3 Sink Definitions and Registration } *)
