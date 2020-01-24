@@ -1,13 +1,10 @@
 import os
 import re
 import pytest
-from tools import paths
+from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
+    all_contracts, all_deprecated_contracts
 from tools import utils
 from tools.constants import IDENTITIES
-
-CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts'
-ILLTYPED_CONTRACT_PATH = f'{CONTRACT_PATH}/ill_typed'
-DEPRECATED_CONTRACT_PATH = f'{CONTRACT_PATH}/deprecated'
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -41,35 +38,39 @@ def originate(client,
 class TestManager:
 
     def test_manager_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/manager.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints', 'manager.tz')
         pubkey = IDENTITIES['bootstrap2']['identity']
         originate(client, session, path, f'"{pubkey}"', 1000)
         originate(client, session, path, f'"{pubkey}"', 1000,
                   contract_name="manager2")
 
     def test_delegatable_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/delegatable_target.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints',
+                            'delegatable_target.tz')
         pubkey = IDENTITIES['bootstrap2']['identity']
         originate(client, session, path,
                   f'Pair "{pubkey}" (Pair "hello" 45)', 1000)
 
     def test_target_with_entrypoints_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/big_map_entrypoints.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints',
+                            'big_map_entrypoints.tz')
         originate(client, session, path, 'Pair {} {}', 1000,
                   contract_name='target')
 
     def test_target_without_entrypoints_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/no_entrypoint_target.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints',
+                            'no_entrypoint_target.tz')
         originate(client, session, path, 'Pair "hello" 42', 1000,
                   contract_name='target_no_entrypoints')
 
     def test_target_without_default_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/no_default_target.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints',
+                            'no_default_target.tz')
         originate(client, session, path, 'Pair "hello" 42', 1000,
                   contract_name='target_no_default')
 
     def test_target_with_root_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/entrypoints/rooted_target.tz'
+        path = os.path.join(CONTRACT_PATH, 'entrypoints', 'rooted_target.tz')
         originate(client, session, path, 'Pair "hello" 42', 1000,
                   contract_name='rooted_target')
 
@@ -219,23 +220,6 @@ class TestManager:
         client.bake('bootstrap5', BAKE_ARGS)
 
 
-def all_contracts():
-    directories = ['attic', 'opcodes',
-                   'macros', 'mini_scenarios', 'non_regression']
-    contracts = []
-    for directory in directories:
-        for contract in os.listdir(f'{CONTRACT_PATH}/{directory}'):
-            contracts.append(f'{directory}/{contract}')
-    return contracts
-
-
-def all_deprecated_contract():
-    contracts = []
-    for contract in os.listdir(f'{DEPRECATED_CONTRACT_PATH}'):
-        contracts.append(f'{DEPRECATED_CONTRACT_PATH}/{contract}')
-    return contracts
-
-
 @pytest.mark.slow
 @pytest.mark.contract
 class TestContracts:
@@ -244,7 +228,7 @@ class TestContracts:
     @pytest.mark.parametrize("contract", all_contracts())
     def test_typecheck(self, client, contract):
         if contract.endswith('.tz'):
-            client.typecheck(f'{CONTRACT_PATH}/{contract}')
+            client.typecheck(os.path.join(CONTRACT_PATH, contract))
 
     # TODO add more tests here
     @pytest.mark.parametrize("contract,param,storage,expected",
@@ -252,14 +236,14 @@ class TestContracts:
                                '(Some 300)')])
     def test_run(self, client, contract, param, storage, expected):
         if contract.endswith('.tz'):
-            contract = f'{CONTRACT_PATH}/{contract}'
+            contract = os.path.join(CONTRACT_PATH, contract)
             run_script_res = client.run_script(contract, param, storage)
             assert run_script_res.storage == expected
 
-    @pytest.mark.parametrize("contract", all_deprecated_contract())
-    def test_deprected_typecheck(self, client, contract):
+    @pytest.mark.parametrize("contract", all_deprecated_contracts())
+    def test_deprecated_typecheck(self, client, contract):
         def cmd():
-            client.typecheck(contract)
+            client.typecheck(os.path.join(CONTRACT_PATH, contract))
 
         utils.assert_run_failure(cmd, r'Use of deprecated instruction')
 
@@ -275,7 +259,7 @@ class TestContracts:
     ])
     def test_ill_typecheck(self, client, contract, error_pattern):
         def cmd():
-            client.typecheck(f'{ILLTYPED_CONTRACT_PATH}/{contract}')
+            client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
 
         utils.assert_run_failure(cmd, error_pattern)
 
@@ -425,13 +409,14 @@ class TestGasBound:
 class TestChainId:
 
     def test_chain_id_opcode(self, client, session):
-        path = f'{CONTRACT_PATH}/opcodes/chain_id.tz'
+        path = os.path.join(CONTRACT_PATH, 'opcodes', 'chain_id.tz')
         originate(client, session, path, 'Unit', 0)
         client.call('bootstrap2', "chain_id", [])
         client.bake('bootstrap5', BAKE_ARGS)
 
     def test_chain_id_authentication_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/authentication.tz'
+        path = os.path.join(CONTRACT_PATH,
+                            'mini_scenarios', 'authentication.tz')
         pubkey = IDENTITIES['bootstrap1']['public']
         originate(client, session, path, f'Pair 0 "{pubkey}"', 1000)
         client.bake('bootstrap5', BAKE_ARGS)
@@ -459,7 +444,7 @@ class TestChainId:
 class TestBigMapToSelf:
 
     def test_big_map_to_self_origination(self, client, session):
-        path = f'{CONTRACT_PATH}/opcodes/big_map_to_self.tz'
+        path = os.path.join(CONTRACT_PATH, 'opcodes', 'big_map_to_self.tz')
         originate(client, session, path, '{}', 0)
         client.bake('bootstrap5', BAKE_ARGS)
 
@@ -476,7 +461,7 @@ class TestNonRegression:
     """Test contract-related non-regressions"""
 
     def test_issue_242_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/non_regression/bug_262.tz'
+        path = os.path.join(CONTRACT_PATH, 'non_regression', 'bug_262.tz')
         originate(client, session, path, 'Unit', 1)
 
     def test_issue_242_assert_balance(self, client):
@@ -489,7 +474,7 @@ class TestMiniScenarios:
 
     # replay.tz related tests
     def test_replay_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/replay.tz'
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios', 'replay.tz')
         originate(client, session, path, 'Unit', 0)
 
     def test_replay_transfer_fail(self, client):
@@ -500,7 +485,8 @@ class TestMiniScenarios:
 
     # create_contract.tz related tests
     def test_create_contract_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/create_contract.tz'
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                            'create_contract.tz')
         originate(client, session, path, 'Unit', 1000)
 
     def test_create_contract_balance(self, client):
@@ -522,7 +508,8 @@ class TestMiniScenarios:
 
     # default_account.tz related tests
     def test_default_account_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/default_account.tz'
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                            'default_account.tz')
         originate(client, session, path, 'Unit', 1000)
 
     def test_default_account_transfer_then_bake(self, client):
@@ -538,7 +525,8 @@ class TestMiniScenarios:
 
     # Test bytes, SHA252, CHECK_SIGNATURE
     def test_reveal_signed_preimage_originate(self, client, session):
-        path = f'{CONTRACT_PATH}/mini_scenarios/reveal_signed_preimage.tz'
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                            'reveal_signed_preimage.tz')
         byt = ('0x9995c2ef7bcc7ae3bd15bdd9b02' +
                'dc6e877c27b26732340d641a4cbc6524813bb')
         sign = f'p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz'
@@ -587,7 +575,8 @@ class TestMiniScenarios:
     def test_vote_for_delegate_originate(self, client, session):
         b_3 = IDENTITIES['bootstrap3']['identity']
         b_4 = IDENTITIES['bootstrap4']['identity']
-        path = f'{CONTRACT_PATH}/mini_scenarios/vote_for_delegate.tz'
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                            'vote_for_delegate.tz')
         storage = f'''(Pair (Pair "{b_3}" None) (Pair "{b_4}" None))'''
         originate(client, session, path, storage, 1000)
         assert client.get_delegate('vote_for_delegate').delegate is None
@@ -706,7 +695,8 @@ class TestTypecheckingErrors:
     @pytest.mark.xfail(reason="To be fixed in next protocol")
     def test_big_map_arity_error(self, client):
         def cmd():
-            client.typecheck(f'{CONTRACT_PATH}/ill_typed/big_map_arity.tz')
+            client.typecheck(os.path.join(CONTRACT_PATH, 'ill_typed',
+                                          'big_map_arity.tz'))
 
         utils.assert_run_failure(
             cmd,

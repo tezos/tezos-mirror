@@ -1,11 +1,10 @@
+from os import path
 import pytest
 from client import client_output
-from tools import paths
+from tools.paths import CONTRACT_PATH, ACCOUNT_PATH
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 TRANSFER_ARGS = ['--burn-cap', '0.257']
-CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts'
-ACCOUNT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/'
 
 
 @pytest.mark.incremental
@@ -101,7 +100,7 @@ class TestRawContext:
             client.transfer(999.95, session['keys'][0], session['keys'][1])
 
     def test_originate_contract_noop(self, client):
-        contract = f'{CONTRACT_PATH}/opcodes/noop.tz'
+        contract = path.join(CONTRACT_PATH, 'opcodes', 'noop.tz')
         client.remember('noop', contract)
         client.typecheck(contract)
         client.originate('noop',
@@ -115,7 +114,7 @@ class TestRawContext:
         client.bake('bootstrap1', BAKE_ARGS)
 
     def test_contract_hardlimit(self, client):
-        contract = f'{CONTRACT_PATH}/mini_scenarios/hardlimit.tz'
+        contract = path.join(CONTRACT_PATH, 'mini_scenarios', 'hardlimit.tz')
         client.originate('hardlimit',
                          1000, 'bootstrap1',
                          contract,

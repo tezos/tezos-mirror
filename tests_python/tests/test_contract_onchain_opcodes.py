@@ -1,10 +1,11 @@
+from os import path
 import pytest
 from tools import paths
+from tools.paths import OPCODES_CONTRACT_PATH
 from tools.utils import assert_run_failure, assert_storage_contains, bake, \
     init_with_transfer, assert_balance
 from tools.constants import IDENTITIES
 
-CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
 KEY1 = 'foo'
 KEY2 = 'bar'
 
@@ -33,7 +34,8 @@ class TestContractOnchainOpcodes:
         assert_balance(client, KEY2, 2000)
 
         # Create a contract and transfer 100 ꜩ to it
-        init_with_transfer(client, f'{CONTRACT_PATH}/store_input.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'store_input.tz'),
                            '""', 100, 'bootstrap1')
 
         client.transfer(100, "bootstrap1", "store_input",
@@ -53,7 +55,8 @@ class TestContractOnchainOpcodes:
     def test_transfer_amount(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
         init_with_transfer(client,
-                           f'{CONTRACT_PATH}/transfer_amount.tz',
+                           path.join(OPCODES_CONTRACT_PATH,
+                                     'transfer_amount.tz'),
                            '0', 100, 'bootstrap1')
 
         client.transfer(500, "bootstrap1", 'transfer_amount',
@@ -72,7 +75,7 @@ class TestContractOnchainOpcodes:
         client.set_regtest(None)
 
         init_with_transfer(client,
-                           f'{CONTRACT_PATH}/store_now.tz',
+                           path.join(OPCODES_CONTRACT_PATH, 'store_now.tz'),
                            '"2017-07-13T09:19:01Z"', 100, 'bootstrap1')
 
         client.transfer(500, "bootstrap1", 'store_now',
@@ -88,18 +91,20 @@ class TestContractOnchainOpcodes:
         client.originate('test_transfer_account1',
                          100,
                          'bootstrap1',
-                         f'{CONTRACT_PATH}/noop.tz',
+                         path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
                          ['--burn-cap', '10'])
         bake(client)
 
         client.originate('test_transfer_account2',
                          20,
                          'bootstrap1',
-                         f'{CONTRACT_PATH}/noop.tz',
+                         path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
                          ['--burn-cap', '10'])
         bake(client)
 
-        init_with_transfer(client, f'{CONTRACT_PATH}/transfer_tokens.tz',
+        init_with_transfer(client,
+                           path.join(OPCODES_CONTRACT_PATH,
+                                     'transfer_tokens.tz'),
                            'Unit', 1000, 'bootstrap1')
 
         assert_balance(client, 'test_transfer_account1', 100)
@@ -126,7 +131,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         client.set_regtest(None)
 
-        init_with_transfer(client, f'{CONTRACT_PATH}/self.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH, 'self.tz'),
                            '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
                            1000, 'bootstrap1')
 
@@ -142,7 +147,8 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         client.set_regtest(None)
 
-        init_with_transfer(client, f'{CONTRACT_PATH}/contract.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'contract.tz'),
                            'Unit',
                            1000, 'bootstrap1')
 
@@ -160,7 +166,7 @@ class TestContractOnchainOpcodes:
     def test_init_proxy(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
         init_with_transfer(client,
-                           f'{CONTRACT_PATH}/proxy.tz',
+                           path.join(OPCODES_CONTRACT_PATH, 'proxy.tz'),
                            'Unit',
                            1000, 'bootstrap1')
 
@@ -168,7 +174,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(client,
-                           f'{CONTRACT_PATH}/source.tz',
+                           path.join(OPCODES_CONTRACT_PATH, 'source.tz'),
                            f'"{init_store}"',
                            1000, 'bootstrap1')
 
@@ -192,7 +198,7 @@ class TestContractOnchainOpcodes:
 
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(client,
-                           f'{CONTRACT_PATH}/sender.tz',
+                           path.join(OPCODES_CONTRACT_PATH, 'sender.tz'),
                            f'"{init_store}"',
                            1000, 'bootstrap1')
 
@@ -214,7 +220,7 @@ class TestContractOnchainOpcodes:
     def test_slice(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
         init_with_transfer(
-            client, f'{CONTRACT_PATH}/slices.tz',
+            client, path.join(OPCODES_CONTRACT_PATH, 'slices.tz'),
             '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"',
             1000, 'bootstrap1')
 
@@ -247,7 +253,8 @@ class TestContractOnchainOpcodes:
 
     def test_split_string(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
-        init_with_transfer(client, f'{CONTRACT_PATH}/split_string.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'split_string.tz'),
                            '{}',
                            1000, 'bootstrap1')
 
@@ -265,7 +272,8 @@ class TestContractOnchainOpcodes:
 
     def test_split_bytes(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
-        init_with_transfer(client, f'{CONTRACT_PATH}/split_bytes.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'split_bytes.tz'),
                            '{}',
                            1000, 'bootstrap1')
 
@@ -283,7 +291,8 @@ class TestContractOnchainOpcodes:
 
     def test_set_delegate(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
-        init_with_transfer(client, f'{CONTRACT_PATH}/set_delegate.tz',
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'set_delegate.tz'),
                            'Unit', 1000, 'bootstrap1')
         bake(client)
 

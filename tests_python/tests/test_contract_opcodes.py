@@ -1,9 +1,9 @@
+from os import path
 import pytest
 from tools import paths
+from tools.paths import OPCODES_CONTRACT_PATH
 from tools.utils import assert_run_failure, assert_run_script_success, \
     assert_run_script_failwith
-
-CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes/'
 
 
 @pytest.mark.slow
@@ -617,7 +617,7 @@ class TestContractOpcodes:
                                    expected):
         client = client_regtest
         if contract.endswith('.tz'):
-            contract = f'{CONTRACT_PATH}/{contract}'
+            contract = path.join(OPCODES_CONTRACT_PATH, contract)
             run_script_res = client.run_script(contract, param,
                                                storage, None, True)
             assert run_script_res.storage == expected
@@ -692,7 +692,7 @@ class TestContractOpcodes:
                                   expected,
                                   big_map_diff):
         client = client_regtest
-        contract = f'{CONTRACT_PATH}/{contract}'
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage,
                                            None, True)
         assert run_script_res.storage == expected
@@ -768,7 +768,7 @@ class TestContractOpcodes:
         client = client_regtest
         assert_run_script_success(
             client,
-            f'{CONTRACT_PATH}/packunpack.tz',
+            path.join(OPCODES_CONTRACT_PATH, 'packunpack.tz'),
             'Unit',
             '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) ' +
             '0x05070707070100000004746f746f020000000800030' +
@@ -776,7 +776,7 @@ class TestContractOpcodes:
         )
         assert_run_script_failwith(
             client,
-            f'{CONTRACT_PATH}/packunpack.tz',
+            path.join(OPCODES_CONTRACT_PATH, 'packunpack.tz'),
             'Unit',
             '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) ' +
             '0x05070707070100000004746f746f020000000800030' +
@@ -789,13 +789,13 @@ class TestContractOpcodes:
               + '9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF'
         assert_run_script_success(
             client,
-            f'{CONTRACT_PATH}/check_signature.tz',
+            path.join(OPCODES_CONTRACT_PATH, 'check_signature.tz'),
             f'(Pair "{sig}" "hello")',
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
         )
         assert_run_script_failwith(
             client,
-            f'{CONTRACT_PATH}/check_signature.tz',
+            path.join(OPCODES_CONTRACT_PATH, 'check_signature.tz'),
             f'(Pair "{sig}" "abcd")',
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"'
         )
@@ -805,7 +805,8 @@ class TestContractOpcodes:
         hash_result = client.hash(
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
             '(pair mutez (pair timestamp int))').blake2b
-        hash_contract = f'{CONTRACT_PATH}/hash_consistency_checker.tz'
+        hash_contract = path.join(OPCODES_CONTRACT_PATH,
+                                  'hash_consistency_checker.tz')
         run_script_res = client.run_script(
             hash_contract, '0x00',
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))')
@@ -833,7 +834,7 @@ class TestContractOpcodes:
                                  param,
                                  storage):
         client = client_regtest_scrubbed
-        contract = f'{CONTRACT_PATH}/{contract}'
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
 
         def cmd():
             client.run_script(contract, param, storage)
@@ -845,7 +846,7 @@ class TestContractOpcodes:
         client = client_regtest
 
         def cmd():
-            client.run_script(f'{CONTRACT_PATH}/set_car.tz',
+            client.run_script(path.join(OPCODES_CONTRACT_PATH, 'set_car.tz'),
                               '(Pair %wrong %field "hello" 0)',
                               '""')
         assert_run_failure(cmd, r'The two annotations do not match')
@@ -870,6 +871,6 @@ class TestContractOpcodes:
                                 storage,
                                 expected):
         client = client_regtest
-        contract = f'{CONTRACT_PATH}/{contract}'
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(contract, param, storage)
         assert run_script_res.storage == expected

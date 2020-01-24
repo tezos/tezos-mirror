@@ -1,10 +1,10 @@
+from os import path
 import pytest
-from tools import paths
+from tools.paths import MACROS_CONTRACT_PATH
 from tools.utils import assert_run_script_failwith, \
     assert_transfer_failwith, init_with_transfer, bake, \
     assert_storage_contains
 
-CONTRACT_PATH = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/macros/'
 BAKE_ARGS = ['--minimal-timestamp']
 
 
@@ -86,7 +86,7 @@ class TestContractMacros:
     def test_contract_input_output(self, client, contract, param, storage,
                                    expected):
         if contract.endswith('.tz'):
-            contract = f'{CONTRACT_PATH}/{contract}'
+            contract = path.join(MACROS_CONTRACT_PATH, contract)
             run_script_res = client.run_script(contract, param, storage)
             assert run_script_res.storage == expected
 
@@ -113,7 +113,7 @@ class TestContractMacros:
             ('assert_cmpge.tz', 'Unit', '(Pair -1 0)')
         ])
     def test_contract_failures(self, client, contract, param, storage):
-        contract = f'{CONTRACT_PATH}/{contract}'
+        contract = path.join(MACROS_CONTRACT_PATH, contract)
         assert_run_script_failwith(client, contract, param, storage)
 
 
@@ -122,7 +122,7 @@ class TestContractMacros:
 class TestGuestBook:
     """Test on the guestbook contract."""
     def test_guestbook(self, client):
-        contract = f'{CONTRACT_PATH}/guestbook.tz'
+        contract = path.join(MACROS_CONTRACT_PATH, 'guestbook.tz')
 
         init_with_transfer(
             client, contract,
@@ -151,7 +151,7 @@ class TestGuestBook:
 class TestBigmap:
     """Tests on the big_map_mem contract."""
     def test_bigmap(self, client):
-        contract = f'{CONTRACT_PATH}/big_map_mem.tz'
+        contract = path.join(MACROS_CONTRACT_PATH, 'big_map_mem.tz')
 
         init_with_transfer(
             client, contract,
@@ -203,7 +203,7 @@ class TestBigmap:
 class TestBigmapGetAdd:
     """Tests on the big_map_get_add contract."""
     def test_bigmap(self, client):
-        contract = f'{CONTRACT_PATH}/big_map_get_add.tz'
+        contract = path.join(MACROS_CONTRACT_PATH, 'big_map_get_add.tz')
 
         init_with_transfer(client, contract,
                            '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)', 100,
