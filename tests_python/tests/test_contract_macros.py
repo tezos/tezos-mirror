@@ -1,6 +1,6 @@
 from os import path
 import pytest
-from tools.paths import MACROS_CONTRACT_PATH
+from tools.paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
 from tools.utils import assert_run_script_failwith, \
     assert_transfer_failwith, init_with_transfer, bake, \
     assert_storage_contains
@@ -243,3 +243,15 @@ class TestBigmapGetAdd:
             '--burn-cap', '10'
         ])
         bake(client)
+
+
+class TestMacroExpansion:
+    """Test expanding macros"""
+
+    @pytest.mark.parametrize("contract", all_contracts(['macros']))
+    def test_macro_expansion(self, client_regtest, contract):
+        """This test expands macros in all macro test contracts, with
+        regression detection enabled. This test should fail if the definition
+        of any macros change.
+        """
+        client_regtest.expand_macros(path.join(CONTRACT_PATH, contract))

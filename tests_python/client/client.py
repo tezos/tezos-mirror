@@ -684,3 +684,7 @@ class Client:
             except Exception:  # pylint: disable=broad-except
                 pass
         return False
+
+    def expand_macros(self, src: str) -> str:
+        cmd = ['expand', 'macros', 'in', src]
+        return self.run(cmd)
