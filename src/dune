@@ -1,5 +1,5 @@
 (library
  (name data_encoding)
  (public_name data-encoding)
- (libraries ocplib-json-typed ocplib-json-typed-bson zarith ezjsonm)
+ (libraries json-data-encoding json-data-encoding-bson zarith ezjsonm)
  (flags (:standard)))
