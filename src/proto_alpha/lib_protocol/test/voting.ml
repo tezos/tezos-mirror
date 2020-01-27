@@ -49,13 +49,13 @@ let ballots_pp ppf v =
    supermajority rate is s_num / s_den = 8 / 10 *)
 let percent_mul = 100_00
 
+let den = 10
+
 let initial_participation_num = 7
 
-let initial_participation = initial_participation_num * percent_mul / 10
+let initial_participation = initial_participation_num * percent_mul / den
 
 let pr_ema_weight = 8
-
-let den = 10
 
 let pr_num = den - pr_ema_weight
 
@@ -67,10 +67,12 @@ let qr_min_num = 2
 
 let qr_max_num = 7
 
-let expected_qr_num =
+let expected_qr_num participation_ema =
+  let participation_ema = Int32.to_int participation_ema in
+  let participation_ema = participation_ema * den / percent_mul in
   Float.(
     of_int qr_min_num
-    +. of_int initial_participation_num
+    +. of_int participation_ema
        *. (of_int qr_max_num -. of_int qr_min_num)
        /. of_int den)
 
@@ -101,6 +103,21 @@ let protos =
        "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX" |]
 
 (** helper functions *)
+let period_kind_to_string kind =
+  Data_encoding.Json.construct Alpha_context.Voting_period.kind_encoding kind
+  |> Data_encoding.Json.to_string
+
+let assert_period_kind expected b loc =
+  Context.Vote.get_current_period_kind (B b)
+  >>=? fun kind ->
+  if Stdlib.(expected = kind) then return_unit
+  else
+    failwith
+      "%s - Unexpected period kind - expected %s, got %s"
+      loc
+      (period_kind_to_string expected)
+      (period_kind_to_string kind)
+
 let mk_contracts_from_pkh pkh_list =
   List.map Alpha_context.Contract.implicit_contract pkh_list
 
@@ -167,12 +184,9 @@ let test_successful_vote num_delegates () =
     v
     Voting_period.(root)
   >>=? fun () ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
+  >>=? fun () ->
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* participation EMA starts at initial_participation *)
   Context.Vote.get_participation_ema b
@@ -250,12 +264,9 @@ let test_successful_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
+  >>=? fun () ->
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* period 1 *)
   Context.Vote.get_voting_period (B b)
@@ -345,12 +356,7 @@ let test_successful_vote num_delegates () =
      -1 because we already baked one block with the ballot *)
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing b __LOC__
   >>=? fun () ->
   (* period 2 *)
   Context.Vote.get_voting_period (B b)
@@ -381,12 +387,9 @@ let test_successful_vote num_delegates () =
   (* skip to promotion_vote period *)
   Block.bake_n (Int32.to_int blocks_per_voting_period) b
   >>=? fun b ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Promotion_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Promotion_vote b __LOC__
+  >>=? fun () ->
+  assert_listings_not_empty b ~loc:__LOC__
   >>=? fun () ->
   (* period 3 *)
   Context.Vote.get_voting_period (B b)
@@ -461,9 +464,18 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Wrong ballot" __LOC__)
                delegates_p4)
   >>=? fun () ->
-  (* skip to end of promotion_vote period and activation*)
+  (* skip to Adoption period *)
   Block.bake_n Int32.(to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
+  assert_period_kind Adoption b __LOC__
+  >>=? fun () ->
+  (* skip to end of Adoption period to activate *)
+  Block.bake_n Int32.(to_int blocks_per_voting_period) b
+  >>=? fun b ->
+  assert_period_kind Proposal b __LOC__
+  >>=? fun () ->
+  assert_listings_not_empty b ~loc:__LOC__
+  >>=? fun () ->
   (* zero is the new protocol (before the vote this value is unset) *)
   Context.Vote.get_protocol b
   >>= fun p ->
@@ -479,7 +491,9 @@ let test_successful_vote num_delegates () =
 (* given a list of active delegates,
    return the first k active delegates with which one can have quorum, that is:
    their roll sum divided by the total roll sum is bigger than pr_ema_weight/den *)
-let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
+let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
+    participation_ema =
+  let expected_quorum = expected_qr_num participation_ema in
   List.fold_left (fun acc v -> Int32.(add v acc)) 0l active_rolls
   |> fun active_rolls_sum ->
   let rec loop delegates rolls sum selected =
@@ -489,7 +503,7 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls =
     | (del :: delegates, del_rolls :: rolls) ->
         if
           den * sum
-          < Float.to_int (expected_qr_num *. Int32.to_float active_rolls_sum)
+          < Float.to_int (expected_quorum *. Int32.to_float active_rolls_sum)
         then
           loop delegates rolls (sum + Int32.to_int del_rolls) (del :: selected)
         else selected
@@ -524,12 +538,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.nth delegates 0 in
   Op.proposals (B b) proposer [Protocol_hash.zero]
@@ -541,12 +550,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
@@ -554,7 +558,9 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
-  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2
+  Context.Vote.get_participation_ema b
+  >>=? fun participation_ema ->
+  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
   |> fun voters ->
   (* take the first two voters out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
@@ -572,12 +578,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* we move back to the proposal period because not enough quorum *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   (* check participation_ema update *)
   get_expected_participation_ema
@@ -602,12 +603,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.nth delegates 0 in
   Op.proposals (B b) proposer [Protocol_hash.zero]
@@ -619,18 +615,15 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
   >>=? fun () ->
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p2, rolls_p2) ->
-  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2
+  Context.Vote.get_participation_ema b
+  >>=? fun participation_ema ->
+  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
   |> fun voters ->
   let open Alpha_context in
   (* all voters vote, for yays;
@@ -643,22 +636,12 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* we move to testing because we have supermajority and enough quorum *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing b __LOC__
   >>=? fun () ->
   (* skip to promotion_vote period *)
   Block.bake_n (Int32.to_int blocks_per_voting_period) b
   >>=? fun b ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Promotion_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Promotion_vote b __LOC__
   >>=? fun () ->
   Context.Vote.get_participation_ema b
   >>=? fun initial_participation_ema ->
@@ -666,7 +649,9 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
   >>=? fun (delegates_p4, rolls_p4) ->
-  get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4
+  Context.Vote.get_participation_ema b
+  >>=? fun participation_ema ->
+  get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4 participation_ema
   |> fun voters ->
   (* take the first voter out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
@@ -694,23 +679,14 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
     (Int32.to_int new_participation_ema)
   >>=? fun () ->
   (* we move back to the proposal period because not enough quorum *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
-  >>=? fun () -> return_unit
+  assert_period_kind Proposal b __LOC__
+  >>=? fun () ->
+  assert_listings_not_empty b ~loc:__LOC__ >>=? fun () -> return_unit
 
 let test_multiple_identical_proposals_count_as_one () =
   Context.init 1
   >>=? fun (b, delegates) ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   let proposer = List.hd delegates in
   Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
@@ -801,22 +777,8 @@ let test_supermajority_in_proposal there_is_a_winner () =
   >>=? fun b ->
   (* we remain in the proposal period when there is no winner,
      otherwise we move to the testing vote period *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             if there_is_a_winner then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Proposal, obtained Testing_vote"
-                 __LOC__
-         | Proposal ->
-             if not there_is_a_winner then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Testing_vote, obtained Proposal"
-                 __LOC__
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  ( if there_is_a_winner then assert_period_kind Testing_vote b __LOC__
+  else assert_period_kind Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 let test_quorum_in_proposal has_quorum () =
@@ -872,22 +834,8 @@ let test_quorum_in_proposal has_quorum () =
   >>=? fun b ->
   (* we remain in the proposal period when there is no quorum,
      otherwise we move to the testing vote period *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             if has_quorum then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Proposal, obtained Testing_vote"
-                 __LOC__
-         | Proposal ->
-             if not has_quorum then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Testing_vote, obtained Proposal"
-                 __LOC__
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  ( if has_quorum then assert_period_kind Testing_vote b __LOC__
+  else assert_period_kind Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 let test_supermajority_in_testing_vote supermajority () =
@@ -905,12 +853,7 @@ let test_supermajority_in_testing_vote supermajority () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* move to testing_vote *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
   >>=? fun () ->
   (* assert our proposal won *)
   Context.Vote.get_current_proposal (B b)
@@ -945,22 +888,8 @@ let test_supermajority_in_testing_vote supermajority () =
   >>=? fun b ->
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing ->
-             if supermajority then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Proposal, obtained Testing"
-                 __LOC__
-         | Proposal ->
-             if not supermajority then return_unit
-             else
-               failwith
-                 "%s - Expected period kind Testing_vote, obtained Proposal"
-                 __LOC__
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  ( if supermajority then assert_period_kind Testing b __LOC__
+  else assert_period_kind Proposal b __LOC__ )
   >>=? fun () -> return_unit
 
 (* test also how the selection scales: all delegates propose max proposals *)
@@ -988,13 +917,7 @@ let test_no_winning_proposal num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 2) b
   >>=? fun b ->
   (* we stay in the same proposal period because no winning proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
-  >>=? fun () -> return_unit
+  assert_period_kind Proposal b __LOC__ >>=? fun () -> return_unit
 
 (** Test that for the vote to pass with maximum possible participation_ema
     (100%), it is sufficient for the vote quorum to be equal or greater than
@@ -1010,12 +933,7 @@ let test_quorum_capped_maximum num_delegates () =
   >>=? fun {parametric = {blocks_per_voting_period; quorum_max; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
@@ -1029,12 +947,7 @@ let test_quorum_capped_maximum num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_max *)
   let minimum_to_pass =
@@ -1053,12 +966,7 @@ let test_quorum_capped_maximum num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* expect to move to testing because we have supermajority and enough quorum *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? function
-  | Testing ->
-      return_unit
-  | _ ->
-      failwith "%s - Unexpected period kind" __LOC__
+  assert_period_kind Testing b __LOC__
 
 (** Test that for the vote to pass with minimum possible participation_ema
     (0%), it is sufficient for the vote quorum to be equal or greater than
@@ -1074,12 +982,7 @@ let test_quorum_capped_minimum num_delegates () =
   >>=? fun {parametric = {blocks_per_voting_period; quorum_min; _}; _} ->
   (* proposal period *)
   let open Alpha_context in
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Proposal ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Proposal b __LOC__
   >>=? fun () ->
   (* propose a new protocol *)
   let protocol = Protocol_hash.zero in
@@ -1093,12 +996,7 @@ let test_quorum_capped_minimum num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* we moved to a testing_vote period with one proposal *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? (function
-         | Testing_vote ->
-             return_unit
-         | _ ->
-             failwith "%s - Unexpected period kind" __LOC__)
+  assert_period_kind Testing_vote b __LOC__
   >>=? fun () ->
   (* take percentage of the delegates equal or greater than quorum_min *)
   let minimum_to_pass =
@@ -1117,12 +1015,7 @@ let test_quorum_capped_minimum num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   (* expect to move to testing because we have supermajority and enough quorum *)
-  Context.Vote.get_current_period_kind (B b)
-  >>=? function
-  | Testing ->
-      return_unit
-  | _ ->
-      failwith "%s - Unexpected period kind" __LOC__
+  assert_period_kind Testing b __LOC__
 
 (* gets the voting power *)
 let get_voting_power block pkhash =
