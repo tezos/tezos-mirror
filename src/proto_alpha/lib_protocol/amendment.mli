@@ -42,9 +42,11 @@
    - Promotion_vote period: delegates can cast votes to promote or not the
      tested proposal using the ballot operation.
      At the end of a promotion_vote period if participation reaches the quorum
-     and the tested proposal has a supermajority in favor, it is activated as
-     the new protocol. Otherwise we go back to a proposal period.
+     and the tested proposal has a supermajority in favor, we move to
+     an adoption period. Otherwise we go back to a proposal period.
      In any case, if there is enough participation the quorum is updated.
+   - Adoption period: At the of an adoption period, the proposal is activated
+     as the new protocol.
 *)
 
 open Alpha_context

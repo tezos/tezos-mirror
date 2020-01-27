@@ -59,7 +59,7 @@ let of_int32_exn l =
   if Compare.Int32.(l >= 0l) then l
   else invalid_arg "Voting_period_repr.of_int32"
 
-type kind = Proposal | Testing_vote | Testing | Promotion_vote
+type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
 
 let kind_encoding =
   let open Data_encoding in
@@ -88,4 +88,10 @@ let kind_encoding =
         ~title:"Promotion_vote"
         (constant "promotion_vote")
         (function Promotion_vote -> Some () | _ -> None)
-        (fun () -> Promotion_vote) ]
+        (fun () -> Promotion_vote);
+      case
+        (Tag 4)
+        ~title:"Adoption"
+        (constant "adoption")
+        (function Adoption -> Some () | _ -> None)
+        (fun () -> Adoption) ]

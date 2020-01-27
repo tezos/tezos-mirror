@@ -129,7 +129,6 @@ let start_new_voting_period ctxt =
       >>= fun ctxt ->
       if approved then
         let expiration =
-          (* in two days maximum... *)
           Time.add
             (Timestamp.current ctxt)
             (Constants.test_chain_duration ctxt)
@@ -149,17 +148,18 @@ let start_new_voting_period ctxt =
   | Promotion_vote ->
       check_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
-      ( if approved then
-        Vote.get_current_proposal ctxt
-        >>=? fun proposal -> activate ctxt proposal >>= fun ctxt -> return ctxt
-      else return ctxt )
-      >>=? fun ctxt ->
-      Vote.clear_ballots ctxt
+      ( if approved then Vote.set_current_period_kind ctxt Adoption
+      else
+        Vote.clear_current_proposal ctxt
+        >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
+      >>=? fun ctxt -> Vote.clear_ballots ctxt >>= return
+  | Adoption ->
+      Vote.get_current_proposal ctxt
+      >>=? fun proposal ->
+      activate ctxt proposal
       >>= fun ctxt ->
       Vote.clear_current_proposal ctxt
-      >>=? fun ctxt ->
-      Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
-  )
+      >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
   >>=? fun ctxt -> Vote.freeze_listings ctxt
 
 type error +=
@@ -281,7 +281,7 @@ let record_proposals ctxt delegate proposals =
           proposals
         >>=? fun ctxt -> return ctxt
       else fail Unauthorized_proposal
-  | Testing_vote | Testing | Promotion_vote ->
+  | Testing_vote | Testing | Promotion_vote | Adoption ->
       fail Unexpected_proposal
 
 let record_ballot ctxt delegate proposal ballot =
@@ -302,7 +302,7 @@ let record_ballot ctxt delegate proposal ballot =
       >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot
       else fail Unauthorized_ballot
-  | Testing | Proposal ->
+  | Testing | Proposal | Adoption ->
       fail Unexpected_ballot
 
 let last_of_a_voting_period ctxt l =

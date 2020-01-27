@@ -564,7 +564,7 @@ module Voting_period : sig
 
   val succ : voting_period -> voting_period
 
-  type kind = Proposal | Testing_vote | Testing | Promotion_vote
+  type kind = Proposal | Testing_vote | Testing | Promotion_vote | Adoption
 
   val kind_encoding : kind Data_encoding.encoding
 
