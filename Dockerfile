@@ -23,6 +23,18 @@ COPY --chown=tezos:nogroup scripts/alphanet_version scripts/alphanet.sh src/bin_
 
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug
+ARG BUILD_IMAGE
+ARG BUILD_IMAGE_VERSION
+ARG COMMIT_SHORT_SHA
+LABEL maintainer="contact@nomadic-labs.com" \
+      org.label-schema.name="Tezos" \
+      org.label-schema.docker.schema-version="1.0" \
+      org.label-schema.description="Tezos node" \
+      org.label-schema.url="https://www.nomadic-labs.com" \
+      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
+      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
+      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
+
 RUN sudo apk --no-cache add vim
 ENV EDITOR=/usr/bin/vi
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/ /usr/local/bin/
@@ -36,11 +48,34 @@ RUN strip /home/tezos/bin/tezos*
 
 
 FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare
+ARG BUILD_IMAGE
+ARG BUILD_IMAGE_VERSION
+ARG COMMIT_SHORT_SHA
+LABEL maintainer="contact@nomadic-labs.com" \
+      org.label-schema.name="Tezos" \
+      org.label-schema.docker.schema-version="1.0" \
+      org.label-schema.description="Tezos node" \
+      org.label-schema.url="https://www.nomadic-labs.com" \
+      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
+      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
+      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
 
 
 FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as minimal
+ARG BUILD_IMAGE
+ARG BUILD_IMAGE_VERSION
+ARG COMMIT_SHORT_SHA
+LABEL maintainer="contact@nomadic-labs.com" \
+      org.label-schema.name="Tezos" \
+      org.label-schema.docker.schema-version="1.0" \
+      org.label-schema.description="Tezos node" \
+      org.label-schema.url="https://www.nomadic-labs.com" \
+      org.label-schema.vcs-url="https://gitlab.com/tezos/tezos" \
+      org.label-schema.vcs-ref="${COMMIT_SHORT_SHA}" \
+      org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
+
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

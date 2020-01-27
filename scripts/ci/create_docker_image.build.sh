@@ -21,10 +21,11 @@ echo
 docker build \
   -t "$image_name:$image_version" \
   -f build.Dockerfile \
-  --build-arg="BASE_IMAGE=$base_image" \
-  --build-arg="BASE_IMAGE_VERSION=${base_image_version}" \
-  --build-arg="BASE_IMAGE_VERSION=${base_image_version}" \
-  --build-arg="BUILD_IMAGE_VERSION=${base_image_version}" \
+  --cache-from "$image_name:$image_version" \
+  --build-arg "BASE_IMAGE=$base_image" \
+  --build-arg "BASE_IMAGE_VERSION=${base_image_version}" \
+  --build-arg "BASE_IMAGE_VERSION=${base_image_version}" \
+  --build-arg "BUILD_IMAGE_VERSION=${base_image_version}" \
   "$src_dir"
 
 echo
