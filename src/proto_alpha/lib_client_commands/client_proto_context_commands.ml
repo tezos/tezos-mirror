@@ -1622,6 +1622,6 @@ let commands network () =
                 ballots_info.ballots.yay
                 ballots_info.supermajority
               >>= fun () -> return_unit
-          | Testing ->
+          | Testing | Adoption ->
               print_proposal info.current_proposal >>= fun () -> return_unit)
     ]
