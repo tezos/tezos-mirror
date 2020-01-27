@@ -559,6 +559,26 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.hash_keccak bytes
     | (Sha3, (bytes, _)) ->
         Interp_costs.hash_sha3 bytes
+    | (Add_bls12_381_g1, _) ->
+        Interp_costs.add_bls12_381_g1
+    | (Add_bls12_381_g2, _) ->
+        Interp_costs.add_bls12_381_g2
+    | (Add_bls12_381_fr, _) ->
+        Interp_costs.add_bls12_381_fr
+    | (Mul_bls12_381_g1, _) ->
+        Interp_costs.mul_bls12_381_g1
+    | (Mul_bls12_381_g2, _) ->
+        Interp_costs.mul_bls12_381_g2
+    | (Mul_bls12_381_fr, _) ->
+        Interp_costs.mul_bls12_381_fr
+    | (Neg_bls12_381_g1, _) ->
+        Interp_costs.neg_bls12_381_g1
+    | (Neg_bls12_381_g2, _) ->
+        Interp_costs.neg_bls12_381_g2
+    | (Neg_bls12_381_fr, _) ->
+        Interp_costs.neg_bls12_381_fr
+    | (Pairing_check_bls12_381, (pairs, _)) ->
+        Interp_costs.pairing_check_bls12_381 pairs.length
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -1231,6 +1251,36 @@ let rec step :
   | (Sha3, (bytes, rest)) ->
       let hash = Raw_hashes.sha3_256 bytes in
       logged_return ((hash, rest), ctxt)
+  | (Add_bls12_381_g1, (x, (y, rest))) ->
+      logged_return ((Bls12_381.G1.add x y, rest), ctxt)
+  | (Add_bls12_381_g2, (x, (y, rest))) ->
+      logged_return ((Bls12_381.G2.add x y, rest), ctxt)
+  | (Add_bls12_381_fr, (x, (y, rest))) ->
+      logged_return ((Bls12_381.Fr.add x y, rest), ctxt)
+  | (Mul_bls12_381_g1, (x, (y, rest))) ->
+      logged_return ((Bls12_381.G1.mul x y, rest), ctxt)
+  | (Mul_bls12_381_g2, (x, (y, rest))) ->
+      logged_return ((Bls12_381.G2.mul x y, rest), ctxt)
+  | (Mul_bls12_381_fr, (x, (y, rest))) ->
+      logged_return ((Bls12_381.Fr.mul x y, rest), ctxt)
+  | (Neg_bls12_381_g1, (x, rest)) ->
+      logged_return ((Bls12_381.G1.negate x, rest), ctxt)
+  | (Neg_bls12_381_g2, (x, rest)) ->
+      logged_return ((Bls12_381.G2.negate x, rest), ctxt)
+  | (Neg_bls12_381_fr, (x, rest)) ->
+      logged_return ((Bls12_381.Fr.negate x, rest), ctxt)
+  | (Pairing_check_bls12_381, (pairs, rest)) ->
+      let check =
+        match pairs.elements with
+        | [] ->
+            true
+        | pairs ->
+            Bls12_381.(
+              miller_loop pairs |> final_exponentiation
+              |> Option.map Gt.(eq one)
+              |> Option.value ~default:false)
+      in
+      logged_return ((check, rest), ctxt)
 
 and interp :
     type p r.

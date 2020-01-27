@@ -377,6 +377,59 @@ module Cost_of = struct
 
     let get_total_voting_power = step_cost 1
 
+    let add_bls12_381_g1 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let add_bls12_381_g2 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let add_bls12_381_fr =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let mul_bls12_381_g1 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let mul_bls12_381_g2 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let mul_bls12_381_fr =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let neg_bls12_381_g1 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let neg_bls12_381_g2 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let neg_bls12_381_fr =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let pairing_bls12_381 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let mul_bls12_381_fq12 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    let check_one_bls12_381_fq12 =
+      (* TODO: Review this *)
+      atomic_step_cost 10
+
+    (* Pairing check on a list of `n` pairs *)
+    let pairing_check_bls12_381 n =
+      (n *@ (pairing_bls12_381 +@ mul_bls12_381_fq12))
+      +@ check_one_bls12_381_fq12
+
     let stack_n_op n =
       atomic_step_cost (20 + ((n lsr 1) + (n lsr 2) + (n lsr 4)))
 
@@ -470,6 +523,12 @@ module Cost_of = struct
     let key_hash = step_cost 1 +@ alloc_cost 1
 
     let signature = step_cost 1 +@ alloc_cost 1
+
+    let bls12_381_g1 = step_cost 1 +@ alloc_cost 1
+
+    let bls12_381_g2 = step_cost 1 +@ alloc_cost 1
+
+    let bls12_381_fr = step_cost 1 +@ alloc_cost 1
 
     let chain_id = step_cost 1 +@ alloc_cost 1
 
@@ -779,6 +838,26 @@ module Cost_of = struct
           alloc_cost 1
       | Sha3 ->
           alloc_cost 1
+      | Add_bls12_381_g1 ->
+          alloc_cost 1
+      | Add_bls12_381_g2 ->
+          alloc_cost 1
+      | Add_bls12_381_fr ->
+          alloc_cost 1
+      | Mul_bls12_381_g1 ->
+          alloc_cost 1
+      | Mul_bls12_381_g2 ->
+          alloc_cost 1
+      | Mul_bls12_381_fr ->
+          alloc_cost 1
+      | Neg_bls12_381_g1 ->
+          alloc_cost 1
+      | Neg_bls12_381_g2 ->
+          alloc_cost 1
+      | Neg_bls12_381_fr ->
+          alloc_cost 1
+      | Pairing_check_bls12_381 ->
+          alloc_cost 1
   end
 
   module Unparse = struct
@@ -811,6 +890,12 @@ module Cost_of = struct
     let operation bytes = Script.bytes_node_cost bytes
 
     let chain_id = string_cost 15
+
+    let bls12_381_g1 = string_cost Bls12_381.G1.size
+
+    let bls12_381_g2 = string_cost Bls12_381.G2.size
+
+    let bls12_381_fr = string_cost Bls12_381.Fr.size
 
     let key = string_cost 54
 

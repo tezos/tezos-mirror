@@ -140,6 +140,12 @@ let rec type_size : type t. t ty -> int =
       1
   | Never_t _ ->
       1
+  | Bls12_381_g1_t _ ->
+      1
+  | Bls12_381_g2_t _ ->
+      1
+  | Bls12_381_fr_t _ ->
+      1
   | Pair_t ((l, _, _), (r, _, _), _) ->
       1 + type_size l + type_size r
   | Union_t ((l, _), (r, _), _) ->
@@ -457,6 +463,26 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Keccak ->
       0
   | Sha3 ->
+      0
+  | Add_bls12_381_g1 ->
+      0
+  | Add_bls12_381_g2 ->
+      0
+  | Add_bls12_381_fr ->
+      0
+  | Mul_bls12_381_g1 ->
+      0
+  | Mul_bls12_381_g2 ->
+      0
+  | Mul_bls12_381_fr ->
+      0
+  | Neg_bls12_381_g1 ->
+      0
+  | Neg_bls12_381_g2 ->
+      0
+  | Neg_bls12_381_fr ->
+      0
+  | Pairing_check_bls12_381 ->
       0
 
 (* ---- Error helpers -------------------------------------------------------*)
@@ -880,6 +906,12 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       None
   | Operation_t _ ->
       None
+  | Bls12_381_fr_t _ ->
+      None
+  | Bls12_381_g1_t _ ->
+      None
+  | Bls12_381_g2_t _ ->
+      None
 
 let add_field_annot a var = function
   | Prim (loc, prim, args, annots) ->
@@ -973,6 +1005,12 @@ let rec unparse_ty_no_lwt :
       return ctxt (T_chain_id, [], unparse_type_annot tname)
   | Never_t tname ->
       return ctxt (T_never, [], unparse_type_annot tname)
+  | Bls12_381_g1_t tname ->
+      return ctxt (T_bls12_381_g1, [], unparse_type_annot tname)
+  | Bls12_381_g2_t tname ->
+      return ctxt (T_bls12_381_g2, [], unparse_type_annot tname)
+  | Bls12_381_fr_t tname ->
+      return ctxt (T_bls12_381_fr, [], unparse_type_annot tname)
   | Contract_t (ut, tname) ->
       unparse_ty_no_lwt ctxt ut
       >>? fun (t, ctxt) ->
@@ -1105,6 +1143,12 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Map_t (_, _, tname) ->
       tname
   | Big_map_t (_, _, tname) ->
+      tname
+  | Bls12_381_g1_t tname ->
+      tname
+  | Bls12_381_g2_t tname ->
+      tname
+  | Bls12_381_fr_t tname ->
       tname
 
 (* ---- Equality witnesses --------------------------------------------------*)
@@ -1332,6 +1376,21 @@ let merge_types :
         consume ctxt 0
         >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
+    | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
+        >|? fun tname -> (Eq, Bls12_381_g1_t tname, ctxt)
+    | (Bls12_381_g2_t tn1, Bls12_381_g2_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
+        >|? fun tname -> (Eq, Bls12_381_g2_t tname, ctxt)
+    | (Bls12_381_fr_t tn1, Bls12_381_fr_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2
+        >|? fun tname -> (Eq, Bls12_381_fr_t tname, ctxt)
     | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
         consume ctxt 2
         >>? fun ctxt ->
@@ -1794,6 +1853,21 @@ and parse_ty :
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 0)
       >|? fun ctxt -> (Ex_ty (Never_t ty_name), ctxt)
+  | Prim (loc, T_bls12_381_g1, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      Gas.consume ctxt (Typecheck_costs.type_ 0)
+      >|? fun ctxt -> (Ex_ty (Bls12_381_g1_t ty_name), ctxt)
+  | Prim (loc, T_bls12_381_g2, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      Gas.consume ctxt (Typecheck_costs.type_ 0)
+      >|? fun ctxt -> (Ex_ty (Bls12_381_g2_t ty_name), ctxt)
+  | Prim (loc, T_bls12_381_fr, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      Gas.consume ctxt (Typecheck_costs.type_ 0)
+      >|? fun ctxt -> (Ex_ty (Bls12_381_fr_t ty_name), ctxt)
   | Prim (loc, T_contract, [utl], annot) ->
       if allow_contract then
         parse_parameter_ty ctxt ~legacy utl
@@ -1977,7 +2051,10 @@ and parse_ty :
              T_key_hash;
              T_timestamp;
              T_chain_id;
-             T_never ]
+             T_never;
+             T_bls12_381_g1;
+             T_bls12_381_g2;
+             T_bls12_381_fr ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.cycle
@@ -2070,6 +2147,12 @@ let check_packable ~legacy loc root =
     | Set_t (_, _) ->
         ok ()
     | Lambda_t (_, _, _) ->
+        ok ()
+    | Bls12_381_g1_t _ ->
+        ok ()
+    | Bls12_381_g2_t _ ->
+        ok ()
+    | Bls12_381_fr_t _ ->
         ok ()
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
         check l_ty >>? fun () -> check r_ty
@@ -2788,6 +2871,37 @@ let rec parse_data :
         ({id; diff; key_type = ty_of_comparable_ty tk; value_type = tv}, ctxt)
   | (Never_t _, expr) ->
       traced (fail (Invalid_never_expr (location expr)))
+  (* Bls12_381 types *)
+  | (Bls12_381_g1_t _, Bytes (_, bs)) (* As unparsed with [Optimized]. *) -> (
+      Lwt.return (Gas.consume ctxt Typecheck_costs.bls12_381_g1)
+      >>=? fun ctxt ->
+      match Bls12_381.G1.of_bytes_opt bs with
+      | Some pt ->
+          return (pt, ctxt)
+      | None ->
+          error () >>=? fail )
+  | (Bls12_381_g1_t _, expr) ->
+      traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+  | (Bls12_381_g2_t _, Bytes (_, bs)) (* As unparsed with [Optimized]. *) -> (
+      Lwt.return (Gas.consume ctxt Typecheck_costs.bls12_381_g2)
+      >>=? fun ctxt ->
+      match Bls12_381.G2.of_bytes_opt bs with
+      | Some pt ->
+          return (pt, ctxt)
+      | None ->
+          error () >>=? fail )
+  | (Bls12_381_g2_t _, expr) ->
+      traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+  | (Bls12_381_fr_t _, Bytes (_, bs)) (* As unparsed with [Optimized]. *) -> (
+      Lwt.return (Gas.consume ctxt Typecheck_costs.bls12_381_fr)
+      >>=? fun ctxt ->
+      match Bls12_381.Fr.of_bytes_opt bs with
+      | Some pt ->
+          return (pt, ctxt)
+      | None ->
+          error () >>=? fail )
+  | (Bls12_381_fr_t _, expr) ->
+      traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
 
 and parse_comparable_data :
     type a.
@@ -4424,37 +4538,6 @@ and parse_instr :
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Total_voting_power (Item_t (Nat_t None, stack, annot))
-  | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Hash_key (Item_t (Key_hash_t None, rest, annot))
-  | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
-      Item_t
-        (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) )
-    ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Check_signature (Item_t (Bool_t None, rest, annot))
-  | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Blake2b (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Sha256 (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_KECCAK, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Keccak (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_SHA3, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed ctxt loc Sha3 (Item_t (Bytes_t None, rest, annot))
   | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
       fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
@@ -4504,6 +4587,135 @@ and parse_instr :
       Lwt.return @@ parse_var_annot loc annot ~default:default_self_annot
       >>=? fun annot ->
       typed ctxt loc Self_address (Item_t (Address_t None, stack, annot))
+  (* cryptography *)
+  | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Hash_key (Item_t (Key_hash_t None, rest, annot))
+  | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
+      Item_t
+        (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) )
+    ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Check_signature (Item_t (Bool_t None, rest, annot))
+  | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Blake2b (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Sha256 (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_KECCAK, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Keccak (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA3, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Sha3 (Item_t (Bytes_t None, rest, annot))
+  | ( Prim (loc, I_ADD, [], annot),
+      Item_t (Bls12_381_g1_t tn1, Item_t (Bls12_381_g1_t tn2, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      Lwt.return @@ merge_type_annot ~legacy tn1 tn2
+      >>=? fun tname ->
+      typed
+        ctxt
+        loc
+        Add_bls12_381_g1
+        (Item_t (Bls12_381_g1_t tname, rest, annot))
+  | ( Prim (loc, I_ADD, [], annot),
+      Item_t (Bls12_381_g2_t tn1, Item_t (Bls12_381_g2_t tn2, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      Lwt.return @@ merge_type_annot ~legacy tn1 tn2
+      >>=? fun tname ->
+      typed
+        ctxt
+        loc
+        Add_bls12_381_g2
+        (Item_t (Bls12_381_g2_t tname, rest, annot))
+  | ( Prim (loc, I_ADD, [], annot),
+      Item_t (Bls12_381_fr_t tn1, Item_t (Bls12_381_fr_t tn2, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      Lwt.return @@ merge_type_annot ~legacy tn1 tn2
+      >>=? fun tname ->
+      typed
+        ctxt
+        loc
+        Add_bls12_381_fr
+        (Item_t (Bls12_381_fr_t tname, rest, annot))
+  | ( Prim (loc, I_MUL, [], annot),
+      Item_t (Bls12_381_g1_t tname, Item_t (Bls12_381_fr_t _, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Mul_bls12_381_g1
+        (Item_t (Bls12_381_g1_t tname, rest, annot))
+  | ( Prim (loc, I_MUL, [], annot),
+      Item_t (Bls12_381_g2_t tname, Item_t (Bls12_381_fr_t _, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Mul_bls12_381_g2
+        (Item_t (Bls12_381_g2_t tname, rest, annot))
+  | ( Prim (loc, I_MUL, [], annot),
+      Item_t (Bls12_381_fr_t tname, Item_t (Bls12_381_fr_t _, rest, _), _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Mul_bls12_381_fr
+        (Item_t (Bls12_381_fr_t tname, rest, annot))
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g1_t tname, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Neg_bls12_381_g1
+        (Item_t (Bls12_381_g1_t tname, rest, annot))
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g2_t tname, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Neg_bls12_381_g2
+        (Item_t (Bls12_381_g2_t tname, rest, annot))
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_fr_t tname, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Neg_bls12_381_fr
+        (Item_t (Bls12_381_fr_t tname, rest, annot))
+  | ( Prim (loc, I_PAIRING_CHECK, [], annot),
+      Item_t
+        ( List_t
+            (Pair_t ((Bls12_381_g1_t _, _, _), (Bls12_381_g2_t _, _, _), _), _),
+          rest,
+          _ ) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Pairing_check_bls12_381
+        (Item_t (Bool_t None, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -4563,7 +4775,8 @@ and parse_instr :
             | I_VOTING_POWER
             | I_TOTAL_VOTING_POWER
             | I_KECCAK
-            | I_SHA3 ) as name ),
+            | I_SHA3
+            | I_PAIRING_CHECK ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4610,7 +4823,8 @@ and parse_instr :
             | I_OR
             | I_XOR
             | I_LSL
-            | I_LSR ) as name ),
+            | I_LSR
+            | I_PAIRING_CHECK ) as name ),
           [],
           _ ),
       Item_t (ta, Item_t (tb, _, _), _) ) ->
@@ -4703,7 +4917,8 @@ and parse_instr :
             | I_OR
             | I_XOR
             | I_LSL
-            | I_LSR ) as name ),
+            | I_LSR
+            | I_PAIRING_CHECK ) as name ),
           _,
           _ ),
       stack ) ->
@@ -4792,7 +5007,8 @@ and parse_instr :
              I_VOTING_POWER;
              I_TOTAL_VOTING_POWER;
              I_KECCAK;
-             I_SHA3 ]
+             I_SHA3;
+             I_PAIRING_CHECK ]
 
 and parse_contract :
     type arg.
@@ -5430,6 +5646,18 @@ let rec unparse_data :
           (Bytes (-1, bytes), ctxt)
       | Readable ->
           (String (-1, Chain_id.to_b58check chain_id), ctxt) )
+  | (Bls12_381_g1_t _, x) ->
+      let bytes = Bls12_381.G1.to_bytes x in
+      Lwt.return (Gas.consume ctxt Unparse_costs.bls12_381_g1)
+      >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
+  | (Bls12_381_g2_t _, x) ->
+      let bytes = Bls12_381.G2.to_bytes x in
+      Lwt.return (Gas.consume ctxt Unparse_costs.bls12_381_g2)
+      >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
+  | (Bls12_381_fr_t _, x) ->
+      let bytes = Bls12_381.Fr.to_bytes x in
+      Lwt.return (Gas.consume ctxt Unparse_costs.bls12_381_fr)
+      >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.pair)
       >>=? fun ctxt ->
@@ -5816,6 +6044,12 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Chain_id_t _ ->
       False_f
   | Never_t _ ->
+      False_f
+  | Bls12_381_g1_t _ ->
+      False_f
+  | Bls12_381_g2_t _ ->
+      False_f
+  | Bls12_381_fr_t _ ->
       False_f
   | Pair_t ((l, _, _), (r, _, _), _) ->
       aux2 (fun l r -> Pair_f (l, r)) l r

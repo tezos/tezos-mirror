@@ -138,6 +138,7 @@ type prim =
   | I_TOTAL_VOTING_POWER
   | I_KECCAK
   | I_SHA3
+  | I_PAIRING_CHECK
   | T_bool
   | T_contract
   | T_int
@@ -162,6 +163,9 @@ type prim =
   | T_address
   | T_chain_id
   | T_never
+  | T_bls12_381_g1
+  | T_bls12_381_g2
+  | T_bls12_381_fr
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -250,6 +254,7 @@ let namespace = function
   | I_OR
   | I_PACK
   | I_PAIR
+  | I_PAIRING_CHECK
   | I_PUSH
   | I_RENAME
   | I_RIGHT
@@ -299,7 +304,10 @@ let namespace = function
   | T_signature
   | T_string
   | T_timestamp
-  | T_unit ->
+  | T_unit
+  | T_bls12_381_fr
+  | T_bls12_381_g1
+  | T_bls12_381_g2 ->
       Type_namespace
 
 let valid_case name =
@@ -523,6 +531,8 @@ let string_of_prim = function
       "KECCAK"
   | I_SHA3 ->
       "SHA3"
+  | I_PAIRING_CHECK ->
+      "PAIRING_CHECK"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -571,6 +581,12 @@ let string_of_prim = function
       "chain_id"
   | T_never ->
       "never"
+  | T_bls12_381_g1 ->
+      "bls12_381_g1"
+  | T_bls12_381_g2 ->
+      "bls12_381_g2"
+  | T_bls12_381_fr ->
+      "bls12_381_fr"
 
 let prim_of_string = function
   | "parameter" ->
@@ -719,6 +735,8 @@ let prim_of_string = function
       ok I_PAIR
   | "UNPAIR" ->
       ok I_UNPAIR
+  | "PAIRING_CHECK" ->
+      ok I_PAIRING_CHECK
   | "PUSH" ->
       ok I_PUSH
   | "RIGHT" ->
@@ -827,6 +845,12 @@ let prim_of_string = function
       ok T_chain_id
   | "never" ->
       ok T_never
+  | "bls12_381_g1" ->
+      ok T_bls12_381_g1
+  | "bls12_381_g2" ->
+      ok T_bls12_381_g2
+  | "bls12_381_fr" ->
+      ok T_bls12_381_fr
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1008,8 +1032,14 @@ let prim_encoding =
          ("VOTING_POWER", I_VOTING_POWER);
          ("TOTAL_VOTING_POWER", I_TOTAL_VOTING_POWER);
          ("KECCAK", I_KECCAK);
-         ("SHA3", I_SHA3)
-         (* New instructions must be added here, for backward compatibility of the encoding. *)
+         ("SHA3", I_SHA3);
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
+         (* Alpha_007 addition *)
+         ("PAIRING_CHECK", I_PAIRING_CHECK);
+         ("bls12_381_g1", T_bls12_381_g1);
+         ("bls12_381_g2", T_bls12_381_g2);
+         ("bls12_381_fr", T_bls12_381_fr)
+         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
         ]
 
 let () =

@@ -193,6 +193,32 @@ module Cost_of : sig
 
     val hash_sha3 : bytes -> Gas.cost
 
+    val add_bls12_381_g1 : Gas.cost
+
+    val add_bls12_381_g2 : Gas.cost
+
+    val add_bls12_381_fr : Gas.cost
+
+    val mul_bls12_381_g1 : Gas.cost
+
+    val mul_bls12_381_g2 : Gas.cost
+
+    val mul_bls12_381_fr : Gas.cost
+
+    val neg_bls12_381_g1 : Gas.cost
+
+    val neg_bls12_381_g2 : Gas.cost
+
+    val neg_bls12_381_fr : Gas.cost
+
+    val pairing_bls12_381 : Gas.cost
+
+    val mul_bls12_381_fq12 : Gas.cost
+
+    val check_one_bls12_381_fq12 : Gas.cost
+
+    val pairing_check_bls12_381 : int -> Gas.cost
+
     val wrap : Gas.cost
 
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
@@ -224,6 +250,12 @@ module Cost_of : sig
     val key_hash : Gas.cost
 
     val signature : Gas.cost
+
+    val bls12_381_g1 : Gas.cost
+
+    val bls12_381_g2 : Gas.cost
+
+    val bls12_381_fr : Gas.cost
 
     val chain_id : Gas.cost
 
@@ -298,6 +330,12 @@ module Cost_of : sig
     val operation : bytes -> Gas.cost
 
     val chain_id : Gas.cost
+
+    val bls12_381_g1 : Gas.cost
+
+    val bls12_381_g2 : Gas.cost
+
+    val bls12_381_fr : Gas.cost
 
     val contract : Gas.cost
 
