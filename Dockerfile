@@ -77,5 +77,6 @@ LABEL maintainer="contact@nomadic-labs.com" \
       org.label-schema.build-image="${BUILD_IMAGE}:${BUILD_IMAGE_VERSION}"
 
 COPY --chown=tezos:nogroup --from=stripper /home/tezos/bin/ /usr/local/bin/
+COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/entrypoint.* /usr/local/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/scripts/ /usr/local/share/tezos
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
