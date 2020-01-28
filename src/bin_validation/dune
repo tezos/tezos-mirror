@@ -22,6 +22,7 @@
 (executable
  (name main_validator)
  (public_name tezos-validator)
+ (package tezos-validator)
  (libraries tezos_validator)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage

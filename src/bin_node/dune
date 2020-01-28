@@ -1,6 +1,7 @@
 (executable
  (name main)
  (public_name tezos-node)
+ (package tezos-node)
  (libraries tezos-base
             tezos-version
             tezos-stdlib-unix
@@ -47,6 +48,7 @@
                    -linkall)))
 
 (install
+ (package tezos-node)
  (section bin)
  (files (tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))
 

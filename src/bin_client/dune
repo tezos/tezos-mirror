@@ -1,6 +1,7 @@
 (executables
  (names main_client main_admin)
  (public_names tezos-client tezos-admin-client)
+ (package tezos-client)
  (libraries tezos-base
             tezos-base.unix
             tezos-rpc-http-client
@@ -46,6 +47,7 @@
                     -linkall)))
 
 (install
+ (package tezos-client)
  (section bin)
  (files (tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))
 

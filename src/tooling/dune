@@ -3,5 +3,6 @@
  (public_name tezos-tooling))
 
 (install
+ (package tezos-tooling)
  (section libexec)
  (files (lint.sh as lint.sh)))

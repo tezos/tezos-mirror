@@ -1,6 +1,7 @@
 (executables
  (names codec)
  (public_names tezos-codec)
+ (package tezos-codec)
  (libraries data-encoding
             tezos-base
             tezos-stdlib-unix
