@@ -18,6 +18,6 @@ trace
       1  	 ]
   - location: 12 (remaining gas: 1039797 units remaining)
     [ (Pair {} 1)  	 ]
-  - location: -1 (remaining gas: 1039797 units remaining)
+  - location: -1 (remaining gas: 1039796 units remaining)
     [ (Pair {} 1)  	 ]
 
