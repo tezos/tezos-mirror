@@ -66,7 +66,7 @@ def check_protocol(client: Client, proto: str,
     return res['next_protocol'] == proto
 
 
-@retry(timeout=1., attempts=10)
+@retry(timeout=2., attempts=10)
 def check_level(client: Client, level) -> bool:
     return client.get_level() == level
 

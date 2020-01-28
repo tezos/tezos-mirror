@@ -104,9 +104,20 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
     ~f:(fun pm n ->
       pm
       >>= fun () ->
-      bake
-        (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1))
-        baker_0)
+      Helpers.wait_for
+        state
+        ~attempts:default_attempts
+        ~seconds:8.
+        (fun _attempt ->
+          Asynchronous_result.bind_on_result
+            (bake
+               (sprintf "first bakes: [%d/%d]" (n + 1) (starting_level - 1))
+               baker_0)
+            ~f:(function
+              | Ok () ->
+                  return (`Done ())
+              | Error _ ->
+                  return (`Not_done "not baked yet"))))
   >>= fun () ->
   Test_scenario.Queries.wait_for_all_levels_to_be
     state

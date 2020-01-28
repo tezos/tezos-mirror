@@ -20,7 +20,7 @@ def scenario():
         # Wait for second node to update its protocol to alpha, if not
         # it may not know yet the `wait_for_inclusion` operation which is
         # protocol specific
-        time.sleep(5)
+        time.sleep(15)
         # first client tells node 0 to transfer money for an account to another
         # receipt is an object representing the client answer
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
