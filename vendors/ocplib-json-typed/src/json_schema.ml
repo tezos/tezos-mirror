@@ -96,15 +96,17 @@ let element kind =
 let option_map f = function None -> None | Some v -> Some (f v)
 
 let rec eq_element a b =
-  a.title = b.title &&
-  a.description = b.description &&
-  option_map Json_repr.from_any a.default =
-  option_map Json_repr.from_any b.default &&
-  option_map (List.map Json_repr.from_any) a.enum =
-  option_map (List.map Json_repr.from_any) b.enum &&
-  eq_kind a.kind b.kind &&
-  a.format = b.format &&
-  a.id = b.id
+  a == b || (
+    a.title = b.title &&
+    a.description = b.description &&
+    option_map Json_repr.from_any a.default =
+    option_map Json_repr.from_any b.default &&
+    option_map (List.map Json_repr.from_any) a.enum =
+    option_map (List.map Json_repr.from_any) b.enum &&
+    eq_kind a.kind b.kind &&
+    a.format = b.format &&
+    a.id = b.id
+  )
 
 and eq_kind a b = match a, b with
   | Object aa, Object ab -> eq_object_specs aa ab
