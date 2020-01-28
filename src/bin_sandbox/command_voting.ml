@@ -683,6 +683,9 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
               client_exec.binary)
           (String.concat ~sep:", " client_protocols_result#out) ]
   >>= fun () ->
+  Loop.n_times protocol.blocks_per_voting_period (fun _ ->
+      Tezos_client.Keyed.bake state baker_0 "Baking to Adoption period")
+  >>= fun () ->
   Helpers.wait_for
     state
     ~seconds:0.5
