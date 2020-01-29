@@ -48,7 +48,7 @@ type error += Michelson_too_many_recursive_calls
 type execution_result = {
   ctxt : context;
   storage : Script.expr;
-  big_map_diff : Contract.big_map_diff option;
+  big_map_diff : Contract.Legacy_big_map_diff.t option;
   operations : packed_internal_operation list;
 }
 
