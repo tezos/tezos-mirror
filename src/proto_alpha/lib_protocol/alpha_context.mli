@@ -768,30 +768,32 @@ module Contract : sig
   val originated_from_current_nonce :
     since:context -> until:context -> contract list tzresult Lwt.t
 
-  type big_map_diff_item =
-    | Update of {
-        big_map : Big_map.id;
-        diff_key : Script.expr;
-        diff_key_hash : Script_expr_hash.t;
-        diff_value : Script.expr option;
-      }
-    | Clear of Big_map.id
-    | Copy of {src : Big_map.id; dst : Big_map.id}
-    | Alloc of {
-        big_map : Big_map.id;
-        key_type : Script.expr;
-        value_type : Script.expr;
-      }
+  module Legacy_big_map_diff : sig
+    type item =
+      | Update of {
+          big_map : Big_map.id;
+          diff_key : Script.expr;
+          diff_key_hash : Script_expr_hash.t;
+          diff_value : Script.expr option;
+        }
+      | Clear of Big_map.id
+      | Copy of {src : Big_map.id; dst : Big_map.id}
+      | Alloc of {
+          big_map : Big_map.id;
+          key_type : Script.expr;
+          value_type : Script.expr;
+        }
 
-  type big_map_diff = big_map_diff_item list
+    type t = item list
 
-  val big_map_diff_encoding : big_map_diff Data_encoding.t
+    val encoding : t Data_encoding.t
+  end
 
   val originate :
     context ->
     contract ->
     balance:Tez.t ->
-    script:Script.t * big_map_diff option ->
+    script:Script.t * Legacy_big_map_diff.t option ->
     delegate:public_key_hash option ->
     context tzresult Lwt.t
 
@@ -805,7 +807,7 @@ module Contract : sig
     context ->
     contract ->
     Script.expr ->
-    big_map_diff option ->
+    Legacy_big_map_diff.t option ->
     context tzresult Lwt.t
 
   val used_storage_space : context -> t -> Z.t tzresult Lwt.t
@@ -1373,7 +1375,8 @@ val prepare_first_block :
   Context.t ->
   typecheck:(context ->
             Script.t ->
-            ((Script.t * Contract.big_map_diff option) * context) tzresult
+            ((Script.t * Contract.Legacy_big_map_diff.t option) * context)
+            tzresult
             Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->

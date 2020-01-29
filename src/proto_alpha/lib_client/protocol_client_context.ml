@@ -162,7 +162,9 @@ let () =
   register ~pp:Protocol.Alpha_context.Contract.pp
   @@ def (stamp_proto "contract" []) Protocol.Alpha_context.Contract.encoding ;
   register
-  @@ def Protocol.name Protocol.Alpha_context.Contract.big_map_diff_encoding ;
+  @@ def
+       Protocol.name
+       Protocol.Alpha_context.Contract.Legacy_big_map_diff.encoding ;
   register
   @@ def
        (stamp_proto "delegate" ["frozen_balance"])

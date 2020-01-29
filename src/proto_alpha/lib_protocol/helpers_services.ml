@@ -87,7 +87,7 @@ module Scripts = struct
           (obj3
              (req "storage" Script.expr_encoding)
              (req "operations" (list Operation.internal_operation_encoding))
-             (opt "big_map_diff" Contract.big_map_diff_encoding))
+             (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding))
         RPC_path.(path / "run_code")
 
     let trace_code =
@@ -101,7 +101,7 @@ module Scripts = struct
              (req "storage" Script.expr_encoding)
              (req "operations" (list Operation.internal_operation_encoding))
              (req "trace" trace_encoding)
-             (opt "big_map_diff" Contract.big_map_diff_encoding))
+             (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding))
         RPC_path.(path / "trace_code")
 
     let typecheck_code =

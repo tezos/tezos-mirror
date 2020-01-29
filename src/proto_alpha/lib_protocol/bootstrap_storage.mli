@@ -27,7 +27,7 @@ val init :
   Raw_context.t ->
   typecheck:(Raw_context.t ->
             Script_repr.t ->
-            ( (Script_repr.t * Contract_storage.big_map_diff option)
+            ( (Script_repr.t * Contract_storage.Legacy_big_map_diff.t option)
             * Raw_context.t )
             tzresult
             Lwt.t) ->

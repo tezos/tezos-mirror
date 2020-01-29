@@ -52,7 +52,7 @@ type _ successful_manager_operation_result =
   | Transaction_result : {
       code : Script.expr option;
       storage : Script.expr option;
-      big_map_diff : Contract.big_map_diff option;
+      big_map_diff : Contract.Legacy_big_map_diff.t option;
       balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Z.t;
@@ -62,7 +62,7 @@ type _ successful_manager_operation_result =
     }
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
-      big_map_diff : Contract.big_map_diff option;
+      big_map_diff : Contract.Legacy_big_map_diff.t option;
       balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Z.t;
@@ -192,7 +192,7 @@ module Manager_result = struct
         (obj9
            (opt "code" Script.expr_encoding)
            (opt "storage" Script.expr_encoding)
-           (opt "big_map_diff" Contract.big_map_diff_encoding)
+           (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
@@ -259,7 +259,7 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
         (obj6
-           (opt "big_map_diff" Contract.big_map_diff_encoding)
+           (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)

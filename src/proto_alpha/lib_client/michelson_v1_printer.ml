@@ -89,9 +89,9 @@ let print_big_map_diff ppf diff =
     "@[<v 0>%a@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf ->
        function
-       | Contract.Clear id ->
+       | Contract.Legacy_big_map_diff.Clear id ->
            Format.fprintf ppf "Clear %a" pp_map id
-       | Contract.Alloc {big_map; key_type; value_type} ->
+       | Contract.Legacy_big_map_diff.Alloc {big_map; key_type; value_type} ->
            Format.fprintf
              ppf
              "New %a of type (big_map %a %a)"
@@ -101,9 +101,10 @@ let print_big_map_diff ppf diff =
              key_type
              print_expr
              value_type
-       | Contract.Copy {src; dst} ->
+       | Contract.Legacy_big_map_diff.Copy {src; dst} ->
            Format.fprintf ppf "Copy %a to %a" pp_map src pp_map dst
-       | Contract.Update {big_map; diff_key; diff_value; _} ->
+       | Contract.Legacy_big_map_diff.Update {big_map; diff_key; diff_value; _}
+         ->
            Format.fprintf
              ppf
              "%s %a[%a]%a"

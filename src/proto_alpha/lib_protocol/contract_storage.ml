@@ -277,74 +277,76 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-type big_map_diff_item =
-  | Update of {
-      big_map : Z.t;
-      diff_key : Script_repr.expr;
-      diff_key_hash : Script_expr_hash.t;
-      diff_value : Script_repr.expr option;
-    }
-  | Clear of Z.t
-  | Copy of {src : Z.t; dst : Z.t}
-  | Alloc of {
-      big_map : Z.t;
-      key_type : Script_repr.expr;
-      value_type : Script_repr.expr;
-    }
+module Legacy_big_map_diff = struct
+  type item =
+    | Update of {
+        big_map : Z.t;
+        diff_key : Script_repr.expr;
+        diff_key_hash : Script_expr_hash.t;
+        diff_value : Script_repr.expr option;
+      }
+    | Clear of Z.t
+    | Copy of {src : Z.t; dst : Z.t}
+    | Alloc of {
+        big_map : Z.t;
+        key_type : Script_repr.expr;
+        value_type : Script_repr.expr;
+      }
 
-type big_map_diff = big_map_diff_item list
+  type t = item list
 
-let big_map_diff_item_encoding =
-  let open Data_encoding in
-  union
-    [ case
-        (Tag 0)
-        ~title:"update"
-        (obj5
-           (req "action" (constant "update"))
-           (req "big_map" z)
-           (req "key_hash" Script_expr_hash.encoding)
-           (req "key" Script_repr.expr_encoding)
-           (opt "value" Script_repr.expr_encoding))
-        (function
-          | Update {big_map; diff_key_hash; diff_key; diff_value} ->
-              Some ((), big_map, diff_key_hash, diff_key, diff_value)
-          | _ ->
-              None)
-        (fun ((), big_map, diff_key_hash, diff_key, diff_value) ->
-          Update {big_map; diff_key_hash; diff_key; diff_value});
-      case
-        (Tag 1)
-        ~title:"remove"
-        (obj2 (req "action" (constant "remove")) (req "big_map" z))
-        (function Clear big_map -> Some ((), big_map) | _ -> None)
-        (fun ((), big_map) -> Clear big_map);
-      case
-        (Tag 2)
-        ~title:"copy"
-        (obj3
-           (req "action" (constant "copy"))
-           (req "source_big_map" z)
-           (req "destination_big_map" z))
-        (function Copy {src; dst} -> Some ((), src, dst) | _ -> None)
-        (fun ((), src, dst) -> Copy {src; dst});
-      case
-        (Tag 3)
-        ~title:"alloc"
-        (obj4
-           (req "action" (constant "alloc"))
-           (req "big_map" z)
-           (req "key_type" Script_repr.expr_encoding)
-           (req "value_type" Script_repr.expr_encoding))
-        (function
-          | Alloc {big_map; key_type; value_type} ->
-              Some ((), big_map, key_type, value_type)
-          | _ ->
-              None)
-        (fun ((), big_map, key_type, value_type) ->
-          Alloc {big_map; key_type; value_type}) ]
+  let item_encoding =
+    let open Data_encoding in
+    union
+      [ case
+          (Tag 0)
+          ~title:"update"
+          (obj5
+             (req "action" (constant "update"))
+             (req "big_map" z)
+             (req "key_hash" Script_expr_hash.encoding)
+             (req "key" Script_repr.expr_encoding)
+             (opt "value" Script_repr.expr_encoding))
+          (function
+            | Update {big_map; diff_key_hash; diff_key; diff_value} ->
+                Some ((), big_map, diff_key_hash, diff_key, diff_value)
+            | _ ->
+                None)
+          (fun ((), big_map, diff_key_hash, diff_key, diff_value) ->
+            Update {big_map; diff_key_hash; diff_key; diff_value});
+        case
+          (Tag 1)
+          ~title:"remove"
+          (obj2 (req "action" (constant "remove")) (req "big_map" z))
+          (function Clear big_map -> Some ((), big_map) | _ -> None)
+          (fun ((), big_map) -> Clear big_map);
+        case
+          (Tag 2)
+          ~title:"copy"
+          (obj3
+             (req "action" (constant "copy"))
+             (req "source_big_map" z)
+             (req "destination_big_map" z))
+          (function Copy {src; dst} -> Some ((), src, dst) | _ -> None)
+          (fun ((), src, dst) -> Copy {src; dst});
+        case
+          (Tag 3)
+          ~title:"alloc"
+          (obj4
+             (req "action" (constant "alloc"))
+             (req "big_map" z)
+             (req "key_type" Script_repr.expr_encoding)
+             (req "value_type" Script_repr.expr_encoding))
+          (function
+            | Alloc {big_map; key_type; value_type} ->
+                Some ((), big_map, key_type, value_type)
+            | _ ->
+                None)
+          (fun ((), big_map, key_type, value_type) ->
+            Alloc {big_map; key_type; value_type}) ]
 
-let big_map_diff_encoding = Data_encoding.list big_map_diff_item_encoding
+  let encoding = Data_encoding.list item_encoding
+end
 
 let big_map_key_cost = 65
 
@@ -354,6 +356,7 @@ let update_script_big_map c = function
   | None ->
       return (c, Z.zero)
   | Some diff ->
+      let open Legacy_big_map_diff in
       fold_left_s
         (fun (c, total) -> function Clear id ->
               Storage.Big_map.Total_bytes.get c id

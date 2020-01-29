@@ -1256,7 +1256,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     * Script.expr
     * packed_internal_operation list
     * context
-    * Contract.big_map_diff option )
+    * Contract.Legacy_big_map_diff.t option )
     tzresult
     Lwt.t =
   parse_script ctxt unparsed_script ~legacy:true
@@ -1308,7 +1308,7 @@ type execution_result = {
   ctxt : context;
   code : Script.expr;
   storage : Script.expr;
-  big_map_diff : Contract.big_map_diff option;
+  big_map_diff : Contract.Legacy_big_map_diff.t option;
   operations : packed_internal_operation list;
 }
 

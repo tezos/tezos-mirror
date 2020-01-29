@@ -123,30 +123,32 @@ val init_set_storage_cached :
 
 val clear_storage_cached : Raw_context.t -> Raw_context.t
 
-type big_map_diff_item =
-  | Update of {
-      big_map : Z.t;
-      diff_key : Script_repr.expr;
-      diff_key_hash : Script_expr_hash.t;
-      diff_value : Script_repr.expr option;
-    }
-  | Clear of Z.t
-  | Copy of {src : Z.t; dst : Z.t}
-  | Alloc of {
-      big_map : Z.t;
-      key_type : Script_repr.expr;
-      value_type : Script_repr.expr;
-    }
+module Legacy_big_map_diff : sig
+  type item =
+    | Update of {
+        big_map : Z.t;
+        diff_key : Script_repr.expr;
+        diff_key_hash : Script_expr_hash.t;
+        diff_value : Script_repr.expr option;
+      }
+    | Clear of Z.t
+    | Copy of {src : Z.t; dst : Z.t}
+    | Alloc of {
+        big_map : Z.t;
+        key_type : Script_repr.expr;
+        value_type : Script_repr.expr;
+      }
 
-type big_map_diff = big_map_diff_item list
+  type t = item list
 
-val big_map_diff_encoding : big_map_diff Data_encoding.t
+  val encoding : t Data_encoding.t
+end
 
 val update_script_storage :
   Raw_context.t ->
   Contract_repr.t ->
   Script_repr.expr ->
-  big_map_diff option ->
+  Legacy_big_map_diff.t option ->
   Raw_context.t tzresult Lwt.t
 
 val credit :
@@ -166,7 +168,7 @@ val originate :
   ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
   balance:Tez_repr.t ->
-  script:Script_repr.t * big_map_diff option ->
+  script:Script_repr.t * Legacy_big_map_diff.t option ->
   delegate:Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 

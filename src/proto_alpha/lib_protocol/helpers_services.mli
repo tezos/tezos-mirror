@@ -52,7 +52,7 @@ module Scripts : sig
     payer:Contract.t option ->
     ( Script.expr
     * packed_internal_operation list
-    * Contract.big_map_diff option )
+    * Contract.Legacy_big_map_diff.t option )
     shell_tzresult
     Lwt.t
 
@@ -72,7 +72,7 @@ module Scripts : sig
     ( Script.expr
     * packed_internal_operation list
     * Script_interpreter.execution_trace
-    * Contract.big_map_diff option )
+    * Contract.Legacy_big_map_diff.t option )
     shell_tzresult
     Lwt.t
 

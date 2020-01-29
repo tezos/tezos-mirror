@@ -5636,7 +5636,10 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       if Ids.mem id ids then
         Big_map.fresh ~temporary ctxt
         >>=? fun (ctxt, duplicate) ->
-        return (ctxt, [Contract.Copy {src = id; dst = duplicate}], duplicate)
+        return
+          ( ctxt,
+            [Contract.Legacy_big_map_diff.Copy {src = id; dst = duplicate}],
+            duplicate )
       else
         (* The first occurrence encountered of a big_map reuses the
              ID. This way, the payer is only charged for the diff.
@@ -5656,7 +5659,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       >>=? fun (kv, ctxt) ->
       return
         ( ctxt,
-          [ Contract.Alloc
+          [ Contract.Legacy_big_map_diff.Alloc
               {
                 big_map = id;
                 key_type = Micheline.strip_locations kt;
@@ -5682,7 +5685,8 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
           return (Some (Micheline.strip_locations node), ctxt) )
       >>=? fun (diff_value, ctxt) ->
       let diff_item =
-        Contract.Update {big_map; diff_key; diff_key_hash; diff_value}
+        Contract.Legacy_big_map_diff.Update
+          {big_map; diff_key; diff_key_hash; diff_value}
       in
       return (diff_item :: acc, ctxt))
     diff
@@ -5786,11 +5790,12 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
       unparsing_mode ->
       temporary:bool ->
       Ids.t ->
-      Contract.big_map_diff list ->
+      Contract.Legacy_big_map_diff.t list ->
       a ty ->
       a ->
       has_big_map:a has_big_map ->
-      (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t =
+      (context * a * Ids.t * Contract.Legacy_big_map_diff.t list) tzresult
+      Lwt.t =
    fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
     Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
     >>=? fun ctxt ->
@@ -5930,7 +5935,11 @@ let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
     if temporary then diffs
     else
       let dead = Ids.diff to_update alive in
-      Ids.fold (fun id acc -> Contract.Clear id :: acc) dead [] :: diffs
+      Ids.fold
+        (fun id acc -> Contract.Legacy_big_map_diff.Clear id :: acc)
+        dead
+        []
+      :: diffs
   in
   match diffs with
   | [] ->
