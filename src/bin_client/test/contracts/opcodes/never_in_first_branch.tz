@@ -1,0 +1,3 @@
+parameter (or never string);
+storage string;
+code { CAR; IF_LEFT { NEVER } { NIL operation; PAIR } }
