@@ -280,7 +280,7 @@ type big_map_diff_item =
       diff_value : Script_repr.expr option;
     }
   | Clear of Z.t
-  | Copy of Z.t * Z.t
+  | Copy of {src : Z.t; dst : Z.t}
   | Alloc of {
       big_map : Z.t;
       key_type : Script_repr.expr;
@@ -321,8 +321,8 @@ let big_map_diff_item_encoding =
            (req "action" (constant "copy"))
            (req "source_big_map" z)
            (req "destination_big_map" z))
-        (function Copy (src, dst) -> Some ((), src, dst) | _ -> None)
-        (fun ((), src, dst) -> Copy (src, dst));
+        (function Copy {src; dst} -> Some ((), src, dst) | _ -> None)
+        (fun ((), src, dst) -> Copy {src; dst});
       case
         (Tag 3)
         ~title:"alloc"
@@ -359,7 +359,7 @@ let update_script_big_map c = function
               >>= fun c ->
               if Compare.Z.(id < Z.zero) then return (c, total)
               else return (c, Z.sub (Z.sub total size) (Z.of_int big_map_cost))
-          | Copy (from, to_) ->
+          | Copy {src = from; dst = to_} ->
               Storage.Big_map.copy c ~from ~to_
               >>=? fun c ->
               if Compare.Z.(to_ < Z.zero) then return (c, total)
