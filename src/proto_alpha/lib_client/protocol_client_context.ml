@@ -153,7 +153,7 @@ let () =
   @@ def
        "contract"
        ["big_map_diff"]
-       Protocol.Alpha_context.Contract.big_map_diff_encoding ;
+       Protocol.Alpha_context.Contract.Legacy_big_map_diff.encoding ;
   register
   @@ def
        "delegate"

@@ -45,7 +45,9 @@ val run :
   ?gas:Gas.Arith.integral ->
   ?entrypoint:string ->
   unit ->
-  (Script.expr * packed_internal_operation list * Contract.big_map_diff option)
+  ( Script.expr
+  * packed_internal_operation list
+  * Contract.Legacy_big_map_diff.t option )
   tzresult
   Lwt.t
 
@@ -65,7 +67,7 @@ val trace :
   ( Script.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Contract.big_map_diff option )
+  * Contract.Legacy_big_map_diff.t option )
   tzresult
   Lwt.t
 
@@ -75,7 +77,7 @@ val print_run_result :
   parsed:Michelson_v1_parser.parsed ->
   ( Script_repr.expr
   * packed_internal_operation list
-  * Contract.big_map_diff option )
+  * Contract.Legacy_big_map_diff.t option )
   tzresult ->
   unit tzresult Lwt.t
 
@@ -86,7 +88,7 @@ val print_trace_result :
   ( Script_repr.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Contract.big_map_diff option )
+  * Contract.Legacy_big_map_diff.t option )
   tzresult ->
   unit tzresult Lwt.t
 

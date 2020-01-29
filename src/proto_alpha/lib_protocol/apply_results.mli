@@ -100,7 +100,7 @@ and _ successful_manager_operation_result =
       -> Kind.reveal successful_manager_operation_result
   | Transaction_result : {
       storage : Script.expr option;
-      big_map_diff : Contract.big_map_diff option;
+      big_map_diff : Contract.Legacy_big_map_diff.t option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Gas.Arith.fp;
@@ -110,7 +110,7 @@ and _ successful_manager_operation_result =
     }
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
-      big_map_diff : Contract.big_map_diff option;
+      big_map_diff : Contract.Legacy_big_map_diff.t option;
       balance_updates : Delegate.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Gas.Arith.fp;
