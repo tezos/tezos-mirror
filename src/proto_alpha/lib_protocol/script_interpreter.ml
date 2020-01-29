@@ -555,6 +555,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.create_contract
   | (Steps_to_quota, _) ->
       Interp_costs.push
+  | (Never, (_, _)) ->
+      .
 
 let rec step_bounded :
     type b a.
@@ -1356,6 +1358,8 @@ let rec step_bounded :
       >>=? fun (_, rest) -> logged_return (rest, ctxt)
   | (ChainId, rest) ->
       logged_return ((step_constants.chain_id, rest), ctxt)
+  | (Never, (_, _)) ->
+      .
 
 let step :
     type b a.
