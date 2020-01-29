@@ -153,6 +153,7 @@ type prim =
   | T_operation
   | T_address
   | T_chain_id
+  | T_never
 
 (** Auxiliary types for error documentation.
     All the prim constructor prefixes must match their namespace. *)

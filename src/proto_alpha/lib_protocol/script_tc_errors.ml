@@ -48,6 +48,8 @@ type error += Invalid_primitive of Script.location * prim list * prim
 
 type error += Invalid_kind of Script.location * kind list * kind
 
+type error += Invalid_never_expr of Script.location
+
 type error += Missing_field of prim
 
 type error += Duplicate_field of Script.location * prim

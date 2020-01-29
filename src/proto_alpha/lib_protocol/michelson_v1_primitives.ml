@@ -154,6 +154,7 @@ type prim =
   | T_operation
   | T_address
   | T_chain_id
+  | T_never
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -276,6 +277,7 @@ let namespace = function
   | T_map
   | T_mutez
   | T_nat
+  | T_never
   | T_operation
   | T_option
   | T_or
@@ -542,6 +544,8 @@ let string_of_prim = function
       "address"
   | T_chain_id ->
       "chain_id"
+  | T_never ->
+      "never"
 
 let prim_of_string = function
   | "parameter" ->
@@ -784,6 +788,8 @@ let prim_of_string = function
       ok T_address
   | "chain_id" ->
       ok T_chain_id
+  | "never" ->
+      ok T_never
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -966,7 +972,8 @@ let prim_encoding =
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_007 addition *)
          ("LEVEL", I_LEVEL);
-         ("SELF_ADDRESS", I_SELF_ADDRESS)
+         ("SELF_ADDRESS", I_SELF_ADDRESS);
+         ("never", T_never)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

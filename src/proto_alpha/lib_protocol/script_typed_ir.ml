@@ -42,6 +42,8 @@ type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
+type never = |
+
 type _ comparable_ty =
   | Unit_key : type_annot option -> unit comparable_ty
   | Int_key : type_annot option -> z num comparable_ty
@@ -153,6 +155,7 @@ and 'ty ty =
   | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
   | Operation_t : type_annot option -> operation ty
   | Chain_id_t : type_annot option -> Chain_id.t ty
+  | Never_t : type_annot option -> never ty
 
 and 'ty stack_ty =
   | Item_t :

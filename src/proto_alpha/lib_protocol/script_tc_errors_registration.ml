@@ -150,6 +150,17 @@ let () =
       | _ ->
           None)
     (fun (loc, (name, exp, got)) -> Invalid_namespace (loc, name, exp, got)) ;
+  (* Invalid literal for type never *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.invalid_never_expr"
+    ~title:"Invalid expression for type never"
+    ~description:
+      "In a script or data expression, an expression was provided but a value \
+       of type never was expected. No expression can have type never."
+    (located unit)
+    (function Invalid_never_expr loc -> Some (loc, ()) | _ -> None)
+    (fun (loc, ()) -> Invalid_never_expr loc) ;
   (* Duplicate field *)
   register_error_kind
     `Permanent

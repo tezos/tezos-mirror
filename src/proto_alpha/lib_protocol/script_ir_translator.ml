@@ -147,6 +147,8 @@ let rec type_size : type t. t ty -> int =
       1 + type_size arg
   | Chain_id_t _ ->
       1
+  | Never_t _ ->
+      1
 
 let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
  fun stack ~up_to ->
@@ -883,6 +885,8 @@ let rec unparse_ty_no_lwt :
       return ctxt (T_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
       return ctxt (T_chain_id, [], unparse_type_annot tname)
+  | Never_t tname ->
+      return ctxt (T_never, [], unparse_type_annot tname)
   | Contract_t (ut, tname) ->
       unparse_ty_no_lwt ctxt ut
       >>? fun (t, ctxt) ->
@@ -995,6 +999,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Operation_t tname ->
       tname
   | Chain_id_t tname ->
+      tname
+  | Never_t tname ->
       tname
   | Contract_t (_, tname) ->
       tname
@@ -1220,6 +1226,10 @@ let merge_types :
         consume ctxt 0
         >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Chain_id_t tname, ctxt)
+    | (Never_t tn1, Never_t tn2) ->
+        consume ctxt 0
+        >>? fun ctxt ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Never_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
         consume ctxt 0
         >>? fun ctxt ->
@@ -1416,6 +1426,8 @@ let has_big_map : type t. t ty -> bool = function
   | Operation_t _ ->
       false
   | Chain_id_t _ ->
+      false
+  | Never_t _ ->
       false
   | Pair_t (_, _, _, has_big_map) ->
       has_big_map
@@ -1704,6 +1716,11 @@ and parse_ty :
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 0)
       >|? fun ctxt -> (Ex_ty (Chain_id_t ty_name), ctxt)
+  | Prim (loc, T_never, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name ->
+      Gas.consume ctxt (Typecheck_costs.type_ 0)
+      >|? fun ctxt -> (Ex_ty (Never_t ty_name), ctxt)
   | Prim (loc, T_contract, [utl], annot) ->
       if allow_contract then
         parse_parameter_ty ctxt ~legacy utl
@@ -1819,7 +1836,8 @@ and parse_ty :
           | T_key_hash
           | T_timestamp
           | T_address
-          | T_chain_id ) as prim ),
+          | T_chain_id
+          | T_never ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1853,7 +1871,8 @@ and parse_ty :
              T_key;
              T_key_hash;
              T_timestamp;
-             T_chain_id ]
+             T_chain_id;
+             T_never ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.cycle
@@ -1965,6 +1984,8 @@ let check_packable ~legacy loc root =
     | Bool_t _ ->
         ok ()
     | Chain_id_t _ ->
+        ok ()
+    | Never_t _ ->
         ok ()
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _, _) ->
         check l_ty >>? fun () -> check r_ty
@@ -2661,6 +2682,8 @@ let rec parse_data :
   | (Big_map_t (_tk, _tv, _), expr) ->
       traced
         (fail (Invalid_kind (location expr, [Seq_kind; Int_kind], kind expr)))
+  | (Never_t _, expr) ->
+      traced (fail (Invalid_never_expr (location expr)))
 
 and parse_comparable_data :
     type a.
@@ -5551,6 +5574,8 @@ let rec unparse_data :
         assert false
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt mode original_code
+  | (Never_t _, _) ->
+      .
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 and unparse_code ctxt mode =
@@ -5889,6 +5914,8 @@ let rec extract_big_map_updates :
       return (ctxt, v, ids, acc)
   | (Operation_t _, _) ->
       assert false
+  | (Never_t _, _) ->
+      .
 
 (* called only on parameters and storage, which cannot contain operations *)
 
@@ -5966,6 +5993,8 @@ let collect_big_maps ctxt ty x =
         ok (acc, ctxt)
     | (Operation_t _, _) ->
         assert false
+    | (Never_t _, _) ->
+        .
    (* called only on parameters and storage, which cannot contain operations *)
   in
   Lwt.return (collect ctxt ty x no_big_map_id)

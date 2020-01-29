@@ -369,6 +369,7 @@ module Script : sig
     | T_operation
     | T_address
     | T_chain_id
+    | T_never
 
   type location = Micheline.canonical_location
 
