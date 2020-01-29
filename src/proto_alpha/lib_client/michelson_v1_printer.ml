@@ -101,7 +101,7 @@ let print_big_map_diff ppf diff =
              key_type
              print_expr
              value_type
-       | Contract.Copy (src, dst) ->
+       | Contract.Copy {src; dst} ->
            Format.fprintf ppf "Copy %a to %a" pp_map src pp_map dst
        | Contract.Update {big_map; diff_key; diff_value; _} ->
            Format.fprintf

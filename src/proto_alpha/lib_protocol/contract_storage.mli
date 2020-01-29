@@ -112,7 +112,7 @@ type big_map_diff_item =
       diff_value : Script_repr.expr option;
     }
   | Clear of Z.t
-  | Copy of Z.t * Z.t
+  | Copy of {src : Z.t; dst : Z.t}
   | Alloc of {
       big_map : Z.t;
       key_type : Script_repr.expr;

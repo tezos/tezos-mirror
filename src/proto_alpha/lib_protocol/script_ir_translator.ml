@@ -5406,7 +5406,7 @@ let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
       if Ids.mem id ids then
         fresh ctxt
         >>=? fun (ctxt, duplicate) ->
-        return (ctxt, [Contract.Copy (id, duplicate)], duplicate)
+        return (ctxt, [Contract.Copy {src = id; dst = duplicate}], duplicate)
       else
         (* The first occurence encountered of a big_map reuses the
              ID. This way, the payer is only charged for the diff.

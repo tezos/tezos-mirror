@@ -770,7 +770,7 @@ module Contract : sig
         diff_value : Script.expr option;
       }
     | Clear of Big_map.id
-    | Copy of Big_map.id * Big_map.id
+    | Copy of {src : Big_map.id; dst : Big_map.id}
     | Alloc of {
         big_map : Big_map.id;
         key_type : Script.expr;
