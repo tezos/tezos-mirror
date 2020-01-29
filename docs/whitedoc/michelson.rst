@@ -456,6 +456,9 @@ Core data types and notations
    placeholder when some result or parameter is not necessary. For
    instance, when the only goal of a contract is to update its storage.
 
+-  ``never``: The empty type, it is impossible to construct a value of
+   type ``never``.
+
 -  ``list (t)``: A single, immutable, homogeneous linked list, whose
    elements are of type ``(t)``, and that we write ``{}`` for the empty
    list or ``{ first ; ... }``. In the semantics, we use chevrons to
@@ -3157,6 +3160,7 @@ Full grammar
       | <comparable type>
       | key
       | unit
+      | never
       | signature
       | option <type>
       | list <type>
