@@ -278,6 +278,10 @@ let () =
 let failwith msg = fail (Failure msg)
 
 module Legacy_big_map_diff = struct
+  (*
+    Big_map_diff receipt as it was represented in 006 and earlier.
+    It is kept here for now for backward compatibility of tools. *)
+
   type item =
     | Update of {
         big_map : Z.t;
@@ -346,88 +350,75 @@ module Legacy_big_map_diff = struct
             Alloc {big_map; key_type; value_type}) ]
 
   let encoding = Data_encoding.list item_encoding
+
+  let to_lazy_storage_diff legacy_diffs =
+    let rev_head (diffs : (_ * (_, _) Lazy_storage_diff.diff) list) =
+      match diffs with
+      | [] ->
+          []
+      | (_, Remove) :: _ ->
+          diffs
+      | (id, Update {init; updates}) :: rest ->
+          (id, Update {init; updates = List.rev updates}) :: rest
+    in
+    (* Invariant:
+      Updates are collected one by one, in reverse order, on the head diff
+      item. So only and exactly the head diff item has its updates reversed.
+    *)
+    List.fold_left
+      (fun (new_diff : (_ * (_, _) Lazy_storage_diff.diff) list) item ->
+        match item with
+        | Clear id ->
+            (id, Lazy_storage_diff.Remove) :: rev_head new_diff
+        | Copy {src; dst} ->
+            (dst, Lazy_storage_diff.Update {init = Copy {src}; updates = []})
+            :: rev_head new_diff
+        | Alloc {big_map; key_type; value_type} ->
+            ( big_map,
+              Lazy_storage_diff.(
+                Update
+                  {init = Alloc Big_map.{key_type; value_type}; updates = []})
+            )
+            :: rev_head new_diff
+        | Update
+            { big_map;
+              diff_key = key;
+              diff_key_hash = key_hash;
+              diff_value = value } -> (
+          match new_diff with
+          | (id, diff) :: rest when Compare.Z.(id = big_map) ->
+              let diff =
+                match diff with
+                | Remove ->
+                    assert false
+                | Update {init; updates} ->
+                    let updates =
+                      Lazy_storage_diff.Big_map.{key; key_hash; value}
+                      :: updates
+                    in
+                    Lazy_storage_diff.Update {init; updates}
+              in
+              (id, diff) :: rest
+          | new_diff ->
+              let updates =
+                [Lazy_storage_diff.Big_map.{key; key_hash; value}]
+              in
+              (big_map, Update {init = Existing; updates}) :: rev_head new_diff
+          ))
+      []
+      legacy_diffs
+    |> rev_head
+    |> List.rev_map (fun (id, diff) ->
+           Lazy_storage_diff.make Lazy_storage_kind.Big_map id diff)
 end
-
-let big_map_key_cost = 65
-
-let big_map_cost = 33
 
 let update_script_big_map c = function
   | None ->
       return (c, Z.zero)
-  | Some diff ->
-      let open Legacy_big_map_diff in
-      fold_left_s
-        (fun (c, total) -> function Clear id ->
-              Storage.Big_map.Total_bytes.get c id
-              >>=? fun size ->
-              Storage.Big_map.remove_rec c id
-              >>= fun c ->
-              if Compare.Z.(id < Z.zero) then return (c, total)
-              else return (c, Z.sub (Z.sub total size) (Z.of_int big_map_cost))
-          | Copy {src = from; dst = to_} ->
-              Storage.Big_map.copy c ~from ~to_
-              >>=? fun c ->
-              if Compare.Z.(to_ < Z.zero) then return (c, total)
-              else
-                Storage.Big_map.Total_bytes.get c from
-                >>=? fun size ->
-                return (c, Z.add (Z.add total size) (Z.of_int big_map_cost))
-          | Alloc {big_map; key_type; value_type} ->
-              Storage.Big_map.Total_bytes.init c big_map Z.zero
-              >>=? fun c ->
-              (* Annotations are erased to allow sharing on
-                 [Copy]. The types from the contract code are used,
-                 these ones are only used to make sure they are
-                 compatible during transmissions between contracts,
-                 and only need to be compatible, annotations
-                 notwithstanding. *)
-              let key_type =
-                Micheline.strip_locations
-                  (Script_repr.strip_annotations (Micheline.root key_type))
-              in
-              let value_type =
-                Micheline.strip_locations
-                  (Script_repr.strip_annotations (Micheline.root value_type))
-              in
-              Storage.Big_map.Key_type.init c big_map key_type
-              >>=? fun c ->
-              Storage.Big_map.Value_type.init c big_map value_type
-              >>=? fun c ->
-              if Compare.Z.(big_map < Z.zero) then return (c, total)
-              else return (c, Z.add total (Z.of_int big_map_cost))
-          | Update {big_map; diff_key_hash; diff_value = None} ->
-              Storage.Big_map.Contents.remove (c, big_map) diff_key_hash
-              >>=? fun (c, freed, existed) ->
-              let freed =
-                if existed then freed + big_map_key_cost else freed
-              in
-              Storage.Big_map.Total_bytes.get c big_map
-              >>=? fun size ->
-              Storage.Big_map.Total_bytes.set
-                c
-                big_map
-                (Z.sub size (Z.of_int freed))
-              >>=? fun c ->
-              if Compare.Z.(big_map < Z.zero) then return (c, total)
-              else return (c, Z.sub total (Z.of_int freed))
-          | Update {big_map; diff_key_hash; diff_value = Some v} ->
-              Storage.Big_map.Contents.init_set (c, big_map) diff_key_hash v
-              >>=? fun (c, size_diff, existed) ->
-              let size_diff =
-                if existed then size_diff else size_diff + big_map_key_cost
-              in
-              Storage.Big_map.Total_bytes.get c big_map
-              >>=? fun size ->
-              Storage.Big_map.Total_bytes.set
-                c
-                big_map
-                (Z.add size (Z.of_int size_diff))
-              >>=? fun c ->
-              if Compare.Z.(big_map < Z.zero) then return (c, total)
-              else return (c, Z.add total (Z.of_int size_diff)))
-        (c, Z.zero)
-        diff
+  | Some legacy_diffs ->
+      Lazy_storage_diff.apply
+        c
+        (Legacy_big_map_diff.to_lazy_storage_diff legacy_diffs)
 
 let create_base c ?(prepaid_bootstrap_storage = false)
     (* Free space for bootstrap contracts *)

@@ -51,6 +51,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -61,6 +62,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
    delegate_storage.mli delegate_storage.ml
+   lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
@@ -129,6 +131,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -139,6 +142,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
    delegate_storage.mli delegate_storage.ml
+   lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
@@ -207,6 +211,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_repr.mli commitment_repr.ml
    parameters_repr.mli parameters_repr.ml
    receipt_repr.mli receipt_repr.ml
+   lazy_storage_kind.ml
    raw_context.mli raw_context.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -217,6 +222,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    seed_storage.mli seed_storage.ml
    roll_storage.mli roll_storage.ml
    delegate_storage.mli delegate_storage.ml
+   lazy_storage_diff.mli lazy_storage_diff.ml
    contract_storage.mli contract_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
    fitness_storage.ml
@@ -305,6 +311,7 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_repr
    Parameters_repr
    Receipt_repr
+   Lazy_storage_kind
    Raw_context
    Storage_sigs
    Storage_functors
@@ -315,6 +322,7 @@ include Tezos_raw_protocol_alpha.Main
    Seed_storage
    Roll_storage
    Delegate_storage
+   Lazy_storage_diff
    Contract_storage
    Bootstrap_storage
    Fitness_storage

@@ -35,6 +35,7 @@
         "Commitment_repr",
         "Parameters_repr",
         "Receipt_repr",
+        "Lazy_storage_kind",
 
         "Raw_context",
         "Storage_sigs",
@@ -47,6 +48,7 @@
         "Seed_storage",
         "Roll_storage",
         "Delegate_storage",
+        "Lazy_storage_diff",
         "Contract_storage",
         "Bootstrap_storage",
         "Fitness_storage",
