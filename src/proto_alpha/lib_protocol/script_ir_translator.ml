@@ -129,6 +129,8 @@ let rec type_size : type t. t ty -> int =
       1
   | Chain_id_t _ ->
       1
+  | Never_t _ ->
+      1
   | Pair_t ((l, _, _), (r, _, _), _) ->
       1 + type_size l + type_size r
   | Union_t ((l, _), (r, _), _) ->
@@ -857,6 +859,8 @@ let rec unparse_ty :
       return ctxt (T_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
       return ctxt (T_chain_id, [], unparse_type_annot tname)
+  | Never_t tname ->
+      return ctxt (T_never, [], unparse_type_annot tname)
   | Contract_t (ut, tname) ->
       unparse_ty ctxt ut
       >>? fun (t, ctxt) ->
@@ -969,6 +973,8 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Operation_t tname ->
       tname
   | Chain_id_t tname ->
+      tname
+  | Never_t tname ->
       tname
   | Contract_t (_, tname) ->
       tname
@@ -1165,6 +1171,8 @@ let merge_types :
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Bool_t tname, ctxt)
     | (Chain_id_t tn1, Chain_id_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Chain_id_t tname, ctxt)
+    | (Never_t tn1, Never_t tn2) ->
+        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Never_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
     | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
@@ -1558,6 +1566,9 @@ and parse_ty :
   | Prim (loc, T_chain_id, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Chain_id_t ty_name), ctxt)
+  | Prim (loc, T_never, [], annot) ->
+      parse_type_annot loc annot
+      >>? fun ty_name -> ok (Ex_ty (Never_t ty_name), ctxt)
   | Prim (loc, T_contract, [utl], annot) ->
       if allow_contract then
         parse_parameter_ty ctxt ~legacy utl
@@ -1696,7 +1707,8 @@ and parse_ty :
           | T_timestamp
           | T_address
           | T_chain_id
-          | T_operation ) as prim ),
+          | T_operation
+          | T_never ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1730,7 +1742,8 @@ and parse_ty :
              T_key;
              T_key_hash;
              T_timestamp;
-             T_chain_id ]
+             T_chain_id;
+             T_never ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
@@ -1818,6 +1831,8 @@ let check_packable ~legacy loc root =
     | Bool_t _ ->
         ok_unit
     | Chain_id_t _ ->
+        ok_unit
+    | Never_t _ ->
         ok_unit
     | Set_t (_, _) ->
         ok_unit
@@ -2526,6 +2541,8 @@ let rec parse_data :
   | (Big_map_t (_tk, _tv, _), expr) ->
       traced_fail
         (Invalid_kind (location expr, [Seq_kind; Int_kind], kind expr))
+  | (Never_t _, expr) ->
+      traced_fail (Invalid_never_expr (location expr))
 
 and parse_comparable_data :
     type a.
@@ -5394,6 +5411,8 @@ let rec unparse_data :
         assert false
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
+  | (Never_t _, _) ->
+      .
 
 and unparse_code ctxt ~stack_depth mode code =
   let legacy = true in
@@ -5696,6 +5715,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Operation_t _ ->
       False_f
   | Chain_id_t _ ->
+      False_f
+  | Never_t _ ->
       False_f
   | Pair_t ((l, _, _), (r, _, _), _) ->
       aux2 (fun l r -> Pair_f (l, r)) l r
