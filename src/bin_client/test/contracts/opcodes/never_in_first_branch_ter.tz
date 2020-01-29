@@ -1,0 +1,3 @@
+parameter (or never string);
+storage string;
+code { CAR; IF_LEFT { PUSH int 3; SWAP; NEVER } { }; NIL operation; PAIR }
