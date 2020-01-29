@@ -1,0 +1,8 @@
+parameter unit;
+storage unit;
+code {
+       CAR;
+       LEFT never;
+       LOOP_LEFT { LEFT never };
+       NEVER
+     }

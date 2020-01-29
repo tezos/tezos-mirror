@@ -1,0 +1,3 @@
+parameter never;
+storage unit;
+code { CAR; NEVER }
