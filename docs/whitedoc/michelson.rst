@@ -671,6 +671,11 @@ Stack operations
 
     > PUSH 'a x / S  =>  x : S
 
+-  ``NEVER``: Close an absurd branch.
+
+::
+    :: never : 'A  ->  'B
+
 -  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
    type `'b` onto the stack.
 
@@ -3080,6 +3085,7 @@ Full grammar
       | SOME
       | NONE <type>
       | UNIT
+      | NEVER
       | IF_NONE { <instruction> ... } { <instruction> ... }
       | PAIR
       | CAR
