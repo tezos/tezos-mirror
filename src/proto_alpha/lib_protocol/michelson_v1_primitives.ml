@@ -131,6 +131,7 @@ type prim =
   | I_RENAME
   | I_DIG
   | I_DUG
+  | I_NEVER
   | T_bool
   | T_contract
   | T_int
@@ -234,6 +235,7 @@ let namespace = function
   | I_MUL
   | I_NEG
   | I_NEQ
+  | I_NEVER
   | I_NIL
   | I_NONE
   | I_NOT
@@ -498,6 +500,8 @@ let string_of_prim = function
       "DIG"
   | I_DUG ->
       "DUG"
+  | I_NEVER ->
+      "NEVER"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -742,6 +746,8 @@ let prim_of_string = function
       ok I_DIG
   | "DUG" ->
       ok I_DUG
+  | "NEVER" ->
+      ok I_NEVER
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -973,7 +979,8 @@ let prim_encoding =
          (* Alpha_007 addition *)
          ("LEVEL", I_LEVEL);
          ("SELF_ADDRESS", I_SELF_ADDRESS);
-         ("never", T_never)
+         ("never", T_never);
+         ("NEVER", I_NEVER)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

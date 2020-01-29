@@ -414,6 +414,7 @@ and ('bef, 'aft) instr =
       int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness
       -> ('bef, 'rest) instr
   | ChainId : ('rest, Chain_id.t * 'rest) instr
+  | Never : (never * 'rest, 'aft) instr
 
 (* Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.

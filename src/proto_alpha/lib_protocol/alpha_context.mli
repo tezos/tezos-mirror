@@ -346,6 +346,7 @@ module Script : sig
     | I_RENAME
     | I_DIG
     | I_DUG
+    | I_NEVER
     | T_bool
     | T_contract
     | T_int

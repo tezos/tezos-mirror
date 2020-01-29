@@ -559,6 +559,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.stack_n_op n
     | (ChainId, _) ->
         Interp_costs.chain_id
+    | (Never, (_, _)) ->
+        .
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -1324,6 +1326,8 @@ let rec step :
       >>=? fun (_, rest) -> logged_return (rest, ctxt)
   | (ChainId, rest) ->
       logged_return ((step_constants.chain_id, rest), ctxt)
+  | (Never, (_, _)) ->
+      .
 
 and interp :
     type p r.

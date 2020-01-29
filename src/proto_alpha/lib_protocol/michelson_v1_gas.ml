@@ -738,6 +738,8 @@ module Cost_of = struct
           n *@ alloc_cost 1
       | ChainId ->
           alloc_cost 1
+      | Never ->
+          alloc_cost 0
   end
 
   module Unparse = struct

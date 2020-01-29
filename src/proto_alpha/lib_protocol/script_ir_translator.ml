@@ -427,6 +427,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | ChainId ->
       0
+  | Never ->
+      0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -3713,6 +3715,12 @@ and parse_instr :
       let descr aft = {loc; instr = Failwith v; bef = stack_ty; aft} in
       log_stack ctxt loc stack_ty Empty_t
       >>=? fun () -> return ctxt (Failed {descr})
+  | (Prim (loc, I_NEVER, [], annot), Item_t (Never_t _, _rest, _)) ->
+      fail_unexpected_annot loc annot
+      >>=? fun () ->
+      let descr aft = {loc; instr = Never; bef = stack_ty; aft} in
+      log_stack ctxt loc stack_ty Empty_t
+      >>=? fun () -> return ctxt (Failed {descr})
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
@@ -4626,7 +4634,8 @@ and parse_instr :
             | I_SHA256
             | I_SHA512
             | I_STEPS_TO_QUOTA
-            | I_ADDRESS ) as name ),
+            | I_ADDRESS
+            | I_NEVER ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4743,7 +4752,8 @@ and parse_instr :
             | I_LT
             | I_GT
             | I_LE
-            | I_GE ) as name ),
+            | I_GE
+            | I_NEVER ) as name ),
           _,
           _ ),
       stack ) ->
@@ -4851,7 +4861,8 @@ and parse_instr :
              I_SENDER;
              I_SELF;
              I_SELF_ADDRESS;
-             I_LAMBDA ]
+             I_LAMBDA;
+             I_NEVER ]
 
 and parse_contract :
     type arg.
