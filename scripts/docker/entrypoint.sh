@@ -37,7 +37,7 @@ case $command in
         upgrade_node_storage
         ;;
     tezos-snapshot-import)
-        snapshot_import
+        snapshot_import "$@"
         ;;
     tezos-baker)
         launch_baker "$@"
@@ -77,6 +77,10 @@ To call the tezos binaries directly you must override the
 entrypoint using --entrypoint . All binaries are in
 $BIN_DIR and the tezos data in $DATA_DIR
 
+You can specify the network with argument --network, for instance:
+  --network babylonnet
+(default is mainnet).
+
 Daemons:
 - tezos-node [args]
   Initialize a new identity and run the tezos node.
@@ -93,7 +97,7 @@ Clients:
 
 Commands:
   - tezos-upgrade-storage
-  - tezos-snapshot-import
+  - tezos-snapshot-import [args]
     Import a snapshot. The snapshot must be available in the file /snapshot
     Using docker run, you can make it available using the command :
        docker run -v <yourfilename>:/snapshot tezos/tezos tezos-snapshot-import
