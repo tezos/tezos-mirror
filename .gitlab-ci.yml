@@ -1009,6 +1009,21 @@ opam:tezos-micheline:
   variables:
     package: tezos-micheline
 
+opam:tezos-mockup:
+  <<: *opam_definition
+  variables:
+    package: tezos-mockup
+
+opam:tezos-mockup-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-mockup-commands
+
+opam:tezos-mockup-registration:
+  <<: *opam_definition
+  variables:
+    package: tezos-mockup-registration
+
 opam:tezos-node:
   <<: *opam_definition
   variables:
