@@ -97,6 +97,7 @@ Commands:
     Import a snapshot. The snapshot must be available in the file /snapshot
     Using docker run, you can make it available using the command :
        docker run -v <yourfilename>:/snapshot tezos/tezos tezos-snapshot-import
+    <yourfilename> must be an absolute path.
 EOF
         ;;
 esac
