@@ -1,3 +1,5 @@
+.. _flexible_network_sandboxes:
+
 Flexible Network Sandboxes
 ==========================
 

@@ -1,3 +1,5 @@
+.. _python_testing_framework:
+
 Python Execution and Testing Environment
 ========================================
 
@@ -490,6 +492,8 @@ It can be run with
 
 Note: this test uses only one revision but it can't run
 on branch ``master`` as we need an extra protocol with bakers.
+
+.. _pytest_regression_testing:
 
 Regression testing
 ------------------

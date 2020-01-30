@@ -498,7 +498,7 @@ documentation:build:
   artifacts:
     paths:
     - docs
-    expire_in: 1 day
+    expire_in: 1 week
 
 documentation:linkcheck:
   <<: *test_definition
