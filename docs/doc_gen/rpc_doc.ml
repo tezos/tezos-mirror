@@ -251,7 +251,8 @@ module Description = struct
             target_ref
             pp_description
             service ;
-          Option.iter service.input ~f:(fun (schema, bin_schema) ->
+          Option.iter service.input ~f:(fun input ->
+              let (schema, bin_schema) = Lazy.force input in
               pp_content
                 ppf
                 ~tag:"pre"
@@ -272,14 +273,14 @@ module Description = struct
             ~shortlabel:"output.json"
             target_ref
             Json_schema.pp
-            (fst service.output) ;
+            (fst (Lazy.force service.output)) ;
           pp_content
             ppf
             ~tag:"pre"
             ~shortlabel:"output.bin"
             target_ref
             Data_encoding.Binary_schema.pp
-            (snd service.output))
+            (snd (Lazy.force service.output)))
   end
 
   let rec pp prefix ppf dir =

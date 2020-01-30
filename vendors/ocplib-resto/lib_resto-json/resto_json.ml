@@ -81,9 +81,32 @@ module Encoding = struct
     let open Json_encoding in
     conv
       (fun { meth ; path ; description ; query ; input ; output ; error } ->
-         (meth, path, description, query, input, output, error))
+         ( meth,
+           path,
+           description,
+           query,
+           ( match input with
+             | None ->
+                 None
+             | Some input ->
+                 Some (Lazy.force input) ),
+           Lazy.force output,
+           Lazy.force error ))
       (fun (meth, path, description, query, input, output, error) ->
-         { meth ; path ; description ; query ; input ; output ; error })
+         {
+           meth;
+           path;
+           description;
+           query;
+           input =
+             ( match input with
+               | None ->
+                   None
+               | Some input ->
+                   Some (Lazy.from_val input) );
+           output = Lazy.from_val output;
+           error = Lazy.from_val error;
+         })
       (obj7
          (req "meth" meth_encoding)
          (req "path" (list path_item_encoding))

@@ -448,9 +448,9 @@ module Description = struct
     path: path_item list ;
     meth: meth ;
     query: query_item list ;
-    input: 'schema option ;
-    output: 'schema ;
-    error: 'schema ;
+    input: 'schema Lazy.t option ;
+    output: 'schema Lazy.t ;
+    error: 'schema Lazy.t ;
   }
 
   and path_item =

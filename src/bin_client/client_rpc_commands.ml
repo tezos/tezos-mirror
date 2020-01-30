@@ -368,13 +368,15 @@ let schema meth url (cctxt : #Client_context.full) =
     | Some {input = Some input; output; _} ->
         let json =
           `O
-            [ ("input", Json_schema.to_json (fst input));
-              ("output", Json_schema.to_json (fst output)) ]
+            [ ("input", Json_schema.to_json (fst (Lazy.force input)));
+              ("output", Json_schema.to_json (fst (Lazy.force output))) ]
         in
         cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json
         >>= fun () -> return_unit
     | Some {input = None; output; _} ->
-        let json = `O [("output", Json_schema.to_json (fst output))] in
+        let json =
+          `O [("output", Json_schema.to_json (fst (Lazy.force output)))]
+        in
         cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json
         >>= fun () -> return_unit )
   | _ ->
@@ -402,12 +404,15 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
         cctxt#message
           "@[<v 0>@[<v 2>Input format:@,%a@]@,@[<v 2>Output format:@,%a@]@,@]"
           pp
-          input
+          (Lazy.force input)
           pp
-          output
+          (Lazy.force output)
         >>= fun () -> return_unit
     | Some {input = None; output; _} ->
-        cctxt#message "@[<v 0>@[<v 2>Output format:@,%a@]@,@]" pp output
+        cctxt#message
+          "@[<v 0>@[<v 2>Output format:@,%a@]@,@]"
+          pp
+          (Lazy.force output)
         >>= fun () -> return_unit )
   | _ ->
       cctxt#message
@@ -458,7 +463,7 @@ let call meth raw_url (cctxt : #Client_context.full) =
     | Some {input = None; _} ->
         cctxt#generic_json_call meth uri >>=? display_answer cctxt
     | Some {input = Some input; _} -> (
-        fill_in ~show_optionals:false (fst input)
+        fill_in ~show_optionals:false (fst (Lazy.force input))
         >>= function
         | Error msg ->
             cctxt#error "%s" msg >>= fun () -> return_unit
