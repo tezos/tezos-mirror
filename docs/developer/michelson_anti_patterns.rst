@@ -179,25 +179,3 @@ Alternatives/Solutions
    be modified and that you have an extremely high degree of confidence
    in it.
 
-Do not store funds for others in spendable contracts
-----------------------------------------------------
-
-Tezos allows contracts to be marked as spendable. Managers of spendable
-contracts can make transfers using the funds stored inside the contract.
-This can subvert guarantees about the contract’s behavior that are
-visible in the code.
-
-.. _possible-issues-5:
-
-Possible Issues
-~~~~~~~~~~~~~~~
-
--  The funds of a contract can be removed.
--  A contract may not be able to meet its obligations
-
-.. _alternativessolutions-5:
-
-Alternatives/Solutions
-~~~~~~~~~~~~~~~~~~~~~~
-
--  Do not store funds in spendable contracts that you do not control.
