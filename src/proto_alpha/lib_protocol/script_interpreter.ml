@@ -313,6 +313,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.if_none
   | (Cons_pair, _) ->
       Interp_costs.cons_pair
+  | (Unpair, _) ->
+      Interp_costs.unpair
   | (Car, _) ->
       Interp_costs.car
   | (Cdr, _) ->
@@ -606,6 +608,8 @@ let rec step_bounded :
   (* pairs *)
   | (Cons_pair, (a, (b, rest))) ->
       logged_return (((a, b), rest), ctxt)
+  | (Unpair, ((a, b), rest)) ->
+      logged_return ((a, (b, rest)), ctxt)
   | (Car, ((a, _), rest)) ->
       logged_return ((a, rest), ctxt)
   | (Cdr, ((_, b), rest)) ->
