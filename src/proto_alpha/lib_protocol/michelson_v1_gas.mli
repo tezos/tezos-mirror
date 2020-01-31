@@ -45,6 +45,8 @@ module Cost_of : sig
 
     val cons_pair : Gas.cost
 
+    val unpair : Gas.cost
+
     val car : Gas.cost
 
     val cdr : Gas.cost

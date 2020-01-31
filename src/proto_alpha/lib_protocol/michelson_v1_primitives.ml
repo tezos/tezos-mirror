@@ -105,6 +105,7 @@ type prim =
   | I_NOW
   | I_OR
   | I_PAIR
+  | I_UNPAIR
   | I_PUSH
   | I_RIGHT
   | I_SIZE
@@ -262,6 +263,7 @@ let namespace = function
   | I_TRANSFER_TOKENS
   | I_UNIT
   | I_UNPACK
+  | I_UNPAIR
   | I_UPDATE
   | I_XOR ->
       Instr_namespace
@@ -478,6 +480,8 @@ let string_of_prim = function
       "SET_DELEGATE"
   | I_UNIT ->
       "UNIT"
+  | I_UNPAIR ->
+      "UNPAIR"
   | I_UPDATE ->
       "UPDATE"
   | I_XOR ->
@@ -694,6 +698,8 @@ let prim_of_string = function
       ok I_OR
   | "PAIR" ->
       ok I_PAIR
+  | "UNPAIR" ->
+      ok I_UNPAIR
   | "PUSH" ->
       ok I_PUSH
   | "RIGHT" ->
@@ -970,7 +976,8 @@ let prim_encoding =
          ("LEVEL", I_LEVEL);
          ("SELF_ADDRESS", I_SELF_ADDRESS);
          ("never", T_never);
-         ("NEVER", I_NEVER)
+         ("NEVER", I_NEVER);
+         ("UNPAIR", I_UNPAIR)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

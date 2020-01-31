@@ -434,6 +434,9 @@ module Cost_of = struct
     (* model N_Swap *)
     let cost_N_Swap = Z.of_int 70
 
+    (* model N_Unpair *)
+    let cost_N_Unpair = Z.of_int 80
+
     (* model N_Xor *)
     let cost_N_Xor = Z.of_int 100
 
@@ -630,6 +633,8 @@ module Cost_of = struct
     let if_none = atomic_step_cost cost_N_If_none
 
     let cons_pair = atomic_step_cost cost_N_Cons_pair
+
+    let unpair = atomic_step_cost cost_N_Unpair
 
     let car = atomic_step_cost cost_N_Car
 
