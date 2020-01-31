@@ -501,7 +501,7 @@ let expand_unpappaiir original =
   | Prim (loc, str, args, _annot) ->
       let len = String.length str in
       if
-        len >= 6
+        len > 6
         && String.sub str 0 3 = "UNP"
         && str.[len - 1] = 'R'
         && check_letters str 3 (len - 2) (function
