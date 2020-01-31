@@ -1075,6 +1075,14 @@ Operations on pairs
 
     > PAIR / a : b : S  =>  (Pair a b) : S
 
+-  ``UNPAIR``: Split a pair into its components.
+
+::
+
+    :: pair 'a 'b : 'S   ->   'a : 'b : 'S
+
+    > UNPAIR / (Pair a b) : S  =>  a : b : S
+
 -  ``CAR``: Access the left part of a pair.
 
 ::
@@ -2058,7 +2066,6 @@ A typing rule can be inferred:
 
 ::
 
-    > UNPAIR / S => DUP ; CAR ; DIP { CDR } / S
     > UNPA(\right)R / S => UNPAIR ; DIP (UN(\right)R) / S
     > UNP(\left)IR / S => UNPAIR ; UN(\left)R / S
     > UNP(\left)(\right)R => UNPAIR ; DIP (UN(\right)R) ; UN(\left)R / S
@@ -2405,6 +2412,7 @@ The instructions which accept at most two variable annotations are:
 
 ::
 
+   UNPAIR
    CREATE_ACCOUNT
    CREATE_CONTRACT
 
@@ -2677,7 +2685,7 @@ Special annotations
 .. _SpecialAnnotations:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
-``CAR`` and ``CDR``. It means to use the accessed field name (if any) as
+``CAR``, ``CDR``, and ``UNPAIR``. It means to use the accessed field name (if any) as
 a name for the value on the stack. The following typing rule
 demonstrates their use for instruction ``CAR``.
 
@@ -3093,6 +3101,7 @@ Full grammar
       | PAIR
       | CAR
       | CDR
+      | UNPAIR
       | LEFT <type>
       | RIGHT <type>
       | IF_LEFT { <instruction> ... } { <instruction> ... }
