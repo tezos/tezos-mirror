@@ -663,8 +663,8 @@ class Client:
         return self.run(cmd)
 
     def check_node_listening(self,
-                             timeout: float = 0.5,
-                             attempts: int = 10) -> bool:
+                             timeout: float = 1,
+                             attempts: int = 20) -> bool:
         """ Checks whether the node is reponsive, by polling it
         using the `version` rpc.
 
