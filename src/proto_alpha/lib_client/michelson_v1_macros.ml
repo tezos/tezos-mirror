@@ -511,13 +511,7 @@ let expand_unpappaiir original =
                    false)
       then
         try
-          let unpair =
-            Seq
-              ( loc,
-                [ Prim (loc, "DUP", [], []);
-                  Prim (loc, "CAR", [], []);
-                  dip ~loc 1 (Seq (loc, [Prim (loc, "CDR", [], [])])) ] )
-          in
+          let unpair = Prim (loc, "UNPAIR", [], []) in
           let ast = parse_pair_substr str ~len 2 in
           let rec parse p (depth, acc) =
             match p with
