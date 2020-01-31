@@ -72,7 +72,7 @@ let wait_for_node_bootstrap state client =
       ~id_prefix:(client.id ^ "-bootstrapped")
       state client ["bootstrapped"]
     >>= fun res -> return Poly.(res#status = Unix.WEXITED 0) in
-  let attempts = 8 in
+  let attempts = 12 in
   let rec loop nth =
     if nth >= attempts then failf "Bootstrapping failed %d times." nth
     else
