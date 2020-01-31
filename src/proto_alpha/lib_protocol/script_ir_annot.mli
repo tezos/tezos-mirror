@@ -190,6 +190,20 @@ val parse_destr_annot :
   value_annot:var_annot option ->
   (var_annot option * field_annot option) tzresult
 
+val parse_unpair_annot :
+  int ->
+  string list ->
+  field_name_car:field_annot option ->
+  field_name_cdr:field_annot option ->
+  pair_annot:var_annot option ->
+  value_annot_car:var_annot option ->
+  value_annot_cdr:var_annot option ->
+  ( var_annot option
+  * var_annot option
+  * field_annot option
+  * field_annot option )
+  tzresult
+
 val parse_entrypoint_annot :
   int ->
   ?default:var_annot option ->

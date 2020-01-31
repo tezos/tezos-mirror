@@ -320,6 +320,7 @@ module Script : sig
     | I_NOW
     | I_OR
     | I_PAIR
+    | I_UNPAIR
     | I_PUSH
     | I_RIGHT
     | I_SIZE

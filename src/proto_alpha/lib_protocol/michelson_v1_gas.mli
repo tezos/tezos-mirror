@@ -59,6 +59,8 @@ module Cost_of : sig
 
     val pair_access : Gas.cost
 
+    val unpair : Gas.cost
+
     val cons : Gas.cost
 
     val variant_no_data : Gas.cost

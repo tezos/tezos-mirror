@@ -484,6 +484,23 @@ let parse_two_var_annot :
   >>? fun () ->
   error_unexpected_annot loc fields >>? fun () -> get_two_annot loc vars
 
+let var_annot_from_special :
+    field_name:field_annot option ->
+    default:var_annot option ->
+    value_annot:var_annot option ->
+    var_annot option ->
+    var_annot option =
+ fun ~field_name ~default ~value_annot v ->
+  match v with
+  | Some (Var_annot "%") ->
+      field_to_var_annot field_name
+  | Some (Var_annot "%%") ->
+      default
+  | Some _ ->
+      v
+  | None ->
+      value_annot
+
 let parse_destr_annot :
     int ->
     string list ->
@@ -505,18 +522,59 @@ let parse_destr_annot :
   let default =
     gen_access_annot pair_annot field_name ~default:default_accessor
   in
-  let v =
-    match v with
-    | Some (Var_annot "%") ->
-        field_to_var_annot field_name
-    | Some (Var_annot "%%") ->
-        default
-    | Some _ ->
-        v
-    | None ->
-        value_annot
-  in
+  let v = var_annot_from_special ~field_name ~default ~value_annot v in
   (v, f)
+
+let parse_unpair_annot :
+    int ->
+    string list ->
+    field_name_car:field_annot option ->
+    field_name_cdr:field_annot option ->
+    pair_annot:var_annot option ->
+    value_annot_car:var_annot option ->
+    value_annot_cdr:var_annot option ->
+    ( var_annot option
+    * var_annot option
+    * field_annot option
+    * field_annot option )
+    tzresult =
+ fun loc
+     annot
+     ~field_name_car
+     ~field_name_cdr
+     ~pair_annot
+     ~value_annot_car
+     ~value_annot_cdr ->
+  parse_annots loc ~allow_special_var:true annot
+  >>? classify_annot loc
+  >>? fun (vars, types, fields) ->
+  error_unexpected_annot loc types
+  >>? fun () ->
+  get_two_annot loc vars
+  >>? fun (vcar, vcdr) ->
+  get_two_annot loc fields
+  >|? fun (fcar, fcdr) ->
+  let default_car =
+    gen_access_annot pair_annot field_name_car ~default:default_car_annot
+  in
+  let default_cdr =
+    gen_access_annot pair_annot field_name_cdr ~default:default_cdr_annot
+  in
+  let vcar =
+    var_annot_from_special
+      ~field_name:field_name_car
+      ~default:default_car
+      ~value_annot:value_annot_car
+      vcar
+  in
+  let vcdr =
+    var_annot_from_special
+      ~field_name:field_name_cdr
+      ~default:default_cdr
+      ~value_annot:value_annot_cdr
+      vcdr
+  in
+  (vcar, vcdr, fcar, fcdr)
 
 let parse_entrypoint_annot :
     int ->

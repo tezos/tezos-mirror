@@ -186,6 +186,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Swap
   | Car
   | Cdr
+  | Unpair
   | If_none _
   | If_left _
   | Cons_list
@@ -2771,6 +2772,29 @@ and parse_instr :
            ( Pair_t ((a, l_field, fst_annot), (b, r_field, snd_annot), ty_name),
              rest,
              annot ))
+  | ( Prim (loc, I_UNPAIR, [], annot),
+      Item_t
+        ( Pair_t
+            ( (a, expected_field_annot_a, a_annot),
+              (b, expected_field_annot_b, b_annot),
+              _ ),
+          rest,
+          pair_annot ) ) ->
+      Lwt.return
+      @@ parse_unpair_annot
+           loc
+           annot
+           ~pair_annot
+           ~value_annot_car:a_annot
+           ~value_annot_cdr:b_annot
+           ~field_name_car:expected_field_annot_a
+           ~field_name_cdr:expected_field_annot_b
+      >>=? fun (annot_a, annot_b, field_a, field_b) ->
+      Lwt.return @@ check_correct_field field_a expected_field_annot_a
+      >>=? fun () ->
+      Lwt.return @@ check_correct_field field_b expected_field_annot_b
+      >>=? fun () ->
+      typed ctxt loc Unpair (Item_t (a, Item_t (b, rest, annot_b), annot_a))
   | ( Prim (loc, I_CAR, [], annot),
       Item_t
         (Pair_t ((a, expected_field_annot, a_annot), _, _), rest, pair_annot)
@@ -4267,6 +4291,7 @@ and parse_instr :
             | I_SOME
             | I_UNIT
             | I_PAIR
+            | I_UNPAIR
             | I_CAR
             | I_CDR
             | I_CONS
@@ -4409,6 +4434,7 @@ and parse_instr :
             | I_DUP
             | I_CAR
             | I_CDR
+            | I_UNPAIR
             | I_SOME
             | I_BLAKE2B
             | I_SHA256
@@ -4477,6 +4503,7 @@ and parse_instr :
              I_SOME;
              I_UNIT;
              I_PAIR;
+             I_UNPAIR;
              I_CAR;
              I_CDR;
              I_CONS;

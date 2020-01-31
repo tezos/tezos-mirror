@@ -188,6 +188,7 @@ and ('bef, 'aft) instr =
   | Cons_pair : ('car * ('cdr * 'rest), ('car, 'cdr) pair * 'rest) instr
   | Car : (('car, _) pair * 'rest, 'car * 'rest) instr
   | Cdr : ((_, 'cdr) pair * 'rest, 'cdr * 'rest) instr
+  | Unpair : (('car, 'cdr) pair * 'rest, 'car * ('cdr * 'rest)) instr
   (* options *)
   | Cons_some : ('v * 'rest, 'v option * 'rest) instr
   | Cons_none : 'a ty -> ('rest, 'a option * 'rest) instr

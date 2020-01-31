@@ -116,6 +116,8 @@ module Cost_of = struct
 
     let pair_access = atomic_step_cost 10
 
+    let unpair = atomic_step_cost 20
+
     let cons = atomic_step_cost 10
 
     let loop_cycle = atomic_step_cost 10
@@ -493,6 +495,8 @@ module Cost_of = struct
           alloc_cost 1
       | Cdr ->
           alloc_cost 1
+      | Unpair ->
+          alloc_cost 2
       | Cons_some ->
           alloc_cost 2
       | Cons_none _ ->

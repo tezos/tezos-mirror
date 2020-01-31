@@ -309,6 +309,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.branch
     | (Cons_pair, _) ->
         Interp_costs.pair
+    | (Unpair, _) ->
+        Interp_costs.unpair
     | (Car, _) ->
         Interp_costs.pair_access
     | (Cdr, _) ->
@@ -605,6 +607,8 @@ let rec step :
   (* pairs *)
   | (Cons_pair, (a, (b, rest))) ->
       logged_return (((a, b), rest), ctxt)
+  | (Unpair, ((a, b), rest)) ->
+      logged_return ((a, (b, rest)), ctxt)
   | (Car, ((a, _), rest)) ->
       logged_return ((a, rest), ctxt)
   | (Cdr, ((_, b), rest)) ->
