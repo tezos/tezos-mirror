@@ -63,6 +63,12 @@ type config = {
       connections indicated by the second integer. *)
   max_known_peer_ids : (int * int) option;
       (** Like [max_known_points], but for known peer_ids. *)
+  peer_greylist_size : int;
+      (** The number of peer_ids kept in the peer_id greylist. *)
+  ip_greylist_size_in_kilobytes : int;
+      (** The size of the IP address greylist. *)
+  ip_greylist_cleanup_delay : Time.System.Span.t;
+      (** The time an IP address is kept in the greylist. *)
 }
 
 val create :
@@ -319,9 +325,13 @@ val greylist_addr : ('msg, 'peer, 'conn) t -> P2p_addr.t -> unit
     and [peer]'s address to [pool]'s addr greylist. *)
 val greylist_peer : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
 
-(** [gc_greylist ~older_than pool] removes addresses older than [older_than]
-    from the greylist. *)
-val gc_greylist : older_than:Time.System.t -> ('msg, 'peer, 'conn) t -> unit
+(** [clear_greylist] removes all addresses from the greylist. *)
+val clear_greylist : ('msg, 'peer, 'conn) t -> unit
+
+(** [gc_greylist] removes some addresses from the greylist (the oldest
+   have a higher probability to be removed, yet due to the underlying
+   probabilistic structure, recent greylistings can be dropped). *)
+val gc_greylist : ('msg, 'peer, 'conn) t -> unit
 
 (** [acl_clear pool] clears ACL tables. *)
 val acl_clear : ('msg, 'peer, 'conn) t -> unit

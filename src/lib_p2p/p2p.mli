@@ -139,6 +139,12 @@ type limits = {
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
       (** Optional limitation of internal hashtables (max, target) *)
+  peer_greylist_size : int;
+      (** The number of peer_ids kept in the peer_id greylist. *)
+  ip_greylist_size_in_kilobytes : int;
+      (** The size of the IP address greylist in kilobytes. *)
+  ip_greylist_cleanup_delay : Time.System.Span.t;
+      (** The time an IP address is kept in the greylist. *)
   swap_linger : Time.System.Span.t;
       (** Peer swapping does not occur more than once during a timespan of
       [swap_linger]. *)

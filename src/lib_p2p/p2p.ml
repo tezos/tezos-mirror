@@ -62,6 +62,9 @@ type limits = {
   outgoing_message_queue_size : int option;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
+  peer_greylist_size : int;
+  ip_greylist_size_in_kilobytes : int;
+  ip_greylist_cleanup_delay : Time.System.Span.t;
   swap_linger : Time.System.Span.t;
   binary_chunks_size : int option;
 }
@@ -86,6 +89,9 @@ let create_connection_pool config limits meta_cfg log triggers =
       private_mode = config.private_mode;
       max_known_points = limits.max_known_points;
       max_known_peer_ids = limits.max_known_peer_ids;
+      peer_greylist_size = limits.peer_greylist_size;
+      ip_greylist_size_in_kilobytes = limits.ip_greylist_size_in_kilobytes;
+      ip_greylist_cleanup_delay = limits.ip_greylist_cleanup_delay;
     }
   in
   P2p_pool.create pool_cfg meta_cfg ~log triggers
@@ -140,7 +146,6 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
-      greylist_timeout = limits.greylist_timeout;
       private_mode = config.private_mode;
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;

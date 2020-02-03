@@ -47,9 +47,14 @@
 
 type t
 
-(** [create size] is a set of four ACLs (see above) with the peer_id
-    greylist being a LRU cache of size [size]. *)
-val create : int -> t
+(** [create ~peer_id_size ~ip_size] is a set of four ACLs (see above)
+   with the peer_id greylist being a LRU cache of size [peer_id_size]
+   and the IP address greylist a bloom filter of size [ip_size]
+   (expressed in KiB). Elements are (probabilistically) kept in the
+   bloom filter for [ip_cleanup_delay], the cleanup happens in a
+   discrete way in sixteen steps. *)
+val create :
+  peer_id_size:int -> ip_size:int -> ip_cleanup_delay:Time.System.Span.t -> t
 
 (** [banned_addr t addr] is [true] if [addr] is blacklisted or
     greylisted. *)
@@ -72,12 +77,18 @@ val clear : t -> unit
 
 module IPGreylist : sig
   (** [add t addr] adds [addr] to the address greylist. *)
-  val add : t -> P2p_addr.t -> Time.System.t -> unit
+  val add : t -> P2p_addr.t -> unit
 
-  (** [remove_old t ~older_than] removes all banned peers older than the
-      given time. *)
-  val remove_old : t -> older_than:Time.System.t -> unit
+  (** [clear t] removes all address greylistings. *)
+  val clear : t -> unit
 
+  (** [gc t] removes some address greylistings (the oldest have a
+     higher probability to be removed, yet due to the underlying
+     probabilistic structure, recent greylistings can be dropped). *)
+  val gc : t -> unit
+
+  (** [mem t addr] tells if [addr] is greylisted, but may return a
+     false positive due to the underlying probabilistic structure. *)
   val mem : t -> P2p_addr.t -> bool
 
   val encoding : P2p_addr.t list Data_encoding.t

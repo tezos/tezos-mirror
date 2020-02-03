@@ -37,7 +37,6 @@ type bounds = {
 
 type config = {
   maintenance_idle_time : Time.System.Span.t;
-  greylist_timeout : Time.System.Span.t;
   private_mode : bool;
   min_connections : int;
   max_connections : int;
@@ -224,27 +223,11 @@ let random_connections pool n =
   in
   TzList.rev_sub candidates n
 
-(** GC peers from the greylist that has been greylisted for more than
-    [t.config.greylist_timeout] *)
-let trigger_greylist_gc t =
-  let now = Systime_os.now () in
-  let minus_greylist_timeout = Ptime.Span.neg t.config.greylist_timeout in
-  let time = Ptime.add_span now minus_greylist_timeout in
-  let older_than =
-    Option.fold_f
-      ~none:(fun () ->
-        raise (Failure "P2p_maintenance.maintain: time overflow"))
-      ~some:Fun.id
-      time
-  in
-  P2p_pool.gc_greylist t.pool ~older_than
-
 (** Maintenance step.
     1. trigger greylist gc
     2. tries *forever* to achieve a number of connections
        between `min_threshold` and `max_threshold`. *)
 let rec do_maintain t =
-  trigger_greylist_gc t ;
   let n_connected = P2p_pool.active_connections t.pool in
   if n_connected < t.bounds.min_threshold then
     too_few_connections t n_connected

@@ -183,6 +183,9 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         private_mode;
         max_known_points = None;
         max_known_peer_ids = None;
+        peer_greylist_size = 10;
+        ip_greylist_size_in_kilobytes = 1024;
+        ip_greylist_cleanup_delay = Time.System.Span.of_seconds_exn 60.;
       }
   in
   Process.detach

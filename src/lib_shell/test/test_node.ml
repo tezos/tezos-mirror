@@ -98,6 +98,9 @@ let default_p2p_limits : P2p.limits =
     max_known_peer_ids = Some (400, 300);
     swap_linger = Time.System.Span.of_seconds_exn 30.;
     binary_chunks_size = None;
+    peer_greylist_size = 1023;
+    ip_greylist_size_in_kilobytes = 256;
+    ip_greylist_cleanup_delay = Ptime.Span.of_int_s 3600;
   }
 
 let default_p2p = Some (default_p2p, default_p2p_limits)

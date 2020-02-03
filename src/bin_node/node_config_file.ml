@@ -377,10 +377,14 @@ and shell = {
 }
 
 let default_p2p_limits : P2p.limits =
+  let greylist_timeout =
+    Time.System.Span.of_seconds_exn 86400.
+    (* one day *)
+  in
   {
     connection_timeout = Time.System.Span.of_seconds_exn 10.;
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
-    greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *);
+    greylist_timeout;
     maintenance_idle_time =
       Time.System.Span.of_seconds_exn 120. (* two minutes *);
     min_connections = 10;
@@ -398,6 +402,10 @@ let default_p2p_limits : P2p.limits =
     outgoing_message_queue_size = None;
     max_known_points = Some (400, 300);
     max_known_peer_ids = Some (400, 300);
+    peer_greylist_size = 1023 (* historical value *);
+    ip_greylist_size_in_kilobytes =
+      2 * 1024 (* two megabytes has shown good properties in simulation *);
+    ip_greylist_cleanup_delay = greylist_timeout;
     swap_linger = Time.System.Span.of_seconds_exn 30.;
     binary_chunks_size = None;
   }
@@ -463,6 +471,9 @@ let limit : P2p.limits Data_encoding.t =
            outgoing_message_queue_size;
            max_known_points;
            max_known_peer_ids;
+           peer_greylist_size;
+           ip_greylist_size_in_kilobytes;
+           ip_greylist_cleanup_delay;
            swap_linger;
            binary_chunks_size } ->
       ( ( ( connection_timeout,
@@ -483,7 +494,12 @@ let limit : P2p.limits Data_encoding.t =
             incoming_message_queue_size,
             outgoing_message_queue_size,
             max_known_points ) ),
-        (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ))
+        ( max_known_peer_ids,
+          peer_greylist_size,
+          ip_greylist_size_in_kilobytes,
+          ip_greylist_cleanup_delay,
+          greylist_timeout,
+          maintenance_idle_time ) ))
     (fun ( ( ( connection_timeout,
                authentication_timeout,
                min_connections,
@@ -502,7 +518,12 @@ let limit : P2p.limits Data_encoding.t =
                incoming_message_queue_size,
                outgoing_message_queue_size,
                max_known_points ) ),
-           (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ) ->
+           ( max_known_peer_ids,
+             peer_greylist_size,
+             ip_greylist_size_in_kilobytes,
+             ip_greylist_cleanup_delay,
+             greylist_timeout,
+             maintenance_idle_time ) ) ->
       {
         connection_timeout;
         authentication_timeout;
@@ -523,6 +544,9 @@ let limit : P2p.limits Data_encoding.t =
         outgoing_message_queue_size;
         max_known_points;
         max_known_peer_ids;
+        peer_greylist_size;
+        ip_greylist_size_in_kilobytes;
+        ip_greylist_cleanup_delay;
         swap_linger;
         binary_chunks_size;
       })
@@ -603,11 +627,28 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
              (opt "max_known_points" (tup2 uint16 uint16))))
-       (obj3
+       (obj6
           (opt
              "max_known_peer_ids"
-             ~description:"max and target size for the known address table."
+             ~description:
+               "The max and target size for the known address table."
              (tup2 uint16 uint16))
+          (dft
+             "peer_greylist_size"
+             ~description:
+               "The number of peer_ids kept in the peer_id greylist."
+             uint16
+             default_p2p_limits.peer_greylist_size)
+          (dft
+             "ip_greylist_size_in_kilobytes"
+             ~description:"The size of the IP address greylist (in kilobytes)."
+             uint16
+             default_p2p_limits.ip_greylist_size_in_kilobytes)
+          (dft
+             "ip_greylist_cleanup_delay"
+             ~description:"The time an IP address is kept in the greylist."
+             Time.System.Span.encoding
+             default_p2p_limits.ip_greylist_cleanup_delay)
           (dft
              "greylist-timeout"
              ~description:"GC delay for the greylists tables, in seconds."

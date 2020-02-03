@@ -41,6 +41,9 @@ type config = {
   private_mode : bool;
   max_known_points : (int * int) option;
   max_known_peer_ids : (int * int) option;
+  peer_greylist_size : int;
+  ip_greylist_size_in_kilobytes : int;
+  ip_greylist_cleanup_delay : Time.System.Span.t;
 }
 
 type ('msg, 'peer, 'conn) t = {
@@ -97,8 +100,7 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
             P2p_point.Table.remove known_points p) ;
         log Gc_points )
 
-let greylist_addr pool addr =
-  P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
+let greylist_addr pool addr = P2p_acl.IPGreylist.add pool.acl addr
 
 let set_expected_peer_id :
     ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t =
@@ -483,8 +485,9 @@ let greylist_peer pool peer =
 
 let acl_clear pool = P2p_acl.clear pool.acl
 
-let gc_greylist ~older_than pool =
-  P2p_acl.IPGreylist.remove_old ~older_than pool.acl
+let clear_greylist pool = P2p_acl.IPGreylist.clear pool.acl
+
+let gc_greylist pool = P2p_acl.IPGreylist.gc pool.acl
 
 let config {config; _} = config
 
@@ -503,7 +506,11 @@ let create config peer_meta_config triggers ~log =
       known_points = P2p_point.Table.create ~random:true 53;
       connected_points = P2p_point.Table.create ~random:true 53;
       triggers;
-      acl = P2p_acl.create 1023;
+      acl =
+        P2p_acl.create
+          ~peer_id_size:config.peer_greylist_size
+          ~ip_size:config.ip_greylist_size_in_kilobytes
+          ~ip_cleanup_delay:config.ip_greylist_cleanup_delay;
       log;
     }
   in
