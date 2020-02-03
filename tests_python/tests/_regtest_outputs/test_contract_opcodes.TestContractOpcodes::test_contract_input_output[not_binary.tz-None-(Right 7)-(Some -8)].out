@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[not_binary.tz-None-(Right 7)-(Some -8)]
+
 storage
   (Some -8)
 emitted operations

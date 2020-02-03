@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice.tz-Some "Foo"-Pair 10 5-None]
+
 storage
   None
 emitted operations

@@ -1,3 +1,5 @@
+tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/guestbook.tz]
+
 { parameter string ;
   storage (map address (option string)) ;
   code { { { DUP ; CAR @message ; DIP { CDR @guestbook } } } ;

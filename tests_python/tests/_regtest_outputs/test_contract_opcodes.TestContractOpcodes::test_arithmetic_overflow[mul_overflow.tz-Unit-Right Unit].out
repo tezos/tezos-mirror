@@ -1,0 +1,2 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_arithmetic_overflow[mul_overflow.tz-Unit-Right Unit]
+

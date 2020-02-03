@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[list_concat.tz-"abc"-{ "d" ; "e" ; "f" }-"abcdef"]
+
 storage
   "abcdef"
 emitted operations

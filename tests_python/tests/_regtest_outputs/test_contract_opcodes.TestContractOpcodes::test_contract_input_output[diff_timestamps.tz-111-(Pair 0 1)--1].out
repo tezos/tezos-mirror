@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[diff_timestamps.tz-111-(Pair 0 1)--1]
+
 storage
   -1
 emitted operations

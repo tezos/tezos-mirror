@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[sub_timestamp_delta.tz-111-(Pair 100 2000000000000000000)--1999999999999999900]
+
 storage
   -1999999999999999900
 emitted operations

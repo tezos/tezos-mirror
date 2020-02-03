@@ -1,3 +1,5 @@
+tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/assert.tz]
+
 { parameter bool ;
   storage unit ;
   code { CAR ;

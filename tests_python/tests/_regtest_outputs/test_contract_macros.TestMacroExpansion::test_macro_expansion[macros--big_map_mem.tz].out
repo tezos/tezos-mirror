@@ -1,3 +1,5 @@
+tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/big_map_mem.tz]
+
 { parameter (pair int bool) ;
   storage (pair (big_map int unit) unit) ;
   code { DUP ;

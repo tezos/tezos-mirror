@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[add_delta_timestamp.tz-None-(Pair 100 100)-(Some "1970-01-01T00:03:20Z")]
+
 storage
   (Some "1970-01-01T00:03:20Z")
 emitted operations

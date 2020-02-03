@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "hello" "hi" } None)-""-(Pair 0 None)-big_map_diff1]
+
 storage
   (Pair 0 None)
 emitted operations

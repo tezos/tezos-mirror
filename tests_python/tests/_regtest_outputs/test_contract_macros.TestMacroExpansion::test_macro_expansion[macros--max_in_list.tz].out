@@ -1,3 +1,5 @@
+tests/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/max_in_list.tz]
+
 { parameter (list int) ;
   storage (option int) ;
   code { CAR ;

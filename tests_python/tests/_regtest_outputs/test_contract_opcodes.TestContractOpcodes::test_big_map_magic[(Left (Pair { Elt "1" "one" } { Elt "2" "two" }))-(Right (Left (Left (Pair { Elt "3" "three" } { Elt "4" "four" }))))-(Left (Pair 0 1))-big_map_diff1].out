@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_big_map_magic[(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))-(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))-(Left (Pair 0 1))-big_map_diff1]
+
 storage
   (Left (Pair 0 1))
 emitted operations

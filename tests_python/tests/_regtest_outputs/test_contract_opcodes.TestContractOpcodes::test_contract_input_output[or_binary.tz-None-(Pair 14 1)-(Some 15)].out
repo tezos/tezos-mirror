@@ -1,3 +1,5 @@
+tests/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[or_binary.tz-None-(Pair 14 1)-(Some 15)]
+
 storage
   (Some 15)
 emitted operations
