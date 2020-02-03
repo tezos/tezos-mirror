@@ -1,6 +1,7 @@
 (executables
  (names test_tzList
-        test_lwt_pipe)
+        test_lwt_pipe
+        test_lru_cache)
  (libraries tezos-stdlib
             alcotest
             lwt_log
@@ -22,9 +23,14 @@
  (action (run %{exe:test_lwt_pipe.exe})))
 
 (alias
+ (name runtest_lru_cache)
+ (action (run %{exe:test_lru_cache.exe})))
+
+(alias
  (name runtest)
  (deps (alias runtest_tzList)
-       (alias runtest_lwt_pipe)))
+       (alias runtest_lwt_pipe)
+       (alias runtest_lru_cache)))
 
 (alias
  (name runtest_lint)
