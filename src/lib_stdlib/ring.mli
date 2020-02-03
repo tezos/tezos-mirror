@@ -51,29 +51,37 @@ val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b
 (** Retrieves the elements as a list, oldest first.. *)
 val elements : 'a t -> 'a list
 
-(** Ring Buffer Table *)
+(** Ring Buffer Table
+
+   The Ring Buffer Table implements a fixed-sized hash Table interface
+   on top of the Ring Buffer: it extends the latter with a O(1)
+   membership operation, and the ability to remove entries, while
+   still preserving the fast O(1) [add] operation from the Ring
+   Buffer.  *)
+
 module type TABLE = sig
   type t
 
   type v
 
-  (** [create size] inizialize an empty ring *)
+  (** [create size] initializes an empty table. *)
   val create : int -> t
 
-  (** [add t v] add a value to the ring. If the ring already contains size elements,
-      the first element is removed and [v] is added. *)
+  (** [add t v] adds v value to the table. If the table already
+     contains size elements, the first element is removed and [v] is
+     added. *)
   val add : t -> v -> unit
 
-  (** [mem t v] check if v is in the ring. O(1) *)
+  (** [mem t v] checks if v is in the table. O(1) *)
   val mem : t -> v -> bool
 
-  (** [remove t v] remove one element from the table *)
+  (** [remove t v] removes one element from the table *)
   val remove : t -> v -> unit
 
-  (** [retest t] remore all bindings from the current ring *)
+  (** [retest t] removes all bindings from the table *)
   val clear : t -> unit
 
-  (** [elements t] return the list of elements currently in the ring *)
+  (** [elements t] returns the list of elements currently in the table *)
   val elements : t -> v list
 end
 

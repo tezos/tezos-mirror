@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Imperative Ring Buffer *)
+
 module Ring = struct
   type 'a raw = Empty of int | Inited of {data : 'a array; mutable pos : int}
 
@@ -87,7 +89,8 @@ end
 
 include Ring
 
-(** Ring Buffer Table *)
+(* Ring Buffer Table *)
+
 module type TABLE = sig
   type t
 
@@ -106,11 +109,18 @@ module type TABLE = sig
   val elements : t -> v list
 end
 
-(* fixed size set of Peers id. If the set exceed the maximal allowed capacity, the
-   element that was added first is removed when a new one is added *)
+(* The Ring Buffer Table module implements a fixed-sized hash Table
+   interface on top of the Ring Buffer: it extends the latter with a
+   O(1) membership operation, and the ability to remove entries, while
+   still preserving the fast O(1) add operation from the Ring Buffer.
+   *)
 module MakeTable (V : Hashtbl.HashedType) = struct
   module Table = Hashtbl.Make (V)
 
+  (* To avoid linear membership operations, and expensive deletions in
+     the middle of the ring, the new functionality will be implemented
+     using a separate hash table. However this is not exposed to the
+     module API. *)
   type raw = {size : int; ring : V.t Ring.t; table : unit Table.t}
 
   type t = raw ref
@@ -127,6 +137,15 @@ module MakeTable (V : Hashtbl.HashedType) = struct
   let mem {contents = t} v = Table.mem t.table v
 
   let remove {contents = t} v = Table.remove t.table v
+
+  (* Notice that [mem] and [remove] affect the Table only, leaving the
+     Ring untouched. Thus, the two containers do not share a common
+     domain: we might have items that have been deleted from the table
+     which linger in the ring, occupying dead space. However it should
+     hold that everything present in the Table's domain is in the
+     Ring's domain. [add] effectively implements this property, by
+     calling [add_and_return_erased], potentially removing the value
+     evicted from the Ring out of the Table. *)
 
   let clear ({contents = t} as tt) =
     tt := {t with ring = Ring.create t.size; table = Table.create t.size}
