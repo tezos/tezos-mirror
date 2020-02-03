@@ -631,10 +631,10 @@ module Make (Encoding : ENCODING) = struct
               input = begin
                 match s.types.input with
                 | Service.No_input -> None
-                | Service.Input input -> Some (Encoding.schema input)
+                | Service.Input input -> Some (lazy (Encoding.schema input))
               end ;
-              output = Encoding.schema s.types.output ;
-              error = Encoding.schema s.types.error ;
+              output = lazy (Encoding.schema s.types.output) ;
+              error = lazy (Encoding.schema s.types.error) ;
             } in
             let builder key = Lwt.return (Service {
                 types = s.types ;
