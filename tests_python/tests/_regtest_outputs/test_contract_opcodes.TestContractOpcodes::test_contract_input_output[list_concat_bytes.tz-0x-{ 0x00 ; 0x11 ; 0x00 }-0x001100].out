@@ -33,13 +33,13 @@ trace
       { 0x00 ; 0x11 ; 0x00 }  	@parameter ]
   - location: 16 (remaining gas: 1039558 units remaining)
     [ { 0x ; 0x00 ; 0x11 ; 0x00 }  	 ]
-  - location: 17 (remaining gas: 1039557 units remaining)
+  - location: 17 (remaining gas: 1039555 units remaining)
     [ 0x001100  	 ]
-  - location: 18 (remaining gas: 1039557 units remaining)
+  - location: 18 (remaining gas: 1039555 units remaining)
     [ {}  	
       0x001100  	 ]
-  - location: 20 (remaining gas: 1039556 units remaining)
+  - location: 20 (remaining gas: 1039554 units remaining)
     [ (Pair {} 0x001100)  	 ]
-  - location: -1 (remaining gas: 1039556 units remaining)
+  - location: -1 (remaining gas: 1039554 units remaining)
     [ (Pair {} 0x001100)  	 ]
 

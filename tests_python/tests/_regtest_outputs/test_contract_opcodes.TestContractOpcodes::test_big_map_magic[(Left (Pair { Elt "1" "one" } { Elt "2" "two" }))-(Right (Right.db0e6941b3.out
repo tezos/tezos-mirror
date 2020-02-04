@@ -78,10 +78,10 @@ trace
       None  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: 195 (remaining gas: 1035709 units remaining)
+  - location: 195 (remaining gas: 1035708 units remaining)
     [ {}  	
       { Elt "2" "two" }  	 ]
-  - location: -1 (remaining gas: 1035709 units remaining)
+  - location: -1 (remaining gas: 1035708 units remaining)
     [ {}  	
       { Elt "2" "two" }  	 ]
   - location: 189 (remaining gas: 1035708 units remaining)

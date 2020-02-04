@@ -38,17 +38,17 @@ trace
       { "_abc" }  	 ]
   - location: 20 (remaining gas: 1039482 units remaining)
     [ { "" ; "_abc" }  	 ]
-  - location: 21 (remaining gas: 1039481 units remaining)
+  - location: 21 (remaining gas: 1039480 units remaining)
     [ "_abc"  	 ]
-  - location: -1 (remaining gas: 1039481 units remaining)
+  - location: -1 (remaining gas: 1039480 units remaining)
     [ "_abc"  	 ]
-  - location: 23 (remaining gas: 1039481 units remaining)
+  - location: 23 (remaining gas: 1039480 units remaining)
     [ "_abc"  	 ]
-  - location: 24 (remaining gas: 1039480 units remaining)
+  - location: 24 (remaining gas: 1039479 units remaining)
     [ {}  	
       "_abc"  	 ]
-  - location: 26 (remaining gas: 1039480 units remaining)
+  - location: 26 (remaining gas: 1039479 units remaining)
     [ (Pair {} "_abc")  	 ]
-  - location: -1 (remaining gas: 1039480 units remaining)
+  - location: -1 (remaining gas: 1039479 units remaining)
     [ (Pair {} "_abc")  	 ]
 

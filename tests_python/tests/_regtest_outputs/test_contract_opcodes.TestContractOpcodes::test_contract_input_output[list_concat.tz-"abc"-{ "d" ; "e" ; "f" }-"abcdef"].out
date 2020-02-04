@@ -33,13 +33,13 @@ trace
       { "d" ; "e" ; "f" }  	@parameter ]
   - location: 16 (remaining gas: 1039556 units remaining)
     [ { "abc" ; "d" ; "e" ; "f" }  	 ]
-  - location: 17 (remaining gas: 1039555 units remaining)
+  - location: 17 (remaining gas: 1039553 units remaining)
     [ "abcdef"  	 ]
-  - location: 18 (remaining gas: 1039555 units remaining)
+  - location: 18 (remaining gas: 1039553 units remaining)
     [ {}  	
       "abcdef"  	 ]
-  - location: 20 (remaining gas: 1039554 units remaining)
+  - location: 20 (remaining gas: 1039552 units remaining)
     [ (Pair {} "abcdef")  	 ]
-  - location: -1 (remaining gas: 1039554 units remaining)
+  - location: -1 (remaining gas: 1039552 units remaining)
     [ (Pair {} "abcdef")  	 ]
 

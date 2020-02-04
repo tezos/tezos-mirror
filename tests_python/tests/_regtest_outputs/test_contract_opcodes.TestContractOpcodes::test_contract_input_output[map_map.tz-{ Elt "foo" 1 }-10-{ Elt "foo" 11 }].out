@@ -31,20 +31,20 @@ trace
   - location: 16 (remaining gas: 1039354 units remaining)
     [ { Elt "foo" 1 }  	@storage
       10  	@parameter ]
-  - location: 19 (remaining gas: 1039353 units remaining)
+  - location: 19 (remaining gas: 1039352 units remaining)
     [ 1  	@elt
       10  	@parameter ]
-  - location: 22 (remaining gas: 1039352 units remaining)
+  - location: 22 (remaining gas: 1039351 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 21 (remaining gas: 1039352 units remaining)
+  - location: 21 (remaining gas: 1039351 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 20 (remaining gas: 1039352 units remaining)
+  - location: 20 (remaining gas: 1039351 units remaining)
     [ 1  	@elt
       10  	@parameter
       10  	@parameter ]
-  - location: 23 (remaining gas: 1039351 units remaining)
+  - location: 23 (remaining gas: 1039350 units remaining)
     [ 11  	
       10  	@parameter ]
   - location: -1 (remaining gas: 1039350 units remaining)
