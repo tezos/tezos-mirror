@@ -59,6 +59,13 @@ class TestContractOpcodes:
             ('slice.tz', 'Some "Foo"', 'Pair 1 3', 'None'),
             ('slice.tz', 'Some "Foo"', 'Pair 1 1', '(Some "o")'),
 
+            # Stress-test the failure case of slice for a
+            # non-trivial gas consumption
+            ('slice.tz',
+             'Some' + '"' + 'Foo' * 2000 + '"',
+             'Pair 1 10000',
+             'None'),
+
             # Slice bytes
             ('slice_bytes.tz', 'None', 'Pair 0 1', 'None'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 0 0', '(Some 0x)'),
@@ -67,6 +74,13 @@ class TestContractOpcodes:
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 2', '(Some 0xbbcc)'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 3', 'None'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 1', '(Some 0xbb)'),
+
+            # Stress-test the failure case of slice for a
+            # non-trivial gas  consumption
+            ('slice_bytes.tz',
+             'Some 0x' + 'aabbcc' * 2000,
+             'Pair 1 10000',
+             'None'),
 
             # Identity on pairs
             ('pair_id.tz', 'None', '(Pair True False)',
