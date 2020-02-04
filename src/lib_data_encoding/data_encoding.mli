@@ -63,7 +63,7 @@
       thus its size is given by the context, and does not
       have to be serialized.
 
-    JSON operations are delegated to [ocplib-json-typed]. *)
+    JSON operations are delegated to [json-data-encoding]. *)
 
 (** {2 Module structure}
 

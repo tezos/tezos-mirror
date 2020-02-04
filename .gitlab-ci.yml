@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: b168af3520f25b427b000b70c579d0cd565361b4
+  build_deps_image_version: bd0787b45cf2a439e111dd37fe6d269b49db3027
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
@@ -575,21 +575,6 @@ opam:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
-
-opam:ocplib-json-typed:
-  <<: *opam_definition
-  variables:
-    package: ocplib-json-typed
-
-opam:ocplib-json-typed-browser:
-  <<: *opam_definition
-  variables:
-    package: ocplib-json-typed-browser
-
-opam:ocplib-json-typed-bson:
-  <<: *opam_definition
-  variables:
-    package: ocplib-json-typed-bson
 
 opam:ocplib-resto:
   <<: *opam_definition

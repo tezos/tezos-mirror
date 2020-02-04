@@ -11,8 +11,8 @@ depends: [
   "lwt"
   "ezjsonm"
   "zarith"
-  "ocplib-json-typed" { = "dev" }
-  "ocplib-json-typed-bson" { = "dev" }
+  "json-data-encoding" { = "0.8" }
+  "json-data-encoding-bson" { = "0.8" }
   "alcotest" { with-test }
   "crowbar" { with-test }
 ]

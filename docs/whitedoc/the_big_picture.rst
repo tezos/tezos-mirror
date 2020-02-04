@@ -63,8 +63,7 @@ Finally, the RPC layer (in yellow on the right in the picture) is an
 important part of the node. It is how the client, third party
 applications and daemons can interact with the node and introspect its
 state. This component uses the mainstream JSON format and HTTP protocol.
-It uses in-house libraries ``ocplib-resto`` and ``ocplib-json-typed``
-(via the module :ref:`Data_encoding <data_encoding>`). It
+It uses in-house libraries ``ocplib-resto``. It
 is fully inter-operable, and auto descriptive, using JSON schema.
 
 .. |Tezos architecture diagram| image:: octopus.svg
@@ -105,7 +104,7 @@ that are used everywhere for basic operations.
    values of type ``t`` both binary and JSON representations. For
    both, the library provides machine and human-readable documentations
    by the use of documentation combinators. The JSON part depends on
-   :opam:`ocplib-json-typed`.
+   :opam:`json-data-encoding`.
    A :ref:`tutorial<data_encoding>` is available for this library.
  - :package:`tezos-error-monad` is an in-house monadic
    interface to the OCaml ``('a, 'b) result`` type, that fixes the

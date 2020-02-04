@@ -2,8 +2,8 @@
  (name tezos_data_encoding)
  (public_name tezos-data-encoding)
  (libraries lwt
-            ocplib-json-typed
-            ocplib-json-typed-bson
+            json-data-encoding
+            json-data-encoding-bson
             zarith
             ezjsonm))
 

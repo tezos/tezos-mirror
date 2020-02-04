@@ -15,5 +15,5 @@ build: [
 depends: [
   "dune" {build}
   "ocplib-resto" {= "dev" }
-  "ocplib-json-typed-bson" { = "dev" }
+  "json-data-encoding-bson" { = "0.8" }
 ]
