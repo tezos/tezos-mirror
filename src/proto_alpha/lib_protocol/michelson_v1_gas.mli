@@ -43,13 +43,11 @@ module Cost_of : sig
 
     val loop_cycle : Gas.cost
 
-    val loop_size : Gas.cost
+    val list_map : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val loop_iter : Gas.cost
+    val list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost
 
-    val loop_map : Gas.cost
-
-    val nop : Gas.cost
+    val set_iter : 'a Script_typed_ir.set -> Gas.cost
 
     val stack_op : Gas.cost
 
@@ -69,11 +67,15 @@ module Cost_of : sig
 
     val branch : Gas.cost
 
-    val concat_string : string list -> Gas.cost
+    val concat_string : length:int -> Gas.cost
 
-    val concat_bytes : MBytes.t list -> Gas.cost
+    val concat_bytes : length:int -> Gas.cost
 
     val slice_string : int -> Gas.cost
+
+    val map_map : ('k, 'v) Script_typed_ir.map -> Gas.cost
+
+    val map_iter : ('k, 'v) Script_typed_ir.map -> Gas.cost
 
     val map_mem : 'a -> ('a, 'b) Script_typed_ir.map -> Gas.cost
 

@@ -99,8 +99,6 @@ module Cost_of = struct
   module Interpreter = struct
     let cycle = atomic_step_cost 10
 
-    let nop = free
-
     let stack_op = atomic_step_cost 10
 
     let push = atomic_step_cost 10
@@ -117,18 +115,21 @@ module Cost_of = struct
 
     let cons = atomic_step_cost 10
 
-    let loop_size = atomic_step_cost 5
-
     let loop_cycle = atomic_step_cost 10
 
-    let loop_iter = atomic_step_cost 20
+    let list_map (l : 'a Script_typed_ir.boxed_list) =
+      atomic_step_cost (30 + (l.length * 30))
 
-    let loop_map = atomic_step_cost 30
+    let list_iter (l : 'a Script_typed_ir.boxed_list) =
+      atomic_step_cost (20 + (l.length * 20))
 
     let empty_set = atomic_step_cost 10
 
     let set_to_list : type elt. elt Script_typed_ir.set -> cost =
      fun (module Box) -> atomic_step_cost (Box.size * 20)
+
+    let set_iter : type elt. elt Script_typed_ir.set -> cost =
+     fun (module Box) -> atomic_step_cost (20 + (Box.size * 20))
 
     let set_mem : type elt. elt -> elt Script_typed_ir.set -> cost =
      fun elt (module Box) ->
@@ -149,6 +150,16 @@ module Cost_of = struct
      fun (module Box) ->
       let size = snd Box.boxed in
       atomic_step_cost (size * 20)
+
+    let map_map : type key value. (key, value) Script_typed_ir.map -> cost =
+     fun (module Box) ->
+      let size = snd Box.boxed in
+      atomic_step_cost (30 + (size * 30))
+
+    let map_iter : type key value. (key, value) Script_typed_ir.map -> cost =
+     fun (module Box) ->
+      let size = snd Box.boxed in
+      atomic_step_cost (20 + (size * 20))
 
     let map_access :
         type key value. key -> (key, value) Script_typed_ir.map -> cost =
@@ -183,16 +194,14 @@ module Cost_of = struct
       let bytes2 = timestamp_bytes t2 in
       atomic_step_cost (51 + (Compare.Int.max bytes1 bytes2 / 62))
 
-    let rec concat_loop l acc =
-      match l with [] -> 30 | _ :: tl -> concat_loop tl (acc + 30)
-
-    let concat_string string_list =
-      atomic_step_cost (concat_loop string_list 0)
+    let concat_string ~length:string_list_length =
+      atomic_step_cost (30 + (string_list_length * 30))
 
     let slice_string string_length =
       atomic_step_cost (40 + (string_length / 70))
 
-    let concat_bytes bytes_list = atomic_step_cost (concat_loop bytes_list 0)
+    let concat_bytes ~length:bytes_list_length =
+      atomic_step_cost (30 + (bytes_list_length * 30))
 
     let int64_op = atomic_step_cost 61
 
