@@ -345,6 +345,276 @@ module No_trace : STEP_LOGGER = struct
   let get_log () = None
 end
 
+let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
+ fun descr stack ->
+  let cycle_cost = Interp_costs.cycle in
+  let instr_cost =
+    match (descr.instr, stack) with
+    | (Drop, _) ->
+        Interp_costs.stack_op
+    | (Dup, _) ->
+        Interp_costs.stack_op
+    | (Swap, _) ->
+        Interp_costs.stack_op
+    | (Const _, _) ->
+        Interp_costs.push
+    | (Cons_some, _) ->
+        Interp_costs.wrap
+    | (Cons_none _, _) ->
+        Interp_costs.variant_no_data
+    | (If_none _, _) ->
+        Interp_costs.branch
+    | (Cons_pair, _) ->
+        Interp_costs.pair
+    | (Car, _) ->
+        Interp_costs.pair_access
+    | (Cdr, _) ->
+        Interp_costs.pair_access
+    | (Left, _) ->
+        Interp_costs.wrap
+    | (Right, _) ->
+        Interp_costs.wrap
+    | (If_left _, _) ->
+        Interp_costs.branch
+    | (Cons_list, _) ->
+        Interp_costs.cons
+    | (Nil, _) ->
+        Interp_costs.variant_no_data
+    | (If_cons _, _) ->
+        Interp_costs.branch
+    | (List_map _, Item (list, _)) ->
+        Interp_costs.list_map list
+    | (List_size, _) ->
+        Interp_costs.push
+    | (List_iter _, Item (l, _)) ->
+        Interp_costs.list_iter l
+    | (Empty_set _, _) ->
+        Interp_costs.empty_set
+    | (Set_iter _, Item (set, _)) ->
+        Gas.(Interp_costs.set_to_list set +@ Interp_costs.set_iter set)
+    | (Set_mem, Item (v, Item (set, _))) ->
+        Interp_costs.set_mem v set
+    | (Set_update, Item (v, Item (presence, Item (set, _)))) ->
+        Interp_costs.set_update v presence set
+    | (Set_size, _) ->
+        Interp_costs.set_size
+    | (Empty_map _, _) ->
+        Interp_costs.empty_map
+    | (Map_map _, Item (map, _)) ->
+        Gas.(Interp_costs.map_to_list map +@ Interp_costs.map_map map)
+    | (Map_iter _, Item (map, _)) ->
+        Gas.(Interp_costs.map_to_list map +@ Interp_costs.map_iter map)
+    | (Map_mem, Item (v, Item (map, _rest))) ->
+        Interp_costs.map_mem v map
+    | (Map_get, Item (v, Item (map, _rest))) ->
+        Interp_costs.map_get v map
+    | (Map_update, Item (k, Item (v, Item (map, _)))) ->
+        Interp_costs.map_update k v map
+    | (Map_size, _) ->
+        Interp_costs.map_size
+    | (Empty_big_map _, _) ->
+        Interp_costs.empty_map
+    | (Big_map_mem, Item (key, Item (map, _))) ->
+        Interp_costs.map_mem key map.diff
+    | (Big_map_get, Item (key, Item (map, _))) ->
+        Interp_costs.map_get key map.diff
+    | (Big_map_update, Item (key, Item (maybe_value, Item (map, _)))) ->
+        Interp_costs.map_update key (Some maybe_value) map.diff
+    | (Add_seconds_to_timestamp, Item (n, Item (t, _))) ->
+        Interp_costs.add_timestamp t n
+    | (Add_timestamp_to_seconds, Item (t, Item (n, _))) ->
+        Interp_costs.add_timestamp t n
+    | (Sub_timestamp_seconds, Item (t, Item (s, _))) ->
+        Interp_costs.sub_timestamp t s
+    | (Diff_timestamps, Item (t1, Item (t2, _))) ->
+        Interp_costs.diff_timestamps t1 t2
+    | (Concat_string_pair, Item (_x, Item (_y, _))) ->
+        Interp_costs.concat_string ~length:2
+    | (Concat_string, Item (ss, _)) ->
+        Interp_costs.concat_string ~length:ss.Script_typed_ir.length
+    | (Slice_string, Item (_offset, Item (length, Item (_s, _)))) ->
+        let length = Script_int.to_zint length in
+        Interp_costs.slice_string (Z.to_int length)
+    | (String_size, _) ->
+        Interp_costs.push
+    | (Concat_bytes_pair, Item (_x, Item (_y, _))) ->
+        Interp_costs.concat_bytes ~length:2
+    | (Concat_bytes, Item (ss, _)) ->
+        Interp_costs.concat_bytes ~length:ss.Script_typed_ir.length
+    | (Slice_bytes, Item (_offset, Item (length, Item (_s, _)))) ->
+        let length = Script_int.to_zint length in
+        Interp_costs.slice_string (Z.to_int length)
+    | (Bytes_size, _) ->
+        Interp_costs.push
+    | (Add_tez, _) ->
+        Interp_costs.int64_op
+    | (Sub_tez, _) ->
+        Interp_costs.int64_op
+    | (Mul_teznat, _) ->
+        Gas.(Interp_costs.int64_op +@ Interp_costs.z_to_int64)
+    | (Mul_nattez, _) ->
+        Gas.(Interp_costs.int64_op +@ Interp_costs.z_to_int64)
+    | (Or, Item (x, Item (y, _))) ->
+        Interp_costs.bool_binop x y
+    | (And, Item (x, Item (y, _))) ->
+        Interp_costs.bool_binop x y
+    | (Xor, Item (x, Item (y, _))) ->
+        Interp_costs.bool_binop x y
+    | (Not, Item (x, _)) ->
+        Interp_costs.bool_unop x
+    | (Is_nat, Item (x, _)) ->
+        Interp_costs.abs x
+    | (Abs_int, Item (x, _)) ->
+        Interp_costs.abs x
+    | (Int_nat, Item (x, _)) ->
+        Interp_costs.int x
+    | (Neg_int, Item (x, _)) ->
+        Interp_costs.neg x
+    | (Neg_nat, Item (x, _)) ->
+        Interp_costs.neg x
+    | (Add_intint, Item (x, Item (y, _))) ->
+        Interp_costs.add x y
+    | (Add_intnat, Item (x, Item (y, _))) ->
+        Interp_costs.add x y
+    | (Add_natint, Item (x, Item (y, _))) ->
+        Interp_costs.add x y
+    | (Add_natnat, Item (x, Item (y, _))) ->
+        Interp_costs.add x y
+    | (Sub_int, Item (x, Item (y, _))) ->
+        Interp_costs.sub x y
+    | (Mul_intint, Item (x, Item (y, _))) ->
+        Interp_costs.mul x y
+    | (Mul_intnat, Item (x, Item (y, _))) ->
+        Interp_costs.mul x y
+    | (Mul_natint, Item (x, Item (y, _))) ->
+        Interp_costs.mul x y
+    | (Mul_natnat, Item (x, Item (y, _))) ->
+        Interp_costs.mul x y
+    | (Ediv_teznat, Item (x, Item (y, _))) ->
+        let open Gas in
+        let x = Script_int.of_int64 (Tez.to_mutez x) in
+        Interp_costs.int64_to_z +@ Interp_costs.div x y
+    | (Ediv_tez, Item (x, Item (y, _))) ->
+        let open Gas in
+        let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
+        let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
+        Interp_costs.int64_to_z +@ Interp_costs.int64_to_z
+        +@ Interp_costs.div x y
+    | (Ediv_intint, Item (x, Item (y, _))) ->
+        Interp_costs.div x y
+    | (Ediv_intnat, Item (x, Item (y, _))) ->
+        Interp_costs.div x y
+    | (Ediv_natint, Item (x, Item (y, _))) ->
+        Interp_costs.div x y
+    | (Ediv_natnat, Item (x, Item (y, _))) ->
+        Interp_costs.div x y
+    | (Lsl_nat, Item (x, Item (y, _))) ->
+        Interp_costs.shift_left x y
+    | (Lsr_nat, Item (x, Item (y, _))) ->
+        Interp_costs.shift_right x y
+    | (Or_nat, Item (x, Item (y, _))) ->
+        Interp_costs.logor x y
+    | (And_nat, Item (x, Item (y, _))) ->
+        Interp_costs.logand x y
+    | (And_int_nat, Item (x, Item (y, _))) ->
+        Interp_costs.logand x y
+    | (Xor_nat, Item (x, Item (y, _))) ->
+        Interp_costs.logxor x y
+    | (Not_int, Item (x, _)) ->
+        Interp_costs.lognot x
+    | (Not_nat, Item (x, _)) ->
+        Interp_costs.lognot x
+    | (Seq _, _) ->
+        Gas.free
+    | (If _, _) ->
+        Interp_costs.branch
+    | (Loop _, _) ->
+        Interp_costs.loop_cycle
+    | (Loop_left _, _) ->
+        Interp_costs.loop_cycle
+    | (Dip _, _) ->
+        Interp_costs.stack_op
+    | (Exec, _) ->
+        Interp_costs.exec
+    | (Apply _, _) ->
+        Interp_costs.apply
+    | (Lambda _, _) ->
+        Interp_costs.push
+    | (Failwith _, _) ->
+        Gas.free
+    | (Nop, _) ->
+        Gas.free
+    | (Compare ty, Item (a, Item (b, _))) ->
+        Interp_costs.compare ty a b
+    | (Eq, _) ->
+        Interp_costs.compare_res
+    | (Neq, _) ->
+        Interp_costs.compare_res
+    | (Lt, _) ->
+        Interp_costs.compare_res
+    | (Le, _) ->
+        Interp_costs.compare_res
+    | (Gt, _) ->
+        Interp_costs.compare_res
+    | (Ge, _) ->
+        Interp_costs.compare_res
+    | (Pack _, _) ->
+        Gas.free
+    | (Unpack _, _) ->
+        Gas.free
+    | (Address, _) ->
+        Interp_costs.address
+    | (Contract _, _) ->
+        Interp_costs.contract
+    | (Transfer_tokens, _) ->
+        Interp_costs.transfer
+    | (Create_account, _) ->
+        Interp_costs.create_account
+    | (Implicit_account, _) ->
+        Interp_costs.implicit_account
+    | (Create_contract _, _) ->
+        Interp_costs.create_contract
+    | (Create_contract_2 _, _) ->
+        Interp_costs.create_contract
+    | (Set_delegate, _) ->
+        Interp_costs.create_account
+    | (Balance, _) ->
+        Interp_costs.balance
+    | (Now, _) ->
+        Interp_costs.now
+    | (Check_signature, Item (key, Item (_, Item (message, _)))) ->
+        Interp_costs.check_signature key message
+    | (Hash_key, _) ->
+        Interp_costs.hash_key
+    | (Blake2b, Item (bytes, _)) ->
+        Interp_costs.hash_blake2b bytes
+    | (Sha256, Item (bytes, _)) ->
+        Interp_costs.hash_sha256 bytes
+    | (Sha512, Item (bytes, _)) ->
+        Interp_costs.hash_sha512 bytes
+    | (Steps_to_quota, _) ->
+        Interp_costs.steps_to_quota
+    | (Source, _) ->
+        Interp_costs.source
+    | (Sender, _) ->
+        Interp_costs.source
+    | (Self _, _) ->
+        Interp_costs.self
+    | (Amount, _) ->
+        Interp_costs.amount
+    | (Dig (n, _), _) ->
+        Interp_costs.stack_n_op n
+    | (Dug (n, _), _) ->
+        Interp_costs.stack_n_op n
+    | (Dipn (n, _, _), _) ->
+        Interp_costs.stack_n_op n
+    | (Dropn (n, _), _) ->
+        Interp_costs.stack_n_op n
+    | (ChainId, _) ->
+        Interp_costs.chain_id
+  in
+  Gas.(cycle_cost +@ instr_cost)
+
 let rec step :
     type b a.
     logger ->
@@ -354,124 +624,63 @@ let rec step :
     b stack ->
     (a stack * context) tzresult Lwt.t =
  fun logger ctxt step_constants ({instr; loc; _} as descr) stack ->
-  Lwt.return (Gas.consume ctxt Interp_costs.cycle)
+  let gas = cost_of_instr descr stack in
+  Lwt.return (Gas.consume ctxt gas)
   >>=? fun ctxt ->
   let module Log = (val logger) in
   Log.log_entry ctxt descr stack
   >>=? fun () ->
-  let logged_return :
-      type a b.
-      (b, a) descr -> a stack * context -> (a stack * context) tzresult Lwt.t =
-   fun descr (ret, ctxt) ->
-    Log.log_exit ctxt descr ret >>=? fun () -> return (ret, ctxt)
-  in
-  let consume_gas_terop :
-      type ret arg1 arg2 arg3 rest.
-      (_ * (_ * (_ * rest)), ret * rest) descr ->
-      (arg1 -> arg2 -> arg3 -> ret) * arg1 * arg2 * arg3 ->
-      (arg1 -> arg2 -> arg3 -> Gas.cost) ->
-      rest stack ->
-      ((ret * rest) stack * context) tzresult Lwt.t =
-   fun descr (op, x1, x2, x3) cost_func rest ->
-    Lwt.return (Gas.consume ctxt (cost_func x1 x2 x3))
-    >>=? fun ctxt -> logged_return descr (Item (op x1 x2 x3, rest), ctxt)
-  in
-  let consume_gas_binop :
-      type ret arg1 arg2 rest.
-      (_ * (_ * rest), ret * rest) descr ->
-      (arg1 -> arg2 -> ret) * arg1 * arg2 ->
-      (arg1 -> arg2 -> Gas.cost) ->
-      rest stack ->
-      context ->
-      ((ret * rest) stack * context) tzresult Lwt.t =
-   fun descr (op, x1, x2) cost_func rest ctxt ->
-    Lwt.return (Gas.consume ctxt (cost_func x1 x2))
-    >>=? fun ctxt -> logged_return descr (Item (op x1 x2, rest), ctxt)
-  in
-  let consume_gas_unop :
-      type ret arg rest.
-      (_ * rest, ret * rest) descr ->
-      (arg -> ret) * arg ->
-      (arg -> Gas.cost) ->
-      rest stack ->
-      context ->
-      ((ret * rest) stack * context) tzresult Lwt.t =
-   fun descr (op, arg) cost_func rest ctxt ->
-    Lwt.return (Gas.consume ctxt (cost_func arg))
-    >>=? fun ctxt -> logged_return descr (Item (op arg, rest), ctxt)
-  in
   let logged_return : a stack * context -> (a stack * context) tzresult Lwt.t =
-    logged_return descr
+   fun (ret, ctxt) ->
+    Log.log_exit ctxt descr ret >>=? fun () -> return (ret, ctxt)
   in
   match (instr, stack) with
   (* stack ops *)
   | (Drop, Item (_, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.stack_op)
-      >>=? fun ctxt -> logged_return (rest, ctxt)
+      logged_return (rest, ctxt)
   | (Dup, Item (v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.stack_op)
-      >>=? fun ctxt -> logged_return (Item (v, Item (v, rest)), ctxt)
+      logged_return (Item (v, Item (v, rest)), ctxt)
   | (Swap, Item (vi, Item (vo, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.stack_op)
-      >>=? fun ctxt -> logged_return (Item (vo, Item (vi, rest)), ctxt)
+      logged_return (Item (vo, Item (vi, rest)), ctxt)
   | (Const v, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.push)
-      >>=? fun ctxt -> logged_return (Item (v, rest), ctxt)
+      logged_return (Item (v, rest), ctxt)
   (* options *)
   | (Cons_some, Item (v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.wrap)
-      >>=? fun ctxt -> logged_return (Item (Some v, rest), ctxt)
+      logged_return (Item (Some v, rest), ctxt)
   | (Cons_none _, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.variant_no_data)
-      >>=? fun ctxt -> logged_return (Item (None, rest), ctxt)
+      logged_return (Item (None, rest), ctxt)
   | (If_none (bt, _), Item (None, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bt rest
+      step logger ctxt step_constants bt rest
   | (If_none (_, bf), Item (Some v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bf (Item (v, rest))
+      step logger ctxt step_constants bf (Item (v, rest))
   (* pairs *)
   | (Cons_pair, Item (a, Item (b, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.pair)
-      >>=? fun ctxt -> logged_return (Item ((a, b), rest), ctxt)
+      logged_return (Item ((a, b), rest), ctxt)
   | (Car, Item ((a, _), rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.pair_access)
-      >>=? fun ctxt -> logged_return (Item (a, rest), ctxt)
+      logged_return (Item (a, rest), ctxt)
   | (Cdr, Item ((_, b), rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.pair_access)
-      >>=? fun ctxt -> logged_return (Item (b, rest), ctxt)
+      logged_return (Item (b, rest), ctxt)
   (* unions *)
   | (Left, Item (v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.wrap)
-      >>=? fun ctxt -> logged_return (Item (L v, rest), ctxt)
+      logged_return (Item (L v, rest), ctxt)
   | (Right, Item (v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.wrap)
-      >>=? fun ctxt -> logged_return (Item (R v, rest), ctxt)
+      logged_return (Item (R v, rest), ctxt)
   | (If_left (bt, _), Item (L v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bt (Item (v, rest))
+      step logger ctxt step_constants bt (Item (v, rest))
   | (If_left (_, bf), Item (R v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bf (Item (v, rest))
+      step logger ctxt step_constants bf (Item (v, rest))
   (* lists *)
   | (Cons_list, Item (hd, Item (tl, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.cons)
-      >>=? fun ctxt -> logged_return (Item (list_cons hd tl, rest), ctxt)
+      logged_return (Item (list_cons hd tl, rest), ctxt)
   | (Nil, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.variant_no_data)
-      >>=? fun ctxt -> logged_return (Item (list_empty, rest), ctxt)
+      logged_return (Item (list_empty, rest), ctxt)
   | (If_cons (_, bf), Item ({elements = []; _}, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bf rest
+      step logger ctxt step_constants bf rest
   | (If_cons (bt, _), Item ({elements = hd :: tl; length}, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt ->
       let tl = {elements = tl; length = length - 1} in
       step logger ctxt step_constants bt (Item (hd, Item (tl, rest)))
   | (List_map body, Item (list, rest)) ->
       let rec loop rest ctxt l acc =
-        Lwt.return (Gas.consume ctxt Interp_costs.loop_map)
-        >>=? fun ctxt ->
         match l with
         | [] ->
             let result = {elements = List.rev acc; length = list.length} in
@@ -483,13 +692,9 @@ let rec step :
       loop rest ctxt list.elements []
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (List_size, Item (list, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.push)
-      >>=? fun ctxt ->
       logged_return (Item (Script_int.(abs (of_int list.length)), rest), ctxt)
   | (List_iter body, Item (l, init)) ->
       let rec loop ctxt l stack =
-        Lwt.return (Gas.consume ctxt Interp_costs.loop_iter)
-        >>=? fun ctxt ->
         match l with
         | [] ->
             return (stack, ctxt)
@@ -501,15 +706,10 @@ let rec step :
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   (* sets *)
   | (Empty_set t, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.empty_set)
-      >>=? fun ctxt -> logged_return (Item (empty_set t, rest), ctxt)
+      logged_return (Item (empty_set t, rest), ctxt)
   | (Set_iter body, Item (set, init)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.set_to_list set))
-      >>=? fun ctxt ->
       let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
       let rec loop ctxt l stack =
-        Lwt.return (Gas.consume ctxt Interp_costs.loop_iter)
-        >>=? fun ctxt ->
         match l with
         | [] ->
             return (stack, ctxt)
@@ -519,31 +719,17 @@ let rec step :
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Set_mem, Item (v, Item (set, rest))) ->
-      consume_gas_binop descr (set_mem, v, set) Interp_costs.set_mem rest ctxt
+      logged_return (Item (set_mem v set, rest), ctxt)
   | (Set_update, Item (v, Item (presence, Item (set, rest)))) ->
-      consume_gas_terop
-        descr
-        (set_update, v, presence, set)
-        Interp_costs.set_update
-        rest
+      logged_return (Item (set_update v presence set, rest), ctxt)
   | (Set_size, Item (set, rest)) ->
-      consume_gas_unop
-        descr
-        (set_size, set)
-        (fun _ -> Interp_costs.set_size)
-        rest
-        ctxt
+      logged_return (Item (set_size set, rest), ctxt)
   (* maps *)
   | (Empty_map (t, _), rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.empty_map)
-      >>=? fun ctxt -> logged_return (Item (empty_map t, rest), ctxt)
+      logged_return (Item (empty_map t, rest), ctxt)
   | (Map_map body, Item (map, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map))
-      >>=? fun ctxt ->
       let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
       let rec loop rest ctxt l acc =
-        Lwt.return (Gas.consume ctxt Interp_costs.loop_map)
-        >>=? fun ctxt ->
         match l with
         | [] ->
             return (Item (acc, rest), ctxt)
@@ -555,12 +741,8 @@ let rec step :
       loop rest ctxt l (empty_map (map_key_ty map))
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Map_iter body, Item (map, init)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.map_to_list map))
-      >>=? fun ctxt ->
       let l = List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
       let rec loop ctxt l stack =
-        Lwt.return (Gas.consume ctxt Interp_costs.loop_iter)
-        >>=? fun ctxt ->
         match l with
         | [] ->
             return (stack, ctxt)
@@ -570,395 +752,232 @@ let rec step :
       in
       loop ctxt l init >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   | (Map_mem, Item (v, Item (map, rest))) ->
-      consume_gas_binop descr (map_mem, v, map) Interp_costs.map_mem rest ctxt
+      logged_return (Item (map_mem v map, rest), ctxt)
   | (Map_get, Item (v, Item (map, rest))) ->
-      consume_gas_binop descr (map_get, v, map) Interp_costs.map_get rest ctxt
+      logged_return (Item (map_get v map, rest), ctxt)
   | (Map_update, Item (k, Item (v, Item (map, rest)))) ->
-      consume_gas_terop
-        descr
-        (map_update, k, v, map)
-        Interp_costs.map_update
-        rest
+      logged_return (Item (map_update k v map, rest), ctxt)
   | (Map_size, Item (map, rest)) ->
-      consume_gas_unop
-        descr
-        (map_size, map)
-        (fun _ -> Interp_costs.map_size)
-        rest
-        ctxt
+      logged_return (Item (map_size map, rest), ctxt)
   (* Big map operations *)
   | (Empty_big_map (tk, tv), rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.empty_map)
-      >>=? fun ctxt ->
       logged_return
         (Item (Script_ir_translator.empty_big_map tk tv, rest), ctxt)
   | (Big_map_mem, Item (key, Item (map, rest))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.map_mem key map.diff))
-      >>=? fun ctxt ->
       Script_ir_translator.big_map_mem ctxt key map
       >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
   | (Big_map_get, Item (key, Item (map, rest))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.map_get key map.diff))
-      >>=? fun ctxt ->
       Script_ir_translator.big_map_get ctxt key map
       >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
   | (Big_map_update, Item (key, Item (maybe_value, Item (map, rest)))) ->
-      consume_gas_terop
-        descr
-        (Script_ir_translator.big_map_update, key, maybe_value, map)
-        (fun k v m -> Interp_costs.map_update k (Some v) m.diff)
-        rest
+      let big_map = Script_ir_translator.big_map_update key maybe_value map in
+      logged_return (Item (big_map, rest), ctxt)
   (* timestamp operations *)
   | (Add_seconds_to_timestamp, Item (n, Item (t, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_timestamp.add_delta, t, n)
-        Interp_costs.add_timestamp
-        rest
-        ctxt
+      let result = Script_timestamp.add_delta t n in
+      logged_return (Item (result, rest), ctxt)
   | (Add_timestamp_to_seconds, Item (t, Item (n, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_timestamp.add_delta, t, n)
-        Interp_costs.add_timestamp
-        rest
-        ctxt
+      let result = Script_timestamp.add_delta t n in
+      logged_return (Item (result, rest), ctxt)
   | (Sub_timestamp_seconds, Item (t, Item (s, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_timestamp.sub_delta, t, s)
-        Interp_costs.sub_timestamp
-        rest
-        ctxt
+      let result = Script_timestamp.sub_delta t s in
+      logged_return (Item (result, rest), ctxt)
   | (Diff_timestamps, Item (t1, Item (t2, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_timestamp.diff, t1, t2)
-        Interp_costs.diff_timestamps
-        rest
-        ctxt
+      let result = Script_timestamp.diff t1 t2 in
+      logged_return (Item (result, rest), ctxt)
   (* string operations *)
   | (Concat_string_pair, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_string [x; y]))
-      >>=? fun ctxt ->
       let s = String.concat "" [x; y] in
       logged_return (Item (s, rest), ctxt)
   | (Concat_string, Item (ss, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_string ss.elements))
-      >>=? fun ctxt ->
       let s = String.concat "" ss.elements in
       logged_return (Item (s, rest), ctxt)
   | (Slice_string, Item (offset, Item (length, Item (s, rest)))) ->
       let s_length = Z.of_int (String.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
-      Lwt.return
-        (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
-      >>=? fun ctxt ->
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
         logged_return
           ( Item (Some (String.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
       else logged_return (Item (None, rest), ctxt)
   | (String_size, Item (s, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.push)
-      >>=? fun ctxt ->
       logged_return
         (Item (Script_int.(abs (of_int (String.length s))), rest), ctxt)
   (* bytes operations *)
   | (Concat_bytes_pair, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes [x; y]))
-      >>=? fun ctxt ->
       let s = MBytes.concat "" [x; y] in
       logged_return (Item (s, rest), ctxt)
   | (Concat_bytes, Item (ss, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.concat_bytes ss.elements))
-      >>=? fun ctxt ->
       let s = MBytes.concat "" ss.elements in
       logged_return (Item (s, rest), ctxt)
   | (Slice_bytes, Item (offset, Item (length, Item (s, rest)))) ->
       let s_length = Z.of_int (MBytes.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
-      Lwt.return
-        (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
-      >>=? fun ctxt ->
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
         logged_return
           ( Item (Some (MBytes.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
       else logged_return (Item (None, rest), ctxt)
   | (Bytes_size, Item (s, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.push)
-      >>=? fun ctxt ->
       logged_return
         (Item (Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
   (* currency operations *)
   | (Add_tez, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_op)
-      >>=? fun ctxt ->
       Lwt.return Tez.(x +? y)
       >>=? fun res -> logged_return (Item (res, rest), ctxt)
   | (Sub_tez, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_op)
-      >>=? fun ctxt ->
       Lwt.return Tez.(x -? y)
       >>=? fun res -> logged_return (Item (res, rest), ctxt)
   | (Mul_teznat, Item (x, Item (y, rest))) -> (
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_op)
-      >>=? fun ctxt ->
-      Lwt.return (Gas.consume ctxt Interp_costs.z_to_int64)
-      >>=? fun ctxt ->
-      match Script_int.to_int64 y with
-      | None ->
-          fail (Overflow (loc, Log.get_log ()))
-      | Some y ->
-          Lwt.return Tez.(x *? y)
-          >>=? fun res -> logged_return (Item (res, rest), ctxt) )
+    match Script_int.to_int64 y with
+    | None ->
+        fail (Overflow (loc, Log.get_log ()))
+    | Some y ->
+        Lwt.return Tez.(x *? y)
+        >>=? fun res -> logged_return (Item (res, rest), ctxt) )
   | (Mul_nattez, Item (y, Item (x, rest))) -> (
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_op)
-      >>=? fun ctxt ->
-      Lwt.return (Gas.consume ctxt Interp_costs.z_to_int64)
-      >>=? fun ctxt ->
-      match Script_int.to_int64 y with
-      | None ->
-          fail (Overflow (loc, Log.get_log ()))
-      | Some y ->
-          Lwt.return Tez.(x *? y)
-          >>=? fun res -> logged_return (Item (res, rest), ctxt) )
+    match Script_int.to_int64 y with
+    | None ->
+        fail (Overflow (loc, Log.get_log ()))
+    | Some y ->
+        Lwt.return Tez.(x *? y)
+        >>=? fun res -> logged_return (Item (res, rest), ctxt) )
   (* boolean operations *)
   | (Or, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (( || ), x, y) Interp_costs.bool_binop rest ctxt
+      logged_return (Item (x || y, rest), ctxt)
   | (And, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (( && ), x, y) Interp_costs.bool_binop rest ctxt
+      logged_return (Item (x && y, rest), ctxt)
   | (Xor, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Compare.Bool.( <> ), x, y)
-        Interp_costs.bool_binop
-        rest
-        ctxt
+      logged_return (Item (Compare.Bool.(x <> y), rest), ctxt)
   | (Not, Item (x, rest)) ->
-      consume_gas_unop descr (not, x) Interp_costs.bool_unop rest ctxt
+      logged_return (Item (not x, rest), ctxt)
   (* integer operations *)
   | (Is_nat, Item (x, rest)) ->
-      consume_gas_unop descr (Script_int.is_nat, x) Interp_costs.abs rest ctxt
+      logged_return (Item (Script_int.is_nat x, rest), ctxt)
   | (Abs_int, Item (x, rest)) ->
-      consume_gas_unop descr (Script_int.abs, x) Interp_costs.abs rest ctxt
+      logged_return (Item (Script_int.abs x, rest), ctxt)
   | (Int_nat, Item (x, rest)) ->
-      consume_gas_unop descr (Script_int.int, x) Interp_costs.int rest ctxt
+      logged_return (Item (Script_int.int x, rest), ctxt)
   | (Neg_int, Item (x, rest)) ->
-      consume_gas_unop descr (Script_int.neg, x) Interp_costs.neg rest ctxt
+      logged_return (Item (Script_int.neg x, rest), ctxt)
   | (Neg_nat, Item (x, rest)) ->
-      consume_gas_unop descr (Script_int.neg, x) Interp_costs.neg rest ctxt
+      logged_return (Item (Script_int.neg x, rest), ctxt)
   | (Add_intint, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
+      logged_return (Item (Script_int.add x y, rest), ctxt)
   | (Add_intnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
+      logged_return (Item (Script_int.add x y, rest), ctxt)
   | (Add_natint, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
+      logged_return (Item (Script_int.add x y, rest), ctxt)
   | (Add_natnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.add_n, x, y)
-        Interp_costs.add
-        rest
-        ctxt
+      logged_return (Item (Script_int.add_n x y, rest), ctxt)
   | (Sub_int, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.sub, x, y) Interp_costs.sub rest ctxt
+      logged_return (Item (Script_int.sub x y, rest), ctxt)
   | (Mul_intint, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
+      logged_return (Item (Script_int.mul x y, rest), ctxt)
   | (Mul_intnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
+      logged_return (Item (Script_int.mul x y, rest), ctxt)
   | (Mul_natint, Item (x, Item (y, rest))) ->
-      consume_gas_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
+      logged_return (Item (Script_int.mul x y, rest), ctxt)
   | (Mul_natnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.mul_n, x, y)
-        Interp_costs.mul
-        rest
-        ctxt
+      logged_return (Item (Script_int.mul_n x y, rest), ctxt)
   | (Ediv_teznat, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_to_z)
-      >>=? fun ctxt ->
       let x = Script_int.of_int64 (Tez.to_mutez x) in
-      consume_gas_binop
-        descr
-        ( (fun x y ->
-            match Script_int.ediv x y with
-            | None ->
-                None
-            | Some (q, r) -> (
-              match (Script_int.to_int64 q, Script_int.to_int64 r) with
-              | (Some q, Some r) -> (
-                match (Tez.of_mutez q, Tez.of_mutez r) with
-                | (Some q, Some r) ->
-                    Some (q, r)
-                (* Cannot overflow *)
-                | _ ->
-                    assert false )
-              (* Cannot overflow *)
-              | _ ->
-                  assert false )),
-          x,
-          y )
-        Interp_costs.div
-        rest
-        ctxt
+      let result =
+        match Script_int.ediv x y with
+        | None ->
+            None
+        | Some (q, r) -> (
+          match (Script_int.to_int64 q, Script_int.to_int64 r) with
+          | (Some q, Some r) -> (
+            match (Tez.of_mutez q, Tez.of_mutez r) with
+            | (Some q, Some r) ->
+                Some (q, r)
+            (* Cannot overflow *)
+            | _ ->
+                assert false )
+          (* Cannot overflow *)
+          | _ ->
+              assert false )
+      in
+      logged_return (Item (result, rest), ctxt)
   | (Ediv_tez, Item (x, Item (y, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_to_z)
-      >>=? fun ctxt ->
-      Lwt.return (Gas.consume ctxt Interp_costs.int64_to_z)
-      >>=? fun ctxt ->
       let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
       let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
-      consume_gas_binop
-        descr
-        ( (fun x y ->
-            match Script_int.ediv_n x y with
+      let result =
+        match Script_int.ediv_n x y with
+        | None ->
+            None
+        | Some (q, r) -> (
+          match Script_int.to_int64 r with
+          | None ->
+              assert false (* Cannot overflow *)
+          | Some r -> (
+            match Tez.of_mutez r with
             | None ->
-                None
-            | Some (q, r) -> (
-              match Script_int.to_int64 r with
-              | None ->
-                  assert false (* Cannot overflow *)
-              | Some r -> (
-                match Tez.of_mutez r with
-                | None ->
-                    assert false (* Cannot overflow *)
-                | Some r ->
-                    Some (q, r) ) )),
-          x,
-          y )
-        Interp_costs.div
-        rest
-        ctxt
+                assert false (* Cannot overflow *)
+            | Some r ->
+                Some (q, r) ) )
+      in
+      logged_return (Item (result, rest), ctxt)
   | (Ediv_intint, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.ediv, x, y)
-        Interp_costs.div
-        rest
-        ctxt
+      logged_return (Item (Script_int.ediv x y, rest), ctxt)
   | (Ediv_intnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.ediv, x, y)
-        Interp_costs.div
-        rest
-        ctxt
+      logged_return (Item (Script_int.ediv x y, rest), ctxt)
   | (Ediv_natint, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.ediv, x, y)
-        Interp_costs.div
-        rest
-        ctxt
+      logged_return (Item (Script_int.ediv x y, rest), ctxt)
   | (Ediv_natnat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.ediv_n, x, y)
-        Interp_costs.div
-        rest
-        ctxt
+      logged_return (Item (Script_int.ediv_n x y, rest), ctxt)
   | (Lsl_nat, Item (x, Item (y, rest))) -> (
-      Lwt.return (Gas.consume ctxt (Interp_costs.shift_left x y))
-      >>=? fun ctxt ->
-      match Script_int.shift_left_n x y with
-      | None ->
-          fail (Overflow (loc, Log.get_log ()))
-      | Some x ->
-          logged_return (Item (x, rest), ctxt) )
+    match Script_int.shift_left_n x y with
+    | None ->
+        fail (Overflow (loc, Log.get_log ()))
+    | Some x ->
+        logged_return (Item (x, rest), ctxt) )
   | (Lsr_nat, Item (x, Item (y, rest))) -> (
-      Lwt.return (Gas.consume ctxt (Interp_costs.shift_right x y))
-      >>=? fun ctxt ->
-      match Script_int.shift_right_n x y with
-      | None ->
-          fail (Overflow (loc, Log.get_log ()))
-      | Some r ->
-          logged_return (Item (r, rest), ctxt) )
+    match Script_int.shift_right_n x y with
+    | None ->
+        fail (Overflow (loc, Log.get_log ()))
+    | Some r ->
+        logged_return (Item (r, rest), ctxt) )
   | (Or_nat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.logor, x, y)
-        Interp_costs.logor
-        rest
-        ctxt
+      logged_return (Item (Script_int.logor x y, rest), ctxt)
   | (And_nat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.logand, x, y)
-        Interp_costs.logand
-        rest
-        ctxt
+      logged_return (Item (Script_int.logand x y, rest), ctxt)
   | (And_int_nat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.logand, x, y)
-        Interp_costs.logand
-        rest
-        ctxt
+      logged_return (Item (Script_int.logand x y, rest), ctxt)
   | (Xor_nat, Item (x, Item (y, rest))) ->
-      consume_gas_binop
-        descr
-        (Script_int.logxor, x, y)
-        Interp_costs.logxor
-        rest
-        ctxt
+      logged_return (Item (Script_int.logxor x y, rest), ctxt)
   | (Not_int, Item (x, rest)) ->
-      consume_gas_unop
-        descr
-        (Script_int.lognot, x)
-        Interp_costs.lognot
-        rest
-        ctxt
+      logged_return (Item (Script_int.lognot x, rest), ctxt)
   | (Not_nat, Item (x, rest)) ->
-      consume_gas_unop
-        descr
-        (Script_int.lognot, x)
-        Interp_costs.lognot
-        rest
-        ctxt
+      logged_return (Item (Script_int.lognot x, rest), ctxt)
   (* control *)
   | (Seq (hd, tl), stack) ->
       step logger ctxt step_constants hd stack
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants tl trans
   | (If (bt, _), Item (true, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bt rest
+      step logger ctxt step_constants bt rest
   | (If (_, bf), Item (false, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.branch)
-      >>=? fun ctxt -> step logger ctxt step_constants bf rest
+      step logger ctxt step_constants bf rest
   | (Loop body, Item (true, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
-      >>=? fun ctxt ->
       step logger ctxt step_constants body rest
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
   | (Loop _, Item (false, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
-      >>=? fun ctxt -> logged_return (rest, ctxt)
+      logged_return (rest, ctxt)
   | (Loop_left body, Item (L v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
-      >>=? fun ctxt ->
       step logger ctxt step_constants body (Item (v, rest))
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
   | (Loop_left _, Item (R v, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
-      >>=? fun ctxt -> logged_return (Item (v, rest), ctxt)
+      logged_return (Item (v, rest), ctxt)
   | (Dip b, Item (ign, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.stack_op)
-      >>=? fun ctxt ->
       step logger ctxt step_constants b rest
       >>=? fun (res, ctxt) -> logged_return (Item (ign, res), ctxt)
   | (Exec, Item (arg, Item (lam, rest))) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.exec)
-      >>=? fun ctxt ->
       interp logger ctxt step_constants lam arg
       >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
   | (Apply capture_ty, Item (capture, Item (lam, rest))) -> (
-      Lwt.return (Gas.consume ctxt Interp_costs.apply)
-      >>=? fun ctxt ->
       let (Lam (descr, expr)) = lam in
       let (Item_t (full_arg_ty, _, _)) = descr.bef in
       unparse_data ctxt Optimized capture_ty capture
@@ -1016,8 +1035,7 @@ let rec step :
       | _ ->
           assert false )
   | (Lambda lam, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.push)
-      >>=? fun ctxt -> logged_return (Item (lam, rest), ctxt)
+      logged_return (Item (lam, rest), ctxt)
   | (Failwith tv, Item (v, _)) ->
       trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
       >>=? fun (v, _ctxt) ->
@@ -1027,8 +1045,6 @@ let rec step :
       logged_return (stack, ctxt)
   (* comparison *)
   | (Compare ty, Item (a, Item (b, rest))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.compare ty a b))
-      >>=? fun ctxt ->
       logged_return
         ( Item
             ( Script_int.of_int
@@ -1039,33 +1055,27 @@ let rec step :
   | (Eq, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres = 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   | (Neq, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres <> 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   | (Lt, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres < 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   | (Le, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres <= 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   | (Gt, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres > 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   | (Ge, Item (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres >= 0) in
-      Lwt.return (Gas.consume ctxt Interp_costs.compare_res)
-      >>=? fun ctxt -> logged_return (Item (cmpres, rest), ctxt)
+      logged_return (Item (cmpres, rest), ctxt)
   (* packing *)
   | (Pack t, Item (value, rest)) ->
       Script_ir_translator.pack_data ctxt t value
@@ -1096,30 +1106,25 @@ let rec step :
       else logged_return (Item (None, rest), ctxt)
   (* protocol *)
   | (Address, Item ((_, address), rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.address)
-      >>=? fun ctxt -> logged_return (Item (address, rest), ctxt)
+      logged_return (Item (address, rest), ctxt)
   | (Contract (t, entrypoint), Item (contract, rest)) -> (
-      Lwt.return (Gas.consume ctxt Interp_costs.contract)
-      >>=? fun ctxt ->
-      match (contract, entrypoint) with
-      | ((contract, "default"), entrypoint)
-      | ((contract, entrypoint), "default") ->
-          Script_ir_translator.parse_contract_for_script
-            ~legacy:false
-            ctxt
-            loc
-            t
-            contract
-            ~entrypoint
-          >>=? fun (ctxt, maybe_contract) ->
-          logged_return (Item (maybe_contract, rest), ctxt)
-      | _ ->
-          logged_return (Item (None, rest), ctxt) )
+    match (contract, entrypoint) with
+    | ((contract, "default"), entrypoint) | ((contract, entrypoint), "default")
+      ->
+        Script_ir_translator.parse_contract_for_script
+          ~legacy:false
+          ctxt
+          loc
+          t
+          contract
+          ~entrypoint
+        >>=? fun (ctxt, maybe_contract) ->
+        logged_return (Item (maybe_contract, rest), ctxt)
+    | _ ->
+        logged_return (Item (None, rest), ctxt) )
   | ( Transfer_tokens,
       Item (p, Item (amount, Item ((tp, (destination, entrypoint)), rest))) )
     ->
-      Lwt.return (Gas.consume ctxt Interp_costs.transfer)
-      >>=? fun ctxt ->
       collect_big_maps ctxt tp p
       >>=? fun (to_duplicate, ctxt) ->
       let to_update = no_big_map_id in
@@ -1155,8 +1160,6 @@ let rec step :
   | ( Create_account,
       Item (manager, Item (delegate, Item (_delegatable, Item (credit, rest))))
     ) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.create_account)
-      >>=? fun ctxt ->
       Contract.fresh_contract_from_current_nonce ctxt
       >>=? fun (ctxt, contract) ->
       (* store in optimized binary representation - as unparsed with [Optimized]. *)
@@ -1183,8 +1186,6 @@ let rec step :
               Item ((contract, "default"), rest) ),
           ctxt )
   | (Implicit_account, Item (key, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.implicit_account)
-      >>=? fun ctxt ->
       let contract = Contract.implicit_contract key in
       logged_return (Item ((Unit_t None, (contract, "default")), rest), ctxt)
   | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
@@ -1196,8 +1197,6 @@ let rec step :
                 ( spendable,
                   Item (delegatable, Item (credit, Item (init, rest))) ) ) ) )
     ->
-      Lwt.return (Gas.consume ctxt Interp_costs.create_contract)
-      >>=? fun ctxt ->
       unparse_ty ctxt param_type
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
@@ -1270,8 +1269,6 @@ let rec step :
   | ( Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     Item (delegate, Item (credit, Item (init, rest))) ) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.create_contract)
-      >>=? fun ctxt ->
       unparse_ty ctxt param_type
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
@@ -1330,8 +1327,6 @@ let rec step :
               Item ((contract, "default"), rest) ),
           ctxt )
   | (Set_delegate, Item (delegate, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.create_account)
-      >>=? fun ctxt ->
       let operation = Delegation delegate in
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
@@ -1343,42 +1338,26 @@ let rec step :
               rest ),
           ctxt )
   | (Balance, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.balance)
-      >>=? fun ctxt ->
       Contract.get_balance ctxt step_constants.self
       >>=? fun balance -> logged_return (Item (balance, rest), ctxt)
   | (Now, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.now)
-      >>=? fun ctxt ->
       let now = Script_timestamp.now ctxt in
       logged_return (Item (now, rest), ctxt)
   | (Check_signature, Item (key, Item (signature, Item (message, rest)))) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.check_signature key message))
-      >>=? fun ctxt ->
       let res = Signature.check key signature message in
       logged_return (Item (res, rest), ctxt)
   | (Hash_key, Item (key, rest)) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.hash_key)
-      >>=? fun ctxt ->
       logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
   | (Blake2b, Item (bytes, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.hash_blake2b bytes))
-      >>=? fun ctxt ->
       let hash = Raw_hashes.blake2b bytes in
       logged_return (Item (hash, rest), ctxt)
   | (Sha256, Item (bytes, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.hash_sha256 bytes))
-      >>=? fun ctxt ->
       let hash = Raw_hashes.sha256 bytes in
       logged_return (Item (hash, rest), ctxt)
   | (Sha512, Item (bytes, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.hash_sha512 bytes))
-      >>=? fun ctxt ->
       let hash = Raw_hashes.sha512 bytes in
       logged_return (Item (hash, rest), ctxt)
   | (Steps_to_quota, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.steps_to_quota)
-      >>=? fun ctxt ->
       let steps =
         match Gas.level ctxt with
         | Limited {remaining} ->
@@ -1388,39 +1367,26 @@ let rec step :
       in
       logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
   | (Source, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.source)
-      >>=? fun ctxt ->
       logged_return (Item ((step_constants.payer, "default"), rest), ctxt)
   | (Sender, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.source)
-      >>=? fun ctxt ->
       logged_return (Item ((step_constants.source, "default"), rest), ctxt)
   | (Self (t, entrypoint), rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.self)
-      >>=? fun ctxt ->
       logged_return (Item ((t, (step_constants.self, entrypoint)), rest), ctxt)
   | (Amount, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.amount)
-      >>=? fun ctxt -> logged_return (Item (step_constants.amount, rest), ctxt)
-  | (Dig (n, n'), stack) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n))
-      >>=? fun ctxt ->
+      logged_return (Item (step_constants.amount, rest), ctxt)
+  | (Dig (_n, n'), stack) ->
       interp_stack_prefix_preserving_operation
         (fun (Item (v, rest)) -> return (rest, v))
         n'
         stack
       >>=? fun (aft, x) -> logged_return (Item (x, aft), ctxt)
-  | (Dug (n, n'), Item (v, rest)) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n))
-      >>=? fun ctxt ->
+  | (Dug (_n, n'), Item (v, rest)) ->
       interp_stack_prefix_preserving_operation
         (fun stk -> return (Item (v, stk), ()))
         n'
         rest
       >>=? fun (aft, ()) -> logged_return (aft, ctxt)
-  | (Dipn (n, n', b), stack) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n))
-      >>=? fun ctxt ->
+  | (Dipn (_n, n', b), stack) ->
       interp_stack_prefix_preserving_operation
         (fun stk ->
           step logger ctxt step_constants b stk
@@ -1428,17 +1394,13 @@ let rec step :
         n'
         stack
       >>=? fun (aft, ctxt') -> logged_return (aft, ctxt')
-  | (Dropn (n, n'), stack) ->
-      Lwt.return (Gas.consume ctxt (Interp_costs.stack_n_op n))
-      >>=? fun ctxt ->
+  | (Dropn (_n, n'), stack) ->
       interp_stack_prefix_preserving_operation
         (fun stk -> return (stk, stk))
         n'
         stack
       >>=? fun (_, rest) -> logged_return (rest, ctxt)
   | (ChainId, rest) ->
-      Lwt.return (Gas.consume ctxt Interp_costs.chain_id)
-      >>=? fun ctxt ->
       logged_return (Item (step_constants.chain_id, rest), ctxt)
 
 and interp :
