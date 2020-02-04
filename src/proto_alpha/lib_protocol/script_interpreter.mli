@@ -58,10 +58,6 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
-type 'tys stack =
-  | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
-  | Empty : Script_typed_ir.end_of_stack stack
-
 (** [STEP_LOGGER] is the module type of logging
     modules as passed to the Michelson interpreter.
     Note that logging must be performed by side-effects
@@ -74,7 +70,7 @@ module type STEP_LOGGER = sig
   val log_interp :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'bef stack ->
+    'bef ->
     unit tzresult Lwt.t
 
   (** [log_entry] is called {i before} executing
@@ -83,7 +79,7 @@ module type STEP_LOGGER = sig
   val log_entry :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'bef stack ->
+    'bef ->
     unit tzresult Lwt.t
 
   (** [log_exit] is called {i after} executing each
@@ -91,7 +87,7 @@ module type STEP_LOGGER = sig
   val log_exit :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'aft stack ->
+    'aft ->
     unit tzresult Lwt.t
 
   (** [get_log] allows to obtain an execution trace, if
@@ -106,8 +102,8 @@ val step :
   context ->
   step_constants ->
   ('bef, 'aft) Script_typed_ir.descr ->
-  'bef stack ->
-  ('aft stack * context) tzresult Lwt.t
+  'bef ->
+  ('aft * context) tzresult Lwt.t
 
 val execute :
   Alpha_context.t ->

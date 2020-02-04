@@ -144,23 +144,19 @@ let () =
 
 (* ---- interpreter ---------------------------------------------------------*)
 
-type 'tys stack =
-  | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
-  | Empty : end_of_stack stack
-
 let unparse_stack ctxt (stack, stack_ty) =
   (* We drop the gas limit as this function is only used for debugging/errors. *)
   let ctxt = Gas.set_unlimited ctxt in
   let rec unparse_stack :
       type a.
-      a stack * a stack_ty -> (Script.expr * string option) list tzresult Lwt.t
-      = function
-    | (Empty, Empty_t) ->
+      a stack_ty * a -> (Script.expr * string option) list tzresult Lwt.t =
+    function
+    | (Empty_t, ()) ->
         return_nil
-    | (Item (v, rest), Item_t (ty, rest_ty, annot)) ->
+    | (Item_t (ty, rest_ty, annot), (v, rest)) ->
         unparse_data ctxt Readable ty v
         >>=? fun (data, _ctxt) ->
-        unparse_stack (rest, rest_ty)
+        unparse_stack (rest_ty, rest)
         >>=? fun rest ->
         let annot =
           match Script_ir_annot.unparse_var_annot annot with
@@ -174,16 +170,16 @@ let unparse_stack ctxt (stack, stack_ty) =
         let data = Micheline.strip_locations data in
         return ((data, annot) :: rest)
   in
-  unparse_stack (stack, stack_ty)
+  unparse_stack (stack_ty, stack)
 
 module Interp_costs = Michelson_v1_gas.Cost_of.Interpreter
 
 let rec interp_stack_prefix_preserving_operation :
     type fbef bef faft aft result.
-    (fbef stack -> (faft stack * result) tzresult Lwt.t) ->
+    (fbef -> (faft * result) tzresult Lwt.t) ->
     (fbef, faft, bef, aft) stack_prefix_preservation_witness ->
-    bef stack ->
-    (aft stack * result) tzresult Lwt.t =
+    bef ->
+    (aft * result) tzresult Lwt.t =
  fun f n stk ->
   match (n, stk) with
   | ( Prefix
@@ -198,88 +194,35 @@ let rec interp_stack_prefix_preserving_operation :
                         (Prefix
                           (Prefix
                             (Prefix (Prefix (Prefix (Prefix (Prefix n))))))))))))))),
-      Item
-        ( v0,
-          Item
-            ( v1,
-              Item
-                ( v2,
-                  Item
-                    ( v3,
-                      Item
-                        ( v4,
-                          Item
-                            ( v5,
-                              Item
-                                ( v6,
-                                  Item
-                                    ( v7,
-                                      Item
-                                        ( v8,
-                                          Item
-                                            ( v9,
-                                              Item
-                                                ( va,
-                                                  Item
-                                                    ( vb,
-                                                      Item
-                                                        ( vc,
-                                                          Item
-                                                            ( vd,
-                                                              Item
-                                                                ( ve,
-                                                                  Item
-                                                                    (vf, rest)
-                                                                ) ) ) ) ) ) )
-                                    ) ) ) ) ) ) ) ) ) ->
+      ( v0,
+        ( v1,
+          ( v2,
+            ( v3,
+              ( v4,
+                ( v5,
+                  ( v6,
+                    (v7, (v8, (v9, (va, (vb, (vc, (vd, (ve, (vf, rest)))))))))
+                  ) ) ) ) ) ) ) ) ->
       interp_stack_prefix_preserving_operation f n rest
       >>=? fun (rest', result) ->
       return
-        ( Item
-            ( v0,
-              Item
-                ( v1,
-                  Item
-                    ( v2,
-                      Item
-                        ( v3,
-                          Item
-                            ( v4,
-                              Item
-                                ( v5,
-                                  Item
-                                    ( v6,
-                                      Item
-                                        ( v7,
-                                          Item
-                                            ( v8,
-                                              Item
-                                                ( v9,
-                                                  Item
-                                                    ( va,
-                                                      Item
-                                                        ( vb,
-                                                          Item
-                                                            ( vc,
-                                                              Item
-                                                                ( vd,
-                                                                  Item
-                                                                    ( ve,
-                                                                      Item
-                                                                        ( vf,
-                                                                          rest'
-                                                                        ) ) )
-                                                            ) ) ) ) ) ) ) ) )
-                        ) ) ) ),
+        ( ( v0,
+            ( v1,
+              ( v2,
+                ( v3,
+                  ( v4,
+                    ( v5,
+                      ( v6,
+                        ( v7,
+                          (v8, (v9, (va, (vb, (vc, (vd, (ve, (vf, rest'))))))))
+                        ) ) ) ) ) ) ) ),
           result )
-  | ( Prefix (Prefix (Prefix (Prefix n))),
-      Item (v0, Item (v1, Item (v2, Item (v3, rest)))) ) ->
+  | (Prefix (Prefix (Prefix (Prefix n))), (v0, (v1, (v2, (v3, rest))))) ->
       interp_stack_prefix_preserving_operation f n rest
-      >>=? fun (rest', result) ->
-      return (Item (v0, Item (v1, Item (v2, Item (v3, rest')))), result)
-  | (Prefix n, Item (v, rest)) ->
+      >>=? fun (rest', result) -> return ((v0, (v1, (v2, (v3, rest')))), result)
+  | (Prefix n, (v, rest)) ->
       interp_stack_prefix_preserving_operation f n rest
-      >>=? fun (rest', result) -> return (Item (v, rest'), result)
+      >>=? fun (rest', result) -> return ((v, rest'), result)
   | (Rest, v) ->
       f v
 
@@ -295,19 +238,19 @@ module type STEP_LOGGER = sig
   val log_interp :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'bef stack ->
+    'bef ->
     unit tzresult Lwt.t
 
   val log_entry :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'bef stack ->
+    'bef ->
     unit tzresult Lwt.t
 
   val log_exit :
     context ->
     ('bef, 'aft) Script_typed_ir.descr ->
-    'aft stack ->
+    'aft ->
     unit tzresult Lwt.t
 
   val get_log : unit -> execution_trace option
@@ -345,7 +288,7 @@ module No_trace : STEP_LOGGER = struct
   let get_log () = None
 end
 
-let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
+let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
  fun descr stack ->
   let cycle_cost = Interp_costs.cycle in
   let instr_cost =
@@ -382,66 +325,66 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Interp_costs.variant_no_data
     | (If_cons _, _) ->
         Interp_costs.branch
-    | (List_map _, Item (list, _)) ->
+    | (List_map _, (list, _)) ->
         Interp_costs.list_map list
     | (List_size, _) ->
         Interp_costs.push
-    | (List_iter _, Item (l, _)) ->
+    | (List_iter _, (l, _)) ->
         Interp_costs.list_iter l
     | (Empty_set _, _) ->
         Interp_costs.empty_set
-    | (Set_iter _, Item (set, _)) ->
+    | (Set_iter _, (set, _)) ->
         Interp_costs.set_iter set
-    | (Set_mem, Item (v, Item (set, _))) ->
+    | (Set_mem, (v, (set, _))) ->
         Interp_costs.set_mem v set
-    | (Set_update, Item (v, Item (presence, Item (set, _)))) ->
+    | (Set_update, (v, (presence, (set, _)))) ->
         Interp_costs.set_update v presence set
     | (Set_size, _) ->
         Interp_costs.set_size
     | (Empty_map _, _) ->
         Interp_costs.empty_map
-    | (Map_map _, Item (map, _)) ->
+    | (Map_map _, (map, _)) ->
         Interp_costs.map_map map
-    | (Map_iter _, Item (map, _)) ->
+    | (Map_iter _, (map, _)) ->
         Interp_costs.map_iter map
-    | (Map_mem, Item (v, Item (map, _rest))) ->
+    | (Map_mem, (v, (map, _rest))) ->
         Interp_costs.map_mem v map
-    | (Map_get, Item (v, Item (map, _rest))) ->
+    | (Map_get, (v, (map, _rest))) ->
         Interp_costs.map_get v map
-    | (Map_update, Item (k, Item (v, Item (map, _)))) ->
+    | (Map_update, (k, (v, (map, _)))) ->
         Interp_costs.map_update k v map
     | (Map_size, _) ->
         Interp_costs.map_size
     | (Empty_big_map _, _) ->
         Interp_costs.empty_map
-    | (Big_map_mem, Item (key, Item (map, _))) ->
+    | (Big_map_mem, (key, (map, _))) ->
         Interp_costs.map_mem key map.diff
-    | (Big_map_get, Item (key, Item (map, _))) ->
+    | (Big_map_get, (key, (map, _))) ->
         Interp_costs.map_get key map.diff
-    | (Big_map_update, Item (key, Item (maybe_value, Item (map, _)))) ->
+    | (Big_map_update, (key, (maybe_value, (map, _)))) ->
         Interp_costs.map_update key (Some maybe_value) map.diff
-    | (Add_seconds_to_timestamp, Item (n, Item (t, _))) ->
+    | (Add_seconds_to_timestamp, (n, (t, _))) ->
         Interp_costs.add_timestamp t n
-    | (Add_timestamp_to_seconds, Item (t, Item (n, _))) ->
+    | (Add_timestamp_to_seconds, (t, (n, _))) ->
         Interp_costs.add_timestamp t n
-    | (Sub_timestamp_seconds, Item (t, Item (s, _))) ->
+    | (Sub_timestamp_seconds, (t, (s, _))) ->
         Interp_costs.sub_timestamp t s
-    | (Diff_timestamps, Item (t1, Item (t2, _))) ->
+    | (Diff_timestamps, (t1, (t2, _))) ->
         Interp_costs.diff_timestamps t1 t2
-    | (Concat_string_pair, Item (_x, Item (_y, _))) ->
+    | (Concat_string_pair, (_x, (_y, _))) ->
         Interp_costs.concat_string ~length:2
-    | (Concat_string, Item (ss, _)) ->
+    | (Concat_string, (ss, _)) ->
         Interp_costs.concat_string ~length:ss.Script_typed_ir.length
-    | (Slice_string, Item (_offset, Item (length, Item (_s, _)))) ->
+    | (Slice_string, (_offset, (length, (_s, _)))) ->
         let length = Script_int.to_zint length in
         Interp_costs.slice_string (Z.to_int length)
     | (String_size, _) ->
         Interp_costs.push
-    | (Concat_bytes_pair, Item (_x, Item (_y, _))) ->
+    | (Concat_bytes_pair, (_x, (_y, _))) ->
         Interp_costs.concat_bytes ~length:2
-    | (Concat_bytes, Item (ss, _)) ->
+    | (Concat_bytes, (ss, _)) ->
         Interp_costs.concat_bytes ~length:ss.Script_typed_ir.length
-    | (Slice_bytes, Item (_offset, Item (length, Item (_s, _)))) ->
+    | (Slice_bytes, (_offset, (length, (_s, _)))) ->
         let length = Script_int.to_zint length in
         Interp_costs.slice_string (Z.to_int length)
     | (Bytes_size, _) ->
@@ -454,75 +397,75 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Gas.(Interp_costs.int64_op +@ Interp_costs.z_to_int64)
     | (Mul_nattez, _) ->
         Gas.(Interp_costs.int64_op +@ Interp_costs.z_to_int64)
-    | (Or, Item (x, Item (y, _))) ->
+    | (Or, (x, (y, _))) ->
         Interp_costs.bool_binop x y
-    | (And, Item (x, Item (y, _))) ->
+    | (And, (x, (y, _))) ->
         Interp_costs.bool_binop x y
-    | (Xor, Item (x, Item (y, _))) ->
+    | (Xor, (x, (y, _))) ->
         Interp_costs.bool_binop x y
-    | (Not, Item (x, _)) ->
+    | (Not, (x, _)) ->
         Interp_costs.bool_unop x
-    | (Is_nat, Item (x, _)) ->
+    | (Is_nat, (x, _)) ->
         Interp_costs.abs x
-    | (Abs_int, Item (x, _)) ->
+    | (Abs_int, (x, _)) ->
         Interp_costs.abs x
-    | (Int_nat, Item (x, _)) ->
+    | (Int_nat, (x, _)) ->
         Interp_costs.int x
-    | (Neg_int, Item (x, _)) ->
+    | (Neg_int, (x, _)) ->
         Interp_costs.neg x
-    | (Neg_nat, Item (x, _)) ->
+    | (Neg_nat, (x, _)) ->
         Interp_costs.neg x
-    | (Add_intint, Item (x, Item (y, _))) ->
+    | (Add_intint, (x, (y, _))) ->
         Interp_costs.add x y
-    | (Add_intnat, Item (x, Item (y, _))) ->
+    | (Add_intnat, (x, (y, _))) ->
         Interp_costs.add x y
-    | (Add_natint, Item (x, Item (y, _))) ->
+    | (Add_natint, (x, (y, _))) ->
         Interp_costs.add x y
-    | (Add_natnat, Item (x, Item (y, _))) ->
+    | (Add_natnat, (x, (y, _))) ->
         Interp_costs.add x y
-    | (Sub_int, Item (x, Item (y, _))) ->
+    | (Sub_int, (x, (y, _))) ->
         Interp_costs.sub x y
-    | (Mul_intint, Item (x, Item (y, _))) ->
+    | (Mul_intint, (x, (y, _))) ->
         Interp_costs.mul x y
-    | (Mul_intnat, Item (x, Item (y, _))) ->
+    | (Mul_intnat, (x, (y, _))) ->
         Interp_costs.mul x y
-    | (Mul_natint, Item (x, Item (y, _))) ->
+    | (Mul_natint, (x, (y, _))) ->
         Interp_costs.mul x y
-    | (Mul_natnat, Item (x, Item (y, _))) ->
+    | (Mul_natnat, (x, (y, _))) ->
         Interp_costs.mul x y
-    | (Ediv_teznat, Item (x, Item (y, _))) ->
+    | (Ediv_teznat, (x, (y, _))) ->
         let open Gas in
         let x = Script_int.of_int64 (Tez.to_mutez x) in
         Interp_costs.int64_to_z +@ Interp_costs.div x y
-    | (Ediv_tez, Item (x, Item (y, _))) ->
+    | (Ediv_tez, (x, (y, _))) ->
         let open Gas in
         let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
         let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
         Interp_costs.int64_to_z +@ Interp_costs.int64_to_z
         +@ Interp_costs.div x y
-    | (Ediv_intint, Item (x, Item (y, _))) ->
+    | (Ediv_intint, (x, (y, _))) ->
         Interp_costs.div x y
-    | (Ediv_intnat, Item (x, Item (y, _))) ->
+    | (Ediv_intnat, (x, (y, _))) ->
         Interp_costs.div x y
-    | (Ediv_natint, Item (x, Item (y, _))) ->
+    | (Ediv_natint, (x, (y, _))) ->
         Interp_costs.div x y
-    | (Ediv_natnat, Item (x, Item (y, _))) ->
+    | (Ediv_natnat, (x, (y, _))) ->
         Interp_costs.div x y
-    | (Lsl_nat, Item (x, Item (y, _))) ->
+    | (Lsl_nat, (x, (y, _))) ->
         Interp_costs.shift_left x y
-    | (Lsr_nat, Item (x, Item (y, _))) ->
+    | (Lsr_nat, (x, (y, _))) ->
         Interp_costs.shift_right x y
-    | (Or_nat, Item (x, Item (y, _))) ->
+    | (Or_nat, (x, (y, _))) ->
         Interp_costs.logor x y
-    | (And_nat, Item (x, Item (y, _))) ->
+    | (And_nat, (x, (y, _))) ->
         Interp_costs.logand x y
-    | (And_int_nat, Item (x, Item (y, _))) ->
+    | (And_int_nat, (x, (y, _))) ->
         Interp_costs.logand x y
-    | (Xor_nat, Item (x, Item (y, _))) ->
+    | (Xor_nat, (x, (y, _))) ->
         Interp_costs.logxor x y
-    | (Not_int, Item (x, _)) ->
+    | (Not_int, (x, _)) ->
         Interp_costs.lognot x
-    | (Not_nat, Item (x, _)) ->
+    | (Not_nat, (x, _)) ->
         Interp_costs.lognot x
     | (Seq _, _) ->
         Gas.free
@@ -544,7 +487,7 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Gas.free
     | (Nop, _) ->
         Gas.free
-    | (Compare ty, Item (a, Item (b, _))) ->
+    | (Compare ty, (a, (b, _))) ->
         Interp_costs.compare ty a b
     | (Eq, _) ->
         Interp_costs.compare_res
@@ -584,15 +527,15 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Interp_costs.level
     | (Now, _) ->
         Interp_costs.now
-    | (Check_signature, Item (key, Item (_, Item (message, _)))) ->
+    | (Check_signature, (key, (_, (message, _)))) ->
         Interp_costs.check_signature key message
     | (Hash_key, _) ->
         Interp_costs.hash_key
-    | (Blake2b, Item (bytes, _)) ->
+    | (Blake2b, (bytes, _)) ->
         Interp_costs.hash_blake2b bytes
-    | (Sha256, Item (bytes, _)) ->
+    | (Sha256, (bytes, _)) ->
         Interp_costs.hash_sha256 bytes
-    | (Sha512, Item (bytes, _)) ->
+    | (Sha512, (bytes, _)) ->
         Interp_costs.hash_sha512 bytes
     | (Steps_to_quota, _) ->
         Interp_costs.steps_to_quota
@@ -625,8 +568,8 @@ let rec step :
     context ->
     step_constants ->
     (b, a) descr ->
-    b stack ->
-    (a stack * context) tzresult Lwt.t =
+    b ->
+    (a * context) tzresult Lwt.t =
  fun logger ctxt step_constants ({instr; loc; _} as descr) stack ->
   let gas = cost_of_instr descr stack in
   Lwt.return (Gas.consume ctxt gas)
@@ -634,247 +577,242 @@ let rec step :
   let module Log = (val logger) in
   Log.log_entry ctxt descr stack
   >>=? fun () ->
-  let logged_return : a stack * context -> (a stack * context) tzresult Lwt.t =
+  let logged_return : a * context -> (a * context) tzresult Lwt.t =
    fun (ret, ctxt) ->
     Log.log_exit ctxt descr ret >>=? fun () -> return (ret, ctxt)
   in
   match (instr, stack) with
   (* stack ops *)
-  | (Drop, Item (_, rest)) ->
+  | (Drop, (_, rest)) ->
       logged_return (rest, ctxt)
-  | (Dup, Item (v, rest)) ->
-      logged_return (Item (v, Item (v, rest)), ctxt)
-  | (Swap, Item (vi, Item (vo, rest))) ->
-      logged_return (Item (vo, Item (vi, rest)), ctxt)
+  | (Dup, (v, rest)) ->
+      logged_return ((v, (v, rest)), ctxt)
+  | (Swap, (vi, (vo, rest))) ->
+      logged_return ((vo, (vi, rest)), ctxt)
   | (Const v, rest) ->
-      logged_return (Item (v, rest), ctxt)
+      logged_return ((v, rest), ctxt)
   (* options *)
-  | (Cons_some, Item (v, rest)) ->
-      logged_return (Item (Some v, rest), ctxt)
+  | (Cons_some, (v, rest)) ->
+      logged_return ((Some v, rest), ctxt)
   | (Cons_none _, rest) ->
-      logged_return (Item (None, rest), ctxt)
-  | (If_none (bt, _), Item (None, rest)) ->
+      logged_return ((None, rest), ctxt)
+  | (If_none (bt, _), (None, rest)) ->
       step logger ctxt step_constants bt rest
-  | (If_none (_, bf), Item (Some v, rest)) ->
-      step logger ctxt step_constants bf (Item (v, rest))
+  | (If_none (_, bf), (Some v, rest)) ->
+      step logger ctxt step_constants bf (v, rest)
   (* pairs *)
-  | (Cons_pair, Item (a, Item (b, rest))) ->
-      logged_return (Item ((a, b), rest), ctxt)
-  | (Car, Item ((a, _), rest)) ->
-      logged_return (Item (a, rest), ctxt)
-  | (Cdr, Item ((_, b), rest)) ->
-      logged_return (Item (b, rest), ctxt)
+  | (Cons_pair, (a, (b, rest))) ->
+      logged_return (((a, b), rest), ctxt)
+  | (Car, ((a, _), rest)) ->
+      logged_return ((a, rest), ctxt)
+  | (Cdr, ((_, b), rest)) ->
+      logged_return ((b, rest), ctxt)
   (* unions *)
-  | (Left, Item (v, rest)) ->
-      logged_return (Item (L v, rest), ctxt)
-  | (Right, Item (v, rest)) ->
-      logged_return (Item (R v, rest), ctxt)
-  | (If_left (bt, _), Item (L v, rest)) ->
-      step logger ctxt step_constants bt (Item (v, rest))
-  | (If_left (_, bf), Item (R v, rest)) ->
-      step logger ctxt step_constants bf (Item (v, rest))
+  | (Left, (v, rest)) ->
+      logged_return ((L v, rest), ctxt)
+  | (Right, (v, rest)) ->
+      logged_return ((R v, rest), ctxt)
+  | (If_left (bt, _), (L v, rest)) ->
+      step logger ctxt step_constants bt (v, rest)
+  | (If_left (_, bf), (R v, rest)) ->
+      step logger ctxt step_constants bf (v, rest)
   (* lists *)
-  | (Cons_list, Item (hd, Item (tl, rest))) ->
-      logged_return (Item (list_cons hd tl, rest), ctxt)
+  | (Cons_list, (hd, (tl, rest))) ->
+      logged_return ((list_cons hd tl, rest), ctxt)
   | (Nil, rest) ->
-      logged_return (Item (list_empty, rest), ctxt)
-  | (If_cons (_, bf), Item ({elements = []; _}, rest)) ->
+      logged_return ((list_empty, rest), ctxt)
+  | (If_cons (_, bf), ({elements = []; _}, rest)) ->
       step logger ctxt step_constants bf rest
-  | (If_cons (bt, _), Item ({elements = hd :: tl; length}, rest)) ->
+  | (If_cons (bt, _), ({elements = hd :: tl; length}, rest)) ->
       let tl = {elements = tl; length = length - 1} in
-      step logger ctxt step_constants bt (Item (hd, Item (tl, rest)))
-  | (List_map body, Item (list, rest)) ->
+      step logger ctxt step_constants bt (hd, (tl, rest))
+  | (List_map body, (list, rest)) ->
       let rec loop rest ctxt l acc =
         match l with
         | [] ->
             let result = {elements = List.rev acc; length = list.length} in
-            return (Item (result, rest), ctxt)
+            return ((result, rest), ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (Item (hd, rest))
-            >>=? fun (Item (hd, rest), ctxt) -> loop rest ctxt tl (hd :: acc)
+            step logger ctxt step_constants body (hd, rest)
+            >>=? fun ((hd, rest), ctxt) -> loop rest ctxt tl (hd :: acc)
       in
       loop rest ctxt list.elements []
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
-  | (List_size, Item (list, rest)) ->
-      logged_return (Item (Script_int.(abs (of_int list.length)), rest), ctxt)
-  | (List_iter body, Item (l, init)) ->
+  | (List_size, (list, rest)) ->
+      logged_return ((Script_int.(abs (of_int list.length)), rest), ctxt)
+  | (List_iter body, (l, init)) ->
       let rec loop ctxt l stack =
         match l with
         | [] ->
             return (stack, ctxt)
         | hd :: tl ->
-            step logger ctxt step_constants body (Item (hd, stack))
+            step logger ctxt step_constants body (hd, stack)
             >>=? fun (stack, ctxt) -> loop ctxt tl stack
       in
       loop ctxt l.elements init
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
   (* sets *)
   | (Empty_set t, rest) ->
-      logged_return (Item (empty_set t, rest), ctxt)
-  | (Set_iter body, Item (set, init)) ->
+      logged_return ((empty_set t, rest), ctxt)
+  | (Set_iter body, (set, init)) ->
       set_fold_m
         (fun item (stack, ctxt) ->
-          step logger ctxt step_constants body (Item (item, stack)))
+          step logger ctxt step_constants body (item, stack))
         set
         (init, ctxt)
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
-  | (Set_mem, Item (v, Item (set, rest))) ->
-      logged_return (Item (set_mem v set, rest), ctxt)
-  | (Set_update, Item (v, Item (presence, Item (set, rest)))) ->
-      logged_return (Item (set_update v presence set, rest), ctxt)
-  | (Set_size, Item (set, rest)) ->
-      logged_return (Item (set_size set, rest), ctxt)
+  | (Set_mem, (v, (set, rest))) ->
+      logged_return ((set_mem v set, rest), ctxt)
+  | (Set_update, (v, (presence, (set, rest)))) ->
+      logged_return ((set_update v presence set, rest), ctxt)
+  | (Set_size, (set, rest)) ->
+      logged_return ((set_size set, rest), ctxt)
   (* maps *)
   | (Empty_map (t, _), rest) ->
-      logged_return (Item (empty_map t, rest), ctxt)
-  | (Map_map body, Item (map, rest)) ->
+      logged_return ((empty_map t, rest), ctxt)
+  | (Map_map body, (map, rest)) ->
       map_fold_m
         (fun ((k, _) as item) (rest, ctxt, acc) ->
-          step logger ctxt step_constants body (Item (item, rest))
-          >>=? fun (Item (item, rest), ctxt) ->
+          step logger ctxt step_constants body (item, rest)
+          >>=? fun ((item, rest), ctxt) ->
           return (rest, ctxt, map_update k (Some item) acc))
         map
         (rest, ctxt, empty_map (map_key_ty map))
-      >>=? fun (rest, ctxt, res) -> logged_return (Item (res, rest), ctxt)
-  | (Map_iter body, Item (map, init)) ->
+      >>=? fun (rest, ctxt, res) -> logged_return ((res, rest), ctxt)
+  | (Map_iter body, (map, init)) ->
       map_fold_m
         (fun item (stack, ctxt) ->
-          step logger ctxt step_constants body (Item (item, stack)))
+          step logger ctxt step_constants body (item, stack))
         map
         (init, ctxt)
       >>=? fun (res, ctxt) -> logged_return (res, ctxt)
-  | (Map_mem, Item (v, Item (map, rest))) ->
-      logged_return (Item (map_mem v map, rest), ctxt)
-  | (Map_get, Item (v, Item (map, rest))) ->
-      logged_return (Item (map_get v map, rest), ctxt)
-  | (Map_update, Item (k, Item (v, Item (map, rest)))) ->
-      logged_return (Item (map_update k v map, rest), ctxt)
-  | (Map_size, Item (map, rest)) ->
-      logged_return (Item (map_size map, rest), ctxt)
+  | (Map_mem, (v, (map, rest))) ->
+      logged_return ((map_mem v map, rest), ctxt)
+  | (Map_get, (v, (map, rest))) ->
+      logged_return ((map_get v map, rest), ctxt)
+  | (Map_update, (k, (v, (map, rest)))) ->
+      logged_return ((map_update k v map, rest), ctxt)
+  | (Map_size, (map, rest)) ->
+      logged_return ((map_size map, rest), ctxt)
   (* Big map operations *)
   | (Empty_big_map (tk, tv), rest) ->
-      logged_return
-        (Item (Script_ir_translator.empty_big_map tk tv, rest), ctxt)
-  | (Big_map_mem, Item (key, Item (map, rest))) ->
+      logged_return ((Script_ir_translator.empty_big_map tk tv, rest), ctxt)
+  | (Big_map_mem, (key, (map, rest))) ->
       Script_ir_translator.big_map_mem ctxt key map
-      >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
-  | (Big_map_get, Item (key, Item (map, rest))) ->
+      >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
+  | (Big_map_get, (key, (map, rest))) ->
       Script_ir_translator.big_map_get ctxt key map
-      >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
-  | (Big_map_update, Item (key, Item (maybe_value, Item (map, rest)))) ->
+      >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
+  | (Big_map_update, (key, (maybe_value, (map, rest)))) ->
       let big_map = Script_ir_translator.big_map_update key maybe_value map in
-      logged_return (Item (big_map, rest), ctxt)
+      logged_return ((big_map, rest), ctxt)
   (* timestamp operations *)
-  | (Add_seconds_to_timestamp, Item (n, Item (t, rest))) ->
+  | (Add_seconds_to_timestamp, (n, (t, rest))) ->
       let result = Script_timestamp.add_delta t n in
-      logged_return (Item (result, rest), ctxt)
-  | (Add_timestamp_to_seconds, Item (t, Item (n, rest))) ->
+      logged_return ((result, rest), ctxt)
+  | (Add_timestamp_to_seconds, (t, (n, rest))) ->
       let result = Script_timestamp.add_delta t n in
-      logged_return (Item (result, rest), ctxt)
-  | (Sub_timestamp_seconds, Item (t, Item (s, rest))) ->
+      logged_return ((result, rest), ctxt)
+  | (Sub_timestamp_seconds, (t, (s, rest))) ->
       let result = Script_timestamp.sub_delta t s in
-      logged_return (Item (result, rest), ctxt)
-  | (Diff_timestamps, Item (t1, Item (t2, rest))) ->
+      logged_return ((result, rest), ctxt)
+  | (Diff_timestamps, (t1, (t2, rest))) ->
       let result = Script_timestamp.diff t1 t2 in
-      logged_return (Item (result, rest), ctxt)
+      logged_return ((result, rest), ctxt)
   (* string operations *)
-  | (Concat_string_pair, Item (x, Item (y, rest))) ->
+  | (Concat_string_pair, (x, (y, rest))) ->
       let s = String.concat "" [x; y] in
-      logged_return (Item (s, rest), ctxt)
-  | (Concat_string, Item (ss, rest)) ->
+      logged_return ((s, rest), ctxt)
+  | (Concat_string, (ss, rest)) ->
       let s = String.concat "" ss.elements in
-      logged_return (Item (s, rest), ctxt)
-  | (Slice_string, Item (offset, Item (length, Item (s, rest)))) ->
+      logged_return ((s, rest), ctxt)
+  | (Slice_string, (offset, (length, (s, rest)))) ->
       let s_length = Z.of_int (String.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
         logged_return
-          ( Item (Some (String.sub s (Z.to_int offset) (Z.to_int length)), rest),
+          ( (Some (String.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
-      else logged_return (Item (None, rest), ctxt)
-  | (String_size, Item (s, rest)) ->
-      logged_return
-        (Item (Script_int.(abs (of_int (String.length s))), rest), ctxt)
+      else logged_return ((None, rest), ctxt)
+  | (String_size, (s, rest)) ->
+      logged_return ((Script_int.(abs (of_int (String.length s))), rest), ctxt)
   (* bytes operations *)
-  | (Concat_bytes_pair, Item (x, Item (y, rest))) ->
+  | (Concat_bytes_pair, (x, (y, rest))) ->
       let s = MBytes.concat "" [x; y] in
-      logged_return (Item (s, rest), ctxt)
-  | (Concat_bytes, Item (ss, rest)) ->
+      logged_return ((s, rest), ctxt)
+  | (Concat_bytes, (ss, rest)) ->
       let s = MBytes.concat "" ss.elements in
-      logged_return (Item (s, rest), ctxt)
-  | (Slice_bytes, Item (offset, Item (length, Item (s, rest)))) ->
+      logged_return ((s, rest), ctxt)
+  | (Slice_bytes, (offset, (length, (s, rest)))) ->
       let s_length = Z.of_int (MBytes.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
         logged_return
-          ( Item (Some (MBytes.sub s (Z.to_int offset) (Z.to_int length)), rest),
+          ( (Some (MBytes.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
-      else logged_return (Item (None, rest), ctxt)
-  | (Bytes_size, Item (s, rest)) ->
-      logged_return
-        (Item (Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
+      else logged_return ((None, rest), ctxt)
+  | (Bytes_size, (s, rest)) ->
+      logged_return ((Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
   (* currency operations *)
-  | (Add_tez, Item (x, Item (y, rest))) ->
-      Lwt.return Tez.(x +? y)
-      >>=? fun res -> logged_return (Item (res, rest), ctxt)
-  | (Sub_tez, Item (x, Item (y, rest))) ->
-      Lwt.return Tez.(x -? y)
-      >>=? fun res -> logged_return (Item (res, rest), ctxt)
-  | (Mul_teznat, Item (x, Item (y, rest))) -> (
+  | (Add_tez, (x, (y, rest))) ->
+      Lwt.return Tez.(x +? y) >>=? fun res -> logged_return ((res, rest), ctxt)
+  | (Sub_tez, (x, (y, rest))) ->
+      Lwt.return Tez.(x -? y) >>=? fun res -> logged_return ((res, rest), ctxt)
+  | (Mul_teznat, (x, (y, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
         fail (Overflow (loc, Log.get_log ()))
     | Some y ->
         Lwt.return Tez.(x *? y)
-        >>=? fun res -> logged_return (Item (res, rest), ctxt) )
-  | (Mul_nattez, Item (y, Item (x, rest))) -> (
+        >>=? fun res -> logged_return ((res, rest), ctxt) )
+  | (Mul_nattez, (y, (x, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
         fail (Overflow (loc, Log.get_log ()))
     | Some y ->
         Lwt.return Tez.(x *? y)
-        >>=? fun res -> logged_return (Item (res, rest), ctxt) )
+        >>=? fun res -> logged_return ((res, rest), ctxt) )
   (* boolean operations *)
-  | (Or, Item (x, Item (y, rest))) ->
-      logged_return (Item (x || y, rest), ctxt)
-  | (And, Item (x, Item (y, rest))) ->
-      logged_return (Item (x && y, rest), ctxt)
-  | (Xor, Item (x, Item (y, rest))) ->
-      logged_return (Item (Compare.Bool.(x <> y), rest), ctxt)
-  | (Not, Item (x, rest)) ->
-      logged_return (Item (not x, rest), ctxt)
+  | (Or, (x, (y, rest))) ->
+      logged_return ((x || y, rest), ctxt)
+  | (And, (x, (y, rest))) ->
+      logged_return ((x && y, rest), ctxt)
+  | (Xor, (x, (y, rest))) ->
+      logged_return ((Compare.Bool.(x <> y), rest), ctxt)
+  | (Not, (x, rest)) ->
+      logged_return ((not x, rest), ctxt)
   (* integer operations *)
-  | (Is_nat, Item (x, rest)) ->
-      logged_return (Item (Script_int.is_nat x, rest), ctxt)
-  | (Abs_int, Item (x, rest)) ->
-      logged_return (Item (Script_int.abs x, rest), ctxt)
-  | (Int_nat, Item (x, rest)) ->
-      logged_return (Item (Script_int.int x, rest), ctxt)
-  | (Neg_int, Item (x, rest)) ->
-      logged_return (Item (Script_int.neg x, rest), ctxt)
-  | (Neg_nat, Item (x, rest)) ->
-      logged_return (Item (Script_int.neg x, rest), ctxt)
-  | (Add_intint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.add x y, rest), ctxt)
-  | (Add_intnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.add x y, rest), ctxt)
-  | (Add_natint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.add x y, rest), ctxt)
-  | (Add_natnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.add_n x y, rest), ctxt)
-  | (Sub_int, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.sub x y, rest), ctxt)
-  | (Mul_intint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.mul x y, rest), ctxt)
-  | (Mul_intnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.mul x y, rest), ctxt)
-  | (Mul_natint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.mul x y, rest), ctxt)
-  | (Mul_natnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.mul_n x y, rest), ctxt)
-  | (Ediv_teznat, Item (x, Item (y, rest))) ->
+  | (Is_nat, (x, rest)) ->
+      logged_return ((Script_int.is_nat x, rest), ctxt)
+  | (Abs_int, (x, rest)) ->
+      logged_return ((Script_int.abs x, rest), ctxt)
+  | (Int_nat, (x, rest)) ->
+      logged_return ((Script_int.int x, rest), ctxt)
+  | (Neg_int, (x, rest)) ->
+      logged_return ((Script_int.neg x, rest), ctxt)
+  | (Neg_nat, (x, rest)) ->
+      logged_return ((Script_int.neg x, rest), ctxt)
+  | (Add_intint, (x, (y, rest))) ->
+      logged_return ((Script_int.add x y, rest), ctxt)
+  | (Add_intnat, (x, (y, rest))) ->
+      logged_return ((Script_int.add x y, rest), ctxt)
+  | (Add_natint, (x, (y, rest))) ->
+      logged_return ((Script_int.add x y, rest), ctxt)
+  | (Add_natnat, (x, (y, rest))) ->
+      logged_return ((Script_int.add_n x y, rest), ctxt)
+  | (Sub_int, (x, (y, rest))) ->
+      logged_return ((Script_int.sub x y, rest), ctxt)
+  | (Mul_intint, (x, (y, rest))) ->
+      logged_return ((Script_int.mul x y, rest), ctxt)
+  | (Mul_intnat, (x, (y, rest))) ->
+      logged_return ((Script_int.mul x y, rest), ctxt)
+  | (Mul_natint, (x, (y, rest))) ->
+      logged_return ((Script_int.mul x y, rest), ctxt)
+  | (Mul_natnat, (x, (y, rest))) ->
+      logged_return ((Script_int.mul_n x y, rest), ctxt)
+  | (Ediv_teznat, (x, (y, rest))) ->
       let x = Script_int.of_int64 (Tez.to_mutez x) in
       let result =
         match Script_int.ediv x y with
@@ -893,8 +831,8 @@ let rec step :
           | _ ->
               assert false )
       in
-      logged_return (Item (result, rest), ctxt)
-  | (Ediv_tez, Item (x, Item (y, rest))) ->
+      logged_return ((result, rest), ctxt)
+  | (Ediv_tez, (x, (y, rest))) ->
       let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
       let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
       let result =
@@ -912,64 +850,64 @@ let rec step :
             | Some r ->
                 Some (q, r) ) )
       in
-      logged_return (Item (result, rest), ctxt)
-  | (Ediv_intint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.ediv x y, rest), ctxt)
-  | (Ediv_intnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.ediv x y, rest), ctxt)
-  | (Ediv_natint, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.ediv x y, rest), ctxt)
-  | (Ediv_natnat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.ediv_n x y, rest), ctxt)
-  | (Lsl_nat, Item (x, Item (y, rest))) -> (
+      logged_return ((result, rest), ctxt)
+  | (Ediv_intint, (x, (y, rest))) ->
+      logged_return ((Script_int.ediv x y, rest), ctxt)
+  | (Ediv_intnat, (x, (y, rest))) ->
+      logged_return ((Script_int.ediv x y, rest), ctxt)
+  | (Ediv_natint, (x, (y, rest))) ->
+      logged_return ((Script_int.ediv x y, rest), ctxt)
+  | (Ediv_natnat, (x, (y, rest))) ->
+      logged_return ((Script_int.ediv_n x y, rest), ctxt)
+  | (Lsl_nat, (x, (y, rest))) -> (
     match Script_int.shift_left_n x y with
     | None ->
         fail (Overflow (loc, Log.get_log ()))
     | Some x ->
-        logged_return (Item (x, rest), ctxt) )
-  | (Lsr_nat, Item (x, Item (y, rest))) -> (
+        logged_return ((x, rest), ctxt) )
+  | (Lsr_nat, (x, (y, rest))) -> (
     match Script_int.shift_right_n x y with
     | None ->
         fail (Overflow (loc, Log.get_log ()))
     | Some r ->
-        logged_return (Item (r, rest), ctxt) )
-  | (Or_nat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.logor x y, rest), ctxt)
-  | (And_nat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.logand x y, rest), ctxt)
-  | (And_int_nat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.logand x y, rest), ctxt)
-  | (Xor_nat, Item (x, Item (y, rest))) ->
-      logged_return (Item (Script_int.logxor x y, rest), ctxt)
-  | (Not_int, Item (x, rest)) ->
-      logged_return (Item (Script_int.lognot x, rest), ctxt)
-  | (Not_nat, Item (x, rest)) ->
-      logged_return (Item (Script_int.lognot x, rest), ctxt)
+        logged_return ((r, rest), ctxt) )
+  | (Or_nat, (x, (y, rest))) ->
+      logged_return ((Script_int.logor x y, rest), ctxt)
+  | (And_nat, (x, (y, rest))) ->
+      logged_return ((Script_int.logand x y, rest), ctxt)
+  | (And_int_nat, (x, (y, rest))) ->
+      logged_return ((Script_int.logand x y, rest), ctxt)
+  | (Xor_nat, (x, (y, rest))) ->
+      logged_return ((Script_int.logxor x y, rest), ctxt)
+  | (Not_int, (x, rest)) ->
+      logged_return ((Script_int.lognot x, rest), ctxt)
+  | (Not_nat, (x, rest)) ->
+      logged_return ((Script_int.lognot x, rest), ctxt)
   (* control *)
   | (Seq (hd, tl), stack) ->
       step logger ctxt step_constants hd stack
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants tl trans
-  | (If (bt, _), Item (true, rest)) ->
+  | (If (bt, _), (true, rest)) ->
       step logger ctxt step_constants bt rest
-  | (If (_, bf), Item (false, rest)) ->
+  | (If (_, bf), (false, rest)) ->
       step logger ctxt step_constants bf rest
-  | (Loop body, Item (true, rest)) ->
+  | (Loop body, (true, rest)) ->
       step logger ctxt step_constants body rest
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
-  | (Loop _, Item (false, rest)) ->
+  | (Loop _, (false, rest)) ->
       logged_return (rest, ctxt)
-  | (Loop_left body, Item (L v, rest)) ->
-      step logger ctxt step_constants body (Item (v, rest))
+  | (Loop_left body, (L v, rest)) ->
+      step logger ctxt step_constants body (v, rest)
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
-  | (Loop_left _, Item (R v, rest)) ->
-      logged_return (Item (v, rest), ctxt)
-  | (Dip b, Item (ign, rest)) ->
+  | (Loop_left _, (R v, rest)) ->
+      logged_return ((v, rest), ctxt)
+  | (Dip b, (ign, rest)) ->
       step logger ctxt step_constants b rest
-      >>=? fun (res, ctxt) -> logged_return (Item (ign, res), ctxt)
-  | (Exec, Item (arg, Item (lam, rest))) ->
+      >>=? fun (res, ctxt) -> logged_return ((ign, res), ctxt)
+  | (Exec, (arg, (lam, rest))) ->
       interp logger ctxt step_constants lam arg
-      >>=? fun (res, ctxt) -> logged_return (Item (res, rest), ctxt)
-  | (Apply capture_ty, Item (capture, Item (lam, rest))) -> (
+      >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
+  | (Apply capture_ty, (capture, (lam, rest))) -> (
       let (Lam (descr, expr)) = lam in
       let (Item_t (full_arg_ty, _, _)) = descr.bef in
       unparse_data ctxt Optimized capture_ty capture
@@ -1023,12 +961,12 @@ let rec step :
                   expr ] )
           in
           let lam' = Lam (full_descr, full_expr) in
-          logged_return (Item (lam', rest), ctxt)
+          logged_return ((lam', rest), ctxt)
       | _ ->
           assert false )
   | (Lambda lam, rest) ->
-      logged_return (Item (lam, rest), ctxt)
-  | (Failwith tv, Item (v, _)) ->
+      logged_return ((lam, rest), ctxt)
+  | (Failwith tv, (v, _)) ->
       trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
       >>=? fun (v, _ctxt) ->
       let v = Micheline.strip_locations v in
@@ -1036,43 +974,41 @@ let rec step :
   | (Nop, stack) ->
       logged_return (stack, ctxt)
   (* comparison *)
-  | (Compare ty, Item (a, Item (b, rest))) ->
+  | (Compare ty, (a, (b, rest))) ->
       logged_return
-        ( Item
-            ( Script_int.of_int
-              @@ Script_ir_translator.compare_comparable ty a b,
-              rest ),
+        ( ( Script_int.of_int @@ Script_ir_translator.compare_comparable ty a b,
+            rest ),
           ctxt )
   (* comparators *)
-  | (Eq, Item (cmpres, rest)) ->
+  | (Eq, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres = 0) in
-      logged_return (Item (cmpres, rest), ctxt)
-  | (Neq, Item (cmpres, rest)) ->
+      logged_return ((cmpres, rest), ctxt)
+  | (Neq, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres <> 0) in
-      logged_return (Item (cmpres, rest), ctxt)
-  | (Lt, Item (cmpres, rest)) ->
+      logged_return ((cmpres, rest), ctxt)
+  | (Lt, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres < 0) in
-      logged_return (Item (cmpres, rest), ctxt)
-  | (Le, Item (cmpres, rest)) ->
+      logged_return ((cmpres, rest), ctxt)
+  | (Le, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres <= 0) in
-      logged_return (Item (cmpres, rest), ctxt)
-  | (Gt, Item (cmpres, rest)) ->
+      logged_return ((cmpres, rest), ctxt)
+  | (Gt, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres > 0) in
-      logged_return (Item (cmpres, rest), ctxt)
-  | (Ge, Item (cmpres, rest)) ->
+      logged_return ((cmpres, rest), ctxt)
+  | (Ge, (cmpres, rest)) ->
       let cmpres = Script_int.compare cmpres Script_int.zero in
       let cmpres = Compare.Int.(cmpres >= 0) in
-      logged_return (Item (cmpres, rest), ctxt)
+      logged_return ((cmpres, rest), ctxt)
   (* packing *)
-  | (Pack t, Item (value, rest)) ->
+  | (Pack t, (value, rest)) ->
       Script_ir_translator.pack_data ctxt t value
-      >>=? fun (bytes, ctxt) -> logged_return (Item (bytes, rest), ctxt)
-  | (Unpack t, Item (bytes, rest)) ->
+      >>=? fun (bytes, ctxt) -> logged_return ((bytes, rest), ctxt)
+  | (Unpack t, (bytes, rest)) ->
       Lwt.return (Gas.check_enough ctxt (Script.serialized_cost bytes))
       >>=? fun () ->
       if
@@ -1083,23 +1019,23 @@ let rec step :
         match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
         | None ->
             Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes))
-            >>=? fun ctxt -> logged_return (Item (None, rest), ctxt)
+            >>=? fun ctxt -> logged_return ((None, rest), ctxt)
         | Some expr -> (
             Lwt.return (Gas.consume ctxt (Script.deserialized_cost expr))
             >>=? fun ctxt ->
             parse_data ctxt ~legacy:false t (Micheline.root expr)
             >>= function
             | Ok (value, ctxt) ->
-                logged_return (Item (Some value, rest), ctxt)
+                logged_return ((Some value, rest), ctxt)
             | Error _ignored ->
                 Lwt.return
                   (Gas.consume ctxt (Interp_costs.unpack_failed bytes))
-                >>=? fun ctxt -> logged_return (Item (None, rest), ctxt) )
-      else logged_return (Item (None, rest), ctxt)
+                >>=? fun ctxt -> logged_return ((None, rest), ctxt) )
+      else logged_return ((None, rest), ctxt)
   (* protocol *)
-  | (Address, Item ((_, address), rest)) ->
-      logged_return (Item (address, rest), ctxt)
-  | (Contract (t, entrypoint), Item (contract, rest)) -> (
+  | (Address, ((_, address), rest)) ->
+      logged_return ((address, rest), ctxt)
+  | (Contract (t, entrypoint), (contract, rest)) -> (
     match (contract, entrypoint) with
     | ((contract, "default"), entrypoint) | ((contract, entrypoint), "default")
       ->
@@ -1111,11 +1047,10 @@ let rec step :
           contract
           ~entrypoint
         >>=? fun (ctxt, maybe_contract) ->
-        logged_return (Item (maybe_contract, rest), ctxt)
+        logged_return ((maybe_contract, rest), ctxt)
     | _ ->
-        logged_return (Item (None, rest), ctxt) )
-  | ( Transfer_tokens,
-      Item (p, Item (amount, Item ((tp, (destination, entrypoint)), rest))) )
+        logged_return ((None, rest), ctxt) )
+  | (Transfer_tokens, (p, (amount, ((tp, (destination, entrypoint)), rest))))
     ->
       collect_big_maps ctxt tp p
       >>=? fun (to_duplicate, ctxt) ->
@@ -1143,15 +1078,12 @@ let rec step :
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
       logged_return
-        ( Item
-            ( ( Internal_operation
-                  {source = step_constants.self; operation; nonce},
-                big_map_diff ),
-              rest ),
+        ( ( ( Internal_operation
+                {source = step_constants.self; operation; nonce},
+              big_map_diff ),
+            rest ),
           ctxt )
-  | ( Create_account,
-      Item (manager, Item (delegate, Item (_delegatable, Item (credit, rest))))
-    ) ->
+  | (Create_account, (manager, (delegate, (_delegatable, (credit, rest))))) ->
       Contract.fresh_contract_from_current_nonce ctxt
       >>=? fun (ctxt, contract) ->
       (* store in optimized binary representation - as unparsed with [Optimized]. *)
@@ -1171,24 +1103,17 @@ let rec step :
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
       logged_return
-        ( Item
-            ( ( Internal_operation
-                  {source = step_constants.self; operation; nonce},
-                None ),
-              Item ((contract, "default"), rest) ),
+        ( ( ( Internal_operation
+                {source = step_constants.self; operation; nonce},
+              None ),
+            ((contract, "default"), rest) ),
           ctxt )
-  | (Implicit_account, Item (key, rest)) ->
+  | (Implicit_account, (key, rest)) ->
       let contract = Contract.implicit_contract key in
-      logged_return (Item ((Unit_t None, (contract, "default")), rest), ctxt)
+      logged_return (((Unit_t None, (contract, "default")), rest), ctxt)
   | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
-      Item
-        ( manager,
-          Item
-            ( delegate,
-              Item
-                ( spendable,
-                  Item (delegatable, Item (credit, Item (init, rest))) ) ) ) )
-    ->
+      (manager, (delegate, (spendable, (delegatable, (credit, (init, rest))))))
+    ) ->
       unparse_ty ctxt param_type
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
@@ -1252,15 +1177,14 @@ let rec step :
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
       logged_return
-        ( Item
-            ( ( Internal_operation
-                  {source = step_constants.self; operation; nonce},
-                big_map_diff ),
-              Item ((contract, "default"), rest) ),
+        ( ( ( Internal_operation
+                {source = step_constants.self; operation; nonce},
+              big_map_diff ),
+            ((contract, "default"), rest) ),
           ctxt )
   | ( Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
-    Item (delegate, Item (credit, Item (init, rest))) ) ->
+    (delegate, (credit, (init, rest))) ) ->
       unparse_ty ctxt param_type
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
@@ -1312,49 +1236,47 @@ let rec step :
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
       logged_return
-        ( Item
-            ( ( Internal_operation
-                  {source = step_constants.self; operation; nonce},
-                big_map_diff ),
-              Item ((contract, "default"), rest) ),
+        ( ( ( Internal_operation
+                {source = step_constants.self; operation; nonce},
+              big_map_diff ),
+            ((contract, "default"), rest) ),
           ctxt )
-  | (Set_delegate, Item (delegate, rest)) ->
+  | (Set_delegate, (delegate, rest)) ->
       let operation = Delegation delegate in
       Lwt.return (fresh_internal_nonce ctxt)
       >>=? fun (ctxt, nonce) ->
       logged_return
-        ( Item
-            ( ( Internal_operation
-                  {source = step_constants.self; operation; nonce},
-                None ),
-              rest ),
+        ( ( ( Internal_operation
+                {source = step_constants.self; operation; nonce},
+              None ),
+            rest ),
           ctxt )
   | (Balance, rest) ->
       Contract.get_balance ctxt step_constants.self
-      >>=? fun balance -> logged_return (Item (balance, rest), ctxt)
+      >>=? fun balance -> logged_return ((balance, rest), ctxt)
   | (Level, rest) ->
       let level =
         (Level.current ctxt).level |> Raw_level.to_int32 |> Script_int.of_int32
         |> Script_int.abs
       in
-      logged_return (Item (level, rest), ctxt)
+      logged_return ((level, rest), ctxt)
   | (Now, rest) ->
       let now = Script_timestamp.now ctxt in
-      logged_return (Item (now, rest), ctxt)
-  | (Check_signature, Item (key, Item (signature, Item (message, rest)))) ->
+      logged_return ((now, rest), ctxt)
+  | (Check_signature, (key, (signature, (message, rest)))) ->
       let res = Signature.check key signature message in
-      logged_return (Item (res, rest), ctxt)
-  | (Hash_key, Item (key, rest)) ->
-      logged_return (Item (Signature.Public_key.hash key, rest), ctxt)
-  | (Blake2b, Item (bytes, rest)) ->
+      logged_return ((res, rest), ctxt)
+  | (Hash_key, (key, rest)) ->
+      logged_return ((Signature.Public_key.hash key, rest), ctxt)
+  | (Blake2b, (bytes, rest)) ->
       let hash = Raw_hashes.blake2b bytes in
-      logged_return (Item (hash, rest), ctxt)
-  | (Sha256, Item (bytes, rest)) ->
+      logged_return ((hash, rest), ctxt)
+  | (Sha256, (bytes, rest)) ->
       let hash = Raw_hashes.sha256 bytes in
-      logged_return (Item (hash, rest), ctxt)
-  | (Sha512, Item (bytes, rest)) ->
+      logged_return ((hash, rest), ctxt)
+  | (Sha512, (bytes, rest)) ->
       let hash = Raw_hashes.sha512 bytes in
-      logged_return (Item (hash, rest), ctxt)
+      logged_return ((hash, rest), ctxt)
   | (Steps_to_quota, rest) ->
       let steps =
         match Gas.level ctxt with
@@ -1363,26 +1285,26 @@ let rec step :
         | Unaccounted ->
             Z.of_string "99999999"
       in
-      logged_return (Item (Script_int.(abs (of_zint steps)), rest), ctxt)
+      logged_return ((Script_int.(abs (of_zint steps)), rest), ctxt)
   | (Source, rest) ->
-      logged_return (Item ((step_constants.payer, "default"), rest), ctxt)
+      logged_return (((step_constants.payer, "default"), rest), ctxt)
   | (Sender, rest) ->
-      logged_return (Item ((step_constants.source, "default"), rest), ctxt)
+      logged_return (((step_constants.source, "default"), rest), ctxt)
   | (Self (t, entrypoint), rest) ->
-      logged_return (Item ((t, (step_constants.self, entrypoint)), rest), ctxt)
+      logged_return (((t, (step_constants.self, entrypoint)), rest), ctxt)
   | (Self_address, rest) ->
-      logged_return (Item ((step_constants.self, "default"), rest), ctxt)
+      logged_return (((step_constants.self, "default"), rest), ctxt)
   | (Amount, rest) ->
-      logged_return (Item (step_constants.amount, rest), ctxt)
+      logged_return ((step_constants.amount, rest), ctxt)
   | (Dig (_n, n'), stack) ->
       interp_stack_prefix_preserving_operation
-        (fun (Item (v, rest)) -> return (rest, v))
+        (fun (v, rest) -> return (rest, v))
         n'
         stack
-      >>=? fun (aft, x) -> logged_return (Item (x, aft), ctxt)
-  | (Dug (_n, n'), Item (v, rest)) ->
+      >>=? fun (aft, x) -> logged_return ((x, aft), ctxt)
+  | (Dug (_n, n'), (v, rest)) ->
       interp_stack_prefix_preserving_operation
-        (fun stk -> return (Item (v, stk), ()))
+        (fun stk -> return ((v, stk), ()))
         n'
         rest
       >>=? fun (aft, ()) -> logged_return (aft, ctxt)
@@ -1401,7 +1323,7 @@ let rec step :
         stack
       >>=? fun (_, rest) -> logged_return (rest, ctxt)
   | (ChainId, rest) ->
-      logged_return (Item (step_constants.chain_id, rest), ctxt)
+      logged_return ((step_constants.chain_id, rest), ctxt)
 
 and interp :
     type p r.
@@ -1412,12 +1334,12 @@ and interp :
     p ->
     (r * context) tzresult Lwt.t =
  fun logger ctxt step_constants (Lam (code, _)) arg ->
-  let stack = Item (arg, Empty) in
+  let stack = (arg, ()) in
   let module Log = (val logger) in
   Log.log_interp ctxt code stack
   >>=? fun () ->
   step logger ctxt step_constants code stack
-  >>=? fun (Item (ret, Empty), ctxt) -> return (ret, ctxt)
+  >>=? fun ((ret, ()), ctxt) -> return (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
 let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
