@@ -66,7 +66,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as split_string.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 17762 units (will add 100 for safety)
+Estimated gas: 17763 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -79,7 +79,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.002049
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 17862
+    Gas limit: 17863
     Storage limit: 38 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.002049
@@ -93,7 +93,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" }
       Storage size: 335 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 17762
+      Consumed gas: 17763
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.018
 
