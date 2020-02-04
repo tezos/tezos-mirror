@@ -13,8 +13,6 @@ The changelog section contains the most significant commit messages
 and instructions to regenerate the protocol sources from the
 Gitlab branch.
 
-**This protocol contains NO breaking changes with respect to Babylon.**
-
 Test network Carthagenet is available to test Carthage.
 See details in :ref:`Test Networks<test-networks>`
 and instructions to join in :ref:`How to get Tezos<howtoget>`.
@@ -22,6 +20,10 @@ and instructions to join in :ref:`How to get Tezos<howtoget>`.
 The code can be found in the Gitlab branch
 `proto-006`_ and its
 full hash is ``PtXXX``.
+
+**This protocol contains several breaking changes with respect to Babylon.**
+Developers are particularly encouraged to carefully read this page and
+to monitor it for updates.
 
 .. contents:: Summary of changes
 
@@ -143,6 +145,10 @@ Annotations are enforced to only contain valid JSON.
 Changes to RPCs
 ---------------
 
+*BREAKING CHANGES*: the semantics of the ``baking_rights`` RPC and the
+return values of the ``block_reward`` and ``endorsement_reward`` RPCs
+have changed.
+
 Below you can find all the RPC changes.
 
 Baking_rights
@@ -224,6 +230,8 @@ Detailed Changelog
    Fix a bug where the `../helpers/baking_rights` RPC would exclude the
    `max_priority` baking right from its result.
 
+   BREAKING CHANGE: the semantics of the `baking_rights` RPC has changed
+
 - Protocol/Emmy+: fix baking and endorsement reward formulae
 
 ::
@@ -285,7 +293,7 @@ Detailed Changelog
    was not the documented behavior of the MAP instruction and it was
    inconsistent with the case of mapping over a list.
 
-   BREAKING CHANGE: originated contracts that rely on the previous and
+   BREAKING CHANGE: originated contracts that rely on the previous (and
    incorrect) semantics might behave incorrectly.
 
 - Protocol/Michelson: improve the performance of the CONTRACT instruction
