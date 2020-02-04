@@ -80,16 +80,16 @@ trace
     [ "three"  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: 163 (remaining gas: 1035696 units remaining)
+  - location: 163 (remaining gas: 1035695 units remaining)
     [ "three"  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: 162 (remaining gas: 1035696 units remaining)
+  - location: 162 (remaining gas: 1035695 units remaining)
     [ "3"  	
       "three"  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: -1 (remaining gas: 1035696 units remaining)
+  - location: -1 (remaining gas: 1035695 units remaining)
     [ "3"  	
       "three"  	
       { Elt "1" "one" }  	
@@ -99,7 +99,7 @@ trace
       "three"  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]
-  - location: 167 (remaining gas: 1035695 units remaining)
+  - location: 167 (remaining gas: 1035694 units remaining)
     [ (Some "three")  	
       { Elt "1" "one" }  	
       { Elt "2" "two" }  	 ]

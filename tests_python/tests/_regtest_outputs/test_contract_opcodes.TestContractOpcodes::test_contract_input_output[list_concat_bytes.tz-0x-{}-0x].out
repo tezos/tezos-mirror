@@ -35,7 +35,7 @@ trace
     [ { 0x }  	 ]
   - location: 17 (remaining gas: 1039593 units remaining)
     [ 0x  	 ]
-  - location: 18 (remaining gas: 1039593 units remaining)
+  - location: 18 (remaining gas: 1039592 units remaining)
     [ {}  	
       0x  	 ]
   - location: 20 (remaining gas: 1039592 units remaining)

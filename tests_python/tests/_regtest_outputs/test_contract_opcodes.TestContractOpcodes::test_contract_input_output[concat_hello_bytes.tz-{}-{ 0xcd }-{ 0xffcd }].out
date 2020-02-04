@@ -11,20 +11,20 @@ trace
     [ (Pair { 0xcd } {})  	 ]
   - location: 9 (remaining gas: 1039704 units remaining)
     [ { 0xcd }  	@parameter ]
-  - location: 12 (remaining gas: 1039703 units remaining)
+  - location: 12 (remaining gas: 1039702 units remaining)
     [ 0xff  	
       0xcd  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039702 units remaining)
+  - location: 15 (remaining gas: 1039701 units remaining)
     [ 0xffcd  	 ]
-  - location: -1 (remaining gas: 1039702 units remaining)
+  - location: -1 (remaining gas: 1039700 units remaining)
     [ 0xffcd  	 ]
-  - location: 10 (remaining gas: 1039701 units remaining)
+  - location: 10 (remaining gas: 1039700 units remaining)
     [ { 0xffcd }  	 ]
-  - location: 16 (remaining gas: 1039701 units remaining)
+  - location: 16 (remaining gas: 1039700 units remaining)
     [ {}  	
       { 0xffcd }  	 ]
-  - location: 18 (remaining gas: 1039700 units remaining)
+  - location: 18 (remaining gas: 1039699 units remaining)
     [ (Pair {} { 0xffcd })  	 ]
-  - location: -1 (remaining gas: 1039700 units remaining)
+  - location: -1 (remaining gas: 1039699 units remaining)
     [ (Pair {} { 0xffcd })  	 ]
 

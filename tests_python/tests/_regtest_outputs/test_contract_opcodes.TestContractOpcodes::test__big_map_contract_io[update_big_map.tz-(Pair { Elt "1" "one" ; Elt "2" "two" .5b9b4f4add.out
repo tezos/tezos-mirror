@@ -59,20 +59,20 @@ trace
       (Pair "1" (Some "two"))  	
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 34 (remaining gas: 1038952 units remaining)
+  - location: 34 (remaining gas: 1038951 units remaining)
     [ "1"  	@key
       (Pair "1" (Some "two"))  	
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 37 (remaining gas: 1038951 units remaining)
+  - location: 37 (remaining gas: 1038950 units remaining)
     [ (Some "two")  	@elt
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 36 (remaining gas: 1038951 units remaining)
+  - location: 36 (remaining gas: 1038950 units remaining)
     [ (Some "two")  	@elt
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 35 (remaining gas: 1038951 units remaining)
+  - location: 35 (remaining gas: 1038950 units remaining)
     [ "1"  	@key
       (Some "two")  	@elt
       { Elt "1" "one" ; Elt "2" "two" }  	
@@ -90,7 +90,7 @@ trace
   - location: 38 (remaining gas: 1038950 units remaining)
     [ { Elt "1" "two" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: -1 (remaining gas: 1038950 units remaining)
+  - location: -1 (remaining gas: 1038949 units remaining)
     [ { Elt "1" "two" ; Elt "2" "two" }  	
       Unit  	 ]
   - location: 29 (remaining gas: 1038949 units remaining)

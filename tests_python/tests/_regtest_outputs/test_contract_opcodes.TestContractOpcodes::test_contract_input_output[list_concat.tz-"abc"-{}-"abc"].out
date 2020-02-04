@@ -35,7 +35,7 @@ trace
     [ { "abc" }  	 ]
   - location: 17 (remaining gas: 1039591 units remaining)
     [ "abc"  	 ]
-  - location: 18 (remaining gas: 1039591 units remaining)
+  - location: 18 (remaining gas: 1039590 units remaining)
     [ {}  	
       "abc"  	 ]
   - location: 20 (remaining gas: 1039590 units remaining)

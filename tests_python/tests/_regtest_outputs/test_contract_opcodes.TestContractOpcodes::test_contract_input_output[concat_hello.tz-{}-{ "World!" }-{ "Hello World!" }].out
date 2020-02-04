@@ -11,20 +11,20 @@ trace
     [ (Pair { "World!" } {})  	 ]
   - location: 9 (remaining gas: 1039704 units remaining)
     [ { "World!" }  	@parameter ]
-  - location: 12 (remaining gas: 1039703 units remaining)
+  - location: 12 (remaining gas: 1039702 units remaining)
     [ "Hello "  	@hello
       "World!"  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039702 units remaining)
+  - location: 15 (remaining gas: 1039701 units remaining)
     [ "Hello World!"  	 ]
-  - location: -1 (remaining gas: 1039702 units remaining)
+  - location: -1 (remaining gas: 1039700 units remaining)
     [ "Hello World!"  	 ]
-  - location: 10 (remaining gas: 1039701 units remaining)
+  - location: 10 (remaining gas: 1039700 units remaining)
     [ { "Hello World!" }  	 ]
-  - location: 16 (remaining gas: 1039701 units remaining)
+  - location: 16 (remaining gas: 1039700 units remaining)
     [ {}  	
       { "Hello World!" }  	 ]
-  - location: 18 (remaining gas: 1039700 units remaining)
+  - location: 18 (remaining gas: 1039699 units remaining)
     [ (Pair {} { "Hello World!" })  	 ]
-  - location: -1 (remaining gas: 1039700 units remaining)
+  - location: -1 (remaining gas: 1039699 units remaining)
     [ (Pair {} { "Hello World!" })  	 ]
 
