@@ -652,16 +652,14 @@ let rec step :
       let s_length = Z.of_int (String.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
+      Lwt.return
+        (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
+      >>=? fun ctxt ->
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
-        Lwt.return
-          (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
-        >>=? fun ctxt ->
         logged_return
           ( Item (Some (String.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
-      else
-        Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0))
-        >>=? fun ctxt -> logged_return (Item (None, rest), ctxt)
+      else logged_return (Item (None, rest), ctxt)
   | (String_size, Item (s, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.push)
       >>=? fun ctxt ->
@@ -682,16 +680,14 @@ let rec step :
       let s_length = Z.of_int (MBytes.length s) in
       let offset = Script_int.to_zint offset in
       let length = Script_int.to_zint length in
+      Lwt.return
+        (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
+      >>=? fun ctxt ->
       if Compare.Z.(offset < s_length && Z.add offset length <= s_length) then
-        Lwt.return
-          (Gas.consume ctxt (Interp_costs.slice_string (Z.to_int length)))
-        >>=? fun ctxt ->
         logged_return
           ( Item (Some (MBytes.sub s (Z.to_int offset) (Z.to_int length)), rest),
             ctxt )
-      else
-        Lwt.return (Gas.consume ctxt (Interp_costs.slice_string 0))
-        >>=? fun ctxt -> logged_return (Item (None, rest), ctxt)
+      else logged_return (Item (None, rest), ctxt)
   | (Bytes_size, Item (s, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.push)
       >>=? fun ctxt ->
