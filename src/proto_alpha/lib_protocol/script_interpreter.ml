@@ -940,7 +940,8 @@ let rec step :
       step logger ctxt step_constants body rest
       >>=? fun (trans, ctxt) -> step logger ctxt step_constants descr trans
   | (Loop _, Item (false, rest)) ->
-      logged_return (rest, ctxt)
+      Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
+      >>=? fun ctxt -> logged_return (rest, ctxt)
   | (Loop_left body, Item (L v, rest)) ->
       Lwt.return (Gas.consume ctxt Interp_costs.loop_cycle)
       >>=? fun ctxt ->
