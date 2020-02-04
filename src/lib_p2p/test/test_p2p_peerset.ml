@@ -33,39 +33,42 @@ let a s = P2p_peer.Id.hash_string [s]
 
 let test_empty _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let empty = P2p_acl.PeerRing.create 10 in
+  let empty = P2p_acl.PeerLRUCache.create 10 in
   List.iter
     (fun peer ->
-      assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerRing.mem empty peer))
+      assert_equal_bool
+        ~msg:__LOC__
+        false
+        (P2p_acl.PeerLRUCache.mem empty peer))
     peers
 
 let test_add _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerRing.create 10 in
-  List.iter (fun peer -> P2p_acl.PeerRing.add set peer) peers ;
+  let set = P2p_acl.PeerLRUCache.create 10 in
+  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
   List.iter
     (fun peer ->
-      assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set peer))
+      assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set peer))
     peers
 
 let test_remove _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerRing.create 10 in
-  List.iter (fun peer -> P2p_acl.PeerRing.add set peer) peers ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "bar")) ;
-  P2p_acl.PeerRing.remove set (a "bar") ;
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerRing.mem set (a "bar"))
+  let set = P2p_acl.PeerLRUCache.create 10 in
+  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
+  P2p_acl.PeerLRUCache.remove set (a "bar") ;
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "bar"))
 
 let test_overflow _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
-  let set = P2p_acl.PeerRing.create 3 in
-  List.iter (fun peer -> P2p_acl.PeerRing.add set peer) peers ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "baz")) ;
-  P2p_acl.PeerRing.add set (a "zor") ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "zor")) ;
-  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerRing.mem set (a "foo")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "bar")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerRing.mem set (a "baz"))
+  let set = P2p_acl.PeerLRUCache.create 3 in
+  List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
+  P2p_acl.PeerLRUCache.add set (a "zor") ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "zor")) ;
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "foo")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz"))
 
 let () =
   Alcotest.run

@@ -23,9 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PeerRing = Ring.MakeTable (struct
-  include P2p_peer.Id
-end)
+module PeerLRUCache : Ring.TABLE with type v = P2p_peer.Id.t = struct
+  module Cache = Lru_cache.Make (P2p_peer.Id.Table)
+
+  type t = unit Cache.t
+
+  type v = Cache.key
+
+  let create capacity = Cache.create ~capacity
+
+  let add cache peer_id = Cache.push cache peer_id ()
+
+  let mem cache peer_id = Cache.is_cached cache peer_id
+
+  let remove cache peer_id = Cache.remove cache peer_id
+
+  let clear cache = Cache.clear cache
+
+  let elements cache = Cache.bindings cache |> List.map fst
+end
 
 module PatriciaTree (V : HashPtree.Value) = struct
   module M = HashPtree.Make_BE_int2_64 (V)
@@ -110,7 +126,7 @@ end)
 
 type t = {
   mutable greylist_ips : IpSet.t;
-  greylist_peers : PeerRing.t;
+  greylist_peers : PeerLRUCache.t;
   banned_ips : unit IpTable.t;
   banned_peers : unit P2p_peer.Table.t;
 }
@@ -118,13 +134,13 @@ type t = {
 let create size =
   {
     greylist_ips = IpSet.empty;
-    greylist_peers = PeerRing.create size;
+    greylist_peers = PeerLRUCache.create size;
     banned_ips = IpTable.create 53;
     banned_peers = P2p_peer.Table.create 53;
   }
 
-(* check if an ip is banned. priority is for static blacklist, then
-   in the greylist *)
+(* Check if an ip is banned. Priority is given to the static
+   banned_ips blacklist, then to the greylist *)
 let banned_addr acl addr =
   IpTable.mem acl.banned_ips addr || IpSet.mem addr acl.greylist_ips
 
@@ -132,21 +148,22 @@ let unban_addr acl addr =
   IpTable.remove acl.banned_ips addr ;
   acl.greylist_ips <- IpSet.remove addr acl.greylist_ips
 
-(* Check is the peer_id is in the banned ring. It might be possible that
-   a peer ID that is not banned, but its ip address is. *)
+(* Check if [peer_id] is in either of the banned/greylisted
+   collections. Caveat Emptor: it might be possible for a peer to have
+   its ip adress banned, but not its ID. *)
 let banned_peer acl peer_id =
   P2p_peer.Table.mem acl.banned_peers peer_id
-  || PeerRing.mem acl.greylist_peers peer_id
+  || PeerLRUCache.mem acl.greylist_peers peer_id
 
 let unban_peer acl peer_id =
   P2p_peer.Table.remove acl.banned_peers peer_id ;
-  PeerRing.remove acl.greylist_peers peer_id
+  PeerLRUCache.remove acl.greylist_peers peer_id
 
 let clear acl =
   acl.greylist_ips <- IpSet.empty ;
   P2p_peer.Table.clear acl.banned_peers ;
   IpTable.clear acl.banned_ips ;
-  PeerRing.clear acl.greylist_peers
+  PeerLRUCache.clear acl.greylist_peers
 
 module IPGreylist = struct
   let add acl addr time =
@@ -154,10 +171,12 @@ module IPGreylist = struct
 
   let mem acl addr = IpSet.mem addr acl.greylist_ips
 
-  (* The GC operation works only on the address set. Peers are removed
-     from the ring in a round-robin fashion. If a address is removed
-     by the GC from the acl.greylist set, it could potentially
-     persist in the acl.peers set until more peers are banned. *)
+  (* The GC operation works only on the greylisted addresses
+     set. Peers are evicted from the cache following LRU semantics,
+     i.e. the least recently greylisted, when adding a new (distinct)
+     peer to the greylist. If an address is removed by the GC from the
+     acl.greylist set, it could potentially persist in the acl.peers
+     set until more peers are banned. *)
   let remove_old acl ~older_than =
     acl.greylist_ips <- IpSet.remove_old acl.greylist_ips ~older_than
 
@@ -177,7 +196,7 @@ module PeerBlacklist = struct
 end
 
 module PeerGreylist = struct
-  let add acl peer_id = PeerRing.add acl.greylist_peers peer_id
+  let add acl peer_id = PeerLRUCache.add acl.greylist_peers peer_id
 
-  let mem acl peer_id = PeerRing.mem acl.greylist_peers peer_id
+  let mem acl peer_id = PeerLRUCache.mem acl.greylist_peers peer_id
 end

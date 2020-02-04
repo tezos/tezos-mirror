@@ -23,26 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**
-   This module implements four Access Control Lists:
-   - IP greylist is a set of banned IP addresses automatically added by
-     the P2P layer.
-   - [peer_id] greylist is a set of banned peers ids automatically added by
-     the P2P layer.
-   - IP blacklist is a set of IP addresses manually added by the node admin.
-   - peers blacklist is a set of peers ids manually added by the node admin.
+(** This module implements four Access Control Lists:
 
-   IP greylists use a time based GC to periodically remove entries from
-   the table, while [peer_id] greylists are built using a ring structure,
-   where peers are removed from the table when removed from the fixed size
-   ring. Other tables are user defined and static.
+   - IP greylist is a set of banned IP addresses automatically added
+   by the P2P layer.
+
+   - [peer_id] greylist is a set of banned peers ids automatically
+   added by the P2P layer.
+
+   - IP blacklist is a set of IP addresses manually added by the node
+   admin.
+
+   - peers blacklist is a set of peers ids manually added by the node
+   admin.
+
+   IP greylists use a time based GC to periodically remove entries
+   from the table, while [peer_id] greylists are built using an LRU
+   cache, where the least-recently grey-listed peer is evicted from
+   the table when adding a new banned peer to a full cache. Other
+   tables are user defined and static.
 
 *)
 
 type t
 
 (** [create size] is a set of four ACLs (see above) with the peer_id
-    greylist being a ring buffer of size [size]. *)
+    greylist being a LRU cache of size [size]. *)
 val create : int -> t
 
 (** [banned_addr t addr] is [true] if [addr] is blacklisted or
@@ -86,14 +92,20 @@ module PeerBlacklist : sig
 end
 
 module PeerGreylist : sig
+  (** [add t peer] adds [peer] to the peer greylist. It might
+     potentially evict the least-recently greylisted peer, if the grey
+     list is full. If [peer] was already in the list, it will become
+     the most-recently greylisted, thus ensuring it is not evicted
+     unfairly soon. *)
   val add : t -> P2p_peer.Id.t -> unit
 
+  (** [mem t peer] returns true iff [peer] is greylisted.*)
   val mem : t -> P2p_peer.Id.t -> bool
 end
 
 (** / *)
 
-module PeerRing : Ring.TABLE with type v = P2p_peer.Id.t
+module PeerLRUCache : Ring.TABLE with type v = P2p_peer.Id.t
 
 module IpSet : sig
   type t
