@@ -7,7 +7,8 @@ parameter.
 """
 import os
 import pytest
-from pytest_regtest import register_converter_pre, deregister_converter_pre
+from pytest_regtest import register_converter_pre, deregister_converter_pre, \
+    _std_conversion
 from launchers.sandbox import Sandbox, SandboxMultiBranch
 from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
@@ -115,6 +116,7 @@ def client_regtest_bis(sandbox):
 def client_regtest(client_regtest_bis, regtest):
     """The client for one node with protocol alpha, with a function level
 regression test fixture."""
+    deregister_converter_pre(_std_conversion)
     client_regtest_bis.set_regtest(regtest)
     yield client_regtest_bis
 
