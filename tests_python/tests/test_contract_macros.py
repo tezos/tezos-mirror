@@ -245,6 +245,7 @@ class TestBigmapGetAdd:
         bake(client)
 
 
+@pytest.mark.regression
 class TestMacroExpansion:
     """Test expanding macros"""
 

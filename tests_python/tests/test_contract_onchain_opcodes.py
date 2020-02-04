@@ -13,6 +13,7 @@ KEY2 = 'bar'
 @pytest.mark.incremental
 @pytest.mark.slow
 @pytest.mark.contract
+@pytest.mark.regression
 class TestContractOnchainOpcodes:
     """Tests for individual opcodes that requires origination."""
 

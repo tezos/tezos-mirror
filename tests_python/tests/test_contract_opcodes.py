@@ -8,6 +8,7 @@ from tools.utils import assert_run_failure, assert_run_script_success, \
 
 @pytest.mark.slow
 @pytest.mark.contract
+@pytest.mark.regression
 class TestContractOpcodes:
     """Tests for individual opcodes that do not require origination."""
 
