@@ -246,6 +246,8 @@ let check_enough_gas ctxt cost =
 
 let gas_level ctxt = ctxt.operation_gas
 
+let internal_gas ctxt = ctxt.internal_gas
+
 let block_gas_level ctxt = ctxt.block_gas
 
 let gas_consumed ~since ~until =

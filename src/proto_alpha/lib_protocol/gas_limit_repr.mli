@@ -25,7 +25,7 @@
 
 type t = Unaccounted | Limited of {remaining : Z.t}
 
-type internal_gas
+type internal_gas = Z.t
 
 val encoding : t Data_encoding.encoding
 

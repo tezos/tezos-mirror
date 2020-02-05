@@ -138,6 +138,8 @@ module Gas = struct
 
   let level = Raw_context.gas_level
 
+  let internal_gas = Raw_context.internal_gas
+
   let consumed = Raw_context.gas_consumed
 
   let block_level = Raw_context.block_gas_level
