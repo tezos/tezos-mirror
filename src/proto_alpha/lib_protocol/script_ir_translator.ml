@@ -5282,6 +5282,23 @@ let parse_code :
   >>=? fun (code, ctxt) ->
   return (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
 
+let parse_storage :
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    'storage ty ->
+    storage:lazy_expr ->
+    ('storage * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy storage_type ~storage ->
+  Script.force_decode ctxt storage
+  >>=? fun (storage, ctxt) ->
+  trace_eval
+    (fun () ->
+      Lwt.return @@ serialize_ty_for_error ctxt storage_type
+      >>|? fun (storage_type, _ctxt) ->
+      Ill_typed_data (None, storage, storage_type))
+    (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
+
 let parse_script :
     ?type_logger:type_logger ->
     context ->
@@ -5291,14 +5308,7 @@ let parse_script :
  fun ?type_logger ctxt ~legacy {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
   >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
-  Script.force_decode ctxt storage
-  >>=? fun (storage, ctxt) ->
-  trace_eval
-    (fun () ->
-      Lwt.return @@ serialize_ty_for_error ctxt storage_type
-      >>|? fun (storage_type, _ctxt) ->
-      Ill_typed_data (None, storage, storage_type))
-    (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
+  parse_storage ?type_logger ctxt ~legacy storage_type ~storage
   >>=? fun (storage, ctxt) ->
   return (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
