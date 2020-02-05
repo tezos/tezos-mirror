@@ -67,7 +67,7 @@ val get_endorsing_reward :
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
-  val get_ballot_list : t -> (baker_hash * Vote.ballot) list tzresult Lwt.t
+  val get_ballot_list : t -> (Contract.t * Vote.ballot) list tzresult Lwt.t
 
   val get_voting_period : t -> Voting_period.t tzresult Lwt.t
 
@@ -79,7 +79,7 @@ module Vote : sig
 
   val get_participation_ema : Block.t -> Int32.t tzresult Lwt.t
 
-  val get_listings : t -> (baker_hash * int32) list tzresult Lwt.t
+  val get_listings : t -> (Contract.t * int32) list tzresult Lwt.t
 
   val get_proposals : t -> Int32.t Protocol_hash.Map.t tzresult Lwt.t
 

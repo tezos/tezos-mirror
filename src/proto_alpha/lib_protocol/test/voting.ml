@@ -123,13 +123,21 @@ let assert_period_kind expected b loc =
 let mk_contracts_from_pkh pkh_list =
   List.map Alpha_context.Contract.implicit_contract pkh_list
 
+let filter_bakers_from_listings =
+  List.filter_map (fun (voter, rolls) ->
+      Contract.is_baker voter
+      |> Option.map (fun baker_hash -> (baker_hash, rolls)))
+
 (* get the list of delegates and the list of their rolls from listings *)
 let get_bakers_and_rolls_from_listings b =
-  Context.Vote.get_listings (B b) >|=? fun l -> (List.map fst l, List.map snd l)
+  Context.Vote.get_listings (B b)
+  >|=? filter_bakers_from_listings
+  >|=? fun l -> (List.map fst l, List.map snd l)
 
 (* compute the rolls of each baker *)
 let get_rolls b bakers loc =
   Context.Vote.get_listings (B b)
+  >|=? filter_bakers_from_listings
   >>=? fun l ->
   map_s
     (fun baker ->
@@ -388,7 +396,8 @@ let test_successful_vote num_bakers () =
              failwith "%s - Unexpected empty ballot list" __LOC__
          | l ->
              iter_s
-               (fun baker ->
+               (fun baker_hash ->
+                 let baker = Contract.baker_contract baker_hash in
                  match List.find_opt (fun (b, _) -> b = baker) l with
                  | None ->
                      failwith "%s - Missing baker" __LOC__
@@ -520,7 +529,8 @@ let test_successful_vote num_bakers () =
              failwith "%s - Unexpected empty ballot list" __LOC__
          | l ->
              iter_s
-               (fun baker ->
+               (fun baker_hash ->
+                 let baker = Contract.baker_contract baker_hash in
                  match List.find_opt (fun (b, _) -> b = baker) l with
                  | None ->
                      failwith "%s - Missing baker" __LOC__
@@ -830,6 +840,7 @@ let test_multiple_identical_proposals_count_as_one () =
   >>=? fun ps ->
   (* compute the rolls of proposer *)
   Context.Vote.get_listings (B b)
+  >|=? filter_bakers_from_listings
   >>=? fun l ->
   ( match List.find_opt (fun (b, _) -> b = proposer) l with
   | None ->
