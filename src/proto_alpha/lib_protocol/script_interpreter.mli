@@ -26,7 +26,7 @@
 open Alpha_context
 
 type execution_trace =
-  (Script.location * Gas.t * (Script.expr * string option) list) list
+  (Script.location * Gas.t * Z.t * (Script.expr * string option) list) list
 
 type error +=
   | Reject of Script.location * Script.expr * execution_trace option

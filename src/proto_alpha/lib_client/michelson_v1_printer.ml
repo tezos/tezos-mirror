@@ -60,13 +60,16 @@ let print_stack ppf = function
 
 let print_execution_trace ppf trace =
   Format.pp_print_list
-    (fun ppf (loc, gas, stack) ->
+    (fun ppf (loc, gas, internal_gas, stack) ->
       Format.fprintf
         ppf
-        "- @[<v 0>location: %d (remaining gas: %a)@,[ @[<v 0>%a ]@]@]"
+        "- @[<v 0>location: %d (remaining gas: %a, internal_gas: %a)@,\
+         [ @[<v 0>%a ]@]@]"
         loc
         Gas.pp
         gas
+        Z.pp_print
+        internal_gas
         (Format.pp_print_list (fun ppf (e, annot) ->
              Format.fprintf
                ppf
