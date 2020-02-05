@@ -59,16 +59,24 @@ let test_remove _ =
   P2p_acl.PeerLRUCache.remove set (a "bar") ;
   assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "bar"))
 
-let test_overflow _ =
+let test_LRU_overflow _ =
   let peers = List.map a ["foo"; "bar"; "baz"] in
   let set = P2p_acl.PeerLRUCache.create 3 in
   List.iter (fun peer -> P2p_acl.PeerLRUCache.add set peer) peers ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
+  P2p_acl.PeerLRUCache.add set (a "foo") ;
   P2p_acl.PeerLRUCache.add set (a "zor") ;
   assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "zor")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "foo")) ;
+  assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
+  P2p_acl.PeerLRUCache.add set (a "baz") ;
+  P2p_acl.PeerLRUCache.add set (a "baz") ;
+  P2p_acl.PeerLRUCache.add set (a "baz") ;
+  P2p_acl.PeerLRUCache.add set (a "qux") ;
   assert_equal_bool ~msg:__LOC__ false (P2p_acl.PeerLRUCache.mem set (a "foo")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "bar")) ;
-  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz"))
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "zor")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "baz")) ;
+  assert_equal_bool ~msg:__LOC__ true (P2p_acl.PeerLRUCache.mem set (a "qux"))
 
 let () =
   Alcotest.run
@@ -77,5 +85,5 @@ let () =
     [ ( "p2p.peerset",
         [ ("empty", `Quick, test_empty);
           ("add", `Quick, test_add);
-          ("overflow", `Quick, test_overflow);
+          ("LRU overflow", `Quick, test_LRU_overflow);
           ("remove", `Quick, test_remove) ] ) ]
