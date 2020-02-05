@@ -7,31 +7,31 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 1039619 units remaining)
+  - location: 9 (remaining gas: 1039619 units remaining, internal_gas: 0)
     [ (Pair (Pair False True) None)  	 ]
-  - location: 10 (remaining gas: 1039619 units remaining)
+  - location: 10 (remaining gas: 1039619 units remaining, internal_gas: 60)
     [ (Pair False True)  	@parameter ]
-  - location: 11 (remaining gas: 1039619 units remaining)
+  - location: 11 (remaining gas: 1039619 units remaining, internal_gas: 120)
     [ (Pair False True)  	@parameter
       (Pair False True)  	@parameter ]
-  - location: 12 (remaining gas: 1039618 units remaining)
+  - location: 12 (remaining gas: 1039618 units remaining, internal_gas: 52)
     [ False  	
       (Pair False True)  	@parameter ]
-  - location: 13 (remaining gas: 1039618 units remaining)
+  - location: 13 (remaining gas: 1039618 units remaining, internal_gas: 112)
     [ (Pair False True)  	@parameter
       False  	 ]
-  - location: 14 (remaining gas: 1039617 units remaining)
+  - location: 14 (remaining gas: 1039617 units remaining, internal_gas: 44)
     [ True  	
       False  	 ]
-  - location: 15 (remaining gas: 1039617 units remaining)
+  - location: 15 (remaining gas: 1039617 units remaining, internal_gas: 104)
     [ True  	 ]
-  - location: 16 (remaining gas: 1039616 units remaining)
+  - location: 16 (remaining gas: 1039616 units remaining, internal_gas: 36)
     [ (Some True)  	 ]
-  - location: 17 (remaining gas: 1039616 units remaining)
+  - location: 17 (remaining gas: 1039616 units remaining, internal_gas: 96)
     [ {}  	
       (Some True)  	 ]
-  - location: 19 (remaining gas: 1039615 units remaining)
+  - location: 19 (remaining gas: 1039615 units remaining, internal_gas: 28)
     [ (Pair {} (Some True))  	 ]
-  - location: -1 (remaining gas: 1039615 units remaining)
+  - location: -1 (remaining gas: 1039615 units remaining, internal_gas: 48)
     [ (Pair {} (Some True))  	 ]
 

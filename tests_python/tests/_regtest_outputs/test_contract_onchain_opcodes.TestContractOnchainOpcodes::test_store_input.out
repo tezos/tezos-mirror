@@ -65,7 +65,7 @@ Injected block [BLOCK_HASH]
 1000 ꜩ
 2000 ꜩ
 Node is bootstrapped.
-Estimated gas: 10954 units (will add 100 for safety)
+Estimated gas: 11272 units (will add 100 for safety)
 Estimated storage: 298 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -76,13 +76,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001377
+    Fee to the baker: ꜩ0.001409
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 11054
+    Gas limit: 11372
     Storage limit: 318 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001377
-      fees(the baker who will include this operation,0) ... +ꜩ0.001377
+      [CONTRACT_HASH] ................ -ꜩ0.001409
+      fees(the baker who will include this operation,0) ... +ꜩ0.001409
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ100
@@ -97,7 +97,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 41 bytes
         Paid storage size diff: 41 bytes
-        Consumed gas: 10954
+        Consumed gas: 11272
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.041
           [CONTRACT_HASH] ... -ꜩ0.257
@@ -108,7 +108,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as store_input.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 11405 units (will add 100 for safety)
+Estimated gas: 11564 units (will add 100 for safety)
 Estimated storage: 7 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -119,13 +119,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001419
+    Fee to the baker: ꜩ0.001435
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 11505
+    Gas limit: 11664
     Storage limit: 27 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001419
-      fees(the baker who will include this operation,0) ... +ꜩ0.001419
+      [CONTRACT_HASH] ................ -ꜩ0.001435
+      fees(the baker who will include this operation,0) ... +ꜩ0.001435
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]
@@ -135,7 +135,7 @@ This sequence of operations was run:
       Updated storage: "abcdefg"
       Storage size: 48 bytes
       Paid storage size diff: 7 bytes
-      Consumed gas: 11405
+      Consumed gas: 11564
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.007
         [CONTRACT_HASH] ... -ꜩ100
@@ -145,7 +145,7 @@ Injected block [BLOCK_HASH]
 200 ꜩ
 "abcdefg"
 Node is bootstrapped.
-Estimated gas: 11417 units (will add 100 for safety)
+Estimated gas: 11576 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -156,13 +156,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001416
+    Fee to the baker: ꜩ0.001432
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 11517
+    Gas limit: 11676
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001416
-      fees(the baker who will include this operation,0) ... +ꜩ0.001416
+      [CONTRACT_HASH] ................ -ꜩ0.001432
+      fees(the baker who will include this operation,0) ... +ꜩ0.001432
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]
@@ -171,7 +171,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: "xyz"
       Storage size: 44 bytes
-      Consumed gas: 11417
+      Consumed gas: 11576
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100

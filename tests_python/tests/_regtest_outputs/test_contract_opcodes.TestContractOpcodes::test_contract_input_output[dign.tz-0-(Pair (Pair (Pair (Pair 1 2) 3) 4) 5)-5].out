@@ -7,154 +7,154 @@ emitted operations
 big_map diff
   
 trace
-  - location: 14 (remaining gas: 1038821 units remaining)
+  - location: 14 (remaining gas: 1038821 units remaining, internal_gas: 0)
     [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0)  	 ]
-  - location: 15 (remaining gas: 1038821 units remaining)
+  - location: 15 (remaining gas: 1038821 units remaining, internal_gas: 60)
     [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
-  - location: 18 (remaining gas: 1038820 units remaining)
+  - location: 18 (remaining gas: 1038820 units remaining, internal_gas: 32)
     [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter
       (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
-  - location: 19 (remaining gas: 1038820 units remaining)
+  - location: 19 (remaining gas: 1038820 units remaining, internal_gas: 92)
     [ (Pair (Pair (Pair 1 2) 3) 4)  	
       (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
-  - location: 22 (remaining gas: 1038819 units remaining)
+  - location: 22 (remaining gas: 1038819 units remaining, internal_gas: 84)
     [ 5  	 ]
-  - location: 21 (remaining gas: 1038819 units remaining)
+  - location: 21 (remaining gas: 1038819 units remaining, internal_gas: 104)
     [ 5  	 ]
-  - location: 20 (remaining gas: 1038819 units remaining)
+  - location: 20 (remaining gas: 1038819 units remaining, internal_gas: 104)
     [ (Pair (Pair (Pair 1 2) 3) 4)  	
       5  	 ]
-  - location: -1 (remaining gas: 1038819 units remaining)
+  - location: -1 (remaining gas: 1038819 units remaining, internal_gas: 124)
     [ (Pair (Pair (Pair 1 2) 3) 4)  	
       5  	 ]
-  - location: 16 (remaining gas: 1038818 units remaining)
+  - location: 16 (remaining gas: 1038818 units remaining, internal_gas: 16)
     [ (Pair (Pair (Pair 1 2) 3) 4)  	
       5  	 ]
-  - location: 25 (remaining gas: 1038818 units remaining)
+  - location: 25 (remaining gas: 1038818 units remaining, internal_gas: 116)
     [ (Pair (Pair (Pair 1 2) 3) 4)  	
       (Pair (Pair (Pair 1 2) 3) 4)  	
       5  	 ]
-  - location: 26 (remaining gas: 1038817 units remaining)
+  - location: 26 (remaining gas: 1038817 units remaining, internal_gas: 48)
     [ (Pair (Pair 1 2) 3)  	
       (Pair (Pair (Pair 1 2) 3) 4)  	
       5  	 ]
-  - location: 29 (remaining gas: 1038816 units remaining)
+  - location: 29 (remaining gas: 1038816 units remaining, internal_gas: 40)
     [ 4  	
       5  	 ]
-  - location: 28 (remaining gas: 1038816 units remaining)
+  - location: 28 (remaining gas: 1038816 units remaining, internal_gas: 60)
     [ 4  	
       5  	 ]
-  - location: 27 (remaining gas: 1038816 units remaining)
+  - location: 27 (remaining gas: 1038816 units remaining, internal_gas: 60)
     [ (Pair (Pair 1 2) 3)  	
       4  	
       5  	 ]
-  - location: -1 (remaining gas: 1038816 units remaining)
+  - location: -1 (remaining gas: 1038816 units remaining, internal_gas: 80)
     [ (Pair (Pair 1 2) 3)  	
       4  	
       5  	 ]
-  - location: 23 (remaining gas: 1038816 units remaining)
+  - location: 23 (remaining gas: 1038816 units remaining, internal_gas: 100)
     [ (Pair (Pair 1 2) 3)  	
       4  	
       5  	 ]
-  - location: 32 (remaining gas: 1038815 units remaining)
+  - location: 32 (remaining gas: 1038815 units remaining, internal_gas: 72)
     [ (Pair (Pair 1 2) 3)  	
       (Pair (Pair 1 2) 3)  	
       4  	
       5  	 ]
-  - location: 33 (remaining gas: 1038814 units remaining)
+  - location: 33 (remaining gas: 1038814 units remaining, internal_gas: 4)
     [ (Pair 1 2)  	
       (Pair (Pair 1 2) 3)  	
       4  	
       5  	 ]
-  - location: 36 (remaining gas: 1038814 units remaining)
+  - location: 36 (remaining gas: 1038814 units remaining, internal_gas: 124)
     [ 3  	
       4  	
       5  	 ]
-  - location: 35 (remaining gas: 1038813 units remaining)
+  - location: 35 (remaining gas: 1038813 units remaining, internal_gas: 16)
     [ 3  	
       4  	
       5  	 ]
-  - location: 34 (remaining gas: 1038813 units remaining)
+  - location: 34 (remaining gas: 1038813 units remaining, internal_gas: 16)
     [ (Pair 1 2)  	
       3  	
       4  	
       5  	 ]
-  - location: -1 (remaining gas: 1038813 units remaining)
+  - location: -1 (remaining gas: 1038813 units remaining, internal_gas: 36)
     [ (Pair 1 2)  	
       3  	
       4  	
       5  	 ]
-  - location: 30 (remaining gas: 1038813 units remaining)
+  - location: 30 (remaining gas: 1038813 units remaining, internal_gas: 56)
     [ (Pair 1 2)  	
       3  	
       4  	
       5  	 ]
-  - location: 39 (remaining gas: 1038812 units remaining)
+  - location: 39 (remaining gas: 1038812 units remaining, internal_gas: 28)
     [ (Pair 1 2)  	
       (Pair 1 2)  	
       3  	
       4  	
       5  	 ]
-  - location: 40 (remaining gas: 1038812 units remaining)
+  - location: 40 (remaining gas: 1038812 units remaining, internal_gas: 88)
     [ 1  	
       (Pair 1 2)  	
       3  	
       4  	
       5  	 ]
-  - location: 43 (remaining gas: 1038811 units remaining)
+  - location: 43 (remaining gas: 1038811 units remaining, internal_gas: 80)
     [ 2  	
       3  	
       4  	
       5  	 ]
-  - location: 42 (remaining gas: 1038811 units remaining)
+  - location: 42 (remaining gas: 1038811 units remaining, internal_gas: 100)
     [ 2  	
       3  	
       4  	
       5  	 ]
-  - location: 41 (remaining gas: 1038811 units remaining)
+  - location: 41 (remaining gas: 1038811 units remaining, internal_gas: 100)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: -1 (remaining gas: 1038811 units remaining)
+  - location: -1 (remaining gas: 1038811 units remaining, internal_gas: 120)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 37 (remaining gas: 1038810 units remaining)
+  - location: 37 (remaining gas: 1038810 units remaining, internal_gas: 12)
     [ 1  	
       2  	
       3  	
       4  	
       5  	 ]
-  - location: 44 (remaining gas: 1038810 units remaining)
+  - location: 44 (remaining gas: 1038810 units remaining, internal_gas: 98)
     [ 5  	
       1  	
       2  	
       3  	
       4  	 ]
-  - location: 48 (remaining gas: 1038809 units remaining)
+  - location: 48 (remaining gas: 1038809 units remaining, internal_gas: 90)
     [ 2  	
       3  	
       4  	 ]
-  - location: 49 (remaining gas: 1038808 units remaining)
+  - location: 49 (remaining gas: 1038808 units remaining, internal_gas: 22)
     [ 3  	
       4  	 ]
-  - location: 50 (remaining gas: 1038808 units remaining)
+  - location: 50 (remaining gas: 1038808 units remaining, internal_gas: 82)
     [ 4  	 ]
-  - location: 51 (remaining gas: 1038807 units remaining)
+  - location: 51 (remaining gas: 1038807 units remaining, internal_gas: 14)
     [  ]
-  - location: -1 (remaining gas: 1038807 units remaining)
+  - location: -1 (remaining gas: 1038807 units remaining, internal_gas: 34)
     [  ]
-  - location: 46 (remaining gas: 1038807 units remaining)
+  - location: 46 (remaining gas: 1038807 units remaining, internal_gas: 34)
     [ 5  	 ]
-  - location: 52 (remaining gas: 1038807 units remaining)
+  - location: 52 (remaining gas: 1038807 units remaining, internal_gas: 94)
     [ {}  	
       5  	 ]
-  - location: 54 (remaining gas: 1038806 units remaining)
+  - location: 54 (remaining gas: 1038806 units remaining, internal_gas: 26)
     [ (Pair {} 5)  	 ]
-  - location: -1 (remaining gas: 1038806 units remaining)
+  - location: -1 (remaining gas: 1038806 units remaining, internal_gas: 46)
     [ (Pair {} 5)  	 ]
 
