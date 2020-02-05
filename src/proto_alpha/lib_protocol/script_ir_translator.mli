@@ -37,6 +37,20 @@ type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
+type ('arg, 'storage) code = {
+  code :
+    ( ('arg, 'storage) Script_typed_ir.pair,
+      ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+        'storage )
+      Script_typed_ir.pair )
+    Script_typed_ir.lambda;
+  arg_type : 'arg Script_typed_ir.ty;
+  storage_type : 'storage Script_typed_ir.ty;
+  root_name : string option;
+}
+
+type ex_code = Ex_code : ('a, 'c) code -> ex_code
+
 type tc_context =
   | Lambda : tc_context
   | Dip : 'a Script_typed_ir.stack_ty * tc_context -> tc_context
@@ -196,6 +210,13 @@ val typecheck_data :
   context ->
   Script.expr * Script.expr ->
   context tzresult Lwt.t
+
+val parse_code :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  code:Script.lazy_expr ->
+  (ex_code * context) tzresult Lwt.t
 
 val parse_script :
   ?type_logger:type_logger ->

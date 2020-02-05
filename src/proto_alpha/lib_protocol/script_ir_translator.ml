@@ -2052,7 +2052,16 @@ let check_packable ~legacy loc root =
   in
   check root
 
+type ('arg, 'storage) code = {
+  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+  arg_type : 'arg ty;
+  storage_type : 'storage ty;
+  root_name : string option;
+}
+
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
+
+type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type _ dig_proof_argument =
   | Dig_proof_argument :
@@ -5208,17 +5217,15 @@ and parse_toplevel :
             Script_ir_annot.error_unexpected_annot sloc sannot
             >>? fun () -> ok (p, s, c, root_name) )
 
-let parse_script :
+let parse_code :
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
-    Script.t ->
-    (ex_script * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy {code; storage} ->
+    code:lazy_expr ->
+    (ex_code * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode ctxt code
   >>=? fun (code, ctxt) ->
-  Script.force_decode ctxt storage
-  >>=? fun (storage, ctxt) ->
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
   trace
@@ -5256,13 +5263,6 @@ let parse_script :
         None,
         has_big_map storage_type )
   in
-  trace_eval
-    (fun () ->
-      Lwt.return @@ serialize_ty_for_error ctxt storage_type
-      >>|? fun (storage_type, _ctxt) ->
-      Ill_typed_data (None, storage, storage_type))
-    (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
-  >>=? fun (storage, ctxt) ->
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
@@ -5280,6 +5280,26 @@ let parse_script :
        ret_type_full
        code_field)
   >>=? fun (code, ctxt) ->
+  return (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
+
+let parse_script :
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    Script.t ->
+    (ex_script * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy {code; storage} ->
+  parse_code ~legacy ctxt ?type_logger ~code
+  >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  Script.force_decode ctxt storage
+  >>=? fun (storage, ctxt) ->
+  trace_eval
+    (fun () ->
+      Lwt.return @@ serialize_ty_for_error ctxt storage_type
+      >>|? fun (storage_type, _ctxt) ->
+      Ill_typed_data (None, storage, storage_type))
+    (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
+  >>=? fun (storage, ctxt) ->
   return (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
 let typecheck_code :
