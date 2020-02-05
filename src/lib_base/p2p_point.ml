@@ -278,6 +278,7 @@ module Info = struct
     last_disconnection : (P2p_peer_id.t * Time.System.t) option;
     last_seen : (P2p_peer_id.t * Time.System.t) option;
     last_miss : Time.System.t option;
+    expected_peer_id : P2p_peer_id.t option;
   }
 
   let encoding =
@@ -296,28 +297,31 @@ module Info = struct
                 last_established_connection;
                 last_disconnection;
                 last_seen;
-                last_miss } ->
+                last_miss;
+                expected_peer_id } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
-           ( trusted,
-             reconnection_time,
-             state,
-             p2p_peer_id,
-             last_failed_connection,
-             last_rejected_connection,
-             last_established_connection,
-             last_disconnection,
-             last_seen,
-             last_miss ))
-         (fun ( trusted,
-                reconnection_time,
-                state,
-                p2p_peer_id,
-                last_failed_connection,
-                last_rejected_connection,
-                last_established_connection,
-                last_disconnection,
-                last_seen,
-                last_miss ) ->
+           ( ( trusted,
+               reconnection_time,
+               state,
+               p2p_peer_id,
+               last_failed_connection,
+               last_rejected_connection,
+               last_established_connection,
+               last_disconnection,
+               last_seen,
+               last_miss ),
+             expected_peer_id ))
+         (fun ( ( trusted,
+                  reconnection_time,
+                  state,
+                  p2p_peer_id,
+                  last_failed_connection,
+                  last_rejected_connection,
+                  last_established_connection,
+                  last_disconnection,
+                  last_seen,
+                  last_miss ),
+                expected_peer_id ) ->
            let state = State.of_peerid_state state p2p_peer_id in
            {
              trusted;
@@ -329,24 +333,29 @@ module Info = struct
              last_disconnection;
              last_seen;
              last_miss;
+             expected_peer_id;
            })
-         (obj10
-            (req "trusted" bool)
-            (opt "greylisted_until" Time.System.encoding)
-            (req "state" State.encoding)
-            (opt "p2p_peer_id" P2p_peer_id.encoding)
-            (opt "last_failed_connection" Time.System.encoding)
-            (opt
-               "last_rejected_connection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt
-               "last_established_connection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt
-               "last_disconnection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt "last_miss" Time.System.encoding))
+         (merge_objs
+            (obj10
+               (req "trusted" bool)
+               (opt "greylisted_until" Time.System.encoding)
+               (req "state" State.encoding)
+               (opt "p2p_peer_id" P2p_peer_id.encoding)
+               (opt "last_failed_connection" Time.System.encoding)
+               (opt
+                  "last_rejected_connection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_established_connection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_disconnection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_seen"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt "last_miss" Time.System.encoding))
+            (obj1 (opt "expected_peer_id" P2p_peer_id.encoding)))
 end
 
 module Pool_event = struct

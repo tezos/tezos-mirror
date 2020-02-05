@@ -33,7 +33,7 @@ type config = {
   listening_addr : P2p_addr.t option;
   discovery_port : P2p_addr.port option;
   discovery_addr : Ipaddr.V4.t option;
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;

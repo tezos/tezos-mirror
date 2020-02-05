@@ -193,6 +193,41 @@ let may_register_my_id_point pool = function
   | _ ->
       ()
 
+(** Checking if there is an expected peer id for the connected point.
+    If an id is expected,
+     -  if the announced identity is not the expected one, issue a warn event and fail.
+     -  if the announced identity is correct issue a notice
+   *)
+let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
+    (conn_info : 'b P2p_connection.Info.t) =
+  Option.fold
+  (* if no point info, nothing is expected from the point, it cannot
+     even be set to trusted.  *)
+    ~none:return_unit
+    ~some:(fun point_info ->
+      let point = P2p_point_state.Info.point point_info in
+      Option.fold
+        ~none:return_unit
+        ~some:(fun expected_peer_id ->
+          if P2p_peer.Id.(expected_peer_id <> conn_info.peer_id) then
+            Events.(emit authenticate_status_peer_id_incorrect)
+              ("peer_id", point, expected_peer_id, conn_info.peer_id)
+            >>= fun () ->
+            fail
+              P2p_errors.(
+                Identity_check_failure
+                  {
+                    point;
+                    expected_peer_id;
+                    received_peer_id = conn_info.peer_id;
+                  })
+          else
+            Events.(emit authenticate_status_peer_id_correct)
+              ("peer_id", point, conn_info.peer_id)
+            >>= return)
+        (P2p_point_state.Info.get_expected_peer_id point_info))
+    point_info
+
 let raw_authenticate t ?point_info canceler fd point =
   let incoming = point_info = None in
   let incoming_opt = if incoming then Some "incoming" else None in
@@ -269,6 +304,9 @@ let raw_authenticate t ?point_info canceler fd point =
     | ((Some _ as point_info), _) | (_, (Some _ as point_info)) ->
         point_info
   in
+  (* Check if there is an expected peer id for this point. *)
+  check_expected_peer_id connection_point_info info
+  >>=? fun () ->
   let peer_info = P2p_pool.register_peer t.pool info.peer_id in
   (* [acceptable] is either Ok with a network version, or a Rejecting
      error with a motive  *)

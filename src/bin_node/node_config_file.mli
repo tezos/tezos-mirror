@@ -152,7 +152,8 @@ val resolve_rpc_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
 (** [resolve_boostrap_addrs bs_addrs] parses [bs_addrs] and returns
    for each [addr] a list of [points]. The default port is
    [default_p2p_port]. Fails if the address could not be parsed. *)
-val resolve_bootstrap_addrs : string list -> P2p_point.Id.t list tzresult Lwt.t
+val resolve_bootstrap_addrs :
+  string list -> (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
 
 val encoding : t Data_encoding.t
 

@@ -178,7 +178,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
     P2p_pool.
       {
         identity;
-        trusted_points;
+        trusted_points = List.map (fun p -> (p, None)) trusted_points;
         peers_file = "/dev/null";
         private_mode;
         max_known_points = None;

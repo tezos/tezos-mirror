@@ -48,6 +48,7 @@ let info_of_point_info i =
       last_disconnection = last_disconnection i;
       last_seen = last_seen i;
       last_miss = last_miss i;
+      expected_peer_id = P2p_point_state.get_expected_peer_id i;
     }
 
 let info_of_peer_info pool i =

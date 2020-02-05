@@ -182,6 +182,29 @@ module P2p_connect_handler = struct
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
+  let authenticate_status_peer_id_correct =
+    declare_3
+      ~section
+      ~name:"authenticate_status_peer_id_correct"
+      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~level:Notice
+      ("type", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+
+  let authenticate_status_peer_id_incorrect =
+    declare_4
+      ~section
+      ~name:"authenticate_status_peer_id_incorrect"
+      ~msg:
+        "authenticate failed: {point} {type}. Expected '{expected_peer_id}', \
+         got '{peer_id}'"
+      ~level:Warning
+      ("type", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("expected_peer_id", P2p_peer.Id.encoding)
+      ("peer_id", P2p_peer.Id.encoding)
+
   let authenticate_error =
     declare_2
       ~section

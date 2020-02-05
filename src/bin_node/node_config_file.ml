@@ -1303,7 +1303,6 @@ let resolve_bootstrap_addrs peers =
     ~default_addr:"::"
     ~default_port:default_p2p_port
     peers
-  >|=? List.map fst
 
 let check_listening_addrs config =
   match config.p2p.listen_addr with

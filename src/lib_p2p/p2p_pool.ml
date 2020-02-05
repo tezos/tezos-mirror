@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,7 +38,7 @@ end)
 
 type config = {
   identity : P2p_identity.t;
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
   peers_file : string;
   private_mode : bool;
   max_known_points : (int * int) option;
@@ -99,10 +99,40 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
             P2p_point.Table.remove known_points p) ;
         log Gc_points )
 
-let register_point ?trusted pool ((addr, port) as point) =
+let greylist_addr pool addr =
+  P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
+
+let set_expected_peer_id :
+    ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t =
+ fun pool point peer_id ->
   match P2p_point.Table.find pool.known_points point with
   | None ->
-      let point_info = P2p_point_state.Info.create ?trusted addr port in
+      Lwt.return_unit
+  | Some point_info -> (
+      P2p_point_state.set_expected_peer_id point_info peer_id ;
+      match P2p_point_state.get point_info with
+      | Disconnected | Requested _ ->
+          Lwt.return_unit
+      (* If the expected_peer_id is not the same than the one given
+         for the current connection, we greylist and disconnect if
+         possible. *)
+      | Running {current_peer_id; data} ->
+          if not (P2p_peer.Id.equal peer_id current_peer_id) then (
+            greylist_addr pool (fst point) ;
+            P2p_conn.disconnect data )
+          else Lwt.return_unit
+      | Accepted {current_peer_id; _} ->
+          if not (P2p_peer.Id.equal peer_id current_peer_id) then (
+            greylist_addr pool (fst point) ;
+            Lwt.return_unit )
+          else Lwt.return_unit )
+
+let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
+  match P2p_point.Table.find pool.known_points point with
+  | None ->
+      let point_info =
+        P2p_point_state.Info.create ?trusted ?expected_peer_id addr port
+      in
       Option.iter
         (fun (max, _) ->
           if P2p_point.Table.length pool.known_points >= max then
@@ -113,6 +143,13 @@ let register_point ?trusted pool ((addr, port) as point) =
       pool.log (New_point point) ;
       point_info
   | Some point_info ->
+      ( match expected_peer_id with
+      | Some peer_id ->
+          Lwt_utils.dont_wait
+            (fun _ -> ())
+            (fun () -> set_expected_peer_id pool point peer_id)
+      | None ->
+          () ) ;
       ( match trusted with
       | Some true ->
           P2p_point_state.Info.set_trusted point_info
@@ -244,7 +281,12 @@ module Points = struct
       (P2p_point.Table.find pool.known_points point)
 
   let set_trusted pool point =
-    ignore @@ register_point ~trusted:true pool point
+    ignore
+    @@ register_point
+         ~trusted:true
+         ?expected_peer_id:(snd point)
+         pool
+         (fst point)
 
   let unset_trusted pool point =
     Option.iter
@@ -275,7 +317,9 @@ module Points = struct
 
   let unban pool (addr, _port) = P2p_acl.unban_addr pool.acl addr
 
-  let trust pool point = unban pool point ; set_trusted pool point
+  let trust pool point =
+    unban pool point ;
+    set_trusted pool (point, None)
 
   let untrust pool point = unset_trusted pool point
 end
@@ -429,9 +473,6 @@ module Connection = struct
 end
 
 let connected_peer_ids pool = pool.connected_peer_ids
-
-let greylist_addr pool addr =
-  P2p_acl.IPGreylist.add pool.acl addr (Systime_os.now ())
 
 let greylist_peer pool peer =
   Option.iter

@@ -122,6 +122,7 @@ module Info : sig
     last_disconnection : (P2p_peer_id.t * Time.System.t) option;
     last_seen : (P2p_peer_id.t * Time.System.t) option;
     last_miss : Time.System.t option;
+    expected_peer_id : P2p_peer_id.t option;
   }
 
   val encoding : t Data_encoding.t

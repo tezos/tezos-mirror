@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,7 +44,7 @@ type ('msg, 'peer, 'conn) t
 
 type config = {
   identity : P2p_identity.t;  (** Our identity. *)
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
       (** List of hard-coded known peers to bootstrap the network from. *)
   peers_file : string;
       (** The path to the JSON file where the metadata associated to
@@ -87,15 +87,22 @@ val config : _ t -> config
 val active_connections : ('msg, 'peer, 'conn) t -> int
 
 (** If [point] doesn't belong to the table of known points,
-    [register_point t point] creates a [P2p_point_state.Info.t], triggers a
-    `New_point` event and signals the `new_point` condition. If table capacity
-    is exceeded, a GC of the table is triggered.
+   [register_point ?expected_peer_id t point] creates a
+   [P2p_point_state.Info.t], triggers a `New_point` event and signals
+   the `new_point` condition. If table capacity is exceeded, a GC of
+   the table is triggered.
 
-    If [point] is already known, the [P2p_point_state.Info.t] from the table
-    is returned. In either case, the trusted status of the returned
-    [P2p_point_state.Info.t] is set to [trusted]. *)
+    If [point] is already known, the [P2p_point_state.Info.t] from the
+   table is returned. In either case, the trusted status of the
+   returned [P2p_point_state.Info.t] is set to [trusted]. If an
+   [expected_peer_id] is given, it will be used during the next
+   connection attempt. If the provided peer_id is different the
+   connection will be refused. If we are already connected to a peer,
+   we check whether the current peer_id is the expected one otherwise
+   we disconnect from this point. *)
 val register_point :
   ?trusted:bool ->
+  ?expected_peer_id:P2p_peer.Id.t ->
   ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t ->
   ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
@@ -341,3 +348,13 @@ val score : ('msg, 'peer, 'conn) t -> 'peer -> float
 (** [add_to_id_points t point] adds [point] to the list of points for this
     peer. [point] is removed from the list of known points. *)
 val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+(** [set_expected_peer_id t point peer] sets [peer] as an expected
+   peer_id to [point]. For any future connection with this point,
+   there is a check that the peer_id announced is the expected one. As
+   a side effect, if there is an active connection with [point] with
+   another peer_id, we disconnect from this point and the point is
+   greylisted. If the connection is not active but accepted, the point
+   is greylisted. *)
+val set_expected_peer_id :
+  ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t
