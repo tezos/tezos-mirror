@@ -17,33 +17,43 @@ If you don't want to deal with the complexity of running your own
 delegate, you can always take part in the protocol by delegating your
 coins to one.
 
-Implicit accounts cannot have a delegate, so the first step is to
-originate an account, transfer your tez there and set a delegate.
-Notice that an originated account is a special case of a contract
-without code, so it is still necessary to pay for its small storage
-(see :ref:`Originated Account <originated-accounts>`).
+Both implicit accounts and smart contracts can have a
+delegate. Setting or resetting the delegate of an implicit account is
+achieved by the following command:
 
 ::
 
-   tezos-client originate account alice_del for alice \
-                                  transferring 1000 from alice \
-                                  --delegate bob
+   tezos-client set delegate for <implicit_account> to <delegate>
 
-As done before, we originate a contract *alice_del* with manager
-*alice* and we fund it with 1kꜩ. The interesting part here is setting the
-delegate to *bob*, as the delegate is not set by default when originating a
-contract. If you already own contracts that are delegatable you can change the
-delegate with the command ``set delegate``.
+where ``<implicit_account>`` is the address or alias of the implicit
+account to delegate and ``<delegate>`` is the address or alias of the
+delegate (which has to be :ref:`registered<DelegateRegistration>`).
+
+To stop a delegation, the following command can be used:
+
+::
+
+   tezos-client withdraw delegate from <implicit_account>
 
 
-Notice that, by default, an originated account is not *delegatable*,
-which means that you can't change the delegate once the contract is
-originated, even if you initially set a delegate.
-To be able to change the delegate latter, add the
-``--delegatable`` flag.
+
+Smart contract can also delegate the tokens they hold to registered
+delegates. The initial delegate of a smart contract can be set at
+origination using the ``--delegate`` option:
+
+::
+
+    tezos-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script> --delegate <delegate> --burn-cap <cap>
+
+
+Once the contract is originated, the only way to stop or modify its
+delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
+:ref:`the Michelson documentation<MichelsonSetDelegate>` for more
+details).
+
 
 Notice that only implicit accounts can be delegates, so your delegate
-must be a *tz1* address.
+must be a *tz* address.
 
 Funds in implicit accounts which are not registered as delegates
 do not participate in baking.
@@ -182,6 +192,8 @@ While fees are unfrozen after ``preserved_cycles`` like deposits and
 rewards, they participate in the staking balance of the delegate
 immediately after the block has been baked.
 
+
+.. _DelegateRegistration:
 
 Register and check your rights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

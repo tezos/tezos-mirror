@@ -189,8 +189,8 @@ aliases (``alice`` in our case) and what you would expect from the name
 of the file.
 Secret keys are stored on disk encrypted with a password except when
 using a hardware wallet (see :ref:`ledger`).
-An additional file ``contracts`` contains the addresses of `originated
-contracts`, which have the form *KT1…*.
+An additional file ``contracts`` contains the addresses of smart
+contracts, which have the form *KT1…*.
 
 We can for example generate a new pair of keys, which can be used locally
 with the alias *bob*::
@@ -365,23 +365,18 @@ operation that seems lost.
 
 .. _originated-accounts:
 
-Originated accounts and contracts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Implicit accounts and smart contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In Tezos there are two kinds of accounts: *implicit* and *originated*.
+In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
 
--  The implicit accounts are the *tz1* we have used up to now. They are created
-   with a transfer operation to the account public key hash.
+-  The implicit accounts are the *tz1*, *tz2*, and *tz3* we have used
+   up to now. They are created with a transfer operation to the
+   account public key hash.
 
--  Originated accounts have addresses *KT1* and are created with an
-   origination operation.
-
-An originated account doesn't have a corresponding secret key, but is *managed*
-by an implicit account. An originated account serves two purposes.
-
--  delegate tokens (see more :ref:`here <howtorun>`).
-
--  run Michelson code, in which case it is called a *contract*.
+-  Smart contracts have addresses *KT1* and are created with an
+   origination operation. They don't have a corresponding secret key
+   and they run Michelson code each time they receive a transaction.
 
 Let's originate our first contract and call it *id*::
 
@@ -389,13 +384,12 @@ Let's originate our first contract and call it *id*::
                  running ./tests_python/contracts/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
-The contract manager is the implicit account ``alice``. The initial balance
-is ꜩ1, generously provided by implicit account *alice* (but it could be from
-another contract managed by ``alice`` too). The contract stores a Michelson
-program ``id.tz``, with Michelson value ``"hello"`` as initial storage (the
-extra quotes are needed to avoid shell expansion). The parameter ``--burn-cap``
-specifies the maximal fee the user is willing to pay for this operation, the
-actual fee being determined by the system.
+The initial balance is ꜩ1, generously provided by implicit account
+*alice*. The contract stores a Michelson program ``id.tz``, with
+Michelson value ``"hello"`` as initial storage (the extra quotes are
+needed to avoid shell expansion). The parameter ``--burn-cap``
+specifies the maximal fee the user is willing to pay for this
+operation, the actual fee being determined by the system.
 
 A Michelson contract is semantically a pure function, mapping a pair
 ``(parameter, storage)`` to a pair ``(list_of_operations, storage)``. It can
@@ -412,8 +406,9 @@ For the sake of this example, here is the `id.tz` contract:
     code {CAR; NIL operation; PAIR};
 
 It specifies the types for the parameter and storage, and implements a
-function which ignores the parameter and returns the storage unchanged together
-with an empty list of operations.
+function which updates the storage with the value passed as parameter
+and returns the storage unchanged together with an empty list of
+operations.
 
 
 Gas and storage cost model

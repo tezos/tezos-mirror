@@ -1564,11 +1564,21 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
--  ``SET_DELEGATE``: Forge a delegation.
+.. _MichelsonSetDelegate:
+
+-  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
 
 ::
 
     :: option key_hash : 'S   ->   operation : 'S
+
+Using this instruction is the only way to modify the delegation of a
+smart contract. If the parameter is `None` then the delegation of the
+current contract is withdrawn; if it is `Some kh` where `kh` is the
+key hash of a registered delegate that is not the current delegate of
+the contract, then this operation sets the delegate of the contract to
+this registered delegate. The operation fails if `kh` is the current
+delegate of the contract or if `kh` is not a registered delegate.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
     contract, including any mutez added by the calling transaction.

@@ -39,7 +39,7 @@ _`Fitness`
     See score_.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates blocks_
+    A peer in the P2P network. It maintains a local state and propagates blocks
     and operations_.
 
 _`Operation`
@@ -121,10 +121,10 @@ _`Delegate`
     delegated to.
 
 _`Delegation`
-    An operation_ in which an `originated account`_'s manager_ lends its account_
-    balance to a delegate_. This increases the delegate_'s rolls and consequently
-    its Baking_ rights. The delegate_ does not control the funds from the
-    account_.
+    An operation_ in which an account_ balance is lent to a
+    delegate_. This increases the delegate_'s rolls and consequently
+    its Baking_ rights. The delegate_ does not control the funds from
+    the account_.
 
 _`Double baking`
     When a baker_ signs two different blocks at the same height, it is called
