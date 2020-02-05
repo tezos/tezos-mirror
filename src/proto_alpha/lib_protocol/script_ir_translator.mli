@@ -218,6 +218,15 @@ val parse_code :
   code:Script.lazy_expr ->
   (ex_code * context) tzresult Lwt.t
 
+val parse_storage :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  'storage Script_typed_ir.ty ->
+  storage:Script.lazy_expr ->
+  ('storage * context) tzresult Lwt.t
+
+(** Combines [parse_code] and [parse_storage] *)
 val parse_script :
   ?type_logger:type_logger ->
   context ->
