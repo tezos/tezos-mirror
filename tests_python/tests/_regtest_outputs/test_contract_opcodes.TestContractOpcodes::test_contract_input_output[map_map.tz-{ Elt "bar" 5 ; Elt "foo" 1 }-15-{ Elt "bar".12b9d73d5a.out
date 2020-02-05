@@ -7,82 +7,82 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039299 units remaining)
+  - location: 8 (remaining gas: 1039299 units remaining, internal_gas: 0)
     [ (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 })  	 ]
-  - location: 11 (remaining gas: 1039299 units remaining)
+  - location: 11 (remaining gas: 1039299 units remaining, internal_gas: 100)
     [ (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 })  	
       (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 })  	 ]
-  - location: 12 (remaining gas: 1039298 units remaining)
+  - location: 12 (remaining gas: 1039298 units remaining, internal_gas: 32)
     [ 15  	@parameter
       (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 })  	 ]
-  - location: 15 (remaining gas: 1039297 units remaining)
+  - location: 15 (remaining gas: 1039297 units remaining, internal_gas: 24)
     [ { Elt "bar" 5 ; Elt "foo" 1 }  	@storage ]
-  - location: 14 (remaining gas: 1039297 units remaining)
+  - location: 14 (remaining gas: 1039297 units remaining, internal_gas: 44)
     [ { Elt "bar" 5 ; Elt "foo" 1 }  	@storage ]
-  - location: 13 (remaining gas: 1039297 units remaining)
+  - location: 13 (remaining gas: 1039297 units remaining, internal_gas: 44)
     [ 15  	@parameter
       { Elt "bar" 5 ; Elt "foo" 1 }  	@storage ]
-  - location: -1 (remaining gas: 1039297 units remaining)
+  - location: -1 (remaining gas: 1039297 units remaining, internal_gas: 64)
     [ 15  	@parameter
       { Elt "bar" 5 ; Elt "foo" 1 }  	@storage ]
-  - location: 9 (remaining gas: 1039297 units remaining)
+  - location: 9 (remaining gas: 1039297 units remaining, internal_gas: 84)
     [ 15  	@parameter
       { Elt "bar" 5 ; Elt "foo" 1 }  	@storage ]
-  - location: 16 (remaining gas: 1039296 units remaining)
+  - location: 16 (remaining gas: 1039296 units remaining, internal_gas: 16)
     [ { Elt "bar" 5 ; Elt "foo" 1 }  	@storage
       15  	@parameter ]
-  - location: 19 (remaining gas: 1039294 units remaining)
+  - location: 19 (remaining gas: 1039294 units remaining, internal_gas: 120)
     [ 5  	@elt
       15  	@parameter ]
-  - location: 22 (remaining gas: 1039293 units remaining)
+  - location: 22 (remaining gas: 1039293 units remaining, internal_gas: 112)
     [ 15  	@parameter
       15  	@parameter ]
-  - location: 21 (remaining gas: 1039292 units remaining)
+  - location: 21 (remaining gas: 1039292 units remaining, internal_gas: 4)
     [ 15  	@parameter
       15  	@parameter ]
-  - location: 20 (remaining gas: 1039292 units remaining)
+  - location: 20 (remaining gas: 1039292 units remaining, internal_gas: 4)
     [ 5  	@elt
       15  	@parameter
       15  	@parameter ]
-  - location: 23 (remaining gas: 1039291 units remaining)
+  - location: 23 (remaining gas: 1039291 units remaining, internal_gas: 18)
     [ 20  	
       15  	@parameter ]
-  - location: -1 (remaining gas: 1039291 units remaining)
+  - location: -1 (remaining gas: 1039291 units remaining, internal_gas: 38)
     [ 20  	
       15  	@parameter ]
-  - location: 19 (remaining gas: 1039291 units remaining)
+  - location: 19 (remaining gas: 1039291 units remaining, internal_gas: 98)
     [ 1  	@elt
       15  	@parameter ]
-  - location: 22 (remaining gas: 1039290 units remaining)
+  - location: 22 (remaining gas: 1039290 units remaining, internal_gas: 90)
     [ 15  	@parameter
       15  	@parameter ]
-  - location: 21 (remaining gas: 1039290 units remaining)
+  - location: 21 (remaining gas: 1039290 units remaining, internal_gas: 110)
     [ 15  	@parameter
       15  	@parameter ]
-  - location: 20 (remaining gas: 1039290 units remaining)
+  - location: 20 (remaining gas: 1039290 units remaining, internal_gas: 110)
     [ 1  	@elt
       15  	@parameter
       15  	@parameter ]
-  - location: 23 (remaining gas: 1039289 units remaining)
+  - location: 23 (remaining gas: 1039289 units remaining, internal_gas: 124)
     [ 16  	
       15  	@parameter ]
-  - location: -1 (remaining gas: 1039288 units remaining)
+  - location: -1 (remaining gas: 1039288 units remaining, internal_gas: 16)
     [ 16  	
       15  	@parameter ]
-  - location: 17 (remaining gas: 1039288 units remaining)
+  - location: 17 (remaining gas: 1039288 units remaining, internal_gas: 16)
     [ { Elt "bar" 20 ; Elt "foo" 16 }  	
       15  	@parameter ]
-  - location: 26 (remaining gas: 1039287 units remaining)
+  - location: 26 (remaining gas: 1039287 units remaining, internal_gas: 8)
     [  ]
-  - location: 25 (remaining gas: 1039287 units remaining)
+  - location: 25 (remaining gas: 1039287 units remaining, internal_gas: 28)
     [  ]
-  - location: 24 (remaining gas: 1039287 units remaining)
+  - location: 24 (remaining gas: 1039287 units remaining, internal_gas: 28)
     [ { Elt "bar" 20 ; Elt "foo" 16 }  	 ]
-  - location: 27 (remaining gas: 1039287 units remaining)
+  - location: 27 (remaining gas: 1039287 units remaining, internal_gas: 88)
     [ {}  	
       { Elt "bar" 20 ; Elt "foo" 16 }  	 ]
-  - location: 29 (remaining gas: 1039286 units remaining)
+  - location: 29 (remaining gas: 1039286 units remaining, internal_gas: 20)
     [ (Pair {} { Elt "bar" 20 ; Elt "foo" 16 })  	 ]
-  - location: -1 (remaining gas: 1039286 units remaining)
+  - location: -1 (remaining gas: 1039286 units remaining, internal_gas: 40)
     [ (Pair {} { Elt "bar" 20 ; Elt "foo" 16 })  	 ]
 

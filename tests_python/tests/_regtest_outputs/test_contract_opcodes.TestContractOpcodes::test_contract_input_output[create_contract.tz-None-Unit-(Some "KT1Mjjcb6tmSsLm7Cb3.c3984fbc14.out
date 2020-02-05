@@ -13,41 +13,41 @@ emitted operations
   big_map diff
     
   trace
-    - location: 7 (remaining gas: 1039372 units remaining)
+    - location: 7 (remaining gas: 1039372 units remaining, internal_gas: 0)
       [ (Pair Unit None)  	 ]
-    - location: 8 (remaining gas: 1039372 units remaining)
+    - location: 8 (remaining gas: 1039372 units remaining, internal_gas: 60)
       [  ]
-    - location: 9 (remaining gas: 1039372 units remaining)
+    - location: 9 (remaining gas: 1039372 units remaining, internal_gas: 120)
       [ Unit  	 ]
-    - location: 10 (remaining gas: 1039371 units remaining)
+    - location: 10 (remaining gas: 1039371 units remaining, internal_gas: 52)
       [ 50000  	@amount
         Unit  	 ]
-    - location: 11 (remaining gas: 1039371 units remaining)
+    - location: 11 (remaining gas: 1039371 units remaining, internal_gas: 112)
       [ None  	
         50000  	@amount
         Unit  	 ]
-    - location: 13 (remaining gas: 1039336 units remaining)
+    - location: 13 (remaining gas: 1039336 units remaining, internal_gas: 24)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	
         "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"  	 ]
-    - location: 27 (remaining gas: 1039335 units remaining)
+    - location: 27 (remaining gas: 1039335 units remaining, internal_gas: 16)
       [ (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 28 (remaining gas: 1039335 units remaining)
+    - location: 28 (remaining gas: 1039335 units remaining, internal_gas: 76)
       [ {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: -1 (remaining gas: 1039335 units remaining)
+    - location: -1 (remaining gas: 1039335 units remaining, internal_gas: 96)
       [ {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 25 (remaining gas: 1039335 units remaining)
+    - location: 25 (remaining gas: 1039335 units remaining, internal_gas: 96)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	
         {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 30 (remaining gas: 1039334 units remaining)
+    - location: 30 (remaining gas: 1039334 units remaining, internal_gas: 28)
       [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 31 (remaining gas: 1039334 units remaining)
+    - location: 31 (remaining gas: 1039334 units remaining, internal_gas: 88)
       [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
               (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"))  	 ]
-    - location: -1 (remaining gas: 1039334 units remaining)
+    - location: -1 (remaining gas: 1039334 units remaining, internal_gas: 108)
       [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
               (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"))  	 ]
 

@@ -7,31 +7,31 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039692 units remaining)
+  - location: 8 (remaining gas: 1039692 units remaining, internal_gas: 0)
     [ (Pair { 0xab ; 0xcd } {})  	 ]
-  - location: 9 (remaining gas: 1039692 units remaining)
+  - location: 9 (remaining gas: 1039692 units remaining, internal_gas: 60)
     [ { 0xab ; 0xcd }  	@parameter ]
-  - location: 12 (remaining gas: 1039690 units remaining)
+  - location: 12 (remaining gas: 1039690 units remaining, internal_gas: 84)
     [ 0xff  	
       0xab  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039688 units remaining)
+  - location: 15 (remaining gas: 1039688 units remaining, internal_gas: 48)
     [ 0xffab  	 ]
-  - location: -1 (remaining gas: 1039688 units remaining)
+  - location: -1 (remaining gas: 1039688 units remaining, internal_gas: 68)
     [ 0xffab  	 ]
-  - location: 12 (remaining gas: 1039687 units remaining)
+  - location: 12 (remaining gas: 1039687 units remaining, internal_gas: 0)
     [ 0xff  	
       0xcd  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039686 units remaining)
+  - location: 15 (remaining gas: 1039686 units remaining, internal_gas: 92)
     [ 0xffcd  	 ]
-  - location: -1 (remaining gas: 1039686 units remaining)
+  - location: -1 (remaining gas: 1039686 units remaining, internal_gas: 112)
     [ 0xffcd  	 ]
-  - location: 10 (remaining gas: 1039686 units remaining)
+  - location: 10 (remaining gas: 1039686 units remaining, internal_gas: 112)
     [ { 0xffab ; 0xffcd }  	 ]
-  - location: 16 (remaining gas: 1039685 units remaining)
+  - location: 16 (remaining gas: 1039685 units remaining, internal_gas: 44)
     [ {}  	
       { 0xffab ; 0xffcd }  	 ]
-  - location: 18 (remaining gas: 1039685 units remaining)
+  - location: 18 (remaining gas: 1039685 units remaining, internal_gas: 104)
     [ (Pair {} { 0xffab ; 0xffcd })  	 ]
-  - location: -1 (remaining gas: 1039685 units remaining)
+  - location: -1 (remaining gas: 1039685 units remaining, internal_gas: 124)
     [ (Pair {} { 0xffab ; 0xffcd })  	 ]
 

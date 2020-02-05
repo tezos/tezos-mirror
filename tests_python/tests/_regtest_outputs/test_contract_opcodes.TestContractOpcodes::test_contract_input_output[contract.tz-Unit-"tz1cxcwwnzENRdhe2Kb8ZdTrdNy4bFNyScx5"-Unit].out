@@ -7,25 +7,25 @@ emitted operations
 big_map diff
   
 trace
-  - location: 6 (remaining gas: 1039680 units remaining)
+  - location: 6 (remaining gas: 1039680 units remaining, internal_gas: 0)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" Unit)  	 ]
-  - location: 7 (remaining gas: 1039680 units remaining)
+  - location: 7 (remaining gas: 1039680 units remaining, internal_gas: 60)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter ]
-  - location: 8 (remaining gas: 1029648 units remaining)
+  - location: 8 (remaining gas: 1029648 units remaining, internal_gas: 100)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")  	@parameter.contract ]
-  - location: 16 (remaining gas: 1029647 units remaining)
+  - location: 16 (remaining gas: 1029647 units remaining, internal_gas: 72)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
-  - location: 10 (remaining gas: 1029647 units remaining)
+  - location: 10 (remaining gas: 1029647 units remaining, internal_gas: 92)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
-  - location: 17 (remaining gas: 1029646 units remaining)
+  - location: 17 (remaining gas: 1029646 units remaining, internal_gas: 24)
     [  ]
-  - location: 18 (remaining gas: 1029646 units remaining)
+  - location: 18 (remaining gas: 1029646 units remaining, internal_gas: 84)
     [ Unit  	 ]
-  - location: 19 (remaining gas: 1029645 units remaining)
+  - location: 19 (remaining gas: 1029645 units remaining, internal_gas: 16)
     [ {}  	
       Unit  	 ]
-  - location: 21 (remaining gas: 1029645 units remaining)
+  - location: 21 (remaining gas: 1029645 units remaining, internal_gas: 76)
     [ (Pair {} Unit)  	 ]
-  - location: -1 (remaining gas: 1029645 units remaining)
+  - location: -1 (remaining gas: 1029645 units remaining, internal_gas: 96)
     [ (Pair {} Unit)  	 ]
 
