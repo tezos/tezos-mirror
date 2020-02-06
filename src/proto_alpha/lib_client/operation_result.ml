@@ -191,6 +191,16 @@ let pp_manager_operation_contents_and_result ppf
         {source; fee; operation; counter; gas_limit; storage_limit},
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
+  let pp_big_map_diff = function
+    | None | Some [] ->
+        ()
+    | Some diff ->
+        Format.fprintf
+          ppf
+          "@,@[<v 2>Updated big_maps:@ %a@]"
+          Michelson_v1_printer.print_big_map_diff
+          diff
+  in
   let pp_transaction_result
       (Transaction_result
         { balance_updates;
@@ -219,15 +229,7 @@ let pp_manager_operation_contents_and_result ppf
           "@,@[<hv 2>Updated storage:@ %a@]"
           Michelson_v1_printer.print_expr
           expr ) ;
-    ( match big_map_diff with
-    | None | Some [] ->
-        ()
-    | Some diff ->
-        Format.fprintf
-          ppf
-          "@,@[<v 2>Updated big_maps:@ %a@]"
-          Michelson_v1_printer.print_big_map_diff
-          diff ) ;
+    pp_big_map_diff big_map_diff ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
     if paid_storage_size_diff <> Z.zero then
@@ -265,15 +267,7 @@ let pp_manager_operation_contents_and_result ppf
           contracts ) ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
-    ( match big_map_diff with
-    | None | Some [] ->
-        ()
-    | Some diff ->
-        Format.fprintf
-          ppf
-          "@,@[<v 2>Updated big_maps:@ %a@]"
-          Michelson_v1_printer.print_big_map_diff
-          diff ) ;
+    pp_big_map_diff big_map_diff ;
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
         ppf
