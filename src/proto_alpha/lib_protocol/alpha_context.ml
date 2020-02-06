@@ -163,9 +163,9 @@ end
 module Big_map = struct
   type id = Z.t
 
-  let fresh = Storage.Big_map.Next.incr
-
-  let fresh_temporary = Raw_context.fresh_temporary_big_map
+  let fresh ~temporary c =
+    if temporary then return (Raw_context.fresh_temporary_big_map c)
+    else Storage.Big_map.Next.incr c
 
   let mem c m k = Storage.Big_map.Contents.mem (c, m) k
 
