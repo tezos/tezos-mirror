@@ -49,9 +49,7 @@ module Scripts : sig
     * Contract.t option
     * Gas.Arith.integral option
     * string ->
-    ( Script.expr
-    * packed_internal_operation list
-    * Contract.Legacy_big_map_diff.t option )
+    (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
     shell_tzresult
     Lwt.t
 
@@ -70,7 +68,7 @@ module Scripts : sig
     ( Script.expr
     * packed_internal_operation list
     * Script_interpreter.execution_trace
-    * Contract.Legacy_big_map_diff.t option )
+    * Lazy_storage.diffs option )
     shell_tzresult
     Lwt.t
 

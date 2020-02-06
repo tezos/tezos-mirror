@@ -78,7 +78,10 @@ let print_execution_trace ppf trace =
     ppf
     trace
 
-let print_big_map_diff ppf diff =
+let print_big_map_diff ppf lazy_storage_diff =
+  let diff =
+    Contract.Legacy_big_map_diff.of_lazy_storage_diff lazy_storage_diff
+  in
   let pp_map ppf id =
     if Compare.Z.(id < Z.zero) then
       Format.fprintf ppf "temp(%s)" (Z.to_string (Z.neg id))
@@ -116,7 +119,7 @@ let print_big_map_diff ppf diff =
              (fun ppf -> function None -> () | Some x ->
                    Format.fprintf ppf " to %a" print_expr x)
              diff_value))
-    diff
+    (diff :> Contract.Legacy_big_map_diff.item list)
 
 let inject_types type_map parsed =
   let rec inject_expr = function
