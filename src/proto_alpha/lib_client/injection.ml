@@ -586,9 +586,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             cctxt#message "Estimated gas: none" >>= fun () -> return Z.zero
           else
             cctxt#message
-              "Estimated gas: %s units (will add 100 for safety)"
+              "Estimated gas: %s units (will add 12800 for safety)"
               (Z.to_string gas)
-            >>= fun () -> return (Z.min (Z.add gas (Z.of_int 100)) gas_limit)
+            >>= fun () -> return (Z.min (Z.add gas (Z.of_int 12800)) gas_limit)
         else return c.gas_limit )
         >>=? fun gas_limit ->
         ( if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
@@ -844,7 +844,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
                 source;
                 fee = Tez.zero;
                 counter;
-                gas_limit = Z.of_int 10_000;
+                gas_limit = Z.of_int (128 * 10_000);
                 storage_limit = Z.zero;
                 operation = Reveal src_pk;
               },

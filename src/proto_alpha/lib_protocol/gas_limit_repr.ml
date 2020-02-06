@@ -107,7 +107,7 @@ let rescaling_mask = Z.sub (Z.shift_left Z.one rescaling_bits) Z.one
 
 let scale (z : Z.t) = Z.shift_left z rescaling_bits
 
-let rescale (z : Z.t) = Z.shift_right z rescaling_bits
+let rescale (z : Z.t) = z
 
 let cost_to_internal_gas (cost : cost) : internal_gas =
   Z.add
@@ -124,7 +124,7 @@ let cost_to_internal_gas (cost : cost) : internal_gas =
 
 let internal_gas_to_gas internal_gas : Z.t * internal_gas =
   let gas = rescale internal_gas in
-  let rest = Z.logand internal_gas rescaling_mask in
+  let rest = Z.zero in
   (gas, rest)
 
 let consume block_gas operation_gas internal_gas cost =
