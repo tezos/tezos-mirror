@@ -465,8 +465,8 @@ module Manpage = struct
       `I
         ( "$(b,Run in sandbox mode listening to RPC commands at localhost \
            port 8732)",
-          "$(mname) run --sandbox --data-dir /custom/data/dir --rpc-addr \
-           localhost:8732" );
+          "$(mname) run --sandbox=sandbox-parameters.json --data-dir \
+           /custom/data/dir --rpc-addr localhost:8732" );
       `I ("$(b,Run a node that accepts network connections)", "$(mname) run")
     ]
 
