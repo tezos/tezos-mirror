@@ -124,7 +124,7 @@ val init_set_storage_cached :
 val clear_storage_cached : Raw_context.t -> Raw_context.t
 
 module Legacy_big_map_diff : sig
-  type item =
+  type item = private
     | Update of {
         big_map : Z.t;
         diff_key : Script_repr.expr;
@@ -142,13 +142,17 @@ module Legacy_big_map_diff : sig
   type t = item list
 
   val encoding : t Data_encoding.t
+
+  val to_lazy_storage_diff : t -> Lazy_storage_diff.diffs
+
+  val of_lazy_storage_diff : Lazy_storage_diff.diffs -> t
 end
 
 val update_script_storage :
   Raw_context.t ->
   Contract_repr.t ->
   Script_repr.expr ->
-  Legacy_big_map_diff.t option ->
+  Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
 
 val credit :
@@ -168,7 +172,7 @@ val originate :
   ?prepaid_bootstrap_storage:bool ->
   Contract_repr.t ->
   balance:Tez_repr.t ->
-  script:Script_repr.t * Legacy_big_map_diff.t option ->
+  script:Script_repr.t * Lazy_storage_diff.diffs option ->
   delegate:Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 

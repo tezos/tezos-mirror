@@ -46,9 +46,7 @@ val run :
   ?gas:Z.t ->
   ?entrypoint:string ->
   unit ->
-  ( Script.expr
-  * packed_internal_operation list
-  * Contract.Legacy_big_map_diff.t option )
+  (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
   tzresult
   Lwt.t
 
@@ -69,7 +67,7 @@ val trace :
   ( Script.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Contract.Legacy_big_map_diff.t option )
+  * Lazy_storage.diffs option )
   tzresult
   Lwt.t
 
@@ -79,7 +77,7 @@ val print_run_result :
   parsed:Michelson_v1_parser.parsed ->
   ( Script_repr.expr
   * packed_internal_operation list
-  * Contract.Legacy_big_map_diff.t option )
+  * Lazy_storage.diffs option )
   tzresult ->
   unit tzresult Lwt.t
 
@@ -90,7 +88,7 @@ val print_trace_result :
   ( Script_repr.expr
   * packed_internal_operation list
   * Script_interpreter.execution_trace
-  * Contract.Legacy_big_map_diff.t option )
+  * Lazy_storage.diffs option )
   tzresult ->
   unit tzresult Lwt.t
 

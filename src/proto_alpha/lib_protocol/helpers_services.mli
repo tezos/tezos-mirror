@@ -50,9 +50,7 @@ module Scripts : sig
     chain_id:Chain_id.t ->
     source:Contract.t option ->
     payer:Contract.t option ->
-    ( Script.expr
-    * packed_internal_operation list
-    * Contract.Legacy_big_map_diff.t option )
+    (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
     shell_tzresult
     Lwt.t
 
@@ -72,7 +70,7 @@ module Scripts : sig
     ( Script.expr
     * packed_internal_operation list
     * Script_interpreter.execution_trace
-    * Contract.Legacy_big_map_diff.t option )
+    * Lazy_storage.diffs option )
     shell_tzresult
     Lwt.t
 

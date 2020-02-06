@@ -331,4 +331,4 @@ val extract_big_map_diff :
   to_update:big_map_ids ->
   'a Script_typed_ir.ty ->
   'a ->
-  ('a * Contract.Legacy_big_map_diff.t option * context) tzresult Lwt.t
+  ('a * Lazy_storage.diffs option * context) tzresult Lwt.t

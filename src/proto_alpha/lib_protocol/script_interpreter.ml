@@ -1256,7 +1256,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     * Script.expr
     * packed_internal_operation list
     * context
-    * Contract.Legacy_big_map_diff.t option )
+    * Lazy_storage.diffs option )
     tzresult
     Lwt.t =
   parse_script ctxt unparsed_script ~legacy:true
@@ -1308,7 +1308,7 @@ type execution_result = {
   ctxt : context;
   code : Script.expr;
   storage : Script.expr;
-  big_map_diff : Contract.Legacy_big_map_diff.t option;
+  lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
 }
 
@@ -1323,11 +1323,11 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     ~entrypoint
     script
     (Micheline.root parameter)
-  >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
+  >>=? fun (code, storage, operations, ctxt, lazy_storage_diff) ->
   Logger.get_log ()
   >>=? fun trace ->
   let trace = Option.value ~default:[] trace in
-  return ({ctxt; code; storage; big_map_diff; operations}, trace)
+  return ({ctxt; code; storage; lazy_storage_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
   let logger = (module No_trace : STEP_LOGGER) in
@@ -1339,5 +1339,5 @@ let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
     ~entrypoint
     script
     (Micheline.root parameter)
-  >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
-  return {ctxt; code; storage; big_map_diff; operations}
+  >>=? fun (code, storage, operations, ctxt, lazy_storage_diff) ->
+  return {ctxt; code; storage; lazy_storage_diff; operations}

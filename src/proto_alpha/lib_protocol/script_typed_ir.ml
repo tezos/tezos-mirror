@@ -101,8 +101,7 @@ end
 type ('key, 'value) map =
   (module Boxed_map with type key = 'key and type value = 'value)
 
-type operation =
-  packed_internal_operation * Contract.Legacy_big_map_diff.t option
+type operation = packed_internal_operation * Lazy_storage.diffs option
 
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;

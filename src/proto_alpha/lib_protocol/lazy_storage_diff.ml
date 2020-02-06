@@ -28,6 +28,12 @@ module type OPS = sig
 
   type updates
 
+  val title : string
+
+  val alloc_encoding : alloc Data_encoding.t
+
+  val updates_encoding : updates Data_encoding.t
+
   val bytes_size_for_empty : Z.t
 
   val alloc : Raw_context.t -> id:Z.t -> alloc -> Raw_context.t tzresult Lwt.t
@@ -118,6 +124,53 @@ type ('alloc, 'updates) diff =
   | Remove
   | Update of {init : 'alloc init; updates : 'updates}
 
+let diff_encoding : type a u. (a, u) ops -> (a, u) diff Data_encoding.t =
+ fun (module OPS) ->
+  let open Data_encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"update"
+        (obj2
+           (req "action" (constant "update"))
+           (req "updates" OPS.updates_encoding))
+        (function
+          | Update {init = Existing; updates} -> Some ((), updates) | _ -> None)
+        (fun ((), updates) -> Update {init = Existing; updates});
+      case
+        (Tag 1)
+        ~title:"remove"
+        (obj1 (req "action" (constant "remove")))
+        (function Remove -> Some () | _ -> None)
+        (fun () -> Remove);
+      case
+        (Tag 2)
+        ~title:"copy"
+        (obj3
+           (req "action" (constant "copy"))
+           (req "source" z)
+           (req "updates" OPS.updates_encoding))
+        (function
+          | Update {init = Copy {src}; updates} ->
+              Some ((), src, updates)
+          | _ ->
+              None)
+        (fun ((), src, updates) -> Update {init = Copy {src}; updates});
+      case
+        (Tag 3)
+        ~title:"alloc"
+        (merge_objs
+           (obj2
+              (req "action" (constant "alloc"))
+              (req "updates" OPS.updates_encoding))
+           OPS.alloc_encoding)
+        (function
+          | Update {init = Alloc alloc; updates} ->
+              Some (((), updates), alloc)
+          | _ ->
+              None)
+        (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates}) ]
+
 let apply_updates :
     type a u.
     Raw_context.t ->
@@ -186,7 +239,35 @@ let make :
     type a u. (a, u) Lazy_storage_kind.t -> Z.t -> (a, u) diff -> diffs_item =
  fun k id diff -> E (k, id, diff)
 
+let item_encoding =
+  let open Data_encoding in
+  union
+  @@ List.map
+       (fun (tag, Lazy_storage_kind.E k) ->
+         let ops = get_ops k in
+         let (module OPS) = ops in
+         let title = OPS.title in
+         case
+           (Tag tag)
+           ~title
+           (obj3
+              (req "kind" (constant title))
+              (req "id" z)
+              (req "diff" (diff_encoding ops)))
+           (fun (E (kind, id, diff)) ->
+             match Lazy_storage_kind.eq k kind with
+             | Some Eq ->
+                 Some ((), id, diff)
+             | None ->
+                 None)
+           (fun ((), id, diff) -> E (k, id, diff)))
+       Lazy_storage_kind.all
+
 type diffs = diffs_item list
+
+let encoding =
+  let open Data_encoding in
+  def "lazy_storage_diff" @@ list item_encoding
 
 let apply ctxt diffs =
   fold_left_s

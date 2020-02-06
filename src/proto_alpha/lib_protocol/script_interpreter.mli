@@ -47,7 +47,7 @@ type execution_result = {
   ctxt : context;
   code : Script.expr;
   storage : Script.expr;
-  big_map_diff : Contract.Legacy_big_map_diff.t option;
+  lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
 }
 

@@ -57,7 +57,7 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
-  | Ok (storage, operations, maybe_diff) ->
+  | Ok (storage, operations, maybe_lazy_storage_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,\
          %a@]@,\
@@ -71,14 +71,14 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         operations
         (fun ppf -> function None -> () | Some diff ->
               print_big_map_diff ppf diff)
-        maybe_diff
+        maybe_lazy_storage_diff
       >>= fun () -> return_unit
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
 let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
-  | Ok (storage, operations, trace, maybe_big_map_diff) ->
+  | Ok (storage, operations, trace, maybe_lazy_storage_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,\
          %a@]@,\
@@ -94,7 +94,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         operations
         (fun ppf -> function None -> () | Some diff ->
               print_big_map_diff ppf diff)
-        maybe_big_map_diff
+        maybe_lazy_storage_diff
         print_execution_trace
         trace
       >>= fun () -> return_unit

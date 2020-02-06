@@ -146,6 +146,17 @@ module Level = struct
   include Level_storage
 end
 
+module Lazy_storage = struct
+  module Kind = Lazy_storage_kind
+  include Lazy_storage_diff
+
+  let legacy_big_map_diff_encoding =
+    Data_encoding.conv
+      Contract_storage.Legacy_big_map_diff.of_lazy_storage_diff
+      Contract_storage.Legacy_big_map_diff.to_lazy_storage_diff
+      Contract_storage.Legacy_big_map_diff.encoding
+end
+
 module Contract = struct
   include Contract_repr
   include Contract_storage

@@ -52,7 +52,7 @@ type _ successful_manager_operation_result =
   | Transaction_result : {
       code : Script.expr option;
       storage : Script.expr option;
-      big_map_diff : Contract.Legacy_big_map_diff.t option;
+      lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Z.t;
@@ -62,7 +62,7 @@ type _ successful_manager_operation_result =
     }
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
-      big_map_diff : Contract.Legacy_big_map_diff.t option;
+      lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
       originated_contracts : Contract.t list;
       consumed_gas : Z.t;
@@ -189,16 +189,22 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj9
+        (obj10
            (opt "code" Script.expr_encoding)
            (opt "storage" Script.expr_encoding)
-           (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding)
+           (opt
+              (* The field [big_map_diff] is deprecated since 007, use [lazy_storage_diff] instead.
+                 Is it kept here for a transition period, for tool like indexers to update.
+                 TODO(008): remove it. *)
+              "big_map_diff"
+              Lazy_storage.legacy_big_map_diff_encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
-           (dft "allocated_destination_contract" bool false))
+           (dft "allocated_destination_contract" bool false)
+           (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
         | Internal_operation_result
             (({operation = Transaction _; _} as op), res) ->
@@ -215,7 +221,7 @@ module Manager_result = struct
         | Transaction_result
             { code;
               storage;
-              big_map_diff;
+              lazy_storage_diff;
               balance_updates;
               originated_contracts;
               consumed_gas;
@@ -224,28 +230,33 @@ module Manager_result = struct
               allocated_destination_contract } ->
             ( code,
               storage,
-              big_map_diff,
+              lazy_storage_diff,
               balance_updates,
               originated_contracts,
               consumed_gas,
               storage_size,
               paid_storage_size_diff,
-              allocated_destination_contract ))
+              allocated_destination_contract,
+              lazy_storage_diff ))
       ~inj:
         (fun ( code,
                storage,
-               big_map_diff,
+               legacy_lazy_storage_diff,
                balance_updates,
                originated_contracts,
                consumed_gas,
                storage_size,
                paid_storage_size_diff,
-               allocated_destination_contract ) ->
+               allocated_destination_contract,
+               lazy_storage_diff ) ->
+        let lazy_storage_diff =
+          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+        in
         Transaction_result
           {
             code;
             storage;
-            big_map_diff;
+            lazy_storage_diff;
             balance_updates;
             originated_contracts;
             consumed_gas;
@@ -258,13 +269,19 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj6
-           (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding)
+        (obj7
+           (opt
+              (* The field [big_map_diff] is deprecated since 007, use [lazy_storage_diff] instead.
+                 Is it kept here for a transition period, for tool like indexers to update.
+                 TODO(008): remove it. *)
+              "big_map_diff"
+              Lazy_storage.legacy_big_map_diff_encoding)
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" z Z.zero)
            (dft "storage_size" z Z.zero)
-           (dft "paid_storage_size_diff" z Z.zero))
+           (dft "paid_storage_size_diff" z Z.zero)
+           (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
         | Internal_operation_result
             (({operation = Origination _; _} as op), res) ->
@@ -278,29 +295,34 @@ module Manager_result = struct
             None)
       ~proj:(function
         | Origination_result
-            { big_map_diff;
+            { lazy_storage_diff;
               balance_updates;
               originated_contracts;
               consumed_gas;
               storage_size;
               paid_storage_size_diff } ->
-            ( big_map_diff,
+            ( lazy_storage_diff,
               balance_updates,
               originated_contracts,
               consumed_gas,
               storage_size,
-              paid_storage_size_diff ))
+              paid_storage_size_diff,
+              lazy_storage_diff ))
       ~kind:Kind.Origination_manager_kind
       ~inj:
-        (fun ( big_map_diff,
+        (fun ( legacy_lazy_storage_diff,
                balance_updates,
                originated_contracts,
                consumed_gas,
                storage_size,
-               paid_storage_size_diff ) ->
+               paid_storage_size_diff,
+               lazy_storage_diff ) ->
+        let lazy_storage_diff =
+          Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+        in
         Origination_result
           {
-            big_map_diff;
+            lazy_storage_diff;
             balance_updates;
             originated_contracts;
             consumed_gas;

@@ -84,10 +84,22 @@ module Scripts = struct
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:
-          (obj3
-             (req "storage" Script.expr_encoding)
-             (req "operations" (list Operation.internal_operation_encoding))
-             (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding))
+          (conv
+             (fun (storage, operations, lazy_storage_diff) ->
+               (storage, operations, lazy_storage_diff, lazy_storage_diff))
+             (fun ( storage,
+                    operations,
+                    legacy_lazy_storage_diff,
+                    lazy_storage_diff ) ->
+               let lazy_storage_diff =
+                 Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+               in
+               (storage, operations, lazy_storage_diff))
+             (obj4
+                (req "storage" Script.expr_encoding)
+                (req "operations" (list Operation.internal_operation_encoding))
+                (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
+                (opt "lazy_storage_diff" Lazy_storage.encoding)))
         RPC_path.(path / "run_code")
 
     let trace_code =
@@ -97,11 +109,28 @@ module Scripts = struct
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:
-          (obj4
-             (req "storage" Script.expr_encoding)
-             (req "operations" (list Operation.internal_operation_encoding))
-             (req "trace" trace_encoding)
-             (opt "big_map_diff" Contract.Legacy_big_map_diff.encoding))
+          (conv
+             (fun (storage, operations, trace, lazy_storage_diff) ->
+               ( storage,
+                 operations,
+                 trace,
+                 lazy_storage_diff,
+                 lazy_storage_diff ))
+             (fun ( storage,
+                    operations,
+                    trace,
+                    legacy_lazy_storage_diff,
+                    lazy_storage_diff ) ->
+               let lazy_storage_diff =
+                 Option.first_some lazy_storage_diff legacy_lazy_storage_diff
+               in
+               (storage, operations, trace, lazy_storage_diff))
+             (obj5
+                (req "storage" Script.expr_encoding)
+                (req "operations" (list Operation.internal_operation_encoding))
+                (req "trace" trace_encoding)
+                (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
+                (opt "lazy_storage_diff" Lazy_storage.encoding)))
         RPC_path.(path / "trace_code")
 
     let typecheck_code =
@@ -253,8 +282,8 @@ module Scripts = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
-        >>=? fun {Script_interpreter.storage; operations; big_map_diff; _} ->
-        return (storage, operations, big_map_diff)) ;
+        >>=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
+        return (storage, operations, lazy_storage_diff)) ;
     register0
       S.trace_code
       (fun ctxt
@@ -304,9 +333,12 @@ module Scripts = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
-        >>=? fun ( {Script_interpreter.storage; operations; big_map_diff; _},
+        >>=? fun ( { Script_interpreter.storage;
+                     operations;
+                     lazy_storage_diff;
+                     _ },
                    trace ) ->
-        return (storage, operations, trace, big_map_diff)) ;
+        return (storage, operations, trace, lazy_storage_diff)) ;
     register0 S.typecheck_code (fun ctxt () (expr, maybe_gas, legacy) ->
         let legacy = Option.value ~default:false legacy in
         let ctxt =

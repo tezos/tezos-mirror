@@ -410,15 +410,50 @@ module Legacy_big_map_diff = struct
     |> rev_head
     |> List.rev_map (fun (id, diff) ->
            Lazy_storage_diff.make Lazy_storage_kind.Big_map id diff)
+
+  let of_lazy_storage_diff diffs =
+    List.fold_left
+      (fun legacy_diffs (Lazy_storage_diff.E (kind, id, diff)) ->
+        let diffs =
+          match kind with
+          | Lazy_storage_kind.Big_map -> (
+            match diff with
+            | Remove ->
+                [Clear id]
+            | Update {init; updates} -> (
+                let updates =
+                  List.rev_map
+                    (fun {Lazy_storage_diff.Big_map.key; key_hash; value} ->
+                      Update
+                        {
+                          big_map = id;
+                          diff_key = key;
+                          diff_key_hash = key_hash;
+                          diff_value = value;
+                        })
+                    updates
+                in
+                match init with
+                | Existing ->
+                    updates
+                | Copy {src} ->
+                    Copy {src; dst = id} :: updates
+                | Alloc {key_type; value_type} ->
+                    Alloc {big_map = id; key_type; value_type} :: updates ) )
+          (* | _ ->
+              (* Not a Big_map *) [] *)
+        in
+        diffs :: legacy_diffs)
+      []
+      diffs
+    |> List.rev |> List.flatten
 end
 
-let update_script_big_map c = function
+let update_script_lazy_storage c = function
   | None ->
       return (c, Z.zero)
-  | Some legacy_diffs ->
-      Lazy_storage_diff.apply
-        c
-        (Legacy_big_map_diff.to_lazy_storage_diff legacy_diffs)
+  | Some diffs ->
+      Lazy_storage_diff.apply c diffs
 
 let create_base c ?(prepaid_bootstrap_storage = false)
     (* Free space for bootstrap contracts *)
@@ -445,15 +480,17 @@ let create_base c ?(prepaid_bootstrap_storage = false)
       Delegate_storage.init c contract delegate )
   >>=? fun c ->
   match script with
-  | Some ({Script_repr.code; storage}, big_map_diff) ->
+  | Some ({Script_repr.code; storage}, lazy_storage_diff) ->
       Storage.Contract.Code.init c contract code
       >>=? fun (c, code_size) ->
       Storage.Contract.Storage.init c contract storage
       >>=? fun (c, storage_size) ->
-      update_script_big_map c big_map_diff
-      >>=? fun (c, big_map_size) ->
+      update_script_lazy_storage c lazy_storage_diff
+      >>=? fun (c, lazy_storage_size) ->
       let total_size =
-        Z.add (Z.add (Z.of_int code_size) (Z.of_int storage_size)) big_map_size
+        Z.add
+          (Z.add (Z.of_int code_size) (Z.of_int storage_size))
+          lazy_storage_size
       in
       assert (Compare.Z.(total_size >= Z.zero)) ;
       let prepaid_bootstrap_storage =
@@ -692,16 +729,16 @@ let get_balance c contract =
   | Some v ->
       return v
 
-let update_script_storage c contract storage big_map_diff =
+let update_script_storage c contract storage lazy_storage_diff =
   let storage_lexpr = Script_repr.lazy_expr storage in
-  update_script_big_map c big_map_diff
-  >>=? fun (c, big_map_size_diff) ->
+  update_script_lazy_storage c lazy_storage_diff
+  >>=? fun (c, lazy_storage_size_diff) ->
   Storage.Contract.Storage.set c contract storage_lexpr
   >>=? fun (c, size_diff) ->
   Storage.Contract.Used_storage_space.get c contract
   >>=? fun previous_size ->
   let new_size =
-    Z.add previous_size (Z.add big_map_size_diff (Z.of_int size_diff))
+    Z.add previous_size (Z.add lazy_storage_size_diff (Z.of_int size_diff))
   in
   Storage.Contract.Used_storage_space.set c contract new_size
   >>=? fun c -> init_set_storage_cached c contract storage |> return

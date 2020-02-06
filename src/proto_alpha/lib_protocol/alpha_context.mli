@@ -697,6 +697,40 @@ module Big_map : sig
     (context * (Script.expr * Script.expr) option) tzresult Lwt.t
 end
 
+module Lazy_storage : sig
+  module Big_map : sig
+    type update = {
+      key : Script_repr.expr;
+      key_hash : Script_expr_hash.t;
+      value : Script_repr.expr option;
+    }
+
+    type updates = update list
+
+    type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
+  end
+
+  module Kind : sig
+    type ('alloc, 'updates) t = Big_map : (Big_map.alloc, Big_map.updates) t
+  end
+
+  type 'alloc init = Existing | Copy of {src : Z.t} | Alloc of 'alloc
+
+  type ('alloc, 'updates) diff =
+    | Remove
+    | Update of {init : 'alloc init; updates : 'updates}
+
+  type diffs_item
+
+  val make : ('a, 'u) Kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
+
+  type diffs = diffs_item list
+
+  val encoding : diffs Data_encoding.t
+
+  val legacy_big_map_diff_encoding : diffs Data_encoding.t
+end
+
 module Contract : sig
   include BASIC_DATA
 
@@ -769,7 +803,7 @@ module Contract : sig
     since:context -> until:context -> contract list tzresult Lwt.t
 
   module Legacy_big_map_diff : sig
-    type item =
+    type item = private
       | Update of {
           big_map : Big_map.id;
           diff_key : Script.expr;
@@ -784,16 +818,16 @@ module Contract : sig
           value_type : Script.expr;
         }
 
-    type t = item list
+    type t = private item list
 
-    val encoding : t Data_encoding.t
+    val of_lazy_storage_diff : Lazy_storage.diffs -> t
   end
 
   val originate :
     context ->
     contract ->
     balance:Tez.t ->
-    script:Script.t * Legacy_big_map_diff.t option ->
+    script:Script.t * Lazy_storage.diffs option ->
     delegate:public_key_hash option ->
     context tzresult Lwt.t
 
@@ -807,7 +841,7 @@ module Contract : sig
     context ->
     contract ->
     Script.expr ->
-    Legacy_big_map_diff.t option ->
+    Lazy_storage.diffs option ->
     context tzresult Lwt.t
 
   val used_storage_space : context -> t -> Z.t tzresult Lwt.t
@@ -1375,9 +1409,7 @@ val prepare_first_block :
   Context.t ->
   typecheck:(context ->
             Script.t ->
-            ((Script.t * Contract.Legacy_big_map_diff.t option) * context)
-            tzresult
-            Lwt.t) ->
+            ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
