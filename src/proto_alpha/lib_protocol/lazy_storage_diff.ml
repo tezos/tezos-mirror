@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module KId = struct
+  type t = E : (_, _) Lazy_storage_kind.t * Z.t -> t
+
+  let make kind id = E (kind, id)
+
+  let compare (E (kind1, id1)) (E (kind2, id2)) =
+    let c = Lazy_storage_kind.compare kind1 kind2 in
+    if Compare.Int.(c <> 0) then c else Compare.Z.compare id1 id2
+end
+
 module type OPS = sig
   type alloc
 
@@ -238,6 +248,8 @@ type diffs_item =
 let make :
     type a u. (a, u) Lazy_storage_kind.t -> Z.t -> (a, u) diff -> diffs_item =
  fun k id diff -> E (k, id, diff)
+
+let make_remove (KId.E (k, id)) = E (k, id, Remove)
 
 let item_encoding =
   let open Data_encoding in

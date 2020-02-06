@@ -1054,10 +1054,10 @@ let rec step :
         logged_return ((None, rest), ctxt) )
   | (Transfer_tokens, (p, (amount, ((tp, (destination, entrypoint)), rest))))
     ->
-      collect_big_maps ctxt tp p
+      collect_lazy_storage ctxt tp p
       >>=? fun (to_duplicate, ctxt) ->
-      let to_update = no_big_map_id in
-      extract_big_map_diff
+      let to_update = no_lazy_storage_id in
+      extract_lazy_storage_diff
         ctxt
         Optimized
         tp
@@ -1065,7 +1065,7 @@ let rec step :
         ~to_duplicate
         ~to_update
         ~temporary:true
-      >>=? fun (p, big_map_diff, ctxt) ->
+      >>=? fun (p, lazy_storage_diff, ctxt) ->
       unparse_data ctxt Optimized tp p
       >>=? fun (p, ctxt) ->
       let operation =
@@ -1082,7 +1082,7 @@ let rec step :
       logged_return
         ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
-              big_map_diff ),
+              lazy_storage_diff ),
             rest ),
           ctxt )
   | (Implicit_account, (key, rest)) ->
@@ -1106,10 +1106,10 @@ let rec step :
                  Prim (0, K_storage, [unparsed_storage_type], []);
                  Prim (0, K_code, [code], []) ] ))
       in
-      collect_big_maps ctxt storage_type init
+      collect_lazy_storage ctxt storage_type init
       >>=? fun (to_duplicate, ctxt) ->
-      let to_update = no_big_map_id in
-      extract_big_map_diff
+      let to_update = no_lazy_storage_id in
+      extract_lazy_storage_diff
         ctxt
         Optimized
         storage_type
@@ -1117,7 +1117,7 @@ let rec step :
         ~to_duplicate
         ~to_update
         ~temporary:true
-      >>=? fun (init, big_map_diff, ctxt) ->
+      >>=? fun (init, lazy_storage_diff, ctxt) ->
       unparse_data ctxt Optimized storage_type init
       >>=? fun (storage, ctxt) ->
       let storage = Micheline.strip_locations storage in
@@ -1141,7 +1141,7 @@ let rec step :
       logged_return
         ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
-              big_map_diff ),
+              lazy_storage_diff ),
             ((contract, "default"), rest) ),
           ctxt )
   | (Set_delegate, (delegate, rest)) ->
@@ -1271,15 +1271,15 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   >>=? fun (arg, ctxt) ->
   Script.force_decode ctxt unparsed_script.code
   >>=? fun (script_code, ctxt) ->
-  Script_ir_translator.collect_big_maps ctxt arg_type arg
+  Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>=? fun (to_duplicate, ctxt) ->
-  Script_ir_translator.collect_big_maps ctxt storage_type storage
+  Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>=? fun (to_update, ctxt) ->
   trace
     (Runtime_contract_error (step_constants.self, script_code))
     (interp logger ctxt step_constants code (arg, storage))
   >>=? fun ((ops, storage), ctxt) ->
-  Script_ir_translator.extract_big_map_diff
+  Script_ir_translator.extract_lazy_storage_diff
     ctxt
     mode
     ~temporary:false
@@ -1287,14 +1287,14 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     ~to_update
     storage_type
     storage
-  >>=? fun (storage, big_map_diff, ctxt) ->
+  >>=? fun (storage, lazy_storage_diff, ctxt) ->
   trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
   >>=? fun (storage, ctxt) ->
   let (ops, op_diffs) = List.split ops.elements in
-  let big_map_diff =
+  let lazy_storage_diff =
     match
       List.flatten
-        (List.map (Option.value ~default:[]) (op_diffs @ [big_map_diff]))
+        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
     with
     | [] ->
         None
@@ -1302,7 +1302,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
         Some diff
   in
   let storage = Micheline.strip_locations storage in
-  return (script_code, storage, ops, ctxt, big_map_diff)
+  return (script_code, storage, ops, ctxt, lazy_storage_diff)
 
 type execution_result = {
   ctxt : context;

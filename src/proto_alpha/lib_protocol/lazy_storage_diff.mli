@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module KId : sig
+  type t = private E : (_, _) Lazy_storage_kind.t * Z.t -> t
+
+  val make : (_, _) Lazy_storage_kind.t -> Z.t -> t
+
+  val compare : t -> t -> int
+end
+
 module Big_map : sig
   type alloc = Lazy_storage_kind.Big_map.alloc = {
     key_type : Script_repr.expr;
@@ -48,6 +56,8 @@ type diffs_item = private
   | E : ('a, 'u) Lazy_storage_kind.t * Z.t * ('a, 'u) diff -> diffs_item
 
 val make : ('a, 'u) Lazy_storage_kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
+
+val make_remove : KId.t -> diffs_item
 
 type diffs = diffs_item list
 

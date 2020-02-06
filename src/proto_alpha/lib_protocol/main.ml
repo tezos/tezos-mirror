@@ -364,15 +364,15 @@ let init ctxt block_header =
       (script : Alpha_context.Script.t) =
     Script_ir_translator.parse_script ctxt ~legacy:false script
     >>=? fun (Ex_script parsed_script, ctxt) ->
-    Script_ir_translator.extract_big_map_diff
+    Script_ir_translator.extract_lazy_storage_diff
       ctxt
       Optimized
       parsed_script.storage_type
       parsed_script.storage
-      ~to_duplicate:Script_ir_translator.no_big_map_id
-      ~to_update:Script_ir_translator.no_big_map_id
+      ~to_duplicate:Script_ir_translator.no_lazy_storage_id
+      ~to_update:Script_ir_translator.no_lazy_storage_id
       ~temporary:false
-    >>=? fun (storage, big_map_diff, ctxt) ->
+    >>=? fun (storage, lazy_storage_diff, ctxt) ->
     Script_ir_translator.unparse_data
       ctxt
       Optimized
@@ -382,7 +382,7 @@ let init ctxt block_header =
     let storage =
       Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
     in
-    return (({script with storage}, big_map_diff), ctxt)
+    return (({script with storage}, lazy_storage_diff), ctxt)
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
   >>=? fun ctxt -> return (Alpha_context.finalize ctxt)

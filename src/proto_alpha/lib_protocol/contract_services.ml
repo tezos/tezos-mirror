@@ -310,7 +310,7 @@ let register () =
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true script
           >>=? fun (Ex_script script, ctxt) ->
-          Script_ir_translator.collect_big_maps
+          Script_ir_translator.collect_lazy_storage
             ctxt
             script.storage_type
             script.storage

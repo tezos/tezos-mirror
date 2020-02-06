@@ -311,24 +311,24 @@ val hash_data :
   'a ->
   (Script_expr_hash.t * context) tzresult Lwt.t
 
-type big_map_ids
+type lazy_storage_ids
 
-val no_big_map_id : big_map_ids
+val no_lazy_storage_id : lazy_storage_ids
 
-val collect_big_maps :
+val collect_lazy_storage :
   context ->
   'a Script_typed_ir.ty ->
   'a ->
-  (big_map_ids * context) tzresult Lwt.t
+  (lazy_storage_ids * context) tzresult Lwt.t
 
-val list_of_big_map_ids : big_map_ids -> Z.t list
+val list_of_big_map_ids : lazy_storage_ids -> Z.t list
 
-val extract_big_map_diff :
+val extract_lazy_storage_diff :
   context ->
   unparsing_mode ->
   temporary:bool ->
-  to_duplicate:big_map_ids ->
-  to_update:big_map_ids ->
+  to_duplicate:lazy_storage_ids ->
+  to_update:lazy_storage_ids ->
   'a Script_typed_ir.ty ->
   'a ->
   ('a * Lazy_storage.diffs option * context) tzresult Lwt.t

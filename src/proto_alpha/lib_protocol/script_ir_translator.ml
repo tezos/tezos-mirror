@@ -5623,17 +5623,18 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
 let big_map_update key value ({diff; _} as map) =
   {map with diff = map_set key value diff}
 
-module Ids = Set.Make (Compare.Z)
+module Ids = Set.Make (Lazy_storage.KId)
 
-type big_map_ids = Ids.t
+type lazy_storage_ids = Ids.t
 
-let no_big_map_id = Ids.empty
+let no_lazy_storage_id = Ids.empty
 
 let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
     =
   ( match id with
   | Some id ->
-      if Ids.mem id ids then
+      let kid = Lazy_storage.KId.make Big_map id in
+      if Ids.mem kid ids then
         Big_map.fresh ~temporary ctxt
         >>=? fun (ctxt, duplicate) ->
         return (ctxt, Lazy_storage.Copy {src = id}, duplicate)
@@ -5644,8 +5645,8 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
              the global diff, otherwise the duplicates will use the
              updated version as a base. This is true because we add
              this diff first in the accumulator of
-             `extract_big_map_updates`, and this accumulator is not
-             reversed before being flattened. *)
+             `extract_lazy_storage_updates`, and this accumulator is not
+             reversed. *)
         return (ctxt, Lazy_storage.Existing, id)
   | None ->
       Big_map.fresh ~temporary ctxt
@@ -5689,7 +5690,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
     map.
 
     This flag is built in [has_big_map] and used only in
-    [extract_big_map_updates] and [collect_big_maps].
+    [extract_lazy_storage_updates] and [collect_lazy_storage].
 
     This flag is necessary to avoid these two functions to have a quadratic
     complexity in the size of the type.
@@ -5772,7 +5773,7 @@ let rec has_big_map : type t. t ty -> t has_big_map =
   | Map_t (_, t, _) ->
       aux1 (fun h -> Map_f h) t
 
-let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
+let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
   let rec aux :
       type a.
       context ->
@@ -5796,7 +5797,8 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         let diff = Lazy_storage.make Big_map id diff in
-        return (ctxt, map, Ids.add id ids, diff :: acc)
+        let kid = Lazy_storage.KId.make Big_map id in
+        return (ctxt, map, Ids.add kid ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids acc tyl xl ~has_big_map:hl
         >>=? fun (ctxt, xl, ids, acc) ->
@@ -5864,7 +5866,7 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
   let has_big_map = has_big_map ty in
   aux ctxt mode ~temporary ids acc ty x ~has_big_map
 
-let collect_big_maps ctxt ty x =
+let collect_lazy_storage ctxt ty x =
   let rec collect :
       type a.
       context ->
@@ -5881,7 +5883,9 @@ let collect_big_maps ctxt ty x =
         ok (acc, ctxt)
     | (_, Big_map_t (_, _, _), {id = Some id}) ->
         Gas.consume ctxt Typecheck_costs.cycle
-        >>? fun ctxt -> ok (Ids.add id acc, ctxt)
+        >>? fun ctxt ->
+        let kid = Lazy_storage.KId.make Big_map id in
+        ok (Ids.add kid acc, ctxt)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         collect ctxt tyl xl ~has_big_map:hl acc
         >>? fun (acc, ctxt) -> collect ctxt tyr xr ~has_big_map:hr acc
@@ -5914,20 +5918,18 @@ let collect_big_maps ctxt ty x =
    (* TODO: fix injectivity of types *)
   in
   let has_big_map = has_big_map ty in
-  Lwt.return (collect ctxt ty x ~has_big_map no_big_map_id)
+  Lwt.return (collect ctxt ty x ~has_big_map no_lazy_storage_id)
 
-let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
+let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
+    v =
   let to_duplicate = Ids.diff to_duplicate to_update in
-  extract_big_map_updates ctxt mode ~temporary to_duplicate [] ty v
+  extract_lazy_storage_updates ctxt mode ~temporary to_duplicate [] ty v
   >>=? fun (ctxt, v, alive, diffs) ->
   let diffs =
     if temporary then diffs
     else
       let dead = Ids.diff to_update alive in
-      Ids.fold
-        (fun id acc -> Lazy_storage.(make Big_map id Remove) :: acc)
-        dead
-        diffs
+      Ids.fold (fun kid acc -> Lazy_storage.make_remove kid :: acc) dead diffs
   in
   match diffs with
   | [] ->
@@ -5935,4 +5937,9 @@ let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
   | diffs ->
       return (v, Some diffs (* do not reverse *), ctxt)
 
-let list_of_big_map_ids ids = Ids.elements ids
+let list_of_big_map_ids kids =
+  Ids.fold
+    (fun (Lazy_storage.KId.E (kind, id)) acc ->
+      match kind with Lazy_storage.Kind.Big_map -> id :: acc)
+    kids
+    []

@@ -714,6 +714,14 @@ module Lazy_storage : sig
     type ('alloc, 'updates) t = Big_map : (Big_map.alloc, Big_map.updates) t
   end
 
+  module KId : sig
+    type t = private E : (_, _) Kind.t * Z.t -> t
+
+    val make : (_, _) Kind.t -> Z.t -> t
+
+    val compare : t -> t -> int
+  end
+
   type 'alloc init = Existing | Copy of {src : Z.t} | Alloc of 'alloc
 
   type ('alloc, 'updates) diff =
@@ -723,6 +731,8 @@ module Lazy_storage : sig
   type diffs_item
 
   val make : ('a, 'u) Kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
+
+  val make_remove : KId.t -> diffs_item
 
   type diffs = diffs_item list
 

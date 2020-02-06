@@ -445,13 +445,13 @@ let apply_manager_operation_content :
       >>=? fun ctxt ->
       Script_ir_translator.parse_script ctxt ~legacy:false script
       >>=? fun (Ex_script parsed_script, ctxt) ->
-      Script_ir_translator.collect_big_maps
+      Script_ir_translator.collect_lazy_storage
         ctxt
         parsed_script.storage_type
         parsed_script.storage
       >>=? fun (to_duplicate, ctxt) ->
-      let to_update = Script_ir_translator.no_big_map_id in
-      Script_ir_translator.extract_big_map_diff
+      let to_update = Script_ir_translator.no_lazy_storage_id in
+      Script_ir_translator.extract_lazy_storage_diff
         ctxt
         Optimized
         parsed_script.storage_type

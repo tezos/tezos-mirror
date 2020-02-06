@@ -72,3 +72,6 @@ let eq :
     type a1 u1 a2 u2. (a1, u1) t -> (a2, u2) t -> (a1 * u1, a2 * u2) eq option
     =
  fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> Some Eq
+
+let compare : type a1 u1 a2 u2. (a1, u1) t -> (a2, u2) t -> int =
+ fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> 0
