@@ -5400,11 +5400,12 @@ type big_map_ids = Ids.t
 
 let no_big_map_id = Ids.empty
 
-let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
+let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
+    =
   ( match id with
   | Some id ->
       if Ids.mem id ids then
-        fresh ctxt
+        Big_map.fresh ~temporary ctxt
         >>=? fun (ctxt, duplicate) ->
         return (ctxt, [Contract.Copy {src = id; dst = duplicate}], duplicate)
       else
@@ -5418,7 +5419,7 @@ let diff_of_big_map ctxt fresh mode ~ids {id; key_type; value_type; diff} =
              reversed before being flattened. *)
         return (ctxt, [], id)
   | None ->
-      fresh ctxt
+      Big_map.fresh ~temporary ctxt
       >>=? fun (ctxt, id) ->
       unparse_ty ctxt key_type
       >>=? fun (kt, ctxt) ->
@@ -5532,50 +5533,50 @@ let rec has_big_map : type t. t ty -> t has_big_map =
   | Map_t (_, t, _) ->
       aux1 (fun h -> Map_f h) t
 
-let extract_big_map_updates ctxt fresh mode ids acc ty x =
+let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
   let rec aux :
       type a.
       context ->
-      (context -> (context * Big_map.id) tzresult Lwt.t) ->
       unparsing_mode ->
+      temporary:bool ->
       Ids.t ->
       Contract.big_map_diff list ->
       a ty ->
       a ->
       has_big_map:a has_big_map ->
       (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t =
-   fun ctxt fresh mode ids acc ty x ~has_big_map ->
+   fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
     Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
     >>=? fun ctxt ->
     match (has_big_map, ty, x) with
     | (False_f, _, _) ->
         return (ctxt, x, ids, acc)
     | (_, Big_map_t (_, _, _), map) ->
-        diff_of_big_map ctxt fresh mode ids map
+        diff_of_big_map ctxt mode ~temporary ~ids map
         >>=? fun (diff, id, ctxt) ->
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         return (ctxt, map, Ids.add id ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
-        aux ctxt fresh mode ids acc tyl xl ~has_big_map:hl
+        aux ctxt mode ~temporary ids acc tyl xl ~has_big_map:hl
         >>=? fun (ctxt, xl, ids, acc) ->
-        aux ctxt fresh mode ids acc tyr xr ~has_big_map:hr
+        aux ctxt mode ~temporary ids acc tyr xr ~has_big_map:hr
         >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
     | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _), L x) ->
-        aux ctxt fresh mode ids acc ty x ~has_big_map
+        aux ctxt mode ~temporary ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
     | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _), R x) ->
-        aux ctxt fresh mode ids acc ty x ~has_big_map
+        aux ctxt mode ~temporary ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
     | (Option_f has_big_map, Option_t (ty, _), Some x) ->
-        aux ctxt fresh mode ids acc ty x ~has_big_map
+        aux ctxt mode ~temporary ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
     | (List_f has_big_map, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
-            aux ctxt fresh mode ids acc ty x ~has_big_map
+            aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >>=? fun (ctxt, x, ids, acc) ->
             return (ctxt, list_cons x l, ids, acc))
           (ctxt, list_empty, ids, acc)
@@ -5588,7 +5589,7 @@ let extract_big_map_updates ctxt fresh mode ids acc ty x =
           (fun (k, x) (ctxt, m, ids, acc) ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
-            aux ctxt fresh mode ids acc ty x ~has_big_map
+            aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >>=? fun (ctxt, x, ids, acc) ->
             return (ctxt, M.OPS.add k x m, ids, acc))
           m
@@ -5621,7 +5622,7 @@ let extract_big_map_updates ctxt fresh mode ids acc ty x =
    (* TODO: fix injectivity of types *)
   in
   let has_big_map = has_big_map ty in
-  aux ctxt fresh mode ids acc ty x ~has_big_map
+  aux ctxt mode ~temporary ids acc ty x ~has_big_map
 
 let collect_big_maps ctxt ty x =
   let rec collect :
@@ -5677,11 +5678,7 @@ let collect_big_maps ctxt ty x =
 
 let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
   let to_duplicate = Ids.diff to_duplicate to_update in
-  let fresh =
-    if temporary then fun c -> return (Big_map.fresh_temporary c)
-    else Big_map.fresh
-  in
-  extract_big_map_updates ctxt fresh mode to_duplicate [] ty v
+  extract_big_map_updates ctxt mode ~temporary to_duplicate [] ty v
   >>=? fun (ctxt, v, alive, diffs) ->
   let diffs =
     if temporary then diffs

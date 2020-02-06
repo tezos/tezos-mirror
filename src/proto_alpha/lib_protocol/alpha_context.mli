@@ -683,9 +683,7 @@ end
 module Big_map : sig
   type id = Z.t
 
-  val fresh : context -> (context * id) tzresult Lwt.t
-
-  val fresh_temporary : context -> context * id
+  val fresh : temporary:bool -> context -> (context * id) tzresult Lwt.t
 
   val mem :
     context -> id -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
