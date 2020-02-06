@@ -432,5 +432,3 @@ and ('bef, 'aft) descr = {
   aft : 'aft stack_ty;
   instr : ('bef, 'aft) instr;
 }
-
-type ex_big_map = Ex_bm : ('key, 'value) big_map -> ex_big_map
