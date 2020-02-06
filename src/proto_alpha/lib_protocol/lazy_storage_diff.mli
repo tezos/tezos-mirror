@@ -44,11 +44,14 @@ type ('alloc, 'updates) diff =
   | Remove
   | Update of {init : 'alloc init; updates : 'updates}
 
-type diffs_item
+type diffs_item = private
+  | E : ('a, 'u) Lazy_storage_kind.t * Z.t * ('a, 'u) diff -> diffs_item
 
 val make : ('a, 'u) Lazy_storage_kind.t -> Z.t -> ('a, 'u) diff -> diffs_item
 
 type diffs = diffs_item list
+
+val encoding : diffs Data_encoding.t
 
 (**
   Unlike other places in the module where [Z.t] represents an identifier,

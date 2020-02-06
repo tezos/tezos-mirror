@@ -600,7 +600,7 @@ let apply_manager_operation_content :
               Transaction_result
                 {
                   storage = None;
-                  big_map_diff = None;
+                  lazy_storage_diff = None;
                   balance_updates =
                     Delegate.cleanup_balance_updates
                       ( [ (Delegate.Contract source, Delegate.Debited amount);
@@ -633,8 +633,12 @@ let apply_manager_operation_content :
             ~script
             ~parameter
             ~entrypoint
-          >>=? fun {ctxt; storage; big_map_diff; operations} ->
-          Contract.update_script_storage ctxt destination storage big_map_diff
+          >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
+          Contract.update_script_storage
+            ctxt
+            destination
+            storage
+            lazy_storage_diff
           >>=? fun ctxt ->
           Fees.record_paid_storage_space ctxt destination
           >>=? fun (ctxt, new_size, paid_storage_size_diff, fees) ->
@@ -646,7 +650,7 @@ let apply_manager_operation_content :
             Transaction_result
               {
                 storage = Some storage;
-                big_map_diff;
+                lazy_storage_diff;
                 balance_updates =
                   Delegate.cleanup_balance_updates
                     [ (Contract payer, Debited fees);
@@ -687,7 +691,7 @@ let apply_manager_operation_content :
         ~to_duplicate
         ~to_update
         ~temporary:false
-      >>=? fun (storage, big_map_diff, ctxt) ->
+      >>=? fun (storage, lazy_storage_diff, ctxt) ->
       Script_ir_translator.unparse_data
         ctxt
         Optimized
@@ -713,7 +717,7 @@ let apply_manager_operation_content :
         contract
         ~delegate
         ~balance:credit
-        ~script:(script, big_map_diff)
+        ~script:(script, lazy_storage_diff)
       >>=? fun ctxt ->
       Fees.origination_burn ctxt
       >>?= fun (ctxt, origination_burn) ->
@@ -722,7 +726,7 @@ let apply_manager_operation_content :
       let result =
         Origination_result
           {
-            big_map_diff;
+            lazy_storage_diff;
             balance_updates =
               Delegate.cleanup_balance_updates
                 [ (Contract payer, Debited fees);

@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module Big_map = struct
+  let title = "big_map"
+
   type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
 
   type update = {
@@ -35,6 +37,38 @@ module Big_map = struct
   }
 
   type updates = update list
+
+  let alloc_encoding =
+    let open Data_encoding in
+    conv
+      (fun {key_type; value_type} -> (key_type, value_type))
+      (fun (key_type, value_type) -> {key_type; value_type})
+      (obj2
+         (req "key_type" Script_repr.expr_encoding)
+         (req "value_type" Script_repr.expr_encoding))
+
+  let update_encoding =
+    let open Data_encoding in
+    conv
+      (fun {key_hash; key; value} -> (key_hash, key, value))
+      (fun (key_hash, key, value) -> {key_hash; key; value})
+      (obj3
+         (req "key_hash" Script_expr_hash.encoding)
+         (req "key" Script_repr.expr_encoding)
+         (opt "value" Script_repr.expr_encoding))
+
+  let updates_encoding = Data_encoding.list update_encoding
 end
 
 type ('alloc, 'updates) t = Big_map : (Big_map.alloc, Big_map.updates) t
+
+type ex = E : (_, _) t -> ex
+
+let all = [(0, E Big_map)]
+
+type (_, _) eq = Eq : ('a, 'a) eq
+
+let eq :
+    type a1 u1 a2 u2. (a1, u1) t -> (a2, u2) t -> (a1 * u1, a2 * u2) eq option
+    =
+ fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> Some Eq

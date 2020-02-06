@@ -5466,9 +5466,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       if Ids.mem id ids then
         Big_map.fresh ~temporary ctxt
         >|=? fun (ctxt, duplicate) ->
-        ( ctxt,
-          [Contract.Legacy_big_map_diff.Copy {src = id; dst = duplicate}],
-          duplicate )
+        (ctxt, Lazy_storage.Copy {src = id}, duplicate)
       else
         (* The first occurrence encountered of a big_map reuses the
              ID. This way, the payer is only charged for the diff.
@@ -5478,7 +5476,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
              this diff first in the accumulator of
              `extract_big_map_updates`, and this accumulator is not
              reversed before being flattened. *)
-        return (ctxt, [], id)
+        return (ctxt, Lazy_storage.Existing, id)
   | None ->
       Big_map.fresh ~temporary ctxt
       >>=? fun (ctxt, id) ->
@@ -5491,45 +5489,37 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
         >>? fun ctxt ->
         Gas.consume ctxt (Script.strip_locations_cost kv)
         >|? fun ctxt ->
-        ( ctxt,
-          [ Contract.Legacy_big_map_diff.Alloc
-              {
-                big_map = id;
-                key_type = Micheline.strip_locations kt;
-                value_type = Micheline.strip_locations kv;
-              } ],
-          id ) ) )
-  >>=? fun (ctxt, init, big_map) ->
+        let key_type = Micheline.strip_locations kt in
+        let value_type = Micheline.strip_locations kv in
+        (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id) ) )
+  >>=? fun (ctxt, init, id) ->
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   fold_left_s
     (fun (acc, ctxt) (key, value) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
       >>?= fun ctxt ->
       hash_data ctxt key_type key
-      >>=? fun (diff_key_hash, ctxt) ->
+      >>=? fun (key_hash, ctxt) ->
       unparse_data ~stack_depth:0 ctxt mode key_type key
       >>=? fun (key_node, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost key_node)
       >>?= fun ctxt ->
-      let diff_key = Micheline.strip_locations key_node in
+      let key = Micheline.strip_locations key_node in
       ( match value with
       | None ->
           return (None, ctxt)
       | Some x ->
           unparse_data ~stack_depth:0 ctxt mode value_type x
           >>=? fun (node, ctxt) ->
-          Gas.consume ctxt (Script.strip_locations_cost node)
-          >>?= fun ctxt -> return (Some (Micheline.strip_locations node), ctxt)
-      )
-      >|=? fun (diff_value, ctxt) ->
-      let diff_item =
-        Contract.Legacy_big_map_diff.Update
-          {big_map; diff_key; diff_key_hash; diff_value}
-      in
+          Lwt.return
+            ( Gas.consume ctxt (Script.strip_locations_cost node)
+            >|? fun ctxt -> (Some (Micheline.strip_locations node), ctxt) ) )
+      >|=? fun (value, ctxt) ->
+      let diff_item = Lazy_storage.Big_map.{key; key_hash; value} in
       (diff_item :: acc, ctxt))
     ([], ctxt)
     pairs
-  >>=? fun (diff, ctxt) -> return (init @ diff, big_map, ctxt)
+  >|=? fun (updates, ctxt) -> (Lazy_storage.Update {init; updates}, id, ctxt)
 
 (**
     Witness flag for whether a type can be populated by a value containing a
@@ -5626,12 +5616,11 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
       unparsing_mode ->
       temporary:bool ->
       Ids.t ->
-      Contract.Legacy_big_map_diff.t list ->
+      Lazy_storage.diffs ->
       a ty ->
       a ->
       has_big_map:a has_big_map ->
-      (context * a * Ids.t * Contract.Legacy_big_map_diff.t list) tzresult
-      Lwt.t =
+      (context * a * Ids.t * Lazy_storage.diffs) tzresult Lwt.t =
    fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
     Gas.consume ctxt Typecheck_costs.parse_instr_cycle
     >>?= fun ctxt ->
@@ -5643,6 +5632,7 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
         >|=? fun (diff, id, ctxt) ->
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
+        let diff = Lazy_storage.make Big_map id diff in
         (ctxt, map, Ids.add id ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids acc tyl xl ~has_big_map:hl
@@ -5759,16 +5749,15 @@ let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
     else
       let dead = Ids.diff to_update alive in
       Ids.fold
-        (fun id acc -> Contract.Legacy_big_map_diff.Clear id :: acc)
+        (fun id acc -> Lazy_storage.(make Big_map id Remove) :: acc)
         dead
-        []
-      :: diffs
+        diffs
   in
   match diffs with
   | [] ->
       (v, None, ctxt)
   | diffs ->
-      (v, Some (List.flatten diffs) (* do not reverse *), ctxt)
+      (v, Some diffs (* do not reverse *), ctxt)
 
 let list_of_big_map_ids ids = Ids.elements ids
 
