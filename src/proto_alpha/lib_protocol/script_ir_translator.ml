@@ -5685,11 +5685,11 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
 
 (**
     Witness flag for whether a type can be populated by a value containing a
-    big map.
-    [False_f] must be used only when a value of the type cannot contain a big
-    map.
+    lazy storage.
+    [False_f] must be used only when a value of the type cannot contain a lazy
+    storage.
 
-    This flag is built in [has_big_map] and used only in
+    This flag is built in [has_lazy_storage] and used only in
     [extract_lazy_storage_updates] and [collect_lazy_storage].
 
     This flag is necessary to avoid these two functions to have a quadratic
@@ -5697,14 +5697,18 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
 
     Please keep the usage of this GADT local.
 *)
-type 'ty has_big_map =
-  | Big_map_f : (_, _) big_map has_big_map
-  | False_f : _ has_big_map
-  | Pair_f : 'a has_big_map * 'b has_big_map -> ('a, 'b) pair has_big_map
-  | Union_f : 'a has_big_map * 'b has_big_map -> ('a, 'b) union has_big_map
-  | Option_f : 'a has_big_map -> 'a option has_big_map
-  | List_f : 'a has_big_map -> 'a boxed_list has_big_map
-  | Map_f : 'v has_big_map -> (_, 'v) map has_big_map
+type 'ty has_lazy_storage =
+  | Big_map_f : (_, _) big_map has_lazy_storage
+  | False_f : _ has_lazy_storage
+  | Pair_f :
+      'a has_lazy_storage * 'b has_lazy_storage
+      -> ('a, 'b) pair has_lazy_storage
+  | Union_f :
+      'a has_lazy_storage * 'b has_lazy_storage
+      -> ('a, 'b) union has_lazy_storage
+  | Option_f : 'a has_lazy_storage -> 'a option has_lazy_storage
+  | List_f : 'a has_lazy_storage -> 'a boxed_list has_lazy_storage
+  | Map_f : 'v has_lazy_storage -> (_, 'v) map has_lazy_storage
 
 (*
     This function is called only on storage and parameter types of contracts,
@@ -5712,12 +5716,12 @@ type 'ty has_big_map =
     the types, which happen to be literally written types, so the gas for them
     has already been paid.
 *)
-let rec has_big_map : type t. t ty -> t has_big_map =
+let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   let aux1 cons t =
-    match has_big_map t with False_f -> False_f | h -> cons h
+    match has_lazy_storage t with False_f -> False_f | h -> cons h
   in
   let aux2 cons t1 t2 =
-    match (has_big_map t1, has_big_map t2) with
+    match (has_lazy_storage t1, has_lazy_storage t2) with
     | (False_f, False_f) ->
         False_f
     | (h1, h2) ->
@@ -5783,12 +5787,12 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
       Lazy_storage.diffs ->
       a ty ->
       a ->
-      has_big_map:a has_big_map ->
+      has_lazy_storage:a has_lazy_storage ->
       (context * a * Ids.t * Lazy_storage.diffs) tzresult Lwt.t =
-   fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
+   fun ctxt mode ~temporary ids acc ty x ~has_lazy_storage ->
     Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
     >>=? fun ctxt ->
-    match (has_big_map, ty, x) with
+    match (has_lazy_storage, ty, x) with
     | (False_f, _, _) ->
         return (ctxt, x, ids, acc)
     | (_, Big_map_t (_, _, _), map) ->
@@ -5800,25 +5804,25 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         let kid = Lazy_storage.KId.make Big_map id in
         return (ctxt, map, Ids.add kid ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
-        aux ctxt mode ~temporary ids acc tyl xl ~has_big_map:hl
+        aux ctxt mode ~temporary ids acc tyl xl ~has_lazy_storage:hl
         >>=? fun (ctxt, xl, ids, acc) ->
-        aux ctxt mode ~temporary ids acc tyr xr ~has_big_map:hr
+        aux ctxt mode ~temporary ids acc tyr xr ~has_lazy_storage:hr
         >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
-    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _), L x) ->
-        aux ctxt mode ~temporary ids acc ty x ~has_big_map
+    | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
+        aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
-    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _), R x) ->
-        aux ctxt mode ~temporary ids acc ty x ~has_big_map
+    | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
+        aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
-    | (Option_f has_big_map, Option_t (ty, _), Some x) ->
-        aux ctxt mode ~temporary ids acc ty x ~has_big_map
+    | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
+        aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
-    | (List_f has_big_map, List_t (ty, _), l) ->
+    | (List_f has_lazy_storage, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
-            aux ctxt mode ~temporary ids acc ty x ~has_big_map
+            aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
             >>=? fun (ctxt, x, ids, acc) ->
             return (ctxt, list_cons x l, ids, acc))
           (ctxt, list_empty, ids, acc)
@@ -5826,12 +5830,12 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         >>=? fun (ctxt, l, ids, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
         return (ctxt, reversed, ids, acc)
-    | (Map_f has_big_map, Map_t (_, ty, _), ((module M) as m)) ->
+    | (Map_f has_lazy_storage, Map_t (_, ty, _), ((module M) as m)) ->
         map_fold_m
           (fun (k, x) (ctxt, m, ids, acc) ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
-            aux ctxt mode ~temporary ids acc ty x ~has_big_map
+            aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
             >>=? fun (ctxt, x, ids, acc) ->
             return (ctxt, M.OPS.add k x m, ids, acc))
           m
@@ -5863,8 +5867,8 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         assert false
    (* TODO: fix injectivity of types *)
   in
-  let has_big_map = has_big_map ty in
-  aux ctxt mode ~temporary ids acc ty x ~has_big_map
+  let has_lazy_storage = has_lazy_storage ty in
+  aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
 
 let collect_lazy_storage ctxt ty x =
   let rec collect :
@@ -5872,13 +5876,13 @@ let collect_lazy_storage ctxt ty x =
       context ->
       a ty ->
       a ->
-      has_big_map:a has_big_map ->
+      has_lazy_storage:a has_lazy_storage ->
       Ids.t ->
       (Ids.t * context) tzresult =
-   fun ctxt ty x ~has_big_map acc ->
+   fun ctxt ty x ~has_lazy_storage acc ->
     Gas.consume ctxt Typecheck_costs.cycle
     >>? fun ctxt ->
-    match (has_big_map, ty, x) with
+    match (has_lazy_storage, ty, x) with
     | (False_f, _, _) ->
         ok (acc, ctxt)
     | (_, Big_map_t (_, _, _), {id = Some id}) ->
@@ -5887,24 +5891,24 @@ let collect_lazy_storage ctxt ty x =
         let kid = Lazy_storage.KId.make Big_map id in
         ok (Ids.add kid acc, ctxt)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
-        collect ctxt tyl xl ~has_big_map:hl acc
-        >>? fun (acc, ctxt) -> collect ctxt tyr xr ~has_big_map:hr acc
-    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _), L x) ->
-        collect ctxt ty x ~has_big_map acc
-    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _), R x) ->
-        collect ctxt ty x ~has_big_map acc
-    | (Option_f has_big_map, Option_t (ty, _), Some x) ->
-        collect ctxt ty x ~has_big_map acc
-    | (List_f has_big_map, List_t (ty, _), l) ->
+        collect ctxt tyl xl ~has_lazy_storage:hl acc
+        >>? fun (acc, ctxt) -> collect ctxt tyr xr ~has_lazy_storage:hr acc
+    | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
+        collect ctxt ty x ~has_lazy_storage acc
+    | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
+        collect ctxt ty x ~has_lazy_storage acc
+    | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
+        collect ctxt ty x ~has_lazy_storage acc
+    | (List_f has_lazy_storage, List_t (ty, _), l) ->
         List.fold_left
           (fun acc x ->
-            acc >>? fun (acc, ctxt) -> collect ctxt ty x ~has_big_map acc)
+            acc >>? fun (acc, ctxt) -> collect ctxt ty x ~has_lazy_storage acc)
           (ok (acc, ctxt))
           l.elements
-    | (Map_f has_big_map, Map_t (_, ty, _), m) ->
+    | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
         map_fold
           (fun _ v acc ->
-            acc >>? fun (acc, ctxt) -> collect ctxt ty v ~has_big_map acc)
+            acc >>? fun (acc, ctxt) -> collect ctxt ty v ~has_lazy_storage acc)
           m
           (ok (acc, ctxt))
     | (_, Big_map_t (_, _, _), {id = None}) ->
@@ -5917,8 +5921,8 @@ let collect_lazy_storage ctxt ty x =
         assert false
    (* TODO: fix injectivity of types *)
   in
-  let has_big_map = has_big_map ty in
-  Lwt.return (collect ctxt ty x ~has_big_map no_lazy_storage_id)
+  let has_lazy_storage = has_lazy_storage ty in
+  Lwt.return (collect ctxt ty x ~has_lazy_storage no_lazy_storage_id)
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
