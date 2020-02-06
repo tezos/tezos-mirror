@@ -78,8 +78,8 @@ let get_manager_operation_gas_and_fee contents =
 
 type fee_parameter = {
   minimal_fees : Tez.t;
-  minimal_nanotez_per_byte : Z.t;
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;
@@ -88,12 +88,17 @@ type fee_parameter = {
 let dummy_fee_parameter =
   {
     minimal_fees = Tez.zero;
-    minimal_nanotez_per_byte = Z.zero;
-    minimal_nanotez_per_gas_unit = Z.zero;
+    minimal_nanotez_per_byte = Q.zero;
+    minimal_nanotez_per_gas_unit = Q.zero;
     force_low_fee = false;
     fee_cap = Tez.one;
     burn_cap = Tez.zero;
   }
+
+(* Rounding up (see Z.cdiv) *)
+let z_mutez_of_q_nanotez (ntz : Q.t) =
+  let q_mutez = Q.div ntz (Q.of_int 1000) in
+  Z.cdiv q_mutez.Q.num q_mutez.Q.den
 
 let check_fees :
     type t.
@@ -122,34 +127,30 @@ let check_fees :
           fee
         >>= fun () -> exit 1
       else
-        (* *)
         let fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
         in
         let minimal_fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
         in
         let minimal_fees_for_gas_in_nanotez =
-          Z.mul config.minimal_nanotez_per_gas_unit gas
+          Q.mul config.minimal_nanotez_per_gas_unit (Q.of_bigint gas)
         in
         let minimal_fees_for_size_in_nanotez =
-          Z.mul config.minimal_nanotez_per_byte (Z.of_int size)
+          Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
         in
         let estimated_fees_in_nanotez =
-          Z.add
+          Q.add
             minimal_fees_in_nanotez
-            (Z.add
+            (Q.add
                minimal_fees_for_gas_in_nanotez
                minimal_fees_for_size_in_nanotez)
         in
+        let estimated_fees_in_mutez =
+          z_mutez_of_q_nanotez estimated_fees_in_nanotez
+        in
         let estimated_fees =
-          match
-            Tez.of_mutez
-              (Z.to_int64
-                 (Z.div
-                    (Z.add (Z.of_int 999) estimated_fees_in_nanotez)
-                    (Z.of_int 1000)))
-          with
+          match Tez.of_mutez (Z.to_int64 estimated_fees_in_mutez) with
           | None ->
               assert false
           | Some fee ->
@@ -157,7 +158,7 @@ let check_fees :
         in
         if
           (not config.force_low_fee)
-          && Z.compare fees_in_nanotez estimated_fees_in_nanotez < 0
+          && Q.compare fees_in_nanotez estimated_fees_in_nanotez < 0
         then
           cctxt#error
             "The proposed fee (%s%a) are lower than the fee that baker expect \
@@ -543,27 +544,26 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
               (Contents op)
         in
         let minimal_fees_in_nanotez =
-          Z.mul
-            (Z.of_int64 (Tez.to_mutez fee_parameter.minimal_fees))
-            (Z.of_int 1000)
+          Q.mul
+            (Q.of_int64 (Tez.to_mutez fee_parameter.minimal_fees))
+            (Q.of_int 1000)
         in
         let minimal_fees_for_gas_in_nanotez =
-          Z.mul fee_parameter.minimal_nanotez_per_gas_unit gas_limit
+          Q.mul
+            fee_parameter.minimal_nanotez_per_gas_unit
+            (Q.of_bigint gas_limit)
         in
         let minimal_fees_for_size_in_nanotez =
-          Z.mul fee_parameter.minimal_nanotez_per_byte (Z.of_int size)
+          Q.mul fee_parameter.minimal_nanotez_per_byte (Q.of_int size)
         in
         let fees_in_nanotez =
-          Z.add minimal_fees_in_nanotez
-          @@ Z.add
+          Q.add minimal_fees_in_nanotez
+          @@ Q.add
                minimal_fees_for_gas_in_nanotez
                minimal_fees_for_size_in_nanotez
         in
-        match
-          Tez.of_mutez
-            (Z.to_int64
-               (Z.div (Z.add (Z.of_int 999) fees_in_nanotez) (Z.of_int 1000)))
-        with
+        let fees_in_mutez = z_mutez_of_q_nanotez fees_in_nanotez in
+        match Tez.of_mutez (Z.to_int64 fees_in_mutez) with
         | None ->
             assert false
         | Some fee ->

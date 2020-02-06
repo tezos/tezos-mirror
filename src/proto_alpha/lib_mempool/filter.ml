@@ -27,14 +27,18 @@ open Protocol
 open Alpha_context
 module Proto = Registerer.Registered
 
-type nanotez = Z.t
+type nanotez = Q.t
 
-let nanotez_enc =
-  Data_encoding.def
+let nanotez_enc : nanotez Data_encoding.t =
+  let open Data_encoding in
+  def
     "nanotez"
     ~title:"A thousandth of a mutez"
     ~description:"One thousand nanotez make a mutez (1 tez = 1e9 nanotez)"
-    Data_encoding.z
+    (conv
+       (fun q -> (q.Q.num, q.Q.den))
+       (fun (num, den) -> {Q.num; den})
+       (tup2 z z))
 
 type config = {
   minimal_fees : Tez.t;
@@ -46,9 +50,9 @@ type config = {
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let config_encoding : config Data_encoding.t =
   let open Data_encoding in
@@ -117,22 +121,22 @@ let pre_filter_manager :
       false
   | Ok (fee, gas) ->
       let fees_in_nanotez =
-        Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+        Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
       in
       let minimal_fees_in_nanotez =
-        Z.mul (Z.of_int64 (Tez.to_mutez config.minimal_fees)) (Z.of_int 1000)
+        Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
       in
       let minimal_fees_for_gas_in_nanotez =
-        Z.mul config.minimal_nanotez_per_gas_unit gas
+        Q.mul config.minimal_nanotez_per_gas_unit (Q.of_bigint gas)
       in
       let minimal_fees_for_size_in_nanotez =
-        Z.mul config.minimal_nanotez_per_byte (Z.of_int size)
+        Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
       in
-      Z.compare
+      Q.compare
         fees_in_nanotez
-        (Z.add
+        (Q.add
            minimal_fees_in_nanotez
-           (Z.add
+           (Q.add
               minimal_fees_for_gas_in_nanotez
               minimal_fees_for_size_in_nanotez))
       >= 0

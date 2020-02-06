@@ -286,9 +286,9 @@ let max_priority_arg =
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let minimal_fees_arg =
   default_arg
@@ -310,20 +310,20 @@ let minimal_nanotez_per_gas_unit_arg =
     ~doc:
       "exclude operations with fees per gas lower than this threshold (in \
        nanotez)"
-    ~default:(Z.to_string default_minimal_nanotez_per_gas_unit)
+    ~default:(Q.to_string default_minimal_nanotez_per_gas_unit)
     (parameter (fun _ s ->
-         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
   default_arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
-    ~default:(Z.to_string default_minimal_nanotez_per_byte)
+    ~default:(Q.to_string default_minimal_nanotez_per_byte)
     ~doc:
       "exclude operations with fees per byte lower than this threshold (in \
        nanotez)"
     (parameter (fun _ s ->
-         try return (Z.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let force_low_fee_arg =
   switch

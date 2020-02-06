@@ -52,9 +52,9 @@ val max_priority_arg : (int option, full) Clic.arg
 
 val minimal_fees_arg : (Tez.tez, full) Clic.arg
 
-val minimal_nanotez_per_gas_unit_arg : (Z.t, full) Clic.arg
+val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Clic.arg
 
-val minimal_nanotez_per_byte_arg : (Z.t, full) Clic.arg
+val minimal_nanotez_per_byte_arg : (Q.t, full) Clic.arg
 
 val force_low_fee_arg : (bool, full) Clic.arg
 

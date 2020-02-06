@@ -30,8 +30,8 @@ open Alpha_context
 val bake_block :
   #Protocol_client_context.full ->
   ?minimal_fees:Tez.t ->
-  ?minimal_nanotez_per_gas_unit:Z.t ->
-  ?minimal_nanotez_per_byte:Z.t ->
+  ?minimal_nanotez_per_gas_unit:Q.t ->
+  ?minimal_nanotez_per_byte:Q.t ->
   ?force:bool ->
   ?max_priority:int ->
   ?minimal_timestamp:bool ->

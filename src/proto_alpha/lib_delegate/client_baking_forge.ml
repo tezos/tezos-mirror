@@ -50,9 +50,9 @@ let default_max_priority = 64
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Z.of_int 100
+let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Z.of_int 1000
+let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 type slot =
   Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
@@ -69,9 +69,9 @@ type state = {
   (* Minimal operation fee required to include an operation in a block *)
   minimal_fees : Tez.t;
   (* Minimal operation fee per gas required to include an operation in a block *)
-  minimal_nanotez_per_gas_unit : Z.t;
+  minimal_nanotez_per_gas_unit : Q.t;
   (* Minimal operation fee per byte required to include an operation in a block *)
-  minimal_nanotez_per_byte : Z.t;
+  minimal_nanotez_per_byte : Q.t;
   (* truly mutable *)
   mutable best_slot : slot option;
 }
@@ -285,21 +285,20 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
       if Tez.(fee < minimal_fees) then return_none
       else
         let ((size, gas, _ratio) as weight) = compute_weight op (fee, gas) in
-        let open Environment in
         let fees_in_nanotez =
-          Z.mul (Z.of_int64 (Tez.to_mutez fee)) (Z.of_int 1000)
+          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
         in
         let enough_fees_for_gas =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_gas_unit gas
+            Q.mul minimal_nanotez_per_gas_unit (Q.of_bigint gas)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         let enough_fees_for_size =
           let minimal_fees_in_nanotez =
-            Z.mul minimal_nanotez_per_byte (Z.of_int size)
+            Q.mul minimal_nanotez_per_byte (Q.of_int size)
           in
-          Z.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         if enough_fees_for_size && enough_fees_for_gas then
           return_some (op, weight)

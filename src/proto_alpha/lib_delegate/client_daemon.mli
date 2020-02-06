@@ -40,8 +40,8 @@ module Baker : sig
   val run :
     #Protocol_client_context.full ->
     ?minimal_fees:Tez.t ->
-    ?minimal_nanotez_per_gas_unit:Z.t ->
-    ?minimal_nanotez_per_byte:Z.t ->
+    ?minimal_nanotez_per_gas_unit:Q.t ->
+    ?minimal_nanotez_per_byte:Q.t ->
     ?max_priority:int ->
     chain:Chain_services.chain ->
     context_path:string ->
