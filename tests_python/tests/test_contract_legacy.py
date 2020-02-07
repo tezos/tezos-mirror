@@ -27,7 +27,7 @@ class TestContractLegacy:
              'Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"', 'Unit'),
             ('create_account.tz', 'None',
              'Left "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"', 'None'),
-            ('steps_to_quota.tz', '0', '100', '1039126'),
+            ('steps_to_quota.tz', '0', '100', '133008040'),
         ])
     def test_contract_input_output(self,
                                    client_regtest,
