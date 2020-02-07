@@ -235,7 +235,6 @@ module type V1 = sig
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
-       and type Z.t = Z.t
 
   type error += Ecoproto_error of Error_monad.error
 
