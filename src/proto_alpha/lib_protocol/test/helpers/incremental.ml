@@ -43,6 +43,8 @@ let header {header; _} = header
 
 let rev_tickets {rev_tickets; _} = rev_tickets
 
+let validation_state {state; _} = state
+
 let level st = st.header.shell.level
 
 let rpc_context st =
