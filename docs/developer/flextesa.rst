@@ -51,7 +51,7 @@ at `gitlab.com/tezos/flextesa <https://gitlab.com/tezos/flextesa>`__.
 One can find more instructions there, including how to use isolated
 sandboxes using Docker. TQ Tezos' assets portal also shows how to start
 a sandbox and interact with it using a separate ``tezos-client``:
-https://assets.tqtezos.com/sandbox-quickstart.
+https://assets.tqtezos.com/setup/2-sandbox.
 
 
 Concepts
