@@ -36,6 +36,8 @@ val header : incremental -> Block_header.t
 
 val rev_tickets : incremental -> operation_receipt list
 
+val validation_state : incremental -> validation_state
+
 val level : incremental -> int32
 
 val begin_construction :
