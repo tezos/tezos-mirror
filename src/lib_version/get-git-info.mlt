@@ -2,17 +2,21 @@
 ;;
 #load "unix.cma"
 
-let query cmd =
-  let chan = Unix.open_process_in cmd in
+let query ~default cmd =
   try
+    let chan = Unix.open_process_in cmd in
     let out = input_line chan in
-    if Unix.close_process_in chan = Unix.WEXITED 0 then out else "unkown"
-  with End_of_file -> "unkown"
+    if Unix.close_process_in chan = Unix.WEXITED 0 then out
+    else try Sys.getenv "GIT_SHORTREF" with Not_found -> default
+  with End_of_file -> (
+    try Sys.getenv "GIT_SHORTREF" with Not_found -> default )
+
+let hash = query ~default:"unknown" "git show -s --pretty=format:%H"
+
+let date = query ~default:"not-available" "git show -s --pretty=format:%ci"
 
 let () =
   Format.printf
-    "@[<v>let commit_hash = \"%s\"@,"
-    (query "git show -s --pretty=format:%H") ;
-  Format.printf
-    "let committer_date = \"%s\"@]@."
-    (query "git show -s --pretty=format:%ci")
+    "@[<v>let commit_hash = \"%s\"@,let committer_date = \"%s\"@]@."
+    hash
+    date
