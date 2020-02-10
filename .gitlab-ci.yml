@@ -1297,7 +1297,15 @@ publish:docker:
     - docker tag
       "${public_docker_image_name}:${CI_COMMIT_REF_NAME}"
       "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker tag
+      "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}"
+      "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker tag
+      "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}"
+      "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
     - docker push "${public_docker_image_name}:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker push "${public_docker_image_name}-bare:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker push "${public_docker_image_name}-debug:${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
   tags:
     - safe_docker
 
