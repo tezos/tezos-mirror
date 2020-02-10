@@ -25,8 +25,6 @@
 
 type t = Unaccounted | Limited of {remaining : Z.t}
 
-type internal_gas = Z.t
-
 val encoding : t Data_encoding.encoding
 
 val pp : Format.formatter -> t -> unit
@@ -41,12 +39,9 @@ type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
 
-val consume :
-  Z.t -> t -> internal_gas -> cost -> (Z.t * t * internal_gas) tzresult
+val consume : Z.t -> t -> cost -> (Z.t * t) tzresult
 
-val check_enough : Z.t -> t -> internal_gas -> cost -> unit tzresult
-
-val internal_gas_zero : internal_gas
+val check_enough : Z.t -> t -> cost -> unit tzresult
 
 val free : cost
 

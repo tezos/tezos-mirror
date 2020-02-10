@@ -41,7 +41,6 @@ type t = {
   rewards : Tez_repr.t;
   block_gas : Z.t;
   operation_gas : Gas_limit_repr.t;
-  internal_gas : Gas_limit_repr.internal_gas;
   storage_space_to_pay : Z.t option;
   allocated_contracts : int option;
   origination_nonce : Contract_repr.origination_nonce option;
@@ -220,33 +219,18 @@ let check_gas_limit ctxt remaining =
   else ok ()
 
 let set_gas_limit ctxt remaining =
-  {
-    ctxt with
-    operation_gas = Limited {remaining};
-    internal_gas = Gas_limit_repr.internal_gas_zero;
-  }
+  {ctxt with operation_gas = Limited {remaining}}
 
 let set_gas_unlimited ctxt = {ctxt with operation_gas = Unaccounted}
 
 let consume_gas ctxt cost =
-  Gas_limit_repr.consume
-    ctxt.block_gas
-    ctxt.operation_gas
-    ctxt.internal_gas
-    cost
-  >>? fun (block_gas, operation_gas, internal_gas) ->
-  ok {ctxt with block_gas; operation_gas; internal_gas}
+  Gas_limit_repr.consume ctxt.block_gas ctxt.operation_gas cost
+  >>? fun (block_gas, operation_gas) -> ok {ctxt with block_gas; operation_gas}
 
 let check_enough_gas ctxt cost =
-  Gas_limit_repr.check_enough
-    ctxt.block_gas
-    ctxt.operation_gas
-    ctxt.internal_gas
-    cost
+  Gas_limit_repr.check_enough ctxt.block_gas ctxt.operation_gas cost
 
 let gas_level ctxt = ctxt.operation_gas
-
-let internal_gas ctxt = ctxt.internal_gas
 
 let block_gas_level ctxt = ctxt.block_gas
 
@@ -547,7 +531,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       rewards = Tez_repr.zero;
       deposits = Signature.Public_key_hash.Map.empty;
       operation_gas = Unaccounted;
-      internal_gas = Gas_limit_repr.internal_gas_zero;
       storage_space_to_pay = None;
       allocated_contracts = None;
       block_gas = constants.Constants_repr.hard_gas_limit_per_block;

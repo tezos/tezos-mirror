@@ -212,8 +212,6 @@ module Gas : sig
 
   val level : context -> t
 
-  val internal_gas : context -> Z.t
-
   val consumed : since:context -> until:context -> Z.t
 
   val block_level : context -> Z.t
