@@ -11,4 +11,4 @@ code { DROP;
              { CDR;
                NIL operation;
                PAIR; } };
-       DROP; SOME; NIL operation; PAIR} # Ending calling convention stuff
+       DIP {SOME;NIL operation};CONS ; PAIR} # Ending calling convention stuff

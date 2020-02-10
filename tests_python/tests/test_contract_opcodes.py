@@ -785,8 +785,8 @@ class TestContractOpcodes:
 
     def test_check_signature(self, client_regtest):
         client = client_regtest
-        sig = 'edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZA' \
-              + 'e7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7'
+        sig = 'edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt' \
+              + '9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF'
         assert_run_script_success(
             client,
             f'{CONTRACT_PATH}/check_signature.tz',
