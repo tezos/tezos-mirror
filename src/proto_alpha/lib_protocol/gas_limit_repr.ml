@@ -25,8 +25,6 @@
 
 type t = Unaccounted | Limited of {remaining : Z.t}
 
-type internal_gas = Z.t
-
 type cost = {
   allocations : Z.t;
   steps : Z.t;
@@ -103,13 +101,9 @@ let byte_written_weight = Z.of_int 15
 
 let rescaling_bits = 7
 
-let rescaling_mask = Z.sub (Z.shift_left Z.one rescaling_bits) Z.one
-
 let scale (z : Z.t) = Z.shift_left z rescaling_bits
 
-let rescale (z : Z.t) = z
-
-let cost_to_internal_gas (cost : cost) : internal_gas =
+let cost_to_gas (cost : cost) : Z.t =
   Z.add
     (Z.add
        (Z.mul cost.allocations allocation_weight)
@@ -122,33 +116,24 @@ let cost_to_internal_gas (cost : cost) : internal_gas =
           (Z.mul cost.bytes_read byte_read_weight)
           (Z.mul cost.bytes_written byte_written_weight)))
 
-let internal_gas_to_gas internal_gas : Z.t * internal_gas =
-  let gas = rescale internal_gas in
-  let rest = Z.zero in
-  (gas, rest)
-
-let consume block_gas operation_gas internal_gas cost =
+let consume block_gas operation_gas cost =
   match operation_gas with
   | Unaccounted ->
-      ok (block_gas, Unaccounted, internal_gas)
+      ok (block_gas, Unaccounted)
   | Limited {remaining} ->
-      let cost_internal_gas = cost_to_internal_gas cost in
-      let total_internal_gas = Z.add cost_internal_gas internal_gas in
-      let (gas, rest) = internal_gas_to_gas total_internal_gas in
+      let gas = cost_to_gas cost in
       if Compare.Z.(gas > Z.zero) then
         let remaining = Z.sub remaining gas in
         let block_remaining = Z.sub block_gas gas in
         if Compare.Z.(remaining < Z.zero) then error Operation_quota_exceeded
         else if Compare.Z.(block_remaining < Z.zero) then
           error Block_quota_exceeded
-        else ok (block_remaining, Limited {remaining}, rest)
-      else ok (block_gas, operation_gas, total_internal_gas)
+        else ok (block_remaining, Limited {remaining})
+      else ok (block_gas, operation_gas)
 
-let check_enough block_gas operation_gas internal_gas cost =
-  consume block_gas operation_gas internal_gas cost
-  >|? fun (_block_remainig, _remaining, _internal_gas) -> ()
-
-let internal_gas_zero : internal_gas = Z.zero
+let check_enough block_gas operation_gas cost =
+  consume block_gas operation_gas cost
+  >|? fun (_block_remainig, _remaining) -> ()
 
 let alloc_cost n =
   {

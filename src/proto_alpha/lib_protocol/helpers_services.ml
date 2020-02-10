@@ -69,10 +69,9 @@ module Scripts = struct
 
     let trace_encoding =
       def "scripted.trace" @@ list
-      @@ obj4
+      @@ obj3
            (req "location" Script.location_encoding)
            (req "gas" Gas.encoding)
-           (req "internal_gas" z)
            (req
               "stack"
               (list

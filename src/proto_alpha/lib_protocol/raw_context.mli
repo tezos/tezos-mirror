@@ -135,8 +135,6 @@ val set_gas_unlimited : t -> t
 
 val gas_level : t -> Gas_limit_repr.t
 
-val internal_gas : t -> Z.t
-
 val gas_consumed : since:t -> until:t -> Z.t
 
 val block_gas_level : t -> Z.t

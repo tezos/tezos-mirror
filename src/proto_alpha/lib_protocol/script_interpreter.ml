@@ -31,7 +31,7 @@ open Script_ir_translator
 (* ---- Run-time errors -----------------------------------------------------*)
 
 type execution_trace =
-  (Script.location * Gas.t * Z.t * (Script.expr * string option) list) list
+  (Script.location * Gas.t * (Script.expr * string option) list) list
 
 type error +=
   | Reject of Script.location * Script.expr * execution_trace option
@@ -52,10 +52,9 @@ let () =
   let open Data_encoding in
   let trace_encoding =
     list
-    @@ obj4
+    @@ obj3
          (req "location" Script.location_encoding)
          (req "gas" Gas.encoding)
-         (req "internal_gas" z)
          (req
             "stack"
             (list (obj2 (req "item" Script.expr_encoding) (opt "annot" string))))
@@ -322,7 +321,7 @@ module Trace_logger () = struct
   let log_interp ctxt descr stack =
     trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.bef))
     >>=? fun stack ->
-    log := (descr.loc, Gas.level ctxt, Gas.internal_gas ctxt, stack) :: !log ;
+    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
     return_unit
 
   let log_entry _ctxt _descr _stack = return_unit
@@ -330,7 +329,7 @@ module Trace_logger () = struct
   let log_exit ctxt descr stack =
     trace Cannot_serialize_log (unparse_stack ctxt (stack, descr.aft))
     >>=? fun stack ->
-    log := (descr.loc, Gas.level ctxt, Gas.internal_gas ctxt, stack) :: !log ;
+    log := (descr.loc, Gas.level ctxt, stack) :: !log ;
     return_unit
 
   let get_log () = Some (List.rev !log)
