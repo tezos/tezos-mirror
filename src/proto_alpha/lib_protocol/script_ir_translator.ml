@@ -2091,33 +2091,6 @@ type _ dropn_proof_argument =
       * 'aft stack_ty )
       -> 'bef dropn_proof_argument
 
-(* Lwt versions *)
-let parse_var_annot loc ?default annot =
-  Lwt.return (parse_var_annot loc ?default annot)
-
-let parse_entrypoint_annot loc ?default annot =
-  Lwt.return (parse_entrypoint_annot loc ?default annot)
-
-let parse_constr_annot loc ?if_special_first ?if_special_second annot =
-  Lwt.return
-    (parse_constr_annot loc ?if_special_first ?if_special_second annot)
-
-let parse_two_var_annot loc annot = Lwt.return (parse_two_var_annot loc annot)
-
-let parse_destr_annot loc annot ~default_accessor ~field_name ~pair_annot
-    ~value_annot =
-  Lwt.return
-    (parse_destr_annot
-       loc
-       annot
-       ~default_accessor
-       ~field_name
-       ~pair_annot
-       ~value_annot)
-
-let parse_var_type_annot loc annot =
-  Lwt.return (parse_var_type_annot loc annot)
-
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
   let rec find_entrypoint :
       type t. t ty -> string -> (Script.node -> Script.node) * ex_ty =
@@ -2951,7 +2924,7 @@ and parse_instr :
            However, DROP is equivalent to DROP 1 so hinting at an arity of 1 makes sense. *)
       fail (Invalid_arity (loc, I_DROP, 1, List.length l))
   | (Prim (loc, I_DUP, [], annot), Item_t (v, rest, stack_annot)) ->
-      parse_var_annot loc annot ~default:stack_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:stack_annot
       >>=? fun annot ->
       typed ctxt loc Dup (Item_t (v, Item_t (v, rest, stack_annot), annot))
   | (Prim (loc, I_DIG, [n], result_annot), stack) ->
@@ -3029,19 +3002,19 @@ and parse_instr :
         Swap
         (Item_t (w, Item_t (v, rest, cur_top_annot), stack_annot))
   | (Prim (loc, I_PUSH, [t; d], annot), stack) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ parse_packable_ty ctxt ~legacy t
       >>=? fun (Ex_ty t, ctxt) ->
       parse_data ?type_logger ctxt ~legacy t d
       >>=? fun (v, ctxt) -> typed ctxt loc (Const v) (Item_t (t, stack, annot))
   | (Prim (loc, I_UNIT, [], annot), stack) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed ctxt loc (Const ()) (Item_t (Unit_t ty_name, stack, annot))
   (* options *)
   | (Prim (loc, I_SOME, [], annot), Item_t (t, rest, _)) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed
         ctxt
@@ -3051,7 +3024,7 @@ and parse_instr :
   | (Prim (loc, I_NONE, [t], annot), stack) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy t
       >>=? fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed
         ctxt
@@ -3085,11 +3058,12 @@ and parse_instr :
   (* pairs *)
   | ( Prim (loc, I_PAIR, [], annot),
       Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ) ->
-      parse_constr_annot
-        loc
-        annot
-        ~if_special_first:(var_to_field_annot fst_annot)
-        ~if_special_second:(var_to_field_annot snd_annot)
+      Lwt.return
+      @@ parse_constr_annot
+           loc
+           annot
+           ~if_special_first:(var_to_field_annot fst_annot)
+           ~if_special_second:(var_to_field_annot snd_annot)
       >>=? fun (annot, ty_name, l_field, r_field) ->
       typed
         ctxt
@@ -3107,13 +3081,14 @@ and parse_instr :
       Item_t
         (Pair_t ((a, expected_field_annot, a_annot), _, _, _), rest, pair_annot)
     ) ->
-      parse_destr_annot
-        loc
-        annot
-        ~pair_annot
-        ~value_annot:a_annot
-        ~field_name:expected_field_annot
-        ~default_accessor:default_car_annot
+      Lwt.return
+      @@ parse_destr_annot
+           loc
+           annot
+           ~pair_annot
+           ~value_annot:a_annot
+           ~field_name:expected_field_annot
+           ~default_accessor:default_car_annot
       >>=? fun (annot, field_annot) ->
       Lwt.return @@ check_correct_field field_annot expected_field_annot
       >>=? fun () -> typed ctxt loc Car (Item_t (a, rest, annot))
@@ -3121,13 +3096,14 @@ and parse_instr :
       Item_t
         (Pair_t (_, (b, expected_field_annot, b_annot), _, _), rest, pair_annot)
     ) ->
-      parse_destr_annot
-        loc
-        annot
-        ~pair_annot
-        ~value_annot:b_annot
-        ~field_name:expected_field_annot
-        ~default_accessor:default_cdr_annot
+      Lwt.return
+      @@ parse_destr_annot
+           loc
+           annot
+           ~pair_annot
+           ~value_annot:b_annot
+           ~field_name:expected_field_annot
+           ~default_accessor:default_cdr_annot
       >>=? fun (annot, field_annot) ->
       Lwt.return @@ check_correct_field field_annot expected_field_annot
       >>=? fun () -> typed ctxt loc Cdr (Item_t (b, rest, annot))
@@ -3135,10 +3111,11 @@ and parse_instr :
   | (Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest, stack_annot)) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy tr
       >>=? fun (Ex_ty tr, ctxt) ->
-      parse_constr_annot
-        loc
-        annot
-        ~if_special_first:(var_to_field_annot stack_annot)
+      Lwt.return
+      @@ parse_constr_annot
+           loc
+           annot
+           ~if_special_first:(var_to_field_annot stack_annot)
       >>=? fun (annot, tname, l_field, r_field) ->
       typed
         ctxt
@@ -3155,10 +3132,11 @@ and parse_instr :
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest, stack_annot)) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy tl
       >>=? fun (Ex_ty tl, ctxt) ->
-      parse_constr_annot
-        loc
-        annot
-        ~if_special_second:(var_to_field_annot stack_annot)
+      Lwt.return
+      @@ parse_constr_annot
+           loc
+           annot
+           ~if_special_second:(var_to_field_annot stack_annot)
       >>=? fun (annot, tname, l_field, r_field) ->
       typed
         ctxt
@@ -3212,7 +3190,7 @@ and parse_instr :
   | (Prim (loc, I_NIL, [t], annot), stack) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy t
       >>=? fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed
         ctxt
@@ -3223,7 +3201,7 @@ and parse_instr :
       Item_t (tv, Item_t (List_t (t, ty_name, has_big_map), rest, _), _) ) ->
       check_item_ty ctxt tv t loc I_CONS 1 2
       >>=? fun (Eq, t, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3259,14 +3237,14 @@ and parse_instr :
       merge_branches ~legacy ctxt loc btr bfr {branch}
       >>=? fun (judgement, ctxt) -> return ctxt judgement
   | (Prim (loc, I_SIZE, [], annot), Item_t (List_t _, rest, _)) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, tname) ->
       typed ctxt loc List_size (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_MAP, [body], annot),
       Item_t (List_t (elt, _, _), starting_rest, list_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (ret_annot, list_ty_name) ->
       let elt_annot = gen_access_annot list_annot default_elt_annot in
       parse_instr
@@ -3336,7 +3314,7 @@ and parse_instr :
   | (Prim (loc, I_EMPTY_SET, [t], annot), rest) ->
       Lwt.return @@ parse_comparable_ty ctxt t
       >>=? fun (Ex_comparable_ty t, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, tname) ->
       typed ctxt loc (Empty_set t) (Item_t (Set_t (t, tname), rest, annot))
   | ( Prim (loc, I_ITER, [body], annot),
@@ -3374,7 +3352,7 @@ and parse_instr :
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (v, Item_t (Set_t (elt, _), rest, _), _) ) ->
       let elt = ty_of_comparable_ty elt in
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, tname) ->
       check_item_ty ctxt elt v loc I_MEM 1 2
       >>=? fun (Eq, _, ctxt) ->
@@ -3390,13 +3368,13 @@ and parse_instr :
         >>=? fun (v, _ctxt) ->
         fail (Comparable_type_expected (loc, Micheline.strip_locations v))
     | Some v ->
-        parse_var_annot loc annot ~default:set_annot
+        Lwt.return @@ parse_var_annot loc annot ~default:set_annot
         >>=? fun annot ->
         check_item_comparable_ty elt v loc I_UPDATE 1 3
         >>=? fun (Eq, elt, ctxt) ->
         typed ctxt loc Set_update (Item_t (Set_t (elt, tname), rest, annot)) )
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Set_size (Item_t (Nat_t None, rest, annot))
   (* maps *)
@@ -3405,7 +3383,7 @@ and parse_instr :
       >>=? fun (Ex_comparable_ty tk, ctxt) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy tv
       >>=? fun (Ex_ty tv, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed
         ctxt
@@ -3417,7 +3395,7 @@ and parse_instr :
       let k = ty_of_comparable_ty ck in
       check_kind [Seq_kind] body
       >>=? fun () ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (ret_annot, ty_name) ->
       let k_name = field_to_var_annot default_key_annot in
       let e_name = field_to_var_annot default_elt_annot in
@@ -3502,7 +3480,7 @@ and parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_MEM 1 2
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Map_mem (Item_t (Bool_t None, rest, annot))
   | ( Prim (loc, I_GET, [], annot),
@@ -3510,7 +3488,7 @@ and parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET 1 2
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3530,7 +3508,7 @@ and parse_instr :
       >>=? fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_UPDATE 2 3
       >>=? fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot ~default:map_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:map_annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3538,7 +3516,7 @@ and parse_instr :
         Map_update
         (Item_t (Map_t (ck, v, map_name, has_big_map), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Map_t (_, _, _, _), rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Map_size (Item_t (Nat_t None, rest, annot))
   (* big_map *)
@@ -3547,7 +3525,7 @@ and parse_instr :
       >>=? fun (Ex_comparable_ty tk, ctxt) ->
       Lwt.return @@ parse_packable_ty ctxt ~legacy tv
       >>=? fun (Ex_ty tv, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       typed
         ctxt
@@ -3559,7 +3537,7 @@ and parse_instr :
       let k = ty_of_comparable_ty map_key in
       check_item_ty ctxt set_key k loc I_MEM 1 2
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Big_map_mem (Item_t (Bool_t None, rest, annot))
   | ( Prim (loc, I_GET, [], annot),
@@ -3567,7 +3545,7 @@ and parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET 1 2
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3587,7 +3565,7 @@ and parse_instr :
       >>=? fun (Eq, _, ctxt) ->
       check_item_ty ctxt set_value map_value loc I_UPDATE 2 3
       >>=? fun (Eq, map_value, ctxt) ->
-      parse_var_annot loc annot ~default:map_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:map_annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3678,7 +3656,7 @@ and parse_instr :
       stack ) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       let l_annot =
         gen_access_annot union_annot l_field ~default:default_left_annot
@@ -3716,7 +3694,7 @@ and parse_instr :
       >>=? fun (Ex_ty ret, ctxt) ->
       check_kind [Seq_kind] code
       >>=? fun () ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       parse_returning
         Lambda
@@ -3736,7 +3714,7 @@ and parse_instr :
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest, _), _) ) ->
       check_item_ty ctxt arg param loc I_EXEC 1 2
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Exec (Item_t (ret, rest, annot))
   | ( Prim (loc, I_APPLY, [], annot),
       Item_t
@@ -3753,7 +3731,7 @@ and parse_instr :
       >>=? fun () ->
       check_item_ty ctxt capture capture_ty loc I_APPLY 1 2
       >>=? fun (Eq, capture_ty, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3829,7 +3807,7 @@ and parse_instr :
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3838,7 +3816,7 @@ and parse_instr :
         (Item_t (Timestamp_t tname, rest, annot))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t _, Item_t (Timestamp_t tname, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3847,7 +3825,7 @@ and parse_instr :
         (Item_t (Timestamp_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3856,7 +3834,7 @@ and parse_instr :
         (Item_t (Timestamp_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t tn1, Item_t (Timestamp_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
@@ -3864,14 +3842,14 @@ and parse_instr :
   (* string operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Concat_string_pair (Item_t (String_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (String_t tname, _, _), rest, list_annot) ) ->
-      parse_var_annot ~default:list_annot loc annot
+      Lwt.return @@ parse_var_annot ~default:list_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Concat_string (Item_t (String_t tname, rest, annot))
   | ( Prim (loc, I_SLICE, [], annot),
@@ -3879,10 +3857,11 @@ and parse_instr :
         ( Nat_t _,
           Item_t (Nat_t _, Item_t (String_t tname, rest, string_annot), _),
           _ ) ) ->
-      parse_var_annot
-        ~default:(gen_access_annot string_annot default_slice_annot)
-        loc
-        annot
+      Lwt.return
+      @@ parse_var_annot
+           ~default:(gen_access_annot string_annot default_slice_annot)
+           loc
+           annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3890,20 +3869,20 @@ and parse_instr :
         Slice_string
         (Item_t (Option_t (String_t tname, None, false), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (String_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc String_size (Item_t (Nat_t None, rest, annot))
   (* bytes operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Concat_bytes_pair (Item_t (Bytes_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (List_t (Bytes_t tname, _, _), rest, list_annot) ) ->
-      parse_var_annot ~default:list_annot loc annot
+      Lwt.return @@ parse_var_annot ~default:list_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Concat_bytes (Item_t (Bytes_t tname, rest, annot))
   | ( Prim (loc, I_SLICE, [], annot),
@@ -3911,10 +3890,11 @@ and parse_instr :
         ( Nat_t _,
           Item_t (Nat_t _, Item_t (Bytes_t tname, rest, bytes_annot), _),
           _ ) ) ->
-      parse_var_annot
-        ~default:(gen_access_annot bytes_annot default_slice_annot)
-        loc
-        annot
+      Lwt.return
+      @@ parse_var_annot
+           ~default:(gen_access_annot bytes_annot default_slice_annot)
+           loc
+           annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3922,20 +3902,20 @@ and parse_instr :
         Slice_bytes
         (Item_t (Option_t (Bytes_t tname, None, false), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Bytes_size (Item_t (Nat_t None, rest, annot))
   (* currency operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Add_tez (Item_t (Mutez_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
@@ -3943,44 +3923,44 @@ and parse_instr :
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Mutez_t tname, Item_t (Nat_t _, rest, _), _) ) ->
       (* no type name check *)
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Mul_teznat (Item_t (Mutez_t tname, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t _, Item_t (Mutez_t tname, rest, _), _) ) ->
       (* no type name check *)
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Mul_nattez (Item_t (Mutez_t tname, rest, annot))
   (* boolean operations *)
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname -> typed ctxt loc Or (Item_t (Bool_t tname, rest, annot))
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname -> typed ctxt loc And (Item_t (Bool_t tname, rest, annot))
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname -> typed ctxt loc Xor (Item_t (Bool_t tname, rest, annot))
   | (Prim (loc, I_NOT, [], annot), Item_t (Bool_t tname, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Not (Item_t (Bool_t tname, rest, annot))
   (* integer operations *)
   | (Prim (loc, I_ABS, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Abs_int (Item_t (Nat_t None, rest, annot))
   | (Prim (loc, I_ISNAT, [], annot), Item_t (Int_t _, rest, int_annot)) ->
-      parse_var_annot loc annot ~default:int_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:int_annot
       >>=? fun annot ->
       typed
         ctxt
@@ -3988,92 +3968,92 @@ and parse_instr :
         Is_nat
         (Item_t (Option_t (Nat_t None, None, false), rest, annot))
   | (Prim (loc, I_INT, [], annot), Item_t (Nat_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Int_nat (Item_t (Int_t None, rest, annot))
   | (Prim (loc, I_NEG, [], annot), Item_t (Int_t tname, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Neg_int (Item_t (Int_t tname, rest, annot))
   | (Prim (loc, I_NEG, [], annot), Item_t (Nat_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Neg_nat (Item_t (Int_t None, rest, annot))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Add_intint (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tname, Item_t (Nat_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Add_intnat (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Nat_t _, Item_t (Int_t tname, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Add_natint (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Add_natnat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Sub_int (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Int_t tname, Item_t (Nat_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Sub_int (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Nat_t _, Item_t (Int_t tname, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Sub_int (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun _tname ->
       typed ctxt loc Sub_int (Item_t (Int_t None, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Mul_intint (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Int_t tname, Item_t (Nat_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Mul_intnat (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t _, Item_t (Int_t tname, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Mul_natint (Item_t (Int_t tname, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Mul_natnat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tname, Item_t (Nat_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -4092,7 +4072,7 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
@@ -4113,7 +4093,7 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
@@ -4134,7 +4114,7 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tname, Item_t (Nat_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -4153,7 +4133,7 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tname, Item_t (Int_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -4172,7 +4152,7 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
@@ -4193,56 +4173,56 @@ and parse_instr :
              annot ))
   | ( Prim (loc, I_LSL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Lsl_nat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_LSR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Lsr_nat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Or_nat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc And_nat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Int_t _, Item_t (Nat_t tname, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc And_int_nat (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       Lwt.return @@ merge_type_annot ~legacy tn1 tn2
       >>=? fun tname ->
       typed ctxt loc Xor_nat (Item_t (Nat_t tname, rest, annot))
   | (Prim (loc, I_NOT, [], annot), Item_t (Int_t tname, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Not_int (Item_t (Int_t tname, rest, annot))
   | (Prim (loc, I_NOT, [], annot), Item_t (Nat_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Not_nat (Item_t (Int_t None, rest, annot))
   (* comparison *)
   | (Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest, _), _))
     -> (
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       check_item_ty ctxt t1 t2 loc I_COMPARE 1 2
       >>=? fun (Eq, t, ctxt) ->
@@ -4254,26 +4234,26 @@ and parse_instr :
           typed ctxt loc (Compare key) (Item_t (Int_t None, rest, annot)) )
   (* comparators *)
   | (Prim (loc, I_EQ, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Eq (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_NEQ, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Neq (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_LT, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Lt (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_GT, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Gt (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_LE, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Le (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_GE, [], annot), Item_t (Int_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot -> typed ctxt loc Ge (Item_t (Bool_t None, rest, annot))
   (* annotations *)
   | (Prim (loc, I_CAST, [cast_t], annot), Item_t (t, stack, item_annot)) ->
-      parse_var_annot loc annot ~default:item_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:item_annot
       >>=? fun annot ->
       Lwt.return @@ parse_any_ty ctxt ~legacy cast_t
       >>=? fun (Ex_ty cast_t, ctxt) ->
@@ -4282,7 +4262,7 @@ and parse_instr :
       Lwt.return @@ merge_types ~legacy ctxt loc cast_t t
       >>=? fun (_, ctxt) -> typed ctxt loc Nop (Item_t (cast_t, stack, annot))
   | (Prim (loc, I_RENAME, [], annot), Item_t (t, stack, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       (* can erase annot *)
       typed ctxt loc Nop (Item_t (t, stack, annot))
@@ -4294,17 +4274,18 @@ and parse_instr :
            (* allow to pack contracts for hash/signature checks *) loc
            t)
       >>=? fun () ->
-      parse_var_annot
-        loc
-        annot
-        ~default:(gen_access_annot unpacked_annot default_pack_annot)
+      Lwt.return
+      @@ parse_var_annot
+           loc
+           annot
+           ~default:(gen_access_annot unpacked_annot default_pack_annot)
       >>=? fun annot ->
       typed ctxt loc (Pack t) (Item_t (Bytes_t None, rest, annot))
   | (Prim (loc, I_UNPACK, [ty], annot), Item_t (Bytes_t _, rest, packed_annot))
     ->
       Lwt.return @@ parse_packable_ty ctxt ~legacy ty
       >>=? fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot
+      Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
       let annot =
         default_annot
@@ -4322,20 +4303,22 @@ and parse_instr :
   (* protocol *)
   | ( Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ) ->
-      parse_var_annot
-        loc
-        annot
-        ~default:(gen_access_annot contract_annot default_addr_annot)
+      Lwt.return
+      @@ parse_var_annot
+           loc
+           annot
+           ~default:(gen_access_annot contract_annot default_addr_annot)
       >>=? fun annot ->
       typed ctxt loc Address (Item_t (Address_t None, rest, annot))
   | ( Prim (loc, I_CONTRACT, [ty], annot),
       Item_t (Address_t _, rest, addr_annot) ) ->
       Lwt.return @@ parse_parameter_ty ctxt ~legacy ty
       >>=? fun (Ex_ty t, ctxt) ->
-      parse_entrypoint_annot
-        loc
-        annot
-        ~default:(gen_access_annot addr_annot default_contract_annot)
+      Lwt.return
+      @@ parse_entrypoint_annot
+           loc
+           annot
+           ~default:(gen_access_annot addr_annot default_contract_annot)
       >>=? fun (annot, entrypoint) ->
       ( Lwt.return
       @@
@@ -4359,12 +4342,12 @@ and parse_instr :
     ) ->
       check_item_ty ctxt p cp loc I_TRANSFER_TOKENS 1 4
       >>=? fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Transfer_tokens (Item_t (Operation_t None, rest, annot))
   | ( Prim (loc, I_SET_DELEGATE, [], annot),
       Item_t (Option_t (Key_hash_t _, _, _), rest, _) ) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Set_delegate (Item_t (Operation_t None, rest, annot))
   | ( Prim (loc, I_CREATE_ACCOUNT, [], annot),
@@ -4377,7 +4360,7 @@ and parse_instr :
           _ ) ) ->
       if legacy then
         (* For existing contracts, this instruction is still allowed *)
-        parse_two_var_annot loc annot
+        Lwt.return @@ parse_two_var_annot loc annot
         >>=? fun (op_annot, addr_annot) ->
         typed
           ctxt
@@ -4392,7 +4375,7 @@ and parse_instr :
         fail (Deprecated_instruction I_CREATE_ACCOUNT)
   | (Prim (loc, I_IMPLICIT_ACCOUNT, [], annot), Item_t (Key_hash_t _, rest, _))
     ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed
         ctxt
@@ -4415,7 +4398,7 @@ and parse_instr :
           _ ) ) ->
       if legacy then
         (* For existing contracts, this instruction is still allowed *)
-        parse_two_var_annot loc annot
+        Lwt.return @@ parse_two_var_annot loc annot
         >>=? fun (op_annot, addr_annot) ->
         let cannonical_code = fst @@ Micheline.extract_locations code in
         Lwt.return @@ parse_toplevel ~legacy cannonical_code
@@ -4508,7 +4491,7 @@ and parse_instr :
       ( Option_t (Key_hash_t _, _, _),
         Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
         _ ) ) ->
-      parse_two_var_annot loc annot
+      Lwt.return @@ parse_two_var_annot loc annot
       >>=? fun (op_annot, addr_annot) ->
       let cannonical_code = fst @@ Micheline.extract_locations code in
       Lwt.return @@ parse_toplevel ~legacy cannonical_code
@@ -4592,63 +4575,64 @@ and parse_instr :
              Item_t (Address_t None, rest, addr_annot),
              op_annot ))
   | (Prim (loc, I_NOW, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_now_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:default_now_annot
       >>=? fun annot ->
       typed ctxt loc Now (Item_t (Timestamp_t None, stack, annot))
   | (Prim (loc, I_AMOUNT, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_amount_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:default_amount_annot
       >>=? fun annot ->
       typed ctxt loc Amount (Item_t (Mutez_t None, stack, annot))
   | (Prim (loc, I_CHAIN_ID, [], annot), stack) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc ChainId (Item_t (Chain_id_t None, stack, annot))
   | (Prim (loc, I_BALANCE, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_balance_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:default_balance_annot
       >>=? fun annot ->
       typed ctxt loc Balance (Item_t (Mutez_t None, stack, annot))
   | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Hash_key (Item_t (Key_hash_t None, rest, annot))
   | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
       Item_t
         (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest, _), _), _) )
     ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Check_signature (Item_t (Bool_t None, rest, annot))
   | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Blake2b (Item_t (Bytes_t None, rest, annot))
   | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Sha256 (Item_t (Bytes_t None, rest, annot))
   | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest, _)) ->
-      parse_var_annot loc annot
+      Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
   | (Prim (loc, I_STEPS_TO_QUOTA, [], annot), stack) ->
       if legacy then
         (* For existing contracts, this instruction is still allowed *)
-        parse_var_annot loc annot ~default:default_steps_annot
+        Lwt.return @@ parse_var_annot loc annot ~default:default_steps_annot
         >>=? fun annot ->
         typed ctxt loc Steps_to_quota (Item_t (Nat_t None, stack, annot))
       else
         (* For new contracts this instruction is not allowed anymore *)
         fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_source_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:default_source_annot
       >>=? fun annot ->
       typed ctxt loc Source (Item_t (Address_t None, stack, annot))
   | (Prim (loc, I_SENDER, [], annot), stack) ->
-      parse_var_annot loc annot ~default:default_sender_annot
+      Lwt.return @@ parse_var_annot loc annot ~default:default_sender_annot
       >>=? fun annot ->
       typed ctxt loc Sender (Item_t (Address_t None, stack, annot))
   | (Prim (loc, I_SELF, [], annot), stack) ->
-      parse_entrypoint_annot loc annot ~default:default_self_annot
+      Lwt.return
+      @@ parse_entrypoint_annot loc annot ~default:default_self_annot
       >>=? fun (annot, entrypoint) ->
       let entrypoint =
         Option.unopt_map
