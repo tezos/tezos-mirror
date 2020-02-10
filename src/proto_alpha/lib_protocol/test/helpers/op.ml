@@ -108,7 +108,7 @@ let combine_operations ?public_key ?counter ~source ctxt
                    fee = Tez.zero;
                    counter;
                    operation = Reveal public_key;
-                   gas_limit = Z.of_int 10000;
+                   gas_limit = Z.of_int (128 * 10000);
                    storage_limit = Z.zero;
                  }
              in
@@ -141,9 +141,7 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
   Context.get_constants ctxt
   >>=? fun c ->
   let gas_limit =
-    Option.value
-      ~default:c.parametric.hard_storage_limit_per_operation
-      gas_limit
+    Option.value ~default:c.parametric.hard_gas_limit_per_operation gas_limit
   in
   let storage_limit =
     Option.value
@@ -177,7 +175,7 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
             fee = Tez.zero;
             counter;
             operation = Reveal public_key;
-            gas_limit = Z.of_int 10000;
+            gas_limit = Z.of_int (128 * 10000);
             storage_limit = Z.zero;
           }
       in
@@ -211,7 +209,7 @@ let revelation ctxt public_key =
               fee = Tez.zero;
               counter;
               operation = Reveal public_key;
-              gas_limit = Z.of_int 10000;
+              gas_limit = Z.of_int (128 * 10000);
               storage_limit = Z.zero;
             }))
   in
