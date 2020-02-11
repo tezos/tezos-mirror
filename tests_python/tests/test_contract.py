@@ -252,6 +252,9 @@ class TestContracts:
          r'Contract has no entrypoint named D'),
         ("contract_annotation_default.tz",
          r'unexpected annotation'),
+        # error message for the arity of the chain_id type
+        ("chain_id_arity.tz",
+         r'invalid primitive chain_id')
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
