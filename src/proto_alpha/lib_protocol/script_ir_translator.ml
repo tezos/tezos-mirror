@@ -1884,7 +1884,8 @@ and parse_ty :
           | T_key
           | T_key_hash
           | T_timestamp
-          | T_address ) as prim ),
+          | T_address
+          | T_chain_id ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
