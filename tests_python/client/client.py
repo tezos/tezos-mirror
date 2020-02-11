@@ -322,6 +322,13 @@ class Client:
         cmd += args
         return client_output.BakeForResult(self.run(cmd))
 
+    def bake_many(self,
+                  num_blocks: int,
+                  account: str,
+                  args: List[str] = None
+                  ) -> List[client_output.BakeForResult]:
+        return [self.bake(account, args) for _ in range(num_blocks)]
+
     def originate(self,
                   contract_name: str,
                   amount: float,
@@ -629,6 +636,19 @@ class Client:
         passes = str(fraction_passes)
         cmd = ['from', 'baker', 'contract', account, 'submit', 'ballot', 'for',
                'protocol', proto, yays, nays, passes]
+        return self.run(cmd)
+
+    def override_ballot(self,
+                        account: str,
+                        proto: str,
+                        fraction_yays: int,
+                        fraction_nays: int,
+                        fraction_passes: int) -> str:
+        yays = str(fraction_yays)
+        nays = str(fraction_nays)
+        passes = str(fraction_passes)
+        cmd = ['submit', 'override', 'ballot', 'for',
+               account, proto, yays, nays, passes]
         return self.run(cmd)
 
     def bootstrapped(self) -> str:
