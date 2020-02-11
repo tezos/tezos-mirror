@@ -299,17 +299,7 @@ let test_pappaiir () =
 let test_unpair () =
   assert_expands
     (Prim (zero_loc, "UNPAIR", [], []))
-    (Seq
-       ( zero_loc,
-         [ Seq
-             ( zero_loc,
-               [ Prim (zero_loc, "DUP", [], []);
-                 Prim (zero_loc, "CAR", [], []);
-                 Prim
-                   ( zero_loc,
-                     "DIP",
-                     [Seq (zero_loc, [Prim (zero_loc, "CDR", [], [])])],
-                     [] ) ] ) ] ))
+    (Prim (zero_loc, "UNPAIR", [], []))
 
 (* duup *)
 
@@ -660,17 +650,7 @@ let test_unexpand_assert_right () =
 
 let test_unexpand_unpair () =
   assert_unexpansion
-    (Seq
-       ( zero_loc,
-         [ Seq
-             ( zero_loc,
-               [ Prim (zero_loc, "DUP", [], []);
-                 Prim (zero_loc, "CAR", [], []);
-                 Prim
-                   ( zero_loc,
-                     "DIP",
-                     [Seq (zero_loc, [Prim (zero_loc, "CDR", [], [])])],
-                     [] ) ] ) ] ))
+    (Prim (zero_loc, "UNPAIR", [], []))
     (Prim (zero_loc, "UNPAIR", [], []))
 
 let test_unexpand_pair () =
