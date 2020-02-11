@@ -745,16 +745,17 @@ module Make (I : Dump_interface) = struct
           rev_block_hashes,
           protocol_datas )
     in
-    (* Check snapshot version *)
-    read_snapshot_metadata rbuf
-    >>=? fun version ->
-    check_version version
-    >>=? fun () ->
     Lwt.catch
-      (fun () -> restore version.mode)
+      (fun () ->
+        (* Check snapshot version *)
+        read_snapshot_metadata rbuf
+        >>=? fun version ->
+        check_version version >>=? fun () -> restore version.mode)
       (function
         | Unix.Unix_error (e, _, _) ->
-            fail @@ System_read_error (Unix.error_message e)
+            fail (System_read_error (Unix.error_message e))
+        | Invalid_argument _ ->
+            fail Inconsistent_snapshot_file
         | err ->
             Lwt.fail err)
 end
