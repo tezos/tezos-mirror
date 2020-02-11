@@ -27,6 +27,14 @@ to monitor it for updates.
 
 .. contents:: Summary of changes
 
+Baking Daemon
+-------------
+
+The baking daemon requires direct access to the context of the Tezos node.
+The daemon for 006 requires the new context introduced by Irmin2. As such
+bakers that use the default baker need to upgrade to the new storage
+backend in order to be able to run the 006 baking daemons.
+
 Smart Contracts
 ---------------
 
