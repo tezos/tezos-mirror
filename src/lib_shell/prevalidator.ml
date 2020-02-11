@@ -371,6 +371,15 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     let config = filter_config w pv in
     Filter.post_filter config (op, receipt)
 
+  let handle_branch_refused pv op oph errors =
+    notify_operation pv `Branch_refused op ;
+    Option.iter (Ring.add_and_return_erased pv.branch_refused oph) ~f:(fun e ->
+        pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
+    pv.branch_refusals <-
+      Operation_hash.Map.add oph (op, errors) pv.branch_refusals
+
   let handle_unprocessed w pv =
     ( match pv.validation_state with
     | Error err ->
@@ -484,7 +493,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                           pv.branch_delays ;
                       Lwt.return (acc_validation_state, new_mempool)
                   | Branch_refused errors ->
-                      notify_operation pv `Branch_refused op.raw ;
                       let new_mempool =
                         if is_endorsement op then
                           Mempool.
@@ -497,20 +505,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                             }
                         else acc_mempool
                       in
-                      Option.iter
-                        (Ring.add_and_return_erased pv.branch_refused op.hash)
-                        ~f:(fun e ->
-                          pv.branch_refusals <-
-                            Operation_hash.Map.remove e pv.branch_refusals ;
-                          pv.in_mempool <-
-                            Operation_hash.Set.remove e pv.in_mempool) ;
-                      pv.in_mempool <-
-                        Operation_hash.Set.add op.hash pv.in_mempool ;
-                      pv.branch_refusals <-
-                        Operation_hash.Map.add
-                          op.hash
-                          (op.raw, errors)
-                          pv.branch_refusals ;
+                      handle_branch_refused pv op.raw op.hash errors ;
                       Lwt.return (acc_validation_state, new_mempool)
                   | Refused errors ->
                       refused op.hash op.raw errors
@@ -794,7 +789,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
       if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then (
         Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
-        (* TODO: put in a specific delayed map ? *)
+        let error = [Exn (Failure "Unknown branch operation")] in
+        handle_branch_refused pv op oph error ;
         return_unit )
       else if
         not (already_handled pv oph) (* prevent double inclusion on flush *)
