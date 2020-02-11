@@ -338,6 +338,9 @@ class TestContracts:
         # error message for set update on non-comparable type
         ("set_update_non_comparable.tz",
          r'comparable type expected'),
+        # error message for the arity of the chain_id type
+        ("chain_id_arity.tz",
+         r'invalid primitive chain_id'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
