@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Protocol_client_context
 open Alpha_context
 
 type error += Contract_without_code of Contract.t

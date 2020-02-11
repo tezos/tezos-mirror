@@ -80,7 +80,7 @@ let secrets () =
           Bigstring.(concat "" [of_string email; of_string password])
         in
         let sk = Bip39.to_seed ~passphrase t in
-        let sk = Bigstring.sub_bytes sk 0 32 in
+        let sk = Bigstring.sub sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)

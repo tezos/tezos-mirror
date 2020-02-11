@@ -157,6 +157,14 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     operation
   >>=? fun res -> return res
 
+let rec rev_map_append_s acc f = function
+  | [] ->
+      return acc
+  | hd :: tl ->
+      f hd >>=? fun v -> rev_map_append_s (v :: acc) f tl
+
+let rev_map_s f l = rev_map_append_s [] f l
+
 let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
   >>=? fun contracts ->
@@ -341,7 +349,7 @@ let read_key key =
         Bigstring.(concat "" [of_string key.email; of_string key.password])
       in
       let sk = Bip39.to_seed ~passphrase t in
-      let sk = Bigstring.sub_bytes sk 0 32 in
+      let sk = Bigstring.sub sk 0 32 in
       let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn Ed25519.Secret_key.encoding sk)

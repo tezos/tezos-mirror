@@ -115,6 +115,7 @@ let generate_seed_nonce () =
 let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
     delegate_sk shell priority seed_nonce_hash =
   Client_baking_pow.mine cctxt chain block shell (fun proof_of_work_nonce ->
+      let proof_of_work_nonce = MBytes.of_bytes proof_of_work_nonce in
       {Block_header.priority; seed_nonce_hash; proof_of_work_nonce})
   >>=? fun contents ->
   let unsigned_header =
@@ -137,7 +138,8 @@ let forge_faked_protocol_data ~priority ~seed_nonce_hash =
         {
           priority;
           seed_nonce_hash;
-          proof_of_work_nonce = Client_baking_pow.empty_proof_of_work_nonce;
+          proof_of_work_nonce =
+            MBytes.of_bytes Client_baking_pow.empty_proof_of_work_nonce;
         };
       signature = Signature.zero;
     }
@@ -221,7 +223,7 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
             f "Client_baking_forge.inject_block: inject %a"
             -% t event "inject_baked_block"
             -% a Block_hash.Logging.tag block_hash
-            -% t signed_header_tag signed_header
+            -% t signed_header_tag (MBytes.to_bytes signed_header)
             -% t operations_tag operations)
       >>= fun () -> return block_hash
 
@@ -726,7 +728,8 @@ let finalize_block_header shell_header ~timestamp validation_result operations
         | Forking _ ->
             fail Forking_test_chain)
   >>=? fun context ->
-  let context = Context.hash ~time:timestamp ?message context in
+  Context.hash ~time:timestamp ?message context
+  >>= fun context ->
   let header =
     Tezos_base.Block_header.
       {

@@ -146,7 +146,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                   fun f ->
                     f "Double endorsement evidence injected %a"
                     -% t event "double_endorsement_denounced"
-                    -% t signed_operation_tag bytes
+                    -% t signed_operation_tag (MBytes.to_bytes bytes)
                     -% a Operation_hash.Logging.tag op_hash)
               >>= fun () ->
               return
@@ -247,7 +247,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           fun f ->
             f "Double baking evidence injected %a"
             -% t event "double_baking_denounced"
-            -% t signed_operation_tag bytes
+            -% t signed_operation_tag (MBytes.to_bytes bytes)
             -% a Operation_hash.Logging.tag op_hash)
       >>= fun () ->
       return
