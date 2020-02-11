@@ -254,7 +254,7 @@ class TestContracts:
          r'unexpected annotation'),
         # error message for the arity of the chain_id type
         ("chain_id_arity.tz",
-         r'invalid primitive chain_id')
+         r'primitive chain_id expects 0 arguments but is given 1')
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
