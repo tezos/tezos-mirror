@@ -274,13 +274,21 @@ let build_raw_rpc_directory ~user_activated_upgrades
       in
       let operations =
         List.map
-          (List.map (fun op ->
-               let proto =
-                 Data_encoding.Binary.to_bytes_exn
-                   Next_proto.operation_data_encoding
-                   op.Next_proto.protocol_data
-               in
-               {Operation.shell = op.shell; proto}))
+          (fun operations ->
+            let operations =
+              if q#sort_operations then
+                List.sort Next_proto.compare_operations operations
+              else operations
+            in
+            List.map
+              (fun op ->
+                let proto =
+                  Data_encoding.Binary.to_bytes_exn
+                    Next_proto.operation_data_encoding
+                    op.Next_proto.protocol_data
+                in
+                {Operation.shell = op.shell; proto})
+              operations)
           p.operations
       in
       Prevalidation.preapply
