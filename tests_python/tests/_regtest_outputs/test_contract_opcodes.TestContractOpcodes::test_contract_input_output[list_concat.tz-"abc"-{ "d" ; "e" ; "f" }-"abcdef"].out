@@ -7,39 +7,39 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039559 units remaining, internal_gas: 0)
+  - location: 7 (remaining gas: 133063552 units remaining, internal_gas: 0)
     [ (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 10 (remaining gas: 1039559 units remaining, internal_gas: 100)
+  - location: 10 (remaining gas: 133063452 units remaining, internal_gas: 0)
     [ (Pair { "d" ; "e" ; "f" } "abc")  	
       (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 11 (remaining gas: 1039558 units remaining, internal_gas: 32)
+  - location: 11 (remaining gas: 133063392 units remaining, internal_gas: 0)
     [ { "d" ; "e" ; "f" }  	@parameter
       (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 14 (remaining gas: 1039557 units remaining, internal_gas: 24)
+  - location: 14 (remaining gas: 133063272 units remaining, internal_gas: 0)
     [ "abc"  	@storage ]
-  - location: 13 (remaining gas: 1039557 units remaining, internal_gas: 44)
+  - location: 13 (remaining gas: 133063252 units remaining, internal_gas: 0)
     [ "abc"  	@storage ]
-  - location: 12 (remaining gas: 1039557 units remaining, internal_gas: 44)
+  - location: 12 (remaining gas: 133063252 units remaining, internal_gas: 0)
     [ { "d" ; "e" ; "f" }  	@parameter
       "abc"  	@storage ]
-  - location: -1 (remaining gas: 1039557 units remaining, internal_gas: 64)
+  - location: -1 (remaining gas: 133063232 units remaining, internal_gas: 0)
     [ { "d" ; "e" ; "f" }  	@parameter
       "abc"  	@storage ]
-  - location: 8 (remaining gas: 1039557 units remaining, internal_gas: 84)
+  - location: 8 (remaining gas: 133063212 units remaining, internal_gas: 0)
     [ { "d" ; "e" ; "f" }  	@parameter
       "abc"  	@storage ]
-  - location: 15 (remaining gas: 1039556 units remaining, internal_gas: 16)
+  - location: 15 (remaining gas: 133063152 units remaining, internal_gas: 0)
     [ "abc"  	@storage
       { "d" ; "e" ; "f" }  	@parameter ]
-  - location: 16 (remaining gas: 1039556 units remaining, internal_gas: 76)
+  - location: 16 (remaining gas: 133063092 units remaining, internal_gas: 0)
     [ { "abc" ; "d" ; "e" ; "f" }  	 ]
-  - location: 17 (remaining gas: 1039553 units remaining, internal_gas: 32)
+  - location: 17 (remaining gas: 133062752 units remaining, internal_gas: 0)
     [ "abcdef"  	 ]
-  - location: 18 (remaining gas: 1039553 units remaining, internal_gas: 92)
+  - location: 18 (remaining gas: 133062692 units remaining, internal_gas: 0)
     [ {}  	
       "abcdef"  	 ]
-  - location: 20 (remaining gas: 1039552 units remaining, internal_gas: 24)
+  - location: 20 (remaining gas: 133062632 units remaining, internal_gas: 0)
     [ (Pair {} "abcdef")  	 ]
-  - location: -1 (remaining gas: 1039552 units remaining, internal_gas: 44)
+  - location: -1 (remaining gas: 133062612 units remaining, internal_gas: 0)
     [ (Pair {} "abcdef")  	 ]
 

@@ -7,55 +7,55 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039337 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133035136 units remaining, internal_gas: 0)
     [ (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 14 (remaining gas: 1039337 units remaining, internal_gas: 100)
+  - location: 14 (remaining gas: 133035036 units remaining, internal_gas: 0)
     [ (Pair "bar" (Pair { Elt "foo" 1 } None))  	
       (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 15 (remaining gas: 1039336 units remaining, internal_gas: 32)
+  - location: 15 (remaining gas: 133034976 units remaining, internal_gas: 0)
     [ "bar"  	@parameter
       (Pair "bar" (Pair { Elt "foo" 1 } None))  	 ]
-  - location: 18 (remaining gas: 1039335 units remaining, internal_gas: 24)
+  - location: 18 (remaining gas: 133034856 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 17 (remaining gas: 1039335 units remaining, internal_gas: 44)
+  - location: 17 (remaining gas: 133034836 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 16 (remaining gas: 1039335 units remaining, internal_gas: 44)
+  - location: 16 (remaining gas: 133034836 units remaining, internal_gas: 0)
     [ "bar"  	@parameter
       (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: -1 (remaining gas: 1039335 units remaining, internal_gas: 64)
+  - location: -1 (remaining gas: 133034816 units remaining, internal_gas: 0)
     [ "bar"  	@parameter
       (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 12 (remaining gas: 1039335 units remaining, internal_gas: 84)
+  - location: 12 (remaining gas: 133034796 units remaining, internal_gas: 0)
     [ "bar"  	@parameter
       (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 21 (remaining gas: 1039334 units remaining, internal_gas: 76)
+  - location: 21 (remaining gas: 133034676 units remaining, internal_gas: 0)
     [ { Elt "foo" 1 }  	 ]
-  - location: 22 (remaining gas: 1039333 units remaining, internal_gas: 8)
+  - location: 22 (remaining gas: 133034616 units remaining, internal_gas: 0)
     [ { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: -1 (remaining gas: 1039333 units remaining, internal_gas: 28)
+  - location: -1 (remaining gas: 133034596 units remaining, internal_gas: 0)
     [ { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 19 (remaining gas: 1039333 units remaining, internal_gas: 28)
+  - location: 19 (remaining gas: 133034596 units remaining, internal_gas: 0)
     [ "bar"  	@parameter
       { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 23 (remaining gas: 1039333 units remaining, internal_gas: 72)
+  - location: 23 (remaining gas: 133034552 units remaining, internal_gas: 0)
     [ False  	
       { Elt "foo" 1 }  	 ]
-  - location: 24 (remaining gas: 1039332 units remaining, internal_gas: 4)
+  - location: 24 (remaining gas: 133034492 units remaining, internal_gas: 0)
     [ (Some False)  	
       { Elt "foo" 1 }  	 ]
-  - location: 25 (remaining gas: 1039332 units remaining, internal_gas: 64)
+  - location: 25 (remaining gas: 133034432 units remaining, internal_gas: 0)
     [ { Elt "foo" 1 }  	
       (Some False)  	 ]
-  - location: 26 (remaining gas: 1039332 units remaining, internal_gas: 124)
+  - location: 26 (remaining gas: 133034372 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 27 (remaining gas: 1039331 units remaining, internal_gas: 56)
+  - location: 27 (remaining gas: 133034312 units remaining, internal_gas: 0)
     [ {}  	
       (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 29 (remaining gas: 1039331 units remaining, internal_gas: 116)
+  - location: 29 (remaining gas: 133034252 units remaining, internal_gas: 0)
     [ (Pair {} (Pair { Elt "foo" 1 } (Some False)))  	 ]
-  - location: -1 (remaining gas: 1039330 units remaining, internal_gas: 8)
+  - location: -1 (remaining gas: 133034232 units remaining, internal_gas: 0)
     [ (Pair {} (Pair { Elt "foo" 1 } (Some False)))  	 ]
 

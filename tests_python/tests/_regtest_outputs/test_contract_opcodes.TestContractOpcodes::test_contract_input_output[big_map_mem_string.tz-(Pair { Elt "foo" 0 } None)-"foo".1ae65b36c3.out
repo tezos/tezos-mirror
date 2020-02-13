@@ -8,55 +8,55 @@ big_map diff
   New map(0) of type (big_map string nat)
   Set map(0)["foo"] to 0
 trace
-  - location: 11 (remaining gas: 1039338 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133035264 units remaining, internal_gas: 0)
     [ (Pair "foo" (Pair { Elt "foo" 0 } None))  	 ]
-  - location: 14 (remaining gas: 1039338 units remaining, internal_gas: 100)
+  - location: 14 (remaining gas: 133035164 units remaining, internal_gas: 0)
     [ (Pair "foo" (Pair { Elt "foo" 0 } None))  	
       (Pair "foo" (Pair { Elt "foo" 0 } None))  	 ]
-  - location: 15 (remaining gas: 1039337 units remaining, internal_gas: 32)
+  - location: 15 (remaining gas: 133035104 units remaining, internal_gas: 0)
     [ "foo"  	@parameter
       (Pair "foo" (Pair { Elt "foo" 0 } None))  	 ]
-  - location: 18 (remaining gas: 1039336 units remaining, internal_gas: 24)
+  - location: 18 (remaining gas: 133034984 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 0 } None)  	@storage ]
-  - location: 17 (remaining gas: 1039336 units remaining, internal_gas: 44)
+  - location: 17 (remaining gas: 133034964 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 0 } None)  	@storage ]
-  - location: 16 (remaining gas: 1039336 units remaining, internal_gas: 44)
+  - location: 16 (remaining gas: 133034964 units remaining, internal_gas: 0)
     [ "foo"  	@parameter
       (Pair { Elt "foo" 0 } None)  	@storage ]
-  - location: -1 (remaining gas: 1039336 units remaining, internal_gas: 64)
+  - location: -1 (remaining gas: 133034944 units remaining, internal_gas: 0)
     [ "foo"  	@parameter
       (Pair { Elt "foo" 0 } None)  	@storage ]
-  - location: 12 (remaining gas: 1039336 units remaining, internal_gas: 84)
+  - location: 12 (remaining gas: 133034924 units remaining, internal_gas: 0)
     [ "foo"  	@parameter
       (Pair { Elt "foo" 0 } None)  	@storage ]
-  - location: 21 (remaining gas: 1039335 units remaining, internal_gas: 76)
+  - location: 21 (remaining gas: 133034804 units remaining, internal_gas: 0)
     [ { Elt "foo" 0 }  	 ]
-  - location: 22 (remaining gas: 1039334 units remaining, internal_gas: 8)
+  - location: 22 (remaining gas: 133034744 units remaining, internal_gas: 0)
     [ { Elt "foo" 0 }  	
       { Elt "foo" 0 }  	 ]
-  - location: -1 (remaining gas: 1039334 units remaining, internal_gas: 28)
+  - location: -1 (remaining gas: 133034724 units remaining, internal_gas: 0)
     [ { Elt "foo" 0 }  	
       { Elt "foo" 0 }  	 ]
-  - location: 19 (remaining gas: 1039334 units remaining, internal_gas: 28)
+  - location: 19 (remaining gas: 133034724 units remaining, internal_gas: 0)
     [ "foo"  	@parameter
       { Elt "foo" 0 }  	
       { Elt "foo" 0 }  	 ]
-  - location: 23 (remaining gas: 1039334 units remaining, internal_gas: 72)
+  - location: 23 (remaining gas: 133034680 units remaining, internal_gas: 0)
     [ True  	
       { Elt "foo" 0 }  	 ]
-  - location: 24 (remaining gas: 1039333 units remaining, internal_gas: 4)
+  - location: 24 (remaining gas: 133034620 units remaining, internal_gas: 0)
     [ (Some True)  	
       { Elt "foo" 0 }  	 ]
-  - location: 25 (remaining gas: 1039333 units remaining, internal_gas: 64)
+  - location: 25 (remaining gas: 133034560 units remaining, internal_gas: 0)
     [ { Elt "foo" 0 }  	
       (Some True)  	 ]
-  - location: 26 (remaining gas: 1039333 units remaining, internal_gas: 124)
+  - location: 26 (remaining gas: 133034500 units remaining, internal_gas: 0)
     [ (Pair { Elt "foo" 0 } (Some True))  	 ]
-  - location: 27 (remaining gas: 1039332 units remaining, internal_gas: 56)
+  - location: 27 (remaining gas: 133034440 units remaining, internal_gas: 0)
     [ {}  	
       (Pair { Elt "foo" 0 } (Some True))  	 ]
-  - location: 29 (remaining gas: 1039332 units remaining, internal_gas: 116)
+  - location: 29 (remaining gas: 133034380 units remaining, internal_gas: 0)
     [ (Pair {} (Pair { Elt "foo" 0 } (Some True)))  	 ]
-  - location: -1 (remaining gas: 1039331 units remaining, internal_gas: 8)
+  - location: -1 (remaining gas: 133034360 units remaining, internal_gas: 0)
     [ (Pair {} (Pair { Elt "foo" 0 } (Some True)))  	 ]
 

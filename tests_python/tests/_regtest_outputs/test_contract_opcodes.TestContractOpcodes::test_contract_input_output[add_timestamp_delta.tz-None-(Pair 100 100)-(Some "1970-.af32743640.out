@@ -7,32 +7,32 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 1039603 units remaining, internal_gas: 0)
+  - location: 9 (remaining gas: 133069184 units remaining, internal_gas: 0)
     [ (Pair (Pair "1970-01-01T00:01:40Z" 100) None)  	 ]
-  - location: 10 (remaining gas: 1039603 units remaining, internal_gas: 60)
+  - location: 10 (remaining gas: 133069124 units remaining, internal_gas: 0)
     [ (Pair "1970-01-01T00:01:40Z" 100)  	@parameter ]
-  - location: 11 (remaining gas: 1039603 units remaining, internal_gas: 120)
+  - location: 11 (remaining gas: 133069064 units remaining, internal_gas: 0)
     [ (Pair "1970-01-01T00:01:40Z" 100)  	@parameter
       (Pair "1970-01-01T00:01:40Z" 100)  	@parameter ]
-  - location: 12 (remaining gas: 1039602 units remaining, internal_gas: 52)
+  - location: 12 (remaining gas: 133069004 units remaining, internal_gas: 0)
     [ "1970-01-01T00:01:40Z"  	
       (Pair "1970-01-01T00:01:40Z" 100)  	@parameter ]
-  - location: 15 (remaining gas: 1039601 units remaining, internal_gas: 44)
+  - location: 15 (remaining gas: 133068884 units remaining, internal_gas: 0)
     [ 100  	 ]
-  - location: 14 (remaining gas: 1039601 units remaining, internal_gas: 64)
+  - location: 14 (remaining gas: 133068864 units remaining, internal_gas: 0)
     [ 100  	 ]
-  - location: 13 (remaining gas: 1039601 units remaining, internal_gas: 64)
+  - location: 13 (remaining gas: 133068864 units remaining, internal_gas: 0)
     [ "1970-01-01T00:01:40Z"  	
       100  	 ]
-  - location: 16 (remaining gas: 1039600 units remaining, internal_gas: 78)
+  - location: 16 (remaining gas: 133068722 units remaining, internal_gas: 0)
     [ "1970-01-01T00:03:20Z"  	 ]
-  - location: 17 (remaining gas: 1039599 units remaining, internal_gas: 10)
+  - location: 17 (remaining gas: 133068662 units remaining, internal_gas: 0)
     [ (Some "1970-01-01T00:03:20Z")  	 ]
-  - location: 18 (remaining gas: 1039599 units remaining, internal_gas: 70)
+  - location: 18 (remaining gas: 133068602 units remaining, internal_gas: 0)
     [ {}  	
       (Some "1970-01-01T00:03:20Z")  	 ]
-  - location: 20 (remaining gas: 1039598 units remaining, internal_gas: 2)
+  - location: 20 (remaining gas: 133068542 units remaining, internal_gas: 0)
     [ (Pair {} (Some "1970-01-01T00:03:20Z"))  	 ]
-  - location: -1 (remaining gas: 1039598 units remaining, internal_gas: 22)
+  - location: -1 (remaining gas: 133068522 units remaining, internal_gas: 0)
     [ (Pair {} (Some "1970-01-01T00:03:20Z"))  	 ]
 

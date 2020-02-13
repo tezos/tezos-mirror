@@ -7,40 +7,40 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039464 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133051392 units remaining, internal_gas: 0)
     [ (Pair "" (Pair None { Elt "hello" "hi" }))  	 ]
-  - location: 12 (remaining gas: 1039464 units remaining, internal_gas: 60)
+  - location: 12 (remaining gas: 133051332 units remaining, internal_gas: 0)
     [ (Pair "" (Pair None { Elt "hello" "hi" }))  	
       (Pair "" (Pair None { Elt "hello" "hi" }))  	 ]
-  - location: 13 (remaining gas: 1039464 units remaining, internal_gas: 120)
+  - location: 13 (remaining gas: 133051272 units remaining, internal_gas: 0)
     [ ""  	@parameter
       (Pair "" (Pair None { Elt "hello" "hi" }))  	 ]
-  - location: 17 (remaining gas: 1039462 units remaining, internal_gas: 4)
+  - location: 17 (remaining gas: 133051132 units remaining, internal_gas: 0)
     [ (Pair None { Elt "hello" "hi" })  	@storage ]
-  - location: 18 (remaining gas: 1039462 units remaining, internal_gas: 64)
+  - location: 18 (remaining gas: 133051072 units remaining, internal_gas: 0)
     [ { Elt "hello" "hi" }  	 ]
-  - location: -1 (remaining gas: 1039462 units remaining, internal_gas: 84)
+  - location: -1 (remaining gas: 133051052 units remaining, internal_gas: 0)
     [ { Elt "hello" "hi" }  	 ]
-  - location: 19 (remaining gas: 1039461 units remaining, internal_gas: 16)
+  - location: 19 (remaining gas: 133050992 units remaining, internal_gas: 0)
     [ { Elt "hello" "hi" }  	
       { Elt "hello" "hi" }  	 ]
-  - location: -1 (remaining gas: 1039461 units remaining, internal_gas: 36)
+  - location: -1 (remaining gas: 133050972 units remaining, internal_gas: 0)
     [ { Elt "hello" "hi" }  	
       { Elt "hello" "hi" }  	 ]
-  - location: 14 (remaining gas: 1039461 units remaining, internal_gas: 36)
+  - location: 14 (remaining gas: 133050972 units remaining, internal_gas: 0)
     [ ""  	@parameter
       { Elt "hello" "hi" }  	
       { Elt "hello" "hi" }  	 ]
-  - location: 20 (remaining gas: 1039461 units remaining, internal_gas: 80)
+  - location: 20 (remaining gas: 133050928 units remaining, internal_gas: 0)
     [ None  	
       { Elt "hello" "hi" }  	 ]
-  - location: 21 (remaining gas: 1039460 units remaining, internal_gas: 12)
+  - location: 21 (remaining gas: 133050868 units remaining, internal_gas: 0)
     [ (Pair None { Elt "hello" "hi" })  	 ]
-  - location: 22 (remaining gas: 1039460 units remaining, internal_gas: 72)
+  - location: 22 (remaining gas: 133050808 units remaining, internal_gas: 0)
     [ {}  	
       (Pair None { Elt "hello" "hi" })  	 ]
-  - location: 24 (remaining gas: 1039459 units remaining, internal_gas: 4)
+  - location: 24 (remaining gas: 133050748 units remaining, internal_gas: 0)
     [ (Pair {} (Pair None { Elt "hello" "hi" }))  	 ]
-  - location: -1 (remaining gas: 1039459 units remaining, internal_gas: 24)
+  - location: -1 (remaining gas: 133050728 units remaining, internal_gas: 0)
     [ (Pair {} (Pair None { Elt "hello" "hi" }))  	 ]
 
