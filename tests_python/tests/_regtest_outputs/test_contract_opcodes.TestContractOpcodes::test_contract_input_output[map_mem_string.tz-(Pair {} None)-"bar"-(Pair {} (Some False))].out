@@ -7,55 +7,55 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 133039488 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133039488 units remaining)
     [ (Pair "bar" (Pair {} None))  	 ]
-  - location: 14 (remaining gas: 133039388 units remaining, internal_gas: 0)
+  - location: 14 (remaining gas: 133039388 units remaining)
     [ (Pair "bar" (Pair {} None))  	
       (Pair "bar" (Pair {} None))  	 ]
-  - location: 15 (remaining gas: 133039328 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133039328 units remaining)
     [ "bar"  	@parameter
       (Pair "bar" (Pair {} None))  	 ]
-  - location: 18 (remaining gas: 133039208 units remaining, internal_gas: 0)
+  - location: 18 (remaining gas: 133039208 units remaining)
     [ (Pair {} None)  	@storage ]
-  - location: 17 (remaining gas: 133039188 units remaining, internal_gas: 0)
+  - location: 17 (remaining gas: 133039188 units remaining)
     [ (Pair {} None)  	@storage ]
-  - location: 16 (remaining gas: 133039188 units remaining, internal_gas: 0)
+  - location: 16 (remaining gas: 133039188 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: -1 (remaining gas: 133039168 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133039168 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: 12 (remaining gas: 133039148 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133039148 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: 21 (remaining gas: 133039028 units remaining, internal_gas: 0)
+  - location: 21 (remaining gas: 133039028 units remaining)
     [ {}  	 ]
-  - location: 22 (remaining gas: 133038968 units remaining, internal_gas: 0)
+  - location: 22 (remaining gas: 133038968 units remaining)
     [ {}  	
       {}  	 ]
-  - location: -1 (remaining gas: 133038948 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133038948 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 19 (remaining gas: 133038948 units remaining, internal_gas: 0)
+  - location: 19 (remaining gas: 133038948 units remaining)
     [ "bar"  	@parameter
       {}  	
       {}  	 ]
-  - location: 23 (remaining gas: 133038906 units remaining, internal_gas: 0)
+  - location: 23 (remaining gas: 133038906 units remaining)
     [ False  	
       {}  	 ]
-  - location: 24 (remaining gas: 133038846 units remaining, internal_gas: 0)
+  - location: 24 (remaining gas: 133038846 units remaining)
     [ (Some False)  	
       {}  	 ]
-  - location: 25 (remaining gas: 133038786 units remaining, internal_gas: 0)
+  - location: 25 (remaining gas: 133038786 units remaining)
     [ {}  	
       (Some False)  	 ]
-  - location: 26 (remaining gas: 133038726 units remaining, internal_gas: 0)
+  - location: 26 (remaining gas: 133038726 units remaining)
     [ (Pair {} (Some False))  	 ]
-  - location: 27 (remaining gas: 133038666 units remaining, internal_gas: 0)
+  - location: 27 (remaining gas: 133038666 units remaining)
     [ {}  	
       (Pair {} (Some False))  	 ]
-  - location: 29 (remaining gas: 133038606 units remaining, internal_gas: 0)
+  - location: 29 (remaining gas: 133038606 units remaining)
     [ (Pair {} (Pair {} (Some False)))  	 ]
-  - location: -1 (remaining gas: 133038586 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133038586 units remaining)
     [ (Pair {} (Pair {} (Some False)))  	 ]
 

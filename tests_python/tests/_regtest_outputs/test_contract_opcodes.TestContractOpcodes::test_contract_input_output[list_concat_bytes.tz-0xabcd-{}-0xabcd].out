@@ -7,39 +7,39 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133068160 units remaining, internal_gas: 0)
+  - location: 7 (remaining gas: 133068160 units remaining)
     [ (Pair {} 0xabcd)  	 ]
-  - location: 10 (remaining gas: 133068060 units remaining, internal_gas: 0)
+  - location: 10 (remaining gas: 133068060 units remaining)
     [ (Pair {} 0xabcd)  	
       (Pair {} 0xabcd)  	 ]
-  - location: 11 (remaining gas: 133068000 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133068000 units remaining)
     [ {}  	@parameter
       (Pair {} 0xabcd)  	 ]
-  - location: 14 (remaining gas: 133067880 units remaining, internal_gas: 0)
+  - location: 14 (remaining gas: 133067880 units remaining)
     [ 0xabcd  	@storage ]
-  - location: 13 (remaining gas: 133067860 units remaining, internal_gas: 0)
+  - location: 13 (remaining gas: 133067860 units remaining)
     [ 0xabcd  	@storage ]
-  - location: 12 (remaining gas: 133067860 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133067860 units remaining)
     [ {}  	@parameter
       0xabcd  	@storage ]
-  - location: -1 (remaining gas: 133067840 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133067840 units remaining)
     [ {}  	@parameter
       0xabcd  	@storage ]
-  - location: 8 (remaining gas: 133067820 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133067820 units remaining)
     [ {}  	@parameter
       0xabcd  	@storage ]
-  - location: 15 (remaining gas: 133067760 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133067760 units remaining)
     [ 0xabcd  	@storage
       {}  	@parameter ]
-  - location: 16 (remaining gas: 133067700 units remaining, internal_gas: 0)
+  - location: 16 (remaining gas: 133067700 units remaining)
     [ { 0xabcd }  	 ]
-  - location: 17 (remaining gas: 133067540 units remaining, internal_gas: 0)
+  - location: 17 (remaining gas: 133067540 units remaining)
     [ 0xabcd  	 ]
-  - location: 18 (remaining gas: 133067480 units remaining, internal_gas: 0)
+  - location: 18 (remaining gas: 133067480 units remaining)
     [ {}  	
       0xabcd  	 ]
-  - location: 20 (remaining gas: 133067420 units remaining, internal_gas: 0)
+  - location: 20 (remaining gas: 133067420 units remaining)
     [ (Pair {} 0xabcd)  	 ]
-  - location: -1 (remaining gas: 133067400 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133067400 units remaining)
     [ (Pair {} 0xabcd)  	 ]
 

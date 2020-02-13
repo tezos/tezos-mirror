@@ -7,48 +7,48 @@ emitted operations
 big_map diff
   
 trace
-  - location: 6 (remaining gas: 133054208 units remaining, internal_gas: 0)
+  - location: 6 (remaining gas: 133054208 units remaining)
     [ (Pair "" "?")  	 ]
-  - location: 7 (remaining gas: 133054148 units remaining, internal_gas: 0)
+  - location: 7 (remaining gas: 133054148 units remaining)
     [ ""  	@parameter ]
-  - location: 8 (remaining gas: 133054088 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133054088 units remaining)
     [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	
       ""  	@parameter ]
-  - location: 22 (remaining gas: 133054028 units remaining, internal_gas: 0)
+  - location: 22 (remaining gas: 133054028 units remaining)
     [ ""  	@parameter
       { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
-  - location: 11 (remaining gas: 133053968 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133053968 units remaining)
     [ ""  	@arg ]
-  - location: 12 (remaining gas: 133053908 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133053908 units remaining)
     [ "_abc"  	
       ""  	@arg ]
-  - location: 15 (remaining gas: 133053848 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133053848 units remaining)
     [ {}  	
       "_abc"  	
       ""  	@arg ]
-  - location: 17 (remaining gas: 133053788 units remaining, internal_gas: 0)
+  - location: 17 (remaining gas: 133053788 units remaining)
     [ "_abc"  	
       {}  	
       ""  	@arg ]
-  - location: 18 (remaining gas: 133053728 units remaining, internal_gas: 0)
+  - location: 18 (remaining gas: 133053728 units remaining)
     [ { "_abc" }  	
       ""  	@arg ]
-  - location: 19 (remaining gas: 133053668 units remaining, internal_gas: 0)
+  - location: 19 (remaining gas: 133053668 units remaining)
     [ ""  	@arg
       { "_abc" }  	 ]
-  - location: 20 (remaining gas: 133053608 units remaining, internal_gas: 0)
+  - location: 20 (remaining gas: 133053608 units remaining)
     [ { "" ; "_abc" }  	 ]
-  - location: 21 (remaining gas: 133053388 units remaining, internal_gas: 0)
+  - location: 21 (remaining gas: 133053388 units remaining)
     [ "_abc"  	 ]
-  - location: -1 (remaining gas: 133053368 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133053368 units remaining)
     [ "_abc"  	 ]
-  - location: 23 (remaining gas: 133053368 units remaining, internal_gas: 0)
+  - location: 23 (remaining gas: 133053368 units remaining)
     [ "_abc"  	 ]
-  - location: 24 (remaining gas: 133053308 units remaining, internal_gas: 0)
+  - location: 24 (remaining gas: 133053308 units remaining)
     [ {}  	
       "_abc"  	 ]
-  - location: 26 (remaining gas: 133053248 units remaining, internal_gas: 0)
+  - location: 26 (remaining gas: 133053248 units remaining)
     [ (Pair {} "_abc")  	 ]
-  - location: -1 (remaining gas: 133053228 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133053228 units remaining)
     [ (Pair {} "_abc")  	 ]
 

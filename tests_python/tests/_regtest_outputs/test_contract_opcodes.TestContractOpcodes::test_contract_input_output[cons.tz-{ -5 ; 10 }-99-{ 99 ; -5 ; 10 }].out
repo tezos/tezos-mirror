@@ -7,34 +7,34 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133071872 units remaining, internal_gas: 0)
+  - location: 7 (remaining gas: 133071872 units remaining)
     [ (Pair 99 { -5 ; 10 })  	 ]
-  - location: 10 (remaining gas: 133071772 units remaining, internal_gas: 0)
+  - location: 10 (remaining gas: 133071772 units remaining)
     [ (Pair 99 { -5 ; 10 })  	
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 11 (remaining gas: 133071712 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133071712 units remaining)
     [ 99  	@parameter
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 14 (remaining gas: 133071592 units remaining, internal_gas: 0)
+  - location: 14 (remaining gas: 133071592 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 13 (remaining gas: 133071572 units remaining, internal_gas: 0)
+  - location: 13 (remaining gas: 133071572 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 12 (remaining gas: 133071572 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133071572 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: -1 (remaining gas: 133071552 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133071552 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 8 (remaining gas: 133071532 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133071532 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 15 (remaining gas: 133071472 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133071472 units remaining)
     [ { 99 ; -5 ; 10 }  	 ]
-  - location: 16 (remaining gas: 133071412 units remaining, internal_gas: 0)
+  - location: 16 (remaining gas: 133071412 units remaining)
     [ {}  	
       { 99 ; -5 ; 10 }  	 ]
-  - location: 18 (remaining gas: 133071352 units remaining, internal_gas: 0)
+  - location: 18 (remaining gas: 133071352 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
-  - location: -1 (remaining gas: 133071332 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133071332 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
 
