@@ -5953,9 +5953,19 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
   | diffs ->
       return (v, Some diffs (* do not reverse *), ctxt)
 
-let list_of_big_map_ids kids =
-  Ids.fold
-    (fun (Lazy_storage.KId.E (kind, id)) acc ->
-      match kind with Lazy_storage.Kind.Big_map -> id :: acc)
-    kids
-    []
+let find_big_map_unaccounted ctxt ty x ~f =
+  let ctxt = Gas.set_unlimited ctxt in
+  collect_lazy_storage ctxt ty x
+  >>=? fun (lazy_storage_ids, _ctxt) ->
+  let rec find_in_ids = function
+    | [] ->
+        return_none
+    | Lazy_storage.KId.E (Big_map, id) :: kids -> (
+        f id
+        >>=? function
+        | None -> find_in_ids kids | Some _ as found -> return found )
+    (* When more lazy storage kinds are added:
+    | _ :: kids ->
+        find_in_ids kids *)
+  in
+  find_in_ids @@ Ids.elements lazy_storage_ids

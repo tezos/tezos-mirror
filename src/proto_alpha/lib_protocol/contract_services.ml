@@ -310,20 +310,13 @@ let register () =
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true script
           >>=? fun (Ex_script script, ctxt) ->
-          Script_ir_translator.collect_lazy_storage
+          Script_ir_translator.find_big_map_unaccounted
             ctxt
             script.storage_type
             script.storage
-          >>=? fun (ids, _ctxt) ->
-          let ids = Script_ir_translator.list_of_big_map_ids ids in
-          let rec find = function
-            | [] ->
-                return_none
-            | (id : Z.t) :: ids -> (
+            ~f:(fun id ->
               try do_big_map_get ctxt id key >>=? return_some
-              with Not_found -> find ids )
-          in
-          find ids) ;
+              with Not_found -> return_none)) ;
   register2 S.big_map_get (fun ctxt id key () () -> do_big_map_get ctxt id key) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract
