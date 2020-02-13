@@ -7,63 +7,63 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133037696 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133037696 units remaining)
     [ (Pair 10 { Elt "foo" 1 })  	 ]
-  - location: 11 (remaining gas: 133037596 units remaining, internal_gas: 0)
+  - location: 11 (remaining gas: 133037596 units remaining)
     [ (Pair 10 { Elt "foo" 1 })  	
       (Pair 10 { Elt "foo" 1 })  	 ]
-  - location: 12 (remaining gas: 133037536 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133037536 units remaining)
     [ 10  	@parameter
       (Pair 10 { Elt "foo" 1 })  	 ]
-  - location: 15 (remaining gas: 133037416 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133037416 units remaining)
     [ { Elt "foo" 1 }  	@storage ]
-  - location: 14 (remaining gas: 133037396 units remaining, internal_gas: 0)
+  - location: 14 (remaining gas: 133037396 units remaining)
     [ { Elt "foo" 1 }  	@storage ]
-  - location: 13 (remaining gas: 133037396 units remaining, internal_gas: 0)
+  - location: 13 (remaining gas: 133037396 units remaining)
     [ 10  	@parameter
       { Elt "foo" 1 }  	@storage ]
-  - location: -1 (remaining gas: 133037376 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133037376 units remaining)
     [ 10  	@parameter
       { Elt "foo" 1 }  	@storage ]
-  - location: 9 (remaining gas: 133037356 units remaining, internal_gas: 0)
+  - location: 9 (remaining gas: 133037356 units remaining)
     [ 10  	@parameter
       { Elt "foo" 1 }  	@storage ]
-  - location: 16 (remaining gas: 133037296 units remaining, internal_gas: 0)
+  - location: 16 (remaining gas: 133037296 units remaining)
     [ { Elt "foo" 1 }  	@storage
       10  	@parameter ]
-  - location: 19 (remaining gas: 133037036 units remaining, internal_gas: 0)
+  - location: 19 (remaining gas: 133037036 units remaining)
     [ 1  	@elt
       10  	@parameter ]
-  - location: 22 (remaining gas: 133036916 units remaining, internal_gas: 0)
+  - location: 22 (remaining gas: 133036916 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 21 (remaining gas: 133036896 units remaining, internal_gas: 0)
+  - location: 21 (remaining gas: 133036896 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 20 (remaining gas: 133036896 units remaining, internal_gas: 0)
+  - location: 20 (remaining gas: 133036896 units remaining)
     [ 1  	@elt
       10  	@parameter
       10  	@parameter ]
-  - location: 23 (remaining gas: 133036754 units remaining, internal_gas: 0)
+  - location: 23 (remaining gas: 133036754 units remaining)
     [ 11  	
       10  	@parameter ]
-  - location: -1 (remaining gas: 133036734 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133036734 units remaining)
     [ 11  	
       10  	@parameter ]
-  - location: 17 (remaining gas: 133036734 units remaining, internal_gas: 0)
+  - location: 17 (remaining gas: 133036734 units remaining)
     [ { Elt "foo" 11 }  	
       10  	@parameter ]
-  - location: 26 (remaining gas: 133036614 units remaining, internal_gas: 0)
+  - location: 26 (remaining gas: 133036614 units remaining)
     [  ]
-  - location: 25 (remaining gas: 133036594 units remaining, internal_gas: 0)
+  - location: 25 (remaining gas: 133036594 units remaining)
     [  ]
-  - location: 24 (remaining gas: 133036594 units remaining, internal_gas: 0)
+  - location: 24 (remaining gas: 133036594 units remaining)
     [ { Elt "foo" 11 }  	 ]
-  - location: 27 (remaining gas: 133036534 units remaining, internal_gas: 0)
+  - location: 27 (remaining gas: 133036534 units remaining)
     [ {}  	
       { Elt "foo" 11 }  	 ]
-  - location: 29 (remaining gas: 133036474 units remaining, internal_gas: 0)
+  - location: 29 (remaining gas: 133036474 units remaining)
     [ (Pair {} { Elt "foo" 11 })  	 ]
-  - location: -1 (remaining gas: 133036454 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133036454 units remaining)
     [ (Pair {} { Elt "foo" 11 })  	 ]
 

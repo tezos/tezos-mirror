@@ -7,31 +7,31 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133080576 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133080576 units remaining)
     [ (Pair { 0xab ; 0xcd } {})  	 ]
-  - location: 9 (remaining gas: 133080516 units remaining, internal_gas: 0)
+  - location: 9 (remaining gas: 133080516 units remaining)
     [ { 0xab ; 0xcd }  	@parameter ]
-  - location: 12 (remaining gas: 133080236 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133080236 units remaining)
     [ 0xff  	
       0xab  	@parameter.elt ]
-  - location: 15 (remaining gas: 133080016 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133080016 units remaining)
     [ 0xffab  	 ]
-  - location: -1 (remaining gas: 133079996 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133079996 units remaining)
     [ 0xffab  	 ]
-  - location: 12 (remaining gas: 133079936 units remaining, internal_gas: 0)
+  - location: 12 (remaining gas: 133079936 units remaining)
     [ 0xff  	
       0xcd  	@parameter.elt ]
-  - location: 15 (remaining gas: 133079716 units remaining, internal_gas: 0)
+  - location: 15 (remaining gas: 133079716 units remaining)
     [ 0xffcd  	 ]
-  - location: -1 (remaining gas: 133079696 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133079696 units remaining)
     [ 0xffcd  	 ]
-  - location: 10 (remaining gas: 133079696 units remaining, internal_gas: 0)
+  - location: 10 (remaining gas: 133079696 units remaining)
     [ { 0xffab ; 0xffcd }  	 ]
-  - location: 16 (remaining gas: 133079636 units remaining, internal_gas: 0)
+  - location: 16 (remaining gas: 133079636 units remaining)
     [ {}  	
       { 0xffab ; 0xffcd }  	 ]
-  - location: 18 (remaining gas: 133079576 units remaining, internal_gas: 0)
+  - location: 18 (remaining gas: 133079576 units remaining)
     [ (Pair {} { 0xffab ; 0xffcd })  	 ]
-  - location: -1 (remaining gas: 133079556 units remaining, internal_gas: 0)
+  - location: -1 (remaining gas: 133079556 units remaining)
     [ (Pair {} { 0xffab ; 0xffcd })  	 ]
 
