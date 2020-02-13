@@ -7,44 +7,44 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039516 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133058048 units remaining, internal_gas: 0)
     [ (Pair 3 (Pair "hello" 500))  	 ]
-  - location: 9 (remaining gas: 1039516 units remaining, internal_gas: 60)
+  - location: 9 (remaining gas: 133057988 units remaining, internal_gas: 0)
     [ (Pair 3 (Pair "hello" 500))  	
       (Pair 3 (Pair "hello" 500))  	 ]
-  - location: 10 (remaining gas: 1039516 units remaining, internal_gas: 120)
+  - location: 10 (remaining gas: 133057928 units remaining, internal_gas: 0)
     [ (Pair "hello" 500)  	@storage
       (Pair 3 (Pair "hello" 500))  	 ]
-  - location: 13 (remaining gas: 1039515 units remaining, internal_gas: 112)
+  - location: 13 (remaining gas: 133057808 units remaining, internal_gas: 0)
     [ 3  	@parameter ]
-  - location: 12 (remaining gas: 1039514 units remaining, internal_gas: 4)
+  - location: 12 (remaining gas: 133057788 units remaining, internal_gas: 0)
     [ 3  	@parameter ]
-  - location: 11 (remaining gas: 1039514 units remaining, internal_gas: 4)
+  - location: 11 (remaining gas: 133057788 units remaining, internal_gas: 0)
     [ (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 15 (remaining gas: 1039514 units remaining, internal_gas: 84)
+  - location: 15 (remaining gas: 133057708 units remaining, internal_gas: 0)
     [ (Pair "hello" 500)  	@storage
       (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 16 (remaining gas: 1039513 units remaining, internal_gas: 16)
+  - location: 16 (remaining gas: 133057648 units remaining, internal_gas: 0)
     [ 500  	
       (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 17 (remaining gas: 1039513 units remaining, internal_gas: 76)
+  - location: 17 (remaining gas: 133057588 units remaining, internal_gas: 0)
     [ (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 18 (remaining gas: 1039512 units remaining, internal_gas: 8)
+  - location: 18 (remaining gas: 133057528 units remaining, internal_gas: 0)
     [ "hello"  	@storage.s
       3  	@parameter ]
-  - location: 19 (remaining gas: 1039512 units remaining, internal_gas: 68)
+  - location: 19 (remaining gas: 133057468 units remaining, internal_gas: 0)
     [ (Pair "hello" 3)  	@storage ]
-  - location: -1 (remaining gas: 1039512 units remaining, internal_gas: 88)
+  - location: -1 (remaining gas: 133057448 units remaining, internal_gas: 0)
     [ (Pair "hello" 3)  	@storage ]
-  - location: 20 (remaining gas: 1039511 units remaining, internal_gas: 20)
+  - location: 20 (remaining gas: 133057388 units remaining, internal_gas: 0)
     [ {}  	
       (Pair "hello" 3)  	@storage ]
-  - location: 22 (remaining gas: 1039511 units remaining, internal_gas: 80)
+  - location: 22 (remaining gas: 133057328 units remaining, internal_gas: 0)
     [ (Pair {} (Pair "hello" 3))  	 ]
-  - location: -1 (remaining gas: 1039511 units remaining, internal_gas: 100)
+  - location: -1 (remaining gas: 133057308 units remaining, internal_gas: 0)
     [ (Pair {} (Pair "hello" 3))  	 ]
 

@@ -6,7 +6,7 @@ This simulation failed:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1040000
+    Gas limit: 133120000
     Storage limit: 60000 bytes
     Transaction:
       Amount: ꜩ0

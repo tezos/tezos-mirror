@@ -7,47 +7,47 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039490 units remaining, internal_gas: 0)
+  - location: 8 (remaining gas: 133054720 units remaining, internal_gas: 0)
     [ (Pair "" (Pair "hello" 0))  	 ]
-  - location: 9 (remaining gas: 1039490 units remaining, internal_gas: 60)
+  - location: 9 (remaining gas: 133054660 units remaining, internal_gas: 0)
     [ (Pair "" (Pair "hello" 0))  	
       (Pair "" (Pair "hello" 0))  	 ]
-  - location: 10 (remaining gas: 1039490 units remaining, internal_gas: 120)
+  - location: 10 (remaining gas: 133054600 units remaining, internal_gas: 0)
     [ (Pair "hello" 0)  	@storage
       (Pair "" (Pair "hello" 0))  	 ]
-  - location: 13 (remaining gas: 1039489 units remaining, internal_gas: 112)
+  - location: 13 (remaining gas: 133054480 units remaining, internal_gas: 0)
     [ ""  	@parameter ]
-  - location: 12 (remaining gas: 1039488 units remaining, internal_gas: 4)
+  - location: 12 (remaining gas: 133054460 units remaining, internal_gas: 0)
     [ ""  	@parameter ]
-  - location: 11 (remaining gas: 1039488 units remaining, internal_gas: 4)
+  - location: 11 (remaining gas: 133054460 units remaining, internal_gas: 0)
     [ (Pair "hello" 0)  	@storage
       ""  	@parameter ]
-  - location: 15 (remaining gas: 1039488 units remaining, internal_gas: 84)
+  - location: 15 (remaining gas: 133054380 units remaining, internal_gas: 0)
     [ (Pair "hello" 0)  	@storage
       (Pair "hello" 0)  	@storage
       ""  	@parameter ]
-  - location: 16 (remaining gas: 1039487 units remaining, internal_gas: 16)
+  - location: 16 (remaining gas: 133054320 units remaining, internal_gas: 0)
     [ "hello"  	
       (Pair "hello" 0)  	@storage
       ""  	@parameter ]
-  - location: 17 (remaining gas: 1039487 units remaining, internal_gas: 76)
+  - location: 17 (remaining gas: 133054260 units remaining, internal_gas: 0)
     [ (Pair "hello" 0)  	@storage
       ""  	@parameter ]
-  - location: 18 (remaining gas: 1039486 units remaining, internal_gas: 8)
+  - location: 18 (remaining gas: 133054200 units remaining, internal_gas: 0)
     [ 0  	@storage.n
       ""  	@parameter ]
-  - location: 19 (remaining gas: 1039486 units remaining, internal_gas: 68)
+  - location: 19 (remaining gas: 133054140 units remaining, internal_gas: 0)
     [ ""  	@parameter
       0  	@storage.n ]
-  - location: 20 (remaining gas: 1039485 units remaining, internal_gas: 0)
+  - location: 20 (remaining gas: 133054080 units remaining, internal_gas: 0)
     [ (Pair "" 0)  	@storage ]
-  - location: -1 (remaining gas: 1039485 units remaining, internal_gas: 20)
+  - location: -1 (remaining gas: 133054060 units remaining, internal_gas: 0)
     [ (Pair "" 0)  	@storage ]
-  - location: 21 (remaining gas: 1039485 units remaining, internal_gas: 80)
+  - location: 21 (remaining gas: 133054000 units remaining, internal_gas: 0)
     [ {}  	
       (Pair "" 0)  	@storage ]
-  - location: 23 (remaining gas: 1039484 units remaining, internal_gas: 12)
+  - location: 23 (remaining gas: 133053940 units remaining, internal_gas: 0)
     [ (Pair {} (Pair "" 0))  	 ]
-  - location: -1 (remaining gas: 1039484 units remaining, internal_gas: 32)
+  - location: -1 (remaining gas: 133053920 units remaining, internal_gas: 0)
     [ (Pair {} (Pair "" 0))  	 ]
 
