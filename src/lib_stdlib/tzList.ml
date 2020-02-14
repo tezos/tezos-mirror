@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -193,3 +194,9 @@ let index_of ?(compare = Stdlib.compare) item list =
         if compare head item = 0 then Some index else find (index + 1) tail
   in
   find 0 list
+
+let rec find_map f = function
+  | [] ->
+      None
+  | x :: l -> (
+    match f x with None -> find_map f l | r -> r )
