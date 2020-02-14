@@ -336,6 +336,7 @@ struct
   end
 
   module Time = Time.Protocol
+  module Bls12_381 = BLS12_381
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
@@ -588,6 +589,94 @@ struct
         bool
 
       val reconstruct : Clear_share.t list -> int list -> Public_key.t
+    end
+
+    module type FIELD = sig
+      type t
+
+      val size : int (* in bytes *)
+
+      val to_bytes : t -> bytes
+
+      val of_bytes_opt : bytes -> t option
+
+      val of_bytes_exn : bytes -> t
+
+      (* Check if a point, represented as a byte array, is in the field *)
+      val check_bytes : bytes -> bool
+
+      (* The zero point *)
+      val zero : t
+
+      (* The one point *)
+      val one : t
+
+      (* Add a pair of points *)
+      val add : t -> t -> t
+
+      (* Multiply a pair of points *)
+      val mul : t -> t -> t
+
+      (* Negate a point *)
+      val negate : t -> t
+
+      (* Try to compute the inverse of a point *)
+      val inverse_exn : t -> t
+
+      (* Try to compute the inverse of a point *)
+      val inverse_opt : t -> t option
+
+      (* Equality check *)
+      val eq : t -> t -> bool
+    end
+
+    module type CURVE = sig
+      type t
+
+      val size : int (* in bytes *)
+
+      val to_bytes : t -> bytes
+
+      val of_bytes_opt : bytes -> t option
+
+      val of_bytes_exn : bytes -> t
+
+      module Scalar : FIELD
+
+      (* Check if a point, represented as a byte array, is on the curve *)
+      val check_bytes : bytes -> bool
+
+      (* The zero point on the curve *)
+      val zero : t
+
+      (* A fixed generator of the elliptic curve *)
+      val one : t
+
+      (* Add a pair of points on the curve *)
+      val add : t -> t -> t
+
+      (* Multiply a point by a scalar *)
+      val mul : t -> Scalar.t -> t
+
+      (* Negate a point on the curve *)
+      val negate : t -> t
+
+      (* Equality test *)
+      val eq : t -> t -> bool
+    end
+
+    module type PAIRING = sig
+      module Gt : FIELD
+
+      module G1 : CURVE
+
+      module G2 : CURVE
+
+      val miller_loop : (G1.t * G2.t) list -> Gt.t
+
+      val final_exponentiation : Gt.t -> Gt.t option
+
+      val pairing : G1.t -> G2.t -> Gt.t
     end
   end
 
