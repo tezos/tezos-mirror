@@ -47,6 +47,12 @@ let build_rpc_directory block_validator state =
           return p
       | None ->
           State.Protocol.read state hash) ;
+  register1 Protocol_services.S.environment (fun hash () () ->
+      match Registered_protocol.get_embedded_sources hash with
+      | Some p ->
+          return p.expected_env
+      | None ->
+          State.Protocol.read state hash >>=? fun p -> return p.expected_env) ;
   register1 Protocol_services.S.fetch (fun hash () () ->
       Block_validator.fetch_and_compile_protocol block_validator hash
       >>=? fun _proto -> return_unit) ;

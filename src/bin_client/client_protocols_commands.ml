@@ -108,6 +108,22 @@ let commands () =
         >>= fun () -> return_unit);
     command
       ~group
+      ~desc:"Show the environment version used by a protocol."
+      no_options
+      ( prefixes ["protocol"; "environment"]
+      @@ proto_param ~name:"protocol hash" ~desc:""
+      @@ stop )
+      (fun () protocol_hash (cctxt : #Client_context.full) ->
+        Shell_services.Protocol.environment cctxt protocol_hash
+        >>=? fun env ->
+        cctxt#message
+          "Protocol %a uses environment %s"
+          Protocol_hash.pp
+          protocol_hash
+          (Protocol.module_name_of_env_version env)
+        >>= fun () -> return_unit);
+    command
+      ~group
       ~desc:"Fetch a protocol from the network."
       no_options
       ( prefixes ["fetch"; "protocol"]

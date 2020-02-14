@@ -34,6 +34,12 @@ module S = struct
       ~output:Protocol.encoding
       RPC_path.(root / "protocols" /: protocols_arg)
 
+  let environment =
+    RPC_service.get_service
+      ~query:RPC_query.empty
+      ~output:Protocol.env_version_encoding
+      RPC_path.(root / "protocols" /: protocols_arg / "environment")
+
   let list =
     RPC_service.get_service
       ~query:RPC_query.empty
@@ -51,6 +57,8 @@ end
 open RPC_context
 
 let contents ctxt h = make_call1 S.contents ctxt h () ()
+
+let environment ctxt h = make_call1 S.environment ctxt h () ()
 
 let list ctxt = make_call S.list ctxt () () ()
 

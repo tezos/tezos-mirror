@@ -27,6 +27,9 @@ open RPC_context
 
 val contents : #simple -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
+val environment :
+  #simple -> Protocol_hash.t -> Protocol.env_version tzresult Lwt.t
+
 val list : #simple -> Protocol_hash.t list tzresult Lwt.t
 
 val fetch : #simple -> Protocol_hash.t -> unit tzresult Lwt.t
@@ -39,6 +42,15 @@ module S : sig
       unit,
       unit,
       Protocol.t )
+    RPC_service.t
+
+  val environment :
+    ( [`GET],
+      unit,
+      unit * Protocol_hash.t,
+      unit,
+      unit,
+      Protocol.env_version )
     RPC_service.t
 
   val list :
