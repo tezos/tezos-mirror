@@ -334,7 +334,7 @@ class TestContracts:
          r'expected a positive 10-bit integer'),
         # error message for set update on non-comparable type
         ("set_update_non_comparable.tz",
-         r'comparable type expected'),
+         r'Type nat is not compatible with type list operation'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
