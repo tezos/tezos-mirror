@@ -5,7 +5,7 @@ The ``data_encoding`` library
 
 Throughout the Tezos protocol, data is serialized so that it can be used
 via RPC, written to disk, or placed in a block. This
-serialization/de-serialization is handled via the :package:`tezos-data-encoding`
+serialization/de-serialization is handled via the :library:`data-encoding`
 library by providing a set primitive encodings and a variety of combinators.
 
 Examples/Tutorial
@@ -203,5 +203,5 @@ clarity):
 The library also provides various wrappers and convenience functions to
 make constructing these objects easier. Reading the documentation in the
 `mli file
-<../api/odoc/tezos-data-encoding/Tezos_data_encoding/Data_encoding/index.html>`__
+<https://gitlab.com/nomadic-labs/data-encoding/-/blob/master/src/data_encoding.mli>`__
 should orient you on how to use these functions.

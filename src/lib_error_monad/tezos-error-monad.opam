@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.7" }
   "tezos-stdlib"
-  "tezos-data-encoding"
+  "data-encoding" { = "0.2" }
   "lwt"
   "lwt-canceler" { = "0.2" }
   "alcotest-lwt" { with-test & = "0.8.5" }

@@ -3,7 +3,7 @@
  (public_name tezos-base)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
-                   -open Tezos_data_encoding
+                   -open Data_encoding
                    -open Tezos_error_monad
                    -open Tezos_rpc
                    -open Tezos_clic
@@ -12,7 +12,7 @@
                    ))
  (libraries tezos-stdlib
             tezos-crypto
-            tezos-data-encoding
+            data-encoding
             tezos-error-monad
             tezos-event-logging
             tezos-rpc

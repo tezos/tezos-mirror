@@ -117,11 +117,6 @@ unit:storage:
   script:
     - dune build @src/lib_storage/runtest
 
-unit:data_encoding:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_data_encoding/runtest
-
 unit:error_monad:
   <<: *test_definition
   script:
@@ -872,11 +867,6 @@ opam:tezos-crypto:
   <<: *opam_definition
   variables:
     package: tezos-crypto
-
-opam:tezos-data-encoding:
-  <<: *opam_definition
-  variables:
-    package: tezos-data-encoding
 
 opam:tezos-embedded-protocol-000-Ps9mPmXa:
   <<: *opam_definition

@@ -102,8 +102,8 @@ let register_error_kind category ~id ~title ~description ?pp encoding
     to_error
 
 let () =
-  let open Tezos_data_encoding.Data_encoding.Registration in
-  let open Tezos_data_encoding.Data_encoding in
+  let open Data_encoding.Registration in
+  let open Data_encoding in
   let stamp_proto id ids = String.concat "." (Protocol.name :: id :: ids) in
   register
   @@ def (stamp_proto "parameters" []) Protocol.Parameters_repr.encoding ;

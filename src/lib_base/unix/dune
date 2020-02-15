@@ -5,8 +5,8 @@
                    -open Tezos_crypto
                    -open Tezos_base
                    -open Tezos_stdlib_unix
-                   -open Tezos_data_encoding))
- (libraries tezos-data-encoding
+                   -open Data_encoding))
+ (libraries data-encoding
             tezos-crypto
             tezos-base
             tezos-stdlib-unix

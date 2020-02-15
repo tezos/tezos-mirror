@@ -2,11 +2,11 @@
  (name tezos_event_logging)
  (public_name tezos-event-logging)
  (flags (:standard -open Tezos_stdlib
-                   -open Tezos_data_encoding
+                   -open Data_encoding
                    -open Tezos_error_monad
                    ))
  (libraries tezos-stdlib
-            tezos-data-encoding
+            data-encoding
             tezos-error-monad
             lwt_log.core))
 

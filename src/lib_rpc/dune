@@ -1,11 +1,11 @@
 (library
  (name tezos_rpc)
  (public_name tezos-rpc)
- (libraries tezos-data-encoding
+ (libraries data-encoding
             tezos-error-monad
             ocplib-resto
             ocplib-resto-directory)
- (flags (:standard -open Tezos_data_encoding
+ (flags (:standard -open Data_encoding
                    -open Tezos_error_monad)))
 
 (alias

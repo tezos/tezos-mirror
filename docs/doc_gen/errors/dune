@@ -1,10 +1,11 @@
 (executable
  (name error_doc)
- (libraries tezos-shell
+ (libraries data-encoding
+            tezos-shell
             tezos-client-alpha)
  (flags (:standard -open Tezos_base
                    -open Tezos_error_monad
-                   -open Tezos_data_encoding
+                   -open Data_encoding
                    -open Tezos_client_alpha
                    -safe-string
                    -linkall)))

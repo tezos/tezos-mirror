@@ -29,7 +29,7 @@ include Tezos_rpc
 include Tezos_clic
 include Tezos_crypto
 include Tezos_micheline
-module Data_encoding = Tezos_data_encoding.Data_encoding
+module Data_encoding = Data_encoding
 
 module List = struct
   include List

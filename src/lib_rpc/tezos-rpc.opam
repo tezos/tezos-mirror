@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.7" }
   "tezos-error-monad"
-  "tezos-data-encoding"
+  "data-encoding" { = "0.2" }
   "ocplib-resto"
   "ocplib-resto-directory"
 ]

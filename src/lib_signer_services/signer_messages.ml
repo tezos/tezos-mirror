@@ -247,12 +247,10 @@ module Request = struct
 end
 
 let () =
-  let open Tezos_data_encoding in
-  Data_encoding.Registration.register Request.encoding ;
-  Data_encoding.Registration.register Sign.Response.encoding ;
-  Data_encoding.Registration.register Deterministic_nonce.Response.encoding ;
-  Data_encoding.Registration.register
-    Deterministic_nonce_hash.Response.encoding ;
-  Data_encoding.Registration.register
-    Supports_deterministic_nonces.Response.encoding ;
-  Data_encoding.Registration.register Public_key.Response.encoding
+  let open Data_encoding.Registration in
+  register Request.encoding ;
+  register Sign.Response.encoding ;
+  register Deterministic_nonce.Response.encoding ;
+  register Deterministic_nonce_hash.Response.encoding ;
+  register Supports_deterministic_nonces.Response.encoding ;
+  register Public_key.Response.encoding

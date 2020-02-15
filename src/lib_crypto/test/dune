@@ -8,11 +8,11 @@
         test_deterministic_nonce)
  (libraries tezos-stdlib
             tezos-crypto
-            tezos-data-encoding
+            data-encoding
             alcotest)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
-                   -open Tezos_data_encoding)))
+                   -open Data_encoding)))
 
 (alias
  (name buildtest)

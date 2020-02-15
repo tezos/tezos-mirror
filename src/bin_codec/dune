@@ -1,7 +1,7 @@
 (executables
  (names codec)
  (public_names tezos-codec)
- (libraries tezos-data-encoding
+ (libraries data-encoding
             tezos-base
             tezos-stdlib-unix
             tezos-event-logging
@@ -14,7 +14,7 @@
             tezos-client-005-PsBabyM1
             tezos-client-006-PsCARTHA
  )
- (flags (:standard -open Tezos_data_encoding
+ (flags (:standard -open Data_encoding
                    -open Tezos_base__TzPervasives
                    -open Tezos_client_base_unix
                    -open Tezos_client_base

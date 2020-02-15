@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.7" }
-  "tezos-data-encoding"
+  "data-encoding" { = "0.2" }
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-event-logging"

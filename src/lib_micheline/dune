@@ -8,11 +8,11 @@
   ;; Internal
   tezos-stdlib
   tezos-error-monad
-  tezos-data-encoding
+  data-encoding
   )
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
-                   -open Tezos_data_encoding)))
+                   -open Data_encoding)))
 
 (alias
  (name runtest_lint)

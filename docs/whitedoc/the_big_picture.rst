@@ -98,14 +98,6 @@ that are used everywhere for basic operations.
    OCaml standard library (a few string primitives, an ``Option``
    module, etc.), a few ``Lwt`` utilities, and a ``Compare`` module
    that implements monomorphic comparison operators.
- - :package:`tezos-data-encoding` is the in-house
-   combinator-based serialization library. From a single type
-   description ``t encoding``, the code can read to and write from
-   values of type ``t`` both binary and JSON representations. For
-   both, the library provides machine and human-readable documentations
-   by the use of documentation combinators. The JSON part depends on
-   :opam:`json-data-encoding`.
-   A :ref:`tutorial<data_encoding>` is available for this library.
  - :package:`tezos-error-monad` is an in-house monadic
    interface to the OCaml ``('a, 'b) result`` type, that fixes the
    ``'b`` to an extensible type ``error`` (actually a list, to hold an
@@ -295,9 +287,6 @@ run them.
  - :package-name:`tezos-crypto`
    (in directory :src:`src/lib_crypto/test/`):
    tests for the in-house merkle trees.
- - :package-name:`tezos-data-encoding`
-   (in directory :src:`src/lib_data_encoding/test/`):
-   tests for the JSON and binary serialization and deserialization.
 
 The Final Executables
 ~~~~~~~~~~~~~~~~~~~~~

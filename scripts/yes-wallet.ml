@@ -60,7 +60,7 @@ let pk_pp (alias,pkh) pk =
 
 
 open Tezos_crypto.Signature ;;
-open Tezos_data_encoding ;;
+open Data_encoding ;;
 open Tezos_stdlib ;;
 
 (* P-256 pk : 33+1 bytes
