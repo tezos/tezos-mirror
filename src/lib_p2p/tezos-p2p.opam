@@ -10,7 +10,7 @@ depends: [
   "dune" { >= "1.7" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "alcotest-lwt" { with-test }
+  "alcotest-lwt" { with-test & = "0.8.5" }
   "lwt" { < "4.3" }
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { = "0.2" }

@@ -17,8 +17,8 @@ depends: [
   "pbkdf"
   "bip39"
   "ledgerwallet-tezos"
-  "alcotest" {with-test & >= "0.8.1"}
-  "alcotest-lwt" {with-test & >= "0.8.0"}
+  "alcotest" {with-test & = "0.8.5"}
+  "alcotest-lwt" {with-test & = "0.8.5"}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

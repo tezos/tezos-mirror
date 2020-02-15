@@ -10,7 +10,7 @@ depends: [
   "dune" { >= "1.7" }
   "tezos-base"
   "tezos-protocol-environment-sigs"
-  "alcotest-lwt" { with-test }
+  "alcotest-lwt" { with-test & = "0.8.5" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
