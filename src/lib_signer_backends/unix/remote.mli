@@ -33,6 +33,8 @@ module Make
         Signature.t tzresult Lwt.t
 
       val logger : RPC_client.logger
+
+      val timeout : Time.System.Span.t option
     end) : Client_keys.SIGNER
 
 val make_pk : Signature.public_key -> Client_keys.pk_uri

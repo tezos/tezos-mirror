@@ -33,8 +33,12 @@ let unix_scheme = "unix"
 module Make (P : sig
   val authenticate :
     Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
+
+  val timeout : Time.System.Span.t option
 end) =
 struct
+  open P
+
   type request_type =
     | Sign_request
     | Deterministic_nonce_request
@@ -59,6 +63,7 @@ struct
              Request.Authorized_keys
            >>=? fun () ->
            Lwt_utils_unix.Socket.recv
+             ?timeout
              conn
              (result_encoding Authorized_keys.Response.encoding)
            >>=? fun authorized_keys ->
@@ -70,7 +75,7 @@ struct
            | No_authentication ->
                return_none
            | Authorized_keys authorized_keys ->
-               P.authenticate
+               authenticate
                  authorized_keys
                  (Sign.Request.to_sign ~pkh ~data:msg)
                >>=? fun signature -> return_some signature)
@@ -91,13 +96,17 @@ struct
     in
     signer_operation path pkh msg Sign_request
     >>=? fun conn ->
-    Lwt_utils_unix.Socket.recv conn (result_encoding Sign.Response.encoding)
+    Lwt_utils_unix.Socket.recv
+      ?timeout
+      conn
+      (result_encoding Sign.Response.encoding)
     >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
 
   let deterministic_nonce path pkh msg =
     signer_operation path pkh msg Deterministic_nonce_request
     >>=? fun conn ->
     Lwt_utils_unix.Socket.recv
+      ?timeout
       conn
       (result_encoding Deterministic_nonce.Response.encoding)
     >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
@@ -106,6 +115,7 @@ struct
     signer_operation path pkh msg Deterministic_nonce_hash_request
     >>=? fun conn ->
     Lwt_utils_unix.Socket.recv
+      ?timeout
       conn
       (result_encoding Deterministic_nonce_hash.Response.encoding)
     >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
@@ -119,6 +129,7 @@ struct
       (Request.Supports_deterministic_nonces pkh)
     >>=? fun () ->
     Lwt_utils_unix.Socket.recv
+      ?timeout
       conn
       (result_encoding Supports_deterministic_nonces.Response.encoding)
     >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
@@ -129,7 +140,7 @@ struct
     Lwt_utils_unix.Socket.send conn Request.encoding (Request.Public_key pkh)
     >>=? fun () ->
     let encoding = result_encoding Public_key.Response.encoding in
-    Lwt_utils_unix.Socket.recv conn encoding
+    Lwt_utils_unix.Socket.recv ?timeout conn encoding
     >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
 
   module Unix = struct

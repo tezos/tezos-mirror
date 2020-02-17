@@ -100,6 +100,8 @@ let setup_remote_signer (module C : M) client_config
       (* overriding the logger we might already have with the one from
              module C *)
       match C.logger with Some logger -> logger | None -> rpc_config.logger
+
+    let timeout = Some (Ptime.Span.of_int_s 8)
   end in
   let module Http =
     Tezos_signer_backends.Http.Make (RPC_client_unix) (Remote_params)

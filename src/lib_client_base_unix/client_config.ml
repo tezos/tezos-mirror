@@ -645,6 +645,8 @@ module type Remote_params = sig
     Signature.public_key_hash list -> Bytes.t -> Signature.t tzresult Lwt.t
 
   val logger : Tezos_rpc_http_client_unix.RPC_client_unix.logger
+
+  val timeout : Time.System.Span.t option
 end
 
 let other_registrations : (_ -> (module Remote_params) -> _) option =
