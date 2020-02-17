@@ -281,9 +281,9 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
             (State.Incorrect_history_mode_switch {previous_mode; next_mode}
             :: _) ->
             failwith
-              "@[Cannot switch from history mode '%a' to '%a'. Import a \
-               context from a corresponding snapshot or re-synchronize a node \
-               with an empty tezos node directory.@]"
+              "@[Cannot switch from history mode '%a' to '%a'. In order to \
+               change your history mode please refer to the Tezos node \
+               documentation. @]"
               History_mode.pp
               previous_mode
               History_mode.pp
