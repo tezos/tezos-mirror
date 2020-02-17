@@ -55,40 +55,6 @@ let read_bytes ?(pos = 0) ?len fd buf =
   in
   inner pos len
 
-let read_string ~len fd =
-  let b = Bytes.create len in
-  read_bytes fd b >>= fun () -> Lwt.return @@ Bytes.to_string b
-
-let read_mbytes ?(pos = 0) ?len fd buf =
-  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
-  let rec inner pos len =
-    if len = 0 then Lwt.return_unit
-    else
-      Lwt_unix.read fd buf pos len
-      >>= function
-      | 0 ->
-          Lwt.fail End_of_file
-          (* other endpoint cleanly closed its connection *)
-      | nb_read ->
-          inner (pos + nb_read) (len - nb_read)
-  in
-  inner pos len
-
-let write_mbytes ?(pos = 0) ?len descr buf =
-  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
-  let rec inner pos len =
-    if len = 0 then Lwt.return_unit
-    else
-      Lwt_unix.write descr buf pos len
-      >>= function
-      | 0 ->
-          Lwt.fail End_of_file
-          (* other endpoint cleanly closed its connection *)
-      | nb_written ->
-          inner (pos + nb_written) (len - nb_written)
-  in
-  inner pos len
-
 let write_bytes ?(pos = 0) ?len descr buf =
   let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
@@ -118,8 +84,6 @@ let write_string ?(pos = 0) ?len descr buf =
           inner (pos + nb_written) (len - nb_written)
   in
   inner pos len
-
-let ( >>= ) = Lwt.bind
 
 let remove_dir dir =
   let rec remove dir =

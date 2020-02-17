@@ -84,7 +84,7 @@ let read t buf pos len =
 let write t buf =
   let len = Bytes.length buf in
   log t "try-write: %d" len ;
-  Lwt_utils_unix.write_mbytes t.fd buf
+  Lwt_utils_unix.write_bytes t.fd buf
   >>= fun () ->
   t.nwrit <- t.nwrit + len ;
   log t "written: %d (%d)" len t.nwrit ;
