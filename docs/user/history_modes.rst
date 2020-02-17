@@ -172,16 +172,32 @@ As the different modes relies on different storage schemes, there are
 some restrictions when switching from one mode to another.
 
 Going from ``archive`` to ``full`` or ``rolling`` or from ``full`` to
-``rolling`` is allowed, as it is just dropping data. It is not allowed
-to switch from the ``full`` or ``rolling`` to ``archive``, since the
-last one would require to rebuild dropped archives.
+``rolling`` is possible by successively exporting a snapshot of the
+targeted mode and then, importing it into a clean data directory.
 
-+---------+---------+------+---------+
-| From/To | Archive | Full | Rolling |
-+=========+=========+======+=========+
-| Archive | X       | Yes  | Yes     |
-+---------+---------+------+---------+
-| Full    | No      | X    | Yes     |
-+---------+---------+------+---------+
-| Rolling | No      | No   | X       |
-+---------+---------+------+---------+
+It is possible to restore an ``archive`` storage from a ``full`` one
+using the reconstruction feature (you should note that the procedure
+may take a couple of days to complete). To do so, you have two
+choices:
+
+- import a ``full`` snapshot using the ``--reconstruct`` option (see
+:ref:`snapshots`),
+
+- use the dedicated command ``tezos-node reconstruct`` if you already
+  have ``full`` storage.
+
+However, it is not possible to switch from ``rolling`` to ``full`` or
+``archive`` using a successive export and import or by using the
+reconstruct feature since the ``rolling`` mode does not keep enough
+data to restore a complete storage.
+
++---------+-------------+-----------+-----------+
+| From/To | Archive     | Full      | Rolling   |
++=========+=============+===========+===========+
+| Archive | X           | Exp./Imp. | Exp./Imp. |
++---------+-------------+-----------+-----------+
+| Full    | Reconstruct | X         | Exp./Imp. |
++---------+-------------+-----------+-----------+
+| Rolling | No          | No        | X         |
++---------+-------------+-----------+-----------+
+

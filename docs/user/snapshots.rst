@@ -57,6 +57,11 @@ block contained in the snapshot is the one that you are expecting to
 import. Otherwise, don’t forget to check the hash of the imported
 block displayed by the node when importing.
 
+When importing a ``full`` snapshot you can **optionally** trigger an
+``archive`` storage reconstruction using the ``--reconstruct``
+option. After importing the snapshot's data, all the chain data will
+be recomputed. This operation may take a couple of days to complete.
+
 Exporting a snapshot
 ~~~~~~~~~~~~~~~~~~~~
 
