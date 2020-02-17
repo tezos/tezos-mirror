@@ -25,8 +25,18 @@
 
 open Error_monad
 
+(** [read_bytes ?timeout ?pos ?len fd buf] reads [len-pos] bytes from
+    [fd] into [bytes].
+
+    @raise Lwt_unix.Timeout if the operation failed to finish within a
+    [timeout] time span.  *)
 val read_bytes :
-  ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
+  ?timeout:Ptime.Span.t ->
+  ?pos:int ->
+  ?len:int ->
+  Lwt_unix.file_descr ->
+  bytes ->
+  unit Lwt.t
 
 val write_string :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> string -> unit Lwt.t
@@ -78,7 +88,8 @@ module Socket : sig
       connection. If a connection is not obtained in less than
       [?timeout], the connection is canceled and and the next socket
       address (if it exists) is tried. *)
-  val connect : ?timeout:float -> addr -> Lwt_unix.file_descr tzresult Lwt.t
+  val connect :
+    ?timeout:Ptime.Span.t -> addr -> Lwt_unix.file_descr tzresult Lwt.t
 
   val bind : ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 
@@ -87,7 +98,11 @@ module Socket : sig
   val send :
     Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a -> unit tzresult Lwt.t
 
-  val recv : Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a tzresult Lwt.t
+  val recv :
+    ?timeout:Ptime.Span.t ->
+    Lwt_unix.file_descr ->
+    'a Data_encoding.t ->
+    'a tzresult Lwt.t
 end
 
 val retry :

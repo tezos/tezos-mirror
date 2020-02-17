@@ -40,12 +40,17 @@ let () =
           None)
     (fun msg -> Exn (Failure msg))
 
-let read_bytes ?(pos = 0) ?len fd buf =
-  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
+let read_bytes ?(timeout = Ptime.Span.zero) ?(pos = 0) ?len fd buf =
+  let buflen = Bytes.length buf in
+  let len = match len with None -> buflen - pos | Some l -> l in
+  if pos < 0 || pos + len > buflen then invalid_arg "read_bytes" ;
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_unix.read fd buf pos len
+      ( if Ptime.Span.(equal timeout zero) then Lwt_unix.read fd buf pos len
+      else
+        Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
+            Lwt_unix.read fd buf pos len) )
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -56,7 +61,9 @@ let read_bytes ?(pos = 0) ?len fd buf =
   inner pos len
 
 let write_bytes ?(pos = 0) ?len descr buf =
-  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
+  let buflen = Bytes.length buf in
+  let len = match len with None -> buflen - pos | Some l -> l in
+  if pos < 0 || pos + len > buflen then invalid_arg "write_bytes" ;
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
@@ -189,7 +196,7 @@ module Json = struct
     protect (fun () ->
         Lwt_io.with_file ~mode:Output file (fun chan ->
             let str = Data_encoding.Json.to_string ~minify:false json in
-            Lwt_io.write chan str >>= fun _ -> return_unit))
+            Lwt_io.write chan str >|= ok))
 
   let read_file file =
     protect (fun () ->
@@ -220,7 +227,7 @@ module Socket = struct
     | Ok ipaddr ->
         Ipaddr.to_string ipaddr
 
-  let connect ?(timeout = 5.) = function
+  let connect ?(timeout = Ptime.Span.of_int_s 5) = function
     | Unix path ->
         let addr = Lwt_unix.ADDR_UNIX path in
         let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
@@ -247,7 +254,9 @@ module Socket = struct
                     ~on_error:(fun e ->
                       Lwt_unix.close sock >>= fun () -> Lwt.return_error e)
                     (fun () ->
-                      with_timeout (Lwt_unix.sleep timeout) (fun _c ->
+                      Lwt_unix.with_timeout
+                        (Ptime.Span.to_float_s timeout)
+                        (fun () ->
                           Lwt_unix.connect sock ai_addr
                           >>= fun () -> return sock))
                   >>= function
@@ -336,16 +345,17 @@ module Socket = struct
         >>=? fun () ->
         (* we set the beginning of the buf with the length of what is next *)
         TzEndian.set_int16 buf 0 encoded_message_len ;
-        write_mbytes fd buf >>= fun () -> return_unit
+        protect (fun () -> write_bytes fd buf >|= ok)
 
-  let recv fd encoding =
+  let recv ?timeout fd encoding =
     let header_buf = Bytes.create message_len_size in
-    read_mbytes ~len:message_len_size fd header_buf
-    >>= fun () ->
+    protect (fun () ->
+        read_bytes ?timeout ~len:message_len_size fd header_buf >|= ok)
+    >>=? fun () ->
     let len = TzEndian.get_uint16 header_buf 0 in
     let buf = Bytes.create len in
-    read_mbytes ~len fd buf
-    >>= fun () ->
+    protect (fun () -> read_bytes ?timeout ~len fd buf >|= ok)
+    >>=? fun () ->
     match Data_encoding.Binary.read_opt encoding buf 0 len with
     | None ->
         fail Decoding_error
