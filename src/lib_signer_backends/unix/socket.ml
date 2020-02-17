@@ -96,11 +96,20 @@ struct
     in
     signer_operation path pkh msg Sign_request
     >>=? fun conn ->
-    Lwt_utils_unix.Socket.recv
-      ?timeout
-      conn
-      (result_encoding Sign.Response.encoding)
-    >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
+    let rec loop n =
+      Lwt_utils_unix.Socket.recv
+        ?timeout
+        conn
+        (result_encoding Sign.Response.encoding)
+      >>=? function
+      | Error [Exn Lwt_unix.Timeout] ->
+          if n = 0 then fail (Exn Lwt_unix.Timeout) else loop (pred n)
+      | Error _ as e ->
+          Lwt.return e
+      | Ok signature ->
+          Lwt_unix.close conn >>= fun () -> return signature
+    in
+    loop 3
 
   let deterministic_nonce path pkh msg =
     signer_operation path pkh msg Deterministic_nonce_request
