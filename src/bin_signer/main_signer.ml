@@ -126,7 +126,7 @@ let commands base_dir require_auth : Client_context.full command list =
   @ [ command
         ~group
         ~desc:"Launch a signer daemon over a TCP socket."
-        (args5
+        (args6
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
@@ -143,9 +143,20 @@ let commands base_dir require_auth : Client_context.full command list =
               ~long:"port"
               ~placeholder:"port number"
               ~default:default_tcp_port
-              (parameter (fun _ s -> return s))))
+              (parameter (fun _ s -> return s)))
+           (default_arg
+              ~doc:
+                "timeout before the signer closes client connection (in \
+                 seconds)"
+              ~short:'t'
+              ~long:"timeout"
+              ~placeholder:"timeout"
+              ~default:"10"
+              (parameter (fun _ s ->
+                   return (Time.System.Span.of_seconds_exn (Float.of_string s))))))
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
-        (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
+        (fun (pidfile, magic_bytes, check_high_watermark, host, port, timeout)
+             cctxt ->
           may_setup_pidfile pidfile
           >>=? fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt
@@ -156,6 +167,7 @@ let commands base_dir require_auth : Client_context.full command list =
             ?magic_bytes
             ~check_high_watermark
             ~require_auth
+            ~timeout
           >>=? fun _ -> return_unit);
       command
         ~group

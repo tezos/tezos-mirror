@@ -24,9 +24,10 @@
 (*****************************************************************************)
 
 val run :
-  #Client_context.io_wallet ->
-  Lwt_utils_unix.Socket.addr ->
   ?magic_bytes:int list ->
+  ?timeout:Time.System.Span.t ->
   check_high_watermark:bool ->
   require_auth:bool ->
+  #Client_context.io_wallet ->
+  Lwt_utils_unix.Socket.addr ->
   'a list tzresult Lwt.t

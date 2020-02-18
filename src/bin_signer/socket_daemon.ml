@@ -28,43 +28,34 @@ open Signer_messages
 
 let log = lwt_log_notice
 
-let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
-  Lwt_utils_unix.Socket.recv fd Request.encoding
+let handle_client_step ?magic_bytes ?timeout ~check_high_watermark
+    ~require_auth cctxt fd =
+  Lwt_utils_unix.Socket.recv ?timeout fd Request.encoding
   >>=? function
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
       Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
   | Deterministic_nonce req ->
       let encoding = result_encoding Deterministic_nonce.Response.encoding in
       Handler.deterministic_nonce cctxt req ~require_auth
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
   | Deterministic_nonce_hash req ->
       let encoding =
         result_encoding Deterministic_nonce_hash.Response.encoding
       in
       Handler.deterministic_nonce_hash cctxt req ~require_auth
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
   | Supports_deterministic_nonces req ->
       let encoding =
         result_encoding Supports_deterministic_nonces.Response.encoding
       in
       Handler.supports_deterministic_nonces cctxt req
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
       Handler.public_key cctxt pkh
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
   | Authorized_keys ->
       let encoding = result_encoding Authorized_keys.Response.encoding in
       ( if require_auth then
@@ -74,12 +65,24 @@ let handle_client ?magic_bytes ~check_high_watermark ~require_auth cctxt fd =
           (Authorized_keys.Response.Authorized_keys
              (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
       else return Authorized_keys.Response.No_authentication )
-      >>= fun res ->
-      Lwt_utils_unix.Socket.send fd encoding res
-      >>= fun _ -> Lwt_unix.close fd >>= fun () -> return_unit
+      >>= fun res -> Lwt_utils_unix.Socket.send fd encoding res
 
-let run (cctxt : #Client_context.wallet) path ?magic_bytes
-    ~check_high_watermark ~require_auth =
+let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark
+    ~require_auth cctxt fd =
+  let rec loop () =
+    handle_client_step
+      ?magic_bytes
+      ?timeout
+      ~check_high_watermark
+      ~require_auth
+      cctxt
+      fd
+    >>=? loop
+  in
+  loop ()
+
+let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet) path =
   let open Lwt_utils_unix.Socket in
   ( match path with
   | Tcp (host, service, _opts) ->
@@ -120,12 +123,16 @@ let run (cctxt : #Client_context.wallet) path ?magic_bytes
             | errs ->
                 Lwt.return_error errs)
           (fun () ->
-            handle_client
-              ?magic_bytes
-              ~check_high_watermark
-              ~require_auth
-              cctxt
-              cfd)) ;
+            Lwt.finalize
+              (fun () ->
+                handle_client_loop
+                  ?magic_bytes
+                  ?timeout
+                  ~check_high_watermark
+                  ~require_auth
+                  cctxt
+                  cfd)
+              (fun () -> Lwt_utils_unix.safe_close cfd))) ;
     loop fd
   in
   Lwt_list.map_p loop fds >>= return
