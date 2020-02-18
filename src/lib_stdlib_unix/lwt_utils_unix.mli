@@ -50,7 +50,7 @@ val create_dir : ?perm:int -> string -> unit Lwt.t
 
 val read_file : string -> string Lwt.t
 
-val create_file : ?perm:int -> string -> string -> unit Lwt.t
+val create_file : ?perm:int -> string -> string -> int Lwt.t
 
 val with_tempdir : string -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
