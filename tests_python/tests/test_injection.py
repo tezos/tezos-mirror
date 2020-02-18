@@ -45,6 +45,10 @@ class TestInjectionAndActivation:
         protos = clients[0].list_protocols()
         assert proto in protos
 
+    def test_environment_version(self, clients: List[Client], session: dict):
+        proto = session['proto_hash']
+        assert clients[0].environment_protocol(proto) == "V1"
+
     def test_activation(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
         parameters = {}  # type: dict
