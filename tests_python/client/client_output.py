@@ -296,6 +296,19 @@ def extract_protocols(client_output: str) -> List[str]:
     return client_output.split()
 
 
+def extract_environment_protocol(client_output: str) -> str:
+    """Extract environment protocol version from the output of
+    'protocol_environment' operation."""
+    try:
+        pattern = r"Protocol \S* uses environment (V\d)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        return match.groups()[0]
+    except Exception:
+        raise InvalidClientOutput(client_output)
+
+
 class PointInfo:
 
     def __init__(self, peer_id=None, is_connected=None, is_trusted=None):
