@@ -334,6 +334,9 @@ class TestContracts:
         # The first duplicated field is reported, storage in this case
         ("multiple_storage_and_code_fields.tz",
          r'duplicate contract field: storage'),
+        # error message for set update on non-comparable type
+        ("set_update_non_comparable.tz",
+         r'comparable type expected'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
