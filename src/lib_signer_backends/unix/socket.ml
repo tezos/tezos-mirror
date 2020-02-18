@@ -54,37 +54,30 @@ struct
         Request.Deterministic_nonce_hash
           {Deterministic_nonce_hash.Request.pkh; data; signature}
 
-  let signer_operation path pkh msg request_type =
-    Lwt_utils_unix.Socket.connect path
-    >>=? (fun conn ->
-           Lwt_utils_unix.Socket.send
-             conn
-             Request.encoding
-             Request.Authorized_keys
-           >>=? fun () ->
-           Lwt_utils_unix.Socket.recv
-             ?timeout
-             conn
-             (result_encoding Authorized_keys.Response.encoding)
-           >>=? fun authorized_keys ->
-           Lwt.return authorized_keys
-           >>=? fun authorized_keys ->
-           Lwt_unix.close conn
-           >>= fun () ->
-           match authorized_keys with
-           | No_authentication ->
-               return_none
-           | Authorized_keys authorized_keys ->
-               authenticate
-                 authorized_keys
-                 (Sign.Request.to_sign ~pkh ~data:msg)
-               >>=? fun signature -> return_some signature)
+  let with_signer_operation path pkh msg request_type f =
+    Lwt_utils_unix.Socket.with_connection path (fun conn ->
+        Lwt_utils_unix.Socket.send
+          conn
+          Request.encoding
+          Request.Authorized_keys
+        >>=? fun () ->
+        Lwt_utils_unix.Socket.recv
+          ?timeout
+          conn
+          (result_encoding Authorized_keys.Response.encoding)
+        >>=? fun authorized_keys ->
+        Lwt.return authorized_keys
+        >>=? function
+        | No_authentication ->
+            return_none
+        | Authorized_keys authorized_keys ->
+            authenticate authorized_keys (Sign.Request.to_sign ~pkh ~data:msg)
+            >>=? fun signature -> return_some signature)
     >>=? fun signature ->
-    Lwt_utils_unix.Socket.connect path
-    >>=? fun conn ->
-    let req = build_request pkh msg signature request_type in
-    Lwt_utils_unix.Socket.send conn Request.encoding req
-    >>=? fun () -> return conn
+    Lwt_utils_unix.Socket.with_connection path (fun conn ->
+        let req = build_request pkh msg signature request_type in
+        Lwt_utils_unix.Socket.send conn Request.encoding req
+        >>=? fun () -> f conn)
 
   let sign ?watermark path pkh msg =
     let msg =
@@ -94,63 +87,64 @@ struct
       | Some watermark ->
           Bytes.cat (Signature.bytes_of_watermark watermark) msg
     in
-    signer_operation path pkh msg Sign_request
-    >>=? fun conn ->
-    let rec loop n =
-      Lwt_utils_unix.Socket.recv
-        ?timeout
-        conn
-        (result_encoding Sign.Response.encoding)
-      >>=? function
-      | Error [Exn Lwt_unix.Timeout] ->
-          if n = 0 then fail (Exn Lwt_unix.Timeout) else loop (pred n)
-      | Error _ as e ->
-          Lwt.return e
-      | Ok signature ->
-          Lwt_unix.close conn >>= fun () -> return signature
-    in
-    loop 3
+    with_signer_operation path pkh msg Sign_request (fun conn ->
+        let rec loop n =
+          Lwt_utils_unix.Socket.recv
+            ?timeout
+            conn
+            (result_encoding Sign.Response.encoding)
+          >>=? function
+          | Error [Exn Lwt_unix.Timeout] ->
+              if n = 0 then fail (Exn Lwt_unix.Timeout) else loop (pred n)
+          | Error _ as e ->
+              Lwt.return e
+          | Ok signature ->
+              return (Ok signature)
+        in
+        loop 3)
 
   let deterministic_nonce path pkh msg =
-    signer_operation path pkh msg Deterministic_nonce_request
-    >>=? fun conn ->
-    Lwt_utils_unix.Socket.recv
-      ?timeout
-      conn
-      (result_encoding Deterministic_nonce.Response.encoding)
-    >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
+    with_signer_operation path pkh msg Deterministic_nonce_request (fun conn ->
+        Lwt_utils_unix.Socket.recv
+          ?timeout
+          conn
+          (result_encoding Deterministic_nonce.Response.encoding))
 
   let deterministic_nonce_hash path pkh msg =
-    signer_operation path pkh msg Deterministic_nonce_hash_request
-    >>=? fun conn ->
-    Lwt_utils_unix.Socket.recv
-      ?timeout
-      conn
-      (result_encoding Deterministic_nonce_hash.Response.encoding)
-    >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
+    with_signer_operation
+      path
+      pkh
+      msg
+      Deterministic_nonce_hash_request
+      (fun conn ->
+        Lwt_utils_unix.Socket.recv
+          ?timeout
+          conn
+          (result_encoding Deterministic_nonce_hash.Response.encoding))
 
   let supports_deterministic_nonces path pkh =
-    Lwt_utils_unix.Socket.connect path
-    >>=? fun conn ->
-    Lwt_utils_unix.Socket.send
-      conn
-      Request.encoding
-      (Request.Supports_deterministic_nonces pkh)
-    >>=? fun () ->
-    Lwt_utils_unix.Socket.recv
-      ?timeout
-      conn
-      (result_encoding Supports_deterministic_nonces.Response.encoding)
-    >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
+    Lwt_utils_unix.Socket.with_connection path (fun conn ->
+        Lwt_utils_unix.Socket.send
+          conn
+          Request.encoding
+          (Request.Supports_deterministic_nonces pkh)
+        >>=? fun () ->
+        Lwt_utils_unix.Socket.recv
+          ?timeout
+          conn
+          (result_encoding Supports_deterministic_nonces.Response.encoding)
+        >>=? fun supported -> Lwt.return supported)
 
   let public_key path pkh =
-    Lwt_utils_unix.Socket.connect path
-    >>=? fun conn ->
-    Lwt_utils_unix.Socket.send conn Request.encoding (Request.Public_key pkh)
-    >>=? fun () ->
-    let encoding = result_encoding Public_key.Response.encoding in
-    Lwt_utils_unix.Socket.recv ?timeout conn encoding
-    >>=? fun res -> Lwt_unix.close conn >>= fun () -> Lwt.return res
+    Lwt_utils_unix.Socket.with_connection path (fun conn ->
+        Lwt_utils_unix.Socket.send
+          conn
+          Request.encoding
+          (Request.Public_key pkh)
+        >>=? fun () ->
+        let encoding = result_encoding Public_key.Response.encoding in
+        Lwt_utils_unix.Socket.recv ?timeout conn encoding
+        >>=? fun pk -> Lwt.return pk)
 
   module Unix = struct
     let scheme = unix_scheme
