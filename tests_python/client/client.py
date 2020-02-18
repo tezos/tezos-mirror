@@ -574,6 +574,11 @@ class Client:
         cmd = ['list', 'protocols']
         return client_output.extract_protocols(self.run(cmd, admin=True))
 
+    def environment_protocol(self, proto) -> str:
+        cmd = ['protocol', 'environment', proto]
+        return client_output.extract_environment_protocol(self.run(cmd,
+                                                                   admin=True))
+
     def list_understood_protocols(self) -> List[str]:
         cmd = ['list', 'understood', 'protocols']
         return client_output.extract_protocols(self.run(cmd, admin=True))
