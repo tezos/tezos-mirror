@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Node_logging
-
 type error += Non_private_sandbox of P2p_addr.t
 
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
@@ -76,6 +74,88 @@ let () =
     (function Invalid_sandbox_file s -> Some s | _ -> None)
     (fun s -> Invalid_sandbox_file s)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "main"]
+
+  let disabled_discovery_addr =
+    declare_0
+      ~section
+      ~name:"disabled_discovery_addr"
+      ~msg:"disabled local peer discovery"
+      ~level:Notice
+      ()
+
+  let disabled_listen_addr =
+    declare_0
+      ~section
+      ~name:"disabled_listen_addr"
+      ~msg:"disabled P2P server"
+      ~level:Notice
+      ()
+
+  let read_identity =
+    declare_1
+      ~section
+      ~name:"read_identity"
+      ~msg:"read identity file"
+      ~level:Notice
+      ("peer_id", P2p_peer.Id.encoding)
+
+  let starting_rpc_server =
+    declare_3
+      ~section
+      ~name:"starting_rpc_server"
+      ~msg:"starting RPC server"
+      ~level:Notice
+      ("host", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+      ("tls", Data_encoding.bool)
+
+  let starting_node =
+    declare_1
+      ~section
+      ~name:"starting_node"
+      ~msg:"starting the Tezos node"
+      ~level:Notice
+      ("chain", Distributed_db_version.Name.encoding)
+
+  let node_is_ready =
+    declare_0
+      ~section
+      ~name:"node_is_ready"
+      ~msg:"the Tezos node is now running"
+      ~level:Notice
+      ()
+
+  let shutting_down_node =
+    declare_0
+      ~section
+      ~name:"shutting_down_node"
+      ~msg:"shutting down the Tezos node"
+      ~level:Notice
+      ()
+
+  let shutting_down_rpc_server =
+    declare_0
+      ~section
+      ~name:"shutting_down_rpc_server"
+      ~msg:"shutting down the RPC server"
+      ~level:Notice
+      ()
+
+  let bye =
+    declare_1
+      ~section
+      ~name:"bye"
+      ~msg:"bye"
+      ~level:Notice
+      ("exit_code", Data_encoding.int31)
+
+  (* may be negative in case of signals *)
+end
+
 let ( // ) = Filename.concat
 
 let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
@@ -83,8 +163,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   (* TODO "WARN" when pow is below our expectation. *)
   ( match config.p2p.discovery_addr with
   | None ->
-      lwt_log_notice "No local peer discovery."
-      >>= fun () -> return (None, None)
+      Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_discovery_addrs addr
       >>= function
@@ -95,8 +174,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
   >>=? fun (discovery_addr, discovery_port) ->
   ( match config.p2p.listen_addr with
   | None ->
-      lwt_log_notice "Not listening to P2P calls."
-      >>= fun () -> return (None, None)
+      Event.(emit disabled_listen_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_listening_addrs addr
       >>= function
@@ -119,7 +197,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       Node_identity_file.read
         (config.data_dir // Node_data_version.default_identity_file_name)
       >>=? fun identity ->
-      lwt_log_notice "Peer's global id: %a" P2p_peer.Id.pp identity.peer_id
+      Event.(emit read_identity) identity.peer_id
       >>= fun () ->
       let p2p_config : P2p.config =
         {
@@ -203,11 +281,7 @@ let launch_rpc_server (rpc_config : Node_config_file.rpc) node (addr, port) =
     | Some {cert; key} ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
-  lwt_log_notice
-    "Starting a RPC server listening on %s:%d%s."
-    host
-    port
-    (if rpc_config.tls = None then "" else " (TLS enabled)")
+  Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)
   >>= fun () ->
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
@@ -268,12 +342,8 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
-  lwt_log_notice
-    "Network chain name is: %s"
-    (config.blockchain_network.chain_name :> string)
-  >>= fun () ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
-  lwt_log_notice "Starting the Tezos node..."
+  Event.(emit starting_node) config.blockchain_network.chain_name
   >>= fun () ->
   init_node ?sandbox ?checkpoint ~singleprocess config
   >>= (function
@@ -295,23 +365,23 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
   >>=? fun node ->
   init_rpc config.rpc node
   >>=? fun rpc ->
-  lwt_log_notice "The Tezos node is now running!"
+  Event.(emit node_is_ready) ()
   >>= fun () ->
   Lwt_exit.(
     wrap_promise @@ retcode_of_unit_result_lwt @@ Lwt_utils.never_ending ())
   >>= fun retcode ->
   (* Clean-shutdown code *)
   Lwt_exit.termination_thread
-  >>= fun x ->
-  lwt_log_notice "Shutting down the Tezos node..."
+  >>= fun exit_code ->
+  Event.(emit shutting_down_node) ()
   >>= fun () ->
   Node.shutdown node
   >>= fun () ->
-  lwt_log_notice "Shutting down the RPC server..."
+  Event.(emit shutting_down_rpc_server) ()
   >>= fun () ->
   Lwt_list.iter_p RPC_server.shutdown rpc
   >>= fun () ->
-  lwt_log_notice "BYE (%d)" x
+  Event.(emit bye) exit_code
   >>= fun () -> Internal_event_unix.close () >>= fun () -> return retcode
 
 let process sandbox verbosity checkpoint singleprocess args =
