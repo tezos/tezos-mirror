@@ -268,6 +268,13 @@ module Socket = struct
             in
             try_connect [] addrs )
 
+  let with_connection ?timeout addr f =
+    connect ?timeout addr
+    >>=? fun conn ->
+    protect
+      (fun () -> f conn >>=? fun a -> safe_close conn >>= fun () -> return a)
+      ~on_error:(fun e -> safe_close conn >>= fun () -> Lwt.return (Error e))
+
   let bind ?(backlog = 10) = function
     | Unix path ->
         let addr = Lwt_unix.ADDR_UNIX path in

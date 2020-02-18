@@ -91,6 +91,12 @@ module Socket : sig
   val connect :
     ?timeout:Ptime.Span.t -> addr -> Lwt_unix.file_descr tzresult Lwt.t
 
+  val with_connection :
+    ?timeout:Ptime.Span.t ->
+    addr ->
+    (Lwt_unix.file_descr -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t
+
   val bind : ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 
   type error += Encoding_error | Decoding_error
