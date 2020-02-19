@@ -325,7 +325,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', '8000', '--burn-cap', '10']
+        args = ['-G', f'{128 * 8000}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):
