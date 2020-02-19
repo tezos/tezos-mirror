@@ -126,7 +126,7 @@ type rpc_context = {
   context : Context.t;
 }
 
-module type T = sig
+module type V1_T = sig
   type context
 
   type quota
@@ -223,6 +223,12 @@ module type T = sig
     context -> Block_header.shell_header -> validation_result tzresult Lwt.t
 end
 
+(* [module type T] is the union of all [module type Vx_T].*)
+module type T = sig
+  include V1_T
+end
+
+(* [module type PROTOCOL] is protocol signature that the shell can use*)
 module type PROTOCOL =
   T
     with type context := Context.t

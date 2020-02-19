@@ -45,6 +45,8 @@ val of_bytes_exn : Bytes.t -> t
 
 val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
 
+val module_name_of_env_version : env_version -> string
+
 module Meta : sig
   type t = {
     hash : Protocol_hash.t option;

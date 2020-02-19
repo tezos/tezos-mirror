@@ -232,9 +232,11 @@ let main {compile_ml; pack_objects; link_shared} =
     (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
+  let version = Protocol.module_name_of_env_version protocol.expected_env in
   let oc = open_out functor_file in
   Packer.dump
     oc
+    version
     hash
     (Array.map
        (fun {Protocol.name; _} ->
@@ -269,8 +271,9 @@ let main {compile_ml; pack_objects; link_shared} =
         (Printf.sprintf
            "module Name = struct let name = %S end\n\
            \ let () = Tezos_protocol_registerer__Registerer.register \
-            Name.name (module %s.Make)"
+            Name.name (%s (module %s.Make))"
            (Protocol_hash.to_b58check hash)
+           (Protocol.module_name_of_env_version protocol.expected_env)
            functor_unit) ;
       let register_object = compile_ml ~for_pack register_file in
       [register_object] )

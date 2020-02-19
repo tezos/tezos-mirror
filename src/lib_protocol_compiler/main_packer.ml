@@ -56,9 +56,11 @@ let () =
           pp_print_error
           err
   in
+  let version = Protocol.module_name_of_env_version protocol.expected_env in
   (* Generate the 'functor' *)
   Packer.dump
     stdout
+    version
     hash
     (Array.map
        (fun {Protocol.name; _} ->

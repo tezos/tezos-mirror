@@ -29,7 +29,9 @@ module type PROTOCOL_V1 = functor
 
 module VersionTable = Protocol_hash.Table
 
-let versions : (module PROTOCOL_V1) VersionTable.t = VersionTable.create 20
+type proto_env = V1 of (module PROTOCOL_V1)
+
+let versions : proto_env VersionTable.t = VersionTable.create 20
 
 let register hash proto =
   let hash = Protocol_hash.of_b58check_exn hash in

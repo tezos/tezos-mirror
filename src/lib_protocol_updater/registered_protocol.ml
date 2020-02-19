@@ -44,11 +44,11 @@ end
 
 type t = (module T)
 
-let build_v1 hash =
+let build hash =
   match Tezos_protocol_registerer.Registerer.get hash with
   | None ->
       None
-  | Some protocol ->
+  | Some (V1 protocol) ->
       let (module F) = protocol in
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
@@ -83,7 +83,7 @@ let mem hash =
 let get hash =
   try Some (VersionTable.find versions hash)
   with Not_found -> (
-    match build_v1 hash with
+    match build hash with
     | Some proto ->
         VersionTable.add versions hash proto ;
         Some proto
@@ -99,13 +99,16 @@ let get_embedded_sources_exn hash = VersionTable.find sources hash
 let get_embedded_sources hash =
   try Some (get_embedded_sources_exn hash) with Not_found -> None
 
-module Register_embedded
-    (Env : Tezos_protocol_environment.V1)
-    (Proto : Env.Updater.PROTOCOL) (Source : sig
-      val hash : Protocol_hash.t option
+module type Source_sig = sig
+  val hash : Protocol_hash.t option
 
-      val sources : Protocol.t
-    end) =
+  val sources : Protocol.t
+end
+
+module Register_embedded_V1
+    (Env : Tezos_protocol_environment.V1)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
 struct
   let hash =
     match Source.hash with

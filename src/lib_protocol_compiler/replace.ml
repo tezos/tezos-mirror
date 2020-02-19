@@ -102,6 +102,9 @@ let process ~template ~destination (protocol : Protocol.t) lib_version hash =
     StringMap.empty
     |> StringMap.add "VERSION" version
     |> StringMap.add "LIB_VERSION" lib_version
+    |> StringMap.add
+         "ENV_VERSION"
+         (Protocol.module_name_of_env_version protocol.expected_env)
     |> StringMap.add "HASH" (Protocol_hash.to_b58check hash)
     |> StringMap.add
          "MODULES"

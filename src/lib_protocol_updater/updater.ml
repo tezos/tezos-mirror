@@ -44,7 +44,6 @@ let init dir = datadir := Some dir
 let compiler_name = "tezos-protocol-compiler"
 
 let do_compile hash p =
-  assert (p.Protocol.expected_env = V1) ;
   let datadir = get_datadir () in
   let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
   let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in

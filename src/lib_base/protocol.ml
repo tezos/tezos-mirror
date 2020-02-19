@@ -51,12 +51,15 @@ let component_encoding =
        (opt "interface" string)
        (req "implementation" string))
 
+let module_name_of_env_version = function V1 -> "V1"
+
 let env_version_encoding =
   let open Data_encoding in
-  conv
-    (function V1 -> 0)
-    (function 0 -> V1 | _ -> failwith "unexpected environment version")
-    int16
+  def "protocol.environment_version"
+  @@ conv
+       (function V1 -> 0)
+       (function 0 -> V1 | _ -> failwith "unexpected environment version")
+       int16
 
 let encoding =
   let open Data_encoding in
@@ -82,8 +85,6 @@ let bounded_encoding ?max_size () =
 let pp ppf op =
   Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding op)
 
-let env_version_to_string = function V1 -> "V1"
-
 let pp_ocaml_component ppf {name; interface; implementation} =
   Format.fprintf
     ppf
@@ -98,7 +99,7 @@ let pp_ocaml ppf {expected_env; components} =
   Format.fprintf
     ppf
     "@[{@[<v 1> expected_env = %s ;@ components = [@[<v>%a@]] ;@]@ }@]"
-    (env_version_to_string expected_env)
+    (module_name_of_env_version expected_env)
     (Format.pp_print_list
        ~pp_sep:(fun ppf () -> Format.fprintf ppf " ;@ ")
        pp_ocaml_component)

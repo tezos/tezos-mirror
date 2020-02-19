@@ -95,11 +95,12 @@ let include_ml oc file =
 let opened_modules =
   ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"; "Logging"]
 
-let dump oc hash files =
+let dump oc version hash files =
   Printf.fprintf
     oc
     "module Make (Tezos_protocol_environment : \
-     Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
+     Tezos_protocol_environment_sigs__%s.T) = struct\n"
+    version ;
   Printf.fprintf oc "[@@@ocaml.warning \"-33\"]\n" ;
   List.iter (Printf.fprintf oc "open %s\n") opened_modules ;
   Printf.fprintf oc "[@@@ocaml.warning \"+33\"]\n" ;

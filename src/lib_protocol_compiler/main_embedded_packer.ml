@@ -61,10 +61,11 @@ let () =
   Format.printf
     {|
 module Registered =
-  Tezos_protocol_updater.Registered_protocol.Register_embedded
+  Tezos_protocol_updater.Registered_protocol.Register_embedded_%s
     (Tezos_protocol_environment_%s.Environment)
     (Tezos_raw_protocol_%s.Main)
     (Source)
 @.|}
+    (Protocol.module_name_of_env_version sources.expected_env)
     version
     version
