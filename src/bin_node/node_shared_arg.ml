@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Cmdliner
-open Node_logging
 
 let ( // ) = Filename.concat
 
@@ -489,6 +488,17 @@ let () =
             Distributed_db_version.Name.of_string command_line_chain_name;
         })
 
+module Event = struct
+  include Internal_event.Simple
+
+  let disabled_bootstrap_peers =
+    Internal_event.Simple.declare_0
+      ~section:["node"; "main"]
+      ~name:"disabled_bootstrap_peers"
+      ~msg:"disabled bootstrap peers"
+      ()
+end
+
 let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
   read_config_file args
   >>=? fun (cfg, config_file_exists) ->
@@ -544,24 +554,22 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
   >>=? fun () ->
   (* Update bootstrap peers must take into account the updated config file
      with the [--network] argument, so we cannot use [Node_config_file]. *)
-  let bootstrap_peers =
-    if no_bootstrap_peers || ignore_bootstrap_peers then (
-      log_info "Ignoring bootstrap peers" ;
-      peers )
-    else
-      let cfg_peers =
-        match cfg.p2p.bootstrap_peers with
-        | Some peers ->
-            peers
-        | None -> (
-          match network with
-          | Some network ->
-              network.default_bootstrap_peers
-          | None ->
-              cfg.blockchain_network.default_bootstrap_peers )
-      in
-      cfg_peers @ peers
-  in
+  ( if no_bootstrap_peers || ignore_bootstrap_peers then
+    Event.(emit disabled_bootstrap_peers) () >>= fun () -> return peers
+  else
+    let cfg_peers =
+      match cfg.p2p.bootstrap_peers with
+      | Some peers ->
+          peers
+      | None -> (
+        match network with
+        | Some network ->
+            network.default_bootstrap_peers
+        | None ->
+            cfg.blockchain_network.default_bootstrap_peers )
+    in
+    return (cfg_peers @ peers) )
+  >>=? fun bootstrap_peers ->
   Node_config_file.update
     ?data_dir
     ?min_connections
