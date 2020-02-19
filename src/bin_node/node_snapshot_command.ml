@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Node_logging
-
 type error += Invalid_sandbox_file of string
 
 let () =
@@ -42,11 +40,22 @@ let () =
 
 (** Main *)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let cleaning_up_after_failure =
+    Internal_event.Simple.declare_1
+      ~section:["node"; "main"]
+      ~name:"cleaning_up_after_failure"
+      ~msg:"cleaning up after failure"
+      ("directory", Data_encoding.string)
+end
+
 module Term = struct
   type subcommand = Export | Import
 
   let dir_cleaner data_dir =
-    lwt_log_notice "Cleaning directory %s because of failure" data_dir
+    Event.(emit cleaning_up_after_failure) data_dir
     >>= fun () ->
     Lwt_utils_unix.remove_dir @@ Node_data_version.store_dir data_dir
     >>= fun () ->
