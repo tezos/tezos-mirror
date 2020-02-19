@@ -1408,7 +1408,7 @@ and interp :
   >>=? fun (Item (ret, Empty), ctxt) -> return (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
-and execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
+let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     ( Script.expr
     * packed_internal_operation list
     * context
