@@ -430,6 +430,170 @@ module Simple = struct
 
   let make_section = Option.map ~f:Section.make_sanitized
 
+  let pp_print_compact_float fmt value = Format.fprintf fmt "%g" value
+
+  let max_shortened_string_length = 64
+
+  let ellipsis = "[...]"
+
+  let pp_print_shortened_string fmt value =
+    let len = String.length value in
+    if len = 0 then Format.pp_print_string fmt "\"\""
+    else
+      let escape len =
+        let rec loop i =
+          if i >= len then false
+          else
+            match value.[i] with
+            | '\000' .. '\032' | '\127' .. '\255' ->
+                (* invisible character (including space) or non-ASCII: needs to be escaped *)
+                true
+            | '\033' .. '\126' ->
+                (* visible, non-space character *)
+                loop (i + 1)
+        in
+        loop 0
+      in
+      if String.length value > max_shortened_string_length then
+        let length_without_ellipsis =
+          max_shortened_string_length - String.length ellipsis
+        in
+        let prefix = String.sub value 0 length_without_ellipsis in
+        if escape length_without_ellipsis then
+          Format.fprintf fmt "\"%s%s\"" prefix ellipsis
+        else Format.fprintf fmt "%s%s" prefix ellipsis
+      else if escape len then Format.fprintf fmt "%S" value
+      else Format.pp_print_string fmt value
+
+  (* Default pretty-printer for parameters.
+     Simple types are printed in a compact way.
+     Structured types are not printed. *)
+  let rec pp_human_readable : 'a. 'a Data_encoding.t -> _ -> 'a -> _ =
+    fun (type a) (encoding : a Data_encoding.t) fmt (value : a) ->
+     match encoding.encoding with
+     | Null ->
+         ()
+     | Empty ->
+         ()
+     | Ignore ->
+         ()
+     | Constant name ->
+         pp_print_shortened_string fmt name
+     | Bool ->
+         Format.pp_print_bool fmt value
+     | Int8 ->
+         Format.pp_print_int fmt value
+     | Uint8 ->
+         Format.pp_print_int fmt value
+     | Int16 ->
+         Format.pp_print_int fmt value
+     | Uint16 ->
+         Format.pp_print_int fmt value
+     | Int31 ->
+         Format.pp_print_int fmt value
+     | Int32 ->
+         Format.fprintf fmt "%ld" value
+     | Int64 ->
+         Format.fprintf fmt "%Ld" value
+     | N ->
+         Format.pp_print_string fmt (Z.to_string value)
+     | Z ->
+         Format.pp_print_string fmt (Z.to_string value)
+     | RangedInt _ ->
+         Format.pp_print_int fmt value
+     | RangedFloat _ ->
+         pp_print_compact_float fmt value
+     | Float ->
+         pp_print_compact_float fmt value
+     | Bytes _ ->
+         pp_print_shortened_string fmt (Bytes.unsafe_to_string value)
+     | String _ ->
+         pp_print_shortened_string fmt value
+     | Padded (encoding, _) ->
+         pp_human_readable encoding fmt value
+     | String_enum (table, _) -> (
+       match Hashtbl.find_opt table value with
+       | None ->
+           ()
+       | Some (name, _) ->
+           pp_print_shortened_string fmt name )
+     | Array _ ->
+         ()
+     | List _ ->
+         ()
+     | Obj (Req {encoding; _} | Dft {encoding; _}) ->
+         pp_human_readable encoding fmt value
+     | Obj (Opt {encoding; _}) ->
+         Option.iter ~f:(pp_human_readable encoding fmt) value
+     | Objs _ ->
+         ()
+     | Tup encoding ->
+         pp_human_readable encoding fmt value
+     | Tups _ ->
+         ()
+     | Union
+         { cases =
+             [ Case {encoding; proj; _};
+               Case {encoding = {encoding = Null; _}; _} ];
+           _ } ->
+         (* Probably an [option] type or similar.
+            We only print the value if it is not null. *)
+         Option.iter ~f:(pp_human_readable encoding fmt) (proj value)
+     | Union _ ->
+         ()
+     | Mu _ ->
+         ()
+     | Conv {proj; encoding; _} ->
+         (* TODO: it may be worth it to take a look at [encoding]
+            before calling [proj], to try and predict whether the value
+            will actually be printed. *)
+         pp_human_readable encoding fmt (proj value)
+     | Describe {encoding; _} ->
+         pp_human_readable encoding fmt value
+     | Splitted {json_encoding; _} -> (
+       (* Generally, [Splitted] nodes imply that the JSON encoding
+          is more human-friendly, as JSON is a human-friendly
+          format. A typical example is Blake2B hashes.
+          So for log outputs we use the JSON encoding.
+          Unfortunately, [Json_encoding.t] is abstract so we have
+          to [construct] the JSON value and continue from here. *)
+       (* TODO: it may be worth it to take a look at [encoding]
+          before constructing the JSON value, to try and predict
+          whether the value will actually be printed (same as [Conv]). *)
+       match Json_encoding.construct json_encoding value with
+       | `Null ->
+           ()
+       | `Bool value ->
+           Format.pp_print_bool fmt value
+       | `Float value ->
+           pp_print_compact_float fmt value
+       | `String value ->
+           pp_print_shortened_string fmt value
+       | `A _ | `O _ ->
+           () )
+     | Dynamic_size {encoding; _} ->
+         pp_human_readable encoding fmt value
+     | Check_size {encoding; _} ->
+         pp_human_readable encoding fmt value
+     | Delayed make_encoding ->
+         pp_human_readable (make_encoding ()) fmt value
+
+  type parameter = Parameter : string * 'a Data_encoding.t * 'a -> parameter
+
+  let pp_log_message msg fmt fields =
+    Format.fprintf fmt "@[<hov 2>%s" msg ;
+    let first_field = ref true in
+    let print_field (Parameter (name, enc, value)) =
+      let value = Format.asprintf "%a" (pp_human_readable enc) value in
+      if String.length value > 0 then
+        if !first_field then (
+          first_field := false ;
+          Format.fprintf fmt "@ (%s = %s" name value )
+        else Format.fprintf fmt ",@ %s = %s" name value
+    in
+    List.iter print_field fields ;
+    if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
+
   let declare_0 ?section ~name ~msg ?(level = Info) () =
     let section = make_section section in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
@@ -439,7 +603,7 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt () = Format.fprintf fmt "%s" msg
+      let pp fmt () = pp_log_message msg fmt []
 
       let encoding = Data_encoding.unit
 
@@ -458,14 +622,7 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt f0 =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a)@]"
-          msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
+      let pp fmt f0 = pp_log_message msg fmt [Parameter (f0_name, f0_enc, f0)]
 
       let encoding = f0_enc
 
@@ -486,16 +643,10 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
+          fmt
+          [Parameter (f0_name, f0_enc, f0); Parameter (f1_name, f1_enc, f1)]
 
       let encoding =
         Data_encoding.obj2
@@ -520,19 +671,12 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2) ]
 
       let encoding =
         Data_encoding.obj3
@@ -560,22 +704,13 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2, f3) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
-          f3_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f3_enc f3)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2);
+            Parameter (f3_name, f3_enc, f3) ]
 
       let encoding =
         Data_encoding.obj4
@@ -605,25 +740,14 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2, f3, f4) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
-          f3_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f3_enc f3)
-          f4_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f4_enc f4)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2);
+            Parameter (f3_name, f3_enc, f3);
+            Parameter (f4_name, f4_enc, f4) ]
 
       let encoding =
         Data_encoding.obj5
@@ -655,29 +779,15 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2, f3, f4, f5) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
-           = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
-          f3_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f3_enc f3)
-          f4_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f4_enc f4)
-          f5_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f5_enc f5)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2);
+            Parameter (f3_name, f3_enc, f3);
+            Parameter (f4_name, f4_enc, f4);
+            Parameter (f5_name, f5_enc, f5) ]
 
       let encoding =
         Data_encoding.obj6
@@ -711,32 +821,16 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2, f3, f4, f5, f6) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
-           = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
-          f3_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f3_enc f3)
-          f4_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f4_enc f4)
-          f5_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f5_enc f5)
-          f6_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f6_enc f6)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2);
+            Parameter (f3_name, f3_enc, f3);
+            Parameter (f4_name, f4_enc, f4);
+            Parameter (f5_name, f5_enc, f5);
+            Parameter (f6_name, f6_enc, f6) ]
 
       let encoding =
         Data_encoding.obj7
@@ -772,35 +866,17 @@ module Simple = struct
       let name = name
 
       let pp fmt (f0, f1, f2, f3, f4, f5, f6, f7) =
-        Format.fprintf
-          fmt
-          "@[<hov 2>%s@ (%s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s = %a,@ %s \
-           = %a,@ %s = %a,@ %s = %a)@]"
+        pp_log_message
           msg
-          f0_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f0_enc f0)
-          f1_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f1_enc f1)
-          f2_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f2_enc f2)
-          f3_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f3_enc f3)
-          f4_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f4_enc f4)
-          f5_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f5_enc f5)
-          f6_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f6_enc f6)
-          f7_name
-          Data_encoding.Json.pp
-          (Data_encoding.Json.construct f7_enc f7)
+          fmt
+          [ Parameter (f0_name, f0_enc, f0);
+            Parameter (f1_name, f1_enc, f1);
+            Parameter (f2_name, f2_enc, f2);
+            Parameter (f3_name, f3_enc, f3);
+            Parameter (f4_name, f4_enc, f4);
+            Parameter (f5_name, f5_enc, f5);
+            Parameter (f6_name, f6_enc, f6);
+            Parameter (f7_name, f7_enc, f7) ]
 
       let encoding =
         Data_encoding.obj8
