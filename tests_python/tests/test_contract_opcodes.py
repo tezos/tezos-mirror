@@ -603,7 +603,11 @@ class TestContractOpcodes:
             ('pexec_2.tz', "{ 0 ; 1 ; 2 ; 3}", '4', "{ 0 ; 7 ; 14 ; 21 }"),
 
             # Test CHAIN_ID
-            ('chain_id_store.tz', 'None', 'Unit', '(Some 0x7a06a770)')
+            ('chain_id_store.tz', 'None', 'Unit', '(Some 0x7a06a770)'),
+
+            # Test SELF
+            ('self_with_entrypoint.tz', 'Unit', 'Left (Left 0)', 'Unit'),
+            ('self_with_default_entrypoint.tz', 'Unit', 'Unit', 'Unit')
         ])
     def test_contract_input_output(self,
                                    client_regtest,
