@@ -6,13 +6,15 @@
             tezos-protocol-environment-structs
             tezos-micheline)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_micheline))
+          -open Tezos_micheline))
  (wrapped false)
  (modules Tezos_protocol_environment
           Environment_V0
+          Environment_V1
           Environment_context
           Environment_protocol_T
           Environment_protocol_T_V0
+          Environment_protocol_T_V1
           Dummy_context
           Memory_context))
 

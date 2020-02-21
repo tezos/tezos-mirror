@@ -23,22 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+val map : f:('a -> 'b) -> 'a option -> 'b option
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val apply : f:('a -> 'b option) -> 'a option -> 'b option
 
-and env_version = V0 | V1
+val iter : f:('a -> unit) -> 'a option -> unit
 
-val component_encoding : component Data_encoding.t
+val unopt : default:'a -> 'a option -> 'a
 
-val env_version_encoding : env_version Data_encoding.t
+val unopt_map : f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val first_some : 'a option -> 'a option -> 'a option
+
+val try_with : (unit -> 'a) -> 'a option
+
+val some : 'a -> 'a option

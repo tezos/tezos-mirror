@@ -23,22 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-and env_version = V0 | V1
+val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-val component_encoding : component Data_encoding.t
+val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-val env_version_encoding : env_version Data_encoding.t
+val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val fatal_error : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a

@@ -23,22 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Return type for service handler *)
+type 'o t =
+  [ `Ok of 'o (* 200 *)
+  | `OkStream of 'o stream (* 200 *)
+  | `Created of string option (* 201 *)
+  | `No_content (* 204 *)
+  | `Unauthorized of error list option (* 401 *)
+  | `Forbidden of error list option (* 403 *)
+  | `Not_found of error list option (* 404 *)
+  | `Conflict of error list option (* 409 *)
+  | `Error of error list option (* 500 *) ]
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 
-and env_version = V0 | V1
+val return : 'o -> 'o t Lwt.t
 
-val component_encoding : component Data_encoding.t
+val return_stream : 'o stream -> 'o t Lwt.t
 
-val env_version_encoding : env_version Data_encoding.t
+val not_found : 'o t Lwt.t
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val fail : error list -> 'a t Lwt.t

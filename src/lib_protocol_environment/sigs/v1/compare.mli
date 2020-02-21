@@ -23,22 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+module type COMPARABLE = sig
+  type t
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+  val compare : t -> t -> int
+end
 
-and env_version = V0 | V1
+module type S = sig
+  type t
 
-val component_encoding : component Data_encoding.t
+  val ( = ) : t -> t -> bool
 
-val env_version_encoding : env_version Data_encoding.t
+  val ( <> ) : t -> t -> bool
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+  val ( < ) : t -> t -> bool
+
+  val ( <= ) : t -> t -> bool
+
+  val ( >= ) : t -> t -> bool
+
+  val ( > ) : t -> t -> bool
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val max : t -> t -> t
+
+  val min : t -> t -> t
+end
+
+module Make (P : COMPARABLE) : S with type t := P.t
+
+module Char : S with type t = char
+
+module Bool : S with type t = bool
+
+module Int : S with type t = int
+
+module Int32 : S with type t = int32
+
+module Uint32 : S with type t = int32
+
+module Int64 : S with type t = int64
+
+module Uint64 : S with type t = int64
+
+module Float : S with type t = float
+
+module String : S with type t = string
+
+module Z : S with type t = Z.t
+
+module List (P : COMPARABLE) : S with type t = P.t list
+
+module Option (P : COMPARABLE) : S with type t = P.t option

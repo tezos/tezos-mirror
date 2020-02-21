@@ -95,7 +95,9 @@ let tezos_protocol_env =
   [ ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
     ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
     ( "Tezos_protocol_environment_sigs__V0",
-      tezos_protocol_environment_sigs__V0_cmi ) ]
+      tezos_protocol_environment_sigs__V0_cmi );
+    ( "Tezos_protocol_environment_sigs__V1",
+      tezos_protocol_environment_sigs__V1_cmi ) ]
 
 let register_env =
   let open Embedded_cmis in
