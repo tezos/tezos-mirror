@@ -1,0 +1,88 @@
+tests/test_contract_onchain_opcodes.py::TestContractOnchainLevel::test_level
+
+Node is bootstrapped.
+Estimated gas: 1453056 units (will add 12800 for safety)
+Estimated storage: 300 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.00142
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1465856
+    Storage limit: 320 bytes
+    Balance updates:
+      [CONTRACT_HASH] ................ -ꜩ0.00142
+      fees(the baker who will include this operation,0) ... +ꜩ0.00142
+    Origination:
+      From: [CONTRACT_HASH]
+      Credit: ꜩ100
+      Script:
+        { parameter unit ;
+          storage nat ;
+          code { DROP ; LEVEL ; NIL operation ; PAIR } }
+        Initial storage: 9999999
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 43 bytes
+        Paid storage size diff: 43 bytes
+        Consumed gas: 1453056
+        Balance updates:
+          [CONTRACT_HASH] ... -ꜩ0.043
+          [CONTRACT_HASH] ... -ꜩ0.257
+          [CONTRACT_HASH] ... -ꜩ100
+          [CONTRACT_HASH] ... +ꜩ100
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as level.
+Injected block [BLOCK_HASH]
+Injected block [BLOCK_HASH]
+Node is bootstrapped.
+Estimated gas: 1469296 units (will add 12800 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.001411
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1482096
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ................ -ꜩ0.001411
+      fees(the baker who will include this operation,0) ... +ꜩ0.001411
+    Transaction:
+      Amount: ꜩ500
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      This transaction was successfully applied
+      Updated storage: 4
+      Storage size: 40 bytes
+      Consumed gas: 1469296
+      Balance updates:
+        [CONTRACT_HASH] ... -ꜩ500
+        [CONTRACT_HASH] ... +ꜩ500
+
+Injected block [BLOCK_HASH]
+{ "level": [LEVEL], "proto": 1,
+  "predecessor": "[BLOCK_HASH]",
+  "timestamp": "[TIMESTAMP]", "validation_pass": 4,
+  "operations_hash": "[OPERATION_HASH]",
+  "fitness": "[FITNESS]",
+  "context": "[CONTEXT]" }
+4
+Injected block [BLOCK_HASH]
+Injected block [BLOCK_HASH]
+4

@@ -321,3 +321,30 @@ class TestContractOnchainOpcodes:
                            path.join(OPCODES_CONTRACT_PATH, contract),
                            'Unit', 1000, 'bootstrap1')
         bake(client)
+
+
+@pytest.mark.incremental
+@pytest.mark.slow
+@pytest.mark.contract
+@pytest.mark.regression
+class TestContractOnchainLevel:
+    """Onchain tests for LEVEL."""
+    # This test needs to be in a separate class to not depend on the number
+    # of operations happening before
+
+    def test_level(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'level.tz'),
+                           '9999999', 100, 'bootstrap1')
+        bake(client)
+        client.transfer(500, "bootstrap1", 'level',
+                        ['-arg', 'Unit', '--burn-cap', '10'])
+        bake(client)
+        level = str(client.get_level())
+        assert_storage_contains(client, 'level', level)
+        bake(client)
+        bake(client)
+        # checks the storage hasn't changed even though the current level has
+        assert_storage_contains(client, 'level', level)
