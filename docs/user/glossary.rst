@@ -10,9 +10,9 @@ Tezos
 
 _`Context`
     The state of the blockchain. The context is defined by the
-    `Economic Protocol`_ and typically includes information such as “this
-    account_ is credited with this many tez” and “this is the code for that smart
-    contract_.”
+    `Economic Protocol`_ and typically includes information such as
+    “this account_ is credited with this many tez” and “this is the
+    code for that `smart contract`_.”
 
     The Context is modified by Operations_. For example, an
     operation_ can transfer tez from one account_ to another, which modifies the
@@ -39,7 +39,7 @@ _`Fitness`
     See score_.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates blocks
+    A peer in the P2P network. It maintains a local state and propagates blocks_
     and operations_.
 
 _`Operation`
@@ -80,8 +80,7 @@ _`Account`
     kinds of accounts (see `Originated account`_ and `Implicit account`_).
 
     In the Context_, each account is associated with a balance (an amount of
-    tez available), a manager_ (another account that manages this one; possibly
-    itself), and other information.
+    tez available).
 
 _`Baker`
     When a node_ creates a new block_, it is the baker of this block_.
@@ -102,12 +101,10 @@ _`Baking`/_`Endorsement rights`
     These different accounts are given different Priorities.
 
     For each block_ height, there are several accounts that are allowed to
-    endorse. There can be multiple endorsements per block_. Endorsements increase
-    the Score_ of the block_.
+    endorse. There can be multiple endorsements per block_.
 
 _`Contract`
-    `Originated account`_ which is associated to a `Michelson <glossary_michelson_>`__ script.
-    Contracts are sometimes referred to as smart contracts.
+    See account_.
 
 _`Cycle`
     A cycle is a set of consecutive blocks. E.g., cycle 12 started at block_
@@ -147,35 +144,36 @@ _`Endorser`
     separate binary.
 
 _`Gas`
-    A measure of the number of elementary operations_ performed during the
-    execution of a contract_. Gas is used to measure how much computing power is
-    used to execute a contract_.
+    A measure of the number of elementary operations_ performed during
+    the execution of a `smart contract`_. Gas is used to measure how
+    much computing power is used to execute a `smart contract`_.
 
-_`Implicit account` / _`Manager`
-    An account_ that is linked to a public key. An `implicit account`_ cannot
-    include a Contract_ and cannot be delegated. An implicit contract can be
-    set as the manager for other accounts, in which case it can perform
-    operations_ on these accounts.
+_`Implicit account`
+    An account_ that is linked to a public key. Contrary to a `smart
+    contract`_, an `Implicit account`_ cannot include a script and it
+    cannot reject incoming transactions.
+
+    If registered, an `Implicit account`_ can act as a delegate_.
+
+    The address of an `Implicit account`_ always starts with the
+    letters `tz` followed by `1`, `2` or `3` (depending on the
+    signature scheme) and finally the hash of the public key.
 
 .. _glossary_michelson:
 
 Michelson
-    The built-in language used in smart contracts.
+    The built-in language used in `smart contracts`_.
 
 _`Operations`
     In protocol Alpha, the main operations are transactions (to transfer funds
-    or to execute contracts), accusations, activations, delegations,
-    endorsements, originations and transactions.
+    or to execute smart contracts), accusations, activations, delegations,
+    endorsements and originations.
 
 _`Originated account`
-    An account_ that can contain a contract_ or be delegated. They are
-    created with an explicit origination_ operation.
+    See `smart contract`_.
 
 _`Origination`
-    An operation_ to create an `originated account`_.
-
-_`Liquidity`
-    A high-level programming language that compiles to `Michelson <glossary_michelson_>`__.
+    An operation_ to create a `smart contract`_.
 
 _`Priority`
     A rank of different baking_ rights. Each rank corresponds to a time span. A
@@ -184,10 +182,17 @@ _`Priority`
     priority, results in an invalid block_.
 
 _`Roll`
-    An amount of tez (e.g., 10000ꜩ) serving as a unit to determine delegates'
+    An amount of tez (e.g., 8000ꜩ) serving as a unit to determine delegates'
     baking_ rights in a cycle_. A delegate_ with twice as many rolls as another
     will be given twice as many rights to bake.
 
+_`Smart contract`
+    `Account`_ which is associated to a `Michelson
+    <glossary_michelson_>`__ script. They are created with an explicit
+    origination_ operation and are therefore sometimes called
+    originated accounts. The address of a smart contract always starts
+    with the letters ``KT1`.
+
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
-    contract_.
+    `smart contract`_.
