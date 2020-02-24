@@ -1,0 +1,19 @@
+(executables
+ (names test_requester)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-requester
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib
+                   -open Tezos_requester)))
+
+
+(alias
+ (name runtest_requester)
+ (action (run %{exe:test_requester.exe})))
+
+(alias
+ (name runtest)
+ (package tezos-requester)
+ (deps (alias runtest_requester)))
