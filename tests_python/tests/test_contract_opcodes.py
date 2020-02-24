@@ -403,6 +403,10 @@ class TestContractOpcodes:
             # Get the current balance of the contract
             ('balance.tz', '111', 'Unit', '4000000000000'),
 
+            # Get the current level of the block
+            # Test the produced variable annotation
+            ('level.tz', '111', 'Unit', '1'),
+
             # Test addition and subtraction on tez
             ('tez_add_sub.tz', 'None', '(Pair 2000000 1000000)',
              '(Some (Pair 3000000 1000000))'),

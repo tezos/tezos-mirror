@@ -346,3 +346,35 @@ class TestContractOnchainOpcodes:
             except subprocess.CalledProcessError:
                 pass
         bake(client)
+
+@pytest.mark.incremental
+@pytest.mark.slow
+@pytest.mark.contract
+@pytest.mark.regression
+class TestContractOnchainLevel:
+    """Onchain tests for LEVEL."""
+    # This test needs to be in a separate class to not depend on the number
+    # of operations happening before
+
+    def test_level(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+
+        init_with_transfer(client, path.join(OPCODES_CONTRACT_PATH,
+                                             'level.tz'),
+                           '9999999', 100, 'bootstrap1')
+        bake(client)
+        client.transfer(500, "bootstrap1", 'level',
+                        ['-arg', 'Unit', '--burn-cap', '10'])
+        bake(client)
+        level = client.get_level()
+        slevel = str(level)
+        assert_storage_contains(client, 'level', slevel)
+        bake(client)
+        bake(client)
+        # checks the storage hasn't changed even though the current level has
+        assert_storage_contains(client, 'level', slevel)
+        # Run again to check the storage gets updated
+        client.transfer(500, "bootstrap1", 'level',
+                        ['-arg', 'Unit', '--burn-cap', '10'])
+        bake(client)
+        assert_storage_contains(client, 'level', str(level + 3))
