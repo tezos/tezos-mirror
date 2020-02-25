@@ -31,12 +31,14 @@ The Community
   important meeting point of the community.
 - Several community-built block explorers are available:
 
+    - https://tzstats.com
     - https://tezos.id
-    - https://tezblock.io/
-    - https://teztracker.everstake.one/
-    - https://tzkt.io/ (Baking focused Explorer)
+    - https://tezblock.io
+    - https://teztracker.everstake.one
+    - https://tzkt.io (Baking focused Explorer)
+    - https://arronax.io
     - https://mininax.cryptonomic.tech/mainnet
-    - https://baking-bad.org/ (Reward Tracker)
+    - https://baking-bad.org (Reward Tracker)
 
 - A few community-run websites collect useful Tezos links:
 
