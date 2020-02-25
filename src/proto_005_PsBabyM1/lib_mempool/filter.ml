@@ -32,8 +32,8 @@ type nanotez = Z.t
 let nanotez_enc =
   Data_encoding.def
     "nanotez"
-    ~title:"Thousandths of tez"
-    ~description:"One thousand nanotez make a tez"
+    ~title:"A thousandth of a mutez"
+    ~description:"One thousand nanotez make a mutez (1 tez = 1e9 nanotez)"
     Data_encoding.z
 
 type config = {
