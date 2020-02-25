@@ -602,6 +602,8 @@ let cost_of_instr : type b a. (b, a) descr -> b stack -> Gas.cost =
         Interp_costs.source
     | (Self _, _) ->
         Interp_costs.self
+    | (Self_address, _) ->
+        Interp_costs.self
     | (Amount, _) ->
         Interp_costs.amount
     | (Dig (n, _), _) ->
@@ -1368,6 +1370,8 @@ let rec step :
       logged_return (Item ((step_constants.source, "default"), rest), ctxt)
   | (Self (t, entrypoint), rest) ->
       logged_return (Item ((t, (step_constants.self, entrypoint)), rest), ctxt)
+  | (Self_address, rest) ->
+      logged_return (Item ((step_constants.self, "default"), rest), ctxt)
   | (Amount, rest) ->
       logged_return (Item (step_constants.amount, rest), ctxt)
   | (Dig (_n, n'), stack) ->

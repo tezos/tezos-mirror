@@ -111,6 +111,7 @@ type prim =
   | I_SOURCE
   | I_SENDER
   | I_SELF
+  | I_SELF_ADDRESS
   | I_SLICE
   | I_STEPS_TO_QUOTA
   | I_SUB

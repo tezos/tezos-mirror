@@ -724,6 +724,8 @@ module Cost_of = struct
           alloc_cost 1
       | Self _ ->
           alloc_cost 2
+      | Self_address ->
+          alloc_cost 1
       | Amount ->
           alloc_cost 1
       | Dig (n, _) ->

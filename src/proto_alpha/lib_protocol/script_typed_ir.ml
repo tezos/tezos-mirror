@@ -394,6 +394,7 @@ and ('bef, 'aft) instr =
   | Source : ('rest, address * 'rest) instr
   | Sender : ('rest, address * 'rest) instr
   | Self : 'p ty * string -> ('rest, 'p typed_contract * 'rest) instr
+  | Self_address : ('rest, address * 'rest) instr
   | Amount : ('rest, Tez.t * 'rest) instr
   | Dig :
       int * ('x * 'rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness

@@ -112,6 +112,7 @@ type prim =
   | I_SOURCE
   | I_SENDER
   | I_SELF
+  | I_SELF_ADDRESS
   | I_SLICE
   | I_STEPS_TO_QUOTA
   | I_SUB
@@ -243,6 +244,7 @@ let namespace = function
   | I_RENAME
   | I_RIGHT
   | I_SELF
+  | I_SELF_ADDRESS
   | I_SENDER
   | I_SET_DELEGATE
   | I_SHA256
@@ -456,6 +458,8 @@ let string_of_prim = function
       "SENDER"
   | I_SELF ->
       "SELF"
+  | I_SELF_ADDRESS ->
+      "SELF_ADDRESS"
   | I_SLICE ->
       "SLICE"
   | I_STEPS_TO_QUOTA ->
@@ -696,6 +700,8 @@ let prim_of_string = function
       ok I_SENDER
   | "SELF" ->
       ok I_SELF
+  | "SELF_ADDRESS" ->
+      ok I_SELF_ADDRESS
   | "SLICE" ->
       ok I_SLICE
   | "STEPS_TO_QUOTA" ->
@@ -959,7 +965,8 @@ let prim_encoding =
          ("CHAIN_ID", I_CHAIN_ID);
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_007 addition *)
-         ("LEVEL", I_LEVEL)
+         ("LEVEL", I_LEVEL);
+         ("SELF_ADDRESS", I_SELF_ADDRESS)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 
