@@ -867,3 +867,32 @@ class TestBadAnnotation:
 
         res = client.run_script(contract, 'None', parameter)
         assert res.storage == 'None'
+
+
+@pytest.mark.contract
+@pytest.mark.regression
+class TestSelfAddressTransfer:
+
+    def test_self_address_originate_sender(self,
+                                           client_regtest_scrubbed,
+                                           session):
+        client = client_regtest_scrubbed
+        path = os.path.join(CONTRACT_PATH,
+                            'mini_scenarios', 'self_address_sender.tz')
+        originate(client, session, path, 'Unit', 0)
+
+    def test_self_address_originate_receiver(self,
+                                             client_regtest_scrubbed,
+                                             session):
+        client = client_regtest_scrubbed
+        path = os.path.join(CONTRACT_PATH,
+                            'mini_scenarios', 'self_address_receiver.tz')
+        originate(client, session, path, 'Unit', 0)
+        session['receiver_address'] = session['contract']
+
+    def test_send_self_address(self, client_regtest_scrubbed, session):
+        client = client_regtest_scrubbed
+        receiver_address = session['receiver_address']
+        client.transfer(0, 'bootstrap2', 'self_address_sender',
+                        ['--arg', f'"{receiver_address}"', '--burn-cap', '2'])
+        client.bake('bootstrap5', BAKE_ARGS)
