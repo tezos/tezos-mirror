@@ -425,6 +425,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Amount ->
       0
+  | Self_address ->
+      0
   | Set_delegate ->
       0
   | Pack _ ->
@@ -4359,6 +4361,10 @@ and parse_instr :
                 (Item_t (Contract_t (param_type, None), stack, annot))
         in
         get_toplevel_type tc_context )
+  | (Prim (loc, I_SELF_ADDRESS, [], annot), stack) ->
+      parse_var_annot loc annot ~default:default_self_annot
+      >>?= fun annot ->
+      typed ctxt loc Self_address (Item_t (Address_t None, stack, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -4668,6 +4674,7 @@ and parse_instr :
              I_SOURCE;
              I_SENDER;
              I_SELF;
+             I_SELF_ADDRESS;
              I_LAMBDA ]
 
 and parse_contract :
