@@ -165,14 +165,25 @@ module Simple : sig
       declare a module and apply the [Make] functor.
       They are pretty-printed as [<DOC> (<PARAMETER> = <VALUE>, ...)]
       (unless there is no parameter at all, in which case they are printed
-      as [<DOC>]).
+      as [<DOC>]). You may also use braces to inline some parameters in [<DOC>].
+      In the example below, [hash] is inlined.
+
+      For consistency, it is suggested that log messages do not start with a
+      capital letter and do not end with a period. For instance, write
+      [~msg: "started something important"] instead of
+      [~msg: "Started something important."]. The reason is that
+      messages that do not inline all of their parameters are followed by
+      the remaining parameters in parentheses, and a period does not
+      (arguably) look great in those cases. If it does not end with a period,
+      it is not a sentence and thus capitalizing the first word does not
+      make much sense either.
 
       Declare events with one of the [declare] functions, for instance:
       [
         let inject =
           Internal_event.Simple.declare_2
             ~name: "inject"
-            ~msg: "injected block"
+            ~msg: "injected block {hash}"
             ("level", int)
             ("hash", string)
       ]
@@ -186,7 +197,7 @@ module Simple : sig
       Then emit this event with some parameters like this:
       [Internal_event.Simple.emit inject (42, "BL654654654645654654564")]
       This event will be printed as:
-      [injected block (level = 42, hash = "BL654654654645654654564")]
+      [injected block BL654654654645654654564 (level = 42)]
 
       For all [declare] functions, the default value for [level] is [Info]. *)
 

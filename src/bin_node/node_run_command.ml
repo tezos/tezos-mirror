@@ -107,7 +107,7 @@ module Event = struct
     declare_3
       ~section
       ~name:"starting_rpc_server"
-      ~msg:"starting RPC server"
+      ~msg:"starting RPC server on {host}:{port}"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)

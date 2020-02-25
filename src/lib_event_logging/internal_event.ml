@@ -467,16 +467,25 @@ module Simple = struct
 
   (* Default pretty-printer for parameters.
      Simple types are printed in a compact way.
-     Structured types are not printed. *)
-  let rec pp_human_readable : 'a. 'a Data_encoding.t -> _ -> 'a -> _ =
-    fun (type a) (encoding : a Data_encoding.t) fmt (value : a) ->
+     Structured types are not printed.
+
+     If [never_empty] is [false], do not print anything for:
+     - structured values, like objects;
+     - empty values, like null.
+     This is useful to ignore non-inline parameters in log messages.
+
+     If [never_empty] is [true], always print something.
+     This is useful for inline parameters. *)
+  let rec pp_human_readable :
+            'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
+    fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
      match encoding.encoding with
      | Null ->
-         ()
+         if never_empty then Format.pp_print_string fmt "N/A"
      | Empty ->
-         ()
+         if never_empty then Format.pp_print_string fmt "N/A"
      | Ignore ->
-         ()
+         if never_empty then Format.pp_print_string fmt "N/A"
      | Constant name ->
          pp_print_shortened_string fmt name
      | Bool ->
@@ -510,46 +519,51 @@ module Simple = struct
      | String _ ->
          pp_print_shortened_string fmt value
      | Padded (encoding, _) ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (
        match Hashtbl.find_opt table value with
        | None ->
-           ()
+           if never_empty then Format.pp_print_string fmt "N/A"
        | Some (name, _) ->
            pp_print_shortened_string fmt name )
      | Array _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<array>"
      | List _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<list>"
      | Obj (Req {encoding; _} | Dft {encoding; _}) ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | Obj (Opt {encoding; _}) ->
-         Option.iter ~f:(pp_human_readable encoding fmt) value
+         Option.iter ~f:(pp_human_readable ~never_empty encoding fmt) value
      | Objs _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<obj>"
      | Tup encoding ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | Tups _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<tuple>"
      | Union
          { cases =
              [ Case {encoding; proj; _};
                Case {encoding = {encoding = Null; _}; _} ];
-           _ } ->
-         (* Probably an [option] type or similar.
-            We only print the value if it is not null. *)
-         Option.iter ~f:(pp_human_readable encoding fmt) (proj value)
+           _ } -> (
+       (* Probably an [option] type or similar.
+          We only print the value if it is not null,
+          unless [never_empty] is [true]. *)
+       match proj value with
+       | None ->
+           if never_empty then Format.pp_print_string fmt "null"
+       | Some value ->
+           pp_human_readable ~never_empty encoding fmt value )
      | Union _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<union>"
      | Mu _ ->
-         ()
+         if never_empty then Format.pp_print_string fmt "<recursive>"
      | Conv {proj; encoding; _} ->
          (* TODO: it may be worth it to take a look at [encoding]
             before calling [proj], to try and predict whether the value
             will actually be printed. *)
-         pp_human_readable encoding fmt (proj value)
+         pp_human_readable ~never_empty encoding fmt (proj value)
      | Describe {encoding; _} ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | Splitted {json_encoding; _} -> (
        (* Generally, [Splitted] nodes imply that the JSON encoding
           is more human-friendly, as JSON is a human-friendly
@@ -562,34 +576,102 @@ module Simple = struct
           whether the value will actually be printed (same as [Conv]). *)
        match Json_encoding.construct json_encoding value with
        | `Null ->
-           ()
+           if never_empty then Format.pp_print_string fmt "N/A"
        | `Bool value ->
            Format.pp_print_bool fmt value
        | `Float value ->
            pp_print_compact_float fmt value
        | `String value ->
            pp_print_shortened_string fmt value
-       | `A _ | `O _ ->
-           () )
+       | `A _ ->
+           if never_empty then Format.pp_print_string fmt "<list>"
+       | `O _ ->
+           if never_empty then Format.pp_print_string fmt "<obj>" )
      | Dynamic_size {encoding; _} ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | Check_size {encoding; _} ->
-         pp_human_readable encoding fmt value
+         pp_human_readable ~never_empty encoding fmt value
      | Delayed make_encoding ->
-         pp_human_readable (make_encoding ()) fmt value
+         pp_human_readable ~never_empty (make_encoding ()) fmt value
 
   type parameter = Parameter : string * 'a Data_encoding.t * 'a -> parameter
 
-  let pp_log_message msg fmt fields =
-    Format.fprintf fmt "@[<hov 2>%s" msg ;
+  type msg_atom = Text of string | Variable of int | Space
+
+  let invalid_msg reason msg =
+    invalid_arg
+      (Printf.sprintf
+         "Internal_event.Simple: invalid message string: %S: %s"
+         msg
+         reason)
+
+  let parse_msg variable_names msg =
+    let len = String.length msg in
+    let rec find_variable_begin acc atom_start i =
+      let add_text () =
+        if i <= atom_start then acc
+        else Text (String.sub msg atom_start (i - atom_start)) :: acc
+      in
+      if i >= len then add_text ()
+      else if msg.[i] = '{' then
+        let acc = add_text () in
+        let i = i + 1 in
+        find_variable_end acc i i
+      else if msg.[i] = ' ' then
+        let acc = Space :: add_text () in
+        let i = i + 1 in
+        find_variable_begin acc i i
+      else find_variable_begin acc atom_start (i + 1)
+    and find_variable_end acc atom_start i =
+      if i >= len then invalid_msg "unmatched '{'" msg
+      else if msg.[i] = '}' then
+        let variable_name = String.sub msg atom_start (i - atom_start) in
+        match TzList.index_of variable_name variable_names with
+        | None ->
+            invalid_msg
+              (Printf.sprintf "unbound variable: %S" variable_name)
+              msg
+        | Some index ->
+            let acc = Variable index :: acc in
+            let i = i + 1 in
+            find_variable_begin acc i i
+      else find_variable_end acc atom_start (i + 1)
+    in
+    find_variable_begin [] 0 0 |> List.rev
+
+  let pp_log_message (msg : msg_atom list) fmt fields =
+    (* Add a boolean reference to each field telling whether the field was used. *)
+    let fields = List.map (fun field -> (field, ref false)) fields in
+    Format.fprintf fmt "@[<hov 2>" ;
+    (* First, print [msg], including interpolated variables. *)
+    let pp_msg_atom = function
+      | Text text ->
+          Format.pp_print_string fmt text
+      | Variable index -> (
+        match List.nth_opt fields index with
+        | None ->
+            (* Not supposed to happen, by construction.
+               But it's just logging, no need to fail here. *)
+            Format.pp_print_string fmt "???"
+        | Some (Parameter (_name, enc, value), used) ->
+            used := true ;
+            pp_human_readable ~never_empty:true enc fmt value )
+      | Space ->
+          Format.pp_print_space fmt ()
+    in
+    List.iter pp_msg_atom msg ;
+    (* Then, print variables that were not used by [msg]. *)
     let first_field = ref true in
-    let print_field (Parameter (name, enc, value)) =
-      let value = Format.asprintf "%a" (pp_human_readable enc) value in
-      if String.length value > 0 then
-        if !first_field then (
-          first_field := false ;
-          Format.fprintf fmt "@ (%s = %s" name value )
-        else Format.fprintf fmt ",@ %s = %s" name value
+    let print_field (Parameter (name, enc, value), used) =
+      if not !used then
+        let value =
+          Format.asprintf "%a" (pp_human_readable ~never_empty:false enc) value
+        in
+        if String.length value > 0 then
+          if !first_field then (
+            first_field := false ;
+            Format.fprintf fmt "@ (%s = %s" name value )
+          else Format.fprintf fmt ",@ %s = %s" name value
     in
     List.iter print_field fields ;
     if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
@@ -601,6 +683,7 @@ module Simple = struct
 
   let declare_0 ?section ~name ~msg ?(level = Info) () =
     let section = make_section section in
+    let parsed_msg = parse_msg [] msg in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
       type t = unit
 
@@ -608,7 +691,7 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt () = pp_log_message msg fmt []
+      let pp fmt () = pp_log_message parsed_msg fmt []
 
       let encoding = with_version ~name Data_encoding.unit
 
@@ -620,6 +703,7 @@ module Simple = struct
   let declare_1 (type a) ?section ~name ~msg ?(level = Info)
       (f0_name, (f0_enc : a Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg = parse_msg [f0_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a = struct
       type t = a
 
@@ -627,7 +711,8 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt f0 = pp_log_message msg fmt [Parameter (f0_name, f0_enc, f0)]
+      let pp fmt f0 =
+        pp_log_message parsed_msg fmt [Parameter (f0_name, f0_enc, f0)]
 
       let encoding = with_version ~name f0_enc
 
@@ -640,6 +725,7 @@ module Simple = struct
       (f0_name, (f0_enc : a Data_encoding.t))
       (f1_name, (f1_enc : b Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg = parse_msg [f0_name; f1_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b = struct
       type t = a * b
 
@@ -649,7 +735,7 @@ module Simple = struct
 
       let pp fmt (f0, f1) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [Parameter (f0_name, f0_enc, f0); Parameter (f1_name, f1_enc, f1)]
 
@@ -669,6 +755,7 @@ module Simple = struct
       (f1_name, (f1_enc : b Data_encoding.t))
       (f2_name, (f2_enc : c Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg = parse_msg [f0_name; f1_name; f2_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c = struct
       type t = a * b * c
 
@@ -678,7 +765,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);
@@ -702,6 +789,7 @@ module Simple = struct
       (f2_name, (f2_enc : c Data_encoding.t))
       (f3_name, (f3_enc : d Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg = parse_msg [f0_name; f1_name; f2_name; f3_name] msg in
     let module Definition : EVENT_DEFINITION with type t = a * b * c * d =
     struct
       type t = a * b * c * d
@@ -712,7 +800,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2, f3) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);
@@ -739,6 +827,9 @@ module Simple = struct
       (f3_name, (f3_enc : d Data_encoding.t))
       (f4_name, (f4_enc : e Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg =
+      parse_msg [f0_name; f1_name; f2_name; f3_name; f4_name] msg
+    in
     let module Definition : EVENT_DEFINITION with type t = a * b * c * d * e =
     struct
       type t = a * b * c * d * e
@@ -749,7 +840,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2, f3, f4) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);
@@ -779,6 +870,9 @@ module Simple = struct
       (f4_name, (f4_enc : e Data_encoding.t))
       (f5_name, (f5_enc : f Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg =
+      parse_msg [f0_name; f1_name; f2_name; f3_name; f4_name; f5_name] msg
+    in
     let module Definition :
       EVENT_DEFINITION with type t = a * b * c * d * e * f = struct
       type t = a * b * c * d * e * f
@@ -789,7 +883,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2, f3, f4, f5) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);
@@ -822,6 +916,11 @@ module Simple = struct
       (f5_name, (f5_enc : f Data_encoding.t))
       (f6_name, (f6_enc : g Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg =
+      parse_msg
+        [f0_name; f1_name; f2_name; f3_name; f4_name; f5_name; f6_name]
+        msg
+    in
     let module Definition :
       EVENT_DEFINITION with type t = a * b * c * d * e * f * g = struct
       type t = a * b * c * d * e * f * g
@@ -832,7 +931,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2, f3, f4, f5, f6) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);
@@ -868,6 +967,11 @@ module Simple = struct
       (f6_name, (f6_enc : g Data_encoding.t))
       (f7_name, (f7_enc : h Data_encoding.t)) =
     let section = make_section section in
+    let parsed_msg =
+      parse_msg
+        [f0_name; f1_name; f2_name; f3_name; f4_name; f5_name; f6_name; f7_name]
+        msg
+    in
     let module Definition :
       EVENT_DEFINITION with type t = a * b * c * d * e * f * g * h = struct
       type t = a * b * c * d * e * f * g * h
@@ -878,7 +982,7 @@ module Simple = struct
 
       let pp fmt (f0, f1, f2, f3, f4, f5, f6, f7) =
         pp_log_message
-          msg
+          parsed_msg
           fmt
           [ Parameter (f0_name, f0_enc, f0);
             Parameter (f1_name, f1_enc, f1);

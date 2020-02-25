@@ -194,3 +194,12 @@ let shuffle l =
   |> List.map (fun d -> (Random.bits (), d))
   |> List.sort (fun (x, _) (y, _) -> compare x y)
   |> List.map snd
+
+let index_of ?(compare = Stdlib.compare) item list =
+  let rec find index = function
+    | [] ->
+        None
+    | head :: tail ->
+        if compare head item = 0 then Some index else find (index + 1) tail
+  in
+  find 0 list
