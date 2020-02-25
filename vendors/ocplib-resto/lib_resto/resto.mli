@@ -97,6 +97,16 @@ module Description : sig
     recurse: bool ;
   }
 
+  (** Service descriptions.
+
+      Note that schemas are lazy.
+      This is because schemas are often only used when generating documentation
+      and they are not needed to actually serve the service.
+      Computing large schemas takes time, and by making them lazy we ensure that
+      this time is not spent unnecessarily.
+      A consequence of this, however, is that errors that may happen when computing
+      schemas only occur when the schema is actually used and not on startup.
+      If this is a problem, consider running a test which generates all schemas. *)
   type 'schema service = {
     description: string option ;
     path: path_item list ;
