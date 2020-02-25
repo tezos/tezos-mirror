@@ -1681,6 +1681,22 @@ delegate of the contract or if `kh` is not a registered delegate.
     :: 'S   ->   contract 'p : 'S
        where   contract 'p is the type of the current contract
 
+Note that ``SELF`` is forbidden in lambdas because it cannot be
+type-checked; the type of the contract executing the lambda cannot be
+known at the point of type-checking the lambda's body.
+
+-  ``SELF_ADDRESS``: Push the address of the current contract. This is
+   equivalent to ``SELF; ADDRESS`` except that it is allowed in
+   lambdas.
+
+::
+
+    :: 'S   ->   address : 'S
+
+Note that ``SELF_ADDRESS`` inside a lambda returns the address of the
+contract executing the lambda, which can be different from the address
+of the contract in which the ``SELF_ADDRESS`` instruction is written.
+
 -  ``AMOUNT``: Push the amount of the current transaction.
 
 ::
@@ -2362,6 +2378,7 @@ The instructions which accept at most one variable annotation are:
    SOURCE
    SENDER
    SELF
+   SELF_ADDRESS
    CAST
    RENAME
    CHAIN_ID
@@ -2622,6 +2639,8 @@ A similar mechanism is used for context dependent instructions:
    SENDER  :: 'S   ->   @sender address : 'S
 
    SELF  :: 'S   ->   @self contract 'p : 'S
+
+   SELF_ADDRESS  :: 'S   ->   @self address : 'S
 
    AMOUNT  :: 'S   ->   @amount mutez : 'S
 
@@ -3113,6 +3132,7 @@ Full grammar
       | LE
       | GE
       | SELF
+      | SELF_ADDRESS
       | CONTRACT <type>
       | TRANSFER_TOKENS
       | SET_DELEGATE
