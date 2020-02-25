@@ -594,6 +594,11 @@ module Simple = struct
     List.iter print_field fields ;
     if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
 
+  let with_version ~name encoding =
+    Data_encoding.With_version.encoding
+      ~name
+      (Data_encoding.With_version.first_version encoding)
+
   let declare_0 ?section ~name ~msg ?(level = Info) () =
     let section = make_section section in
     let module Definition : EVENT_DEFINITION with type t = unit = struct
@@ -605,7 +610,7 @@ module Simple = struct
 
       let pp fmt () = pp_log_message msg fmt []
 
-      let encoding = Data_encoding.unit
+      let encoding = with_version ~name Data_encoding.unit
 
       let level _ = level
     end in
@@ -624,7 +629,7 @@ module Simple = struct
 
       let pp fmt f0 = pp_log_message msg fmt [Parameter (f0_name, f0_enc, f0)]
 
-      let encoding = f0_enc
+      let encoding = with_version ~name f0_enc
 
       let level _ = level
     end in
@@ -649,9 +654,10 @@ module Simple = struct
           [Parameter (f0_name, f0_enc, f0); Parameter (f1_name, f1_enc, f1)]
 
       let encoding =
-        Data_encoding.obj2
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
+        with_version ~name
+        @@ Data_encoding.obj2
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
 
       let level _ = level
     end in
@@ -679,10 +685,11 @@ module Simple = struct
             Parameter (f2_name, f2_enc, f2) ]
 
       let encoding =
-        Data_encoding.obj3
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
+        with_version ~name
+        @@ Data_encoding.obj3
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
 
       let level _ = level
     end in
@@ -713,11 +720,12 @@ module Simple = struct
             Parameter (f3_name, f3_enc, f3) ]
 
       let encoding =
-        Data_encoding.obj4
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
-          (Data_encoding.req f3_name f3_enc)
+        with_version ~name
+        @@ Data_encoding.obj4
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
+             (Data_encoding.req f3_name f3_enc)
 
       let level _ = level
     end in
@@ -750,12 +758,13 @@ module Simple = struct
             Parameter (f4_name, f4_enc, f4) ]
 
       let encoding =
-        Data_encoding.obj5
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
-          (Data_encoding.req f3_name f3_enc)
-          (Data_encoding.req f4_name f4_enc)
+        with_version ~name
+        @@ Data_encoding.obj5
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
+             (Data_encoding.req f3_name f3_enc)
+             (Data_encoding.req f4_name f4_enc)
 
       let level _ = level
     end in
@@ -790,13 +799,14 @@ module Simple = struct
             Parameter (f5_name, f5_enc, f5) ]
 
       let encoding =
-        Data_encoding.obj6
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
-          (Data_encoding.req f3_name f3_enc)
-          (Data_encoding.req f4_name f4_enc)
-          (Data_encoding.req f5_name f5_enc)
+        with_version ~name
+        @@ Data_encoding.obj6
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
+             (Data_encoding.req f3_name f3_enc)
+             (Data_encoding.req f4_name f4_enc)
+             (Data_encoding.req f5_name f5_enc)
 
       let level _ = level
     end in
@@ -833,14 +843,15 @@ module Simple = struct
             Parameter (f6_name, f6_enc, f6) ]
 
       let encoding =
-        Data_encoding.obj7
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
-          (Data_encoding.req f3_name f3_enc)
-          (Data_encoding.req f4_name f4_enc)
-          (Data_encoding.req f5_name f5_enc)
-          (Data_encoding.req f6_name f6_enc)
+        with_version ~name
+        @@ Data_encoding.obj7
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
+             (Data_encoding.req f3_name f3_enc)
+             (Data_encoding.req f4_name f4_enc)
+             (Data_encoding.req f5_name f5_enc)
+             (Data_encoding.req f6_name f6_enc)
 
       let level _ = level
     end in
@@ -879,15 +890,16 @@ module Simple = struct
             Parameter (f7_name, f7_enc, f7) ]
 
       let encoding =
-        Data_encoding.obj8
-          (Data_encoding.req f0_name f0_enc)
-          (Data_encoding.req f1_name f1_enc)
-          (Data_encoding.req f2_name f2_enc)
-          (Data_encoding.req f3_name f3_enc)
-          (Data_encoding.req f4_name f4_enc)
-          (Data_encoding.req f5_name f5_enc)
-          (Data_encoding.req f6_name f6_enc)
-          (Data_encoding.req f7_name f7_enc)
+        with_version ~name
+        @@ Data_encoding.obj8
+             (Data_encoding.req f0_name f0_enc)
+             (Data_encoding.req f1_name f1_enc)
+             (Data_encoding.req f2_name f2_enc)
+             (Data_encoding.req f3_name f3_enc)
+             (Data_encoding.req f4_name f4_enc)
+             (Data_encoding.req f5_name f5_enc)
+             (Data_encoding.req f6_name f6_enc)
+             (Data_encoding.req f7_name f7_enc)
 
       let level _ = level
     end in
