@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -398,6 +399,18 @@ let build_rpc_directory net =
         | Some pool ->
             P2p_pool.Points.trust pool point ;
             RPC_answer.return_unit)
+  in
+  let dir =
+    RPC_directory.gen_register1
+      dir
+      P2p_services.Points.S.set_expected_peer_id
+      (fun point_id () peer_id ->
+        match P2p.pool net with
+        | None ->
+            RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.set_expected_peer_id pool point_id peer_id
+            >>= fun () -> RPC_answer.return_unit)
   in
   let dir =
     RPC_directory.gen_register1

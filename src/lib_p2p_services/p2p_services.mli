@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -124,6 +125,9 @@ module Points : sig
 
   val banned : #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
 
+  val set_expected_peer_id :
+    #simple -> P2p_point.Id.t -> P2p_peer.Id.t -> unit tzresult Lwt.t
+
   module S : sig
     val list :
       ( [`GET],
@@ -157,6 +161,15 @@ module Points : sig
 
     val unban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
+
+    val set_expected_peer_id :
+      ( [`PATCH],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        P2p_peer.Id.t,
+        unit )
+      RPC_service.t
 
     val trust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t

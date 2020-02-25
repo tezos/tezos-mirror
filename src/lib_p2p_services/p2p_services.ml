@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -116,11 +117,11 @@ let versions ctxt = make_call S.versions ctxt () () ()
 
 let events ctxt = make_streamed_call S.events ctxt () () ()
 
-let connect ctxt ~timeout peer_id =
+let connect ctxt ~timeout point_id =
   make_call1
     S.connect
     ctxt
-    peer_id
+    point_id
     (object
        method timeout = timeout
     end)
@@ -179,6 +180,18 @@ module Points = struct
         ~query:RPC_query.empty
         ~output:P2p_point.Info.encoding
         ~description:"Details about a given `IP:addr`."
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
+
+    let expected_peer_id_encoding =
+      let open Data_encoding in
+      obj1 (req "peer_id" P2p_peer.Id.encoding)
+
+    let set_expected_peer_id =
+      RPC_service.patch_service
+        ~description:"Patch attributes of a point"
+        ~query:RPC_query.empty
+        ~input:expected_peer_id_encoding
+        ~output:Data_encoding.unit
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
 
     let events =
@@ -277,9 +290,12 @@ module Points = struct
       end)
       ()
 
-  let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
+  let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
 
-  let unban ctxt peer_id = make_call1 S.unban ctxt peer_id () ()
+  let unban ctxt point_id = make_call1 S.unban ctxt point_id () ()
+
+  let set_expected_peer_id ctxt point_id peer_id =
+    make_call1 S.set_expected_peer_id ctxt point_id () peer_id
 
   let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
 
@@ -374,11 +390,11 @@ module Peers = struct
 
   let info ctxt peer_id = make_call1 S.info ctxt peer_id () ()
 
-  let events ctxt point =
+  let events ctxt peer =
     make_streamed_call
       S.events
       ctxt
-      ((), point)
+      ((), peer)
       (object
          method monitor = true
       end)
@@ -394,15 +410,15 @@ module Peers = struct
       end)
       ()
 
-  let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
+  let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
 
-  let unban ctxt point_id = make_call1 S.unban ctxt point_id () ()
+  let unban ctxt peer_id = make_call1 S.unban ctxt peer_id () ()
 
-  let trust ctxt point_id = make_call1 S.trust ctxt point_id () ()
+  let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
 
-  let untrust ctxt point_id = make_call1 S.untrust ctxt point_id () ()
+  let untrust ctxt peer_id = make_call1 S.untrust ctxt peer_id () ()
 
-  let banned ctxt point_id = make_call1 S.banned ctxt point_id () ()
+  let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end
 
 module ACL = struct
