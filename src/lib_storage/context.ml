@@ -226,7 +226,7 @@ module P = Store.Private
 type index = {
   path : string;
   repo : Store.Repo.t;
-  patch_context : context -> context Lwt.t;
+  patch_context : context -> context tzresult Lwt.t;
 }
 
 and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
@@ -416,22 +416,11 @@ let fork_test_chain v ~protocol ~expiration =
 
 (*-- Initialisation ----------------------------------------------------------*)
 
-let init ?patch_context ?mapsize:_ ?readonly root =
+let init ?(patch_context = return) ?mapsize:_ ?readonly root =
   Store.Repo.v
     (Irmin_pack.config ?readonly ?index_log_size:!index_log_size root)
   >>= fun repo ->
-  let v =
-    {
-      path = root;
-      repo;
-      patch_context =
-        ( match patch_context with
-        | None ->
-            fun ctxt -> Lwt.return ctxt
-        | Some patch_context ->
-            patch_context );
-    }
-  in
+  let v = {path = root; repo; patch_context} in
   Gc.finalise (fun v -> Lwt.async (fun () -> Store.Repo.close v.repo)) v ;
   Lwt.return v
 
@@ -441,7 +430,7 @@ let commit_genesis index ~chain_id ~time ~protocol =
   let tree = Store.Tree.empty in
   let ctxt = {index; tree; parents = []} in
   index.patch_context ctxt
-  >>= fun ctxt ->
+  >>=? fun ctxt ->
   set_protocol ctxt protocol
   >>= fun ctxt ->
   set_test_chain ctxt Not_running
@@ -449,7 +438,7 @@ let commit_genesis index ~chain_id ~time ~protocol =
   raw_commit ~time ~message:"Genesis" ctxt
   >>= fun commit ->
   Store.Branch.set index.repo (get_branch chain_id) commit
-  >|= fun () -> Hash.to_context_hash (Store.Commit.hash commit)
+  >>= fun () -> return (Hash.to_context_hash (Store.Commit.hash commit))
 
 let compute_testchain_chain_id genesis =
   let genesis_hash = Block_hash.hash_bytes [Block_hash.to_bytes genesis] in

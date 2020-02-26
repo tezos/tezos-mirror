@@ -407,7 +407,7 @@ val history_mode : global_state -> History_mode.t Lwt.t
 (** Read the internal state of the node and initialize
     the databases. *)
 val init :
-  ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?store_mapsize:int64 ->
   ?context_mapsize:int64 ->

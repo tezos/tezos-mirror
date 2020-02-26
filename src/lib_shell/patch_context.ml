@@ -37,7 +37,7 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
   match Registered_protocol.get genesis.protocol with
   | None ->
       assert false (* FIXME error *)
-  | Some proto -> (
+  | Some proto ->
       let module Proto = (val proto) in
       let ctxt = Shell_context.wrap_disk_context ctxt in
       Proto.init
@@ -52,9 +52,5 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
           fitness = [];
           context = Context_hash.zero;
         }
-      >>= function
-      | Error _ ->
-          assert false (* FIXME error *)
-      | Ok {context; _} ->
-          let context = Shell_context.unwrap_disk_context context in
-          Lwt.return context )
+      >>=? fun {context; _} ->
+      return (Shell_context.unwrap_disk_context context)

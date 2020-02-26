@@ -27,6 +27,17 @@ open Context
 
 let ( >>= ) = Lwt.bind
 
+(* Same as [>>=], but handle errors using [Assert.fail_msg]. *)
+let ( >>=! ) x f =
+  x
+  >>= fun result ->
+  match result with
+  | Error trace ->
+      let message = Format.asprintf "%a" Error_monad.pp_print_error trace in
+      Assert.fail_msg "%s" message
+  | Ok x ->
+      f x
+
 let ( >|= ) = Lwt.( >|= )
 
 let ( // ) = Filename.concat
@@ -116,15 +127,13 @@ let wrap_context_init f _ () =
         ~chain_id
         ~time:genesis_time
         ~protocol:genesis_protocol
-      >>= fun genesis ->
+      >>=! fun genesis ->
       create_block2 idx genesis
       >>= fun block2 ->
       create_block3a idx block2
       >>= fun block3a ->
       create_block3b idx block2
-      >>= fun block3b ->
-      f {idx; genesis; block2; block3a; block3b}
-      >>= fun result -> Lwt.return result)
+      >>= fun block3b -> f {idx; genesis; block2; block3a; block3b})
 
 (** Simple test *)
 
@@ -329,12 +338,7 @@ let test_dump {idx; block3b; _} =
       let expected_ctxt_hash = bh.Block_header.shell.context in
       assert (Context_hash.equal ctxt_hash expected_ctxt_hash) ;
       return ())
-  >>= function
-  | Error err ->
-      Error_monad.pp_print_error Format.err_formatter err ;
-      assert false
-  | Ok () ->
-      Lwt.return_unit
+  >>=! Lwt.return
 
 (******************************************************************************)
 

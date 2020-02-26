@@ -314,7 +314,6 @@ let commit_genesis bvp ~chain_id =
         ~chain_id
         ~time:genesis.time
         ~protocol:genesis.protocol
-      >>= fun res -> return res
   | External vp ->
       let request = External_validation.Commit_genesis {chain_id} in
       External_validator.send_request vp request Context_hash.encoding

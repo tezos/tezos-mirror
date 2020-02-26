@@ -1813,7 +1813,6 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
           ~chain_id
           ~time:genesis.time
           ~protocol:genesis.protocol
-        >>= fun res -> return res
       in
       Lwt.return (context_index, commit_genesis) )
   >>= fun (context_index, commit_genesis) ->

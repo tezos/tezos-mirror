@@ -37,7 +37,7 @@ type context = t
 
 (** Open or initialize a versioned store at a given path. *)
 val init :
-  ?patch_context:(context -> context Lwt.t) ->
+  ?patch_context:(context -> context tzresult Lwt.t) ->
   ?mapsize:int64 ->
   ?readonly:bool ->
   string ->
@@ -52,7 +52,7 @@ val commit_genesis :
   chain_id:Chain_id.t ->
   time:Time.Protocol.t ->
   protocol:Protocol_hash.t ->
-  Context_hash.t Lwt.t
+  Context_hash.t tzresult Lwt.t
 
 val commit_test_chain_genesis :
   context -> Block_header.t -> Block_header.t Lwt.t

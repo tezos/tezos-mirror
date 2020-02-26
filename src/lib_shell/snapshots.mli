@@ -37,7 +37,7 @@ val export :
 
 val import :
   ?reconstruct:bool ->
-  ?patch_context:(Context.t -> Context.t Lwt.t) ->
+  ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
   data_dir:string ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->

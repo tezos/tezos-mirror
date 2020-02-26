@@ -132,6 +132,7 @@ let run stdin stdout =
                 stdout
                 (Error_monad.result_encoding Block_validation.result_encoding)
                 res
+              >>= return
           | External_validation.Commit_genesis {chain_id} ->
               Error_monad.protect (fun () ->
                   Context.commit_genesis
@@ -140,43 +141,48 @@ let run stdin stdout =
                     ~time:genesis.time
                     ~protocol:genesis.protocol
                   >>= fun commit -> return commit)
-              >>= fun commit ->
+              >>=? fun commit ->
               External_validation.send
                 stdout
                 (Error_monad.result_encoding Context_hash.encoding)
                 commit
+              >>= return
           | External_validation.Init ->
               External_validation.send
                 stdout
                 (Error_monad.result_encoding Data_encoding.empty)
                 (Ok ())
+              >>= return
           | External_validation.Fork_test_chain {context_hash; forked_header}
-            -> (
+            ->
               Context.checkout context_index context_hash
-              >>= function
-              | Some ctxt ->
-                  Block_validation.init_test_chain ctxt forked_header
-                  >>= (function
-                        | Error
-                            [ Block_validator_errors.Missing_test_protocol
-                                protocol ] ->
-                            load_protocol protocol protocol_root
-                            >>=? fun () ->
-                            Block_validation.init_test_chain ctxt forked_header
-                        | result ->
-                            Lwt.return result)
-                  >>= fun result ->
-                  External_validation.send
-                    stdout
-                    (Error_monad.result_encoding Block_header.encoding)
-                    result
-              | None ->
-                  External_validation.send
-                    stdout
-                    (Error_monad.result_encoding Data_encoding.empty)
-                    (error
-                       (Block_validator_errors.Failed_to_checkout_context
-                          context_hash)) )
+              >>= (function
+                    | Some ctxt ->
+                        Block_validation.init_test_chain ctxt forked_header
+                        >>= (function
+                              | Error
+                                  [ Block_validator_errors.Missing_test_protocol
+                                      protocol ] ->
+                                  load_protocol protocol protocol_root
+                                  >>=? fun () ->
+                                  Block_validation.init_test_chain
+                                    ctxt
+                                    forked_header
+                              | result ->
+                                  Lwt.return result)
+                        >>= fun result ->
+                        External_validation.send
+                          stdout
+                          (Error_monad.result_encoding Block_header.encoding)
+                          result
+                    | None ->
+                        External_validation.send
+                          stdout
+                          (Error_monad.result_encoding Data_encoding.empty)
+                          (error
+                             (Block_validator_errors.Failed_to_checkout_context
+                                context_hash)))
+              >>= return
           | External_validation.Terminate ->
               Lwt_io.flush_all () >>= fun () -> exit 0
           | External_validation.Restore_context_integrity ->
@@ -184,8 +190,9 @@ let run stdin stdout =
               External_validation.send
                 stdout
                 (Error_monad.result_encoding Data_encoding.(option int31))
-                res)
-    >>= fun () -> loop ()
+                res
+              >>= return)
+    >>=? loop
   in
   loop ()
 

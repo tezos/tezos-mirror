@@ -36,7 +36,7 @@ type config = {
   store_root : string;
   context_root : string;
   protocol_root : string;
-  patch_context : (Context.t -> Context.t Lwt.t) option;
+  patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
   p2p : (P2p.config * P2p.limits) option;
   checkpoint : Block_header.t option;
   disable_mempool : bool;
