@@ -197,7 +197,10 @@ module Term = struct
       & info ~docs ~docv:"OUTPUT" ~doc ["log-output"])
 
   let data_dir =
-    let doc = "The directory where the Tezos node will store all its data." in
+    let doc =
+      "The directory where the Tezos node will store all its data. Parent \
+       directories are created if necessary."
+    in
     Arg.(
       value & opt (some string) None & info ~docs ~doc ~docv:"DIR" ["data-dir"])
 
