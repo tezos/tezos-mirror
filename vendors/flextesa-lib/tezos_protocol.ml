@@ -64,12 +64,15 @@ module Voting_period = struct
 end
 
 module Protocol_kind = struct
-  type t = [`Athens | `Babylon | `Carthage]
+  type t = [`Athens | `Babylon | `Carthage | `Alpha]
 
   let names =
-    [("Athens", `Athens); ("Babylon", `Babylon); ("Carthage", `Carthage)]
+    [ ("Athens", `Athens)
+    ; ("Babylon", `Babylon)
+    ; ("Carthage", `Carthage)
+    ; ("Alpha", `Alpha) ]
 
-  let default = `Carthage
+  let default = `Alpha
 
   let cmdliner_term ~docs () : t Cmdliner.Term.t =
     let open Cmdliner in
@@ -141,7 +144,7 @@ let protocol_parameters_json t : Ezjsonm.t =
     let op_gas_limit, block_gas_limit =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
-      | `Carthage -> (1_040_000, 10_400_000) in
+      | `Carthage | `Alpha -> (1_040_000, 10_400_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     [ ("blocks_per_commitment", int 4)
@@ -156,13 +159,13 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("endorsement_security_deposit", string (Int.to_string 64_000_000))
     ; ( match subkind with
       | `Babylon -> ("block_reward", string (Int.to_string 16_000_000))
-      | `Carthage ->
+      | `Carthage | `Alpha ->
           ( "baking_reward_per_endorsement"
           , list_of_zs t.baking_reward_per_endorsement ) )
     ; ( "endorsement_reward"
       , match subkind with
         | `Babylon -> string (Int.to_string 2_000_000)
-        | `Carthage -> list_of_zs t.endorsement_reward )
+        | `Carthage | `Alpha -> list_of_zs t.endorsement_reward )
     ; ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
     ; ("cost_per_byte", string (Int.to_string 1_000))
     ; ("test_chain_duration", string (Int.to_string 1_966_080))
@@ -188,7 +191,8 @@ let protocol_parameters_json t : Ezjsonm.t =
   | None ->
       dict
         ( match t.kind with
-        | (`Babylon | `Carthage) as sk -> common @ extra_post_babylon_stuff sk
+        | (`Babylon | `Carthage | `Alpha) as sk ->
+            common @ extra_post_babylon_stuff sk
         | `Athens -> common )
 
 let sandbox {dictator; _} =
