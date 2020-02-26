@@ -3096,9 +3096,6 @@ Full grammar
       | big_map <comparable type> <type>
       | chain_id
     <comparable type> ::=
-      | <simple comparable type>
-      | pair <simple comparable type> <comparable type>
-    <simple comparable type> ::=
       | int
       | nat
       | string
@@ -3108,6 +3105,7 @@ Full grammar
       | key_hash
       | timestamp
       | address
+      | pair <comparable type> <comparable type>
 
 
 Reference implementation
