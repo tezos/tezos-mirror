@@ -122,26 +122,4 @@ end
 
 module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
 
-module IpSet : sig
-  type t
-
-  val empty : t
-
-  val add : Ipaddr.V6.t -> Time.System.t -> t -> t
-
-  val add_prefix : Ipaddr.V6.Prefix.t -> Time.System.t -> t -> t
-
-  val remove : Ipaddr.V6.t -> t -> t
-
-  val remove_prefix : Ipaddr.V6.Prefix.t -> t -> t
-
-  val mem : Ipaddr.V6.t -> t -> bool
-
-  val fold : (Ipaddr.V6.Prefix.t -> Time.System.t -> 'a -> 'a) -> t -> 'a -> 'a
-
-  val pp : Format.formatter -> t -> unit
-
-  val remove_old : t -> older_than:Time.System.t -> t
-end
-
 module IpTable : Hashtbl.S with type key = Ipaddr.V6.t
