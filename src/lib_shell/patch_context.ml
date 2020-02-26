@@ -34,8 +34,6 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
         [key]
         (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
   >>= fun ctxt ->
-  (* TODO: this code seems to be shared with validator.ml, function run:
-     can we share it? *)
   match Registered_protocol.get genesis.protocol with
   | None ->
       assert false (* FIXME error *)
