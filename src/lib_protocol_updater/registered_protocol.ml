@@ -90,6 +90,31 @@ let get hash =
     | None ->
         None )
 
+type error += Unregistered_protocol of Protocol_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"registered_protocol.unregistered_protocol"
+    ~title:"Unregistered protocol"
+    ~description:"No protocol was registered with the requested hash."
+    ~pp:(fun fmt hash ->
+      Format.fprintf
+        fmt
+        "@[<hov>No registered protocol with hash:@ %a@]"
+        Protocol_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "protocol_hash" Protocol_hash.encoding))
+    (function Unregistered_protocol hash -> Some hash | _ -> None)
+    (fun hash -> Unregistered_protocol hash)
+
+let get_result hash =
+  match get hash with
+  | Some hash ->
+      return hash
+  | None ->
+      fail (Unregistered_protocol hash)
+
 let list () = VersionTable.fold (fun _ p acc -> p :: acc) versions []
 
 let list_embedded () = VersionTable.fold (fun k _ acc -> k :: acc) sources []

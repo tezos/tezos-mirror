@@ -34,23 +34,20 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
         [key]
         (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
   >>= fun ctxt ->
-  match Registered_protocol.get genesis.protocol with
-  | None ->
-      assert false (* FIXME error *)
-  | Some proto ->
-      let module Proto = (val proto) in
-      let ctxt = Shell_context.wrap_disk_context ctxt in
-      Proto.init
-        ctxt
-        {
-          level = 0l;
-          proto_level = 0;
-          predecessor = genesis.block;
-          timestamp = genesis.time;
-          validation_passes = 0;
-          operations_hash = Operation_list_list_hash.empty;
-          fitness = [];
-          context = Context_hash.zero;
-        }
-      >>=? fun {context; _} ->
-      return (Shell_context.unwrap_disk_context context)
+  Registered_protocol.get_result genesis.protocol
+  >>=? fun proto ->
+  let module Proto = (val proto) in
+  let ctxt = Shell_context.wrap_disk_context ctxt in
+  Proto.init
+    ctxt
+    {
+      level = 0l;
+      proto_level = 0;
+      predecessor = genesis.block;
+      timestamp = genesis.time;
+      validation_passes = 0;
+      operations_hash = Operation_list_list_hash.empty;
+      fitness = [];
+      context = Context_hash.zero;
+    }
+  >>=? fun {context; _} -> return (Shell_context.unwrap_disk_context context)
