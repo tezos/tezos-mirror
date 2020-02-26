@@ -25,14 +25,18 @@
 
 open Worker
 
-module Make (Event : EVENT) (Request : REQUEST) = struct
+module type STATIC = sig
+  val worker_name : string
+end
+
+module Make (Event : EVENT) (Static : STATIC) :
+  LOGGER with module Event = Event = struct
   module Event = Event
-  module Request = Request
 
   type status =
     | WorkerEvent of Event.t
     | Request of
-        (Request.view * Worker_types.request_status * error list option)
+        (string Lazy.t * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -56,11 +60,12 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
              (Tag 1)
              ~title:"Request"
              (obj3
-                (req "request_view" (dynamic_size Request.encoding))
+                (req "request_view" string)
                 (req "request_status" Worker_types.request_status_encoding)
                 (req "errors" (option (list error_encoding))))
-             (function Request (v, s, e) -> Some (v, s, e) | _ -> None)
-             (fun (v, s, e) -> Request (v, s, e));
+             (function
+               | Request (v, s, e) -> Some (Lazy.force v, s, e) | _ -> None)
+             (fun (v, s, e) -> Request (lazy v, s, e));
            case
              (Tag 2)
              ~title:"Terminated"
@@ -104,17 +109,15 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
     | Request (view, {pushed; treated; completed}, None) ->
         Format.fprintf
           ppf
-          "@[<v 0>%a@, %a@]"
-          Request.pp
-          view
+          "@[<v 0>%s@, %a@]"
+          (Lazy.force view)
           Worker_types.pp_status
           {pushed; treated; completed}
     | Request (view, {pushed; treated; completed}, Some errors) ->
         Format.fprintf
           ppf
-          "@[<v 0>%a@, %a, %a@]"
-          Request.pp
-          view
+          "@[<v 0>%s@, %a, %a@]"
+          (Lazy.force view)
           Worker_types.pp_status
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
@@ -143,9 +146,7 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
         in
         Format.fprintf ppf "Worker.launch: duplicate worker %s" full_name
 
-  module MakeDefinition (Static : sig
-    val worker_name : string
-  end) : Internal_event.EVENT_DEFINITION with type t = t = struct
+  module Definition : Internal_event.EVENT_DEFINITION with type t = t = struct
     let name = Static.worker_name
 
     type nonrec t = t
@@ -175,4 +176,7 @@ module Make (Event : EVENT) (Request : REQUEST) = struct
       | Duplicate _ ->
           Internal_event.Error
   end
+
+  module LogEvent : Internal_event.EVENT with type t = t =
+    Internal_event.Make (Definition)
 end

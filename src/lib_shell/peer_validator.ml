@@ -113,7 +113,13 @@ module Types = struct
     }
 end
 
-module Logger = Worker_logger.Make (Event) (Request)
+module Logger =
+  Worker_logger.Make
+    (Event)
+    (struct
+      let worker_name = "node_peer_validator"
+    end)
+
 module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 open Types
 

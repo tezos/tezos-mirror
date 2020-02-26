@@ -46,6 +46,8 @@ module type T = sig
 
   val result_encoding : result Data_encoding.t
 
+  val pp_result : Format.formatter -> result -> unit
+
   (** Creates/tear-down a new mempool validator context. *)
   val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
 
@@ -65,6 +67,79 @@ end
 module type STATIC = sig
   val max_size_parsed_cache : int
 end
+
+module Event = struct
+  type t =
+    | Request of
+        (string Lazy.t * Worker_types.request_status * error list option)
+    | Debug of string
+
+  let level req =
+    match req with
+    | Debug _ ->
+        Internal_event.Debug
+    | Request _ ->
+        Internal_event.Info
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [ case
+          (Tag 0)
+          ~title:"Debug"
+          (obj1 (req "message" string))
+          (function Debug msg -> Some msg | _ -> None)
+          (fun msg -> Debug msg);
+        case
+          (Tag 1)
+          ~title:"Request"
+          (obj2
+             (req "request" string)
+             (req "status" Worker_types.request_status_encoding))
+          (function
+            | Request (req, t, None) -> Some (Lazy.force req, t) | _ -> None)
+          (fun (req, t) -> Request (lazy req, t, None));
+        case
+          (Tag 2)
+          ~title:"Failed request"
+          (obj3
+             (req "error" RPC_error.encoding)
+             (req "failed_request" string)
+             (req "status" Worker_types.request_status_encoding))
+          (function
+            | Request (req, t, Some errs) ->
+                Some (errs, Lazy.force req, t)
+            | _ ->
+                None)
+          (fun (errs, req, t) -> Request (lazy req, t, Some errs)) ]
+
+  let pp ppf = function
+    | Debug msg ->
+        Format.fprintf ppf "%s" msg
+    | Request (view, {pushed; treated; completed}, None) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%s@, %a@]"
+          (Lazy.force view)
+          Worker_types.pp_status
+          {pushed; treated; completed}
+    | Request (view, {pushed; treated; completed}, Some errors) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>%s@, %a, %a@]"
+          (Lazy.force view)
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errors
+end
+
+module Logger =
+  Worker_logger.Make
+    (Event)
+    (struct
+      let worker_name = "node_mempol_worker"
+    end)
 
 module Make (Static : STATIC) (Proto : Registered_protocol.T) :
   T with module Proto = Proto = struct
@@ -151,10 +226,6 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
          (req "raw" Operation.encoding)
          (req "protocol_data" Proto.operation_data_encoding))
 
-  module Log = Internal_event.Legacy_logging.Make (struct
-    let name = "node.mempool_validator"
-  end)
-
   module Name = struct
     type t = Chain_id.t
 
@@ -187,70 +258,6 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
 
     let pp ppf (View (Validate {hash; _})) =
       Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
-  end
-
-  module Event = struct
-    type t =
-      | Request of
-          (Request.view * Worker_types.request_status * error list option)
-      | Debug of string
-
-    let level req =
-      match req with
-      | Debug _ ->
-          Internal_event.Debug
-      | Request _ ->
-          Internal_event.Info
-
-    let encoding =
-      let open Data_encoding in
-      union
-        [ case
-            (Tag 0)
-            ~title:"Debug"
-            (obj1 (req "message" string))
-            (function Debug msg -> Some msg | _ -> None)
-            (fun msg -> Debug msg);
-          case
-            (Tag 1)
-            ~title:"Request"
-            (obj2
-               (req "request" Request.encoding)
-               (req "status" Worker_types.request_status_encoding))
-            (function Request (req, t, None) -> Some (req, t) | _ -> None)
-            (fun (req, t) -> Request (req, t, None));
-          case
-            (Tag 2)
-            ~title:"Failed request"
-            (obj3
-               (req "error" RPC_error.encoding)
-               (req "failed_request" Request.encoding)
-               (req "status" Worker_types.request_status_encoding))
-            (function
-              | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
-            (fun (errs, req, t) -> Request (req, t, Some errs)) ]
-
-    let pp ppf = function
-      | Debug msg ->
-          Format.fprintf ppf "%s" msg
-      | Request (view, {pushed; treated; completed}, None) ->
-          Format.fprintf
-            ppf
-            "@[<v 0>%a@, %a@]"
-            Request.pp
-            view
-            Worker_types.pp_status
-            {pushed; treated; completed}
-      | Request (view, {pushed; treated; completed}, Some errors) ->
-          Format.fprintf
-            ppf
-            "@[<v 0>%a@, %a, %a@]"
-            Request.pp
-            view
-            Worker_types.pp_status
-            {pushed; treated; completed}
-            (Format.pp_print_list Error_monad.pp)
-            errors
   end
 
   (* parsed operations' cache. used for memoization *)
@@ -412,7 +419,6 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
         cache
   end
 
-  module Logger = Worker_logger.Make (Event) (Request)
   module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
   open Types
 
@@ -541,6 +547,7 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
         Lwt.return result
 
   (* worker's handlers *)
+
   let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
    fun w request ->
     match request with
@@ -577,11 +584,16 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
     Lwt.return_unit
 
   let on_error w r st errs =
-    Worker.record_event w (Event.Request (r, st, Some errs)) ;
+    Worker.record_event
+      w
+      (Event.Request (lazy (Format.asprintf "%a" Request.pp r), st, Some errs)) ;
     Lwt.return_error errs
 
   let on_completion w r _ st =
-    Worker.record_event w (Event.Request (Request.view r, st, None)) ;
+    Worker.record_event
+      w
+      (Event.Request
+         (lazy (Format.asprintf "%a" Request.pp (Request.view r)), st, None)) ;
     Lwt.return_unit
 
   let table = Worker.create_table Queue

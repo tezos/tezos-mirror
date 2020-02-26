@@ -79,7 +79,13 @@ module Request = struct
     {chain_id; block = hash; peer}
 end
 
-module Logger = Worker_logger.Make (Event) (Request)
+module Logger =
+  Worker_logger.Make
+    (Event)
+    (struct
+      let worker_name = "node_block_validator"
+    end)
+
 module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
 type t = Worker.infinite Worker.queue Worker.t

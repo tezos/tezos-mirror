@@ -47,6 +47,8 @@ module type T = sig
 
   val result_encoding : result Data_encoding.t
 
+  val pp_result : Format.formatter -> result -> unit
+
   (** Creates/tear-down a new mempool validator context. *)
   val create : limits -> Distributed_db.chain_db -> t tzresult Lwt.t
 

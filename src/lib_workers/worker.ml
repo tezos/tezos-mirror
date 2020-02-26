@@ -73,12 +73,10 @@ end
 module type LOGGER = sig
   module Event : EVENT
 
-  module Request : REQUEST
-
   type status =
     | WorkerEvent of Event.t
     | Request of
-        (Request.view * Worker_types.request_status * error list option)
+        (string Lazy.t * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -88,9 +86,7 @@ module type LOGGER = sig
 
   type t = status Time.System.stamped
 
-  module MakeDefinition (Static : sig
-    val worker_name : string
-  end) : Internal_event.EVENT_DEFINITION with type t = t
+  module LogEvent : Internal_event.EVENT with type t = t
 end
 
 (** An error returned when trying to communicate with a worker that
@@ -308,7 +304,7 @@ module Make
     (Event : EVENT)
     (Request : REQUEST)
     (Types : TYPES)
-    (Logger : LOGGER with module Event = Event and module Request = Request) =
+    (Logger : LOGGER with module Event = Event) =
 struct
   module Name = Name
   module Event = Event
@@ -647,7 +643,13 @@ struct
                      let status = Worker_types.{pushed; treated; completed} in
                      Handlers.on_completion w request res status
                      >>= fun () ->
-                     lwt_emit w (Request (current_request, status, None))
+                     lwt_emit
+                       w
+                       (Request
+                          ( lazy
+                              (Format.asprintf "%a" Request.pp current_request),
+                            status,
+                            None ))
                      >>= fun () -> return_unit
                  | Some u ->
                      Handlers.on_request w request
@@ -660,7 +662,13 @@ struct
                      w.current_request <- None ;
                      Handlers.on_completion w request res status
                      >>= fun () ->
-                     lwt_emit w (Request (current_request, status, None))
+                     lwt_emit
+                       w
+                       (Request
+                          ( lazy
+                              (Format.asprintf "%a" Request.pp current_request),
+                            status,
+                            None ))
                      >>= fun () -> return_unit ))
       >>= function
       | Ok () ->
@@ -734,10 +742,6 @@ struct
         in
         List.map (fun l -> (l, Ring.create limits.backlog_size)) levels
       in
-      let module Definition = Logger.MakeDefinition (struct
-        let worker_name = id_name
-      end) in
-      let module LogEvent = Internal_event.Make (Definition) in
       let w =
         {
           limits;
@@ -752,7 +756,7 @@ struct
           event_log;
           timeout;
           current_request = None;
-          logEvent = (module LogEvent);
+          logEvent = (module Logger.LogEvent);
           status = Launching (Systime_os.now ());
         }
       in

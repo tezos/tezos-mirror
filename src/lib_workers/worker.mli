@@ -112,12 +112,10 @@ end
 module type LOGGER = sig
   module Event : EVENT
 
-  module Request : REQUEST
-
   type status =
     | WorkerEvent of Event.t
     | Request of
-        (Request.view * Worker_types.request_status * error list option)
+        (string Lazy.t * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -127,9 +125,7 @@ module type LOGGER = sig
 
   type t = status Time.System.stamped
 
-  module MakeDefinition (Static : sig
-    val worker_name : string
-  end) : Internal_event.EVENT_DEFINITION with type t = t
+  module LogEvent : Internal_event.EVENT with type t = t
 end
 
 (** {2 Worker group maker} *)
@@ -341,7 +337,7 @@ module Make
     (Event : EVENT)
     (Request : REQUEST)
     (Types : TYPES)
-    (Logger : LOGGER with module Event = Event and module Request = Request) :
+    (Logger : LOGGER with module Event = Event) :
   T
     with module Name = Name
      and module Event = Event

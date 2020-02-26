@@ -35,6 +35,13 @@ type limits = {
 
 type name_t = Chain_id.t * Protocol_hash.t
 
+module Logger =
+  Worker_logger.Make
+    (Event)
+    (struct
+      let worker_name = "node_prevalidator"
+    end)
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -213,8 +220,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             (domain state.branch_refusals);
       }
   end
-
-  module Logger = Worker_logger.Make (Event) (Request)
 
   module Worker :
     Worker.T

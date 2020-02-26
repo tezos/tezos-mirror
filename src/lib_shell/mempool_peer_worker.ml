@@ -32,12 +32,56 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
+type input = Operation_hash.t list
+
+type result =
+  | Cannot_download of error list
+  | Cannot_parse of error list
+  | Cannot_validate of error list
+  (* maybe add a protocol_plugin to handle mempool_results *)
+  | Mempool_result of string
+
+type output = result Operation_hash.Map.t
+
+let result_encoding =
+  let open Data_encoding in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Cannot download"
+        (obj1 (req "download_errors" (list Error_monad.error_encoding)))
+        (function Cannot_download errs -> Some errs | _ -> None)
+        (fun errs -> Cannot_download errs);
+      case
+        (Tag 1)
+        ~title:"Cannot parse"
+        (obj1 (req "parse_errors" (list Error_monad.error_encoding)))
+        (function Cannot_parse errs -> Some errs | _ -> None)
+        (fun errs -> Cannot_parse errs);
+      case
+        (Tag 2)
+        ~title:"Cannot validate"
+        (obj1 (req "validation_errors" (list Error_monad.error_encoding)))
+        (function Cannot_validate errs -> Some errs | _ -> None)
+        (fun errs -> Cannot_validate errs);
+      case
+        (Tag 3)
+        ~title:"Validation result"
+        (obj1 (req "validation_result" string))
+        (function Mempool_result result -> Some result | _ -> None)
+        (fun result -> Mempool_result result) ]
+
+let pp_input ppf input =
+  Format.fprintf
+    ppf
+    "@[<v 0>%a@]"
+    (Format.pp_print_list Operation_hash.pp)
+    input
+
 module type T = sig
   module Mempool_worker : Mempool_worker.T
 
   type t
-
-  type input = Operation_hash.t list
 
   val create : limits -> P2p_peer.Id.t -> Mempool_worker.t -> t tzresult Lwt.t
 
@@ -45,6 +89,96 @@ module type T = sig
 
   val validate : t -> input -> unit tzresult Lwt.t
 end
+
+module Request = struct
+  type 'a t = Batch : input -> output t
+
+  type view = input
+
+  let view : type a. a t -> view = fun (Batch os) -> os
+
+  let encoding =
+    let open Data_encoding in
+    list Operation_hash.encoding
+
+  let pp ppf = function
+    | [] ->
+        Format.fprintf ppf "@[<v 2>Request:@, Empty List of Operations@]"
+    | os ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Request:@,%a@]"
+          (Format.pp_print_list Operation_hash.pp)
+          os
+end
+
+module Event = struct
+  type t =
+    | Start of input
+    | End_ok of (Request.view * Worker_types.request_status * output)
+    | End_error of (Request.view * Worker_types.request_status * error list)
+
+  let level req =
+    let open Internal_event in
+    match req with Start _ -> Info | End_ok _ -> Info | End_error _ -> Error
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [ case
+          (Tag 0)
+          ~title:"Start"
+          (obj1 (req "input" (list Operation_hash.encoding)))
+          (function Start input -> Some input | _ -> None)
+          (fun input -> Start input);
+        case
+          (Tag 1)
+          ~title:"End_ok"
+          (obj3
+             (req "request" Request.encoding)
+             (req "status" Worker_types.request_status_encoding)
+             (req "output" (Operation_hash.Map.encoding result_encoding)))
+          (function
+            | End_ok (view, status, result) ->
+                Some (view, status, result)
+            | _ ->
+                None)
+          (fun (view, status, result) -> End_ok (view, status, result));
+        case
+          (Tag 2)
+          ~title:"End_error"
+          (obj3
+             (req "failed_request" Request.encoding)
+             (req "status" Worker_types.request_status_encoding)
+             (req "error" RPC_error.encoding))
+          (function
+            | End_error (view, status, errs) ->
+                Some (view, status, errs)
+            | _ ->
+                None)
+          (fun (view, status, errs) -> End_error (view, status, errs)) ]
+
+  let pp ppf = function
+    | Start input ->
+        Format.fprintf ppf "@[<v 0>Starting: %a@]" pp_input input
+    | End_ok (view, _, _) ->
+        Format.fprintf ppf "@[<v 0>Finished: %a@]" Request.pp view
+    | End_error (view, _, errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>Errors: %a, Operations: %a@]"
+          (Format.pp_print_list Error_monad.pp)
+          errs
+          Request.pp
+          view
+end
+
+module Logger =
+  Worker_logger.Make
+    (Event)
+    (struct
+      let worker_name = "node_mempool_peer_worker"
+    end)
 
 module type STATIC = sig
   val max_pending_requests : int
@@ -57,55 +191,6 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
 
   module Proto = Mempool_worker.Proto
   module Mempool_worker = Mempool_worker
-
-  type input = Operation_hash.t list
-
-  type result =
-    | Cannot_download of error list
-    | Cannot_parse of error list
-    | Cannot_validate of error list
-    | Mempool_result of Mempool_worker.result
-
-  type output = result Operation_hash.Map.t
-
-  let pp_input ppf input =
-    Format.fprintf
-      ppf
-      "@[<v 0>%a@]"
-      (Format.pp_print_list Operation_hash.pp)
-      input
-
-  let result_encoding =
-    let open Data_encoding in
-    union
-      [ case
-          (Tag 0)
-          ~title:"Cannot download"
-          (obj1 (req "download_errors" (list Error_monad.error_encoding)))
-          (function Cannot_download errs -> Some errs | _ -> None)
-          (fun errs -> Cannot_download errs);
-        case
-          (Tag 1)
-          ~title:"Cannot parse"
-          (obj1 (req "parse_errors" (list Error_monad.error_encoding)))
-          (function Cannot_parse errs -> Some errs | _ -> None)
-          (fun errs -> Cannot_parse errs);
-        case
-          (Tag 2)
-          ~title:"Cannot validate"
-          (obj1 (req "validation_errors" (list Error_monad.error_encoding)))
-          (function Cannot_validate errs -> Some errs | _ -> None)
-          (fun errs -> Cannot_validate errs);
-        case
-          (Tag 3)
-          ~title:"Validation result"
-          (obj1 (req "validation_result" Mempool_worker.result_encoding))
-          (function Mempool_result result -> Some result | _ -> None)
-          (fun result -> Mempool_result result) ]
-
-  module Log = Internal_event.Legacy_logging.Make (struct
-    let name = "node.mempool.peer_worker"
-  end)
 
   (* 1. Core: the carefully scheduled work performed by the worker *)
 
@@ -188,7 +273,11 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
             record_result pipeline op.hash (Cannot_validate errs) ;
             Lwt.return_unit
         | Ok mempool_result ->
-            record_result pipeline op.hash (Mempool_result mempool_result) ;
+            record_result
+              pipeline
+              op.hash
+              (Mempool_result
+                 (Format.asprintf "%a" Mempool_worker.pp_result mempool_result)) ;
             Lwt.return_unit )
       else if head_is_resolved pipeline.downloading then
         let (op_hash, p) = Queue.pop pipeline.downloading in
@@ -252,95 +341,6 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
     let pp = P2p_peer.Id.pp
   end
 
-  module Request = struct
-    type 'a t = Batch : input -> output t
-
-    type view = input
-
-    let view : type a. a t -> view = fun (Batch os) -> os
-
-    let encoding =
-      let open Data_encoding in
-      list Operation_hash.encoding
-
-    let pp ppf = function
-      | [] ->
-          Format.fprintf ppf "@[<v 2>Request:@, Empty List of Operations@]"
-      | os ->
-          Format.fprintf
-            ppf
-            "@[<v 2>Request:@,%a@]"
-            (Format.pp_print_list Operation_hash.pp)
-            os
-  end
-
-  module Event = struct
-    type t =
-      | Start of input
-      | End_ok of (Request.view * Worker_types.request_status * output)
-      | End_error of (Request.view * Worker_types.request_status * error list)
-
-    let level req =
-      let open Internal_event in
-      match req with
-      | Start _ ->
-          Info
-      | End_ok _ ->
-          Info
-      | End_error _ ->
-          Error
-
-    let encoding =
-      let open Data_encoding in
-      union
-        [ case
-            (Tag 0)
-            ~title:"Start"
-            (obj1 (req "input" (list Operation_hash.encoding)))
-            (function Start input -> Some input | _ -> None)
-            (fun input -> Start input);
-          case
-            (Tag 1)
-            ~title:"End_ok"
-            (obj3
-               (req "request" Request.encoding)
-               (req "status" Worker_types.request_status_encoding)
-               (req "output" (Operation_hash.Map.encoding result_encoding)))
-            (function
-              | End_ok (view, status, result) ->
-                  Some (view, status, result)
-              | _ ->
-                  None)
-            (fun (view, status, result) -> End_ok (view, status, result));
-          case
-            (Tag 2)
-            ~title:"End_error"
-            (obj3
-               (req "failed_request" Request.encoding)
-               (req "status" Worker_types.request_status_encoding)
-               (req "error" RPC_error.encoding))
-            (function
-              | End_error (view, status, errs) ->
-                  Some (view, status, errs)
-              | _ ->
-                  None)
-            (fun (view, status, errs) -> End_error (view, status, errs)) ]
-
-    let pp ppf = function
-      | Start input ->
-          Format.fprintf ppf "@[<v 0>Starting: %a@]" pp_input input
-      | End_ok (view, _, _) ->
-          Format.fprintf ppf "@[<v 0>Finished: %a@]" Request.pp view
-      | End_error (view, _, errs) ->
-          Format.fprintf
-            ppf
-            "@[<v 0>Errors: %a, Operations: %a@]"
-            (Format.pp_print_list Error_monad.pp)
-            errs
-            Request.pp
-            view
-  end
-
   module Types = struct
     type parameters = Mempool_worker.t * int
 
@@ -355,7 +355,6 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
     let pp _ _ = ()
   end
 
-  module Logger = Worker_logger.Make (Event) (Request)
   module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 
   type t = Worker.bounded Worker.queue Worker.t
