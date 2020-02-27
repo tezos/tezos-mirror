@@ -475,16 +475,20 @@ let () =
   (* Invalid syntactic constant *)
   register_error_kind
     `Permanent
-    ~id:"invalidSyntacticConstantError"
+    ~id:"michelson_v1.invalid_syntactic_constant"
     ~title:"Invalid constant (parse error)"
     ~description:"A compile-time constant was invalid for its expected form."
     (located
        (obj2
-          (req "expectedForm" Script.expr_encoding)
-          (req "wrongExpression" Script.expr_encoding)))
+          (req "expected_form" string)
+          (req "wrong_expression" Script.expr_encoding)))
     (function
-      | Invalid_constant (loc, expr, ty) -> Some (loc, (ty, expr)) | _ -> None)
-    (fun (loc, (ty, expr)) -> Invalid_constant (loc, expr, ty)) ;
+      | Invalid_syntactic_constant (loc, expr, expected) ->
+          Some (loc, (expected, expr))
+      | _ ->
+          None)
+    (fun (loc, (expected, expr)) ->
+      Invalid_syntactic_constant (loc, expr, expected)) ;
   (* Invalid contract *)
   register_error_kind
     `Permanent
