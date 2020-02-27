@@ -1,3 +1,0 @@
-(rule
- (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
-       protocol_parameters.json))
