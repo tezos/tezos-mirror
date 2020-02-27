@@ -800,6 +800,17 @@ Operations on booleans
 
     > NOT / x : S  =>  ~x : S
 
+-  ``COMPARE``: Boolean comparison
+
+::
+
+    :: bool : bool : 'S   ->   int : 'S
+
+    > COMPARE / False : False : S  =>  0 : S
+    > COMPARE / False : True : S  =>  -1 : S
+    > COMPARE / True : False : S  =>  1 : S
+    > COMPARE / True : True : S  =>  0 : S
+
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
