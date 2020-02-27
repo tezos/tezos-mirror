@@ -2720,20 +2720,17 @@ and parse_returning :
 
 and parse_uint30 (n : (location, prim) Micheline.node) : int tzresult =
   let max_uint30 = 0x3fffffff in
-  let error' () =
-    Invalid_syntactic_constant
-      ( location n,
-        strip_locations n,
-        "a positive 31-bit integer (between 0 and " ^ string_of_int max_uint30
-        ^ ")" )
-  in
   match n with
-  | Micheline.Int (_, n') ->
-      if Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint30) then
-        ok (Z.to_int n')
-      else error @@ error' ()
+  | Micheline.Int (_, n')
+    when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint30) ->
+      ok (Z.to_int n')
   | _ ->
-      error @@ error' ()
+      error
+      @@ Invalid_syntactic_constant
+           ( location n,
+             strip_locations n,
+             "a positive 31-bit integer (between 0 and "
+             ^ string_of_int max_uint30 ^ ")" )
 
 and parse_instr :
     type bef.
