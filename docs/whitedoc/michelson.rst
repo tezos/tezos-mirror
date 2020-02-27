@@ -765,6 +765,17 @@ second, and positive otherwise.
 Operations
 ----------
 
+Operations on unit
+~~~~~~~~~~~~~~~~~~
+
+-  ``COMPARE``: Unit comparison
+
+::
+
+    :: unit : unit : 'S   ->   int : 'S
+
+    > COMPARE / Unit : Unit : S  =>  0 : S
+
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1320,6 +1331,17 @@ Operations on optional values
     > IF_NONE bt bf / (None) : S  =>  bt / S
     > IF_NONE bt bf / (Some a) : S  =>  bf / a : S
 
+-  ``COMPARE``: Optional values comparison
+
+::
+
+    :: option 'a : option 'a : 'S   ->   int : 'S
+
+    > COMPARE / None : None : S  =>  0 : S
+    > COMPARE / None : (Some _) : S  =>  -1 : S
+    > COMPARE / (Some _) : None : S  =>  1 : S
+    > COMPARE / (Some a) : (Some b) : S  =>  COMPARE / a : b : S
+
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -1349,6 +1371,17 @@ Operations on unions
 
     > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
     > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
+
+-  ``COMPARE``: Unions comparison
+
+::
+
+    :: or 'a 'b : or 'a 'b : 'S   ->   int : 'S
+
+    > COMPARE / (Left a) : (Left b) : S  =>  COMPARE / a : b : S
+    > COMPARE / (Left _) : (Right _) : S  =>  -1 : S
+    > COMPARE / (Right _) : (Left _) : S  =>  1 : S
+    > COMPARE / (Right a) : (Right b) : S  =>  COMPARE / a : b : S
 
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
@@ -3107,15 +3140,18 @@ Full grammar
       | big_map <comparable type> <type>
       | chain_id
     <comparable type> ::=
+      | unit
+      | bool
       | int
       | nat
       | string
       | bytes
       | mutez
-      | bool
       | key_hash
       | timestamp
       | address
+      | option <comparable type>
+      | or <comparable type> <comparable type>
       | pair <comparable type> <comparable type>
 
 
