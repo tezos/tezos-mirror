@@ -263,7 +263,7 @@ class TestContracts:
          r'primitive DIP expects 1 arguments but is given 2'),
         # error message for DROP over the limit
         ("big_drop.tz",
-         r'Was the error registered?'),
+         r'expected a positive 31-bit integer'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
