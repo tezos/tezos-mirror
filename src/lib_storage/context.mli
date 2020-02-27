@@ -88,6 +88,13 @@ val fold :
 
 (** {2 Accessing and Updating Versions} *)
 
+(** [restore_integrity ppf index] attempts to restore the context
+    integrity of [index]. Returns [None] when nothing needs to be fixed and
+    [Some n] with [n] the number of entries fixed. If needs be, the
+    progress might be printed via [ppf]
+    If the context integrity cannot be restored, [Failure msg] is thrown. *)
+val restore_integrity : ?ppf:Format.formatter -> index -> int option tzresult
+
 val exists : index -> Context_hash.t -> bool Lwt.t
 
 val checkout : index -> Context_hash.t -> context option Lwt.t

@@ -239,6 +239,20 @@ let current_test_chain_key = ["test_chain"]
 
 let current_data_key = ["data"]
 
+let restore_integrity ?ppf index =
+  match Store.integrity_check ?ppf ~auto_repair:true index.repo with
+  | Ok (`Fixed n) ->
+      Ok (Some n)
+  | Ok `No_error ->
+      Ok None
+  | Error (`Cannot_fix msg) ->
+      error (failure "%s" msg)
+  | Error (`Corrupted n) ->
+      error
+        (failure
+           "unable to fix the corrupted context: %d bad entries detected"
+           n)
+
 let exists index key =
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
   >|= function None -> false | Some _ -> true
