@@ -750,7 +750,30 @@ code {{
 
 
 @pytest.mark.contract
-class TestComparablePairs:
+class TestComparables:
+
+    def test_comparable_unit(self, client):
+        client.typecheck_data('{}', '(set unit)')
+        client.typecheck_data('{Unit}', '(set unit)')
+
+    def test_comparable_options(self, client):
+        client.typecheck_data('{}', '(set (option nat))')
+        client.typecheck_data('{None; Some 1; Some 2}', '(set (option int))')
+        utils.assert_typecheck_data_failure(
+            client, '{Some "foo"; Some "bar"}', '(set (option string))')
+        utils.assert_typecheck_data_failure(
+            client, '{Some Unit; None}', '(set (option unit))')
+
+    def test_comparable_unions(self, client):
+        client.typecheck_data('{}', '(set (or unit bool))')
+        client.typecheck_data('{Left 3; Left 4; Right "bar"; Right "foo"}',
+                              '(set (or nat string))')
+        utils.assert_typecheck_data_failure(
+            client, '{Left 2; Left 1}', '(set (or mutez unit))')
+        utils.assert_typecheck_data_failure(
+            client, '{Right True; Right False}', '(set (or unit bool))')
+        utils.assert_typecheck_data_failure(
+            client, '{Right 0; Left 1}', '(set (or nat nat))')
 
     def test_comparable_pair(self, client: Client):
         # tests that comb pairs are comparable and that the order is the
