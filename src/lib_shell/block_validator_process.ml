@@ -332,3 +332,11 @@ let init_test_chain bvp forking_block =
         External_validation.Fork_test_chain {context_hash; forked_header}
       in
       External_validator.send_request vp request Block_header.encoding
+
+let restore_context_integrity bvp =
+  match bvp with
+  | Sequential {context_index; _} ->
+      Lwt.return (Context.restore_integrity context_index)
+  | External vp ->
+      let request = External_validation.Restore_context_integrity in
+      External_validator.send_request vp request Data_encoding.(option int31)

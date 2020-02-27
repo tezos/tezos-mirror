@@ -47,6 +47,7 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
+  | Restore_context_integrity
 
 let request_pp ppf = function
   | Init ->
@@ -73,6 +74,8 @@ let request_pp ppf = function
         (Block_header.hash forked_header)
   | Terminate ->
       Format.fprintf ppf "terminate validation process"
+  | Restore_context_integrity ->
+      Format.fprintf ppf "restore context integrity"
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
@@ -122,11 +125,7 @@ let request_encoding =
         (Tag 0)
         ~title:"init"
         empty
-        (function
-          | Init ->
-              Some ()
-          | Commit_genesis _ | Validate _ | Fork_test_chain _ | Terminate ->
-              None)
+        (function Init -> Some () | _ -> None)
         (fun () -> Init);
       case
         (Tag 1)
@@ -150,7 +149,7 @@ let request_encoding =
                   predecessor_block_header,
                   max_operations_ttl,
                   operations )
-          | Init | Commit_genesis _ | Fork_test_chain _ | Terminate ->
+          | _ ->
               None)
         (fun ( chain_id,
                block_header,
@@ -172,7 +171,11 @@ let request_encoding =
         (function
           | Commit_genesis {chain_id} ->
               Some chain_id
-          | Init | Validate _ | Fork_test_chain _ | Terminate ->
+          | Init
+          | Validate _
+          | Fork_test_chain _
+          | Terminate
+          | Restore_context_integrity ->
               None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
@@ -184,7 +187,7 @@ let request_encoding =
         (function
           | Fork_test_chain {context_hash; forked_header} ->
               Some (context_hash, forked_header)
-          | Init | Validate _ | Commit_genesis _ | Terminate ->
+          | _ ->
               None)
         (fun (context_hash, forked_header) ->
           Fork_test_chain {context_hash; forked_header});
@@ -192,12 +195,14 @@ let request_encoding =
         (Tag 4)
         ~title:"terminate"
         unit
-        (function
-          | Terminate ->
-              Some ()
-          | Init | Validate _ | Commit_genesis _ | Fork_test_chain _ ->
-              None)
-        (fun () -> Terminate) ]
+        (function Terminate -> Some () | _ -> None)
+        (fun () -> Terminate);
+      case
+        (Tag 5)
+        ~title:"restore_integrity"
+        unit
+        (function Restore_context_integrity -> Some () | _ -> None)
+        (fun () -> Restore_context_integrity) ]
 
 let send pin encoding data =
   let msg = Data_encoding.Binary.to_bytes_exn encoding data in

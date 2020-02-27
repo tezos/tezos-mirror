@@ -211,7 +211,13 @@ let run stdin stdout =
                        (Block_validator_errors.Failed_to_checkout_context
                           context_hash)) )
           | External_validation.Terminate ->
-              Lwt_io.flush_all () >>= fun () -> exit 0)
+              Lwt_io.flush_all () >>= fun () -> exit 0
+          | External_validation.Restore_context_integrity ->
+              let res = Context.restore_integrity context_index in
+              External_validation.send
+                stdout
+                (Error_monad.result_encoding Data_encoding.(option int31))
+                res)
     >>= fun () -> loop ()
   in
   loop ()

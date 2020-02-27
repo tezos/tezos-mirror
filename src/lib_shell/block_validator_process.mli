@@ -44,6 +44,8 @@ val init :
 
 val close : t -> unit Lwt.t
 
+val restore_context_integrity : t -> int option tzresult Lwt.t
+
 val apply_block :
   t ->
   predecessor:State.Block.t ->
