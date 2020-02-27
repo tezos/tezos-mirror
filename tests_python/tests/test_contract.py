@@ -343,7 +343,7 @@ class TestContracts:
          r'primitive chain_id expects 0 arguments but is given 1'),
         # error message for DIP over the limit
         ("big_dip.tz",
-         r'primitive DIP expects 1 arguments but is given 2'),
+         r'expected a positive 31-bit integer'),
         # error message for DROP over the limit
         ("big_drop.tz",
          r'expected a positive 31-bit integer'),
