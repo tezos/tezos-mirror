@@ -311,7 +311,7 @@ let compute_size_chain size_locator =
    Run the test with:
    $ dune build @runbench_locator
    Copy the output to a file timing.dat and plot it with:
-   $ test_locator_plot.sh timing.dat
+   $ generate_locator_plot.sh timing.dat
 *)
 (*
    chain 1 year   518k   covered by locator 150
