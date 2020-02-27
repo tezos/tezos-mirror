@@ -1714,6 +1714,12 @@ Special operations
 
     :: 'S   ->   chain_id : 'S
 
+- ``LEVEL``: Push the current block level.
+
+::
+
+    :: 'S   ->   nat : 'S
+
 
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
@@ -2346,6 +2352,7 @@ The instructions which accept at most one variable annotation are:
    SET_DELEGATE
    IMPLICIT_ACCOUNT
    NOW
+   LEVEL
    AMOUNT
    BALANCE
    HASH_KEY
@@ -2621,6 +2628,8 @@ A similar mechanism is used for context dependent instructions:
    STEPS_TO_QUOTA  :: 'S   ->  @steps nat : 'S
 
    NOW  :: 'S   ->   @now timestamp : 'S
+
+   LEVEL :: 'S  ->   @level nat : 'S
 
 Inside nested code blocks, bound items on the stack will be given a
 default variable name annotation depending on the instruction and stack
@@ -3111,6 +3120,7 @@ Full grammar
       | CREATE_CONTRACT { <instruction> ... }
       | IMPLICIT_ACCOUNT
       | NOW
+      | LEVEL
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
