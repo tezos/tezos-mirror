@@ -260,10 +260,10 @@ class TestContracts:
          r'Type nat is not compatible with type list operation'),
         # error message for DIP over the limit
         ("big_dip.tz",
-         r'wrong stack type for instruction DIP'),
+         r'primitive DIP expects 1 arguments but is given 2'),
         # error message for DROP over the limit
         ("big_drop.tz",
-         r'int16 out of range'),
+         r'Was the error registered?'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
