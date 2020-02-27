@@ -61,11 +61,9 @@ let run stdin stdout =
   >>= fun { context_root;
             protocol_root;
             sandbox_parameters;
+            genesis;
             user_activated_upgrades;
             user_activated_protocol_overrides } ->
-  let genesis_block = ref Block_hash.zero in
-  let genesis_time = ref Time.Protocol.epoch in
-  let genesis_protocol = ref Protocol_hash.zero in
   let sandbox_param =
     Option.map ~f:(fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
@@ -79,7 +77,7 @@ let run stdin stdout =
           [key]
           (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
     >>= fun ctxt ->
-    match Registered_protocol.get !genesis_protocol with
+    match Registered_protocol.get genesis.protocol with
     | None ->
         assert false (* FIXME error *)
     | Some proto -> (
@@ -90,8 +88,8 @@ let run stdin stdout =
           {
             level = 0l;
             proto_level = 0;
-            predecessor = !genesis_block;
-            timestamp = !genesis_time;
+            predecessor = genesis.block;
+            timestamp = genesis.time;
             validation_passes = 0;
             operations_hash = Operation_list_list_hash.empty;
             fitness = [];
@@ -168,10 +166,7 @@ let run stdin stdout =
                 (Error_monad.result_encoding Block_validation.result_encoding)
                 res
           | External_validation.Commit_genesis
-              {chain_id; time; genesis_hash; protocol} ->
-              genesis_time := time ;
-              genesis_block := genesis_hash ;
-              genesis_protocol := protocol ;
+              {chain_id; time; genesis_hash = _; protocol} ->
               Error_monad.protect (fun () ->
                   Context.commit_genesis
                     context_index

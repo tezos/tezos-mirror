@@ -345,6 +345,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     State.init ~store_root ~context_root ?history_mode ?patch_context genesis
     >>=? fun (state, mainchain_state, context_index, history_mode) ->
     init
+      ~genesis
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
       (Internal context_index)
@@ -352,6 +353,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     return (validator_process, state, mainchain_state, history_mode)
   else
     init
+      ~genesis
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
       (External

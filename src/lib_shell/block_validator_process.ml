@@ -89,6 +89,7 @@ module External_validator = struct
   type validation_context = {
     context_root : string;
     protocol_root : string;
+    genesis : Genesis.t;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
     process_path : string;
@@ -99,7 +100,7 @@ module External_validator = struct
 
   type t = validation_context
 
-  let init ?sandbox_parameters ~context_root ~protocol_root
+  let init ?sandbox_parameters ~context_root ~protocol_root ~genesis
       ~user_activated_upgrades ~user_activated_protocol_overrides ~process_path
       =
     lwt_emit Init
@@ -108,6 +109,7 @@ module External_validator = struct
       {
         context_root;
         protocol_root;
+        genesis;
         user_activated_upgrades;
         user_activated_protocol_overrides;
         process_path;
@@ -153,6 +155,7 @@ module External_validator = struct
           External_validation.context_root = vp.context_root;
           protocol_root = vp.protocol_root;
           sandbox_parameters = vp.sandbox_parameters;
+          genesis = vp.genesis;
           user_activated_upgrades = vp.user_activated_upgrades;
           user_activated_protocol_overrides =
             vp.user_activated_protocol_overrides;
@@ -225,7 +228,8 @@ type validator_kind =
 
 type t = Sequential of Seq_validator.t | External of External_validator.t
 
-let init ~user_activated_upgrades ~user_activated_protocol_overrides kind =
+let init ~genesis ~user_activated_upgrades ~user_activated_protocol_overrides
+    kind =
   match kind with
   | Internal index ->
       Seq_validator.init
@@ -238,6 +242,7 @@ let init ~user_activated_upgrades ~user_activated_protocol_overrides kind =
         ?sandbox_parameters
         ~context_root
         ~protocol_root
+        ~genesis
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         ~process_path

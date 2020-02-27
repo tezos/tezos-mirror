@@ -36,6 +36,7 @@ type validator_kind =
 type t
 
 val init :
+  genesis:Genesis.t ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   validator_kind ->

@@ -26,6 +26,7 @@
 type parameters = {
   context_root : string;
   protocol_root : string;
+  genesis : Genesis.t;
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -89,29 +90,34 @@ let parameters_encoding =
   conv
     (fun { context_root;
            protocol_root;
+           genesis;
            user_activated_upgrades;
            user_activated_protocol_overrides;
            sandbox_parameters } ->
       ( context_root,
         protocol_root,
+        genesis,
         user_activated_upgrades,
         user_activated_protocol_overrides,
         sandbox_parameters ))
     (fun ( context_root,
            protocol_root,
+           genesis,
            user_activated_upgrades,
            user_activated_protocol_overrides,
            sandbox_parameters ) ->
       {
         context_root;
         protocol_root;
+        genesis;
         user_activated_upgrades;
         user_activated_protocol_overrides;
         sandbox_parameters;
       })
-    (obj5
+    (obj6
        (req "context_root" string)
        (req "protocol_root" string)
+       (req "genesis" Genesis.encoding)
        (req "user_activated_upgrades" User_activated.upgrades_encoding)
        (req
           "user_activated_protocol_overrides"
