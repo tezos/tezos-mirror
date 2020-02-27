@@ -5870,59 +5870,71 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
 
+let rec fold_lazy_storage :
+    type a.
+    f:(Ids.elt -> 'acc -> 'acc) ->
+    init:'acc ->
+    context ->
+    a ty ->
+    a ->
+    has_lazy_storage:a has_lazy_storage ->
+    ('acc * context) tzresult =
+ fun ~f ~init ctxt ty x ~has_lazy_storage ->
+  Gas.consume ctxt Typecheck_costs.cycle
+  >>? fun ctxt ->
+  match (has_lazy_storage, ty, x) with
+  | (False_f, _, _) ->
+      ok (init, ctxt)
+  | (_, Big_map_t (_, _, _), {id = Some id}) ->
+      Gas.consume ctxt Typecheck_costs.cycle
+      >>? fun ctxt ->
+      let kid = Lazy_storage.KId.make Big_map id in
+      ok (f kid init, ctxt)
+  | (_, Big_map_t (_, _, _), {id = None}) ->
+      ok (init, ctxt)
+  | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
+      fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
+      >>? fun (init, ctxt) ->
+      fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
+  | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
+      fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
+  | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
+      fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
+  | (_, Option_t (_, _), None) ->
+      ok (init, ctxt)
+  | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
+      fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
+  | (List_f has_lazy_storage, List_t (ty, _), l) ->
+      List.fold_left
+        (fun acc x ->
+          acc
+          >>? fun (init, ctxt) ->
+          fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage)
+        (ok (init, ctxt))
+        l.elements
+  | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
+      map_fold
+        (fun _ v acc ->
+          acc
+          >>? fun (init, ctxt) ->
+          fold_lazy_storage ~f ~init ctxt ty v ~has_lazy_storage)
+        m
+        (ok (init, ctxt))
+  | (_, Never_t _, _) ->
+      .
+  | _ ->
+      (* TODO: fix injectivity of types *) assert false
+
 let collect_lazy_storage ctxt ty x =
-  let rec collect :
-      type a.
-      context ->
-      a ty ->
-      a ->
-      has_lazy_storage:a has_lazy_storage ->
-      Ids.t ->
-      (Ids.t * context) tzresult =
-   fun ctxt ty x ~has_lazy_storage acc ->
-    Gas.consume ctxt Typecheck_costs.cycle
-    >>? fun ctxt ->
-    match (has_lazy_storage, ty, x) with
-    | (False_f, _, _) ->
-        ok (acc, ctxt)
-    | (_, Big_map_t (_, _, _), {id = Some id}) ->
-        Gas.consume ctxt Typecheck_costs.cycle
-        >>? fun ctxt ->
-        let kid = Lazy_storage.KId.make Big_map id in
-        ok (Ids.add kid acc, ctxt)
-    | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
-        collect ctxt tyl xl ~has_lazy_storage:hl acc
-        >>? fun (acc, ctxt) -> collect ctxt tyr xr ~has_lazy_storage:hr acc
-    | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
-        collect ctxt ty x ~has_lazy_storage acc
-    | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
-        collect ctxt ty x ~has_lazy_storage acc
-    | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
-        collect ctxt ty x ~has_lazy_storage acc
-    | (List_f has_lazy_storage, List_t (ty, _), l) ->
-        List.fold_left
-          (fun acc x ->
-            acc >>? fun (acc, ctxt) -> collect ctxt ty x ~has_lazy_storage acc)
-          (ok (acc, ctxt))
-          l.elements
-    | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
-        map_fold
-          (fun _ v acc ->
-            acc >>? fun (acc, ctxt) -> collect ctxt ty v ~has_lazy_storage acc)
-          m
-          (ok (acc, ctxt))
-    | (_, Big_map_t (_, _, _), {id = None}) ->
-        ok (acc, ctxt)
-    | (_, Option_t (_, _), None) ->
-        ok (acc, ctxt)
-    | (_, Never_t _, _) ->
-        .
-    | _ ->
-        assert false
-   (* TODO: fix injectivity of types *)
-  in
   let has_lazy_storage = has_lazy_storage ty in
-  Lwt.return (collect ctxt ty x ~has_lazy_storage no_lazy_storage_id)
+  Lwt.return
+  @@ fold_lazy_storage
+       ~f:(fun id acc -> Ids.add id acc)
+       ~init:no_lazy_storage_id
+       ctxt
+       ty
+       x
+       ~has_lazy_storage
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
