@@ -41,12 +41,7 @@ type request =
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
-  | Commit_genesis of {
-      chain_id : Chain_id.t;
-      genesis_hash : Block_hash.t;
-      time : Time.Protocol.t;
-      protocol : Protocol_hash.t;
-    }
+  | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
@@ -64,14 +59,10 @@ let request_pp ppf = function
         (Block_header.hash block_header)
         Chain_id.pp_short
         chain_id
-  | Commit_genesis {chain_id; genesis_hash; protocol; _} ->
+  | Commit_genesis {chain_id} ->
       Format.fprintf
         ppf
-        "genesis block commit %a(%a) for chain %a"
-        Block_hash.pp_short
-        genesis_hash
-        Protocol_hash.pp_short
-        protocol
+        "commit genesis block for chain %a"
         Chain_id.pp_short
         chain_id
   | Fork_test_chain {forked_header; _} ->
@@ -177,18 +168,13 @@ let request_encoding =
       case
         (Tag 2)
         ~title:"commit_genesis"
-        (obj4
-           (req "chain_id" Chain_id.encoding)
-           (req "time" Time.Protocol.encoding)
-           (req "genesis_hash" Block_hash.encoding)
-           (req "protocol" Protocol_hash.encoding))
+        (obj1 (req "chain_id" Chain_id.encoding))
         (function
-          | Commit_genesis {chain_id; time; genesis_hash; protocol} ->
-              Some (chain_id, time, genesis_hash, protocol)
+          | Commit_genesis {chain_id} ->
+              Some chain_id
           | Init | Validate _ | Fork_test_chain _ | Terminate ->
               None)
-        (fun (chain_id, time, genesis_hash, protocol) ->
-          Commit_genesis {chain_id; time; genesis_hash; protocol});
+        (fun chain_id -> Commit_genesis {chain_id});
       case
         (Tag 3)
         ~title:"fork_test_chain"

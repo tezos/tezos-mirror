@@ -303,16 +303,13 @@ let apply_block bvp ~predecessor block_header operations =
         request
         Block_validation.result_encoding
 
-let commit_genesis bvp ~genesis_hash ~chain_id ~time ~protocol =
+let commit_genesis bvp ~genesis_hash:_ ~chain_id ~time ~protocol =
   match bvp with
   | Sequential {context_index; _} ->
       Context.commit_genesis context_index ~chain_id ~time ~protocol
       >>= fun res -> return res
   | External vp ->
-      let request =
-        External_validation.Commit_genesis
-          {genesis_hash; chain_id; time; protocol}
-      in
+      let request = External_validation.Commit_genesis {chain_id} in
       External_validator.send_request vp request Context_hash.encoding
 
 let init_test_chain bvp forking_block =

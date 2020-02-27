@@ -41,12 +41,7 @@ type request =
       operations : Operation.t list list;
       max_operations_ttl : int;
     }
-  | Commit_genesis of {
-      chain_id : Chain_id.t;
-      genesis_hash : Block_hash.t;
-      time : Time.Protocol.t;
-      protocol : Protocol_hash.t;
-    }
+  | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
       context_hash : Context_hash.t;
       forked_header : Block_header.t;

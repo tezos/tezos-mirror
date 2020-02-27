@@ -165,14 +165,13 @@ let run stdin stdout =
                 stdout
                 (Error_monad.result_encoding Block_validation.result_encoding)
                 res
-          | External_validation.Commit_genesis
-              {chain_id; time; genesis_hash = _; protocol} ->
+          | External_validation.Commit_genesis {chain_id} ->
               Error_monad.protect (fun () ->
                   Context.commit_genesis
                     context_index
                     ~chain_id
-                    ~time
-                    ~protocol
+                    ~time:genesis.time
+                    ~protocol:genesis.protocol
                   >>= fun commit -> return commit)
               >>= fun commit ->
               External_validation.send
