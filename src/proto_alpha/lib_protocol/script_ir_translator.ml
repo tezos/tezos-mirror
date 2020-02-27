@@ -2754,12 +2754,6 @@ and parse_instr :
     bef stack_ty ->
     (bef judgement * context) tzresult Lwt.t =
  fun ?type_logger tc_context ctxt ~legacy script_instr stack_ty ->
-  let _check_item check loc name n m =
-    trace_eval (fun () ->
-        serialize_stack_for_error ctxt stack_ty
-        >>|? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
-    @@ trace (Bad_stack_item n) @@ Lwt.return check
-  in
   let check_item_ty (type a b) ctxt (exp : a ty) (got : b ty) loc name n m :
       ((a, b) eq * a ty * context) tzresult Lwt.t =
     trace_eval (fun () ->
