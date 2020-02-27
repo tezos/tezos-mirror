@@ -287,14 +287,72 @@ let store_known_protocols state =
                         -% t event "embedded_protocol_already_stored") ) ))
     embedded_protocols
 
-let check_and_fix_storage_consistency state =
+type error += Non_recoverable_context
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"context.non_recoverable_context"
+    ~title:"Non recoverable context"
+    ~description:"Cannot recover from a corrupted context."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "@[The context may have been corrupted after crashing while writing \
+         data on disk. Its state appears to be non-recoverable. Import a \
+         snapshot or re-synchronize from an empty node data directory.@]")
+    Data_encoding.unit
+    (function Non_recoverable_context -> Some () | _ -> None)
+    (fun () -> Non_recoverable_context)
+
+let check_and_fix_storage_consistency state vp =
+  let restore_context_integrity () =
+    let open Local_logging in
+    Local_logging.lwt_log_error
+      Tag.DSL.(
+        fun f ->
+          f
+            "Context corruption detected: restoring integrity. This may take \
+             a while..."
+          -% t event "corrupted_context_detected")
+    >>= fun () ->
+    (* Corrupted context for current block, backtracking head *)
+    Block_validator_process.restore_context_integrity vp
+    >>= function
+    | Ok (Some n) ->
+        Local_logging.lwt_log_notice
+          Tag.DSL.(
+            fun f ->
+              f "Successfully restored context integrity - repaired %a entries"
+              -% a (Tag.def ~doc:"" "entries" Format.pp_print_int) n
+              -% t event "restored_context_integrity")
+        >>= fun () -> return_unit
+    | Ok None ->
+        Local_logging.lwt_log_notice
+          Tag.DSL.(
+            fun f ->
+              f "No corruption detected while scanning the context."
+              -% t event "context_already_consistent")
+        >>= fun () -> return_unit
+    | Error err ->
+        Local_logging.lwt_log_error
+          Tag.DSL.(fun f -> f "@[Error: %a@]" -% a Error_monad.errs_tag err)
+        >>= fun () -> fail Non_recoverable_context
+  in
   State.Chain.all state
   >>= fun chains ->
   let rec check_block n chain_state block =
     fail_unless (n > 0) Validation_errors.Bad_data_dir
     >>=? fun () ->
-    State.Block.context_exists block
-    >>= fun is_context_known ->
+    Lwt.catch
+      (fun () -> State.Block.context_exists block >>= fun b -> return b)
+      (fun _exn ->
+        restore_context_integrity ()
+        >>=? fun () ->
+        (* Corrupted commit has been purged. We need to backtrack the
+            head. Returning false will do the trick. *)
+        return_false)
+    >>=? fun is_context_known ->
     if is_context_known then
       (* Found a known context for the block: setting as consistent head *)
       Chain.set_head chain_state block >>=? fun _ -> return_unit
@@ -377,7 +435,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     >>=? fun (state, mainchain_state, _context_index, history_mode) ->
     return (validator_process, state, mainchain_state, history_mode))
   >>=? fun (validator_process, state, mainchain_state, history_mode) ->
-  check_and_fix_storage_consistency state
+  check_and_fix_storage_consistency state validator_process
   >>=? fun () ->
   may_update_checkpoint mainchain_state checkpoint history_mode
   >>=? fun () ->
