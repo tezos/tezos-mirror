@@ -38,19 +38,21 @@ module Seq_validator = struct
 
   type validation_context = {
     context_index : Context.index;
+    genesis : Genesis.t;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
   }
 
   type t = validation_context
 
-  let init ~user_activated_upgrades ~user_activated_protocol_overrides
+  let init ~genesis ~user_activated_upgrades ~user_activated_protocol_overrides
       context_index =
     lwt_emit Init
     >>= fun () ->
     Lwt.return
       {
         context_index;
+        genesis;
         user_activated_upgrades;
         user_activated_protocol_overrides;
       }
@@ -233,6 +235,7 @@ let init ~genesis ~user_activated_upgrades ~user_activated_protocol_overrides
   match kind with
   | Internal index ->
       Seq_validator.init
+        ~genesis
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         index
@@ -303,10 +306,14 @@ let apply_block bvp ~predecessor block_header operations =
         request
         Block_validation.result_encoding
 
-let commit_genesis bvp ~genesis_hash:_ ~chain_id ~time ~protocol =
+let commit_genesis bvp ~chain_id =
   match bvp with
-  | Sequential {context_index; _} ->
-      Context.commit_genesis context_index ~chain_id ~time ~protocol
+  | Sequential {context_index; genesis; _} ->
+      Context.commit_genesis
+        context_index
+        ~chain_id
+        ~time:genesis.time
+        ~protocol:genesis.protocol
       >>= fun res -> return res
   | External vp ->
       let request = External_validation.Commit_genesis {chain_id} in
