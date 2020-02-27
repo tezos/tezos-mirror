@@ -19,22 +19,5 @@
             %{bin:tezos-admin-client})))
 
 (alias
- (name runtest_cors.sh)
- (locks /tcp-port/18731
-        /tcp-port/19731)
- (deps sandbox.json
-       protocol_parameters.json
-       test_lib.inc.sh
-       (glob_files proto_test_injection/*))
- (action
-  (run bash %{dep:test_cors.sh}
-            %{bin:tezos-sandboxed-node.sh}
-            %{bin:tezos-node}
-            %{bin:tezos-init-sandboxed-client.sh}
-            %{bin:tezos-client}
-            %{bin:tezos-admin-client})))
-
-(alias
  (name runtest)
- (deps (alias runtest_tls.sh)
-       (alias runtest_cors.sh)))
+ (deps (alias runtest_tls.sh)))
