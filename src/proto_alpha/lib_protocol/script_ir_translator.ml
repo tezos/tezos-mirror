@@ -3655,8 +3655,7 @@ and parse_instr :
           typed ctxt loc (Dip descr) (Item_t (v, descr.aft, stack_annot))
       | Failed _ ->
           fail (Fail_not_in_tail_position loc) )
-  | (Prim (loc, I_DIP, [n; code], result_annot), stack)
-    when match parse_uint30 n with Ok _ -> true | Error _ -> false ->
+  | (Prim (loc, I_DIP, [n; code], result_annot), stack) ->
       let rec make_proof_argument :
           type tstk.
           int
@@ -4621,7 +4620,6 @@ and parse_instr :
             | I_MAP
             | I_ITER
             | I_EMPTY_SET
-            | I_DIP
             | I_LOOP
             | I_LOOP_LEFT
             | I_CONTRACT ) as name ),
