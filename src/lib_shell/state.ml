@@ -637,10 +637,7 @@ module Chain = struct
         if Chain_id.Table.mem data.chains chain_id then
           Pervasives.failwith "State.Chain.create"
         else
-          commit_genesis
-            ~chain_id
-            ~time:genesis.Genesis.time
-            ~protocol:genesis.protocol
+          commit_genesis ~chain_id
           >>=? fun commit ->
           Locked_block.store_genesis block_store genesis commit
           >>= fun genesis_header ->
@@ -1792,7 +1789,7 @@ let () =
 
 let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
     ?(context_mapsize = 409_600_000_000L) ~store_root ~context_root
-    ?history_mode ?(readonly = false) genesis =
+    ?history_mode ?(readonly = false) (genesis : Genesis.t) =
   Store.init ~mapsize:store_mapsize store_root
   >>=? fun global_store ->
   ( match commit_genesis with
@@ -1810,8 +1807,12 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
         ?patch_context
         context_root
       >>= fun context_index ->
-      let commit_genesis ~chain_id ~time ~protocol =
-        Context.commit_genesis context_index ~chain_id ~time ~protocol
+      let commit_genesis ~chain_id =
+        Context.commit_genesis
+          context_index
+          ~chain_id
+          ~time:genesis.time
+          ~protocol:genesis.protocol
         >>= fun res -> return res
       in
       Lwt.return (context_index, commit_genesis) )

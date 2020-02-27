@@ -364,7 +364,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
            sandbox_parameters;
          })
     >>=? fun validator_process ->
-    let commit_genesis ~chain_id ~time:_ ~protocol:_ =
+    let commit_genesis ~chain_id =
       Block_validator_process.commit_genesis validator_process ~chain_id
     in
     State.init
