@@ -386,16 +386,17 @@ let password_filename_arg () =
 
 let mockup_mode_arg () =
   let parse_mockup_mode (str : string) : mockup_mode tzresult Lwt.t =
-    if str = "default" then return Mode_default
+    if str = "client" then return Mode_default
     else if str = "mockup" then return Mode_mockup
     else fail (Invalid_mockup_arg str)
   in
   arg
+    ~short:'M'
     ~long:"mode"
-    ~placeholder:"mockup mode"
-    ~doc:"default|mockup"
+    ~placeholder:"client|mockup"
+    ~doc:"how to interact with the node"
     (parameter
-       ~autocomplete:(fun _ -> return ["default"; "mockup"])
+       ~autocomplete:(fun _ -> return ["client"; "mockup"])
        (fun _ param -> parse_mockup_mode param))
 
 let read_config_file config_file =

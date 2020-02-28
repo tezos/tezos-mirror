@@ -174,20 +174,21 @@ let () =
   register_error_kind
     `Permanent
     ~id:"local_rpc_client.request_failed"
-    ~title:""
-    ~description:""
+    ~title:"Local mockup RPC request failure"
+    ~description:"An RPC request failed in mockup mode"
     ~pp:(fun ppf error ->
+      Format.fprintf ppf "A mockup RPC request failed" ;
       match error with
       | Rpc_generic_error ->
-          Format.fprintf ppf "Rpc_generic_error"
+          ()
       | Rpc_not_found None ->
-          Format.fprintf ppf "Rpc_not_found (no description)"
+          Format.fprintf ppf ": RPC not found"
       | Rpc_not_found (Some desc) ->
-          Format.fprintf ppf "Rpc_not_found (description: %s)" desc
+          Format.fprintf ppf ": RPC not found (%s)" desc
       | Rpc_unauthorized ->
-          Format.fprintf ppf "Rpc_unauthorized"
+          Format.fprintf ppf ": RPC unauthorized"
       | Rpc_unexpected_type_of_failure ->
-          Format.fprintf ppf "Rpc_unexpected_type_of_failure")
+          Format.fprintf ppf ": unexpected type of failure")
     (let open Data_encoding in
     obj1 (req "rpc_error" rpc_error_encoding))
     (function Local_RPC_error rpc_error -> Some rpc_error | _ -> None)
@@ -197,11 +198,9 @@ let () =
   register_error_kind
     `Permanent
     ~id:"local_rpc_client.not_implemented_in_local_mode"
-    ~title:""
-    ~description:""
-    ~pp:(fun ppf () -> Format.fprintf ppf "Not_implemented_in_local_mode")
-    (let open Data_encoding in
-    obj1
-      (req "not_implemented_error" (constant "not_implemented_in_local_mode")))
+    ~title:"Local mockup RPC request not implemented"
+    ~description:"A specific RPC is not implemented in mockup mode"
+    ~pp:(fun ppf () -> Format.fprintf ppf "RPC not implemented in mockup mode")
+    Data_encoding.empty
     (function Not_implemented_in_local_RPC_mode -> Some () | _ -> None)
     (fun () -> Not_implemented_in_local_RPC_mode)
