@@ -368,7 +368,10 @@ def assert_storage_contains(client: Client,
                             contract: str,
                             expected_storage: str) -> None:
     actual_storage = client.get_storage(contract)
-    assert actual_storage == expected_storage
+    equal = actual_storage == expected_storage
+    assert equal, (f"failed: actual_storage == expected_storage\n"
+                   f"Actual storage: {actual_storage}\n"
+                   f"Expected storage: {expected_storage}")
 
 
 def contract_name_of_file(contract_path: str) -> str:
