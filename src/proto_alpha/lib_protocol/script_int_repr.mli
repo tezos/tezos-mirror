@@ -54,6 +54,9 @@ val to_string : _ num -> string
     Supports [+] and [-] sign modifiers, and [0x], [0o] and [0b] base modifiers. *)
 val of_string : string -> z num option
 
+(** Conversion from an OCaml [int32]. *)
+val of_int32 : int32 -> z num
+
 (** Conversion to an OCaml [int64], returns [None] on overflow. *)
 val to_int64 : _ num -> int64 option
 
