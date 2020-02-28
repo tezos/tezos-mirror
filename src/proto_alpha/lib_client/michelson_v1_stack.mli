@@ -19,6 +19,10 @@ type error +=
   | Wrong_extra_big_maps_item of localized_node
   | Wrong_extra_big_maps of localized_node
   | Invalid_address_for_smart_contract of string
+  | Duplicated_tzt_top_prim of string * localized_node
+  | Wrong_tzt_top_prim_arity of string * localized_node * int
+  | Unknown_tzt_top_prim of string * localized_node
+  | Missing_mandatory_tzt_top_prim of string
 
 val print_localized_node_location : Format.formatter -> localized_node -> unit
 
@@ -38,3 +42,12 @@ val parse_extra_big_maps :
   ?node:(Micheline.canonical_location, string) Micheline.node ->
   string Michelson_v1_parser.parser_result ->
   RPC.Scripts.S.extra_big_map_description list tzresult
+
+type unit_test = {
+  input : (Script.expr * Script.expr) list;
+  code : Script.expr;
+  output : (Script.expr * Script.expr) list;
+}
+
+val parse_unit_test :
+  string Michelson_v1_parser.parser_result -> unit_test tzresult

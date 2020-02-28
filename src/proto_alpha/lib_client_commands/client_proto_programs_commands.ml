@@ -459,6 +459,111 @@ let commands () =
         return_unit);
     command
       ~group
+      ~desc:"Ask the node to run Michelson unit tests from files or literals"
+      no_options
+      (prefixes ["run"; "unit"; "tests"; "from"]
+      @@ seq_of_param
+      @@ file_or_literal_with_origin_param ())
+      (fun () tests (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        match tests with
+        | [] ->
+            let*! () =
+              cctxt#warning "No test file was specified on the command line"
+            in
+            return_unit
+        | _ :: _ ->
+            let*! ( (_number_of_literals : int),
+                    number_of_seen_tests,
+                    number_of_passed_tests,
+                    errors ) =
+              List.fold_left_s
+                (fun (i, number_of_seen_tests, number_of_passed_tests, error_acc)
+                     content_with_origin ->
+                  let name, i =
+                    match content_with_origin with
+                    | Client_proto_args.File {path; _} -> (path, i)
+                    | Text _ ->
+                        let i = i + 1 in
+                        ("Literal script " ^ string_of_int i, i)
+                  in
+                  let source =
+                    Client_proto_args.content_of_file_or_text
+                      content_with_origin
+                  in
+                  let parsed, parsing_errors =
+                    Michelson_v1_parser.expand_toplevel source
+                  in
+                  let*! res =
+                    let open Client_proto_tzt in
+                    let*? (test : unit_test_with_source) =
+                      Micheline_parser.no_parsing_error
+                        ({source; parsed}, parsing_errors)
+                    in
+                    run_unit_test
+                      cctxt
+                      ~chain:cctxt#chain
+                      ~block:cctxt#block
+                      ~test
+                      ()
+                  in
+                  match res with
+                  | Ok () ->
+                      Lwt.return
+                        ( i,
+                          number_of_seen_tests + 1,
+                          number_of_passed_tests + 1,
+                          error_acc )
+                  | Error err ->
+                      Lwt.return
+                        ( i,
+                          number_of_seen_tests + 1,
+                          number_of_passed_tests,
+                          (name, parsed, err) :: error_acc ))
+                (0, 0, 0, [])
+                tests
+            in
+            let number_of_failed_tests =
+              number_of_seen_tests - number_of_passed_tests
+            in
+            let print_result () =
+              cctxt#message
+                "Test results: Passed:%d Failed:%d Total:%d"
+                number_of_passed_tests
+                number_of_failed_tests
+                number_of_seen_tests
+            in
+            if number_of_failed_tests > 0 then
+              let*! () =
+                List.iter_s
+                  (fun (name, parsed, errs) ->
+                    let*! errs =
+                      Michelson_v1_error_reporter.enrich_runtime_errors
+                        cctxt
+                        ~chain:cctxt#chain
+                        ~block:cctxt#block
+                        ~parsed:(Some parsed)
+                        errs
+                    in
+                    cctxt#message
+                      "%s:@.%a"
+                      name
+                      (Michelson_v1_error_reporter.report_errors
+                         ~details:true
+                         ~parsed
+                         ~show_source:true)
+                      errs)
+                  errors
+              in
+              let*! () = print_result () in
+              let*! () = cctxt#error "Some tests have failed" in
+              return_unit
+            else
+              let*! () = print_result () in
+              let*! () = cctxt#message "All tests have passed" in
+              return_unit);
+    command
+      ~group
       ~desc:"Ask the node to typecheck one or several scripts."
       (args6
          show_types_switch
