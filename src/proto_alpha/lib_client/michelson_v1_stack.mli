@@ -43,10 +43,25 @@ val parse_extra_big_maps :
   string Michelson_v1_parser.parser_result ->
   RPC.Scripts.S.extra_big_map_description list tzresult
 
+type unit_test_optional = {
+  now : Script_timestamp.t option;
+  level : Script_int.n Script_int.num option;
+  sender : Contract.t option;
+  source : Signature.public_key_hash option;
+  chain_id : Chain_id.t option;
+  self : Contract_hash.t option;
+  parameter : Script.expr option;
+  amount : Tez.t option;
+  balance : Tez.t option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
+}
+
 type unit_test = {
   input : (Script.expr * Script.expr) list;
   code : Script.expr;
   output : (Script.expr * Script.expr) list;
+  optional : unit_test_optional;
 }
 
 val parse_unit_test :

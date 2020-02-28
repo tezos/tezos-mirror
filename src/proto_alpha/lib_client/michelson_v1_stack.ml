@@ -405,10 +405,25 @@ let parse_extra_big_maps ?node parsed =
     ~error:(fun node -> Wrong_extra_big_maps node)
     parse_extra_big_map_item
 
+type unit_test_optional = {
+  now : Script_timestamp.t option;
+  level : Script_int.n Script_int.num option;
+  sender : Contract.t option;
+  source : Signature.public_key_hash option;
+  chain_id : Chain_id.t option;
+  self : Contract_hash.t option;
+  parameter : Script.expr option;
+  amount : Tez.t option;
+  balance : Tez.t option;
+  other_contracts : RPC.Scripts.S.other_contract_description list option;
+  extra_big_maps : RPC.Scripts.S.extra_big_map_description list option;
+}
+
 type unit_test = {
   input : (Script.expr * Script.expr) list;
   code : Script.expr;
   output : (Script.expr * Script.expr) list;
+  optional : unit_test_optional;
 }
 
 (* Same as unit_test but all fields are optional. Used only during
@@ -417,7 +432,75 @@ type temp_unit_test = {
   temp_input : (Script.expr * Script.expr) list option;
   temp_code : Script.expr option;
   temp_output : (Script.expr * Script.expr) list option;
+  temp_optional : unit_test_optional;
 }
+
+(* Same as Option.value_fe but takes an error instead of a trace. *)
+let value_fe_err opt ~error =
+  Option.value_fe opt ~error:(fun () -> TzTrace.make (error ()))
+
+(* TODO: #6678
+   Reuse protocol elaboration functions from the
+   Script_ir_translator module instead of duplicating them here. *)
+let parse_mutez node ~error =
+  let mutez_opt =
+    match node with
+    | Micheline.Int (_loc, z) -> Tez.of_mutez (Z.to_int64 z)
+    | _ -> None
+  in
+  value_fe_err mutez_opt ~error
+
+let parse_chain_id node ~error =
+  match node with
+  | Micheline.String (_loc, s) ->
+      record_trace_eval error @@ Chain_id.of_b58check s
+  | Bytes (_loc, b) ->
+      value_fe_err ~error
+      @@ Data_encoding.Binary.of_bytes_opt Chain_id.encoding b
+  | _ -> Result_syntax.tzfail @@ error ()
+
+let parse_timestamp node ~error =
+  value_fe_err ~error
+  @@
+  match node with
+  | Micheline.String (_loc, s) -> Script_timestamp.of_string s
+  | Int (_loc, z) -> Some (Script_timestamp.of_zint z)
+  | _ -> None
+
+let parse_nat node ~error =
+  value_fe_err ~error
+  @@
+  match node with
+  | Micheline.Int (_loc, z) -> Script_int.(is_nat (of_zint z))
+  | _ -> None
+
+let parse_key_hash node ~error =
+  match node with
+  | Micheline.String (_loc, s) ->
+      record_trace_eval error @@ Signature.Public_key_hash.of_b58check s
+  | Bytes (_loc, b) ->
+      value_fe_err ~error
+      @@ Data_encoding.Binary.of_bytes_opt Signature.Public_key_hash.encoding b
+  | _ -> Result_syntax.tzfail @@ error ()
+
+let parse_address node ~error =
+  match node with
+  | Micheline.String (_loc, s) ->
+      record_trace_eval error @@ Environment.wrap_tzresult
+      @@ Contract.of_b58check s
+  | Bytes (_loc, b) ->
+      value_fe_err ~error
+      @@ Data_encoding.Binary.of_bytes_opt Contract.encoding b
+  | _ -> Result_syntax.tzfail @@ error ()
+
+let parse_contract_hash node ~error =
+  value_fe_err ~error
+  @@
+  match node with
+  | Micheline.String (_loc, s) -> Contract_hash.of_b58check_opt s
+  | Bytes (_loc, b) ->
+      Data_encoding.Binary.of_bytes_opt Contract_hash.encoding b
+  | _ -> None
 
 let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
   let open Result_syntax in
@@ -447,6 +530,95 @@ let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
             let* () = check_duplicated ut.temp_code in
             let* c = trace_invalid_format @@ parse_expression arg in
             parse {ut with temp_code = Some c} l
+        | "amount" ->
+            let* () = check_duplicated ut.temp_optional.amount in
+            let* t = parse_mutez arg ~error:invalid_format in
+            parse
+              {ut with temp_optional = {ut.temp_optional with amount = Some t}}
+              l
+        | "balance" ->
+            let* () = check_duplicated ut.temp_optional.balance in
+            let* t = parse_mutez arg ~error:invalid_format in
+            parse
+              {ut with temp_optional = {ut.temp_optional with balance = Some t}}
+              l
+        | "chain_id" ->
+            let* () = check_duplicated ut.temp_optional.chain_id in
+            let* chain_id = parse_chain_id arg ~error:invalid_format in
+            parse
+              {
+                ut with
+                temp_optional = {ut.temp_optional with chain_id = Some chain_id};
+              }
+              l
+        | "now" ->
+            let* () = check_duplicated ut.temp_optional.now in
+            let* time = parse_timestamp arg ~error:invalid_format in
+            parse
+              {ut with temp_optional = {ut.temp_optional with now = Some time}}
+              l
+        | "level" ->
+            let* () = check_duplicated ut.temp_optional.level in
+            let* level = parse_nat arg ~error:invalid_format in
+            parse
+              {
+                ut with
+                temp_optional = {ut.temp_optional with level = Some level};
+              }
+              l
+        | "sender" ->
+            let* () = check_duplicated ut.temp_optional.sender in
+            let* addr = parse_address arg ~error:invalid_format in
+            parse
+              {
+                ut with
+                temp_optional = {ut.temp_optional with sender = Some addr};
+              }
+              l
+        | "source" ->
+            let* () = check_duplicated ut.temp_optional.source in
+            let* addr = parse_key_hash arg ~error:invalid_format in
+            parse
+              {
+                ut with
+                temp_optional = {ut.temp_optional with source = Some addr};
+              }
+              l
+        | "self" ->
+            let* () = check_duplicated ut.temp_optional.self in
+            let* addr = parse_contract_hash arg ~error:invalid_format in
+            parse
+              {ut with temp_optional = {ut.temp_optional with self = Some addr}}
+              l
+        | "parameter" ->
+            let* () = check_duplicated ut.temp_optional.parameter in
+            let* ty = parse_expression arg in
+            parse
+              {
+                ut with
+                temp_optional = {ut.temp_optional with parameter = Some ty};
+              }
+              l
+        | "other_contracts" ->
+            let* () = check_duplicated ut.temp_optional.other_contracts in
+            let* items = parse_other_contracts ~node:arg parsed in
+            parse
+              {
+                ut with
+                temp_optional =
+                  {ut.temp_optional with other_contracts = Some items};
+              }
+              l
+        | "big_maps" ->
+            let* () = check_duplicated ut.temp_optional.extra_big_maps in
+            let* items = parse_extra_big_maps ~node:arg parsed in
+            parse
+              {
+                ut with
+                temp_optional =
+                  {ut.temp_optional with extra_big_maps = Some items};
+              }
+              l
         | _ -> tzfail @@ Unknown_tzt_top_prim (prim, localize_node ~parsed e))
     | (Prim (_loc, prim, ([] | _ :: _ :: _), _annots) as e) :: _ ->
         tzfail @@ Wrong_tzt_top_prim_arity (prim, localize_node ~parsed e, 1)
@@ -459,7 +631,27 @@ let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
     | node -> [node]
   in
   let* ut =
-    parse {temp_input = None; temp_code = None; temp_output = None} nodes
+    parse
+      {
+        temp_input = None;
+        temp_code = None;
+        temp_output = None;
+        temp_optional =
+          {
+            now = None;
+            level = None;
+            sender = None;
+            source = None;
+            chain_id = None;
+            self = None;
+            parameter = None;
+            amount = None;
+            balance = None;
+            other_contracts = None;
+            extra_big_maps = None;
+          };
+      }
+      nodes
   in
   let check_mandatory opt prim =
     Option.value_e
@@ -469,4 +661,4 @@ let parse_unit_test (parsed : string Michelson_v1_parser.parser_result) =
   let* input = check_mandatory ut.temp_input "input" in
   let* code = check_mandatory ut.temp_code "code" in
   let* output = check_mandatory ut.temp_output "output" in
-  return {input; code; output}
+  return {input; code; output; optional = ut.temp_optional}

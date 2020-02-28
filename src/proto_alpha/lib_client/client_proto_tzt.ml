@@ -19,8 +19,12 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ~(test : unit_test_with_source) () =
   let open Lwt_result_syntax in
   let*? ut = Michelson_v1_stack.parse_unit_test test.parsed in
-  let* chain_id = Chain_services.chain_id cctxt ~chain () in
-  let amount = Tez.zero in
+  let* chain_id =
+    match ut.optional.chain_id with
+    | Some chain_id -> return chain_id
+    | None -> Chain_services.chain_id cctxt ~chain ()
+  in
+  let amount = Option.value ~default:Tez.zero ut.optional.amount in
   let* expected_output =
     Plugin.RPC.Scripts.normalize_stack
       cctxt
@@ -28,8 +32,8 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
       ~stack:ut.output
       ~unparsing_mode:Readable
       ~legacy:true
-      ~other_contracts:None
-      ~extra_big_maps:None
+      ~other_contracts:ut.optional.other_contracts
+      ~extra_big_maps:ut.optional.extra_big_maps
   in
   let* output, _gas =
     Plugin.RPC.Scripts.run_instr
@@ -37,17 +41,17 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
       ~gas:None
       ~input:ut.input
       ~code:ut.code
-      ~now:None
-      ~level:None
-      ~sender:None
-      ~source:None
+      ~now:ut.optional.now
+      ~level:ut.optional.level
+      ~sender:ut.optional.sender
+      ~source:ut.optional.source
       ~chain_id
-      ~self:None
-      ~parameter:None
+      ~self:ut.optional.self
+      ~parameter:ut.optional.parameter
       ~amount
-      ~balance:None
-      ~other_contracts:None
-      ~extra_big_maps:None
+      ~balance:ut.optional.balance
+      ~other_contracts:ut.optional.other_contracts
+      ~extra_big_maps:ut.optional.extra_big_maps
       ~unparsing_mode:None
       cctxt
       (chain, block)
