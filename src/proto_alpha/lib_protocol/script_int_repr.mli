@@ -57,13 +57,13 @@ val of_string : string -> z num option
 (** Conversion to an OCaml [int64], returns [None] on overflow. *)
 val to_int64 : _ num -> int64 option
 
-(** Conversion from an OCaml [int]. *)
+(** Conversion from an OCaml [int64]. *)
 val of_int64 : int64 -> z num
 
 (** Conversion to an OCaml [int], returns [None] on overflow. *)
 val to_int : _ num -> int option
 
-(** Conversion from an OCaml [int64]. *)
+(** Conversion from an OCaml [int]. *)
 val of_int : int -> z num
 
 (** Conversion from a Zarith integer ([Z.t]). *)
