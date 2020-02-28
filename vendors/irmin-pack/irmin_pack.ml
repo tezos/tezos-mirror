@@ -110,7 +110,7 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
     block : IO.t;
     lock : Lwt_mutex.t;
     w : W.t;
-    mutable counter : int;
+    mutable open_instances : int;
   }
 
   let read_length32 ~off block =
@@ -170,8 +170,7 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
   let unsafe_find t k =
     Log.debug (fun l -> l "[branches] find %a" pp_branch k);
     if IO.readonly t.block then sync_offset t;
-    try Lwt.return_some (Tbl.find t.cache k)
-    with Not_found -> Lwt.return_none
+    try Lwt.return_some (Tbl.find t.cache k) with Not_found -> Lwt.return_none
 
   let find t k = Lwt_mutex.with_lock t.lock (fun () -> unsafe_find t k)
 
@@ -206,8 +205,8 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
   let watches = W.v ()
 
   let valid t =
-    if t.counter <> 0 then (
-      t.counter <- t.counter + 1;
+    if t.open_instances <> 0 then (
+      t.open_instances <- t.open_instances + 1;
       true )
     else false
 
@@ -222,7 +221,7 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
         block;
         w = watches;
         lock = Lwt_mutex.create ();
-        counter = 1;
+        open_instances = 1;
       }
     in
     refill t ~from:0L;
@@ -284,8 +283,8 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
   let unwatch t = W.unwatch t.w
 
   let unsafe_close t =
-    t.counter <- t.counter - 1;
-    if t.counter = 0 then (
+    t.open_instances <- t.open_instances - 1;
+    if t.open_instances = 0 then (
       Tbl.reset t.index;
       Tbl.reset t.cache;
       if not (IO.readonly t.block) then IO.sync t.block;
@@ -438,8 +437,7 @@ struct
         let readonly = readonly config in
         let log_size = index_log_size config in
         let index = Index.v ~fresh ~readonly ~log_size root in
-        Contents.CA.v ~fresh ~readonly ~lru_size ~index root
-        >>= fun contents ->
+        Contents.CA.v ~fresh ~readonly ~lru_size ~index root >>= fun contents ->
         Node.CA.v ~fresh ~readonly ~lru_size ~index root >>= fun node ->
         Commit.CA.v ~fresh ~readonly ~lru_size ~index root >>= fun commit ->
         Branch.v ~fresh ~readonly root >|= fun branch ->
@@ -453,38 +451,70 @@ struct
     end
   end
 
-  let integrity_check ppf (t : X.Repo.t) =
-    Fmt.pf ppf "running the integrity check\n%!";
-    let commits = ref 0 in
-    let contents = ref 0 in
-    let nodes = ref 0 in
-    let pp_stats ppf () =
-      Fmt.pf ppf "%4dk blobs / %4dk trees / %4dk commits" (!contents / 1000)
-        (!nodes / 1000) (!commits / 1000)
+  let null =
+    match Sys.os_type with
+    | "Unix" | "Cygwin" -> "/dev/null"
+    | "Win32" -> "NUL"
+    | _ -> invalid_arg "invalid os type"
+
+  let integrity_check ?ppf ~auto_repair t =
+    let ppf =
+      match ppf with
+      | Some p -> p
+      | None -> open_out null |> Format.formatter_of_out_channel
     in
-    let pr_stats () = Fmt.epr "\r%a%!" pp_stats () in
+    Fmt.pf ppf "Running the integrity_check.\n%!";
+    let nb_commits = ref 0 in
+    let nb_nodes = ref 0 in
+    let nb_contents = ref 0 in
+    let nb_absent = ref 0 in
+    let nb_corrupted = ref 0 in
+    let exception Cannot_fix in
+    let contents = X.Repo.contents_t t in
+    let nodes = X.Repo.node_t t |> snd in
+    let commits = X.Repo.commit_t t |> snd in
+    let pp_stats () =
+      Fmt.pf ppf "\t%dk contents / %dk nodes / %dk commits\n%!"
+        (!nb_contents / 1000) (!nb_nodes / 1000) (!nb_commits / 1000)
+    in
     let count_increment count =
       incr count;
-      if !count mod 100 = 0 then pr_stats ()
+      if !count mod 1000 = 0 then pp_stats ()
     in
-    Index.iter
-      (fun k (offset, length, m) ->
-        match m with
-        | 'B' ->
-            let capability = X.Repo.contents_t t in
-            X.Contents.CA.integrity_check ~offset ~length k capability;
-            count_increment contents
-        | 'N' | 'I' ->
-            let _, capability = X.Repo.node_t t in
-            X.Node.CA.integrity_check ~offset ~length k capability;
-            count_increment nodes
-        | 'C' ->
-            let _, capability = X.Repo.commit_t t in
-            X.Commit.CA.integrity_check ~offset ~length k capability;
-            count_increment commits
-        | _ -> invalid_arg "unknown content type")
-      t.index;
-    pr_stats ()
+    let f (k, (offset, length, m)) =
+      match m with
+      | 'B' ->
+          count_increment nb_contents;
+          X.Contents.CA.integrity_check ~offset ~length k contents
+      | 'N' | 'I' ->
+          count_increment nb_nodes;
+          X.Node.CA.integrity_check ~offset ~length k nodes
+      | 'C' ->
+          count_increment nb_commits;
+          X.Commit.CA.integrity_check ~offset ~length k commits
+      | _ -> invalid_arg "unknown content type"
+    in
+    if auto_repair then
+      try
+        Index.filter t.index (fun binding ->
+            match f binding with
+            | Ok () -> true
+            | Error `Wrong_hash -> raise Cannot_fix
+            | Error `Absent_value ->
+                incr nb_absent;
+                false);
+        if !nb_absent = 0 then Ok `No_error else Ok (`Fixed !nb_absent)
+      with Cannot_fix -> Error (`Cannot_fix "Not implemented")
+    else (
+      Index.iter
+        (fun k v ->
+          match f (k, v) with
+          | Ok () -> ()
+          | Error `Wrong_hash -> incr nb_corrupted
+          | Error `Absent_value -> incr nb_absent)
+        t.index;
+      if !nb_absent = 0 && !nb_corrupted = 0 then Ok `No_error
+      else Error (`Corrupted (!nb_corrupted + !nb_absent)) )
 
   include Irmin.Of_private (X)
 end
@@ -508,3 +538,4 @@ end
 
 module KV (Config : CONFIG) (C : Irmin.Contents.S) =
   Make (Config) (Metadata) (C) (Path) (Irmin.Branch.String) (Hash)
+module Stats = Stats

@@ -23,7 +23,8 @@ let equal t t' =
     else if Int64.equal t.fans.(i) t'.fans.(i) then loop (i + 1)
     else false
   in
-  t.mask = t'.mask && t.shift = t'.shift
+  t.mask = t'.mask
+  && t.shift = t'.shift
   && Array.length t.fans = Array.length t'.fans
   && loop 0
 

@@ -91,7 +91,7 @@ let scheduler () =
         incr workers_r;
         Lwt.async (fun () ->
             (* FIXME: we would like to skip some updates if more recent ones
-             are at the back of the queue. *)
+               are at the back of the queue. *)
             Lwt_stream.iter_s (fun f -> f ()) stream);
         p := Some push;
         (c := fun () -> push None);
@@ -161,8 +161,7 @@ struct
     (* destroy the notification thread. *)
     mutable listeners : int;
     (* number of listeners. *)
-    mutable stop_listening : unit -> unit Lwt.t;
-        (* clean-up listen resources. *)
+    mutable stop_listening : unit -> unit Lwt.t; (* clean-up listen resources. *)
   }
 
   let stats t = (IMap.cardinal t.keys, IMap.cardinal t.glob)
@@ -226,8 +225,7 @@ struct
   let protect f () =
     Lwt.catch f (fun e ->
         Log.err (fun l ->
-            l "watch callback got: %a\n%s" Fmt.exn e
-              (Printexc.get_backtrace ()));
+            l "watch callback got: %a\n%s" Fmt.exn e (Printexc.get_backtrace ()));
         Lwt.return_unit)
 
   let notify_all_unsafe t key value =

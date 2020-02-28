@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2013-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
+ * Copyright (c) 2016-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,10 +14,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-(** The type for representing differences betwen values. *)
+open Type_core
 
-(** {1 Value Types} *)
+val encode_bin : 'a t -> 'a encode_bin
 
-val t : 'a Type.t -> 'a t Type.t
-(** [t typ] is the value type for differences between values of type [typ]. *)
+val decode_bin : 'a t -> 'a decode_bin
+
+val to_bin_string : 'a t -> 'a to_string
+
+val of_bin_string : 'a t -> 'a of_string

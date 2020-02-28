@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2013-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
+ * Copyright (c) 2016-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,10 +14,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-(** The type for representing differences betwen values. *)
+open Type_core
 
-(** {1 Value Types} *)
+val pp : ?minify:bool -> 'a t -> 'a Fmt.t
 
-val t : 'a Type.t -> 'a t Type.t
-(** [t typ] is the value type for differences between values of type [typ]. *)
+val to_string : ?minify:bool -> 'a t -> 'a to_string
+
+val of_string : 'a t -> 'a of_string
+
+val encode : 'a t -> 'a encode_json
+
+val decode : 'a t -> 'a decode_json
+
+val decode_jsonm : 'a t -> Jsonm.decoder -> ('a, [ `Msg of string ]) result
+
+val decode_lexemes :
+  'a t -> Jsonm.lexeme list -> ('a, [ `Msg of string ]) result

@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2013-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
+ * Copyright (c) 2016-2017 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,10 +14,26 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-(** The type for representing differences betwen values. *)
+type (_, _) eq = Refl : ('a, 'a) eq
 
-(** {1 Value Types} *)
+type _ equality = ..
 
-val t : 'a Type.t -> 'a t Type.t
-(** [t typ] is the value type for differences between values of type [typ]. *)
+module type Inst = sig
+  type t
+
+  type _ equality += Eq : t equality
+end
+
+type 'a t = (module Inst with type t = 'a)
+
+let make : type a. unit -> a t =
+ fun () ->
+  let module Inst = struct
+    type t = a
+
+    type _ equality += Eq : t equality
+  end in
+  (module Inst)
+
+let eq : type a b. a t -> b t -> (a, b) eq option =
+ fun (module A) (module B) -> match A.Eq with B.Eq -> Some Refl | _ -> None

@@ -58,7 +58,10 @@ module type S = sig
 
   val sync : 'a t -> unit
 
-  val integrity_check : offset:int64 -> length:int -> key -> 'a t -> unit
+  type integrity_error = [ `Wrong_hash | `Absent_value ]
+
+  val integrity_check :
+    offset:int64 -> length:int -> key -> 'a t -> (unit, integrity_error) result
 
   val close : 'a t -> unit Lwt.t
 end
@@ -68,22 +71,11 @@ module type MAKER = sig
 
   type index
 
-  (** Save multiple kind of values in the same pack file. Values will
-      be distinguished using [V.magic], so they have to all be
-      different. *)
+  (** Save multiple kind of values in the same pack file. Values will be
+      distinguished using [V.magic], so they have to all be different. *)
   module Make (V : ELT with type hash := key) :
     S with type key = key and type value = V.t and type index = index
 end
 
 module File (Index : Pack_index.S) (K : Irmin.Hash.S with type t = Index.key) :
   MAKER with type key = K.t and type index = Index.t
-
-type stats = {
-  pack_cache_misses : float;
-  offset_ratio : float;
-  offset_significance : int;
-}
-
-val reset_stats : unit -> unit
-
-val stats : unit -> stats

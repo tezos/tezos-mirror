@@ -22,30 +22,6 @@ let current_version = "00000001"
 
 let ( -- ) = Int64.sub
 
-type all_stats = {
-  mutable pack_finds : int;
-  mutable pack_cache_misses : int;
-  mutable appended_hashes : int;
-  mutable appended_offsets : int;
-}
-
-let fresh_stats () =
-  {
-    pack_finds = 0;
-    pack_cache_misses = 0;
-    appended_hashes = 0;
-    appended_offsets = 0;
-  }
-
-let stats = fresh_stats ()
-
-let reset_stats () =
-  stats.pack_finds <- 0;
-  stats.pack_cache_misses <- 0;
-  stats.appended_hashes <- 0;
-  stats.appended_offsets <- 0;
-  ()
-
 module type ELT = sig
   include Irmin.Type.S
 
@@ -90,7 +66,10 @@ module type S = sig
 
   val sync : 'a t -> unit
 
-  val integrity_check : offset:int64 -> length:int -> key -> 'a t -> unit
+  type integrity_error = [ `Wrong_hash | `Absent_value ]
+
+  val integrity_check :
+    offset:int64 -> length:int -> key -> 'a t -> (unit, integrity_error) result
 
   val close : 'a t -> unit Lwt.t
 end
@@ -138,7 +117,7 @@ struct
     index : Index.t;
     dict : Dict.t;
     lock : Lwt_mutex.t;
-    mutable counter : int;
+    mutable open_instances : int;
   }
 
   let clear t =
@@ -147,8 +126,8 @@ struct
     Dict.clear t.dict
 
   let valid t =
-    if t.counter <> 0 then (
-      t.counter <- t.counter + 1;
+    if t.open_instances <> 0 then (
+      t.open_instances <- t.open_instances + 1;
       true )
     else false
 
@@ -160,7 +139,7 @@ struct
     if IO.version block <> current_version then
       Fmt.failwith "invalid version: got %S, expecting %S" (IO.version block)
         current_version;
-    { block; index; lock; dict; counter = 1 }
+    { block; index; lock; dict; open_instances = 1 }
 
   let (`Staged v) =
     with_cache ~clear ~valid ~v:(fun index -> unsafe_v ~index) "store.pack"
@@ -168,8 +147,8 @@ struct
   type key = K.t
 
   let close t =
-    t.counter <- t.counter - 1;
-    if t.counter = 0 then (
+    t.open_instances <- t.open_instances - 1;
+    if t.open_instances = 0 then (
       if not (IO.readonly t.block) then IO.sync t.block;
       IO.close t.block;
       Dict.close t.dict )
@@ -182,7 +161,7 @@ struct
       pack : 'a t;
       lru : V.t Lru.t;
       staging : V.t Tbl.t;
-      mutable counter : int;
+      mutable open_instances : int;
     }
 
     type key = K.t
@@ -203,8 +182,8 @@ struct
     let create = Lwt_mutex.create ()
 
     let valid t =
-      if t.counter <> 0 then (
-        t.counter <- t.counter + 1;
+      if t.open_instances <> 0 then (
+        t.open_instances <- t.open_instances + 1;
         true )
       else false
 
@@ -212,7 +191,7 @@ struct
       let pack = v index ~fresh ~readonly root in
       let staging = Tbl.create 127 in
       let lru = Lru.create lru_size in
-      { staging; lru; pack; counter = 1 }
+      { staging; lru; pack; open_instances = 1 }
 
     let unsafe_v ?(fresh = false) ?(readonly = false) ?(lru_size = 10_000)
         ~index root =
@@ -257,24 +236,23 @@ struct
 
     let check_key k v =
       let k' = V.hash v in
-      if Irmin.Type.equal K.t k k' then ()
-      else
-        Fmt.failwith "corrupted value: got %a, expecting %a." pp_hash k'
-          pp_hash k
+      if Irmin.Type.equal K.t k k' then Ok () else Error (k, k')
+
+    exception Invalid_read
 
     let io_read_and_decode ~off ~len t =
-      if not (IO.readonly t.pack.block) then
-        assert (off <= IO.offset t.pack.block);
+      if (not (IO.readonly t.pack.block)) && off > IO.offset t.pack.block then
+        raise Invalid_read;
       let buf = Bytes.create len in
       let n = IO.read t.pack.block ~off buf in
-      assert (n = len);
+      if n <> len then raise Invalid_read;
       let hash off = io_read_and_decode_hash ~off t in
       let dict = Dict.find t.pack.dict in
       V.decode_bin ~hash ~dict (Bytes.unsafe_to_string buf) 0
 
     let unsafe_find t k =
       Log.debug (fun l -> l "[pack] find %a" pp_hash k);
-      stats.pack_finds <- succ stats.pack_finds;
+      Stats.incr_finds ();
       match Tbl.find t.staging k with
       | v ->
           Lru.add t.lru k v;
@@ -283,12 +261,16 @@ struct
           match Lru.find t.lru k with
           | v -> Some v
           | exception Not_found -> (
-              stats.pack_cache_misses <- succ stats.pack_cache_misses;
+              Stats.incr_cache_misses ();
               match Index.find t.pack.index k with
               | None -> None
               | Some (off, len, _) ->
                   let v = io_read_and_decode ~off ~len t in
-                  check_key k v;
+                  (check_key k v |> function
+                   | Ok () -> ()
+                   | Error (expected, got) ->
+                       Fmt.failwith "corrupted value: got %a, expecting %a."
+                         pp_hash got pp_hash expected);
                   Lru.add t.lru k v;
                   Some v ) )
 
@@ -305,9 +287,15 @@ struct
       Index.flush t.pack.index;
       Tbl.clear t.staging
 
+    type integrity_error = [ `Wrong_hash | `Absent_value ]
+
     let integrity_check ~offset ~length k t =
-      let value = io_read_and_decode ~off:offset ~len:length t in
-      check_key k value
+      try
+        let value = io_read_and_decode ~off:offset ~len:length t in
+        match check_key k value with
+        | Ok () -> Ok ()
+        | Error _ -> Error `Wrong_hash
+      with Invalid_read -> Error `Absent_value
 
     let batch t f =
       f (cast t) >>= fun r ->
@@ -326,10 +314,10 @@ struct
           let offset k =
             match Index.find t.pack.index k with
             | None ->
-                stats.appended_hashes <- stats.appended_hashes + 1;
+                Stats.incr_appended_hashes ();
                 None
             | Some (off, _, _) ->
-                stats.appended_offsets <- stats.appended_offsets + 1;
+                Stats.incr_appended_offsets ();
                 Some off
           in
           let dict = Dict.index t.pack.dict in
@@ -353,8 +341,8 @@ struct
     let unsafe_add t k v = append t k v
 
     let unsafe_close t =
-      t.counter <- t.counter - 1;
-      if t.counter = 0 then (
+      t.open_instances <- t.open_instances - 1;
+      if t.open_instances = 0 then (
         Log.debug (fun l -> l "[pack] close %s" (IO.name t.pack.block));
         Tbl.clear t.staging;
         ignore (Lru.clear t.lru);
@@ -366,20 +354,3 @@ struct
           Lwt.return_unit)
   end
 end
-
-let div_or_zero a b = if b = 0 then 0. else float_of_int a /. float_of_int b
-
-type stats = {
-  pack_cache_misses : float;
-  offset_ratio : float;
-  offset_significance : int;
-}
-
-let stats () =
-  {
-    pack_cache_misses = div_or_zero stats.pack_cache_misses stats.pack_finds;
-    offset_ratio =
-      div_or_zero stats.appended_offsets
-        (stats.appended_offsets + stats.appended_hashes);
-    offset_significance = stats.appended_offsets + stats.appended_hashes;
-  }

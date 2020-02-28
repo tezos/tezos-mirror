@@ -61,6 +61,8 @@ module IO : Index.IO = struct
     external pwrite : Unix.file_descr -> int64 -> bytes -> int -> int -> int
       = "caml_pwrite"
 
+    external unix_fsync : Unix.file_descr -> unit = "unix_fsync"
+
     let really_write fd off buf =
       let rec aux fd_off buf_off len =
         let w = pwrite fd fd_off buf buf_off len in
@@ -77,6 +79,8 @@ module IO : Index.IO = struct
         else (aux [@tailcall]) (fd_off ++ Int64.of_int r) (buf_off + r) (len - r)
       in
       (aux [@tailcall]) off 0 len
+
+    let fsync t = unix_fsync t.fd
 
     let unsafe_write t ~off buf =
       let buf = Bytes.unsafe_of_string buf in
@@ -161,7 +165,7 @@ module IO : Index.IO = struct
     buf : Buffer.t;
   }
 
-  let sync t =
+  let sync ?(with_fsync = false) t =
     if t.readonly then raise RO_not_allowed;
     let buf = Buffer.contents t.buf in
     let offset = t.offset in
@@ -171,12 +175,13 @@ module IO : Index.IO = struct
       Raw.unsafe_write t.raw ~off:t.flushed buf;
       Raw.Offset.set t.raw offset;
       assert (t.flushed ++ Int64.of_int (String.length buf) = t.header ++ offset);
-      t.flushed <- offset ++ t.header )
+      t.flushed <- offset ++ t.header );
+    if with_fsync then Raw.fsync t.raw
 
   let name t = t.file
 
   let rename ~src ~dst =
-    sync src;
+    sync ~with_fsync:true src;
     Unix.close dst.raw.fd;
     Unix.rename src.file dst.file;
     Buffer.clear dst.buf;
@@ -357,22 +362,24 @@ module IO : Index.IO = struct
   let unlock { path; fd } =
     Log.debug (fun l -> l "Unlocking %s" path);
     Unix.close fd
+end
 
-  module Mutex = struct
-    include Mutex
+module Mutex = struct
+  include Mutex
 
-    let with_lock t f =
-      Mutex.lock t;
-      try
-        let ans = f () in
-        Mutex.unlock t;
-        ans
-      with e ->
-        Mutex.unlock t;
-        raise e
-  end
+  let with_lock t f =
+    Mutex.lock t;
+    try
+      let ans = f () in
+      Mutex.unlock t;
+      ans
+    with e ->
+      Mutex.unlock t;
+      raise e
+end
 
-  type async = Thread.t option
+module Thread = struct
+  type t = Thread.t option
 
   let async f = Some (Thread.create f ())
 
@@ -383,10 +390,11 @@ module IO : Index.IO = struct
   let await t = match t with None -> () | Some t -> Thread.join t
 end
 
-module Make (K : Index.Key) (V : Index.Value) = Index.Make (K) (V) (IO)
+module Make (K : Index.Key) (V : Index.Value) =
+  Index.Make (K) (V) (IO) (Mutex) (Thread)
 
 module Private = struct
   module IO = IO
   module Make (K : Index.Key) (V : Index.Value) =
-    Index.Private.Make (K) (V) (IO)
+    Index.Private.Make (K) (V) (IO) (Mutex) (Thread)
 end

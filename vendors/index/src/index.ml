@@ -49,6 +49,30 @@ end
 
 module type IO = Io.S
 
+module type MUTEX = sig
+  type t
+
+  val create : unit -> t
+
+  val lock : t -> unit
+
+  val unlock : t -> unit
+
+  val with_lock : t -> (unit -> 'a) -> 'a
+end
+
+module type THREAD = sig
+  type t
+
+  val async : (unit -> 'a) -> t
+
+  val await : t -> unit
+
+  val return : unit -> t
+
+  val yield : unit -> unit
+end
+
 module type S = sig
   type t
 
@@ -70,9 +94,11 @@ module type S = sig
 
   val replace : t -> key -> value -> unit
 
+  val filter : t -> (key * value -> bool) -> unit
+
   val iter : (key -> value -> unit) -> t -> unit
 
-  val flush : t -> unit
+  val flush : ?with_fsync:bool -> t -> unit
 
   val close : t -> unit
 end
@@ -85,10 +111,16 @@ exception RO_not_allowed
 
 exception Closed
 
-module Make_private (K : Key) (V : Value) (IO : IO) = struct
-  type async = IO.async
+module Make_private
+    (K : Key)
+    (V : Value)
+    (IO : IO)
+    (Mutex : MUTEX)
+    (Thread : THREAD) =
+struct
+  type async = Thread.t
 
-  let await = IO.await
+  let await = Thread.await
 
   type key = K.t
 
@@ -137,8 +169,8 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     mutable log_async : log option;
     mutable open_instances : int;
     writer_lock : IO.lock option;
-    mutable merge_lock : IO.Mutex.t;
-    mutable rename_lock : IO.Mutex.t;
+    mutable merge_lock : Mutex.t;
+    mutable rename_lock : Mutex.t;
   }
 
   type t = instance option ref
@@ -151,7 +183,7 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     Log.debug (fun l -> l "clear %S" t.root);
     if t.config.readonly then raise RO_not_allowed;
     t.generation <- 0L;
-    IO.Mutex.with_lock t.merge_lock (fun () ->
+    Mutex.with_lock t.merge_lock (fun () ->
         let log = assert_and_get t.log in
         IO.clear log.io;
         Tbl.clear log.mem;
@@ -168,17 +200,17 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
         t.index <- None;
         t.log_async <- None)
 
-  let flush_instance instance =
+  let flush_instance ?(with_fsync = false) instance =
     Log.debug (fun l ->
         l "[%s] flushing instance" (Filename.basename instance.root));
     if instance.config.readonly then raise RO_not_allowed;
-    may (fun log -> IO.sync log.io) instance.log;
-    may (fun log -> IO.sync log.io) instance.log_async
+    may (fun log -> IO.sync ~with_fsync log.io) instance.log;
+    may (fun log -> IO.sync ~with_fsync log.io) instance.log_async
 
-  let flush t =
+  let flush ?(with_fsync = false) t =
     let t = check_open t in
     Log.info (fun l -> l "[%s] flush" (Filename.basename t.root));
-    IO.Mutex.with_lock t.rename_lock (fun () -> flush_instance t)
+    Mutex.with_lock t.rename_lock (fun () -> flush_instance ~with_fsync t)
 
   let ( // ) = Filename.concat
 
@@ -367,8 +399,8 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       root;
       index;
       open_instances = 1;
-      merge_lock = IO.Mutex.create ();
-      rename_lock = IO.Mutex.create ();
+      merge_lock = Mutex.create ();
+      rename_lock = Mutex.create ();
       writer_lock;
     }
 
@@ -473,7 +505,7 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       find_if_exists ~name:"log" ~find:(fun log -> Tbl.find log.mem) t.log
       @~ find_if_exists ~name:"index" ~find:interpolation_search t.index
     in
-    IO.Mutex.with_lock t.rename_lock (fun () ->
+    Mutex.with_lock t.rename_lock (fun () ->
         if t.config.readonly then sync_log t;
         find_if_exists ~name:"log_async"
           ~find:(fun log -> Tbl.find log.mem)
@@ -517,8 +549,9 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       append_entry_fanout fan_out log.(log_i) dst_io
     done
 
-  (* Merge [log] with [t] into [dst_io]. [log] must be sorted by key hashes. *)
-  let merge_with log (index : index) dst_io =
+  (* Merge [log] with [index] into [dst_io], ignoring bindings that do not
+     satisfy [filter (k, v)]. [log] must be sorted by key hashes. *)
+  let merge_with ~filter log (index : index) dst_io =
     let entries = 10_000 in
     let len = entries * entry_size in
     let buf = Bytes.create len in
@@ -530,18 +563,19 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       if index_offset >= index_end then
         append_remaining_log fan_out log log_i dst_io
       else
-        let buf_str = Bytes.sub_string buf buf_offset entry_size in
+        let buf_str = Bytes.sub buf buf_offset entry_size in
         let index_offset = Int64.add index_offset entry_sizeL in
-        let key_e = K.decode buf_str 0 in
-        let hash_e = K.hash key_e in
-        let log_i = merge_from_log fan_out log log_i hash_e dst_io in
-        IO.yield ();
+        let e = Entry.decode buf_str 0 in
+        let log_i = merge_from_log fan_out log log_i e.key_hash dst_io in
+        Thread.yield ();
         if
-          log_i >= Array.length log
+          ( log_i >= Array.length log
           ||
           let key = log.(log_i).key in
-          not (K.equal key key_e)
-        then append_buf_fanout fan_out hash_e buf_str dst_io;
+          not (K.equal key e.key) )
+          && filter (e.key, e.value)
+        then
+          append_buf_fanout fan_out e.key_hash (Bytes.to_string buf_str) dst_io;
         let buf_offset =
           let n = buf_offset + entry_size in
           if n >= Bytes.length buf then (
@@ -553,11 +587,11 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     in
     (go [@tailcall]) 0L 0 0
 
-  let merge ?hook ~witness t =
-    IO.Mutex.lock t.merge_lock;
+  let merge ?(blocking = false) ?(filter = fun _ -> true) ?hook ~witness t =
+    Mutex.lock t.merge_lock;
     Log.info (fun l -> l "[%s] merge" (Filename.basename t.root));
     Stats.incr_nb_merge ();
-    flush_instance t;
+    flush_instance ~with_fsync:true t;
     let log_async =
       let io =
         let log_async_path = log_async_path t.root in
@@ -575,6 +609,9 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       let generation = Int64.succ t.generation in
       let log_array =
         let compare_entry e e' = compare e.key_hash e'.key_hash in
+        Tbl.filter_map_inplace
+          (fun key value -> if filter (key, value) then Some value else None)
+          log.mem;
         let b = Array.make (Tbl.length log.mem) witness in
         Tbl.fold
           (fun key value i ->
@@ -610,12 +647,12 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
             { io; fan_out }
         | Some index ->
             let index = { index with fan_out } in
-            merge_with log_array index merge;
+            merge_with ~filter log_array index merge;
             index
       in
       Fan.finalize index.fan_out;
       IO.set_fanout merge (Fan.export index.fan_out);
-      IO.Mutex.with_lock t.rename_lock (fun () ->
+      Mutex.with_lock t.rename_lock (fun () ->
           IO.rename ~src:merge ~dst:index.io;
           t.index <- Some index;
           IO.clear ~keep_generation:true log.io;
@@ -633,9 +670,12 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
       may (fun f -> f `After) hook;
       IO.clear log_async.io;
       IO.close log_async.io;
-      IO.Mutex.unlock t.merge_lock
+      Mutex.unlock t.merge_lock
     in
-    IO.async go
+    if blocking then (
+      go ();
+      Thread.return () )
+    else Thread.async go
 
   let get_witness t =
     match t.log with
@@ -661,11 +701,11 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
   let force_merge ?hook t =
     let t = check_open t in
     Log.info (fun l -> l "[%s] forced merge" (Filename.basename t.root));
-    let witness = IO.Mutex.with_lock t.rename_lock (fun () -> get_witness t) in
+    let witness = Mutex.with_lock t.rename_lock (fun () -> get_witness t) in
     match witness with
     | None ->
         Log.debug (fun l -> l "[%s] index is empty" (Filename.basename t.root));
-        IO.return ()
+        Thread.return ()
     | Some witness -> merge ?hook ~witness t
 
   let replace t key value =
@@ -674,7 +714,7 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
         l "[%s] replace %a %a" (Filename.basename t.root) K.pp key V.pp value);
     if t.config.readonly then raise RO_not_allowed;
     let do_merge =
-      IO.Mutex.with_lock t.rename_lock (fun () ->
+      Mutex.with_lock t.rename_lock (fun () ->
           let log =
             match t.log_async with
             | Some async_log -> async_log
@@ -687,6 +727,16 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     if do_merge then
       ignore (merge ~witness:{ key; key_hash = K.hash key; value } t : async)
 
+  let filter t f =
+    let t = check_open t in
+    Log.info (fun l -> l "[%s] filter" (Filename.basename t.root));
+    if t.config.readonly then raise RO_not_allowed;
+    let witness = Mutex.with_lock t.rename_lock (fun () -> get_witness t) in
+    match witness with
+    | None ->
+        Log.debug (fun l -> l "[%s] index is empty" (Filename.basename t.root))
+    | Some witness -> Thread.await (merge ~blocking:true ~filter:f ~witness t)
+
   let iter f t =
     let t = check_open t in
     Log.info (fun l -> l "[%s] iter" (Filename.basename t.root));
@@ -696,7 +746,7 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     | Some log ->
         Tbl.iter f log.mem;
         may (fun (i : index) -> iter_io (fun e -> f e.key e.value) i.io) t.index;
-        IO.Mutex.with_lock t.rename_lock (fun () ->
+        Mutex.with_lock t.rename_lock (fun () ->
             ( match t.log_async with
             | None -> ()
             | Some log -> Tbl.iter f log.mem );
@@ -709,14 +759,14 @@ module Make_private (K : Key) (V : Value) (IO : IO) = struct
     | None -> Log.info (fun l -> l "close: instance already closed")
     | Some t ->
         Log.info (fun l -> l "[%s] close" (Filename.basename t.root));
-        IO.Mutex.with_lock t.merge_lock (fun () ->
+        Mutex.with_lock t.merge_lock (fun () ->
             it := None;
             t.open_instances <- t.open_instances - 1;
             if t.open_instances = 0 then (
               Log.debug (fun l ->
                   l "[%s] last open instance: closing the file descriptor"
                     (Filename.basename t.root));
-              if not t.config.readonly then flush_instance t;
+              if not t.config.readonly then flush_instance ~with_fsync:true t;
               may
                 (fun l ->
                   Tbl.clear l.mem;

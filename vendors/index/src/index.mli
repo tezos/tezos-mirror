@@ -82,6 +82,48 @@ end
 
 module type IO = Io.S
 
+module type MUTEX = sig
+  (** Locks for mutual exclusion *)
+
+  type t
+  (** The type of mutual-exclusion locks. *)
+
+  val create : unit -> t
+  (** Return a fresh mutex. *)
+
+  val lock : t -> unit
+  (** Lock the given mutex. Locks are not assumed to be re-entrant. *)
+
+  val unlock : t -> unit
+  (** Unlock the mutex. If any threads are attempting to lock the mutex, exactly
+      one of them will gain access to the lock. *)
+
+  val with_lock : t -> (unit -> 'a) -> 'a
+  (** [with_lock t f] first obtains [t], then computes [f ()], and finally
+      unlocks [t]. *)
+end
+
+module type THREAD = sig
+  (** Cooperative threads. *)
+
+  type t
+  (** The type of thread handles. *)
+
+  val async : (unit -> 'a) -> t
+  (** [async f] creates a new thread of control which executes [f ()] and
+      returns the corresponding thread handle. The thread terminates whenever
+      [f ()] returns a value or raises an exception. *)
+
+  val await : t -> unit
+  (** [await t] blocks on the termination of [t]. *)
+
+  val return : unit -> t
+  (** [return ()] is a pre-terminated thread handle. *)
+
+  val yield : unit -> unit
+  (** Re-schedule the calling thread without suspending it. *)
+end
+
 exception RO_not_allowed
 (** The exception raised when a write operation is attempted on a read_only
     index. *)
@@ -127,6 +169,10 @@ module type S = sig
   (** [replace t k v] binds [k] to [v] in [t], replacing any existing binding of
       [k]. *)
 
+  val filter : t -> (key * value -> bool) -> unit
+  (** [filter t p] removes all the bindings (k, v) that do not satisfy [p]. This
+      operation is costly and blocking. *)
+
   val iter : (key -> value -> unit) -> t -> unit
   (** Iterates over the index bindings. Limitations:
 
@@ -136,14 +182,15 @@ module type S = sig
       - May not observe recent concurrent updates to the index by other
         processes. *)
 
-  val flush : t -> unit
-  (** Flushes all buffers to the supplied [IO] instance. *)
+  val flush : ?with_fsync:bool -> t -> unit
+  (** Flushes all internal buffers of the [IO] instances. If [with_fsync] is
+      [true], this also flushes the OS caches for each [IO] instance. *)
 
   val close : t -> unit
   (** Closes all resources used by [t]. *)
 end
 
-module Make (K : Key) (V : Value) (IO : IO) :
+module Make (K : Key) (V : Value) (IO : IO) (M : MUTEX) (T : THREAD) :
   S with type key = K.t and type value = V.t
 
 (** These modules should not be used. They are exposed purely for testing
@@ -178,6 +225,6 @@ module Private : sig
     (** Wait for an asynchronous computation to finish. *)
   end
 
-  module Make (K : Key) (V : Value) (IO : IO) :
+  module Make (K : Key) (V : Value) (IO : IO) (M : MUTEX) (T : THREAD) :
     S with type key = K.t and type value = V.t
 end

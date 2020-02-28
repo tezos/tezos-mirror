@@ -38,7 +38,7 @@ module type S = sig
 
   val clear : ?keep_generation:bool -> t -> unit
 
-  val sync : t -> unit
+  val sync : ?with_fsync:bool -> t -> unit
 
   val version : t -> string
 
@@ -61,26 +61,4 @@ module type S = sig
   val lock : string -> lock
 
   val unlock : lock -> unit
-
-  module Mutex : sig
-    type t
-
-    val create : unit -> t
-
-    val lock : t -> unit
-
-    val unlock : t -> unit
-
-    val with_lock : t -> (unit -> 'a) -> 'a
-  end
-
-  type async
-
-  val async : (unit -> 'a) -> async
-
-  val await : async -> unit
-
-  val return : unit -> async
-
-  val yield : unit -> unit
 end

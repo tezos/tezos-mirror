@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open Lwt
+open Lwt.Infix
 
 let src = Logs.Src.create "irmin.graph" ~doc:"Irmin graph support"
 
@@ -50,6 +50,18 @@ module type S = sig
     max:vertex list ->
     unit ->
     t Lwt.t
+
+  val iter :
+    ?depth:int ->
+    pred:(vertex -> vertex list Lwt.t) ->
+    min:vertex list ->
+    max:vertex list ->
+    node:(vertex -> unit Lwt.t) ->
+    edge:(vertex -> vertex -> unit Lwt.t) ->
+    skip:(vertex -> bool Lwt.t) ->
+    rev:bool ->
+    unit ->
+    unit Lwt.t
 
   val output :
     Format.formatter ->
@@ -134,33 +146,67 @@ struct
 
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
 
+  let iter ?(depth = max_int) ~pred ~min ~max ~node ~edge ~skip ~rev () =
+    Log.debug (fun f ->
+        f "iter on closure depth=%d (%d elements)" depth (List.length max));
+    let marks = Table.create 1024 in
+    let mark key level = Table.add marks key level in
+    let has_mark key = Table.mem marks key in
+    let todo = Stack.create () in
+    List.iter (fun k -> Stack.push (k, 0) todo) max;
+    let treat key =
+      Log.debug (fun f -> f "TREAT %a" Type.(pp X.t) key);
+      node key >>= fun () ->
+      if not (List.mem key min) then
+        pred key >>= fun keys -> Lwt_list.iter_p (fun k -> edge key k) keys
+      else Lwt.return_unit
+    in
+    let rec pop key level =
+      ignore (Stack.pop todo);
+      mark key level;
+      visit ()
+    and visit () =
+      match Stack.top todo with
+      | exception Stack.Empty -> Lwt.return_unit
+      | key, level -> (
+          if level >= depth then pop key level
+          else if has_mark key then (
+            (if rev then treat key else Lwt.return_unit) >>= fun () ->
+            ignore (Stack.pop todo);
+            visit () )
+          else
+            skip key >>= function
+            | true -> pop key level
+            | false ->
+                Log.debug (fun f -> f "VISIT %a %d" Type.(pp X.t) key level);
+                (if not rev then treat key else Lwt.return_unit) >>= fun () ->
+                mark key level;
+                if List.mem key min then visit ()
+                else
+                  pred key >>= fun keys ->
+                  List.iter
+                    (fun k ->
+                      if not (has_mark k) then Stack.push (k, level + 1) todo)
+                    keys;
+                  visit () )
+    in
+    visit ()
+
   let closure ?(depth = max_int) ~pred ~min ~max () =
     Log.debug (fun f ->
         f "closure depth=%d (%d elements)" depth (List.length max));
     let g = G.create ~size:1024 () in
-    let marks = Table.create 1024 in
-    let mark key level = Table.add marks key level in
-    let has_mark key = Table.mem marks key in
-    List.iter (fun k -> mark k max_int) min;
     List.iter (G.add_vertex g) max;
-    let todo = Queue.create () in
-    List.iter (fun k -> Queue.push (k, 0) todo) max;
-    let rec add () =
-      match Queue.pop todo with
-      | exception Queue.Empty -> return_unit
-      | key, level ->
-          if level >= depth then add ()
-          else if has_mark key then add ()
-          else (
-            mark key level;
-            Log.debug (fun f -> f "ADD %a %d" Type.(pp X.t) key level);
-            if not (G.mem_vertex g key) then G.add_vertex g key;
-            pred key >>= fun keys ->
-            List.iter (fun k -> G.add_edge g k key) keys;
-            List.iter (fun k -> Queue.push (k, level + 1) todo) keys;
-            add () )
+    let node key =
+      if not (G.mem_vertex g key) then G.add_vertex g key else ();
+      Lwt.return_unit
     in
-    add () >>= fun () -> Lwt.return g
+    let edge node pred =
+      G.add_edge g pred node;
+      Lwt.return_unit
+    in
+    let skip _ = Lwt.return_false in
+    iter ~depth ~pred ~min ~max ~node ~edge ~skip ~rev:false () >|= fun () -> g
 
   let min g =
     G.fold_vertex
@@ -186,7 +232,7 @@ struct
     let default_edge_attributes _ = []
 
     let vertex_name k =
-      let str t v = Type.to_string t v in
+      let str t v = "\"" ^ Type.to_string t v ^ "\"" in
       match k with
       | `Node n -> str Node.t n
       | `Commit c -> str Commit.t c

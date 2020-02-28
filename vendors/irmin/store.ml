@@ -41,8 +41,8 @@ struct
         let k' = hash v in
         if Type.equal K.t k k' then Lwt.return r
         else
-          Fmt.kstrf Lwt.fail_invalid_arg
-            "corrupted value: got %a, expecting %a" pp_key k' pp_key k
+          Fmt.kstrf Lwt.fail_invalid_arg "corrupted value: got %a, expecting %a"
+            pp_key k' pp_key k
 
   let unsafe_add t k v = add t k v
 
@@ -124,8 +124,7 @@ module Make (P : S.PRIVATE) = struct
       P.Repo.batch r @@ fun contents_t node_t commit_t ->
       ( match tree with
       | `Node n -> Tree.export r contents_t node_t n
-      | `Contents _ -> Lwt.fail_invalid_arg "cannot add contents at the root"
-      )
+      | `Contents _ -> Lwt.fail_invalid_arg "cannot add contents at the root" )
       >>= fun node ->
       let v = P.Commit.Val.v ~info ~node ~parents in
       P.Commit.add commit_t v >|= fun h -> { r; h; v }
@@ -221,12 +220,16 @@ module Make (P : S.PRIVATE) = struct
               | Some h -> h :: acc ))
         [] bs
 
-    let export ?(full = true) ?depth ?(min = []) ?(max = []) t =
+    let export ?(full = true) ?depth ?(min = []) ?(max = `Head) t =
       Log.debug (fun f ->
-          f "export depth=%s full=%b min=%d max=%d"
+          f "export depth=%s full=%b min=%d max=%s"
             (match depth with None -> "<none>" | Some d -> string_of_int d)
-            full (List.length min) (List.length max));
-      (match max with [] -> heads t | m -> Lwt.return m) >>= fun max ->
+            full (List.length min)
+            ( match max with
+            | `Head -> "heads"
+            | `Max m -> string_of_int (List.length m) ));
+      (match max with `Head -> heads t | `Max m -> Lwt.return m)
+      >>= fun max ->
       P.Slice.empty () >>= fun slice ->
       let max = List.map (fun x -> `Commit x.Commit.h) max in
       let min = List.map (fun x -> `Commit x.Commit.h) min in
@@ -616,8 +619,8 @@ module Make (P : S.PRIVATE) = struct
               Lwt.return_true ))
     | `Branch name ->
         (* concurrent handlers and/or process can modify the
-         branch. Need to check that we are still working on the same
-         head. *)
+           branch. Need to check that we are still working on the same
+           head. *)
         let test =
           match old_head with None -> None | Some c -> Some (Commit.hash c)
         in
@@ -655,8 +658,7 @@ module Make (P : S.PRIVATE) = struct
   let snapshot t key =
     tree_and_head t >>= function
     | None ->
-        Lwt.return
-          { head = None; root = Tree.empty; tree = None; parents = [] }
+        Lwt.return { head = None; root = Tree.empty; tree = None; parents = [] }
     | Some (c, root) ->
         let root = (root :> tree) in
         Tree.find_tree root key >|= fun tree ->
@@ -669,7 +671,7 @@ module Make (P : S.PRIVATE) = struct
     | Some x, Some y -> Tree.equal x y
 
   (* Update the store with a new commit. Ensure the no commit becomes orphan
-     in the process.  *)
+     in the process. *)
   let update ?(allow_empty = false) ~info ?parents t key merge_tree f =
     snapshot t key >>= fun s ->
     (* this might take a very long time *)
@@ -728,8 +730,7 @@ module Make (P : S.PRIVATE) = struct
     | None, None -> set_tree_once root key ~new_tree ~current_tree
     | None, _ | _, None -> err_test current_tree
     | Some test, Some v ->
-        if Tree.equal test v then
-          set_tree_once root key ~new_tree ~current_tree
+        if Tree.equal test v then set_tree_once root key ~new_tree ~current_tree
         else err_test current_tree
 
   let test_and_set_tree ?(retries = 13) ?allow_empty ?parents ~info t k ~test
@@ -970,10 +971,7 @@ module Make (P : S.PRIVATE) = struct
           >|= fun parents -> List.map (fun x -> `Commit x.Commit.h) parents
       | _ -> Lwt.return_nil
     in
-    (Head.find t >>= function
-     | Some h -> Lwt.return [ h ]
-     | None -> Lwt.return max)
-    >>= fun max ->
+    (Head.find t >|= function Some h -> [ h ] | None -> max) >>= fun max ->
     let max = List.map (fun k -> `Commit k.Commit.h) max in
     let min = List.map (fun k -> `Commit k.Commit.h) min in
     Gmap.Src.closure ?depth ~min ~max ~pred () >>= fun g ->
@@ -994,8 +992,7 @@ module Make (P : S.PRIVATE) = struct
 
   let last_modified ?depth ?(n = 1) t key =
     Log.debug (fun l ->
-        l "last_modified depth=%a number=%d key=%a" pp_option depth n pp_key
-          key);
+        l "last_modified depth=%a number=%d key=%a" pp_option depth n pp_key key);
     Head.get t >>= fun commit ->
     let heap = Heap.create 5 in
     let () = Heap.add heap (commit, 0) in
@@ -1031,8 +1028,7 @@ module Make (P : S.PRIVATE) = struct
                   | _, _ -> false )
               | None -> Lwt.return_false)
             parents
-          >>= fun found ->
-          if found then search (current :: acc) else search acc
+          >>= fun found -> if found then search (current :: acc) else search acc
     in
     search []
 

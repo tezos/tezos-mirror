@@ -4,6 +4,7 @@
  (libraries tezos-base
             tezos-shell-services
             lmdb
+            logs.fmt
             digestif.c
             irmin
             irmin-pack

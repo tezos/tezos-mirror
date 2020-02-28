@@ -111,8 +111,7 @@ struct
           match old with
           | None -> Merge.ok None
           | Some old ->
-              get t old >>= fun vold ->
-              Merge.ok (Some (Some (S.Val.node vold)))
+              get t old >>= fun vold -> Merge.ok (Some (Some (S.Val.node vold)))
         in
         merge_node t ~old (Some (S.Val.node v1)) (Some (S.Val.node v2))
         >>=* fun node ->
@@ -240,7 +239,7 @@ module History (S : S.COMMIT_STORE) = struct
           | None -> return ()
           | Some (depth, commit) ->
               (* Log.debug "lca %d: %s.%d %a"
-             !lca_calls (pp_key commit) depth force (pp ()); *)
+                 !lca_calls (pp_key commit) depth force (pp ()); *)
               let seen = KSet.add commit seen in
               read_parents t commit >>= fun parents ->
               let () = f depth commit parents in
@@ -306,8 +305,7 @@ module History (S : S.COMMIT_STORE) = struct
 
   let set_mark t elt mark = KHashtbl.replace t.marks elt mark
 
-  let get_layer t d =
-    try Hashtbl.find t.layers d with Not_found -> KSet.empty
+  let get_layer t d = try Hashtbl.find t.layers d with Not_found -> KSet.empty
 
   let add_to_layer t d k =
     Hashtbl.replace t.layers d (KSet.add k (get_layer t d))
@@ -389,7 +387,7 @@ module History (S : S.COMMIT_STORE) = struct
     loop mark
 
   (* We are looking for LCAs, doing a breadth-first-search from the two starting commits.
-     This is called each time we visit a new commit.  *)
+     This is called each time we visit a new commit. *)
   let update_parents t depth commit parents =
     add_parent t commit parents;
     add_to_layer t depth commit;
@@ -541,5 +539,6 @@ module V1 (C : S.COMMIT) = struct
     record "commit" (fun node parents info -> make ~info ~node ~parents)
     |+ field "node" K.t node
     |+ field "parents" (list ~len:`Int64 K.t) parents
-    |+ field "info" info_t info |> sealr
+    |+ field "info" info_t info
+    |> sealr
 end
