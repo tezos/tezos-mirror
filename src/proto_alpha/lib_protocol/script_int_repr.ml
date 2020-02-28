@@ -39,6 +39,8 @@ let to_string x = Z.to_string x
 
 let of_string s = try Some (Z.of_string s) with _ -> None
 
+let of_int32 n = Z.of_int64 @@ Int64.of_int32 n
+
 let to_int64 x = try Some (Z.to_int64 x) with _ -> None
 
 let of_int64 n = Z.of_int64 n
