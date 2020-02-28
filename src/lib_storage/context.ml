@@ -226,7 +226,7 @@ module P = Store.Private
 type index = {
   path : string;
   repo : Store.Repo.t;
-  patch_context : context -> context tzresult Lwt.t;
+  patch_context : (context -> context tzresult Lwt.t) option;
 }
 
 and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
@@ -416,7 +416,7 @@ let fork_test_chain v ~protocol ~expiration =
 
 (*-- Initialisation ----------------------------------------------------------*)
 
-let init ?(patch_context = return) ?mapsize:_ ?readonly root =
+let init ?patch_context ?mapsize:_ ?readonly root =
   Store.Repo.v
     (Irmin_pack.config ?readonly ?index_log_size:!index_log_size root)
   >>= fun repo ->
@@ -429,7 +429,11 @@ let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 let commit_genesis index ~chain_id ~time ~protocol =
   let tree = Store.Tree.empty in
   let ctxt = {index; tree; parents = []} in
-  index.patch_context ctxt
+  ( match index.patch_context with
+  | None ->
+      return ctxt
+  | Some patch_context ->
+      patch_context ctxt )
   >>=? fun ctxt ->
   set_protocol ctxt protocol
   >>= fun ctxt ->
