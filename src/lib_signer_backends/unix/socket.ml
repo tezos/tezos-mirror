@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Internal_event.Legacy_logging.Make (struct
+  let name = "client.signer.socket"
+end)
+
 open Client_keys
 open Signer_messages
 
@@ -54,30 +58,48 @@ struct
         Request.Deterministic_nonce_hash
           {Deterministic_nonce_hash.Request.pkh; data; signature}
 
-  let with_signer_operation path pkh msg request_type f =
-    Lwt_utils_unix.Socket.with_connection path (fun conn ->
-        Lwt_utils_unix.Socket.send
-          conn
-          Request.encoding
-          Request.Authorized_keys
-        >>=? fun () ->
-        Lwt_utils_unix.Socket.recv
-          ?timeout
-          conn
-          (result_encoding Authorized_keys.Response.encoding)
-        >>=? fun authorized_keys ->
-        Lwt.return authorized_keys
-        >>=? function
-        | No_authentication ->
-            return_none
-        | Authorized_keys authorized_keys ->
-            authenticate authorized_keys (Sign.Request.to_sign ~pkh ~data:msg)
-            >>=? fun signature -> return_some signature)
-    >>=? fun signature ->
-    Lwt_utils_unix.Socket.with_connection path (fun conn ->
-        let req = build_request pkh msg signature request_type in
-        Lwt_utils_unix.Socket.send conn Request.encoding req
-        >>=? fun () -> f conn)
+  let maybe_authenticate pkh msg conn =
+    Lwt_utils_unix.Socket.send conn Request.encoding Request.Authorized_keys
+    >>=? fun () ->
+    Lwt_utils_unix.Socket.recv
+      ?timeout
+      conn
+      (result_encoding Authorized_keys.Response.encoding)
+    >>=? fun authorized_keys ->
+    Lwt.return authorized_keys
+    >>=? function
+    | No_authentication ->
+        return_none
+    | Authorized_keys authorized_keys ->
+        authenticate authorized_keys (Sign.Request.to_sign ~pkh ~data:msg)
+        >>=? fun signature -> return_some signature
+
+  let with_signer_operation path pkh msg request_type enc =
+    let f () =
+      Lwt_utils_unix.Socket.with_connection ?timeout path (fun conn ->
+          maybe_authenticate pkh msg conn
+          >>=? fun signature ->
+          let req = build_request pkh msg signature request_type in
+          Lwt_utils_unix.Socket.send conn Request.encoding req
+          >>=? fun () ->
+          Lwt_utils_unix.Socket.recv ?timeout conn (result_encoding enc))
+    in
+    let rec loop n =
+      protect (fun () -> f ())
+      >>= function
+      | Error trace as e when List.mem (Exn Lwt_unix.Timeout) trace ->
+          if n = 0 then Lwt.return e
+          else
+            lwt_log_error
+              "Remote signer timeout, retrying %d more time(s)"
+              (pred n)
+            >>= fun () -> loop (pred n)
+      | Error _ as e ->
+          Lwt.return e
+      | Ok v ->
+          Lwt.return v
+    in
+    loop 3
 
   let sign ?watermark path pkh msg =
     let msg =
@@ -87,28 +109,15 @@ struct
       | Some watermark ->
           Bytes.cat (Signature.bytes_of_watermark watermark) msg
     in
-    with_signer_operation path pkh msg Sign_request (fun conn ->
-        let rec loop n =
-          Lwt_utils_unix.Socket.recv
-            ?timeout
-            conn
-            (result_encoding Sign.Response.encoding)
-          >>=? function
-          | Error [Exn Lwt_unix.Timeout] ->
-              if n = 0 then fail (Exn Lwt_unix.Timeout) else loop (pred n)
-          | Error _ as e ->
-              Lwt.return e
-          | Ok signature ->
-              return (Ok signature)
-        in
-        loop 3)
+    with_signer_operation path pkh msg Sign_request Sign.Response.encoding
 
   let deterministic_nonce path pkh msg =
-    with_signer_operation path pkh msg Deterministic_nonce_request (fun conn ->
-        Lwt_utils_unix.Socket.recv
-          ?timeout
-          conn
-          (result_encoding Deterministic_nonce.Response.encoding))
+    with_signer_operation
+      path
+      pkh
+      msg
+      Deterministic_nonce_request
+      Deterministic_nonce.Response.encoding
 
   let deterministic_nonce_hash path pkh msg =
     with_signer_operation
@@ -116,11 +125,7 @@ struct
       pkh
       msg
       Deterministic_nonce_hash_request
-      (fun conn ->
-        Lwt_utils_unix.Socket.recv
-          ?timeout
-          conn
-          (result_encoding Deterministic_nonce_hash.Response.encoding))
+      Deterministic_nonce_hash.Response.encoding
 
   let supports_deterministic_nonces path pkh =
     Lwt_utils_unix.Socket.with_connection path (fun conn ->
