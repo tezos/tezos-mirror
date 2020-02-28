@@ -668,14 +668,6 @@ Stack operations
 
     > PUSH 'a x / S  =>  x : S
 
--  ``UNIT``: Push a unit value onto the stack.
-
-::
-
-    :: 'A   ->   unit : 'A
-
-    > UNIT / S  =>  Unit : S
-
 -  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
    type `'b` onto the stack.
 
@@ -767,6 +759,14 @@ Operations
 
 Operations on unit
 ~~~~~~~~~~~~~~~~~~
+
+-  ``UNIT``: Push a unit value onto the stack.
+
+::
+
+    :: 'A   ->   unit : 'A
+
+    > UNIT / S  =>  Unit : S
 
 -  ``COMPARE``: Unit comparison
 
