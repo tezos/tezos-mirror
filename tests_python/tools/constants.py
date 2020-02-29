@@ -1,65 +1,17 @@
-BOOTSTRAP_ACCOUNTS = [
-    ["edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-     "4000000000000"],
-    ["edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
-     "4000000000000"],
-    ["edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV",
-     "4000000000000"],
-    ["edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
-     "4000000000000"],
-    ["edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n",
-     "4000000000000"]
-]
+import os.path
+import json
+from tools import paths
 
-COMMITMENTS = [
-    ["btz1bRL4X5BWo2Fj4EsBdUwexXqgTf75uf1qa", "23932454669343"],
-    ["btz1SxjV1syBgftgKy721czKi3arVkVwYUFSv", "72954577464032"],
-    ["btz1LtoNCjiW23txBTenALaf5H6NKF1L3c1gw", "217487035428348"],
-    ["btz1SUd3mMhEBcWudrn8u361MVAec4WYCcFoy", "4092742372031"],
-    ["btz1MvBXf4orko1tsGmzkjLbpYSgnwUjEe81r", "17590039016550"],
-    ["btz1LoDZ3zsjgG3k3cqTpUMc9bsXbchu9qMXT", "26322312350555"],
-    ["btz1RMfq456hFV5AeDiZcQuZhoMv2dMpb9hpP", "244951387881443"],
-    ["btz1Y9roTh4A7PsMBkp8AgdVFrqUDNaBE59y1", "80065050465525"],
-    ["btz1Q1N2ePwhVw5ED3aaRVek6EBzYs1GDkSVD", "3569618927693"],
-    ["btz1VFFVsVMYHd5WfaDTAt92BeQYGK8Ri4eLy", "9034781424478"]
-]
-
-PARAMETERS = {
-    "bootstrap_accounts": BOOTSTRAP_ACCOUNTS,
-    "commitments": COMMITMENTS,
-    "preserved_cycles": 2,
-    "blocks_per_cycle": 8,
-    "blocks_per_commitment": 4,
-    "blocks_per_roll_snapshot": 4,
-    "blocks_per_voting_period": 64,
-    "time_between_blocks": ["1", "0"],
-    "endorsers_per_block": 32,
-    "hard_gas_limit_per_operation": "800000",
-    "hard_gas_limit_per_block": "8000000",
-    "proof_of_work_threshold": "-1",
-    "tokens_per_roll": "8000000000",
-    "michelson_maximum_type_size": 1000,
-    "seed_nonce_revelation_tip": "125000",
-    "origination_size": 257,
-    "block_security_deposit": "512000000",
-    "endorsement_security_deposit": "64000000",
-    "block_reward": "16000000",
-    "endorsement_reward": "2000000",
-    "cost_per_byte": "1000",
-    "hard_storage_limit_per_operation": "60000",
-    "test_chain_duration": "1966080",
-    "quorum_min": 3000,
-    "quorum_max": 7000,
-    "min_proposal_quorum": 500,
-    "initial_endorsers": 1,
-    "delay_per_missing_endorsement": "1"
-}
+PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/proto_alpha/parameters/'
+                   'test-parameters.json')
+assert os.path.isfile(PARAMETERS_FILE), (f'{PARAMETERS_FILE}'
+                                         ' cannot be found; please first run'
+                                         ' `make` in TEZOS_HOME.')
+with open(PARAMETERS_FILE) as f:
+    PARAMETERS = json.load(f)
 
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
-
-
 GENESIS_PK = "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
-
 
 IDENTITIES = {
     'bootstrap1': {
