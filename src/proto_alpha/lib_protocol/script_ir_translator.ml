@@ -1420,7 +1420,7 @@ and parse_packable_ty :
   parse_ty
     ctxt
     ~legacy
-    ~allow_big_map:false
+    ~allow_lazy_storage:false
     ~allow_operation:false
     ~allow_contract:legacy
 
@@ -1430,7 +1430,7 @@ and parse_parameter_ty :
   parse_ty
     ctxt
     ~legacy
-    ~allow_big_map:true
+    ~allow_lazy_storage:true
     ~allow_operation:false
     ~allow_contract:true
 
@@ -1440,7 +1440,7 @@ and parse_normal_storage_ty :
   parse_ty
     ctxt
     ~legacy
-    ~allow_big_map:true
+    ~allow_lazy_storage:true
     ~allow_operation:false
     ~allow_contract:legacy
 
@@ -1450,19 +1450,19 @@ and parse_any_ty :
   parse_ty
     ctxt
     ~legacy
-    ~allow_big_map:true
+    ~allow_lazy_storage:true
     ~allow_operation:true
     ~allow_contract:true
 
 and parse_ty :
     context ->
     legacy:bool ->
-    allow_big_map:bool ->
+    allow_lazy_storage:bool ->
     allow_operation:bool ->
     allow_contract:bool ->
     Script.node ->
     (ex_ty * context) tzresult =
- fun ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract node ->
+ fun ctxt ~legacy ~allow_lazy_storage ~allow_operation ~allow_contract node ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match node with
@@ -1522,9 +1522,21 @@ and parse_ty :
       >>? fun (utl, left_field) ->
       extract_field_annot utr
       >>? fun (utr, right_field) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utl
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        utl
       >>? fun (Ex_ty tl, ctxt) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utr
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
@@ -1537,9 +1549,21 @@ and parse_ty :
       >>? fun (utl, left_constr) ->
       extract_field_annot utr
       >>? fun (utr, right_constr) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utl
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        utl
       >>? fun (Ex_ty tl, ctxt) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utr
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
@@ -1561,10 +1585,22 @@ and parse_ty :
         >>? fun (ty_name, _none_constr, _) -> ok (ut, ty_name)
       else parse_type_annot loc annot >>? fun ty_name -> ok (ut, ty_name) )
       >>? fun (ut, ty_name) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        ut
       >>? fun (Ex_ty t, ctxt) -> ok (Ex_ty (Option_t (t, ty_name)), ctxt)
   | Prim (loc, T_list, [ut], annot) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        ut
       >>? fun (Ex_ty t, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
@@ -1576,11 +1612,17 @@ and parse_ty :
   | Prim (loc, T_map, [uta; utr], annot) ->
       parse_comparable_ty ctxt uta
       >>? fun (Ex_comparable_ty ta, ctxt) ->
-      parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract utr
+      parse_ty
+        ctxt
+        ~legacy
+        ~allow_lazy_storage
+        ~allow_operation
+        ~allow_contract
+        utr
       >>? fun (Ex_ty tr, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
-  | Prim (loc, T_big_map, args, annot) when allow_big_map ->
+  | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
       parse_big_map_ty ctxt ~legacy loc args annot
       >>? fun (big_map_ty, ctxt) -> ok (big_map_ty, ctxt)
   | Prim (loc, T_big_map, _, _) ->

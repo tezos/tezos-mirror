@@ -195,7 +195,7 @@ val parse_parameter_ty :
 val parse_ty :
   context ->
   legacy:bool ->
-  allow_big_map:bool ->
+  allow_lazy_storage:bool ->
   allow_operation:bool ->
   allow_contract:bool ->
   Script.node ->
