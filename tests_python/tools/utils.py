@@ -440,6 +440,14 @@ def client_output_converter(pre):
        replaced by [TIMESTAMP].
     """
 
+    # Scrub constants
+    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
+                 '"proof_of_work_nonce": "[NONCE]"', pre)
+    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
+    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
+    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
+    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
+
     # Scrub hashes
     pre = re.sub(r'sig\w{93}', '[SIGNATURE]', pre)
     pre = re.sub(r'\w{53}', '[OPERATION_HASH]', pre)
@@ -458,14 +466,6 @@ def client_output_converter(pre):
     pre = re.sub(r'Injected block \w{12}', 'Injected block [BLOCK_HASH]', pre)
     pre = re.sub(r'Expected counter: \w+',
                  'Expected counter: [EXPECTED_COUNTER]', pre)
-
-    # Scrub constants
-    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
-                 '"proof_of_work_nonce": "[NONCE]"', pre)
-    pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
-    pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
-    pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
-    pre = re.sub(r'"fitness": \[.*\]', '"fitness": "[FITNESS]"', pre)
 
     # Scrub timestamps
     pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)
