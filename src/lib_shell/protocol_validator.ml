@@ -75,14 +75,9 @@ let rec worker_loop bv =
   | Ok () ->
       worker_loop bv
   | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
-      lwt_log_notice
-        Tag.DSL.(fun f -> f "terminating" -% t event "terminating")
+      Protocol_validator_event.(emit validator_terminated) ()
   | Error err ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "@[Unexpected error (worker):@ %a@]"
-            -% t event "unexpected_error" -% a errs_tag err)
+      Protocol_validator_event.(emit unexpected_worker_error) err
       >>= fun () -> Lwt_canceler.cancel bv.canceler
 
 let create db =
@@ -107,20 +102,10 @@ let shutdown {canceler; worker; _} =
 let validate state hash protocol =
   match Registered_protocol.get hash with
   | Some protocol ->
-      lwt_debug
-        Tag.DSL.(
-          fun f ->
-            f "previously validated protocol %a (before pipe)"
-            -% t event "previously_validated_protocol"
-            -% a Protocol_hash.Logging.tag hash)
+      Protocol_validator_event.(emit previously_validated_protocol) hash
       >>= fun () -> return protocol
   | None -> (
-      lwt_debug
-        Tag.DSL.(
-          fun f ->
-            f "pushing validation request for protocol %a"
-            -% t event "pushing_validation_request"
-            -% a Protocol_hash.Logging.tag hash)
+      Protocol_validator_event.(emit pushing_protocol_validation) hash
       >>= fun () ->
       match Protocol_hash.Map.find_opt hash state.pending with
       | None ->
@@ -143,13 +128,7 @@ let fetch_and_compile_protocol pv ?peer ?timeout hash =
             | Some protocol ->
                 return protocol
             | None ->
-                lwt_log_notice
-                  Tag.DSL.(
-                    fun f ->
-                      f "Fetching protocol %a%a"
-                      -% t event "fetching_protocol"
-                      -% a Protocol_hash.Logging.tag hash
-                      -% a P2p_peer.Id.Logging.tag_source peer)
+                Protocol_validator_event.(emit fetching_protocol) (hash, peer)
                 >>= fun () ->
                 Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
       >>=? fun protocol ->
