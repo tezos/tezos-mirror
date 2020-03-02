@@ -151,7 +151,10 @@ let commands base_dir require_auth : Client_context.full command list =
               ~short:'t'
               ~long:"timeout"
               ~placeholder:"timeout"
-              ~default:"10"
+              ~default:
+                (Printf.sprintf
+                   "%.0f"
+                   (Ptime.Span.to_float_s !Lwt_utils_unix.default_net_timeout))
               (parameter (fun _ s ->
                    return (Time.System.Span.of_seconds_exn (Float.of_string s))))))
         (prefixes ["launch"; "socket"; "signer"] @@ stop)

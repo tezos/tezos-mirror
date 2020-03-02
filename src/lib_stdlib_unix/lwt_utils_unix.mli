@@ -25,6 +25,11 @@
 
 open Error_monad
 
+(** [default_net_timeout] is the default timeout used by functions in
+   this library which admit a timeout value, i.e. [read_bytes],
+   [Socket.connect], [Socket.recv]. *)
+val default_net_timeout : Ptime.Span.t ref
+
 (** [read_bytes ?timeout ?pos ?len fd buf] reads [len-pos] bytes from
     [fd] into [bytes].
 

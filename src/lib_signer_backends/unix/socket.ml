@@ -37,8 +37,6 @@ let unix_scheme = "unix"
 module Make (P : sig
   val authenticate :
     Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
-
-  val timeout : Time.System.Span.t option
 end) =
 struct
   open P
@@ -62,7 +60,6 @@ struct
     Lwt_utils_unix.Socket.send conn Request.encoding Request.Authorized_keys
     >>=? fun () ->
     Lwt_utils_unix.Socket.recv
-      ?timeout
       conn
       (result_encoding Authorized_keys.Response.encoding)
     >>=? fun authorized_keys ->
@@ -76,13 +73,12 @@ struct
 
   let with_signer_operation path pkh msg request_type enc =
     let f () =
-      Lwt_utils_unix.Socket.with_connection ?timeout path (fun conn ->
+      Lwt_utils_unix.Socket.with_connection path (fun conn ->
           maybe_authenticate pkh msg conn
           >>=? fun signature ->
           let req = build_request pkh msg signature request_type in
           Lwt_utils_unix.Socket.send conn Request.encoding req
-          >>=? fun () ->
-          Lwt_utils_unix.Socket.recv ?timeout conn (result_encoding enc))
+          >>=? fun () -> Lwt_utils_unix.Socket.recv conn (result_encoding enc))
     in
     let rec loop n =
       protect (fun () -> f ())
@@ -135,7 +131,6 @@ struct
           (Request.Supports_deterministic_nonces pkh)
         >>=? fun () ->
         Lwt_utils_unix.Socket.recv
-          ?timeout
           conn
           (result_encoding Supports_deterministic_nonces.Response.encoding)
         >>=? fun supported -> Lwt.return supported)
@@ -148,8 +143,7 @@ struct
           (Request.Public_key pkh)
         >>=? fun () ->
         let encoding = result_encoding Public_key.Response.encoding in
-        Lwt_utils_unix.Socket.recv ?timeout conn encoding
-        >>=? fun pk -> Lwt.return pk)
+        Lwt_utils_unix.Socket.recv conn encoding >>=? fun pk -> Lwt.return pk)
 
   module Unix = struct
     let scheme = unix_scheme

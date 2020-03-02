@@ -26,8 +26,6 @@
 module Make (P : sig
   val authenticate :
     Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
-
-  val timeout : Time.System.Span.t option
 end) : sig
   module Unix : Client_keys.SIGNER
 

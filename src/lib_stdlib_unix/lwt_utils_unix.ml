@@ -40,17 +40,17 @@ let () =
           None)
     (fun msg -> Exn (Failure msg))
 
-let read_bytes ?(timeout = Ptime.Span.zero) ?(pos = 0) ?len fd buf =
+let default_net_timeout = ref (Ptime.Span.of_int_s 8)
+
+let read_bytes ?(timeout = !default_net_timeout) ?(pos = 0) ?len fd buf =
   let buflen = Bytes.length buf in
   let len = match len with None -> buflen - pos | Some l -> l in
   if pos < 0 || pos + len > buflen then invalid_arg "read_bytes" ;
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      ( if Ptime.Span.(equal timeout zero) then Lwt_unix.read fd buf pos len
-      else
-        Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
-            Lwt_unix.read fd buf pos len) )
+      Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
+          Lwt_unix.read fd buf pos len)
       >>= function
       | 0 ->
           Lwt.fail End_of_file
@@ -228,7 +228,7 @@ module Socket = struct
     | Ok ipaddr ->
         Ipaddr.to_string ipaddr
 
-  let connect ?(timeout = Ptime.Span.of_int_s 5) = function
+  let connect ?(timeout = !default_net_timeout) = function
     | Unix path ->
         let addr = Lwt_unix.ADDR_UNIX path in
         let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in

@@ -37,8 +37,6 @@ module Make
         Signature.t tzresult Lwt.t
 
       val logger : RPC_client.logger
-
-      val timeout : Time.System.Span.t option
     end) =
 struct
   let scheme = scheme
