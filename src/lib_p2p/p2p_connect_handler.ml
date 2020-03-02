@@ -423,7 +423,7 @@ let raw_authenticate t ?point_info canceler fd point =
             :: _ ->
               lwt_debug
                 "@[<v 2> Connection to %a rejected by peer. @[Motive : %a@]. \
-                 @[Peer list received :%a@]"
+                 @[Peer list received :%a@]@]"
                 P2p_point.Id.pp
                 point
                 P2p_rejection.pp
@@ -438,7 +438,14 @@ let raw_authenticate t ?point_info canceler fd point =
                 points ;
               Lwt.return_unit
           | _ ->
-              Lwt.return_unit )
+              lwt_debug
+                "@[<v 2> Connection to %a rejected by peer. Stack trace: \
+                 @[%a@]@]"
+                P2p_point.Id.pp
+                point
+                Error_monad.pp_print_error
+                err
+              >>= fun () -> Lwt.return_unit )
           >>= fun () ->
           lwt_debug
             "authenticate: %a -> rejected %a"
