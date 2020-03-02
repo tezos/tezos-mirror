@@ -17,7 +17,7 @@ A blockchain is a linked list of **blocks**. In Tezos, blocks to be
 added to the blockchain are agreed upon through a proof-of-stake
 consensus mechanism. Proof-of-stake means that participants in the
 consensus algorithm are chosen in function of their stake. In Tezos, a
-participant needs to have a minimum stake of 8,000 XTZ (which is
+participant needs to have a minimum stake of 8,000 ꜩ (which is
 called a **roll**). If one does not have enough stake to participate
 on its own or does not want to set up the needed infrastructure, (s)he
 can use **delegation**. Therefore, in Tezos, participants in the
@@ -219,8 +219,8 @@ and resell them right after.
 Security deposits
 ~~~~~~~~~~~~~~~~~
 
-The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 XTZ
-per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 XTZ per
+The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 ꜩ
+per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 ꜩ per
 endorsement (explained below).
 
 Each delegate key has an associated security deposit account.
@@ -306,7 +306,7 @@ Rewards
 
 Baking a block should give a block reward of ``BLOCK_REWARD /
 (1 + p) * (0.8 + 0.2 * e / ENDORSERS_PER_BLOCK)`` plus all fees paid
-by transactions inside the block, where ``BLOCK_REWARD`` = 16 XTZ,
+by transactions inside the block, where ``BLOCK_REWARD`` = 16 ꜩ,
 ``p`` is the priority at which the block was baked, and ``e`` is the
 number of endorsements the block contains. Due to a bug in
 ``PsBabyM1``, the block reward is actually slightly smaller:
@@ -315,7 +315,7 @@ where `/` is *integer* division.
 
 Endorsers also receive a reward (at the same time as block creators
 do). The reward is ``ENDORSEMENT_REWARD / (1 + p)``, where
-``ENDORSEMENT_REWARD`` = 2 XTZ and ``p`` is the priority of the block
+``ENDORSEMENT_REWARD`` = 2 ꜩ and ``p`` is the priority of the block
 containing the endorsement. So the endorsement reward is only half if
 it is contained in a block of priority 1.
 
@@ -334,7 +334,7 @@ Inflation
 
 Inflation from block rewards and endorsement reward is at most
 ``ENDORSERS_PER_BLOCK`` \* ``ENDORSEMENT_REWARD`` + ``BLOCK_REWARD`` =
-80 XTZ. This means at most 5.51% annual inflation.
+80 ꜩ. This means at most 5.51% annual inflation.
 
 Random seed
 ~~~~~~~~~~~
@@ -351,7 +351,7 @@ security deposit is not forfeited).
 
 A *revelation* is an operation, and multiple revelations can thus be
 included in a block. A baker receives a ``seed_nonce_revelation_tip`` =
-1/8 XTZ reward for including a revelation.
+1/8 ꜩ reward for including a revelation.
 Revelations are free operations which do not compete with transactions
 for block space. Up to ``MAX_REVELATIONS_PER_BLOCK`` = 32 revelations
 can be contained in any given block. Thus, 1 /
