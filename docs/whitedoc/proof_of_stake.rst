@@ -109,6 +109,15 @@ programming style also puts limits on the size of operations it
 expects). This ensures that critical operations do not compete with
 transactions for block space.
 
+Fitness
+~~~~~~~
+
+To each block we associate a measure of `fitness` which determines the
+quality of the chain leading to that block. This measure is simply the
+length of the chain (as in Bitcoin). More precisely, the fitness of a
+block is 1 plus the fitness of the previous block. The shell changes
+the head of the chain to the valid block that has the highest fitness.
+
 Cycles
 ------
 
@@ -216,27 +225,6 @@ they will consume a lot of memory. If they are too rare, strategic
 participants could purchase many tokens in anticipation of a snapshot
 and resell them right after.
 
-Security deposits
-~~~~~~~~~~~~~~~~~
-
-The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 ꜩ
-per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 ꜩ per
-endorsement (explained below).
-
-Each delegate key has an associated security deposit account.
-When a delegate bakes or endorses a block the security deposit is
-automatically moved to the deposit account where it is frozen for
-``PRESERVED_CYCLES`` cycles, after which it is automatically moved
-back to the baker's main account.
-
-Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
-compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
-``ENDORSEMENT_SECURITY_DEPOSIT`` \* ``ENDORSERS_PER_BLOCK``) \*
-(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
-all tokens should be held as security deposits. It also means that a
-delegate should own over 8.25% of the amount of token delegated to them
-in order to not miss out on creating any block.
-
 Baking
 ~~~~~~
 
@@ -319,14 +307,26 @@ do). The reward is ``ENDORSEMENT_REWARD / (1 + p)``, where
 containing the endorsement. So the endorsement reward is only half if
 it is contained in a block of priority 1.
 
-Fitness
-~~~~~~~
+Security deposits
+~~~~~~~~~~~~~~~~~
 
-To each block we associate a measure of `fitness` which determines the
-quality of the chain leading to that block. This measure is simply the
-length of the chain (as in Bitcoin). More precisely, the fitness of a
-block is 1 plus the fitness of the previous block. The shell changes
-the head of the chain to the valid block has the highest fitness.
+The cost of a security deposit is ``BLOCK_SECURITY_DEPOSIT`` = 512 ꜩ
+per block created and ``ENDORSEMENT_SECURITY_DEPOSIT`` = 64 ꜩ per
+endorsement slot.
+
+Each delegate key has an associated security deposit account.
+When a delegate bakes or endorses a block the security deposit is
+automatically moved to the deposit account where it is frozen for
+``PRESERVED_CYCLES`` cycles, after which it is automatically moved
+back to the baker's main account.
+
+Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
+compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
+``ENDORSEMENT_SECURITY_DEPOSIT`` \* ``ENDORSERS_PER_BLOCK``) \*
+(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
+all tokens should be held as security deposits. It also means that a
+delegate should own over 8.25% of the amount of token delegated to them
+in order to not miss out on creating any block.
 
 
 Inflation
