@@ -42,7 +42,7 @@ let read_dir dir =
   Lwt_list.map_p (find_component dir) meta.modules
   >>= fun components ->
   let expected_env =
-    match meta.expected_env_version with None -> V1 | Some v -> v
+    match meta.expected_env_version with None -> V0 | Some v -> v
   in
   return (meta.hash, {expected_env; components})
 

@@ -56,8 +56,8 @@ val get_embedded_sources : Protocol_hash.t -> Protocol.t option
 
 val get_embedded_sources_exn : Protocol_hash.t -> Protocol.t
 
-module Register_embedded_V1
-    (Env : Tezos_protocol_environment.V1)
+module Register_embedded_V0
+    (Env : Tezos_protocol_environment.V0)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 

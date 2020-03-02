@@ -27,9 +27,9 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V1 = sig
+module type V0 = sig
   include
-    Tezos_protocol_environment_sigs.V1.T
+    Tezos_protocol_environment_sigs.V0.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
@@ -97,11 +97,11 @@ module type V1 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV1 (Param : sig
+module MakeV0 (Param : sig
   val name : string
 end)
 () :
-  V1
+  V0
     with type Context.t = Context.t
      and type Updater.validation_result = validation_result
      and type Updater.quota = quota

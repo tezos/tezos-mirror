@@ -26,5 +26,5 @@
 include module type of struct
   include Environment_context
   include Environment_protocol_T
-  include Environment_V1
+  include Environment_V0
 end

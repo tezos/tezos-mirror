@@ -1,7 +1,7 @@
-(include v1.dune.inc)
+(include v0.dune.inc)
 
 (library
  (name tezos_protocol_environment_sigs)
  (public_name tezos-protocol-environment-sigs)
  (flags (:standard -nopervasives ))
- (modules ("V1")))
+ (modules ("V0")))

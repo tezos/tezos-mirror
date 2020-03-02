@@ -48,12 +48,12 @@ let build hash =
   match Tezos_protocol_registerer.Registerer.get hash with
   | None ->
       None
-  | Some (V1 protocol) ->
+  | Some (V0 protocol) ->
       let (module F) = protocol in
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
+      let module Env = Tezos_protocol_environment.MakeV0 (Name) () in
       Some
         ( module struct
           module Raw = F (Env)
@@ -105,8 +105,8 @@ module type Source_sig = sig
   val sources : Protocol.t
 end
 
-module Register_embedded_V1
-    (Env : Tezos_protocol_environment.V1)
+module Register_embedded_V0
+    (Env : Tezos_protocol_environment.V0)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

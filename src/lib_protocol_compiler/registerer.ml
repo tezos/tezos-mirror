@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type PROTOCOL_V1 = functor
-  (Env : Tezos_protocol_environment_sigs.V1.T)
+module type PROTOCOL_V0 = functor
+  (Env : Tezos_protocol_environment_sigs.V0.T)
   -> Env.Updater.PROTOCOL
 
 module VersionTable = Protocol_hash.Table
 
-type proto_env = V1 of (module PROTOCOL_V1)
+type proto_env = V0 of (module PROTOCOL_V0)
 
 let versions : proto_env VersionTable.t = VersionTable.create 20
 
