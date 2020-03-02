@@ -267,6 +267,15 @@ Each endorser verifies the last block that was baked, say at level
 are then baked in block ``n+1``. Once block ``n+1`` is baked, no other
 endorsement for block ``n`` will be considered valid.
 
+It is possible that an endorser has more than one endorsement
+slot. However, the endorser injects a single endorsement operation,
+which represents all of its endorsements slots. In what follows, when
+we say "the number of endorsements a block contains", we do not refer
+to the number of endorsements operations, but to the number of
+endorsements slots covered by the contained endorsement
+operations. (In the code base, the number of filled endorsements slots
+is called the block's endorsing power.)
+
 Minimal block delays
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -283,11 +292,6 @@ higher the priority and the fewer endorsements a block carries the
 longer it takes before it can be considered valid. However, if the
 block contains more than ``INITIAL_ENDORSERS`` then there is no time
 penalty.
-
-It is possible that the same endorser be selected ``k`` times for the
-same block, in this case ``k`` deposits are required and ``k`` rewards
-gained. However a single operation needs to be sent on the network to
-endorse ``k`` times the same block.
 
 Rewards
 ~~~~~~~
