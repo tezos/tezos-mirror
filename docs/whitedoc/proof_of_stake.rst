@@ -91,7 +91,7 @@ Protocol header
    the block was baked.
 -  ``seed_nonce_hash``: a commitment to a random number, used to
    generate entropy on the chain. Present in only one out of
-   (``BLOCKS_PER_COMMITMENT`` = 32) blocks.
+   ``BLOCKS_PER_COMMITMENT`` = 32 blocks.
 -  ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
    proof-of-work for the block, as a spam prevention measure.
 
@@ -123,14 +123,14 @@ Cycles
 
 Blocks in Tezos are grouped into *cycles* of
 ``BLOCKS_PER_CYCLE`` = 4,096 blocks. Since blocks are at least
-``TIME_BETWEEN_BLOCKS`` = one minute apart, this means a cycle lasts *at
+``TIME_BETWEEN_BLOCKS[0]`` = one minute apart, this means a cycle lasts *at
 least* 2 days, 20 hours, and 16 minutes. In the following description,
-the current cycle is referred to as ``n``, it is the nth cycle from the
+the current cycle is referred to as ``n``, it is the ``n``-th cycle from the
 beginning of the chain. Cycle ``(n-1)`` is the cycle that took place
 before the current one, cycle ``(n-2)`` the one before, cycle ``(n+1)``
 the one after, etc.
 
-At any point, the tezos shell will not implicitly accept a branch whose
+At any point, the shell will not implicitly accept a branch whose
 fork point is in a cycle more than ``PRESERVED_CYCLES`` = 5 cycles in the
 past (that is *at least* 14 days, 5 hours, and 20 minutes).
 
@@ -228,9 +228,9 @@ and resell them right after.
 Baking
 ~~~~~~
 
-Baking is the action of signing and publishing a block.
-In Bitcoin, the right to publish a block is associated with solving a
-proof-of-work puzzle. In Tezos, the right to publish a block in
+Baking is the action of producing and signing a block.
+In Bitcoin, the right to produce a block is associated with solving a
+proof-of-work puzzle. In Tezos, the right to produce a block in
 cycle ``n`` is assigned to a randomly selected roll in a randomly
 selected roll snapshot from cycle ``n-PRESERVED_CYCLES-2``.
 
@@ -258,7 +258,7 @@ all fees paid by transactions inside the block.
 Endorsements
 ~~~~~~~~~~~~
 
-To each baking slot, we associate a list of ``ENDORSERS_PER_BLOCK`` =
+To each level, we associate a list of ``ENDORSERS_PER_BLOCK`` =
 32 *endorsers*. Endorsers are drawn similarly as bakers, by randomly
 selecting 32 active rolls with replacement.
 
@@ -272,10 +272,10 @@ Minimal block delays
 
 A block is valid only if its timestamp has a minimal delay with
 respect to the previous block’s timestamp. The minimal delay is given
-by the following expression:
-``TIME_BETWEEN_BLOCKS[0] + TIME_BETWEEN_BLOCKS[1] * p + DELAY_PER_MISSING_ENDORSEMENT * MAX (0, INITIAL_ENDORSERS - e)``
-where ``TIME_BETWEEN_BLOCKS[0]`` = 60 seconds,
-``TIME_BETWEEN_BLOCKS[1]`` = 40 seconds,
+by the following expression: ``TIME_BETWEEN_BLOCKS[0] +
+TIME_BETWEEN_BLOCKS[1] * p +`` ``DELAY_PER_MISSING_ENDORSEMENT * MAX
+(0, INITIAL_ENDORSERS - e)`` where ``TIME_BETWEEN_BLOCKS[0]`` = 60
+seconds, ``TIME_BETWEEN_BLOCKS[1]`` = 40 seconds,
 ``DELAY_PER_MISSING_ENDORSEMENT`` = 8 seconds, ``INITIAL_ENDORSERS`` =
 24, ``p`` is the block's priority at which the block was baked, and
 ``e`` is the number of endorsements the block contains. That is, the
