@@ -5,10 +5,7 @@ Proof-of-stake in Tezos
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm as implemented in the current protocol
-(namely `PsBabyM1` on `mainnet`) and described in these blog posts
-https://blog.nomadic-labs.com/analysis-of-emmy.html and
-https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html.
-
+(namely `PsCARTHA` on `mainnet`).
 
 Brief Overview
 --------------
@@ -46,13 +43,19 @@ Further External Resources
 The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/static/white_paper-2dc8c02267a8fb86bd67a108199441bf.pdf>`_.
+The following blog posts present the intuition behind the changes to the original consensus algorithm:
+
+-  https://blog.nomadic-labs.com/analysis-of-emmy.html,
+-  https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html,
+-  https://blog.nomadic-labs.com/a-new-reward-formula-for-carthage.html.
+
 Here are a few more resources that present Tezos' proof-of-stake
 mechanism:
 
 -  `Proof of Stake <https://learn.tqtezos.com/files/proofofstake.html#consensus>`_
 -  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
--  `All you ever wanted to ask about Tezos — Illustrated <https://medium.com/@cogarius/all-you-ever-wanted-to-ask-about-tezos-illustrated-cf2034f000c9>`_
 
+Please note that these external resources may contain outdated information.
 
 Blocks
 ------
@@ -167,7 +170,7 @@ Active and passive delegates
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A delegate can be marked as either active or passive. A passive delegate
-cannot be selected for baking or endorsement.
+cannot be selected for baking or endorsing.
 
 A delegate becomes passive for cycle ``n`` when they fail to create
 any of the blocks or endorsements in the past ``PRESERVED_CYCLES`` = 5
@@ -269,11 +272,11 @@ endorsement for block ``n`` will be considered valid.
 
 It is possible that an endorser has more than one endorsement
 slot. However, the endorser injects a single endorsement operation,
-which represents all of its endorsements slots. In what follows, when
+which represents all of its endorsement slots. In what follows, when
 we say "the number of endorsements a block contains", we do not refer
-to the number of endorsements operations, but to the number of
-endorsements slots covered by the contained endorsement
-operations. (In the code base, the number of filled endorsements slots
+to the number of endorsement operations, but to the number of
+endorsement slots covered by the contained endorsement
+operations. (In the code base, the number of filled endorsement slots
 is called the block's endorsing power.)
 
 Minimal block delays
@@ -296,20 +299,25 @@ penalty.
 Rewards
 ~~~~~~~
 
-Baking a block should give a block reward of ``BLOCK_REWARD /
-(1 + p) * (0.8 + 0.2 * e / ENDORSERS_PER_BLOCK)`` plus all fees paid
-by transactions inside the block, where ``BLOCK_REWARD`` = 16 ꜩ,
-``p`` is the priority at which the block was baked, and ``e`` is the
-number of endorsements the block contains. Due to a bug in
-``PsBabyM1``, the block reward is actually slightly smaller:
-``BLOCK_REWARD * (8 + 2 * e / ENDORSERS_PER_BLOCK) / 10 / (1 + p)``,
-where `/` is *integer* division.
+Baking a block gives a block reward of ``e *
+BAKING_REWARD_PER_ENDORSEMENT[p']`` plus all fees paid by the
+transactions contained in the block, where
+``BAKING_REWARD_PER_ENDORSEMENT`` = ``[1.250ꜩ, 1.875ꜩ]``,
+``e`` is the number of endorsements the block contains, ``p`` is the
+priority at which the block was baked, and ``p'`` is 0 if ``p`` is
+0 and is 1 if ``p`` is bigger than 0.  That is, a delegate
+producing a block of priority 0 will be rewarded ``e * 1.25``
+ꜩ. If a delegate produces a block at priority 1 or higher, then
+the reward is ``e * 0.1875`` ꜩ.
 
 Endorsers also receive a reward (at the same time as block creators
-do). The reward is ``ENDORSEMENT_REWARD / (1 + p)``, where
-``ENDORSEMENT_REWARD`` = 2 ꜩ and ``p`` is the priority of the block
-containing the endorsement. So the endorsement reward is only half if
-it is contained in a block of priority 1.
+do). The reward is ``ENDORSEMENT_REWARD[p']``, where
+``ENDORSEMENT_REWARD`` = ``[1.250ꜩ, 0.833333ꜩ]``, where ``p'``
+is as above.  That is, a delegate endorsing a block of priority 0
+will be rewarded ``e * 1.25`` ꜩ, with ``e`` the number of endorsement
+slots attributed to the delegate for this level. Moreover, endorsing
+blocks of priority 1 or higher will be rewarded ``e * 0.8333333``
+ꜩ.
 
 Security deposits
 ~~~~~~~~~~~~~~~~~
@@ -337,7 +345,8 @@ Inflation
 ~~~~~~~~~
 
 Inflation from block rewards and endorsement reward is at most
-``ENDORSERS_PER_BLOCK`` \* ``ENDORSEMENT_REWARD`` + ``BLOCK_REWARD`` =
+``ENDORSERS_PER_BLOCK`` \* (``ENDORSEMENT_REWARD[0]`` +
+``BAKING_REWARD_PER_ENDORSEMENT[0]``) =
 80 ꜩ. This means at most 5.51% annual inflation.
 
 Random seed
