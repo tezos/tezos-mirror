@@ -699,7 +699,7 @@ class TestContractOpcodes:
         assert run_script_res.big_map_diff == big_map_diff
 
     @pytest.mark.parametrize(
-        "param,storage,expected,big_map_diff",
+        "storage,param,expected,big_map_diff",
         [   # test swap
             ('(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))',
              '(Left Unit)',
@@ -751,14 +751,14 @@ class TestContractOpcodes:
         ])
     def test_big_map_magic(self,
                            client_regtest,
-                           param,
                            storage,
+                           param,
                            expected,
                            big_map_diff):
         client = client_regtest
         contract = f'{paths.TEZOS_HOME}/src/bin_client/test/' + \
             'contracts/mini_scenarios/big_map_magic.tz'
-        run_script_res = client.run_script(contract, param, storage,
+        run_script_res = client.run_script(contract, storage, param,
                                            None, True)
         assert run_script_res.storage == expected
         assert run_script_res.big_map_diff == big_map_diff
