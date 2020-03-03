@@ -55,7 +55,7 @@ module Private_answerer = struct
       "Receive requests for peers addresses from %a"
       P2p_peer.Id.pp
       conn.peer_id
-    >>= fun () -> Lwt.return_nil
+    >>= fun () -> return_unit
 
   let swap_request conn _request _new_point _peer =
     private_node_warn
@@ -89,13 +89,33 @@ module Default_answerer = struct
     Lwt.return_unit
 
   let bootstrap config conn _request_info =
+    let source_peer_id = conn.peer_id in
     if conn.is_private then
       private_node_warn
         "Private peer (%a) asked other peers addresses"
         P2p_peer.Id.pp
         conn.peer_id
-      >>= fun () -> Lwt.return_nil
-    else P2p_pool.list_known_points ~ignore_private:true config.pool
+      >>= fun () -> return_unit
+    else
+      P2p_pool.list_known_points ~ignore_private:true config.pool
+      >>= function
+      | [] ->
+          return_unit
+      | points -> (
+        match conn.write_advertise points with
+        | Ok true ->
+            return ()
+        | Ok false ->
+            (* if not sent then ?? TODO count dropped message ?? *)
+            return ()
+        | Error err ->
+            lwt_log_error
+              "Sending advertise to %a failed: %a"
+              P2p_peer.Id.pp
+              source_peer_id
+              pp_print_error
+              err
+            >>= fun () -> Lwt.return (Error err) )
 
   let swap t pool source_peer_id ~connect current_peer_id new_point =
     t.latest_accepted_swap <- Systime_os.now () ;

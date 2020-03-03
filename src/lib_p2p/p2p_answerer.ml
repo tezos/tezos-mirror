@@ -37,7 +37,16 @@
 type 'msg conn_info = {
   peer_id : P2p_peer.Id.t;
   is_private : bool;
+  write_advertise : P2p_point.Id.t list -> bool tzresult;
+      (** [write_advertise points] must send the message [Advertise(points)]
+          to the internal [peer_id]. It must return [Ok true] if the message
+          has been successfully sent, [Ok false] if the message has been
+          dropped, or fails with a corresponding error otherwise. *)
   write_swap_ack : P2p_point.Id.t -> P2p_peer.Id.t -> bool tzresult;
+      (** [write_swap_ack (p1, p2)] must send the message [Swap_ack(p1, p2)]
+          to the internal [peer_id]. It must return [Ok true] if the message
+          has been successfully sent, [Ok false] if the message has been
+          dropped, or fails with a corresponding error otherwise. *)
   messages : (int * 'msg) Lwt_pipe.t;
 }
 
@@ -46,7 +55,7 @@ type request_info = {
 }
 
 type 'msg callback = {
-  bootstrap : request_info -> P2p_point.Id.t list Lwt.t;
+  bootstrap : request_info -> unit tzresult Lwt.t;
   advertise : request_info -> P2p_point.Id.t list -> unit Lwt.t;
   message : request_info -> int -> 'msg -> unit Lwt.t;
   swap_request : request_info -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t;

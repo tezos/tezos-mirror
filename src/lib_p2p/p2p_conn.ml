@@ -72,22 +72,13 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn)
   >>= function
   | Ok (_, Bootstrap) -> (
-      (* callback.bootstrap will return an empty list if the node
-         is in private mode *)
       callback.bootstrap request_info
       >>= function
-      | [] ->
+      | Ok () ->
           worker_loop t callback
-      | points -> (
-        match P2p_socket.write_now t.conn (Advertise points) with
-        | Ok _sent ->
-            (* if not sent then ?? TODO count dropped message ?? *)
-            worker_loop t callback
-        | Error _ ->
-            Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit ) )
+      | Error _ ->
+          Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit )
   | Ok (_, Advertise points) ->
-      (* callback.advertise will ignore the points if the node is
-         in private mode *)
       callback.advertise request_info points
       >>= fun () -> worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
@@ -121,6 +112,8 @@ let shutdown t =
 let write_swap_ack t point peer_id =
   P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
 
+let write_advertise t points = P2p_socket.write_now t.conn (Advertise points)
+
 let create conn point_info peer_info messages canceler callback
     negotiated_version =
   let private_node = P2p_socket.private_node conn in
@@ -153,6 +146,7 @@ let create conn point_info peer_info messages canceler callback
       {
         peer_id = t.peer_info |> P2p_peer_state.Info.peer_id;
         is_private = P2p_socket.private_node t.conn;
+        write_advertise = write_advertise t;
         write_swap_ack = write_swap_ack t;
         messages;
       }
