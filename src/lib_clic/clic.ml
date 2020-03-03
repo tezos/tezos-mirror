@@ -395,7 +395,7 @@ let print_group print_command ppf ({title; _}, commands) =
     commands
 
 type formatter_state =
-  Format.formatter_out_functions * Format.formatter_tag_functions * bool
+  Format.formatter_out_functions * Format.formatter_stag_functions * bool
 
 type format = Plain | Ansi | Html
 
@@ -405,7 +405,7 @@ let setup_formatter ppf format verbosity =
   let skip = ref false in
   let ((orig_out_functions, _, _) as orig_state) =
     ( Format.pp_get_formatter_out_functions ppf (),
-      Format.pp_get_formatter_tag_functions ppf (),
+      Format.pp_get_formatter_stag_functions ppf (),
       Format.pp_get_print_tags ppf () )
   in
   ( Format.pp_print_flush ppf () ;
@@ -443,41 +443,47 @@ let setup_formatter ppf format verbosity =
           Stdlib.failwith "Clic: unclosed verbosity tag"
     in
     push_level (Terse, ( <= )) ;
-    let push_level_tag tag =
-      let push op = function
-        | "full" ->
-            push_level (Full, op)
-        | "details" ->
-            push_level (Details, op)
-        | "short" ->
-            push_level (Short, op)
-        | "terse" ->
-            push_level (Terse, op)
-        | tag ->
-            Stdlib.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
-      in
-      if String.length tag > 0 && tag.[0] = '=' then
-        push ( = ) (String.sub tag 1 (String.length tag - 1))
-      else if String.length tag > 0 && tag.[0] = '-' then
-        push ( > ) (String.sub tag 1 (String.length tag - 1))
-      else push ( <= ) tag
+    let push_level_tag = function
+      | Format.String_tag tag ->
+          let push op = function
+            | "full" ->
+                push_level (Full, op)
+            | "details" ->
+                push_level (Details, op)
+            | "short" ->
+                push_level (Short, op)
+            | "terse" ->
+                push_level (Terse, op)
+            | tag ->
+                Stdlib.failwith
+                  ("Clic: invalid semantic string tag <" ^ tag ^ ">")
+          in
+          if String.length tag > 0 && tag.[0] = '=' then
+            push ( = ) (String.sub tag 1 (String.length tag - 1))
+          else if String.length tag > 0 && tag.[0] = '-' then
+            push ( > ) (String.sub tag 1 (String.length tag - 1))
+          else push ( <= ) tag
+      | _stag ->
+          Stdlib.failwith "Clic: invalid semantic tag"
     in
     let pop_level_tag = function
-      | "full"
-      | "details"
-      | "short"
-      | "terse"
-      | "-full"
-      | "-details"
-      | "-short"
-      | "-terse"
-      | "=full"
-      | "=details"
-      | "=short"
-      | "=terse" ->
+      | Format.String_tag "full"
+      | Format.String_tag "details"
+      | Format.String_tag "short"
+      | Format.String_tag "terse"
+      | Format.String_tag "-full"
+      | Format.String_tag "-details"
+      | Format.String_tag "-short"
+      | Format.String_tag "-terse"
+      | Format.String_tag "=full"
+      | Format.String_tag "=details"
+      | Format.String_tag "=short"
+      | Format.String_tag "=terse" ->
           pop_level ()
-      | tag ->
-          Stdlib.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
+      | Format.String_tag tag ->
+          Stdlib.failwith ("Clic: invalid semantic string tag <" ^ tag ^ ">")
+      | _stag ->
+          Stdlib.failwith "Clic: invalid semantic tag"
     in
     match format with
     | Ansi ->
@@ -546,161 +552,161 @@ let setup_formatter ppf format verbosity =
           | [_] | [] ->
               Stdlib.failwith "Clic: unclosed ansi format"
         in
-        Format.pp_set_formatter_tag_functions
+        Format.pp_set_formatter_stag_functions
           ppf
           {
-            mark_open_tag = (fun _ -> "");
-            mark_close_tag = (fun _ -> "");
-            print_open_tag =
+            mark_open_stag = (fun _ -> "");
+            mark_close_stag = (fun _ -> "");
+            print_open_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   push_ansi_format (None, None, true, true)
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "@[<hov 4>"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "  @[<v 0>"
-              | "opt" ->
+              | Format.String_tag "opt" ->
                   push_ansi_format (Some `Green, None, false, false)
-              | "arg" ->
+              | Format.String_tag "arg" ->
                   push_ansi_format (Some `Yellow, None, false, false) ;
                   Format.fprintf ppf "<"
-              | "kwd" ->
+              | Format.String_tag "kwd" ->
                   push_ansi_format (None, None, false, true)
-              | "error" ->
+              | Format.String_tag "error" ->
                   push_ansi_format (Some `Red, None, true, true)
-              | "warning" ->
+              | Format.String_tag "warning" ->
                   push_ansi_format (Some `Yellow, None, true, true)
-              | "hilight" ->
+              | Format.String_tag "hilight" ->
                   push_ansi_format (Some `White, Some `Yellow, true, true)
-              | "list" ->
+              | Format.String_tag "list" ->
                   Format.fprintf ppf "  @[<v 0>"
-              | "command" ->
+              | Format.String_tag "command" ->
                   Format.fprintf ppf "@[<v 0>"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf ppf "@[<v 0>"
               | other ->
                   push_level_tag other);
-            print_close_tag =
+            print_close_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   Format.fprintf ppf ":" ; pop_ansi_format ()
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "@]"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "@]"
-              | "opt" ->
+              | Format.String_tag "opt" ->
                   pop_ansi_format ()
-              | "arg" ->
+              | Format.String_tag "arg" ->
                   Format.fprintf ppf ">" ; pop_ansi_format ()
-              | "kwd" ->
+              | Format.String_tag "kwd" ->
                   pop_ansi_format ()
-              | "error" ->
+              | Format.String_tag "error" ->
                   pop_ansi_format ()
-              | "warning" ->
+              | Format.String_tag "warning" ->
                   pop_ansi_format ()
-              | "hilight" ->
+              | Format.String_tag "hilight" ->
                   pop_ansi_format ()
-              | "command" | "list" ->
+              | Format.String_tag "command" | Format.String_tag "list" ->
                   Format.fprintf ppf "@]"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf ppf "@]"
               | other ->
                   pop_level_tag other);
           } ;
         Format.pp_set_print_tags ppf true
     | Plain ->
-        Format.pp_set_formatter_tag_functions
+        Format.pp_set_formatter_stag_functions
           ppf
           {
-            mark_open_tag = (fun _ -> "");
-            mark_close_tag = (fun _ -> "");
-            print_open_tag =
+            mark_open_stag = (fun _ -> "");
+            mark_close_stag = (fun _ -> "");
+            print_open_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   ()
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "@[<hov 4>"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "  @[<v 0>"
-              | "opt" ->
+              | Format.String_tag "opt" ->
                   ()
-              | "arg" ->
+              | Format.String_tag "arg" ->
                   Format.fprintf ppf "<"
-              | "kwd" ->
+              | Format.String_tag "kwd" ->
                   ()
-              | "hilight" ->
+              | Format.String_tag "hilight" ->
                   ()
-              | "error" ->
+              | Format.String_tag "error" ->
                   ()
-              | "warning" ->
+              | Format.String_tag "warning" ->
                   ()
-              | "list" ->
+              | Format.String_tag "list" ->
                   Format.fprintf ppf "  @[<v 0>"
-              | "command" ->
+              | Format.String_tag "command" ->
                   Format.fprintf ppf "@[<v 0>"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf ppf "@[<v 0>"
               | other ->
                   push_level_tag other);
-            print_close_tag =
+            print_close_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   Format.fprintf ppf ":"
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "@]"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "@]"
-              | "opt" ->
+              | Format.String_tag "opt" ->
                   ()
-              | "arg" ->
+              | Format.String_tag "arg" ->
                   Format.fprintf ppf ">"
-              | "kwd" ->
+              | Format.String_tag "kwd" ->
                   ()
-              | "error" ->
+              | Format.String_tag "error" ->
                   ()
-              | "warning" ->
+              | Format.String_tag "warning" ->
                   ()
-              | "hilight" ->
+              | Format.String_tag "hilight" ->
                   ()
-              | "command" | "list" ->
+              | Format.String_tag "command" | Format.String_tag "list" ->
                   Format.fprintf ppf "@]"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf ppf "@]"
               | other ->
                   pop_level_tag other);
           } ;
         Format.pp_set_print_tags ppf true
     | Html ->
-        Format.pp_set_formatter_tag_functions
+        Format.pp_set_formatter_stag_functions
           ppf
           {
-            mark_open_tag = (fun _ -> "");
-            mark_close_tag = (fun _ -> "");
-            print_open_tag =
+            mark_open_stag = (fun _ -> "");
+            mark_close_stag = (fun _ -> "");
+            print_open_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   Format.fprintf ppf "\003h3\004"
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "\003div class='cmddoc'\004"
-              | "opt" ->
+              | Format.String_tag "opt" ->
                   Format.fprintf ppf "\003span class='opt'\004"
-              | "arg" ->
+              | Format.String_tag "arg" ->
                   Format.fprintf ppf "\003span class='arg'\004"
-              | "kwd" ->
+              | Format.String_tag "kwd" ->
                   Format.fprintf ppf "\003span class='kwd'\004"
-              | "hilight" ->
+              | Format.String_tag "hilight" ->
                   ()
-              | "error" ->
+              | Format.String_tag "error" ->
                   ()
-              | "warning" ->
+              | Format.String_tag "warning" ->
                   ()
-              | "list" ->
+              | Format.String_tag "list" ->
                   Format.fprintf ppf "\003ul\004@\n"
-              | "command" ->
+              | Format.String_tag "command" ->
                   Format.fprintf ppf "\003li\004@\n"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf
                     ppf
                     "@[<v 0>\003style\004.cmdline { font-family: monospace \
@@ -716,23 +722,27 @@ let setup_formatter ppf format verbosity =
                      }\003/style\004@\n"
               | other ->
                   push_level_tag other);
-            print_close_tag =
+            print_close_stag =
               (function
-              | "title" ->
+              | Format.String_tag "title" ->
                   Format.fprintf ppf "\003/h3\004@\n"
-              | "commandline" ->
+              | Format.String_tag "commandline" ->
                   Format.fprintf ppf "@]\003/div\004@\n"
-              | "commanddoc" ->
+              | Format.String_tag "commanddoc" ->
                   Format.fprintf ppf "\003/div\004@\n"
-              | "opt" | "arg" | "kwd" ->
+              | Format.String_tag "opt"
+              | Format.String_tag "arg"
+              | Format.String_tag "kwd" ->
                   Format.fprintf ppf "\003/span\004"
-              | "error" | "warning" | "hilight" ->
+              | Format.String_tag "error"
+              | Format.String_tag "warning"
+              | Format.String_tag "hilight" ->
                   ()
-              | "list" ->
+              | Format.String_tag "list" ->
                   Format.fprintf ppf "\003/ul\004@\n"
-              | "command" ->
+              | Format.String_tag "command" ->
                   Format.fprintf ppf "\003/li\004@\n"
-              | "document" ->
+              | Format.String_tag "document" ->
                   Format.fprintf ppf "@]"
               | other ->
                   pop_level_tag other);
@@ -769,7 +779,7 @@ let setup_formatter ppf format verbosity =
 let restore_formatter ppf (out_functions, tag_functions, tags) =
   Format.pp_print_flush ppf () ;
   Format.pp_set_formatter_out_functions ppf out_functions ;
-  Format.pp_set_formatter_tag_functions ppf tag_functions ;
+  Format.pp_set_formatter_stag_functions ppf tag_functions ;
   Format.pp_set_print_tags ppf tags
 
 let usage_internal ppf ~executable_name ~global_options ?(highlights = [])

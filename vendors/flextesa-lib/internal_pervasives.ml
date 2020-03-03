@@ -108,9 +108,9 @@ module More_fmt = struct
         string ppf (String.make 45 '`'))
 
   let tag tag ppf f =
-    Caml.Format.pp_open_tag ppf tag ;
+    Caml.Format.pp_open_stag ppf (Caml.Format.String_tag tag) ;
     (f ppf : unit) ;
-    Caml.Format.pp_close_tag ppf ()
+    Caml.Format.pp_close_stag ppf ()
 
   let shout = tag "shout"
   let prompt = tag "prompt"
