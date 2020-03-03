@@ -87,7 +87,7 @@ a transfer operation.
             sandbox.add_node(1)
             # Launch a baker associated to node 0, baking on behalf of delegate
             # bootstrap5
-            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DEAMON)
+            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
             # first client tells node 0 to transfer money for an account to another
             # receipt is an object representing the client answer
             receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
@@ -219,7 +219,7 @@ To run a specifc test, we usually want client and server traces
     > pytest -m "vote and not slow"
     # run module test_voting.py, display all output, save server logs in tmp
     > pytest -s tests/test_voting.py --log-dir=tmp
-    # run all tests using a deamon
+    # run all tests using a daemon
     > pytest -m "endorser or baker"
     # run everything
     > pytest
@@ -254,7 +254,7 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
             sandbox.add_node(0)
             utils.activate_alpha(sandbox.client(0))
             sandbox.add_node(1)
-            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DEAMON)
+            sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
             yield sandbox
             assert sandbox.are_daemons_alive()
 
@@ -306,7 +306,7 @@ The list of fixtures available is given by
 
 Most fixtures are defined in ``conftest.py``.
 The most general fixture is ``sandbox``. It allows to instanciate an arbitrary
-number of nodes and deamons. Other fixtures, such as ``client``,
+number of nodes and daemons. Other fixtures, such as ``client``,
 are specialized versions (slightly more convenient than using
 ``sandbox`` directly). Fixtures can be defined directly in a module defining a
 test, or they can be shared.
@@ -343,7 +343,7 @@ Adding a test
   in `tests_python/`, or simple `make test-python-lint` from the Tezos home
   directory. Note that linting and typechecking are enforced by the CI
   in the build stage.
-- If you modify the API (launchers or deamons), make sure you maintain the
+- If you modify the API (launchers or daemons), make sure you maintain the
   layers structure. API shouldn't rely testing constants (``tools/constant.py``
   or ``tools/paths.py``).
 
@@ -351,20 +351,20 @@ Testing on a production branch (``zeronet``, ``mainnet``,...)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 On ``master``, protocol alpha is named
-``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and deamons binary
+``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and daemons binary
 name are suffixed with ``alpha`` (``tezos-baker-alpha``,
 ``tezos-endorser-alpha``...). However, on *production* branches, an actual
 hash of the protocol is used, and a shortened string is used to specify
-deamons.
+daemons.
 
 For instance, on revision ``816625bed0983f7201e4c369440a910f006beb1a`` of
 zeronet, protocol alpha is named
-``PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP`` and deamons are
+``PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP`` and daemons are
 suffixed by ``003-PsddFKi3`` (``tezos-baker-003-PsddFKi3``).
 
 To reduce coupling between tests and the actual branch to be tested, tests
 refer to protocol alpha using ``constants.ALPHA`` and
-``constants.ALPHA_DEAMON`` rather than by hard-coded identifiers.
+``constants.ALPHA_DAEMON`` rather than by hard-coded identifiers.
 
 Tests based on fixed revisions (multibranch)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -378,7 +378,7 @@ parameter ``branch`` that points to a subdirectory where binaries are to be
 looked for.
 
 2. The ``SandboxMultibranch`` launcher is instanciated by map from ids to
-branches. Then everytime we launch a node or a deamon the actual binary will
+branches. Then everytime we launch a node or a daemon the actual binary will
 be selected according to the map.
 
 Tests using specific revisions are in ``tests/multibranch`` and aren't run by
