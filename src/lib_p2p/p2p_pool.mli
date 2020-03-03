@@ -100,6 +100,9 @@ val register_point :
   P2p_point.Id.t ->
   ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
 
+(** Remove a [point] from the table of known points if it is already known.. *)
+val unregister_point : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
 (** [register_new_point pool point] returns [None] if [point] is a point for
     this peer. Otherwise it behaves as [register_point]. *)
 val register_new_point :

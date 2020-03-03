@@ -484,6 +484,16 @@ let authenticate t ?point_info canceler fd point =
   >>= function
   | Ok connection ->
       return connection
+  | Error
+      (P2p_errors.Rejected {motive = P2p_rejection.Unknown_chain_name; _} :: _)
+    as err ->
+      (* We don't register point that belong to another network.
+        They are useless, and we don't want to advertize them.
+        They are not greylisted as their might be node from our
+        network on the same IP.
+      *)
+      P2p_pool.unregister_point t.pool point ;
+      P2p_io_scheduler.close fd >>=? fun () -> Lwt.return err
   | Error _ as err ->
       P2p_io_scheduler.close fd >>=? fun () -> Lwt.return err
 

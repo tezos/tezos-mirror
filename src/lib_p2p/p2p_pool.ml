@@ -120,6 +120,9 @@ let register_point ?trusted pool ((addr, port) as point) =
           () ) ;
       point_info
 
+let unregister_point pool point =
+  P2p_point.Table.remove pool.known_points point
+
 let register_new_point ?trusted t point =
   if not (P2p_point.Table.mem t.my_id_points point) then
     Some (register_point ?trusted t point)
