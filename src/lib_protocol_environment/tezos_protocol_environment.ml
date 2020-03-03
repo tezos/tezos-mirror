@@ -338,7 +338,7 @@ struct
   module Format = Format
 
   module Option = struct
-    include Option
+    include Tezos_stdlib.Option
 
     (* For compatibility with sigs.v1. It is not used and it shouldn't be used. *)
     let try_with f = try Some (f ()) with _ -> None
