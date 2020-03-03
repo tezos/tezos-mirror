@@ -1570,7 +1570,8 @@ contract, unit for an account.
 
     :: option key_hash : 'S   ->   operation : 'S
 
--  ``BALANCE``: Push the current amount of mutez of the current contract.
+-  ``BALANCE``: Push the current amount of mutez held by the executing
+    contract, including any mutez added by the calling transaction.
 
 ::
 
