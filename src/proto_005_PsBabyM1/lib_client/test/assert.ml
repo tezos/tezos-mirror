@@ -25,7 +25,7 @@
 
 let fail expected given msg =
   Format.kasprintf
-    Pervasives.failwith
+    Stdlib.failwith
     "@[%s@ expected: %s@ got: %s@]"
     msg
     expected

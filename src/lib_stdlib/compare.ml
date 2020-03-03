@@ -113,13 +113,13 @@ module Char = Make (Char)
 module Bool = Make (struct
   type t = bool
 
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end)
 
 module Int = Make (struct
   type t = int
 
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end)
 
 module Int32 = Make (Int32)
@@ -176,7 +176,7 @@ module Uint64 =
 module Float = Make (struct
   type t = float
 
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end)
 
 module String = Make (String)

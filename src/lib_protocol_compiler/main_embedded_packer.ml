@@ -39,7 +39,7 @@ let (hash, sources) =
       (hash, proto)
   | Error err ->
       Format.kasprintf
-        Pervasives.failwith
+        Stdlib.failwith
         "Failed to read TEZOS_PROTOCOL: %a"
         pp_print_error
         err

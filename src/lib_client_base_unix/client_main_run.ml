@@ -348,5 +348,5 @@ let run ?log (module M : M)
        Client_context.full Clic.command list tzresult Lwt.t) =
   Lwt_exit.exit_on ?log Sys.sigint ;
   Lwt_exit.exit_on ?log Sys.sigterm ;
-  Pervasives.exit @@ Lwt_main.run @@ Lwt_exit.wrap_promise
+  Stdlib.exit @@ Lwt_main.run @@ Lwt_exit.wrap_promise
   @@ main (module M) ~select_commands

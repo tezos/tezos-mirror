@@ -41,17 +41,17 @@ let () =
     try
       Tezos_protocol_compiler.Compiler.main
         Tezos_protocol_compiler_native.Native.driver ;
-      Pervasives.exit 0
+      Stdlib.exit 0
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Pervasives.exit 1 )
+      Stdlib.exit 1 )
 
 let () =
   if Filename.basename Sys.argv.(0) = "tezos-validator" then (
-    try Pervasives.exit (Lwt_main.run @@ Validator.main ())
+    try Stdlib.exit (Lwt_main.run @@ Validator.main ())
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
-      Pervasives.exit 1 )
+      Stdlib.exit 1 )
 
 let term =
   let open Cmdliner.Term in

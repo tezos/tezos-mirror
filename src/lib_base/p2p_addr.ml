@@ -53,7 +53,7 @@ let of_string_opt str =
 let of_string_exn str =
   match of_string_opt str with
   | None ->
-      Pervasives.failwith "P2p_addr.of_string"
+      Stdlib.failwith "P2p_addr.of_string"
   | Some t ->
       t
 

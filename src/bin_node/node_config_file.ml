@@ -732,7 +732,7 @@ let rpc : rpc Data_encoding.t =
         | (None, None) ->
             default_rpc.listen_addrs
         | (Some _, Some _) ->
-            Pervasives.failwith
+            Stdlib.failwith
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in

@@ -187,7 +187,7 @@ let unparse ?type_map parse expanded =
   | (res, []) ->
       res
   | (_, _ :: _) ->
-      Pervasives.failwith "Michelson_v1_printer.unparse"
+      Stdlib.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map =
   unparse ?type_map Michelson_v1_parser.parse_toplevel

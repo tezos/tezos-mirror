@@ -99,9 +99,9 @@ let pp_operation formatter (a : Alpha_block_services.operation) =
           formatter
           (od.contents, omd.contents)
     | None ->
-        Pervasives.failwith "Unexpected result." )
+        Stdlib.failwith "Unexpected result." )
   | _ ->
-      Pervasives.failwith "Unexpected result."
+      Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
     operation_hash =

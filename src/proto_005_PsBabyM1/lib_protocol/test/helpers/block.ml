@@ -312,7 +312,7 @@ let genesis_with_parameters parameters =
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?min_proposal_quorum (initial_accounts : (Account.t * Tez_repr.t) list) =
   if initial_accounts = [] then
-    Pervasives.failwith "Must have one account with a roll to bake" ;
+    Stdlib.failwith "Must have one account with a roll to bake" ;
   let open Tezos_protocol_005_PsBabyM1_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =

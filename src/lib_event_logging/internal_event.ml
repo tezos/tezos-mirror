@@ -201,7 +201,7 @@ module All_sinks = struct
     | _ ->
         (* This should be considered a programming error: *)
         Printf.ksprintf
-          Pervasives.invalid_arg
+          Stdlib.invalid_arg
           "Internal_event: registering duplicate URI scheme: %S"
           S.uri_scheme
 

@@ -39,7 +39,7 @@ let () =
         source_dir
     | _ ->
         Arg.usage args_spec usage_msg ;
-        Pervasives.exit 1
+        Stdlib.exit 1
   in
   let (hash, protocol) =
     match
@@ -51,7 +51,7 @@ let () =
         (hash, proto)
     | Error err ->
         Format.kasprintf
-          Pervasives.failwith
+          Stdlib.failwith
           "Failed to read TEZOS_PROTOCOL: %a"
           pp_print_error
           err

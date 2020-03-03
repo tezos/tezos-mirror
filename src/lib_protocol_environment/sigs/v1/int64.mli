@@ -197,7 +197,7 @@ external float_of_bits : int64 -> float
 type t = int64
 
 (** The comparison function for 64-bit integers, with the same specification as
-    {!Pervasives.compare}.  Along with the type [t], this function [compare]
+    {!Stdlib.compare}.  Along with the type [t], this function [compare]
     allows the module [Int64] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 val compare : t -> t -> int

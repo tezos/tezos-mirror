@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () = Pervasives.exit (Lwt_main.run @@ Validator.main ())
+let () = Stdlib.exit (Lwt_main.run @@ Validator.main ())

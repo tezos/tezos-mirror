@@ -128,7 +128,7 @@ let main commands =
     | None ->
         Clic.dispatch commands ctxt argv
   in
-  Pervasives.exit
+  Stdlib.exit
     (Lwt_main.run
        ( Lwt.catch run (function
              | Failure msg ->

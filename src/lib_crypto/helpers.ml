@@ -99,7 +99,7 @@ struct
     | Some x ->
         x
     | None ->
-        Format.kasprintf Pervasives.failwith "Unexpected data (%s)" H.name
+        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" H.name
 
   let of_b58check s =
     match of_b58check_opt s with

@@ -128,7 +128,7 @@ let read_proto destination =
       (hash, proto)
   | Error err ->
       Format.kasprintf
-        Pervasives.failwith
+        Stdlib.failwith
         "Failed to read TEZOS_PROTOCOL in %s:@ %a"
         source_dir
         pp_print_error

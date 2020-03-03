@@ -130,7 +130,7 @@ module Public_key_hash = struct
     | Some x ->
         x
     | None ->
-        Format.kasprintf Pervasives.failwith "Unexpected data (%s)" name
+        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
@@ -224,7 +224,7 @@ module Public_key_hash = struct
       | (P256 x, P256 y) ->
           P256.Public_key_hash.compare x y
       | _ ->
-          Pervasives.compare a b
+          Stdlib.compare a b
   end)
 
   include Helpers.MakeEncoder (struct
@@ -301,7 +301,7 @@ module Public_key = struct
       | (P256 x, P256 y) ->
           P256.Public_key.compare x y
       | _ ->
-          Pervasives.compare a b
+          Stdlib.compare a b
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -331,7 +331,7 @@ module Public_key = struct
     | Some x ->
         x
     | None ->
-        Format.kasprintf Pervasives.failwith "Unexpected data (%s)" name
+        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
@@ -430,7 +430,7 @@ module Secret_key = struct
       | (P256 x, P256 y) ->
           P256.Secret_key.compare x y
       | _ ->
-          Pervasives.compare a b
+          Stdlib.compare a b
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -460,7 +460,7 @@ module Secret_key = struct
     | Some x ->
         x
     | None ->
-        Format.kasprintf Pervasives.failwith "Unexpected data (%s)" name
+        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
@@ -606,7 +606,7 @@ let of_b58check_exn s =
   | Some x ->
       x
   | None ->
-      Format.kasprintf Pervasives.failwith "Unexpected data (%s)" name
+      Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
 let of_b58check s =
   match of_b58check_opt s with

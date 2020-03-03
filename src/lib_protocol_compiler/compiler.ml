@@ -177,7 +177,7 @@ let main {compile_ml; pack_objects; link_shared} =
         protocol_dir
     | _ ->
         Arg.usage args_spec usage_msg ;
-        Pervasives.exit 1
+        Stdlib.exit 1
   in
   let (announced_hash, protocol) =
     match

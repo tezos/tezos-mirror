@@ -230,7 +230,7 @@ module Ledger_commands = struct
         let buf = Bigstring.create (pklen + 1) in
         match pk_of_bytes secp256r1 (Cstruct.to_bigarray pk) with
         | None ->
-            Pervasives.failwith
+            Stdlib.failwith
               "Impossible to read P256 public key from Ledger"
         | Some pk ->
             EndianBigstring.BigEndian.set_int8 buf 0 2 ;
@@ -404,7 +404,7 @@ module Ledger_uri = struct
   type t = [`Ledger of Ledger_id.t | `Ledger_account of Ledger_account.t]
 
   let int32_of_path_element_exn ~allow_weak x =
-    let failf ppf = Printf.ksprintf Pervasives.failwith ppf in
+    let failf ppf = Printf.ksprintf Stdlib.failwith ppf in
     let len = String.length x in
     match x.[len - 1] with
     | exception _ ->

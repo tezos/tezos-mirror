@@ -109,7 +109,7 @@ let signals_to_exit_on = ref []
 let exit_on ?log signal =
   if List.mem signal !signals_to_exit_on then
     Format.kasprintf
-      Pervasives.failwith
+      Stdlib.failwith
       "Killable.exit_on: already registered signal %d"
       signal
   else (
@@ -141,4 +141,4 @@ let wrap_promise (p : int Lwt.t) =
         Lwt.cancel p ;
         Lwt.return 2 )
       else (* Other exit *)
-        Pervasives.exit 3
+        Stdlib.exit 3

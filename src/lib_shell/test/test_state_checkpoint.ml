@@ -57,10 +57,9 @@ let incr_fitness fitness =
   let new_fitness =
     match fitness with
     | [fitness] ->
-        Pervasives.(
-          Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
-          |> Option.unopt ~default:0L |> Int64.succ
-          |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64)
+        Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
+        |> Option.unopt ~default:0L |> Int64.succ
+        |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
     | _ ->
         Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
   in
@@ -207,7 +206,7 @@ exception Found of string
 
 let vblocks s =
   Hashtbl.fold (fun k v acc -> (k, v) :: acc) s.vblock []
-  |> List.sort Pervasives.compare
+  |> List.sort Stdlib.compare
 
 (*******************************************************)
 (*
@@ -565,6 +564,6 @@ let wrap (n, f) =
           | Ok () ->
               Lwt.return_unit
           | Error error ->
-              Format.kasprintf Pervasives.failwith "%a" pp_print_error error))
+              Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 
 let tests = List.map wrap tests

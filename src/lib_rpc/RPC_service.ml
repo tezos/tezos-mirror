@@ -36,7 +36,7 @@ let meth_encoding =
     (fun m ->
       match meth_of_string m with
       | None ->
-          Pervasives.failwith "Cannot parse methods"
+          Stdlib.failwith "Cannot parse methods"
       | Some s ->
           s)
     string

@@ -68,7 +68,7 @@ module M = struct
     | (_ :: _, Key _, None) ->
         None
     | (_ :: _, Key _, Some _) ->
-        Pervasives.failwith "Mem_context.set"
+        Stdlib.failwith "Mem_context.set"
 
   let mem m k =
     match raw_get m k with

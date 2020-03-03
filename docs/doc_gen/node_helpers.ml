@@ -71,4 +71,4 @@ let with_node f =
       Lwt.return_unit
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
-      Pervasives.exit 1
+      Stdlib.exit 1

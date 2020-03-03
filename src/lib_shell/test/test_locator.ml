@@ -62,10 +62,9 @@ let incr_fitness fitness =
   let new_fitness =
     match fitness with
     | [fitness] ->
-        Pervasives.(
-          Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
-          |> Option.unopt ~default:0L |> Int64.succ
-          |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64)
+        Data_encoding.Binary.of_bytes_opt Data_encoding.int64 fitness
+        |> Option.unopt ~default:0L |> Int64.succ
+        |> Data_encoding.Binary.to_bytes_exn Data_encoding.int64
     | _ ->
         Data_encoding.Binary.to_bytes_exn Data_encoding.int64 1L
   in
@@ -82,7 +81,7 @@ let init_chain base_dir : State.Chain.t Lwt.t =
     state_genesis_block
   >>= function
   | Error _ ->
-      Pervasives.failwith "read err"
+      Stdlib.failwith "read err"
   | Ok (_state, chain, _index, _history_mode) ->
       Lwt.return chain
 
@@ -380,7 +379,7 @@ let wrap n f =
           | Ok () ->
               Lwt.return_unit
           | Error error ->
-              Format.kasprintf Pervasives.failwith "%a" pp_print_error error))
+              Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 
 let tests = [wrap "test pred" test_pred]
 

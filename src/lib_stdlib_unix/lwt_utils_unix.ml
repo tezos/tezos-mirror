@@ -157,7 +157,7 @@ let rec create_dir ?(perm = 0o755) dir =
       | {st_kind = S_DIR; _} ->
           Lwt.return_unit
       | _ ->
-          Pervasives.failwith "Not a directory" )
+          Stdlib.failwith "Not a directory" )
 
 let create_file ?(perm = 0o644) name content =
   Lwt_unix.openfile name Unix.[O_TRUNC; O_CREAT; O_WRONLY] perm

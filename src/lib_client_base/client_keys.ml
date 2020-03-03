@@ -75,7 +75,7 @@ type pk_uri = Uri.t
 let make_pk_uri (x : Uri.t) : pk_uri =
   match Uri.scheme x with
   | None ->
-      Pervasives.failwith "PK_URI needs a scheme"
+      Stdlib.failwith "PK_URI needs a scheme"
   | Some _ ->
       x
 
@@ -84,7 +84,7 @@ type sk_uri = Uri.t
 let make_sk_uri (x : Uri.t) : sk_uri =
   match Uri.scheme x with
   | None ->
-      Pervasives.failwith "SK_URI needs a scheme"
+      Stdlib.failwith "SK_URI needs a scheme"
   | Some _ ->
       x
 

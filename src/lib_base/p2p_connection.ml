@@ -29,7 +29,7 @@ module Id = struct
   type t = P2p_addr.t * P2p_addr.port option
 
   let compare (a1, p1) (a2, p2) =
-    match Ipaddr.V6.compare a1 a2 with 0 -> Pervasives.compare p1 p2 | x -> x
+    match Ipaddr.V6.compare a1 a2 with 0 -> Stdlib.compare p1 p2 | x -> x
 
   let equal p1 p2 = compare p1 p2 = 0
 

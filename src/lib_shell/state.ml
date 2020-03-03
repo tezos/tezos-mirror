@@ -503,7 +503,7 @@ module Chain = struct
         Store.Chain.Protocol_info.read_opt chain_store protocol_level
         >>= function
         | None ->
-            Pervasives.failwith "State.Chain.get_level_index_protocol"
+            Stdlib.failwith "State.Chain.get_level_index_protocol"
         | Some (p, _) ->
             Lwt.return p)
 
@@ -635,7 +635,7 @@ module Chain = struct
         let chain_store = Store.Chain.get data.global_store chain_id in
         let block_store = Store.Block.get chain_store in
         if Chain_id.Table.mem data.chains chain_id then
-          Pervasives.failwith "State.Chain.create"
+          Stdlib.failwith "State.Chain.create"
         else
           commit_genesis ~chain_id
           >>=? fun commit ->

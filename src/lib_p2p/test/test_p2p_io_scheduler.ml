@@ -251,7 +251,7 @@ let wrap n f =
       | Ok () ->
           Lwt.return_unit
       | Error error ->
-          Format.kasprintf Pervasives.failwith "%a" pp_print_error error)
+          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 
 let () =
   Alcotest.run

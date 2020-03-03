@@ -68,17 +68,17 @@ module LE = struct
   let set_int64 = Bytes_encodings.set_int64_le
 end
 
-let ( = ) = Pervasives.( = )
+let ( = ) = Stdlib.( = )
 
-let ( <> ) = Pervasives.( <> )
+let ( <> ) = Stdlib.( <> )
 
-let ( < ) = Pervasives.( < )
+let ( < ) = Stdlib.( < )
 
-let ( <= ) = Pervasives.( <= )
+let ( <= ) = Stdlib.( <= )
 
-let ( >= ) = Pervasives.( >= )
+let ( >= ) = Stdlib.( >= )
 
-let ( > ) = Pervasives.( > )
+let ( > ) = Stdlib.( > )
 
 let compare = Bytes.compare
 

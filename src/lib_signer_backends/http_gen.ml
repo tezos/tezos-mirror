@@ -66,7 +66,7 @@ struct
                (fun acc line ->
                  match String.index_opt line ':' with
                  | None ->
-                     Pervasives.failwith
+                     Stdlib.failwith
                        "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS \
                         environment variable, missing colon"
                  | Some pos ->
@@ -77,7 +77,7 @@ struct
                        && ( String.length header < 2
                           || String.sub header 0 2 <> "x-" )
                      then
-                       Pervasives.failwith
+                       Stdlib.failwith
                          "Http signer: invalid TEZOS_SIGNER_HTTP_HEADERS \
                           environment variable, only 'host' or 'x-' headers \
                           are supported" ;

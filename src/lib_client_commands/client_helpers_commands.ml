@@ -50,9 +50,9 @@ let commands () =
           >>=? fun completions ->
           match completions with
           | [] ->
-              Pervasives.exit 3
+              Stdlib.exit 3
           | _ :: _ :: _ when unique ->
-              Pervasives.exit 3
+              Stdlib.exit 3
           | completions ->
               List.iter print_endline completions ;
               return_unit);

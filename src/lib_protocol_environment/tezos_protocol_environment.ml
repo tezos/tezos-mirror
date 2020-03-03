@@ -312,8 +312,8 @@ module MakeV1 (Param : sig
 end)
 () =
 struct
-  include Pervasives
-  module Pervasives = Pervasives
+  include Stdlib
+  module Pervasives = Stdlib
   module Compare = Compare
   module List = List
 

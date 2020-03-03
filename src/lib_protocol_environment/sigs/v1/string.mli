@@ -227,7 +227,7 @@ val uncapitalize_ascii : string -> string
 type t = string
 
 (** The comparison function for strings, with the same specification as
-    {!Pervasives.compare}.  Along with the type [t], this function [compare]
+    {!Stdlib.compare}.  Along with the type [t], this function [compare]
     allows the module [String] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 val compare : t -> t -> int

@@ -440,7 +440,7 @@ let setup_formatter ppf format verbosity =
           levels := level :: rest ;
           setup_level level
       | [_] | [] ->
-          Pervasives.failwith "Clic: unclosed verbosity tag"
+          Stdlib.failwith "Clic: unclosed verbosity tag"
     in
     push_level (Terse, ( <= )) ;
     let push_level_tag tag =
@@ -454,7 +454,7 @@ let setup_formatter ppf format verbosity =
         | "terse" ->
             push_level (Terse, op)
         | tag ->
-            Pervasives.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
+            Stdlib.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
       in
       if String.length tag > 0 && tag.[0] = '=' then
         push ( = ) (String.sub tag 1 (String.length tag - 1))
@@ -477,7 +477,7 @@ let setup_formatter ppf format verbosity =
       | "=terse" ->
           pop_level ()
       | tag ->
-          Pervasives.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
+          Stdlib.failwith ("Clic: invalid semantic tag <" ^ tag ^ ">")
     in
     match format with
     | Ansi ->
@@ -544,7 +544,7 @@ let setup_formatter ppf format verbosity =
               ansi_stack := format :: rest ;
               Format.fprintf ppf "@<0>%a" ansi_format format
           | [_] | [] ->
-              Pervasives.failwith "Clic: unclosed ansi format"
+              Stdlib.failwith "Clic: unclosed ansi format"
         in
         Format.pp_set_formatter_tag_functions
           ppf
@@ -1655,7 +1655,7 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     | (TParam t, Prefix (_n, next)) ->
         TParam {t with tree = insert_tree t.tree next}
     | (_, _) ->
-        Pervasives.failwith
+        Stdlib.failwith
           (Format.asprintf
              "Clic.Command_tree.insert: conflicting commands \"%a\""
              (fun ppf (Command {params; options = Argument {spec; _}; _}) ->
@@ -1822,7 +1822,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         continuation args 0
         >>|? fun cont_args -> cont_args @ remaining_spec seen args_spec
     | [] ->
-        Pervasives.failwith "cli_entries internal autocomplete error"
+        Stdlib.failwith "cli_entries internal autocomplete error"
     | arg :: tl ->
         if TzString.Map.mem arg arities then
           let (arity, long) = TzString.Map.find arg arities in
@@ -1838,7 +1838,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
           | (1, _ :: tl) ->
               help tl (ind - 2) seen
           | _ ->
-              Pervasives.failwith "cli_entries internal error, invalid arity"
+              Stdlib.failwith "cli_entries internal error, invalid arity"
         else continuation args ind
   in
   help args ind TzString.Set.empty

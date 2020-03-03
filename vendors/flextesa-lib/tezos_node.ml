@@ -174,7 +174,7 @@ let connections node_list =
       | `Duplex (a, b), `Duplex (c, d) when equal a d && equal b c -> 0
       | `Duplex _, _ -> -1
       | _, `Duplex _ -> 1
-      | _, _ -> Caml.Pervasives.compare a b
+      | _, _ -> Stdlib.compare a b
   end in
   let module Connection_set = Caml.Set.Make (Connection) in
   let res = ref Connection_set.empty in

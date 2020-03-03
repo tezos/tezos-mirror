@@ -172,7 +172,7 @@ module ErrorPartition = struct
         in
         loop 0 titles
       in
-      Pervasives.compare (idx s) (idx s')
+      Stdlib.compare (idx s) (idx s')
   end)
 
   let add_error (id : key) (error : Error_monad.error_info) (map : 'a t) =

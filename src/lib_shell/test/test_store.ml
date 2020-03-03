@@ -58,7 +58,7 @@ let wrap_store_init f _ () =
             (fun () -> Store.close store ; Lwt.return_unit)
       | Error err ->
           Format.kasprintf
-            Pervasives.failwith
+            Stdlib.failwith
             "@[Cannot initialize store:@ %a@]"
             pp_print_error
             err)
@@ -74,7 +74,7 @@ let wrap_raw_store_init f _ () =
             (fun () -> Raw_store.close store ; Lwt.return_unit)
       | Error err ->
           Format.kasprintf
-            Pervasives.failwith
+            Stdlib.failwith
             "@[Cannot initialize store:@ %a@]"
             pp_print_error
             err)

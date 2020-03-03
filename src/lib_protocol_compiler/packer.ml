@@ -57,7 +57,7 @@ let check_syntax kind file =
             match struct_item.pstr_desc with
             | Pstr_primitive _ ->
                 Format.kasprintf
-                  Pervasives.failwith
+                  Stdlib.failwith
                   "protocol-compiler: %a: use of `external` is forbidden"
                   Location.print
                   struct_item.pstr_loc

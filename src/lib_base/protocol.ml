@@ -36,7 +36,7 @@ and env_version = V1
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end)
 
 let component_encoding =

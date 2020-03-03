@@ -176,7 +176,7 @@ external float_of_bits : int32 -> float
 type t = int32
 
 (** The comparison function for 32-bit integers, with the same specification as
-    {!Pervasives.compare}.  Along with the type [t], this function [compare]
+    {!Stdlib.compare}.  Along with the type [t], this function [compare]
     allows the module [Int32] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 val compare : t -> t -> int

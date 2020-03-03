@@ -231,13 +231,13 @@ struct
   let check_encoded_prefix enc p l =
     if enc.encoded_prefix <> p then
       Format.kasprintf
-        Pervasives.failwith
+        Stdlib.failwith
         "Unexpected prefix %s (expected %s)"
         p
         enc.encoded_prefix ;
     if enc.encoded_length <> l then
       Format.kasprintf
-        Pervasives.failwith
+        Stdlib.failwith
         "Unexpected encoded length %d for %s (expected %d)"
         l
         p

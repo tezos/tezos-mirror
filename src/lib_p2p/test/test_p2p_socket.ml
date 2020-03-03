@@ -277,12 +277,12 @@ module Crypto_test = struct
             Lwt.return_unit
         | Ok res ->
             Format.kasprintf
-              Pervasives.failwith
+              Stdlib.failwith
               "Error : %s <> %s"
               (Bytes.to_string res)
               (Bytes.to_string msg)
         | Error error ->
-            Format.kasprintf Pervasives.failwith "%a" pp_print_error error)
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 end
 
 module Low_level = struct
@@ -599,7 +599,7 @@ let wrap n f =
       | Ok () ->
           Lwt.return_unit
       | Error error ->
-          Format.kasprintf Pervasives.failwith "%a" pp_print_error error)
+          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in

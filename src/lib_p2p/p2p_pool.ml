@@ -147,7 +147,7 @@ module Gc_peer_set = List.Bounded (struct
   type t = float * Time.System.t * P2p_peer.Id.t
 
   let compare (s, t, _) (s', t', _) =
-    let score_cmp = Pervasives.compare s s' in
+    let score_cmp = Stdlib.compare s s' in
     if score_cmp = 0 then Time.System.compare t t' else -score_cmp
 end)
 

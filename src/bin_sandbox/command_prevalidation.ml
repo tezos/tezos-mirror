@@ -18,8 +18,8 @@ let run state node_exec client_exec () =
 
          TODO: non-interactive test for propagation
          TODO: commands for interactivea use *)
-      Caml.Pervasives.ignore c1 ;
-      Caml.Pervasives.ignore c2 ;
+      Stdlib.ignore c1 ;
+      Stdlib.ignore c2 ;
       return ()
       >>= fun () ->
       let commands = Interactive_test.Commands.all_defaults state ~nodes in
