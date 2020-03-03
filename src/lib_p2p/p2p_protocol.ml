@@ -81,6 +81,9 @@ module Default_answerer = struct
   open P2p_connection.P2p_event
 
   let advertise config conn _request points =
+    let log = config.log in
+    let source_peer_id = conn.peer_id in
+    log (Advertise_received {source = source_peer_id}) ;
     P2p_pool.register_list_of_new_points
       ~medium:"advertise"
       ~source:conn.peer_id
@@ -89,7 +92,9 @@ module Default_answerer = struct
     Lwt.return_unit
 
   let bootstrap config conn _request_info =
+    let log = config.log in
     let source_peer_id = conn.peer_id in
+    log (Bootstrap_received {source = source_peer_id}) ;
     if conn.is_private then
       private_node_warn
         "Private peer (%a) asked other peers addresses"
@@ -104,10 +109,11 @@ module Default_answerer = struct
       | points -> (
         match conn.write_advertise points with
         | Ok true ->
-            return ()
+            log (Advertise_sent {source = source_peer_id}) ;
+            return_unit
         | Ok false ->
             (* if not sent then ?? TODO count dropped message ?? *)
-            return ()
+            return_unit
         | Error err ->
             lwt_log_error
               "Sending advertise to %a failed: %a"

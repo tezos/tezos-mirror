@@ -86,16 +86,17 @@ type ('msg, 'meta, 'meta_conn) t = {
   log : P2p_connection.P2p_event.t -> unit;
 }
 
-let broadcast_bootstrap_msg pool =
+let broadcast_bootstrap_msg t =
   P2p_peer.Table.iter
-    (fun _peer_id peer_info ->
+    (fun peer_id peer_info ->
       match P2p_peer_state.get peer_info with
       | Running {data = conn; _} ->
-          if not (P2p_conn.private_node conn) then
-            ignore (P2p_conn.write_bootstrap conn)
+          if not (P2p_conn.private_node conn) then (
+            ignore (P2p_conn.write_bootstrap conn) ;
+            t.log (Bootstrap_sent {source = peer_id}) )
       | _ ->
           ())
-    (P2p_pool.connected_peer_ids pool)
+    (P2p_pool.connected_peer_ids t.pool)
 
 let send_swap_request t =
   match P2p_pool.Connection.propose_swap_request t.pool with
@@ -228,7 +229,7 @@ let ask_for_more_contacts t =
     protect ~canceler:t.canceler (fun () ->
         Lwt_unix.sleep time_between_looking_for_peers >>= fun () -> return_unit)
   else (
-    broadcast_bootstrap_msg t.pool ;
+    broadcast_bootstrap_msg t ;
     Option.iter ~f:P2p_discovery.wakeup t.discovery ;
     protect ~canceler:t.canceler (fun () ->
         Lwt.pick
