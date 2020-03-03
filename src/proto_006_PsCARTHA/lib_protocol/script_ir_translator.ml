@@ -4297,7 +4297,7 @@ and parse_instr :
         loc
         (Unpack t)
         (Item_t
-           ( Option_t (t, ty_name, false (* cannot unpack big_maps *)),
+           ( Option_t (t, ty_name, false) (* cannot unpack big_maps *),
              rest,
              annot ))
   (* protocol *)
@@ -6092,6 +6092,6 @@ let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
   | [] ->
       return (v, None, ctxt)
   | diffs ->
-      return (v, Some (List.flatten diffs (* do not reverse *)), ctxt)
+      return (v, Some (List.flatten diffs) (* do not reverse *), ctxt)
 
 let list_of_big_map_ids ids = Ids.elements ids

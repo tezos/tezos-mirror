@@ -580,7 +580,7 @@ let rec parse ?(check = true) errors tokens stack =
   | ( (Sequence _ | Toplevel _) :: _,
       ({token = Semi; _} as valid) :: ({token = Semi; _} as token) :: rem ) ->
       let errors = Extra token :: errors in
-      parse ~check errors ((* skip *) valid :: rem) stack
+      parse ~check errors (* skip *) (valid :: rem) stack
   | ( (Wrapped _ | Unwrapped _) :: _,
       {token = Open_paren; _}
       :: ( {token = Int _ | String _ | Bytes _ | Annot _ | Close_paren; _} as

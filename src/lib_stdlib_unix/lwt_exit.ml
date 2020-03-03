@@ -138,7 +138,6 @@ let wrap_promise (p : int Lwt.t) =
       (*TODO: what are the correct expected behaviour here?*)
       if List.mem s !signals_to_exit_on then (
         (* Exit because of signal *)
-        Lwt.cancel p ;
-        Lwt.return 2 )
+        Lwt.cancel p ; Lwt.return 2 )
       else (* Other exit *)
         Stdlib.exit 3

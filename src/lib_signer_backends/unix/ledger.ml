@@ -230,8 +230,7 @@ module Ledger_commands = struct
         let buf = Bigstring.create (pklen + 1) in
         match pk_of_bytes secp256r1 (Cstruct.to_bigarray pk) with
         | None ->
-            Stdlib.failwith
-              "Impossible to read P256 public key from Ledger"
+            Stdlib.failwith "Impossible to read P256 public key from Ledger"
         | Some pk ->
             EndianBigstring.BigEndian.set_int8 buf 0 2 ;
             let _nb_written =

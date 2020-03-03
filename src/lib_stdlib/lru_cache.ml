@@ -118,7 +118,7 @@ module Make (Table : Hashtbl.S) = struct
               cache.last <- last.prev ;
               new_last.next <- None
           | None ->
-              assert false (* because size > 1 *) ) ;
+              (* because size > 1 *) assert false ) ;
           (* To avoid allocation, we re-use the [last] node *)
           last.key <- key ;
           last.value <- value ;
@@ -128,7 +128,7 @@ module Make (Table : Hashtbl.S) = struct
           | Some old_first ->
               old_first.prev <- Some last
           | None ->
-              assert false (* because size > 1 *) ) ;
+              (* because size > 1 *) assert false ) ;
           cache.first <- Some last ;
           Table.replace cache.table key last )
     else

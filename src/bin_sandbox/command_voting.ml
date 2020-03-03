@@ -758,8 +758,8 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
                   ~force:true
                 >>= fun () ->
                 Console.say state EF.(wf "Sleeping for a couple of seconds…")
-                >>= fun () -> System.sleep 4.
-                (* USB thing is often slower than humans hitting `q` *))
+                (* USB thing is often slower than humans hitting `q` *)
+                >>= fun () -> System.sleep 4.)
             >>= fun (_ : unit option) ->
             Tezos_client.Keyed.bake
               state

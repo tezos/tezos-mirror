@@ -145,7 +145,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Some ploc
       with Not_found -> None
     in
-    let print_source ppf (parsed, _hilights (* TODO *)) =
+    let print_source ppf (parsed, _hilights) (* TODO *) =
       let lines =
         String.split_on_char '\n' parsed.Michelson_v1_parser.source
       in

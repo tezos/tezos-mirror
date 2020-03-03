@@ -477,7 +477,7 @@ let create config peer_meta_config triggers ~log =
           let peer_id = P2p_peer_state.Info.peer_id peer_info in
           P2p_peer.Table.add pool.known_peer_ids peer_id peer_info ;
           match P2p_peer_state.Info.last_seen peer_info with
-          | None | Some ((_, None (* no reachable port stored*)), _) ->
+          | None | Some ((_, None) (* no reachable port stored*), _) ->
               ()
           | Some ((addr, Some port), _) ->
               register_point pool (addr, port) |> ignore)
