@@ -173,7 +173,7 @@ A delegate can be marked as either active or passive. A passive delegate
 cannot be selected for baking or endorsing.
 
 A delegate becomes passive for cycle ``n`` when they fail to create
-any of the blocks or endorsements in the past ``PRESERVED_CYCLES`` = 5
+any blocks or endorsements in the past ``PRESERVED_CYCLES``
 cycles, that is, in cycles ``n-1``, ``n-2``, ..., ``n -
 PRESERVED_CYCLES``.
 
@@ -302,7 +302,7 @@ Rewards
 Baking a block gives a block reward of ``e *
 BAKING_REWARD_PER_ENDORSEMENT[p']`` plus all fees paid by the
 transactions contained in the block, where
-``BAKING_REWARD_PER_ENDORSEMENT`` = ``[1.250ꜩ, 1.875ꜩ]``,
+``BAKING_REWARD_PER_ENDORSEMENT`` = ``[1.250ꜩ, 0.1875ꜩ]``,
 ``e`` is the number of endorsements the block contains, ``p`` is the
 priority at which the block was baked, and ``p'`` is 0 if ``p`` is
 0 and is 1 if ``p`` is bigger than 0.  That is, a delegate
@@ -335,11 +335,15 @@ back to the baker's main account.
 Since deposits are locked for a period of ``PRESERVED_CYCLES`` one can
 compute that at any given time, about ((``BLOCK_SECURITY_DEPOSIT`` +
 ``ENDORSEMENT_SECURITY_DEPOSIT`` \* ``ENDORSERS_PER_BLOCK``) \*
-(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) / ``763e6`` = 8.25% of
-all tokens should be held as security deposits. It also means that a
-delegate should own over 8.25% of the amount of token delegated to them
-in order to not miss out on creating any block.
-
+(``PRESERVED_CYCLES`` + 1) \* ``BLOCKS_PER_CYCLE``) tokens of all
+staked tokens should be held as security deposits. For instance, if
+the amount of staked tokens is 720,000,000 ꜩ, then roughly 8.74% of
+this amount is stored in security deposits. This percentage also gives
+an indication of the minimal amount of tokens a delegate should own in
+order to not miss out on creating a block or an endorsement.  Please
+refer to `this section
+<https://tezos.gitlab.io/introduction/howtorun.html#deposits-and-over-delegation>`_
+of the documentation for a discussion on (over-)delegation.
 
 Inflation
 ~~~~~~~~~
