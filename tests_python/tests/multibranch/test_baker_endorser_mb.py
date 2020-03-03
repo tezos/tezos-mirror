@@ -56,7 +56,7 @@ MAP = {i: A if i % 2 == 0 else B for i in range(20)}
 
 # A and B use the same protocol but it may not be the case
 ALPHA = 'PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP'
-ALPHA_DEAMON = '003-PsddFKi3'
+ALPHA_DAEMON = '003-PsddFKi3'
 
 
 def params(i):
@@ -72,7 +72,7 @@ def params(i):
 @pytest.mark.slow
 @pytest.mark.multibranch
 @pytest.mark.incremental
-class TestAllDeamonsWithOperations:
+class TestAllDaemonsWithOperations:
     '''Runs two baker and two endorsers, generates random op, and
        add (or replace) new nodes dynamically. After a little while,
        we kill the bakers and check everyone synchronize to the same head. '''
@@ -85,15 +85,15 @@ class TestAllDeamonsWithOperations:
         parameters["time_between_blocks"] = ["10", "0"]
         sandbox_multibranch.client(0).activate_protocol_json(ALPHA, parameters)
         sandbox_multibranch.add_baker(0, 'bootstrap5',
-                                      proto=ALPHA_DEAMON)
+                                      proto=ALPHA_DAEMON)
         sandbox_multibranch.add_baker(1, 'bootstrap4',
-                                      proto=ALPHA_DEAMON)
+                                      proto=ALPHA_DAEMON)
         sandbox_multibranch.add_endorser(0, account='bootstrap1',
                                          endorsement_delay=1,
-                                         proto=ALPHA_DEAMON)
+                                         proto=ALPHA_DAEMON)
         sandbox_multibranch.add_endorser(1, account='bootstrap2',
                                          endorsement_delay=1,
-                                         proto=ALPHA_DEAMON)
+                                         proto=ALPHA_DAEMON)
 
     def test_wait_for_alpha(self, sandbox_multibranch):
         clients = sandbox_multibranch.all_clients()
@@ -133,8 +133,8 @@ class TestAllDeamonsWithOperations:
             time.sleep(TIME_BETWEEN_CYCLE)
 
     def test_kill_baker(self, sandbox_multibranch):
-        sandbox_multibranch.rm_baker(0, proto=ALPHA_DEAMON)
-        sandbox_multibranch.rm_baker(1, proto=ALPHA_DEAMON)
+        sandbox_multibranch.rm_baker(0, proto=ALPHA_DAEMON)
+        sandbox_multibranch.rm_baker(1, proto=ALPHA_DAEMON)
 
     def test_synchronize(self, sandbox_multibranch):
         utils.synchronize(sandbox_multibranch.all_clients())

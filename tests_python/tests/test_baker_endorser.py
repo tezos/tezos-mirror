@@ -28,7 +28,7 @@ def random_op(client):
 @pytest.mark.multinode
 @pytest.mark.slow
 @pytest.mark.incremental
-class TestAllDeamonsWithOperations:
+class TestAllDaemonsWithOperations:
     '''Runs two baker and two endorsers, generates random op, and
        add (or replace) new nodes dynamically. After a little while,
        we kill the bakers and check everyone synchronize to the same head. '''
@@ -40,12 +40,12 @@ class TestAllDeamonsWithOperations:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=['--connections', '500'])
         utils.activate_alpha(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DEAMON)
-        sandbox.add_baker(1, 'bootstrap4', proto=constants.ALPHA_DEAMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(1, 'bootstrap4', proto=constants.ALPHA_DAEMON)
         sandbox.add_endorser(0, account='bootstrap1', endorsement_delay=1,
-                             proto=constants.ALPHA_DEAMON)
+                             proto=constants.ALPHA_DAEMON)
         sandbox.add_endorser(1, account='bootstrap2', endorsement_delay=1,
-                             proto=constants.ALPHA_DEAMON)
+                             proto=constants.ALPHA_DAEMON)
 
     def test_wait_for_alpha(self, sandbox):
         clients = sandbox.all_clients()
@@ -81,8 +81,8 @@ class TestAllDeamonsWithOperations:
             time.sleep(TIME_BETWEEN_CYCLE)
 
     def test_kill_baker(self, sandbox):
-        sandbox.rm_baker(0, proto=constants.ALPHA_DEAMON)
-        sandbox.rm_baker(1, proto=constants.ALPHA_DEAMON)
+        sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
+        sandbox.rm_baker(1, proto=constants.ALPHA_DAEMON)
 
     def test_synchronize(self, sandbox):
         utils.synchronize(sandbox.all_clients())

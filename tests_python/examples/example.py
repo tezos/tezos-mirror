@@ -16,7 +16,7 @@ def scenario():
         sandbox.add_node(1)
         # Launch a baker associated to node 0, baking on behalf of delegate
         # bootstrap5
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DEAMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
         # Wait for second node to update its protocol to alpha, if not
         # it may not know yet the `wait_for_inclusion` operation which is
         # protocol specific

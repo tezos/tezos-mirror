@@ -57,8 +57,8 @@ def pytest_addoption(parser):
     )
 
 
-DEAD_DEAMONS_WARN = '''
-It seems some deamons terminated unexpectingly, or didn't launch properly.
+DEAD_DAEMONS_WARN = '''
+It seems some daemons terminated unexpectingly, or didn't launch properly.
 You can investigate daemon logs by running this test using the
 `--log-dir=LOG_DIR` option.'''
 
@@ -74,7 +74,7 @@ def sandbox(log_dir):
                  constants.GENESIS_PK,
                  log_dir=log_dir) as sandbox:
         yield sandbox
-        assert sandbox.are_daemons_alive(), DEAD_DEAMONS_WARN
+        assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
 
 
 @pytest.fixture(scope="class")
@@ -181,6 +181,6 @@ def sandbox_multibranch(log_dir, request):
                             log_dir=log_dir,
                             branch_map=branch_map) as sandbox:
         yield sandbox
-        # this assertion checks that deamons (baker, endorser, node...) didn't
+        # this assertion checks that daemons (baker, endorser, node...) didn't
         # fail unexpected.
-        assert sandbox.are_daemons_alive(), DEAD_DEAMONS_WARN
+        assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN

@@ -21,7 +21,7 @@ class TestManyBakers:
         utils.activate_alpha(sandbox.client(0))
         for i in range(5):
             sandbox.add_baker(i, f'bootstrap{i + 1}',
-                              proto=constants.ALPHA_DEAMON)
+                              proto=constants.ALPHA_DAEMON)
 
     def test_wait(self):
         time.sleep(5)

@@ -12,7 +12,7 @@ def sandbox():
         sandbox.add_node(0)
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DEAMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
         yield sandbox
         assert sandbox.are_daemons_alive()
 

@@ -22,9 +22,9 @@ class TestManyNodesBootstrap:
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         utils.activate_alpha(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DEAMON)
+        sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
         sandbox.add_node(1, params=PARAMS)
-        sandbox.add_baker(1, 'bootstrap2', proto=constants.ALPHA_DEAMON)
+        sandbox.add_baker(1, 'bootstrap2', proto=constants.ALPHA_DAEMON)
 
     def test_add_nodes(self, sandbox):
         for i in range(2, NUM_NODES):
@@ -45,8 +45,8 @@ class TestManyNodesBootstrap:
 
     def test_kill_baker(self, sandbox):
         assert utils.check_logs(sandbox.logs, ERROR_PATTERN)
-        sandbox.rm_baker(0, proto=constants.ALPHA_DEAMON)
-        sandbox.rm_baker(1, proto=constants.ALPHA_DEAMON)
+        sandbox.rm_baker(0, proto=constants.ALPHA_DAEMON)
+        sandbox.rm_baker(1, proto=constants.ALPHA_DAEMON)
 
     def test_synchronize(self, sandbox):
         utils.synchronize(sandbox.all_clients())

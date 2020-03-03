@@ -32,7 +32,7 @@ PARAMETERS["blocks_per_voting_period"] = 20
 ZERONET = "b8de4297db6a681eb13343d2773c6840969a5537"
 MAP = {i: ZERONET for i in range(20)}
 ALPHA = 'PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP'
-ALPHA_DEAMON = '003-PsddFKi3'
+ALPHA_DAEMON = '003-PsddFKi3'
 NEW_PROTO = 'Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd'
 NEW_PROTO_BAKER = "004-Pt24m4xi"
 
@@ -51,7 +51,7 @@ class TestMultiNode:
         sandbox_multibranch.add_node(1, params=NODE_PARAMS)
         sandbox_multibranch.add_node(2, params=NODE_PARAMS)
         sandbox_multibranch.add_node(3, params=NODE_PARAMS)
-        sandbox_multibranch.add_baker(0, 'bootstrap5', proto=ALPHA_DEAMON)
+        sandbox_multibranch.add_baker(0, 'bootstrap5', proto=ALPHA_DAEMON)
 
     def test_wait_for_alpha(self, sandbox_multibranch):
         clients = sandbox_multibranch.all_clients()
@@ -179,7 +179,7 @@ class TestMultiNode:
             time.sleep(2)
 
     def test_stop_old_bakers(self, sandbox_multibranch):
-        sandbox_multibranch.rm_baker(0, ALPHA_DEAMON)
+        sandbox_multibranch.rm_baker(0, ALPHA_DAEMON)
         sandbox_multibranch.rm_baker(0, NEW_PROTO_BAKER)
         time.sleep(1)
 

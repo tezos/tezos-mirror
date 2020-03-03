@@ -10,9 +10,9 @@ def scenario(contract, storage, time_between_blocks, proto):
     if proto is None:
         proto = 'alpha'
     assert proto in {'alpha', 'babylon'}, 'unknown protocol'
-    protos = {'alpha': (constants.ALPHA, constants.ALPHA_DEAMON),
-              'babylon': (constants.BABYLON, constants.BABYLON_DEAMON)}
-    proto_hash, proto_deamon = protos[proto]
+    protos = {'alpha': (constants.ALPHA, constants.ALPHA_DAEMON),
+              'babylon': (constants.BABYLON, constants.BABYLON_DAEMON)}
+    proto_hash, proto_daemon = protos[proto]
     if contract:
         assert os.path.isfile(contract), f'{contract} is not a file'
     if storage is None:
@@ -25,7 +25,7 @@ def scenario(contract, storage, time_between_blocks, proto):
 
         sandbox.add_node(1)
         utils.activate_alpha(sandbox.client(1), parameters, proto=proto_hash)
-        sandbox.add_baker(1, 'bootstrap5', proto=proto_deamon)
+        sandbox.add_baker(1, 'bootstrap5', proto=proto_daemon)
         client = sandbox.client(1)
         if contract:
             args = ['--init', storage, '--burn-cap', '10.0']

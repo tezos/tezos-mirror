@@ -22,18 +22,18 @@ class Sandbox:
     """A sandbox acts as a node/daemons factory with nodes running in
     sandbox mode.
 
-    Nodes and deamons are identified by an integer 0 <= node_id < num_peers,
+    Nodes and daemons are identified by an integer 0 <= node_id < num_peers,
     which is mapped to a port rpc + node_id, p2p + node_id.
 
-    Nodes and deamons can be dynamically added or removed. Deamons are
-    protocol specific. There can be more than one deamons for a given node,
+    Nodes and daemons can be dynamically added or removed. Daemons are
+    protocol specific. There can be more than one daemons for a given node,
     as long as they correspond to different protocol.
 
     Whenever a node has been added with `add_node()`, we can access to a
     corresponding client object `client()` to interact with this node.
 
     When the sandbox resources are cleaned (from a call `__exit__()`),
-    the sandbox checks all nodes/deamons started are still alive
+    the sandbox checks all nodes/daemons started are still alive
     to alert to user of unexpected failure. If you want to definitively
     terminate a node within a sandbox, use `sandbox.rm_node()` instead
     of `node.terminate()`.
@@ -68,7 +68,7 @@ class Sandbox:
             rpc (int): base RPC port
             p2p (int): base P2P port
             num_peers (int): max number of peers
-            log_dir (str): optional log directory for node/deamons logs
+            log_dir (str): optional log directory for node/daemons logs
 
         Binaries contained in `binaries_path` are supposed to follow the
         naming conventions used in the Tezos codebase. For instance,
@@ -124,7 +124,7 @@ class Sandbox:
 
         Args:
             node_id (int): id of the node, defines its RPC/P2P port and serves
-                           as an identifier for client and deamons
+                           as an identifier for client and daemons
             peer (list): id of peers initialized trusted by this nodes
             params (list): list of additional parameters to run the node
             log_levels (dict): log levels. e.g. {"p2p.connection-pool":"debug"}
@@ -342,7 +342,7 @@ class Sandbox:
         self.cleanup()
 
     def cleanup(self):
-        """Kill all deamons and cleanup temp dirs."""
+        """Kill all daemons and cleanup temp dirs."""
         for node in self.nodes.values():
             node.terminate_or_kill()
             node.cleanup()
@@ -357,9 +357,9 @@ class Sandbox:
         shutil.rmtree(self.sandbox_dir)
 
     def are_daemons_alive(self) -> bool:
-        """ Returns True iff all started deamons/nodes are still alive.
+        """ Returns True iff all started daemons/nodes are still alive.
 
-        Deamons/nodes must be removed explicitely to prevent this to
+        Daemons/nodes must be removed explicitely to prevent this to
         return false.
         """
         daemons_alive = True
