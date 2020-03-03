@@ -72,7 +72,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       >>= fun () -> worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
-  | Error (P2p_errors.Decoding_error :: _) ->
+  | Error (P2p_errors.Decoding_error _ :: _) ->
       t.greylister () ;
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
   | Error (Canceled :: _) ->

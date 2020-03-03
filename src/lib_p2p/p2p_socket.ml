@@ -187,11 +187,12 @@ module Connection_message = struct
     TzEndian.set_int16 buf 0 len ;
     P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf
     >>=? fun () ->
-    match Data_encoding.Binary.read_opt encoding buf pos len with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (next_pos, message) ->
-        if next_pos <> pos + len then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf pos len with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (next_pos, message) ->
+        if next_pos <> pos + len then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return (message, buf)
 end
 
@@ -222,11 +223,12 @@ module Metadata = struct
     >>=? fun buf ->
     let length = Bytes.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
-    match Data_encoding.Binary.read_opt encoding buf 0 length with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> length then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf 0 length with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (read_len, message) ->
+        if read_len <> length then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -294,11 +296,12 @@ module Ack = struct
     Crypto.read_chunk ?canceler fd cryptobox_data
     >>=? fun buf ->
     let length = Bytes.length buf in
-    match Data_encoding.Binary.read_opt encoding buf 0 length with
-    | None ->
-        fail P2p_errors.Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> length then fail P2p_errors.Decoding_error
+    match Data_encoding.Binary.read encoding buf 0 length with
+    | Error re ->
+        fail (P2p_errors.Decoding_error re)
+    | Ok (read_len, message) ->
+        if read_len <> length then
+          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -412,10 +415,10 @@ module Reader = struct
       let open Data_encoding.Binary in
       match status with
       | Success {result; size; stream} ->
-          return_some (result, size, stream)
-      | Error _err ->
+          return (result, size, stream)
+      | Error err ->
           lwt_debug "[read_message] incremental decoding error"
-          >>= fun () -> return_none
+          >>= fun () -> fail (P2p_errors.Decoding_error err)
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
@@ -433,16 +436,10 @@ module Reader = struct
 
   let rec worker_loop st stream =
     read_message st stream
-    >>=? (fun msg ->
-           match msg with
-           | None ->
-               protect ~canceler:st.canceler (fun () ->
-                   Lwt_pipe.push st.messages (error P2p_errors.Decoding_error)
-                   >>= fun () -> return_none)
-           | Some (msg, size, stream) ->
-               protect ~canceler:st.canceler (fun () ->
-                   Lwt_pipe.push st.messages (Ok (size, msg))
-                   >>= fun () -> return_some stream))
+    >>=? (fun (msg, size, stream) ->
+           protect ~canceler:st.canceler (fun () ->
+               Lwt_pipe.push st.messages (Ok (size, msg))
+               >>= fun () -> return_some stream))
     >>= function
     | Ok (Some stream) ->
         worker_loop st (Some stream)

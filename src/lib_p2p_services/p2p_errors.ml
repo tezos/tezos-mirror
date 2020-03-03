@@ -60,7 +60,7 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error
+type error += Decoding_error of Data_encoding.Binary.read_error
 
 type error += Myself of P2p_connection.Id.t
 
@@ -180,10 +180,15 @@ let () =
     ~id:"node.p2p_socket.decoding_error"
     ~title:"Decoding error"
     ~description:"An error occurred while decoding."
-    ~pp:(fun ppf () -> Format.fprintf ppf "An error occurred while decoding.")
-    Data_encoding.empty
-    (function Decoding_error -> Some () | _ -> None)
-    (fun () -> Decoding_error) ;
+    ~pp:(fun ppf re ->
+      Format.fprintf
+        ppf
+        "An error occurred while decoding: %a."
+        Data_encoding.Binary.pp_read_error
+        re)
+    Data_encoding.(obj1 @@ req "read_error" Binary.read_error_encoding)
+    (function Decoding_error re -> Some re | _ -> None)
+    (fun re -> Decoding_error re) ;
   (* Myself *)
   register_error_kind
     `Permanent

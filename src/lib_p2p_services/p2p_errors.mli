@@ -47,7 +47,7 @@ type error +=
 
 type error += Rejected_no_common_protocol of {announced : Network_version.t}
 
-type error += Decoding_error
+type error += Decoding_error of Data_encoding.Binary.read_error
 
 type error += Myself of P2p_connection.Id.t
 
