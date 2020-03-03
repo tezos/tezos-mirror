@@ -59,7 +59,7 @@ let check_syntax kind file =
                 Format.kasprintf
                   Stdlib.failwith
                   "protocol-compiler: %a: use of `external` is forbidden"
-                  Location.print
+                  Location.print_loc
                   struct_item.pstr_loc
             | _should_be_fine ->
                 default_iterator.structure_item iterator struct_item);

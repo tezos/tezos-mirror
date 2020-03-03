@@ -62,10 +62,10 @@ let backend = (module Backend : Backend_intf.S)
 
 let pack_objects output objects =
   let output = output ^ ".cmx" in
-  Compmisc.init_path true ;
+  Compmisc.init_path () ;
   Asmpackager.package_files
     ~backend
-    Format.err_formatter
+    ~ppf_dump:Format.err_formatter
     Env.initial_safe_string
     objects
     output ;
@@ -74,17 +74,17 @@ let pack_objects output objects =
 
 let link_shared output objects =
   Compenv.(readenv Format.err_formatter Before_link) ;
-  Compmisc.init_path true ;
-  Asmlink.link_shared Format.err_formatter objects output ;
+  Compmisc.init_path () ;
+  Asmlink.link_shared ~ppf_dump:Format.err_formatter objects output ;
   Warnings.check_fatal ()
 
-let compile_ml ?for_pack ml =
-  let target = Filename.chop_extension ml in
+let compile_ml ?for_pack source_file =
+  let output_prefix = Filename.chop_extension source_file in
   Clflags.for_package := for_pack ;
-  Compenv.(readenv Format.err_formatter (Before_compile ml)) ;
-  Optcompile.implementation ~backend Format.err_formatter ml target ;
+  Compenv.(readenv Format.err_formatter (Before_compile source_file)) ;
+  Optcompile.implementation ~backend ~source_file ~output_prefix ;
   Clflags.for_package := None ;
-  target ^ ".cmx"
+  output_prefix ^ ".cmx"
 
 let () = Clflags.native_code := true
 

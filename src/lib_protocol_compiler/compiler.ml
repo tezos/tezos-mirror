@@ -33,12 +33,13 @@ let () = Clflags.unsafe_string := false
     with a lookup in locally defined hashtable.
 *)
 
-let preloaded_cmis : (string, Env.Persistent_signature.t) Hashtbl.t =
+let preloaded_cmis : (string, Persistent_env.Persistent_signature.t) Hashtbl.t
+    =
   Hashtbl.create ~random:true 42
 
 (* Set hook *)
 let () =
-  Env.Persistent_signature.load :=
+  Persistent_env.Persistent_signature.load :=
     fun ~unit_name ->
       try
         Some (Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name))

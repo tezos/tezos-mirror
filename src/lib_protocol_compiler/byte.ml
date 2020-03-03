@@ -36,9 +36,9 @@
 
 let pack_objects output objects =
   let output = output ^ ".cmo" in
-  Compmisc.init_path true ;
+  Compmisc.init_path () ;
   Bytepackager.package_files
-    Format.err_formatter
+    ~ppf_dump:Format.err_formatter
     Env.initial_safe_string
     objects
     output ;
@@ -47,17 +47,17 @@ let pack_objects output objects =
 
 let link_shared output objects =
   Compenv.(readenv Format.err_formatter Before_link) ;
-  Compmisc.init_path true ;
-  Bytelink.link Format.err_formatter objects output ;
+  Compmisc.init_path () ;
+  Bytelink.link objects output ;
   Warnings.check_fatal ()
 
-let compile_ml ?for_pack ml =
-  let target = Filename.chop_extension ml in
+let compile_ml ?for_pack source_file =
+  let output_prefix = Filename.chop_extension source_file in
   Clflags.for_package := for_pack ;
-  Compenv.(readenv Format.err_formatter (Before_compile ml)) ;
-  Compile.implementation Format.err_formatter ml target ;
+  Compenv.(readenv Format.err_formatter (Before_compile source_file)) ;
+  Compile.implementation ~source_file ~output_prefix ;
   Clflags.for_package := None ;
-  target ^ ".cmo"
+  output_prefix ^ ".cmo"
 
 let () = Clflags.native_code := false
 
