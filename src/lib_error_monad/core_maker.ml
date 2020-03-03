@@ -154,7 +154,7 @@ end = struct
       | Unclassified msg ->
           Some msg
       | error ->
-          let msg = Obj.(extension_name @@ extension_constructor error) in
+          let msg = Obj.Extension_constructor.(name @@ of_val error) in
           Some ("Unclassified error: " ^ msg ^ ". Was the error registered?")
     in
     let title = "Generic error" in

@@ -56,7 +56,7 @@ module Def (X : DEF_ARG) : DEF with type t = X.t = struct
 
   type _ selector += Me : t selector
 
-  let uid = Obj.(extension_id @@ extension_constructor @@ Me)
+  let uid = Obj.Extension_constructor.(id @@ of_val @@ Me)
 end
 
 type 'a def = (module DEF with type t = 'a)
