@@ -320,29 +320,51 @@ module Socket = struct
             in
             map_s do_bind addrs )
 
-  type error += Encoding_error | Decoding_error
+  type error +=
+    | Encoding_error of Data_encoding.Binary.write_error
+    | Unexpected_size_of_encoded_value
+
+  type error += Decoding_error of Data_encoding.Binary.read_error
 
   let () =
     register_error_kind
       `Permanent
       ~id:"signer.encoding_error"
-      ~title:"Encoding_error"
+      ~title:"Encoding error"
       ~description:"Error while encoding a remote signer message"
+      ~pp:(fun ppf we ->
+        Format.fprintf
+          ppf
+          "Could not encode a remote signer message: %a"
+          Data_encoding.Binary.pp_write_error
+          we)
+      Data_encoding.(obj1 (req "error" Binary.write_error_encoding))
+      (function Encoding_error we -> Some we | _ -> None)
+      (fun we -> Encoding_error we) ;
+    register_error_kind
+      `Permanent
+      ~id:"signer.unexepcted_size_of_encoded_value"
+      ~title:"Unexpected size of encoded value"
+      ~description:"An encoded value is not of the expected size."
       ~pp:(fun ppf () ->
-        Format.fprintf ppf "Could not encode a remote signer message")
+        Format.fprintf ppf "An encoded value is not of the expected size.")
       Data_encoding.empty
-      (function Encoding_error -> Some () | _ -> None)
-      (fun () -> Encoding_error) ;
+      (function Unexpected_size_of_encoded_value -> Some () | _ -> None)
+      (fun () -> Unexpected_size_of_encoded_value) ;
     register_error_kind
       `Permanent
       ~id:"signer.decoding_error"
-      ~title:"Decoding_error"
+      ~title:"Decoding error"
       ~description:"Error while decoding a remote signer message"
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "Could not decode a remote signer message")
-      Data_encoding.empty
-      (function Decoding_error -> Some () | _ -> None)
-      (fun () -> Decoding_error)
+      ~pp:(fun ppf re ->
+        Format.fprintf
+          ppf
+          "Could not decode a remote signer message: %a"
+          Data_encoding.Binary.pp_read_error
+          re)
+      Data_encoding.(obj1 (req "error" Binary.read_error_encoding))
+      (function Decoding_error re -> Some re | _ -> None)
+      (fun re -> Decoding_error re)
 
   let message_len_size = 2
 
@@ -350,23 +372,23 @@ module Socket = struct
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     fail_unless
       (encoded_message_len < 1 lsl (message_len_size * 8))
-      Encoding_error
+      Unexpected_size_of_encoded_value
     >>=? fun () ->
     (* len is the length of int16 plus the length of the message we want to send *)
     let len = message_len_size + encoded_message_len in
     let buf = Bytes.create len in
     match
-      Data_encoding.Binary.write_opt
+      Data_encoding.Binary.write
         encoding
         message
         buf
         message_len_size
         encoded_message_len
     with
-    | None ->
-        fail Encoding_error
-    | Some last ->
-        fail_unless (last = len) Encoding_error
+    | Error we ->
+        fail (Encoding_error we)
+    | Ok last ->
+        fail_unless (last = len) Unexpected_size_of_encoded_value
         >>=? fun () ->
         (* we set the beginning of the buf with the length of what is next *)
         TzEndian.set_int16 buf 0 encoded_message_len ;
@@ -381,11 +403,12 @@ module Socket = struct
     let buf = Bytes.create len in
     protect (fun () -> read_bytes ?timeout ~len fd buf >|= ok)
     >>=? fun () ->
-    match Data_encoding.Binary.read_opt encoding buf 0 len with
-    | None ->
-        fail Decoding_error
-    | Some (read_len, message) ->
-        if read_len <> len then fail Decoding_error else return message
+    match Data_encoding.Binary.read encoding buf 0 len with
+    | Error re ->
+        fail (Decoding_error re)
+    | Ok (read_len, message) ->
+        if read_len <> len then fail (Decoding_error Extra_bytes)
+        else return message
 end
 
 let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =

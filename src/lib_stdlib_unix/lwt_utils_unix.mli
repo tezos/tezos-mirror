@@ -104,7 +104,13 @@ module Socket : sig
 
   val bind : ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
 
-  type error += Encoding_error | Decoding_error
+  (** Errors that can happen when using [send]. *)
+  type error +=
+    | Encoding_error of Data_encoding.Binary.write_error
+    | Unexpected_size_of_encoded_value
+
+  (** Error that can happen when using [recv]. *)
+  type error += Decoding_error of Data_encoding.Binary.read_error
 
   val send :
     Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a -> unit tzresult Lwt.t
