@@ -48,7 +48,9 @@ type error += Invalid_message_size
 
 type error += Invalid_incoming_ciphertext_size
 
-type error += Encoding_error
+type error += Encoding_error of Data_encoding.Binary.write_error
+
+type error += Unexpected_size_of_encoded_message
 
 type error += Rejected_socket_connection
 
@@ -112,10 +114,26 @@ let () =
     ~id:"node.p2p_socket.encoding_error"
     ~title:"Encoding error"
     ~description:"An error occurred while encoding."
-    ~pp:(fun ppf () -> Format.fprintf ppf "An error occurred while encoding.")
+    ~pp:(fun ppf we ->
+      Format.fprintf
+        ppf
+        "An error occurred while encoding: %a."
+        Data_encoding.Binary.pp_write_error
+        we)
+    Data_encoding.(obj1 @@ req "write_error" Binary.write_error_encoding)
+    (function Encoding_error we -> Some we | _ -> None)
+    (fun we -> Encoding_error we) ;
+  (* Encoding error: unexpected behaviour from Data_encoding library *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_socket.unexpected_size_of_encoded_message"
+    ~title:"Encoding issue"
+    ~description:"An encoded message is not of the expected length."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "An encoded message is not of the expected length.")
     Data_encoding.empty
-    (function Encoding_error -> Some () | _ -> None)
-    (fun () -> Encoding_error) ;
+    (function Unexpected_size_of_encoded_message -> Some () | _ -> None)
+    (fun () -> Unexpected_size_of_encoded_message) ;
   (* Rejected socket connection *)
   register_error_kind
     `Permanent

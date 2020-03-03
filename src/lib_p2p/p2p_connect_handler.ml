@@ -227,7 +227,8 @@ let raw_authenticate t ?point_info canceler fd point =
               | P2p_errors.Invalid_auth
               | P2p_errors.Decipher_error
               | P2p_errors.Invalid_message_size
-              | P2p_errors.Encoding_error
+              | P2p_errors.Encoding_error _
+              | P2p_errors.Unexpected_size_of_encoded_message
               | P2p_errors.Decoding_error _
               | P2p_errors.Invalid_chunks_size _ ->
                   P2p_pool.greylist_addr t.pool (fst point)
