@@ -29,20 +29,25 @@ module Make_value (V : ENCODED_VALUE) = struct
   type t = V.t
 
   let of_bytes b =
-    match Data_encoding.Binary.of_bytes_opt V.encoding b with
-    | None ->
-        generic_error "Cannot parse data" (* TODO personalize *)
-    | Some v ->
+    match Data_encoding.Binary.of_bytes V.encoding b with
+    | Error re ->
+        generic_error
+          "Cannot parse data: %a"
+          Data_encoding.Binary.pp_read_error
+          re
+    | Ok v ->
         ok v
 
   let to_bytes v =
-    try Data_encoding.Binary.to_bytes_exn V.encoding v
-    with Data_encoding.Binary.Write_error error ->
-      Store_logging.log_error
-        "Exception while serializing value %a"
-        Data_encoding.Binary.pp_write_error
-        error ;
-      Bytes.create 0
+    match Data_encoding.Binary.to_bytes V.encoding v with
+    | Ok b ->
+        b
+    | Error we ->
+        Store_logging.log_error
+          "Exception while serializing value %a"
+          Data_encoding.Binary.pp_write_error
+          we ;
+        Bytes.create 0
 end
 
 module Raw_value = struct

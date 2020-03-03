@@ -395,12 +395,14 @@ let get_test_chain v =
   | None ->
       Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
   | Some data -> (
-    match
-      Data_encoding.Binary.of_bytes_opt Test_chain_status.encoding data
-    with
-    | None ->
-        Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
-    | Some r ->
+    match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+    | Error re ->
+        Format.kasprintf
+          (fun s -> Lwt.fail (Failure s))
+          "Error in Context.get_test_chain: %a"
+          Data_encoding.Binary.pp_read_error
+          re
+    | Ok r ->
         Lwt.return r )
 
 let set_test_chain v id =
