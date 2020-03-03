@@ -29,12 +29,10 @@
 (** Pretty-printing.
 
     This module implements a pretty-printing facility to format values
-    within {{!boxes}'pretty-printing boxes'} and {{!tags}'semantic tags'}
+    within {{!boxes}'pretty-printing boxes'}
     combined with a set of {{!fpp}printf-like functions}.
     The pretty-printer splits lines at specified {{!breaks}break hints},
     and indents lines according to the box structure.
-    Similarly, {{!tags}semantic tags} can be used to decouple text
-    presentation from its contents.
 
     This pretty-printing facility is implemented as an overlay on top of
     abstract {{!section:formatter}formatters} which provide basic output
@@ -479,113 +477,6 @@ val pp_set_ellipsis_text : formatter -> string -> unit
 (** Return the text of the ellipsis. *)
 val pp_get_ellipsis_text : formatter -> unit -> string
 
-(** {1:tags Semantic tags} *)
-
-type tag = string
-
-(** {i Semantic tags} (or simply {e tags}) are user's defined delimiters
-    to associate user's specific operations to printed entities.
-
-    Common usage of semantic tags is text decoration to get specific font or
-    text size rendering for a display device, or marking delimitation of
-    entities (e.g. HTML or TeX elements or terminal escape sequences).
-    More sophisticated usage of semantic tags could handle dynamic
-    modification of the pretty-printer behavior to properly print the material
-    within some specific tags.
-
-    In order to properly delimit printed entities, a semantic tag must be
-    opened before and closed after the entity. Semantic tags must be properly
-    nested like parentheses.
-
-    Tag specific operations occur any time a tag is opened or closed, At each
-    occurrence, two kinds of operations are performed {e tag-marking} and
-    {e tag-printing}:
-    - The tag-marking operation is the simpler tag specific operation: it simply
-    writes a tag specific string into the output device of the
-    formatter. Tag-marking does not interfere with line-splitting computation.
-    - The tag-printing operation is the more involved tag specific operation: it
-    can print arbitrary material to the formatter. Tag-printing is tightly
-    linked to the current pretty-printer operations.
-
-    Roughly speaking, tag-marking is commonly used to get a better rendering of
-    texts in the rendering device, while tag-printing allows fine tuning of
-    printing routines to print the same entity differently according to the
-    semantic tags (i.e. print additional material or even omit parts of the
-    output).
-
-    More precisely: when a semantic tag is opened or closed then both and
-    successive 'tag-printing' and 'tag-marking' operations occur:
-    - Tag-printing a semantic tag means calling the formatter specific function
-    [print_open_tag] (resp. [print_close_tag]) with the name of the tag as
-    argument: that tag-printing function can then print any regular material
-    to the formatter (so that this material is enqueued as usual in the
-    formatter queue for further line splitting computation).
-    - Tag-marking a semantic tag means calling the formatter specific function
-    [mark_open_tag] (resp. [mark_close_tag]) with the name of the tag as
-    argument: that tag-marking function can then return the 'tag-opening
-    marker' (resp. `tag-closing marker') for direct output into the output
-    device of the formatter.
-
-    Being written directly into the output device of the formatter, semantic
-    tag marker strings are not considered as part of the printing material that
-    drives line splitting (in other words, the length of the strings
-    corresponding to tag markers is considered as zero for line splitting).
-
-    Thus, semantic tag handling is in some sense transparent to pretty-printing
-    and does not interfere with usual indentation. Hence, a single
-    pretty-printing routine can output both simple 'verbatim' material or
-    richer decorated output depending on the treatment of tags. By default,
-    tags are not active, hence the output is not decorated with tag
-    information. Once [set_tags] is set to [true], the pretty-printer engine
-    honors tags and decorates the output accordingly.
-
-    Default tag-marking functions behave the HTML way: tags are enclosed in "<"
-    and ">"; hence, opening marker for tag [t] is ["<t>"] and closing marker is
-    ["</t>"].
-
-    Default tag-printing functions just do nothing.
-
-    Tag-marking and tag-printing functions are user definable and can
-    be set by calling {!set_formatter_tag_functions}.
-
-    Semantic tag operations may be set on or off with {!set_tags}.
-    Tag-marking operations may be set on or off with {!set_mark_tags}.
-    Tag-printing operations may be set on or off with {!set_print_tags}.
-*)
-
-(** [pp_open_tag ppf t] opens the semantic tag named [t].
-
-    The [print_open_tag] tag-printing function of the formatter is called with
-    [t] as argument; then the opening tag marker for [t], as given by
-    [mark_open_tag t], is written into the output device of the formatter.
-*)
-val pp_open_tag : formatter -> string -> unit
-
-(** [pp_close_tag ppf ()] closes the most recently opened semantic tag [t].
-
-    The closing tag marker, as given by [mark_close_tag t], is written into the
-    output device of the formatter; then the [print_close_tag] tag-printing
-    function of the formatter is called with [t] as argument.
-*)
-val pp_close_tag : formatter -> unit -> unit
-
-(** [pp_set_tags ppf b] turns on or off the treatment of semantic tags
-    (default is off).
-*)
-val pp_set_tags : formatter -> bool -> unit
-
-(** [pp_set_print_tags ppf b] turns on or off the tag-printing operations. *)
-val pp_set_print_tags : formatter -> bool -> unit
-
-(** [pp_set_mark_tags ppf b] turns on or off the tag-marking operations. *)
-val pp_set_mark_tags : formatter -> bool -> unit
-
-(** Return the current status of tag-printing operations. *)
-val pp_get_print_tags : formatter -> unit -> bool
-
-(** Return the current status of tag-marking operations. *)
-val pp_get_mark_tags : formatter -> unit -> bool
-
 (** {1 Convenience formatting functions.} *)
 
 (** [pp_print_list ?pp_sep pp_v ppf l] prints items of list [l],
@@ -669,16 +560,6 @@ val fprintf : formatter -> ('a, formatter, unit) format -> 'a
     If [@<n>] is not followed by a conversion specification,
     then the following character of the format is printed as if
     it were of length [n].
-    - [@\{]: open a semantic tag. The name of the tag may be optionally
-    specified with the following syntax:
-    the [<] character, followed by an optional string
-    specification, and the closing [>] character. The string
-    specification is any character string that does not contain the
-    closing character ['>']. If omitted, the tag name defaults to the
-    empty string.
-    For more details about semantic tags, see the functions {!open_tag} and
-    {!close_tag}.
-    - [@\}]: close the most recently opened semantic tag.
     - [@?]: flush the pretty-printer as with [print_flush ()].
     This is equivalent to the conversion [%!].
     - [@\n]: force a newline, as with [force_newline ()], not the normal way
