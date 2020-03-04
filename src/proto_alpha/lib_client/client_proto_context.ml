@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -456,11 +457,27 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
   Alpha_services.Voting.listings cctxt cb
   >>=? fun listings ->
   let max_participation =
-    List.fold_left (fun acc (_, w) -> Int32.add w acc) 0l listings
+    (* Multiply the weight by votes_per_roll before accummulating it *)
+    List.fold_left
+      (fun acc (_, w) ->
+        Int32.(add (mul (of_int Constants_repr.fixed.votes_per_roll) w) acc))
+      0l
+      listings
   in
-  let all_votes = Int32.(add (add ballots.yay ballots.nay) ballots.pass) in
-  let participation = Int32.(div (mul all_votes 100_00l) max_participation) in
-  let supermajority = Int32.(div (mul 8l (add ballots.yay ballots.nay)) 10l) in
+  (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
+     small as 1e3, there is a maximum of 8e5 rolls and thus votes.
+     In 'participation' an Int64 is used because in the worst case 'all_votes is
+     8e5 and after the multiplication is 8e9, making it potentially overflow a
+     signed Int32 which is 2e9. *)
+  let casted_votes = Int32.(add ballots.yay ballots.nay) in
+  let all_votes = Int32.(add casted_votes ballots.pass) in
+  let supermajority = Int32.(div (mul 8l casted_votes) 10l) in
+  let participation =
+    (* in centile of percentage *)
+    Int64.(
+      to_int32
+        (div (mul (of_int32 all_votes) 100_00L) (of_int32 max_participation)))
+  in
   return {current_quorum; participation; supermajority; ballots}
 
 let get_period_info (cctxt : #full) ~chain ~block =
