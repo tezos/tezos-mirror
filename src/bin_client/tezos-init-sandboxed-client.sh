@@ -129,7 +129,7 @@ main () {
         local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
         local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/main_native.exe}"
 
-        parameters_file="$bin_dir/../../sandbox-parameters.json"
+        parameters_file="$bin_dir/../proto_alpha/parameters/sandbox-parameters.json"
 
     else
         # we assume a clean install with tezos-(admin-)client in the path
