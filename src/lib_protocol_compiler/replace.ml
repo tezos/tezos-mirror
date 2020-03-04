@@ -108,10 +108,10 @@ let process ~template ~destination (protocol : Protocol.t) lib_version hash =
     |> StringMap.add "HASH" (Protocol_hash.to_b58check hash)
     |> StringMap.add
          "MODULES"
-         (String.concat " " (List.map module_name protocol.components))
+         (String.concat "\n   " (List.map module_name protocol.components))
     |> StringMap.add
          "SOURCES"
-         (String.concat " " (List.map sources_name protocol.components))
+         (String.concat "\n   " (List.map sources_name protocol.components))
   in
   replace ~template ~destination vars
 

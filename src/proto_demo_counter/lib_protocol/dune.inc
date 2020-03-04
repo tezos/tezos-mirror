@@ -18,23 +18,50 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 
 (rule
  (targets registerer.ml)
- (deps error.mli error.ml proto_params.mli proto_params.ml header.mli header.ml state.mli state.ml proto_operation.mli proto_operation.ml receipt.mli receipt.ml apply.mli apply.ml services.mli services.ml main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   error.mli error.ml
+   proto_params.mli proto_params.ml
+   header.mli header.ml
+   state.mli state.ml
+   proto_operation.mli proto_operation.ml
+   receipt.mli receipt.ml
+   apply.mli apply.ml
+   services.mli services.ml
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to %{targets}
                   (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "demo_counter")))))
 
 (rule
  (targets functor.ml)
- (deps error.mli error.ml proto_params.mli proto_params.ml header.mli header.ml state.mli state.ml proto_operation.mli proto_operation.ml receipt.mli receipt.ml apply.mli apply.ml services.mli services.ml main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   error.mli error.ml
+   proto_params.mli proto_params.ml
+   header.mli header.ml
+   state.mli state.ml
+   proto_operation.mli proto_operation.ml
+   receipt.mli receipt.ml
+   apply.mli apply.ml
+   services.mli services.ml
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
                          (chdir %{workspace_root}
                                 (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
 
 (rule
  (targets protocol.ml)
- (deps error.mli error.ml proto_params.mli proto_params.ml header.mli header.ml state.mli state.ml proto_operation.mli proto_operation.ml receipt.mli receipt.ml apply.mli apply.ml services.mli services.ml main.mli main.ml)
+ (deps
+   error.mli error.ml
+   proto_params.mli proto_params.ml
+   header.mli header.ml
+   state.mli state.ml
+   proto_operation.mli proto_operation.ml
+   receipt.mli receipt.ml
+   apply.mli apply.ml
+   services.mli services.ml
+   main.mli main.ml)
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_demo_counter.Environment
@@ -62,7 +89,16 @@ include Tezos_raw_protocol_demo_counter.Main
                    -open Tezos_protocol_environment_demo_counter__Environment
                    -open Pervasives
                    -open Error_monad))
- (modules Error Proto_params Header State Proto_operation Receipt Apply Services Main))
+ (modules
+   Error
+   Proto_params
+   Header
+   State
+   Proto_operation
+   Receipt
+   Apply
+   Services
+   Main))
 
 (install
  (section lib)

@@ -18,23 +18,26 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 
 (rule
  (targets registerer.ml)
- (deps main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to %{targets}
                   (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "demo_noops")))))
 
 (rule
  (targets functor.ml)
- (deps main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
                          (chdir %{workspace_root}
                                 (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
 
 (rule
  (targets protocol.ml)
- (deps main.mli main.ml)
+ (deps
+   main.mli main.ml)
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_demo_noops.Environment
@@ -62,7 +65,8 @@ include Tezos_raw_protocol_demo_noops.Main
                    -open Tezos_protocol_environment_demo_noops__Environment
                    -open Pervasives
                    -open Error_monad))
- (modules Main))
+ (modules
+   Main))
 
 (install
  (section lib)

@@ -18,23 +18,32 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 
 (rule
  (targets registerer.ml)
- (deps data.ml services.ml main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   data.ml
+   services.ml
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to %{targets}
                   (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "genesis_babylonnet")))))
 
 (rule
  (targets functor.ml)
- (deps data.ml services.ml main.mli main.ml
-       (:src_dir TEZOS_PROTOCOL))
+ (deps
+   data.ml
+   services.ml
+   main.mli main.ml
+   (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
                          (chdir %{workspace_root}
                                 (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
 
 (rule
  (targets protocol.ml)
- (deps data.ml services.ml main.mli main.ml)
+ (deps
+   data.ml
+   services.ml
+   main.mli main.ml)
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_genesis_babylonnet.Environment
@@ -62,7 +71,10 @@ include Tezos_raw_protocol_genesis_babylonnet.Main
                    -open Tezos_protocol_environment_genesis_babylonnet__Environment
                    -open Pervasives
                    -open Error_monad))
- (modules Data Services Main))
+ (modules
+   Data
+   Services
+   Main))
 
 (install
  (section lib)
