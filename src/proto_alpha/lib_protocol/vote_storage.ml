@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,17 +80,16 @@ let get_ballots ctxt =
       (* Assuming the same listings is used at votings *)
       Storage.Vote.Listings.get ctxt delegate
       >>=? fun weight ->
-      let count = Int32.add weight in
+      let allocate fraction total = Int32.(add (mul weight fraction) total) in
       Lwt.return
         ( ballots
         >>? fun ballots ->
-        match ballot with
-        | Yay ->
-            ok {ballots with yay = count ballots.yay}
-        | Nay ->
-            ok {ballots with nay = count ballots.nay}
-        | Pass ->
-            ok {ballots with pass = count ballots.pass} ))
+        ok
+          {
+            yay = allocate ballot.yays_per_roll ballots.yay;
+            nay = allocate ballot.nays_per_roll ballots.nay;
+            pass = allocate ballot.passes_per_roll ballots.pass;
+          } ))
     ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
 
 let get_ballot_list = Storage.Vote.Ballots.bindings

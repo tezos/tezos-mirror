@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,8 +27,13 @@
 (** a protocol change proposal *)
 type proposal = Protocol_hash.t
 
-(** votes can be for, against or neutral.
-    Neutral serves to count towards a quorum *)
-type ballot = Yay | Nay | Pass
+(** votes are split into fractions for yay, nay, or pass, where these fractions
+   have to add up to the constant votes_per_roll. *)
+
+type ballot = {
+  yays_per_roll : int32;
+  nays_per_roll : int32;
+  passes_per_roll : int32;
+}
 
 val ballot_encoding : ballot Data_encoding.t

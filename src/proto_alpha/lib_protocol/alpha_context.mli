@@ -443,6 +443,7 @@ module Constants : sig
     max_revelations_per_block : int;
     max_operation_data_length : int;
     max_proposals_per_delegate : int;
+    votes_per_roll : int;
   }
 
   val fixed_encoding : fixed Data_encoding.t
@@ -907,7 +908,11 @@ module Vote : sig
 
   val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
-  type ballot = Yay | Nay | Pass
+  type ballot = {
+    yays_per_roll : int32;
+    nays_per_roll : int32;
+    passes_per_roll : int32;
+  }
 
   val ballot_encoding : ballot Data_encoding.t
 

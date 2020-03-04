@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,12 +38,15 @@ let max_proposals_per_delegate = 20
 
 let max_operation_data_length = 16 * 1024 (* 16kB *)
 
+let votes_per_roll = 100
+
 type fixed = {
   proof_of_work_nonce_size : int;
   nonce_length : int;
   max_revelations_per_block : int;
   max_operation_data_length : int;
   max_proposals_per_delegate : int;
+  votes_per_roll : int;
 }
 
 let fixed_encoding =
@@ -53,25 +57,29 @@ let fixed_encoding =
         c.nonce_length,
         c.max_revelations_per_block,
         c.max_operation_data_length,
-        c.max_proposals_per_delegate ))
+        c.max_proposals_per_delegate,
+        c.votes_per_roll ))
     (fun ( proof_of_work_nonce_size,
            nonce_length,
            max_revelations_per_block,
            max_operation_data_length,
-           max_proposals_per_delegate ) ->
+           max_proposals_per_delegate,
+           votes_per_roll ) ->
       {
         proof_of_work_nonce_size;
         nonce_length;
         max_revelations_per_block;
         max_operation_data_length;
         max_proposals_per_delegate;
+        votes_per_roll;
       })
-    (obj5
+    (obj6
        (req "proof_of_work_nonce_size" uint8)
        (req "nonce_length" uint8)
        (req "max_revelations_per_block" uint8)
        (req "max_operation_data_length" int31)
-       (req "max_proposals_per_delegate" uint8))
+       (req "max_proposals_per_delegate" uint8)
+       (req "votes_per_roll" int31))
 
 let fixed =
   {
@@ -80,6 +88,7 @@ let fixed =
     max_revelations_per_block;
     max_operation_data_length;
     max_proposals_per_delegate;
+    votes_per_roll;
   }
 
 type parametric = {

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,6 +70,9 @@ let check_approval_and_update_participation_ema ctxt =
   Vote.get_ballots ctxt
   >>=? fun ballots ->
   Vote.listing_size ctxt
+  >>=? fun rolls ->
+  (* Multiply the total number of rolls by votes_per_roll *)
+  return Int32.(mul rolls (of_int Constants.fixed.votes_per_roll))
   >>=? fun maximum_vote ->
   Vote.get_participation_ema ctxt
   >>=? fun participation_ema ->
@@ -81,7 +85,7 @@ let check_approval_and_update_participation_ema ctxt =
      signed Int32 which is 2e9. *)
   let casted_votes = Int32.add ballots.yay ballots.nay in
   let all_votes = Int32.add casted_votes ballots.pass in
-  let supermajority = Int32.div (Int32.mul 8l casted_votes) 10l in
+  let supermajority = Int32.(div (mul 8l casted_votes) 10l) in
   let participation =
     (* in centile of percentage *)
     Int64.(

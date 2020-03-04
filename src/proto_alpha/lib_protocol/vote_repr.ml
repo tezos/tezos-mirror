@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,22 +26,26 @@
 
 type proposal = Protocol_hash.t
 
-type ballot = Yay | Nay | Pass
+type ballot = {
+  yays_per_roll : int32;
+  nays_per_roll : int32;
+  passes_per_roll : int32;
+}
 
 let ballot_encoding =
-  let of_int8 = function
-    | 0 ->
-        Yay
-    | 1 ->
-        Nay
-    | 2 ->
-        Pass
-    | _ ->
-        invalid_arg "ballot_of_int8"
-  in
-  let to_int8 = function Yay -> 0 | Nay -> 1 | Pass -> 2 in
   let open Data_encoding in
-  (* union *)
-  splitted
-    ~binary:(conv to_int8 of_int8 int8)
-    ~json:(string_enum [("yay", Yay); ("nay", Nay); ("pass", Pass)])
+  conv
+    (fun {yays_per_roll; nays_per_roll; passes_per_roll} ->
+      (yays_per_roll, nays_per_roll, passes_per_roll))
+    (fun (yays_per_roll, nays_per_roll, passes_per_roll) ->
+      let open Constants_repr in
+      if
+        Compare.Int32.( = )
+          Int32.(add (add yays_per_roll nays_per_roll) passes_per_roll)
+          (Int32.of_int fixed.votes_per_roll)
+      then {yays_per_roll; nays_per_roll; passes_per_roll}
+      else invalid_arg "ballot_encoding")
+  @@ obj3
+       (req "yays_per_roll" int32)
+       (req "nays_per_roll" int32)
+       (req "passes_per_roll" int32)
