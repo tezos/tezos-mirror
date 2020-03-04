@@ -86,3 +86,36 @@ Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 4
+Node is bootstrapped.
+Estimated gas: 1465456 units (will add 12800 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 30 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.001408
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1478256
+    Storage limit: 0 bytes
+    Balance updates:
+      [CONTRACT_HASH] ................ -ꜩ0.001408
+      fees(the baker who will include this operation,0) ... +ꜩ0.001408
+    Transaction:
+      Amount: ꜩ500
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      This transaction was successfully applied
+      Updated storage: 7
+      Storage size: 40 bytes
+      Consumed gas: 1465456
+      Balance updates:
+        [CONTRACT_HASH] ... -ꜩ500
+        [CONTRACT_HASH] ... +ꜩ500
+
+Injected block [BLOCK_HASH]
+7
