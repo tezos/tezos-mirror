@@ -159,10 +159,8 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
-.. _glossary_michelson:
-
-Michelson
-    The built-in language used in `smart contracts`_.
+_`Michelson`
+    The built-in language used by a `smart contract`_.
 
 _`Operations`
     In protocol Alpha, the main operations are transactions (to transfer funds
@@ -187,11 +185,10 @@ _`Roll`
     will be given twice as many rights to bake.
 
 _`Smart contract`
-    `Account`_ which is associated to a `Michelson
-    <glossary_michelson_>`__ script. They are created with an explicit
-    origination_ operation and are therefore sometimes called
-    originated accounts. The address of a smart contract always starts
-    with the letters ``KT1`.
+    Account_ which is associated to a Michelson_ script. They are
+    created with an explicit origination_ operation and are therefore
+    sometimes called originated accounts. The address of a smart
+    contract always starts with the letters ``KT1``.
 
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
