@@ -486,17 +486,25 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Tezos_client.successful_client_cmd
     state
     ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
+    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "100"; "0"; "0"]
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       ledger_prompt_notice
         state
-        EF.(wf "Submitting “Yes” ballot for %S" winner_hash))
+        EF.(
+          wf "Submitting (yay=100, nay=0, pass=0)) ballot for %S" winner_hash))
   >>= fun (_ : unit option) ->
   Tezos_client.successful_client_cmd
     state
     ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
+    [ "submit";
+      "ballot";
+      "for";
+      special_baker.key_name;
+      winner_hash;
+      "100";
+      "0";
+      "0" ]
   >>= fun _ ->
   Interactive_test.Pauser.generic
     state
@@ -621,7 +629,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   Tezos_client.successful_client_cmd
     state
     ~client:baker_0.client
-    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "yay"]
+    ["submit"; "ballot"; "for"; baker_0.key_name; winner_hash; "100"; "0"; "0"]
   >>= fun _ ->
   Asynchronous_result.map_option with_ledger ~f:(fun _ ->
       Interactive_test.Pauser.generic
@@ -635,12 +643,19 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
       >>= fun () ->
       ledger_prompt_notice
         state
-        EF.(wf "Submitting “Yes” ballot for %S" winner_hash))
+        EF.(wf "Submitting (yay=100, nay=0, pass=0) ballot for %S" winner_hash))
   >>= fun (_ : unit option) ->
   Tezos_client.successful_client_cmd
     state
     ~client:special_baker.client
-    ["submit"; "ballot"; "for"; special_baker.key_name; winner_hash; "yay"]
+    [ "submit";
+      "ballot";
+      "for";
+      special_baker.key_name;
+      winner_hash;
+      "100";
+      "0";
+      "0" ]
   >>= fun _ ->
   Interactive_test.Pauser.generic
     state
