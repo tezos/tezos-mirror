@@ -602,8 +602,11 @@ class Client:
     def submit_ballot(self,
                       account: str,
                       proto: str,
-                      vote: str) -> str:
-        return self.run(['submit', 'ballot', 'for', account, proto, vote])
+                      fraction_yays: str,
+                      fraction_nays: str,
+                      fraction_passes: str) -> str:
+        return self.run(['submit', 'ballot', 'for', account, proto,
+                         fraction_yays, fraction_nays, fraction_passes])
 
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])

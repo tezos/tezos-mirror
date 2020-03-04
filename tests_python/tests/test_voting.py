@@ -7,6 +7,8 @@ BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
              '--minimal-timestamp']
 
+VOTES_PER_ROLL = 100
+
 
 @pytest.fixture(scope="class")
 def client(sandbox):
@@ -110,8 +112,15 @@ class TestManualBaking:
     def test_submit_ballot(self, client: Client, session: dict):
         proto = session['protos'][1]
         for i in range(1, 4):
-            client.submit_ballot(f'bootstrap{i}', proto, 'yay')
-        client.submit_ballot(f'bootstrap{4}', proto, 'nay')
+            yay_fraction = int(i * 0.2 * VOTES_PER_ROLL)
+            nay_fraction = int(VOTES_PER_ROLL - yay_fraction -
+                               (0.2 * VOTES_PER_ROLL))
+            pass_fraction = int(0.2 * VOTES_PER_ROLL)
+            client.submit_ballot(f'bootstrap{i}', proto,
+                                 str(yay_fraction), str(nay_fraction),
+                                 str(pass_fraction))
+        client.submit_ballot(f'bootstrap{4}', proto, '0',
+                             str(VOTES_PER_ROLL), '0')
 
     def test_bake_four_blocks(self, client: Client):
         client.bake('bootstrap1', BAKE_ARGS)
