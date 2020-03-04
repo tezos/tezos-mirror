@@ -47,9 +47,9 @@ checkout the latest code, experiment and run unit tests::
   make
   make test
 
-The sandbox script automatically activates the lastest `proto_alpha`
-so we can use the usual commands to run a node, client and daemons for
-further manual testing::
+The sandbox script automatically activates the Alpha protocol, located
+in the `proto_alpha` directory, so we can use the usual commands to
+run a node, client and daemons for further manual testing::
 
   ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
   eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
@@ -130,7 +130,7 @@ Except for specific scenarios, it's convenient to link both.
 User-activated update
 ~~~~~~~~~~~~~~~~~~~~~
 
-The current protocol alpha supports self-amending through a voting
+The current protocol Alpha supports self-amending through a voting
 procedure, however we'd like to test our migration without waiting 3
 months.
 Other than amendments driven by the protocol, Tezos supports

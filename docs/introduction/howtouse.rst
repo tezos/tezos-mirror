@@ -107,7 +107,7 @@ Node protocol
 A Tezos node can switch from one protocol to another during its execution.
 This typically happens during the synchronization phase when a node launches for
 the first time. The node starts with the genesis protocol and then switches to
-the alpha protocol.
+the Alpha protocol.
 
 Storage
 ~~~~~~~

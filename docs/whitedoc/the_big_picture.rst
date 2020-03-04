@@ -217,7 +217,7 @@ Three economic protocols are included in the main Tezos repository.
     whose public key is hardcoded, that single action is to switch to
     a new protocol chosen by the activator.
   - :package:`tezos-protocol-alpha`
-    (:package:`tezos-embedded-protocol-alpha`) is the first real
+    (:package:`tezos-embedded-protocol-alpha`) is the current
     protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
     to start reading the protocol's code.
   - :package:`tezos-protocol-demo-noops`
@@ -240,13 +240,13 @@ compatible, and library vs command line interface.
     type. That way, it is possible to use the same code for different
     platforms or toolkits.
   - :package:`tezos-client-alpha` provides some functions to perform
-    the operations of protocol alpha using the wallet and signers from
+    the operations of protocol Alpha using the wallet and signers from
     the client context.
   - :package:`tezos-client-commands` plugs the basic context access
     functions from :package:`tezos-client-base` as handlers for the
     commands of the ``tezos-client`` command line wallet.
   - :package:`tezos-client-alpha-commands` plugs the functions from
-    :package:`tezos-client-alpha` as handlers for the alpha specific
+    :package:`tezos-client-alpha` as handlers for the Alpha specific
     commands of the ``tezos-client`` command line wallet.
   - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
@@ -282,7 +282,7 @@ run them.
    tests for the versioned key-value context.
  - :package-name:`tezos-protocol-alpha`
    (in directory :src:`src/proto_alpha/lib_protocol/test/`):
-   tests of the alpha protocol (without launching a node).
+   tests of the Alpha protocol (without launching a node).
  - :package-name:`tezos-crypto`
    (in directory :src:`src/lib_crypto/test/`):
    tests for the in-house merkle trees.

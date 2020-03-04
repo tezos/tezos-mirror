@@ -80,7 +80,7 @@ a transfer operation.
         with Sandbox(paths.TEZOS_HOME,
                     constants.IDENTITIES,
                     constants.GENESIS_PK) as sandbox:
-            # Launch node running protocol alpha
+            # Launch node running protocol Alpha
             sandbox.add_node(0)
             utils.activate_alpha(sandbox.client(0))
             # Launch a second node on the same private tezos network
@@ -92,7 +92,7 @@ a transfer operation.
             # receipt is an object representing the client answer
             receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
             transfer_hash = receipt.operation_hash
-            # Wait for second node to update its protocol to alpha, if not
+            # Wait for second node to update its protocol to Alpha, if not
             # it may not know yet the ``wait_for_inclusion`` operation which is
             # protocol specific
             time.sleep(5)
@@ -350,7 +350,7 @@ Adding a test
 Testing on a production branch (``zeronet``, ``mainnet``,...)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-On ``master``, protocol alpha is named
+On ``master``, protocol Alpha is named
 ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and daemons binary
 name are suffixed with ``alpha`` (``tezos-baker-alpha``,
 ``tezos-endorser-alpha``...). However, on *production* branches, an actual
@@ -358,12 +358,12 @@ hash of the protocol is used, and a shortened string is used to specify
 daemons.
 
 For instance, on revision ``816625bed0983f7201e4c369440a910f006beb1a`` of
-zeronet, protocol alpha is named
+zeronet, protocol Alpha is named
 ``PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP`` and daemons are
 suffixed by ``003-PsddFKi3`` (``tezos-baker-003-PsddFKi3``).
 
 To reduce coupling between tests and the actual branch to be tested, tests
-refer to protocol alpha using ``constants.ALPHA`` and
+refer to protocol Alpha using ``constants.ALPHA`` and
 ``constants.ALPHA_DAEMON`` rather than by hard-coded identifiers.
 
 Tests based on fixed revisions (multibranch)

@@ -244,7 +244,7 @@ your ``.emacs`` :
 Note that the Michelson mode will be chosen automatically by Emacs for
 files with a ``.tz`` or ``.tez`` extension.
 
-Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the alphanet
+Run a :ref:`sandboxed node<sandboxed-mode>` (and activate the Alpha
 protocol with ``tezos-activate-alpha``) so that useful information
 about the program can be displayed.
 We can now open our favourite contract ``emacs

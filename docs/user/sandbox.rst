@@ -110,11 +110,11 @@ testing purposes, all baking should be done using the ``tezos-baker``
 binary.
 
 
-Tune protocol alpha parameters
+Tune protocol Alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``tezos-active-alpha`` alias uses parameters from
-``scripts/protocol_parameters.json`` to activate protocol alpha. It can
+``scripts/protocol_parameters.json`` to activate protocol Alpha. It can
 be useful to tune these parameters when you need to debug something,
 for example, change the number of blocks per cycle, the time between
 blocks, etc.

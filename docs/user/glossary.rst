@@ -61,7 +61,7 @@ _`Shell`
 _`Weight`
     See score_.
 
-Protocol alpha
+Protocol Alpha
 --------------
 
 _`Accuser`
@@ -76,7 +76,7 @@ _`Accuser`
     separate binary.
 
 _`Account`
-    An account is a unique identifier within protocol alpha. There are different
+    An account is a unique identifier within protocol Alpha. There are different
     kinds of accounts (see `Originated account`_ and `Implicit account`_).
 
     In the Context_, each account is associated with a balance (an amount of
@@ -191,4 +191,3 @@ _`Roll`
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     contract_.
-
