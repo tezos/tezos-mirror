@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,7 +36,7 @@ let ballots_pp ppf v =
   Alpha_context.Vote.(
     Format.fprintf
       ppf
-      "{ yay = %ld ; nay = %ld ; pass = %ld"
+      "{ yay = %ld ; nay = %ld ; pass = %ld }"
       v.yay
       v.nay
       v.pass)
@@ -297,12 +298,29 @@ let test_successful_vote num_delegates () =
   >>=? fun () ->
   (* unanimous vote: all delegates --active when p2 started-- vote *)
   map_s
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        Protocol_hash.zero
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
     delegates_p2
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay
+  Op.ballot
+    (B b)
+    del1
+    Protocol_hash.zero
+    {
+      yays_per_roll = 0l;
+      nays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+      passes_per_roll = 0l;
+    }
   >>=? fun op ->
   Block.bake ~operations:[op] b
   >>= fun res ->
@@ -312,9 +330,10 @@ let test_successful_vote num_delegates () =
       | _ ->
           false)
   >>=? fun () ->
+  (* Allocate votes from weight (rolls) of active delegates *)
   fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls_p2
   >>=? fun rolls_sum ->
-  (* # of Yays in ballots matches rolls of the delegate *)
+  (* # of Yay rolls in ballots matches votes of the delegates *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
   Assert.equal
@@ -323,7 +342,12 @@ let test_successful_vote num_delegates () =
     "Unexpected ballots"
     ballots_pp
     v
-    Vote.{yay = rolls_sum; nay = 0l; pass = 0l}
+    Vote.
+      {
+        yay = Int32.(mul (of_int Constants.fixed.votes_per_roll) rolls_sum);
+        nay = 0l;
+        pass = 0l;
+      }
   >>=? fun () ->
   (* One Yay ballot per delegate *)
   Context.Vote.get_ballot_list (B b)
@@ -338,10 +362,14 @@ let test_successful_vote num_delegates () =
                  match List.find_opt (fun (del, _) -> del = pkh) l with
                  | None ->
                      failwith "%s - Missing delegate" __LOC__
-                 | Some (_, Vote.Yay) ->
-                     return_unit
-                 | Some _ ->
-                     failwith "%s - Wrong ballot" __LOC__)
+                 | Some (_, ballot) ->
+                     if
+                       ballot.yays_per_roll
+                       = Int32.of_int Constants.fixed.votes_per_roll
+                       && ballot.nays_per_roll = 0l
+                       && ballot.passes_per_roll = 0l
+                     then return_unit
+                     else failwith "%s - Wrong ballot" __LOC__)
                delegates_p2)
   >>=? fun () ->
   (* skip to testing period
@@ -434,7 +462,16 @@ let test_successful_vote num_delegates () =
   >>=? fun () ->
   (* unanimous vote: all delegates --active when p4 started-- vote *)
   map_s
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        Protocol_hash.zero
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
     delegates_p4
   >>=? fun operations ->
   Block.bake ~operations b
@@ -450,7 +487,12 @@ let test_successful_vote num_delegates () =
     "Unexpected ballots"
     ballots_pp
     v
-    Vote.{yay = rolls_sum; nay = 0l; pass = 0l}
+    Vote.
+      {
+        yay = Int32.(mul (of_int Constants.fixed.votes_per_roll) rolls_sum);
+        nay = 0l;
+        pass = 0l;
+      }
   >>=? fun () ->
   (* One Yay ballot per delegate *)
   Context.Vote.get_ballot_list (B b)
@@ -465,10 +507,14 @@ let test_successful_vote num_delegates () =
                  match List.find_opt (fun (del, _) -> del = pkh) l with
                  | None ->
                      failwith "%s - Missing delegate" __LOC__
-                 | Some (_, Vote.Yay) ->
-                     return_unit
-                 | Some _ ->
-                     failwith "%s - Wrong ballot" __LOC__)
+                 | Some (_, ballot) ->
+                     if
+                       ballot.yays_per_roll
+                       = Int32.of_int Constants.fixed.votes_per_roll
+                       && ballot.nays_per_roll = 0l
+                       && ballot.passes_per_roll = 0l
+                     then return_unit
+                     else failwith "%s - Wrong ballot" __LOC__)
                delegates_p4)
   >>=? fun () ->
   (* skip to end of promotion_vote period and activation*)
@@ -533,7 +579,6 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_voting_period; _}; _} ->
   (* proposal period *)
-  let open Alpha_context in
   Context.Vote.get_current_period_kind (B b)
   >>=? (function
          | Proposal ->
@@ -572,8 +617,18 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   >>=? fun voters_rolls_in_testing_vote ->
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
+  let open Alpha_context in
   map_s
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        Protocol_hash.zero
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
     voters_without_quorum
   >>=? fun operations ->
   Block.bake ~operations b
@@ -642,10 +697,21 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   >>=? fun (delegates_p2, rolls_p2) ->
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2
   >>=? fun voters ->
-  let open Alpha_context in
   (* all voters vote, for yays;
        no nays, so supermajority is satisfied *)
-  map_s (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay) voters
+  let open Alpha_context in
+  map_s
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        Protocol_hash.zero
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
+    voters
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
@@ -685,7 +751,16 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   map_s
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        Protocol_hash.zero
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
     voters_without_quorum
   >>=? fun operations ->
   Block.bake ~operations b
@@ -943,12 +1018,34 @@ let test_supermajority_in_testing_vote supermajority () =
   let num_yays = num_nays * s_num / (s_den - s_num) in
   (* majority/minority vote depending on the [supermajority] parameter *)
   let num_yays = if supermajority then num_yays else num_yays - 1 in
-  let open Alpha_context in
   let (nays_delegates, rest) = List.split_n num_nays delegates_p2 in
   let (yays_delegates, _) = List.split_n num_yays rest in
-  map_s (fun del -> Op.ballot (B b) del proposal Vote.Yay) yays_delegates
+  let open Alpha_context in
+  map_s
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        proposal
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
+    yays_delegates
   >>=? fun operations_yays ->
-  map_s (fun del -> Op.ballot (B b) del proposal Vote.Nay) nays_delegates
+  map_s
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        proposal
+        {
+          yays_per_roll = 0l;
+          nays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          passes_per_roll = 0l;
+        })
+    nays_delegates
   >>=? fun operations_nays ->
   let operations = operations_yays @ operations_nays in
   Block.bake ~operations b
@@ -1019,7 +1116,6 @@ let test_quorum_capped_maximum num_delegates () =
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_voting_period; quorum_max; _}; _} ->
   (* proposal period *)
-  let open Alpha_context in
   Context.Vote.get_current_period_kind (B b)
   >>=? (function
          | Proposal ->
@@ -1055,7 +1151,19 @@ let test_quorum_capped_maximum num_delegates () =
   in
   let voters = List.take_n minimum_to_pass delegates in
   (* all voters vote for yays; no nays, so supermajority is satisfied *)
-  map_s (fun del -> Op.ballot (B b) del protocol Vote.Yay) voters
+  let open Alpha_context in
+  map_s
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        protocol
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
+    voters
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
@@ -1083,7 +1191,6 @@ let test_quorum_capped_minimum num_delegates () =
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_voting_period; quorum_min; _}; _} ->
   (* proposal period *)
-  let open Alpha_context in
   Context.Vote.get_current_period_kind (B b)
   >>=? (function
          | Proposal ->
@@ -1119,7 +1226,19 @@ let test_quorum_capped_minimum num_delegates () =
   in
   let voters = List.take_n minimum_to_pass delegates in
   (* all voters vote for yays; no nays, so supermajority is satisfied *)
-  map_s (fun del -> Op.ballot (B b) del protocol Vote.Yay) voters
+  let open Alpha_context in
+  map_s
+    (fun del ->
+      Op.ballot
+        (B b)
+        del
+        protocol
+        {
+          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
+          nays_per_roll = 0l;
+          passes_per_roll = 0l;
+        })
+    voters
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
