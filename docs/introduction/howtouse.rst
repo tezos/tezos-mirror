@@ -22,7 +22,8 @@ After a successful compilation, you should have the following binaries:
 Note that on a production branch (Mainnet, Zeronet, etc.), the daemons
 are not suffixed with ``alpha`` but with the partial hash of the
 protocol they are bound to, such as
-``tezos-{baker,endorser,accuser}-002-PsYLVpVv``.
+``tezos-{baker,endorser,accuser}-002-PsYLVpVv``. (See `Node protocol`_
+section below for the meaning of `alpha`.)
 
 
 Read The Friendly Manual
@@ -101,13 +102,23 @@ while), or on a slow network connection.
 Once the synchronization is complete, the node is said to be *bootstrapped*.
 Some operations require the node to be bootstrapped.
 
+.. _node-protocol:
+
 Node protocol
 ~~~~~~~~~~~~~
 
-A Tezos node can switch from one protocol to another during its execution.
-This typically happens during the synchronization phase when a node launches for
-the first time. The node starts with the genesis protocol and then switches to
-the Alpha protocol.
+A Tezos node can switch from one protocol to another during its
+execution.  This typically happens during the synchronization phase
+when a node launches for the first time. The node starts with the
+genesis protocol and then goes through all previous protocols until it
+finally switches to the current protocol.
+
+Throughout the documentation, `Alpha` refers to the protocol in the
+``src/proto_alpha`` directory of the ``master`` branch, which is a
+copy of the protocol active on Mainnet.  The Alpha protocol is used by
+default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
+suites. Its git history is also more detailed.
+
 
 Storage
 ~~~~~~~
