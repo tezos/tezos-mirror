@@ -32,9 +32,11 @@ def all_deprecated_contracts() -> List[str]:
 TEZOS_HOME = tezos_home()
 TEZOS_BINARIES = os.environ.get('TEZOS_BINARIES')
 
-CONTRACT_PATH = path.join(TEZOS_HOME, 'src', 'bin_client', 'test', 'contracts')
+CONTRACT_PATH = path.join(TEZOS_HOME, 'tests_python', 'contracts')
 MACROS_CONTRACT_PATH = path.join(CONTRACT_PATH, 'macros')
 ILLTYPED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'ill_typed')
 DEPRECATED_CONTRACT_PATH = path.join(CONTRACT_PATH, 'deprecated')
 OPCODES_CONTRACT_PATH = path.join(CONTRACT_PATH, 'opcodes')
+MINI_SCENARIOS_CONTRACT_PATH = path.join(CONTRACT_PATH,
+                                         'mini_scenarios')
 ACCOUNT_PATH = path.join(TEZOS_HOME, 'tests_python', 'account')

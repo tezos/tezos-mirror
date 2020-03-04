@@ -375,7 +375,7 @@ by an implicit account. An originated account serves two purposes.
 Let's originate our first contract and call it *id*::
 
     tezos-client originate contract id for alice transferring 1 from alice \
-                 running ./src/bin_client/test/contracts/attic/id.tz \
+                 running ./tests_python/contracts/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
 The contract manager is the implicit account ``alice``. The initial balance
@@ -459,7 +459,7 @@ usage. Otherwise, you can force a low fee operation using the
 `--force-low-fee`, with the risk that no baker will include it.
 
 More test contracts can be found in directory
-:src:`src/bin_client/test/contracts/`.
+:src:`tests_python/contracts/`.
 An advanced documentation of the smart contract language is available
 :ref:`here<michelson>`.
 For details and examples, see also https://www.michelson-lang.com/

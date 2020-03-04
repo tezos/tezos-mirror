@@ -1,7 +1,7 @@
 from os import path
 import pytest
-from tools import paths
-from tools.paths import OPCODES_CONTRACT_PATH
+from tools.paths import OPCODES_CONTRACT_PATH, \
+    MINI_SCENARIOS_CONTRACT_PATH
 from tools.utils import assert_run_failure, assert_run_script_success, \
     assert_run_script_failwith
 
@@ -757,8 +757,8 @@ class TestContractOpcodes:
                            expected,
                            big_map_diff):
         client = client_regtest
-        contract = f'{paths.TEZOS_HOME}/src/bin_client/test/' + \
-            'contracts/mini_scenarios/big_map_magic.tz'
+        contract = path.join(MINI_SCENARIOS_CONTRACT_PATH,
+                             'big_map_magic.tz')
         run_script_res = client.run_script(contract, storage, param,
                                            None, True)
         assert run_script_res.storage == expected

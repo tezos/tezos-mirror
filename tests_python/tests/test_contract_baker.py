@@ -1,3 +1,4 @@
+import os
 import pytest
 from tools import paths, utils
 
@@ -20,8 +21,8 @@ class TestOriginationCall:
 
     def test_originate(self, client, session):
         initial_storage = 'Unit'
-        path = f'{paths.TEZOS_HOME}/src/bin_client/test/contracts/opcodes'
-        contract = f'{path}/transfer_tokens.tz'
+        contract = os.path.join(paths.OPCODES_CONTRACT_PATH,
+                                'transfer_tokens.tz')
         args = ['--init', initial_storage, '--burn-cap', '0.400']
         origination = client.originate('foobar', 1000,
                                        'bootstrap1', contract, args)
