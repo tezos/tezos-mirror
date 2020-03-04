@@ -76,7 +76,7 @@ Injected block [BLOCK_HASH]
 [CONTRACT_HASH]
 
 Node is bootstrapped.
-Estimated gas: 3251728 units (will add 12800 for safety)
+Estimated gas: 3195148 units (will add 12800 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -87,13 +87,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.002847
+    Fee to the baker: ꜩ0.002803
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3264528
+    Gas limit: 3207948
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.002847
-      fees(the baker who will include this operation,2) ... +ꜩ0.002847
+      [CONTRACT_HASH] ................ -ꜩ0.002803
+      fees(the baker who will include this operation,2) ... +ꜩ0.002803
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -101,8 +101,8 @@ This sequence of operations was run:
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
       Updated storage: Unit
-      Storage size: 76 bytes
-      Consumed gas: 1687308
+      Storage size: 55 bytes
+      Consumed gas: 1630728
     Internal operations:
       Transaction:
         Amount: ꜩ0

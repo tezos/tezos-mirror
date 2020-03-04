@@ -7,70 +7,32 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 133022976 units remaining)
+  - location: 9 (remaining gas: 133060352 units remaining)
     [ (Pair (Pair 1 1) (Some 0xaabbcc))  	 ]
-  - location: 12 (remaining gas: 133022876 units remaining)
-    [ (Pair (Pair 1 1) (Some 0xaabbcc))  	
-      (Pair (Pair 1 1) (Some 0xaabbcc))  	 ]
-  - location: 13 (remaining gas: 133022816 units remaining)
-    [ (Pair 1 1)  	@parameter
-      (Pair (Pair 1 1) (Some 0xaabbcc))  	 ]
-  - location: 16 (remaining gas: 133022696 units remaining)
-    [ (Some 0xaabbcc)  	@storage ]
-  - location: 15 (remaining gas: 133022676 units remaining)
-    [ (Some 0xaabbcc)  	@storage ]
-  - location: 14 (remaining gas: 133022676 units remaining)
+  - location: 10 (remaining gas: 133060272 units remaining)
     [ (Pair 1 1)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: -1 (remaining gas: 133022656 units remaining)
-    [ (Pair 1 1)  	@parameter
-      (Some 0xaabbcc)  	@storage ]
-  - location: 10 (remaining gas: 133022636 units remaining)
-    [ (Pair 1 1)  	@parameter
-      (Some 0xaabbcc)  	@storage ]
-  - location: 17 (remaining gas: 133022576 units remaining)
+  - location: 11 (remaining gas: 133060212 units remaining)
     [ (Some 0xaabbcc)  	@storage
       (Pair 1 1)  	@parameter ]
-  - location: 25 (remaining gas: 133022436 units remaining)
+  - location: 19 (remaining gas: 133060072 units remaining)
     [ (Pair 1 1)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 28 (remaining gas: 133022336 units remaining)
-    [ (Pair 1 1)  	@parameter
-      (Pair 1 1)  	@parameter
-      0xaabbcc  	@storage.some ]
-  - location: 29 (remaining gas: 133022276 units remaining)
-    [ 1  	
-      (Pair 1 1)  	@parameter
-      0xaabbcc  	@storage.some ]
-  - location: 32 (remaining gas: 133022156 units remaining)
-    [ 1  	
-      0xaabbcc  	@storage.some ]
-  - location: 31 (remaining gas: 133022136 units remaining)
-    [ 1  	
-      0xaabbcc  	@storage.some ]
-  - location: 30 (remaining gas: 133022136 units remaining)
+  - location: 20 (remaining gas: 133059992 units remaining)
     [ 1  	
       1  	
       0xaabbcc  	@storage.some ]
-  - location: -1 (remaining gas: 133022116 units remaining)
-    [ 1  	
-      1  	
-      0xaabbcc  	@storage.some ]
-  - location: 26 (remaining gas: 133022096 units remaining)
-    [ 1  	
-      1  	
-      0xaabbcc  	@storage.some ]
-  - location: 33 (remaining gas: 133021976 units remaining)
+  - location: 21 (remaining gas: 133059872 units remaining)
     [ (Some 0xbb)  	@storage.some.slice ]
-  - location: -1 (remaining gas: 133021956 units remaining)
+  - location: -1 (remaining gas: 133059852 units remaining)
     [ (Some 0xbb)  	@storage.some.slice ]
-  - location: 18 (remaining gas: 133021936 units remaining)
+  - location: 12 (remaining gas: 133059832 units remaining)
     [ (Some 0xbb)  	 ]
-  - location: 34 (remaining gas: 133021876 units remaining)
+  - location: 22 (remaining gas: 133059772 units remaining)
     [ {}  	
       (Some 0xbb)  	 ]
-  - location: 36 (remaining gas: 133021816 units remaining)
+  - location: 24 (remaining gas: 133059712 units remaining)
     [ (Pair {} (Some 0xbb))  	 ]
-  - location: -1 (remaining gas: 133021796 units remaining)
+  - location: -1 (remaining gas: 133059692 units remaining)
     [ (Pair {} (Some 0xbb))  	 ]
 

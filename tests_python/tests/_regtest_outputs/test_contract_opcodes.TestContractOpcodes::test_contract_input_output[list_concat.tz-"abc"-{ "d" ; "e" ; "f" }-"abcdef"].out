@@ -7,39 +7,23 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133063296 units remaining)
+  - location: 7 (remaining gas: 133081984 units remaining)
     [ (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 10 (remaining gas: 133063196 units remaining)
-    [ (Pair { "d" ; "e" ; "f" } "abc")  	
-      (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 11 (remaining gas: 133063136 units remaining)
-    [ { "d" ; "e" ; "f" }  	@parameter
-      (Pair { "d" ; "e" ; "f" } "abc")  	 ]
-  - location: 14 (remaining gas: 133063016 units remaining)
-    [ "abc"  	@storage ]
-  - location: 13 (remaining gas: 133062996 units remaining)
-    [ "abc"  	@storage ]
-  - location: 12 (remaining gas: 133062996 units remaining)
+  - location: 8 (remaining gas: 133081904 units remaining)
     [ { "d" ; "e" ; "f" }  	@parameter
       "abc"  	@storage ]
-  - location: -1 (remaining gas: 133062976 units remaining)
-    [ { "d" ; "e" ; "f" }  	@parameter
-      "abc"  	@storage ]
-  - location: 8 (remaining gas: 133062956 units remaining)
-    [ { "d" ; "e" ; "f" }  	@parameter
-      "abc"  	@storage ]
-  - location: 15 (remaining gas: 133062896 units remaining)
+  - location: 9 (remaining gas: 133081844 units remaining)
     [ "abc"  	@storage
       { "d" ; "e" ; "f" }  	@parameter ]
-  - location: 16 (remaining gas: 133062836 units remaining)
+  - location: 10 (remaining gas: 133081784 units remaining)
     [ { "abc" ; "d" ; "e" ; "f" }  	 ]
-  - location: 17 (remaining gas: 133062496 units remaining)
+  - location: 11 (remaining gas: 133081444 units remaining)
     [ "abcdef"  	 ]
-  - location: 18 (remaining gas: 133062436 units remaining)
+  - location: 12 (remaining gas: 133081384 units remaining)
     [ {}  	
       "abcdef"  	 ]
-  - location: 20 (remaining gas: 133062376 units remaining)
+  - location: 14 (remaining gas: 133081324 units remaining)
     [ (Pair {} "abcdef")  	 ]
-  - location: -1 (remaining gas: 133062356 units remaining)
+  - location: -1 (remaining gas: 133081304 units remaining)
     [ (Pair {} "abcdef")  	 ]
 

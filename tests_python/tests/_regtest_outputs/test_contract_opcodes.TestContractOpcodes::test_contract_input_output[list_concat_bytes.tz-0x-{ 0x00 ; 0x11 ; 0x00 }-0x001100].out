@@ -7,39 +7,23 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133063552 units remaining)
+  - location: 7 (remaining gas: 133082240 units remaining)
     [ (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
-  - location: 10 (remaining gas: 133063452 units remaining)
-    [ (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	
-      (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
-  - location: 11 (remaining gas: 133063392 units remaining)
-    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
-      (Pair { 0x00 ; 0x11 ; 0x00 } 0x)  	 ]
-  - location: 14 (remaining gas: 133063272 units remaining)
-    [ 0x  	@storage ]
-  - location: 13 (remaining gas: 133063252 units remaining)
-    [ 0x  	@storage ]
-  - location: 12 (remaining gas: 133063252 units remaining)
+  - location: 8 (remaining gas: 133082160 units remaining)
     [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
       0x  	@storage ]
-  - location: -1 (remaining gas: 133063232 units remaining)
-    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
-      0x  	@storage ]
-  - location: 8 (remaining gas: 133063212 units remaining)
-    [ { 0x00 ; 0x11 ; 0x00 }  	@parameter
-      0x  	@storage ]
-  - location: 15 (remaining gas: 133063152 units remaining)
+  - location: 9 (remaining gas: 133082100 units remaining)
     [ 0x  	@storage
       { 0x00 ; 0x11 ; 0x00 }  	@parameter ]
-  - location: 16 (remaining gas: 133063092 units remaining)
+  - location: 10 (remaining gas: 133082040 units remaining)
     [ { 0x ; 0x00 ; 0x11 ; 0x00 }  	 ]
-  - location: 17 (remaining gas: 133062752 units remaining)
+  - location: 11 (remaining gas: 133081700 units remaining)
     [ 0x001100  	 ]
-  - location: 18 (remaining gas: 133062692 units remaining)
+  - location: 12 (remaining gas: 133081640 units remaining)
     [ {}  	
       0x001100  	 ]
-  - location: 20 (remaining gas: 133062632 units remaining)
+  - location: 14 (remaining gas: 133081580 units remaining)
     [ (Pair {} 0x001100)  	 ]
-  - location: -1 (remaining gas: 133062612 units remaining)
+  - location: -1 (remaining gas: 133081560 units remaining)
     [ (Pair {} 0x001100)  	 ]
 

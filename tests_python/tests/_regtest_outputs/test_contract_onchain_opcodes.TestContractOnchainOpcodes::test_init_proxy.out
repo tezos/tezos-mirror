@@ -1,8 +1,8 @@
 tests/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_init_proxy
 
 Node is bootstrapped.
-Estimated gas: 1576192 units (will add 12800 for safety)
-Estimated storage: 333 bytes added (will add 20 for safety)
+Estimated gas: 1506432 units (will add 12800 for safety)
+Estimated storage: 312 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.00155
+    Fee to the baker: ꜩ0.001474
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1588992
-    Storage limit: 353 bytes
+    Gas limit: 1519232
+    Storage limit: 332 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.00155
-      fees(the baker who will include this operation,2) ... +ꜩ0.00155
+      [CONTRACT_HASH] ................ -ꜩ0.001474
+      fees(the baker who will include this operation,2) ... +ꜩ0.001474
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
@@ -37,11 +37,11 @@ This sequence of operations was run:
         This origination was successfully applied
         Originated contracts:
           [CONTRACT_HASH]
-        Storage size: 76 bytes
-        Paid storage size diff: 76 bytes
-        Consumed gas: 1576192
+        Storage size: 55 bytes
+        Paid storage size diff: 55 bytes
+        Consumed gas: 1506432
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.076
+          [CONTRACT_HASH] ... -ꜩ0.055
           [CONTRACT_HASH] ... -ꜩ0.257
           [CONTRACT_HASH] ... -ꜩ1000
           [CONTRACT_HASH] ... +ꜩ1000

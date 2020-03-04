@@ -7,46 +7,30 @@ emitted operations
 big_map diff
   
 trace
-  - location: 18 (remaining gas: 133003904 units remaining)
+  - location: 18 (remaining gas: 133022592 units remaining)
     [ (Pair (Pair 10 (Right 10)) (Left None))  	 ]
-  - location: 19 (remaining gas: 133003844 units remaining)
+  - location: 19 (remaining gas: 133022532 units remaining)
     [ (Pair 10 (Right 10))  	@parameter ]
-  - location: 22 (remaining gas: 133003744 units remaining)
-    [ (Pair 10 (Right 10))  	@parameter
-      (Pair 10 (Right 10))  	@parameter ]
-  - location: 23 (remaining gas: 133003684 units remaining)
-    [ 10  	
-      (Pair 10 (Right 10))  	@parameter ]
-  - location: 26 (remaining gas: 133003564 units remaining)
-    [ (Right 10)  	 ]
-  - location: 25 (remaining gas: 133003544 units remaining)
-    [ (Right 10)  	 ]
-  - location: 24 (remaining gas: 133003544 units remaining)
+  - location: 20 (remaining gas: 133022452 units remaining)
     [ 10  	
       (Right 10)  	 ]
-  - location: -1 (remaining gas: 133003524 units remaining)
-    [ 10  	
-      (Right 10)  	 ]
-  - location: 20 (remaining gas: 133003504 units remaining)
-    [ 10  	
-      (Right 10)  	 ]
-  - location: 27 (remaining gas: 133003444 units remaining)
+  - location: 21 (remaining gas: 133022392 units remaining)
     [ (Right 10)  	
       10  	 ]
-  - location: 38 (remaining gas: 133003324 units remaining)
+  - location: 32 (remaining gas: 133022272 units remaining)
     [ 10  	
       10  	 ]
-  - location: 39 (remaining gas: 133003142 units remaining)
+  - location: 33 (remaining gas: 133022090 units remaining)
     [ (Some (Pair 1 0))  	 ]
-  - location: 40 (remaining gas: 133003082 units remaining)
+  - location: 34 (remaining gas: 133022030 units remaining)
     [ (Right (Some (Pair 1 0)))  	 ]
-  - location: -1 (remaining gas: 133003062 units remaining)
+  - location: -1 (remaining gas: 133022010 units remaining)
     [ (Right (Some (Pair 1 0)))  	 ]
-  - location: 45 (remaining gas: 133003002 units remaining)
+  - location: 39 (remaining gas: 133021950 units remaining)
     [ {}  	
       (Right (Some (Pair 1 0)))  	 ]
-  - location: 47 (remaining gas: 133002942 units remaining)
+  - location: 41 (remaining gas: 133021890 units remaining)
     [ (Pair {} (Right (Some (Pair 1 0))))  	 ]
-  - location: -1 (remaining gas: 133002922 units remaining)
+  - location: -1 (remaining gas: 133021870 units remaining)
     [ (Pair {} (Right (Some (Pair 1 0))))  	 ]
 

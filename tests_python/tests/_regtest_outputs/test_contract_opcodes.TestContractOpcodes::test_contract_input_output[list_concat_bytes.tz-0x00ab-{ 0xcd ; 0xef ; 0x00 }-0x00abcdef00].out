@@ -7,39 +7,23 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133063296 units remaining)
+  - location: 7 (remaining gas: 133081984 units remaining)
     [ (Pair { 0xcd ; 0xef ; 0x00 } 0x00ab)  	 ]
-  - location: 10 (remaining gas: 133063196 units remaining)
-    [ (Pair { 0xcd ; 0xef ; 0x00 } 0x00ab)  	
-      (Pair { 0xcd ; 0xef ; 0x00 } 0x00ab)  	 ]
-  - location: 11 (remaining gas: 133063136 units remaining)
-    [ { 0xcd ; 0xef ; 0x00 }  	@parameter
-      (Pair { 0xcd ; 0xef ; 0x00 } 0x00ab)  	 ]
-  - location: 14 (remaining gas: 133063016 units remaining)
-    [ 0x00ab  	@storage ]
-  - location: 13 (remaining gas: 133062996 units remaining)
-    [ 0x00ab  	@storage ]
-  - location: 12 (remaining gas: 133062996 units remaining)
+  - location: 8 (remaining gas: 133081904 units remaining)
     [ { 0xcd ; 0xef ; 0x00 }  	@parameter
       0x00ab  	@storage ]
-  - location: -1 (remaining gas: 133062976 units remaining)
-    [ { 0xcd ; 0xef ; 0x00 }  	@parameter
-      0x00ab  	@storage ]
-  - location: 8 (remaining gas: 133062956 units remaining)
-    [ { 0xcd ; 0xef ; 0x00 }  	@parameter
-      0x00ab  	@storage ]
-  - location: 15 (remaining gas: 133062896 units remaining)
+  - location: 9 (remaining gas: 133081844 units remaining)
     [ 0x00ab  	@storage
       { 0xcd ; 0xef ; 0x00 }  	@parameter ]
-  - location: 16 (remaining gas: 133062836 units remaining)
+  - location: 10 (remaining gas: 133081784 units remaining)
     [ { 0x00ab ; 0xcd ; 0xef ; 0x00 }  	 ]
-  - location: 17 (remaining gas: 133062496 units remaining)
+  - location: 11 (remaining gas: 133081444 units remaining)
     [ 0x00abcdef00  	 ]
-  - location: 18 (remaining gas: 133062436 units remaining)
+  - location: 12 (remaining gas: 133081384 units remaining)
     [ {}  	
       0x00abcdef00  	 ]
-  - location: 20 (remaining gas: 133062376 units remaining)
+  - location: 14 (remaining gas: 133081324 units remaining)
     [ (Pair {} 0x00abcdef00)  	 ]
-  - location: -1 (remaining gas: 133062356 units remaining)
+  - location: -1 (remaining gas: 133081304 units remaining)
     [ (Pair {} 0x00abcdef00)  	 ]
 

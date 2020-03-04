@@ -7,251 +7,133 @@ emitted operations
 big_map diff
   
 trace
-  - location: 26 (remaining gas: 132871168 units remaining)
+  - location: 26 (remaining gas: 132945920 units remaining)
     [ (Pair (Pair -8 2) (Pair None (Pair None (Pair None None))))  	 ]
-  - location: 27 (remaining gas: 132871108 units remaining)
+  - location: 27 (remaining gas: 132945860 units remaining)
     [ (Pair -8 2)  	@parameter ]
-  - location: 28 (remaining gas: 132871048 units remaining)
+  - location: 28 (remaining gas: 132945800 units remaining)
     [ (Pair -8 2)  	@parameter
       (Pair -8 2)  	@parameter ]
-  - location: 31 (remaining gas: 132870948 units remaining)
-    [ (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter ]
-  - location: 32 (remaining gas: 132870888 units remaining)
-    [ -8  	
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter ]
-  - location: 35 (remaining gas: 132870768 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter ]
-  - location: 34 (remaining gas: 132870748 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter ]
-  - location: 33 (remaining gas: 132870748 units remaining)
+  - location: 29 (remaining gas: 132945720 units remaining)
     [ -8  	
       2  	
       (Pair -8 2)  	@parameter ]
-  - location: -1 (remaining gas: 132870728 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter ]
-  - location: 29 (remaining gas: 132870708 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter ]
-  - location: 36 (remaining gas: 132870546 units remaining)
+  - location: 30 (remaining gas: 132945558 units remaining)
     [ 8  	
       2  	
       (Pair -8 2)  	@parameter ]
-  - location: 39 (remaining gas: 132870324 units remaining)
+  - location: 33 (remaining gas: 132945336 units remaining)
     [ 2  	
       (Pair -8 2)  	@parameter ]
-  - location: 38 (remaining gas: 132870304 units remaining)
+  - location: 32 (remaining gas: 132945316 units remaining)
     [ 2  	
       (Pair -8 2)  	@parameter ]
-  - location: 37 (remaining gas: 132870304 units remaining)
+  - location: 31 (remaining gas: 132945316 units remaining)
     [ 8  	
       2  	
       (Pair -8 2)  	@parameter ]
-  - location: 40 (remaining gas: 132870162 units remaining)
+  - location: 34 (remaining gas: 132945174 units remaining)
     [ (Some (Pair 4 0))  	
       (Pair -8 2)  	@parameter ]
-  - location: 41 (remaining gas: 132870102 units remaining)
+  - location: 35 (remaining gas: 132945114 units remaining)
     [ (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	 ]
-  - location: 42 (remaining gas: 132870042 units remaining)
+  - location: 36 (remaining gas: 132945054 units remaining)
     [ (Pair -8 2)  	@parameter
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	 ]
-  - location: 45 (remaining gas: 132869942 units remaining)
-    [ (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 46 (remaining gas: 132869882 units remaining)
-    [ -8  	
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 49 (remaining gas: 132869762 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 48 (remaining gas: 132869742 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 47 (remaining gas: 132869742 units remaining)
+  - location: 37 (remaining gas: 132944974 units remaining)
     [ -8  	
       2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	 ]
-  - location: -1 (remaining gas: 132869722 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 43 (remaining gas: 132869702 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	 ]
-  - location: 50 (remaining gas: 132869540 units remaining)
+  - location: 38 (remaining gas: 132944812 units remaining)
     [ 8  	
       2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	 ]
-  - location: 51 (remaining gas: 132869398 units remaining)
+  - location: 39 (remaining gas: 132944670 units remaining)
     [ (Some (Pair 4 0))  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	 ]
-  - location: 52 (remaining gas: 132869338 units remaining)
+  - location: 40 (remaining gas: 132944610 units remaining)
     [ (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 53 (remaining gas: 132869278 units remaining)
+  - location: 41 (remaining gas: 132944550 units remaining)
     [ (Pair -8 2)  	@parameter
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 56 (remaining gas: 132869178 units remaining)
-    [ (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 57 (remaining gas: 132869118 units remaining)
-    [ -8  	
-      (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 60 (remaining gas: 132868998 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 59 (remaining gas: 132868978 units remaining)
-    [ 2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 58 (remaining gas: 132868978 units remaining)
+  - location: 42 (remaining gas: 132944470 units remaining)
     [ -8  	
       2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: -1 (remaining gas: 132868958 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 54 (remaining gas: 132868938 units remaining)
-    [ -8  	
-      2  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 63 (remaining gas: 132868716 units remaining)
+  - location: 45 (remaining gas: 132944248 units remaining)
     [ 2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 62 (remaining gas: 132868696 units remaining)
+  - location: 44 (remaining gas: 132944228 units remaining)
     [ 2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 61 (remaining gas: 132868696 units remaining)
+  - location: 43 (remaining gas: 132944228 units remaining)
     [ -8  	
       2  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 64 (remaining gas: 132868554 units remaining)
+  - location: 46 (remaining gas: 132944086 units remaining)
     [ (Some (Pair -4 0))  	
       (Pair -8 2)  	@parameter
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 65 (remaining gas: 132868494 units remaining)
+  - location: 47 (remaining gas: 132944026 units remaining)
     [ (Pair -8 2)  	@parameter
       (Some (Pair -4 0))  	
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 68 (remaining gas: 132868394 units remaining)
-    [ (Pair -8 2)  	@parameter
-      (Pair -8 2)  	@parameter
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 69 (remaining gas: 132868334 units remaining)
-    [ -8  	
-      (Pair -8 2)  	@parameter
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 72 (remaining gas: 132868214 units remaining)
-    [ 2  	
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 71 (remaining gas: 132868194 units remaining)
-    [ 2  	
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 70 (remaining gas: 132868194 units remaining)
+  - location: 48 (remaining gas: 132943946 units remaining)
     [ -8  	
       2  	
       (Some (Pair -4 0))  	
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: -1 (remaining gas: 132868174 units remaining)
-    [ -8  	
-      2  	
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 66 (remaining gas: 132868154 units remaining)
-    [ -8  	
-      2  	
-      (Some (Pair -4 0))  	
-      (Some (Pair 4 0))  	
-      (Some (Pair 4 0))  	 ]
-  - location: 73 (remaining gas: 132868012 units remaining)
+  - location: 49 (remaining gas: 132943804 units remaining)
     [ (Some (Pair -4 0))  	
       (Some (Pair -4 0))  	
       (Some (Pair 4 0))  	
       (Some (Pair 4 0))  	 ]
-  - location: 78 (remaining gas: 132867850 units remaining)
+  - location: 54 (remaining gas: 132943642 units remaining)
     [ (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
-  - location: 77 (remaining gas: 132867830 units remaining)
+  - location: 53 (remaining gas: 132943622 units remaining)
     [ (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
-  - location: 75 (remaining gas: 132867830 units remaining)
+  - location: 51 (remaining gas: 132943622 units remaining)
     [ (Some (Pair -4 0))  	
       (Some (Pair -4 0))  	
       (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
-  - location: 81 (remaining gas: 132867710 units remaining)
+  - location: 57 (remaining gas: 132943502 units remaining)
     [ (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0))))  	 ]
-  - location: 80 (remaining gas: 132867690 units remaining)
+  - location: 56 (remaining gas: 132943482 units remaining)
     [ (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0))))  	 ]
-  - location: 79 (remaining gas: 132867690 units remaining)
+  - location: 55 (remaining gas: 132943482 units remaining)
     [ (Some (Pair -4 0))  	
       (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0))))  	 ]
-  - location: 82 (remaining gas: 132867630 units remaining)
+  - location: 58 (remaining gas: 132943422 units remaining)
     [ (Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))))  	 ]
-  - location: -1 (remaining gas: 132867610 units remaining)
+  - location: -1 (remaining gas: 132943402 units remaining)
     [ (Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))))  	 ]
-  - location: 83 (remaining gas: 132867550 units remaining)
+  - location: 59 (remaining gas: 132943342 units remaining)
     [ {}  	
       (Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))))  	 ]
-  - location: 85 (remaining gas: 132867490 units remaining)
+  - location: 61 (remaining gas: 132943282 units remaining)
     [ (Pair {}
             (Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0))))))  	 ]
-  - location: -1 (remaining gas: 132867470 units remaining)
+  - location: -1 (remaining gas: 132943262 units remaining)
     [ (Pair {}
             (Pair (Some (Pair -4 0)) (Pair (Some (Pair -4 0)) (Pair (Some (Pair 4 0)) (Some (Pair 4 0))))))  	 ]
 
