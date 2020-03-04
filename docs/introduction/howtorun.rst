@@ -76,8 +76,8 @@ to 1 roll.
 When you obtain coins from :ref:`the faucet<faucet>`, if you
 are lucky to obtain more than one roll, you can register a delegate
 using this identity.
-Otherwise, you need to ask the faucet for more accounts, originate an
-account for each one and delegate them to the first.
+Otherwise, you need to ask the faucet for more accounts and
+delegate them to the first.
 
 Deposits and over-delegation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
