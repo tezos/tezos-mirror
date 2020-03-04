@@ -103,7 +103,7 @@ let shutdown t =
       Lwt_canceler.cancel t.canceler >>= fun () -> w
 
 let write_swap_ack t point peer_id =
-  P2p_socket.write_now t.conn (Swap_request (point, peer_id))
+  P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
 
 let create conn point_info peer_info messages canceler callback
     negotiated_version =
