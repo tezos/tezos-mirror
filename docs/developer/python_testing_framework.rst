@@ -549,13 +549,11 @@ In this example test, we test the output of the `hash data` command of
 
 .. code-block:: python
 
-    import pytest
-
     class TestDemonstrateRegtest:
         """Tests demonstrating regression testing."""
 
         def test_hash_regtest(self, client_regtest):
-            client_regtest.hash('(Pair 1 "foo")', '(pair nat string)').blake2b == \
+            assert client_regtest.hash('(Pair 1 "foo")', '(pair nat string)').blake2b == \
                 "Hadaf2hW4QwbgTdhtAfFTofrCbmnnPhkGy2Sa5ZneUDs"
 
 
