@@ -935,7 +935,7 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
   >>= fun () ->
   let context_root = context_dir data_dir in
   let store_root = store_dir data_dir in
-  let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
+  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   State.init ~context_root ~store_root genesis ?patch_context
   >>=? fun (state, chain_state, context_index, _history_mode) ->
   Store.init store_root

@@ -67,7 +67,7 @@ module Term = struct
       let genesis = config.blockchain_network.genesis in
       State.init ~context_root ~store_root genesis
       >>=? fun (state, chain_state, context_index, history_mode) ->
-      let chain_id = Chain_id.of_block_hash genesis.State.Chain.block in
+      let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
       fail_unless
         (history_mode = History_mode.Full)
         (Snapshots.Cannot_reconstruct history_mode)

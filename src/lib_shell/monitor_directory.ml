@@ -195,7 +195,7 @@ let build_rpc_directory validator mainchain_validator =
           else
             State.Chain.get_exn state chain_id
             >>= fun chain_state ->
-            let {State.Chain.protocol; _} = State.Chain.genesis chain_state in
+            let {Genesis.protocol; _} = State.Chain.genesis chain_state in
             let expiration_date =
               Option.unopt_exn
                 (Invalid_argument

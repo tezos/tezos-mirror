@@ -46,8 +46,12 @@ let proto =
 
 module Proto = (val proto)
 
-let genesis : State.Chain.genesis =
-  {time = genesis_time; block = genesis_block; protocol = genesis_protocol}
+let genesis : Genesis.t =
+  {
+    Genesis.time = genesis_time;
+    block = genesis_block;
+    protocol = genesis_protocol;
+  }
 
 let incr_fitness fitness =
   let new_fitness =

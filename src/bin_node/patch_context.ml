@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let patch_context (genesis : State.Chain.genesis) key_json ctxt =
+let patch_context (genesis : Genesis.t) key_json ctxt =
   ( match key_json with
   | None ->
       Lwt.return ctxt

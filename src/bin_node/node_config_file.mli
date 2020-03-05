@@ -31,7 +31,7 @@ type chain_name = Distributed_db_version.Name.t
 type blockchain_network = {
   alias : string option;
       (** as given to [--network], only for built-in networks *)
-  genesis : State.Chain.genesis;
+  genesis : Genesis.t;
   chain_name : chain_name;
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;

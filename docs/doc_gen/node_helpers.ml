@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let genesis : State.Chain.genesis =
+let genesis : Genesis.t =
   {
     time = Time.Protocol.of_notation_exn "2018-04-17T11:46:23Z";
     block =

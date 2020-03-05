@@ -69,6 +69,7 @@ module Time = Time
 module Fitness = Fitness
 module User_activated = User_activated
 module Block_header = Block_header
+module Genesis = Genesis
 module Operation = Operation
 module Protocol = Protocol
 module Test_chain_status = Test_chain_status

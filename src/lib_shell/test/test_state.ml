@@ -46,7 +46,7 @@ let proto =
 
 module Proto = (val proto)
 
-let genesis : State.Chain.genesis =
+let genesis : Genesis.t =
   {time = genesis_time; block = genesis_block; protocol = genesis_protocol}
 
 let chain_id = Chain_id.of_block_hash genesis_block

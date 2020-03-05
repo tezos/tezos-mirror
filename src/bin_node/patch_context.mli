@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 val patch_context :
-  State.Chain.genesis ->
+  Genesis.t ->
   (string * Data_encoding.json) option ->
   Context.t ->
   Context.t Lwt.t

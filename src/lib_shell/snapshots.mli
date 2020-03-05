@@ -30,7 +30,7 @@ val export :
   ?export_rolling:bool ->
   context_root:string ->
   store_root:string ->
-  genesis:State.Chain.genesis ->
+  genesis:Genesis.t ->
   string ->
   block:string option ->
   unit tzresult Lwt.t
@@ -42,7 +42,7 @@ val import :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   dir_cleaner:(string -> unit Lwt.t) ->
-  genesis:State.Chain.genesis ->
+  genesis:Genesis.t ->
   string ->
   block:string option ->
   unit tzresult Lwt.t

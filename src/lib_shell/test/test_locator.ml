@@ -39,9 +39,9 @@ let genesis_time = Time.Protocol.of_seconds 0L
 
 let state_genesis_block =
   {
-    State.Chain.time = genesis_time;
-    State.Chain.block = genesis_hash;
-    State.Chain.protocol = genesis_protocol;
+    Genesis.time = genesis_time;
+    block = genesis_hash;
+    protocol = genesis_protocol;
   }
 
 let chain_id = Chain_id.of_block_hash genesis_hash

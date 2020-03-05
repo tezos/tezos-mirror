@@ -36,12 +36,6 @@ module Shared = struct
   let use {data; lock} f = Lwt_mutex.with_lock lock (fun () -> f data)
 end
 
-type genesis = {
-  time : Time.Protocol.t;
-  block : Block_hash.t;
-  protocol : Protocol_hash.t;
-}
-
 type global_state = {
   global_data : global_data Shared.t;
   protocol_store : Store.Protocol.store Shared.t;
@@ -61,7 +55,7 @@ and chain_state = {
      the lock on 'chain_data'. *)
   global_state : global_state;
   chain_id : Chain_id.t;
-  genesis : genesis;
+  genesis : Genesis.t;
   faked_genesis_hash : Block_hash.t;
   expiration : Time.Protocol.t option;
   allow_forked_chain : bool;
@@ -312,6 +306,7 @@ type t = global_state
 module Locked_block = struct
   let store_genesis store genesis context =
     let shell : Block_header.shell_header =
+      let open Genesis in
       {
         level = 0l;
         proto_level = 0;
@@ -488,22 +483,6 @@ let cut_alternate_heads block_store chain_store heads =
     heads
 
 module Chain = struct
-  type nonrec genesis = genesis = {
-    time : Time.Protocol.t;
-    block : Block_hash.t;
-    protocol : Protocol_hash.t;
-  }
-
-  let genesis_encoding =
-    let open Data_encoding in
-    conv
-      (fun {time; block; protocol} -> (time, block, protocol))
-      (fun (time, block, protocol) -> {time; block; protocol})
-      (obj3
-         (req "timestamp" Time.Protocol.encoding)
-         (req "block" Block_hash.encoding)
-         (req "protocol" Protocol_hash.encoding))
-
   type t = chain_state
 
   type chain_state = t
@@ -568,7 +547,7 @@ module Chain = struct
             current_head =
               {chain_state; hash = current_head; header = current_block_head};
             current_mempool = Mempool.empty;
-            live_blocks = Block_hash.Set.singleton genesis.block;
+            live_blocks = Block_hash.Set.singleton genesis.Genesis.block;
             live_operations = Operation_hash.Set.empty;
             test_chain = None;
           };
@@ -595,6 +574,7 @@ module Chain = struct
 
   let locked_create global_state data ?expiration ?(allow_forked_chain = false)
       chain_id genesis (genesis_header : Block_header.t) =
+    let open Genesis in
     let chain_store = Store.Chain.get data.global_store chain_id in
     let block_store = Store.Block.get chain_store
     and chain_data_store = Store.Chain_data.get chain_store in
@@ -659,7 +639,7 @@ module Chain = struct
         else
           commit_genesis
             ~chain_id
-            ~time:genesis.time
+            ~time:genesis.Genesis.time
             ~protocol:genesis.protocol
           >>=? fun commit ->
           Locked_block.store_genesis block_store genesis commit
@@ -695,7 +675,7 @@ module Chain = struct
     >>= fun allow_forked_chain ->
     Header.read (block_store, genesis_hash)
     >>=? fun genesis_header ->
-    let genesis = {time; protocol; block = genesis_hash} in
+    let genesis = {Genesis.time; protocol; block = genesis_hash} in
     Store.Chain_data.Current_head.read chain_data_store
     >>=? fun current_head ->
     Store.Chain_data.Checkpoint.read chain_data_store
@@ -1601,7 +1581,11 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol
         }
       >>= fun () ->
       let genesis =
-        {block = genesis_hash; time = genesis_header.shell.timestamp; protocol}
+        {
+          Genesis.block = genesis_hash;
+          time = genesis_header.shell.timestamp;
+          protocol;
+        }
       in
       Chain.locked_create
         block.chain_state.global_state
@@ -1832,7 +1816,7 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
       in
       Lwt.return (context_index, commit_genesis) )
   >>= fun (context_index, commit_genesis) ->
-  let chain_id = Chain_id.of_block_hash genesis.Chain.block in
+  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   read global_store context_index chain_id
   >>=? fun state ->
   may_create_chain ~commit_genesis state chain_id genesis

@@ -143,7 +143,7 @@ let init_p2p chain_name p2p_params disable_mempool =
       >>= fun () -> return p2p
 
 type config = {
-  genesis : State.Chain.genesis;
+  genesis : Genesis.t;
   chain_name : Distributed_db_version.Name.t;
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;

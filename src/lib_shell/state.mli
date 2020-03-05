@@ -45,15 +45,6 @@ module Chain : sig
 
   type chain_state = t
 
-  (** The chain starts from a genesis block associated to a seed protocol *)
-  type genesis = {
-    time : Time.Protocol.t;
-    block : Block_hash.t;
-    protocol : Protocol_hash.t;
-  }
-
-  val genesis_encoding : genesis Data_encoding.t
-
   (** Initialize a chain for a given [genesis]. By default,
       the chain does accept forking test chain. When
       [~allow_forked_chain:true] is provided, test chain are allowed. *)
@@ -64,7 +55,7 @@ module Chain : sig
                    time:Time.Protocol.t ->
                    protocol:Protocol_hash.t ->
                    Context_hash.t tzresult Lwt.t) ->
-    genesis ->
+    Genesis.t ->
     Chain_id.t ->
     chain_state tzresult Lwt.t
 
@@ -90,7 +81,7 @@ module Chain : sig
   (** Various accessors. *)
   val id : chain_state -> Chain_id.t
 
-  val genesis : chain_state -> genesis
+  val genesis : chain_state -> Genesis.t
 
   val global_state : chain_state -> global_state
 
@@ -430,7 +421,7 @@ val init :
   context_root:string ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
-  Chain.genesis ->
+  Genesis.t ->
   (global_state * Chain.t * Context.index * History_mode.t) tzresult Lwt.t
 
 val close : global_state -> unit Lwt.t

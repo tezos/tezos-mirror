@@ -42,7 +42,7 @@ type chain_name = Distributed_db_version.Name.t
 
 type blockchain_network = {
   alias : string option;
-  genesis : State.Chain.genesis;
+  genesis : Genesis.t;
   chain_name : chain_name;
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;
@@ -79,16 +79,15 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
 let blockchain_network_mainnet =
   make_blockchain_network
     ~alias:"mainnet"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
     ~chain_name:"TEZOS_MAINNET"
     ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
@@ -104,16 +103,15 @@ let blockchain_network_mainnet =
 let blockchain_network_alphanet =
   make_blockchain_network
     ~alias:"alphanet"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H";
+    }
     ~chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
     ~old_chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
     ~incompatible_chain_name:"INCOMPATIBLE"
@@ -123,16 +121,15 @@ let blockchain_network_alphanet =
 let blockchain_network_zeronet =
   make_blockchain_network
     ~alias:"zeronet"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+    }
     ~chain_name:"TEZOS_ZERONET_2019-08-06T15:18:56Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:["bootstrap.zeronet.fun"; "bootzero.tzbeta.net"]
@@ -140,16 +137,15 @@ let blockchain_network_zeronet =
 let blockchain_network_babylonnet =
   make_blockchain_network
     ~alias:"babylonnet"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2019-09-27T07:43:32Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisd1f7bcGMoXy";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2019-09-27T07:43:32Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisd1f7bcGMoXy";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
+    }
     ~chain_name:"TEZOS_ALPHANET_BABYLON_2019-09-27T07:43:32Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
@@ -158,16 +154,15 @@ let blockchain_network_babylonnet =
 let blockchain_network_carthagenet =
   make_blockchain_network
     ~alias:"carthagenet"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2019-11-28T13:02:13Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisd6f5afWyME7";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2019-11-28T13:02:13Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisd6f5afWyME7";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
     ~chain_name:"TEZOS_ALPHANET_CARTHAGE_2019-11-28T13:02:13Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
@@ -180,16 +175,15 @@ let blockchain_network_carthagenet =
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
-    State.Chain.
-      {
-        time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-        block =
-          Block_hash.of_b58check_exn
-            "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-        protocol =
-          Protocol_hash.of_b58check_exn
-            "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
-      }
+    {
+      time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+    }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
 
@@ -234,7 +228,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
       })
     (let chain = Distributed_db_version.Name.encoding in
      obj8
-       (req "genesis" State.Chain.genesis_encoding)
+       (req "genesis" Genesis.encoding)
        (req "chain_name" chain)
        (opt "old_chain_name" chain)
        (opt "incompatible_chain_name" chain)
