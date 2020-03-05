@@ -213,10 +213,8 @@ module Default_answerer = struct
             swap config pool source_peer_id ~connect proposed_peer_id new_point
             >>= fun () -> Lwt.return_unit
         | Ok false ->
-            log (Swap_request_received {source = source_peer_id}) ;
             Lwt.return_unit
         | Error _ ->
-            log (Swap_request_received {source = source_peer_id}) ;
             Lwt.return_unit )
 
   let create config conn =
