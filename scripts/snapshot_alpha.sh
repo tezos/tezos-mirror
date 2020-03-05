@@ -80,7 +80,7 @@ fi
 mv src/proto_${version} src/proto_${version}_${short_hash}
 
 
-# move deamons to a tmp directory to avoid editing lib_protocol
+# move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
 daemons=$(ls | grep -v lib_protocol)
 mkdir tmp
