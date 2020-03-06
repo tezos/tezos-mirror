@@ -227,13 +227,13 @@ val return_false : bool t
 
     Note: {!join} leaves the local values of the current thread
     unchanged. *)
-val join : unit t list -> unit t
+(* val join : unit t list -> unit t *)
 
 (* val ( <?> ) : 'a t -> 'a t -> 'a t *)
 (*   (\** [t <?> t'] is the same as [choose [t; t']] *\) *)
 
 (** [t <&> t'] is the same as [join [t; t']] *)
-val ( <&> ) : unit t -> unit t -> unit t
+(* val ( <&> ) : unit t -> unit t -> unit t *)
 
 (* val async : (unit -> 'a t) -> unit *)
 (*   (\** [async f] starts a thread without waiting for the result. If it *)
