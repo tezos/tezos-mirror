@@ -38,6 +38,8 @@ __pycache__
 /docs/api/p2p.rst
 
 /src/bin_client/test/LOG.*
+/_coverage_output
+/_coverage_report
 
 *.install
 .merlin
