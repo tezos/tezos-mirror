@@ -153,6 +153,42 @@ configuration file (or to doing nothing, as Mainnet is the default).
   They are only used if ``p2p.bootstrap_peers`` is not present in the configuration file,
   and ``--no-bootstrap-peers`` is not given on the command-line.
 
+Genesis Parameters
+------------------
+
+In addition to the above fields, you can also specify custom genesis parameters.
+For instance, if your genesis protocol is ``proto_genesis``, you can specify the
+activation key::
+
+  {
+    "p2p": {},
+    "network": {
+      "genesis": { ... },
+      "genesis_parameters": {
+        "context_key": "sandbox_parameter",
+        "values": {
+          "genesis_pubkey": "edpk..."
+        }
+      },
+      ...
+    }
+  }
+
+The ``genesis_parameters`` object contains:
+
+- ``context_key``, the name of the key in the context part of the storage,
+  whose value must be modified (if omitted, the default context key is
+  ``sandbox_parameter``);
+
+- ``values``, which contains the protocol parameters.
+
+In the above example, we set the ``genesis_pubkey`` parameter of ``proto_genesis``.
+
+Note that the genesis parameters that you specify in the configuration file
+can be overridden by the ``--sandbox`` parameter on the command-line.
+Similarly, if you are using a built-in network and if this built-in network
+comes with genesis parameters, you can override them with ``--sandbox``.
+
 Development
 -----------
 
