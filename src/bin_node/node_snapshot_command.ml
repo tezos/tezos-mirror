@@ -81,16 +81,20 @@ module Term = struct
             ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir)
           >>=? fun () ->
-          Option.unopt_map
-            ~default:return_none
-            ~f:(fun filename ->
+          ( match
+              (node_config.blockchain_network.genesis_parameters, sandbox_file)
+            with
+          | (None, None) ->
+              return_none
+          | (Some parameters, None) ->
+              return_some (parameters.context_key, parameters.values)
+          | (_, Some filename) -> (
               Lwt_utils_unix.Json.read_file filename
               >>= function
               | Error _err ->
                   fail (Invalid_sandbox_file filename)
               | Ok json ->
-                  return_some ("sandbox_parameter", json))
-            sandbox_file
+                  return_some ("sandbox_parameter", json) ) )
           >>=? fun sandbox_parameters ->
           let patch_context =
             Patch_context.patch_context genesis sandbox_parameters

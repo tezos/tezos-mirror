@@ -32,6 +32,7 @@ type blockchain_network = {
   alias : string option;
       (** as given to [--network], only for built-in networks *)
   genesis : Genesis.t;
+  genesis_parameters : Genesis.Parameters.t option;
   chain_name : chain_name;
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;

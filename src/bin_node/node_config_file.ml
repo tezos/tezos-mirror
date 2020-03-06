@@ -43,6 +43,7 @@ type chain_name = Distributed_db_version.Name.t
 type blockchain_network = {
   alias : string option;
   genesis : Genesis.t;
+  genesis_parameters : Genesis.Parameters.t option;
   chain_name : chain_name;
   old_chain_name : chain_name option;
   incompatible_chain_name : chain_name option;
@@ -55,11 +56,12 @@ type blockchain_network = {
 let make_blockchain_network ~alias ~chain_name ?old_chain_name
     ?incompatible_chain_name ~sandboxed_chain_name
     ?(user_activated_upgrades = []) ?(user_activated_protocol_overrides = [])
-    ?(default_bootstrap_peers = []) genesis =
+    ?(default_bootstrap_peers = []) ?genesis_parameters genesis =
   let of_string = Distributed_db_version.Name.of_string in
   {
     alias = Some alias;
     genesis;
+    genesis_parameters;
     chain_name = of_string chain_name;
     old_chain_name = Option.map old_chain_name ~f:of_string;
     incompatible_chain_name = Option.map incompatible_chain_name ~f:of_string;
@@ -174,6 +176,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
   conv
     (fun { alias = _;
            genesis;
+           genesis_parameters;
            chain_name;
            old_chain_name;
            incompatible_chain_name;
@@ -182,6 +185,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_protocol_overrides;
            default_bootstrap_peers } ->
       ( genesis,
+        genesis_parameters,
         chain_name,
         old_chain_name,
         incompatible_chain_name,
@@ -190,6 +194,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         user_activated_protocol_overrides,
         default_bootstrap_peers ))
     (fun ( genesis,
+           genesis_parameters,
            chain_name,
            old_chain_name,
            incompatible_chain_name,
@@ -200,6 +205,7 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
       {
         alias = None;
         genesis;
+        genesis_parameters;
         chain_name;
         old_chain_name;
         incompatible_chain_name;
@@ -209,8 +215,9 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
         default_bootstrap_peers;
       })
     (let chain = Distributed_db_version.Name.encoding in
-     obj8
+     obj9
        (req "genesis" Genesis.encoding)
+       (opt "genesis_parameters" Genesis.Parameters.encoding)
        (req "chain_name" chain)
        (opt "old_chain_name" chain)
        (opt "incompatible_chain_name" chain)

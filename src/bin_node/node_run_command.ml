@@ -139,16 +139,18 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       in
       return_some (p2p_config, config.p2p.limits) )
   >>=? fun p2p_config ->
-  Option.unopt_map
-    ~default:return_none
-    ~f:(fun filename ->
+  ( match (config.blockchain_network.genesis_parameters, sandbox) with
+  | (None, None) ->
+      return_none
+  | (Some parameters, None) ->
+      return_some (parameters.context_key, parameters.values)
+  | (_, Some filename) -> (
       Lwt_utils_unix.Json.read_file filename
       >>= function
       | Error _err ->
           fail (Invalid_sandbox_file filename)
       | Ok json ->
-          return_some ("sandbox_parameter", json))
-    sandbox
+          return_some ("sandbox_parameter", json) ) )
   >>=? fun sandbox_param ->
   let genesis = config.blockchain_network.genesis in
   let patch_context =
@@ -388,10 +390,11 @@ module Term = struct
     let doc =
       "Run the daemon in sandbox mode. P2P to non-localhost addresses are \
        disabled, and constants of the economic protocol can be altered with \
-       an optional JSON file. $(b,IMPORTANT): Using sandbox mode affects the \
-       node state and subsequent runs of Tezos node must also use sandbox \
-       mode. In order to run the node in normal mode afterwards, a full reset \
-       must be performed (by removing the node's data directory)."
+       an optional JSON file which overrides the $(b,genesis_parameters) \
+       field of the network configuration. $(b,IMPORTANT): Using sandbox mode \
+       affects the node state and subsequent runs of Tezos node must also use \
+       sandbox mode. In order to run the node in normal mode afterwards, a \
+       full reset must be performed (by removing the node's data directory)."
     in
     Arg.(
       value
