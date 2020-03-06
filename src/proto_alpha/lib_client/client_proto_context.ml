@@ -604,6 +604,28 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     contents
     ?verbose_signing
 
+let submit_ballot_override (cctxt : #full) ?dry_run ?confirmations ~chain
+    ~block ?verbose_signing ?branch ~source ~src_pk ~src_sk ?fee ~fee_parameter
+    ~proposal ~ballot () =
+  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
+  >>=? fun (level : Level.t) ->
+  let period = level.voting_period in
+  let contents = Ballot_override {period; proposal; ballot} in
+  Injection.inject_manager_operation
+    cctxt
+    ?dry_run
+    ?confirmations
+    ~chain
+    ~block
+    ?verbose_signing
+    ?branch
+    ~source
+    ?fee
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
   | (Some (Apply_results.Operation_metadata omd), Operation_data od) -> (

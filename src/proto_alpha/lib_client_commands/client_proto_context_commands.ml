@@ -1371,7 +1371,9 @@ let commands version () =
               (fun acc (baker, _) ->
                 if acc then return true
                 else
-                  get_baker_consensus_key cctxt ~chain:cctxt#chain baker
+                  baker_of_contract cctxt baker
+                  >>=? fun baker_hash ->
+                  get_baker_consensus_key cctxt ~chain:cctxt#chain baker_hash
                   >>=? fun (_, consensus_key, _, _) ->
                   return
                   @@ Signature.Public_key_hash.equal consensus_key src_pkh)
@@ -1608,5 +1610,126 @@ let commands version () =
                 ballots_info.supermajority
               >>= fun () -> return_unit
           | Testing | Adoption ->
-              print_proposal info.current_proposal >>= fun () -> return_unit)
-    ]
+              print_proposal info.current_proposal >>= fun () -> return_unit);
+      command
+        ~group
+        ~desc:"Submit an override ballot"
+        (args8
+           dry_run_switch
+           verbose_signing_switch
+           minimal_fees_arg
+           minimal_nanotez_per_byte_arg
+           minimal_nanotez_per_gas_unit_arg
+           force_low_fee_arg
+           fee_cap_arg
+           burn_cap_arg)
+        ( prefixes ["submit"; "override"; "ballot"; "for"]
+        @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+        @@ param
+             ~name:"proposal"
+             ~desc:"the protocol hash proposal to vote for"
+             (parameter (fun _ x ->
+                  match Protocol_hash.of_b58check_opt x with
+                  | None ->
+                      Error_monad.failwith "Invalid proposal hash: '%s'" x
+                  | Some hash ->
+                      return hash))
+        @@ param
+             ~name:"yays_per_roll"
+             ~desc:
+               (Printf.sprintf
+                  "number of yays per roll (total number of yays/nays/passes \
+                   must be equal to %d)"
+                  Constants.fixed.votes_per_roll)
+             int_parameter
+        @@ param
+             ~name:"nays_per_roll"
+             ~desc:
+               (Printf.sprintf
+                  "number of nays per roll (total number of yays/nays/passes \
+                   must be equal to %d)"
+                  Constants.fixed.votes_per_roll)
+             int_parameter
+        @@ param
+             ~name:"passes_per_roll"
+             ~desc:
+               (Printf.sprintf
+                  "number of passes per roll (yays, nays and passes must add \
+                   up to %d)"
+                  Constants.fixed.votes_per_roll)
+             int_parameter
+        @@ stop )
+        (fun ( dry_run,
+               verbose_signing,
+               minimal_fees,
+               minimal_nanotez_per_byte,
+               minimal_nanotez_per_gas_unit,
+               force_low_fee,
+               fee_cap,
+               burn_cap )
+             (_, contract)
+             proposal
+             number_of_yays
+             number_of_nays
+             number_of_passes
+             (cctxt : Protocol_client_context.full) ->
+          get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+          >>=? fun info ->
+          ( match info.current_period_kind with
+          | Testing_vote | Promotion_vote ->
+              if number_of_yays < 0 then
+                cctxt#error "Number of yays has to be a non-negative integer"
+              else if number_of_nays < 0 then
+                cctxt#error "Number of nays has to be a non-negative integer"
+              else if number_of_passes < 0 then
+                cctxt#error "Number of passes has to be a non-negative integer"
+              else if
+                number_of_yays + number_of_nays + number_of_passes
+                <> Alpha_context.Constants.fixed.votes_per_roll
+              then
+                cctxt#error
+                  "Total number of yays/nays/passes differs from %d"
+                  Alpha_context.Constants.fixed.votes_per_roll
+              else return_unit
+          | _ ->
+              cctxt#error "Not in a Testing_vote or Promotion_vote period" )
+          >>=? fun () ->
+          match Contract.is_implicit contract with
+          | None ->
+              cctxt#error "Command is only supported for implicit contracts"
+          | Some mgr ->
+              let fee_parameter =
+                {
+                  Injection.minimal_fees;
+                  minimal_nanotez_per_byte;
+                  minimal_nanotez_per_gas_unit;
+                  force_low_fee;
+                  fee_cap;
+                  burn_cap;
+                }
+              in
+              let ballot =
+                Vote.
+                  {
+                    yays_per_roll = number_of_yays;
+                    nays_per_roll = number_of_nays;
+                    passes_per_roll = number_of_passes;
+                  }
+              in
+              Client_keys.get_key cctxt mgr
+              >>=? fun (_, src_pk, src_sk) ->
+              let src_pkh = Signature.Public_key.hash src_pk in
+              submit_ballot_override
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~src_pk
+                ~src_sk
+                ~source:src_pkh
+                ~verbose_signing
+                ~dry_run
+                ~fee_parameter
+                ~proposal
+                ~ballot
+                ()
+              >>=? fun _ -> return_unit) ]

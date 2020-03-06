@@ -306,6 +306,24 @@ val submit_ballot :
   Vote.ballot ->
   Kind.ballot Injection.result_list tzresult Lwt.t
 
+val submit_ballot_override :
+  #Protocol_client_context.full ->
+  ?dry_run:bool ->
+  ?confirmations:int ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?verbose_signing:bool ->
+  ?branch:int ->
+  source:public_key_hash ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  ?fee:Tez.t ->
+  fee_parameter:Injection.fee_parameter ->
+  proposal:Protocol_hash.t ->
+  ballot:Vote.ballot ->
+  unit ->
+  Kind.ballot Kind.manager Injection.result tzresult Lwt.t
+
 (** lookup an operation in [predecessors] previous blocks, and print the
     receipt if found *)
 val display_receipt_for_operation :

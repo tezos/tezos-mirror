@@ -184,6 +184,20 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Baker_hash.pp
         delegate
         pp_result
+        result
+  | Ballot_override {period; proposal; ballot} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Ballot:@,Contract: %a@,Period: %a@,Protocol: %a@,Vote: %a%a@]"
+        Contract.pp
+        source
+        Voting_period.pp
+        period
+        Protocol_hash.pp
+        proposal
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+        pp_result
         result ) ;
   Format.fprintf ppf "@]"
 
@@ -568,6 +582,14 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This baker registration was BACKTRACKED, its expected \
            effects (as follow) were NOT applied.@]" ;
         pp_baker_registration_result op
+    | Applied (Ballot_override_result {consumed_gas}) ->
+        Format.fprintf ppf "The ballot was successfully submitted" ;
+        Format.fprintf ppf "@,Consumed gas: %s" (Z.to_string consumed_gas)
+    | Backtracked (Ballot_override_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>The ballot submission was BACKTRACKED, its expected effects \
+           were NOT applied.@]"
   in
   let pp_baker_result (type kind) ppf (result : kind baker_operation_result) =
     Format.fprintf ppf "@," ;

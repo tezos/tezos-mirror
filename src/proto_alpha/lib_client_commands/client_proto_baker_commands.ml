@@ -372,7 +372,12 @@ let singlesig_commands () : #Protocol_client_context.full Clic.command list =
             if
               not
                 (List.exists
-                   (fun (baker', _) -> Baker_hash.equal baker' baker)
+                   (fun (baker_contract, _) ->
+                     match Contract.is_baker baker_contract with
+                     | Some baker_hash ->
+                         Baker_hash.equal baker_hash baker
+                     | None ->
+                         false)
                    listings)
             then
               error
@@ -1519,11 +1524,12 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
                fee_cap,
                burn_cap,
                force )
-             baker
+             baker_hash
              (_, source)
              signatures
              proposals
              (cctxt : #Protocol_client_context.full) ->
+          let baker = Contract.baker_contract baker_hash in
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -1603,13 +1609,13 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
                 if
                   not
                     (List.exists
-                       (fun (baker', _) -> Baker_hash.equal baker' baker)
+                       (fun (contract, _) -> Contract.equal contract baker)
                        listings)
                 then
                   error
                     "Baker `%a` does not appear to have voting rights."
                     Baker_hash.pp
-                    baker ;
+                    baker_hash ;
                 if !errors <> [] then
                   cctxt#message
                     "There %s with the submission:%t"
@@ -1652,7 +1658,7 @@ let multisig_commands () : #Protocol_client_context.full Clic.command list =
                 ?fee
                 ~src_pk
                 ~src_sk
-                ~baker
+                ~baker:baker_hash
                 ~signatures
                 ~action:(Client_proto_baker.Submit_proposals proposals)
                 ?gas_limit

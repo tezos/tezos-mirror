@@ -334,6 +334,8 @@ let estimated_gas_single (type kind)
         Ok consumed_gas
     | Applied (Delegation_result {consumed_gas}) ->
         Ok consumed_gas
+    | Applied (Ballot_override_result {consumed_gas}) ->
+        Ok consumed_gas
     | Skipped _ ->
         assert false
     | Backtracked (_, None) ->
@@ -398,6 +400,8 @@ let estimated_storage_single (type kind) origination_size
     | Applied (Delegation_legacy_result _) ->
         Ok Z.zero
     | Applied (Delegation_result _) ->
+        Ok Z.zero
+    | Applied (Ballot_override_result _) ->
         Ok Z.zero
     | Skipped _ ->
         assert false
@@ -477,6 +481,8 @@ let originated_contracts_single (type kind)
     | Applied (Delegation_legacy_result _) ->
         Ok []
     | Applied (Delegation_result _) ->
+        Ok []
+    | Applied (Ballot_override_result _) ->
         Ok []
     | Skipped _ ->
         assert false
