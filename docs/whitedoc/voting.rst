@@ -3,22 +3,27 @@
 The Voting Process
 ==================
 
-The design of the Tezos Node allows the consensus protocol to be
+The design of the Tezos Node allows the economic protocol to be
 amended, that is replaced by another set of OCaml files which
 implement the API of a valid protocol.
 
 In the current protocol the amendment procedure is guided by a voting
 procedure where delegates can propose, select and test a candidate
-protocol before activating it.
-Delegates take part in the amendment procedure with an influence
-proportional to their stake, one roll one vote.
+protocol before activating it.  Delegates take part in the amendment
+procedure with an influence proportional to their stake. As for baking
+and endorsing, only an active delegate with at least one roll can take
+part in the amendment procedure. Furthermore, a delegate can cast a
+"split vote", that is, it can partition its voting power to give a
+confidence (or influence) level to its vote or to reflect the
+preferences of its delegators.
 
-The procedure consists of four periods, each of 32768 blocks (or
-~three weeks), for a total of approximately three months.
+The procedure consists of four periods, each of 8 cycles, that is, 32768 blocks
+(roughly three weeks), for a total of approximately three months.
 
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium.
 <https://medium.com/tezos/amending-tezos-b77949d97e1e>`_
+(Note that concrete details there might be out of date.)
 
 Periods
 -------
@@ -31,7 +36,7 @@ The voting procedure works as follows:
   If there are no proposals, or a tie between proposals, a new proposal
   period starts. Each delegate can submit a maximum of 20 proposals,
   including duplicates.
-- `Testing_vote period`: delegates can cast one vote to test or not the winning
+- `Testing_vote period`: delegates can cast one ballot to test or not the winning
   proposal using the `ballot` operation.
   At the end of a testing_vote period if participation reaches the quorum
   and the proposal has a super-majority in favor, we proceed to a testing
@@ -39,29 +44,38 @@ The voting procedure works as follows:
 - `Testing period`: a test chain is forked for 48 hours to test a
   correct migration of the context.
   At the end of a testing period we move to a promotion_vote period.
-- `Promotion_vote period`: delegates can cast one vote to promote or not the
+- `Promotion_vote period`: delegates can cast one ballot to promote or not the
   tested proposal using the `ballot` operation.
   At the end of a promotion_vote period if participation reaches the quorum
   and the tested proposal has a super-majority in favor, it is activated as
   the new protocol. Otherwise we go back to a proposal period.
 
-It is important to note that the stake of each delegated is computed
+It is important to note that the stake of each delegate is computed
 at the beginning of each period.
 
 Super-majority and Quorum
 -------------------------
 
-Both voting periods work in the same way, only the subject of the
-vote differs.
-During a vote a delegate can cast a single Yea, Nay or Pass vote.
-A vote is successful if it has super-majority and the participation
-reaches the current quorum.
+Both voting periods work in the same way, only the subject of the vote
+differs.  The protocol keeps track of the number of "Yay", "Nay", and
+"Pass" votes which are indirectly cast during the voting period.
 
-`Super-majority` means the Yeas are more than 8/10 of Yeas+Nays votes.
-The `participation` is the ratio of all received votes, including
-passes, with respect to the number of possible votes. The `quorum`
-starts at 80% and at each vote it is updated using the old quorum and
-the current participation with the following coefficients::
+During a vote a delegate can cast a single ballot. A ballot consists
+of three non-negative integers that add up to a given constant
+``votes_per_roll``, currently set to 100. These three integers
+represent partitions of the delegate's voting power that the delegate
+is giving to the positive, negative, or respectively neutral part of
+its vote.  The number of votes of a delegate for each of the three
+categories is calculated by multiplying the corresponding partition by
+the number of rolls owned by the delegate. For instance, if a delegate
+has 3 rolls and casts a `50/30/20` ballot, then this ballot will add
+150 Yay votes, 90 Nay votes, and 60 Pass votes to the total number of
+Yays/Nays/Passes votes.
+
+`Super-majority` means the Yay votes are more than 8/10 of Yay+Nay votes.  The
+`participation` is the ratio of all received votes, including passes, with respect to the
+number of possible votes. The `quorum` starts at 80% and at each vote it is updated using
+the old quorum and the current participation with the following coefficients::
 
   newQ = oldQ * 8/10 + participation * 2/10
 
@@ -95,7 +109,7 @@ For example, a delegate submits a proposals operation for protocol A
 and B early in the proposal period, later a new protocol C is revealed
 and the delegate submits another proposals operation for protocol B
 and C.
-The list of submissions that will be tallied is [A,B,C] and the
+The list of submissions that will be tallied is [A,B,C].
 
 A ballot operation can only be submitted during one of the voting
 periods, and only once per period.
@@ -108,11 +122,18 @@ periods, and only once per period.
      proposal: Protocol_hash.t ;
      ballot: Vote_repr.ballot ; }
 
-Source and period are the same as above, while proposal is the
-currently selected proposal and ballot is one of ``Yea``, ``Nay`` or
-``Pass``.
-The pass vote allows a delegate to not influence a vote but still
-allowing it to reach quorum.
+Source and period are the same as above, while proposal is the currently selected proposal
+and ballot is a record that stores the fractions for ``Yay``, ``Nay`` and ``Pass``.
+
+::
+
+   Vote_repr.ballot : {
+     yay_fraction : int32 ;
+     nay_fraction: int32 ;
+     pass_fraction : int32 ; }
+
+Increasing the pass fraction over the other two fractions allows a delegate to diminish
+its influence on a vote but still allowing it to reach quorum.
 
 More details can be found, as for all operations, in
 ``src/proto_alpha/lib_protocol/operation_repr.ml``.
@@ -176,7 +197,8 @@ Submit ballots
 During a voting period, being it a testing vote or a promotion vote,
 ballots can be submitted once with::
 
-    tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
+    tezos-client submit ballot for <delegate> <proposal>
+                 <yay_fraction> <nay_fraction> <pass_fraction>
 
 Other resources
 ~~~~~~~~~~~~~~~
