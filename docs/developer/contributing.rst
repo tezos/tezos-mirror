@@ -97,7 +97,6 @@ master. You can (should) activate these tests by including keywords in
 the branch name.
 
 -  If your MR impacts OPAM packaging, use ``opam`` in the branch name.
--  If your MR updates documentation, use ``doc`` in the branch name.
 
 Code Review
 -----------
