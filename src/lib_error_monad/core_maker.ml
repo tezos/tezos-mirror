@@ -23,16 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* hack: forward reference from [Data_encoding_ezjsonm] *)
-let json_to_string = ref (fun _ -> "")
-
-let json_pp id encoding ppf x =
-  Format.pp_print_string ppf @@ !json_to_string
+let json_pp id description encoding ppf data =
+  Format.pp_print_string ppf @@ Data_encoding.Json.to_string
   @@
-  let encoding =
-    Data_encoding.(merge_objs (obj1 (req "id" string)) encoding)
+  let pp_encoding =
+    Data_encoding.(
+      obj3 (req "id" string) (req "description" string) (req "data" encoding))
   in
-  Data_encoding.Json.construct encoding (id, x)
+  Data_encoding.Json.construct pp_encoding (id, description, data)
 
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
@@ -274,7 +272,7 @@ end = struct
           description;
           from_error;
           encoding_case;
-          pp = Option.unopt ~default:(json_pp name encoding) pp;
+          pp = Option.unopt ~default:(json_pp name description encoding) pp;
         }
       :: !error_kinds
 

@@ -30,7 +30,3 @@ module Make (Prefix : Sig.PREFIX) : sig
 
   include Sig.WITH_WRAPPED with type error := error
 end
-
-(**/**)
-
-val json_to_string : (Data_encoding.json -> string) ref

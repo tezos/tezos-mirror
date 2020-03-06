@@ -104,6 +104,4 @@ end
 
 (**/**)
 
-val json_to_string : (Data_encoding.json -> string) ref
-
 val errs_tag : trace Tag.def

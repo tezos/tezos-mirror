@@ -148,5 +148,3 @@ let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
   else Lwt_canceler.cancel canceler >>= fun () -> fail Timeout
 
 let errs_tag = Tag.def ~doc:"Errors" "errs" pp_print_error
-
-let json_to_string = Core_maker.json_to_string
