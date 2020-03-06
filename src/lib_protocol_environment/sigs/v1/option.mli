@@ -35,6 +35,4 @@ val unopt_map : f:('a -> 'b) -> default:'b -> 'a option -> 'b
 
 val first_some : 'a option -> 'a option -> 'a option
 
-val try_with : (unit -> 'a) -> 'a option
-
 val some : 'a -> 'a option
