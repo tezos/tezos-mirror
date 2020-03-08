@@ -8,4 +8,5 @@
 
 (alias
  (name    runtest)
+ (package hacl)
  (deps    (alias runtest-hacl)))

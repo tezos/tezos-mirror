@@ -9,4 +9,5 @@
 
 (alias
  (name runtest)
+ (package ocplib-resto-directory)
  (deps (alias runtest_resto)))

@@ -8,4 +8,5 @@
 
 (alias
  (name    runtest)
+ (package blake2)
  (deps    (alias runtest-blake2)))

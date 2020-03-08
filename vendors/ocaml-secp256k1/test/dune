@@ -8,4 +8,5 @@
 
 (alias
  (name    runtest)
+ (package secp256k1)
  (deps    (alias runtest-secp256k1)))

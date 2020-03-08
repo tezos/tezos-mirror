@@ -18,5 +18,6 @@
 
 (alias
  (name    runtest)
+ (package uecc)
  (deps    (alias runtest-uecc)
           (alias runtest-uecc-vectors)))
