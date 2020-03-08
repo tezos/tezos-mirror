@@ -18,6 +18,7 @@
 
 (alias
  (name runtest)
+ (package tezos-signer-backends)
  (deps (alias runtest_crouching)))
 
 (alias

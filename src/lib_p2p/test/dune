@@ -75,6 +75,7 @@
 
 (alias
  (name runtest)
+ (package tezos-p2p)
  (deps (alias runtest_p2p_socket_ipv4)
        (alias runtest_p2p_pool_ipv4)
        (alias runtest_p2p_io_scheduler_ipv4)

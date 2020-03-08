@@ -39,6 +39,7 @@
 
 (alias
  (name runtest)
+ (package tezos-shell)
  (deps (alias runtest_shell)
        (alias runtest_locator)))
 

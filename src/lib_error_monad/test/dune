@@ -15,4 +15,5 @@
 
 (alias
  (name runtest)
+ (package tezos-error-monad)
  (deps (alias runtest_error_tables)))

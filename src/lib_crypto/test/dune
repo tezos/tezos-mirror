@@ -54,6 +54,7 @@
 
 (alias
  (name runtest)
+ (package tezos-crypto)
  (deps (alias runtest_merkle)
        (alias runtest_base58)
        (alias runtest_ed25519)

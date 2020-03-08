@@ -47,6 +47,7 @@
 
 (alias
  (name runtest)
+ (package tezos-stdlib)
  (deps (alias runtest_tzList)
        (alias runtest_lwt_pipe)
        (alias runtest_lru_cache)

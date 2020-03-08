@@ -21,6 +21,7 @@
 
 (alias
 (name runtest)
+(package tezos-client-alpha)
 (deps (alias runtest_michelson_v1_macros)))
 
 (alias

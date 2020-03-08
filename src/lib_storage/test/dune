@@ -14,6 +14,7 @@
 
 (alias
  (name runtest)
+ (package tezos-storage)
  (action (chdir %{workspace_root} (run %{exe:test.exe}))))
 
 (alias

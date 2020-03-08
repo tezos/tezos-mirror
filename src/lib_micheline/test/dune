@@ -14,6 +14,7 @@
 
 (alias
   (name runtest)
+  (package tezos-micheline)
   (deps (alias runtest_micheline_parser)))
 
 (alias
