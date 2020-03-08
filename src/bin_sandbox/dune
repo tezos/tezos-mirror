@@ -101,7 +101,7 @@
 
 
 (alias
- (name runtest)
+ (name runtest_flextesa)
  (deps
   (alias runtest_sandbox_accusations_simple_double_baking)
   (alias runtest_sandbox_accusations_simple_double_endorsing)
