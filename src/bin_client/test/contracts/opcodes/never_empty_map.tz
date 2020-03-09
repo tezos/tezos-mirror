@@ -1,0 +1,9 @@
+parameter unit;
+storage (map never nat);
+code {
+       DROP;
+       EMPTY_MAP never nat;
+       NIL operation;
+       PAIR
+     }
+
