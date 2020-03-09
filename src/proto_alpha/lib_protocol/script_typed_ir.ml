@@ -46,6 +46,7 @@ type never = |
 
 type _ comparable_ty =
   | Unit_key : type_annot option -> unit comparable_ty
+  | Never_key : type_annot option -> never comparable_ty
   | Int_key : type_annot option -> z num comparable_ty
   | Nat_key : type_annot option -> n num comparable_ty
   | String_key : type_annot option -> string comparable_ty
