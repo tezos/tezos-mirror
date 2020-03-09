@@ -113,7 +113,7 @@ build-test: build-sandbox
 
 .PHONY: test
 test:
-	@dune build @runtest @runtest_flextesa
+	@dune build @runtest_dune_template @runtest @runtest_flextesa
 	@./scripts/check_opam_test.sh
 
 .PHONY: test-lint
