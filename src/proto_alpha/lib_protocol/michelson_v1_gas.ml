@@ -56,6 +56,8 @@ module Cost_of = struct
     match (wit, v) with
     | (Unit_key _, _) ->
         Z.of_int 1
+    | (Never_key _, _) ->
+        .
     | (Int_key _, _) ->
         Z.of_int (int_bytes v)
     | (Nat_key _, _) ->
@@ -874,6 +876,8 @@ module Cost_of = struct
       match ty with
       | Unit_key _ ->
           compare_unit
+      | Never_key _ -> (
+        match x with _ -> . )
       | Bool_key _ ->
           compare_bool
       | String_key _ ->
