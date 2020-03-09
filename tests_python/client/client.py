@@ -207,7 +207,7 @@ class Client:
 
         See `run` for more details.
         """
-        assert verb in {'put', 'get', 'post', 'delete'}
+        assert verb in {'put', 'get', 'post', 'delete', 'patch'}
         params = [] if params is None else params
         params = params + ['rpc', verb, path]
         if data is not None:
@@ -369,6 +369,14 @@ class Client:
 
     def untrust_peer(self, port: int) -> dict:
         return self.rpc('get', f'/network/points/127.0.0.1:{port}/untrust')
+
+    def get_expected_peer_id(self, port: int) -> dict:
+        path = f'/network/points/127.0.0.1:{port}'
+        return self.rpc('get', path)["expected_peer_id"]
+
+    def set_expected_peer_id(self, port: int, peer_id) -> dict:
+        path = f'/network/points/127.0.0.1:{port}'
+        return self.rpc('patch', path, data={"peer_id": peer_id})
 
     def endorse(self, account: str) -> client_output.EndorseResult:
         res = self.run(['endorse', 'for', account])

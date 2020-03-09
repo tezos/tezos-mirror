@@ -78,4 +78,70 @@ class TestTrustedRing:
                 num_trusted += point.is_trusted
             assert num_trusted == 1
             assert len(res.peers) == NUM_NODES - 1
+
+    def test_set_expected_peers(self, sandbox: Sandbox):
+        """For all nodes, we add one expected peer_id
+        for the successor node."""
+        peers_id = dict()
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            peers_id[i] = client.rpc('get', '/network/self')
+
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            client.set_expected_peer_id(
+                sandbox.p2p + ((i + 1) % NUM_NODES),
+                peers_id[(i + 1) % NUM_NODES],
+            )
+
+    def test_expected_peers(self, sandbox: Sandbox):
+        """For all nodes, we check that expected peer_id was
+        set properly."""
+        peers_id = dict()
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            peers_id[i] = client.rpc('get', '/network/self')
+
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            expected_id = client.get_expected_peer_id(
+                sandbox.p2p + ((i + 1) % NUM_NODES)
+            )
+            assert expected_id == peers_id[(i + 1) % NUM_NODES]
+
+    def test_wrong_expected_peer(self, sandbox: Sandbox):
+        """We change the expected peer_id set previously to a wrong
+        expected peer_id."""
+        peers_id = dict()
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            peers_id[i] = client.rpc('get', '/network/self')
+
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            client.set_expected_peer_id(
+                sandbox.p2p + ((i + 2) % NUM_NODES), peers_id[i]
+            )
+
+    def test_check_stat_with_wrong_expected_peers(self, sandbox: Sandbox):
+        """All nodes are public, everyone should be connected. But
+        only one neighbor should be trusted."""
+        base_p2p = sandbox.p2p
+        for i in range(NUM_NODES):
+            client = sandbox.client(i)
+            point_id = '127.0.0.1:' + str(base_p2p + i)
+            peer_id = client.rpc('get', '/network/self')
+            res = client.p2p_stat()
+            assert peer_id not in res.peers
+            assert point_id not in res.points
+            num_trusted = 0
+            num_connected = 0
+            for point_id, point in res.points.items():
+                num_trusted += point.is_trusted
+                num_connected += point.is_connected
+            assert len(res.peers) == NUM_NODES - 1
+            assert len(res.points) == NUM_NODES - 1
+            assert num_trusted == 1
+            # We lost two connections
+            assert num_connected == NUM_NODES - 1 - 2
             assert len(res.points) == NUM_NODES - 1
