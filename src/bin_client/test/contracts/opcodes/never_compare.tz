@@ -1,0 +1,5 @@
+parameter (pair never never);
+storage unit;
+code {
+       UNPAIR; UNPAIR; COMPARE; FAILWITH
+     }
