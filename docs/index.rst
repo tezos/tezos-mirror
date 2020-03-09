@@ -39,6 +39,7 @@ The Community
     - https://arronax.io
     - https://mininax.cryptonomic.tech/mainnet
     - https://baking-bad.org (Reward Tracker)
+    - https://better-call.dev (Smart-contract Explorer)
 
 - A few community-run websites collect useful Tezos links:
 
