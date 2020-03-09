@@ -73,6 +73,8 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
   match ty with
   | Unit_key _ ->
       1
+  | Never_key _ ->
+      1
   | Int_key _ ->
       1
   | Nat_key _ ->
@@ -527,6 +529,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
   match kind with
   | Unit_key _ ->
       fun () () -> 0
+  | Never_key _ -> (
+      function _ -> . )
   | String_key _ ->
       wrap_compare Compare.String.compare
   | Bool_key _ ->
@@ -701,6 +705,8 @@ let map_size : type key value. (key, value) map -> Script_int.n Script_int.num
 let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Unit_key tname ->
       Unit_t tname
+  | Never_key tname ->
+      Never_t tname
   | Int_key tname ->
       Int_t tname
   | Nat_key tname ->
@@ -733,6 +739,8 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
   function
   | Unit_t tname ->
       Some (Unit_key tname)
+  | Never_t tname ->
+      Some (Never_key tname)
   | Int_t tname ->
       Some (Int_key tname)
   | Nat_t tname ->
@@ -794,6 +802,8 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
   function
   | Unit_key tname ->
       Prim (-1, T_unit, [], unparse_type_annot tname)
+  | Never_key tname ->
+      Prim (-1, T_never, [], unparse_type_annot tname)
   | Int_key tname ->
       Prim (-1, T_int, [], unparse_type_annot tname)
   | Nat_key tname ->
@@ -1033,6 +1043,9 @@ let rec merge_comparable_types :
       ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
         (Unit_key annot : ta comparable_ty),
         ctxt )
+  | (Never_key annot_a, Never_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Never_key annot, ctxt)
   | (Int_key annot_a, Int_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Int_key annot, ctxt)
@@ -1367,6 +1380,9 @@ let rec parse_comparable_ty :
   | Prim (loc, T_unit, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Unit_key tname), ctxt)
+  | Prim (loc, T_never, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Never_key tname), ctxt)
   | Prim (loc, T_int, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Int_key tname), ctxt)
@@ -1397,6 +1413,7 @@ let rec parse_comparable_ty :
   | Prim
       ( loc,
         ( ( T_int
+          | T_never
           | T_nat
           | T_string
           | T_mutez
@@ -1464,6 +1481,7 @@ let rec parse_comparable_ty :
            []
            Type_namespace
            [ T_int;
+             T_never;
              T_nat;
              T_string;
              T_mutez;
