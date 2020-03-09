@@ -813,6 +813,7 @@ branches.
 
    :: never : never : 'S   ->   int : 'S
 
+
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3195,7 +3196,6 @@ Full grammar
       | <comparable type>
       | key
       | unit
-      | never
       | signature
       | option <type>
       | list <type>
@@ -3210,6 +3210,7 @@ Full grammar
       | chain_id
     <comparable type> ::=
       | unit
+      | never
       | bool
       | int
       | nat
