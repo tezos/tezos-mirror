@@ -209,20 +209,34 @@ protocol in alternative environment possible.
 The Embedded Economic Protocols
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Three economic protocols are included in the main Tezos repository.
+Three kinds of economic protocols are included in the main Tezos repository.
 
-  - :package:`tezos-protocol-genesis`
+  - The genesis protocol. :package:`tezos-protocol-genesis`
     (:package:`tezos-embedded-protocol-genesis`) is the protocol of
-    the genesis block. It accepts a single block, signed by an activator
-    whose public key is hardcoded, that single action is to switch to
-    a new protocol chosen by the activator.
-  - :package:`tezos-protocol-alpha`
-    (:package:`tezos-embedded-protocol-alpha`) is the current
-    protocol of Tezos. A :ref:`tutorial<entering_alpha>` is available
-    to start reading the protocol's code.
-  - :package:`tezos-protocol-demo-noops`
-    (:package:`tezos-embedded-protocol-demo-noops`) is just a demo protocol
-    that does nothing interesting but has the right shape.
+    the genesis block. It accepts a single block, signed by an
+    activator whose public key is hardcoded, and whose single action is to
+    switch to a new protocol chosen by the activator.
+    The `master` branch contains additional variants of the genesis
+    protocol, one for each of the existing :ref:`test
+    networks<test-networks>`.
+  - The active protocols. ``tezos-protocol-nnn-hhhhhhhh``
+    (``tezos-embedded-protocol-nnn-hhhhhhhh``) is either the current
+    protocol on Mainnet or a protocol that has been active on Mainnet
+    at some point, where ``nnn`` is a counter starting at 0 and
+    ``hhhhhhhh`` is a prefix of the hash of the protocol code.
+    Also, :package:`tezos-protocol-alpha`
+    (:package:`tezos-embedded-protocol-alpha`) on the ``master``
+    branch is basically a copy of the current protocol of Tezos
+    (see :ref:`here<node-protocol>` for more details).
+    A :ref:`tutorial<entering_alpha>` is available to start reading
+    the protocol's code.
+  - Demo protocols. :package:`tezos-protocol-demo-noops`
+    (:package:`tezos-embedded-protocol-demo-noops`) is just a demo
+    protocol that does nothing interesting but has the right
+    shape. :package:`tezos-protocol-demo-counter`
+    (:package:`tezos-embedded-protocol-demo-counter`) is another demo
+    protocol in which blocks can contain simple operations.
+
 
 The Client Library
 ~~~~~~~~~~~~~~~~~~
