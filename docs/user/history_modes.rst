@@ -181,7 +181,7 @@ may take a couple of days to complete). To do so, you have two
 choices:
 
 - import a ``full`` snapshot using the ``--reconstruct`` option (see
-:ref:`snapshots`),
+  :ref:`snapshots`),
 
 - use the dedicated command ``tezos-node reconstruct`` if you already
   have ``full`` storage.
@@ -200,4 +200,3 @@ data to restore a complete storage.
 +---------+-------------+-----------+-----------+
 | Rolling | No          | No        | X         |
 +---------+-------------+-----------+-----------+
-

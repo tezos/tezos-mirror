@@ -190,8 +190,8 @@ protocol in alternative environment possible.
     any of the implementations described in the two points below.
 
   - :package:`tezos-shell-context` implements a context representation
-     that is accepted by the protocol environment. The node uses this
-     instance to read and write data on disk.
+    that is accepted by the protocol environment. The node uses this
+    instance to read and write data on disk.
 
   - :package:`tezos-protocol-environment` contains the protocol
     generic environment. It also defines two different context

@@ -3,10 +3,12 @@
 The ``data_encoding`` library
 =============================
 
-Throughout the Tezos protocol, data is serialized so that it can be used
-via RPC, written to disk, or placed in a block. This
-serialization/de-serialization is handled via the :library:`data-encoding`
-library by providing a set primitive encodings and a variety of combinators.
+Throughout the Tezos protocol, data is serialized so that it can be
+used via RPC, written to disk, or placed in a block. This
+serialization/de-serialization is handled via the
+`data-encoding <https://opam.ocaml.org/packages/data-encoding/>`_
+library by providing a set primitive encodings and a variety of
+combinators.
 
 Examples/Tutorial
 -----------------
