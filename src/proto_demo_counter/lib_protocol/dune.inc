@@ -143,3 +143,8 @@ include Tezos_raw_protocol_demo_counter.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-demo-counter)
+ (deps (alias runtest_sandbox)))

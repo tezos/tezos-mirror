@@ -383,3 +383,8 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_005_PsBABY5H.objs/native/tezos_protocol_005_PsBABY5H.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-005-PsBABY5H)
+ (deps (alias runtest_sandbox)))

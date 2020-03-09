@@ -379,3 +379,8 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-004-Pt24m4xi)
+ (deps (alias runtest_sandbox)))

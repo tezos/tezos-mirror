@@ -383,3 +383,8 @@ include Tezos_raw_protocol_alpha.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-alpha)
+ (deps (alias runtest_sandbox)))

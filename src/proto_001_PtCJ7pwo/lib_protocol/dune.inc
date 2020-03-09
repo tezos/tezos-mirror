@@ -375,3 +375,8 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_001_PtCJ7pwo.objs/native/tezos_protocol_001_PtCJ7pwo.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-001-PtCJ7pwo)
+ (deps (alias runtest_sandbox)))

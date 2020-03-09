@@ -119,3 +119,8 @@ include Tezos_raw_protocol_genesis_alphanet.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_genesis_alphanet.objs/native/tezos_protocol_genesis_alphanet.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-genesis-alphanet)
+ (deps (alias runtest_sandbox)))

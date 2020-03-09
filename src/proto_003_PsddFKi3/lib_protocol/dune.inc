@@ -379,3 +379,8 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_003_PsddFKi3.objs/native/tezos_protocol_003_PsddFKi3.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-003-PsddFKi3)
+ (deps (alias runtest_sandbox)))

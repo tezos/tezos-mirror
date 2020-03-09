@@ -119,3 +119,8 @@ include Tezos_raw_protocol_genesis_babylonnet.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_genesis_babylonnet.objs/native/tezos_protocol_genesis_babylonnet.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-genesis-babylonnet)
+ (deps (alias runtest_sandbox)))

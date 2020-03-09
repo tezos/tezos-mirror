@@ -119,3 +119,8 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-000-Ps9mPmXa)
+ (deps (alias runtest_sandbox)))

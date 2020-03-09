@@ -119,3 +119,8 @@ include Tezos_raw_protocol_genesis.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_genesis.objs/native/tezos_protocol_genesis.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-genesis)
+ (deps (alias runtest_sandbox)))

@@ -383,3 +383,8 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_006_PsCARTHA.objs/native/tezos_protocol_006_PsCARTHA.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-006-PsCARTHA)
+ (deps (alias runtest_sandbox)))

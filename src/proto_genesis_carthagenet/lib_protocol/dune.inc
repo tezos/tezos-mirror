@@ -119,3 +119,8 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_genesis_carthagenet.objs/native/tezos_protocol_genesis_carthagenet.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-genesis-carthagenet)
+ (deps (alias runtest_sandbox)))

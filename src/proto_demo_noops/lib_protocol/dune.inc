@@ -111,3 +111,8 @@ include Tezos_raw_protocol_demo_noops.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_demo_noops.objs/native/tezos_protocol_demo_noops.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-demo-noops)
+ (deps (alias runtest_sandbox)))

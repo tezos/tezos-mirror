@@ -375,3 +375,8 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 (alias
  (name runtest_sandbox)
  (deps .tezos_protocol_002_PsYLVpVv.objs/native/tezos_protocol_002_PsYLVpVv.cmx))
+
+(alias
+ (name runtest)
+ (package tezos-protocol-002-PsYLVpVv)
+ (deps (alias runtest_sandbox)))
