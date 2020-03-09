@@ -671,11 +671,6 @@ Stack operations
 
     > PUSH 'a x / S  =>  x : S
 
--  ``NEVER``: Close an absurd branch.
-
-::
-    :: never : 'A  ->  'B
-
 -  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
    type `'b` onto the stack.
 
@@ -783,6 +778,21 @@ Operations on unit
     :: unit : unit : 'S   ->   int : 'S
 
     > COMPARE / Unit : Unit : S  =>  0 : S
+
+Operations on type never
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  ``NEVER``: Close an absurd branch.
+
+::
+    :: never : 'A  ->  'B
+
+- ``COMPARE``: Trivial comparison on type ``never``
+
+::
+
+   :: never : never : 'S   ->   int : 'S
+
 
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -3166,7 +3176,6 @@ Full grammar
       | <comparable type>
       | key
       | unit
-      | never
       | signature
       | option <type>
       | list <type>
@@ -3181,6 +3190,7 @@ Full grammar
       | chain_id
     <comparable type> ::=
       | unit
+      | never
       | bool
       | int
       | nat
