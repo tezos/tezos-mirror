@@ -8,55 +8,55 @@ big_map diff
   New map(0) of type (big_map nat nat)
   Set map(0)[0] to 1
 trace
-  - location: 11 (remaining gas: 133035904 units remaining)
+  - location: 11 (remaining gas: 133035392 units remaining)
     [ (Pair 1 (Pair { Elt 0 1 } None))  	 ]
-  - location: 14 (remaining gas: 133035804 units remaining)
+  - location: 14 (remaining gas: 133035292 units remaining)
     [ (Pair 1 (Pair { Elt 0 1 } None))  	
       (Pair 1 (Pair { Elt 0 1 } None))  	 ]
-  - location: 15 (remaining gas: 133035744 units remaining)
+  - location: 15 (remaining gas: 133035232 units remaining)
     [ 1  	@parameter
       (Pair 1 (Pair { Elt 0 1 } None))  	 ]
-  - location: 18 (remaining gas: 133035624 units remaining)
+  - location: 18 (remaining gas: 133035112 units remaining)
     [ (Pair { Elt 0 1 } None)  	@storage ]
-  - location: 17 (remaining gas: 133035604 units remaining)
+  - location: 17 (remaining gas: 133035092 units remaining)
     [ (Pair { Elt 0 1 } None)  	@storage ]
-  - location: 16 (remaining gas: 133035604 units remaining)
+  - location: 16 (remaining gas: 133035092 units remaining)
     [ 1  	@parameter
       (Pair { Elt 0 1 } None)  	@storage ]
-  - location: -1 (remaining gas: 133035584 units remaining)
+  - location: -1 (remaining gas: 133035072 units remaining)
     [ 1  	@parameter
       (Pair { Elt 0 1 } None)  	@storage ]
-  - location: 12 (remaining gas: 133035564 units remaining)
+  - location: 12 (remaining gas: 133035052 units remaining)
     [ 1  	@parameter
       (Pair { Elt 0 1 } None)  	@storage ]
-  - location: 21 (remaining gas: 133035444 units remaining)
+  - location: 21 (remaining gas: 133034932 units remaining)
     [ { Elt 0 1 }  	 ]
-  - location: 22 (remaining gas: 133035384 units remaining)
+  - location: 22 (remaining gas: 133034872 units remaining)
     [ { Elt 0 1 }  	
       { Elt 0 1 }  	 ]
-  - location: -1 (remaining gas: 133035364 units remaining)
+  - location: -1 (remaining gas: 133034852 units remaining)
     [ { Elt 0 1 }  	
       { Elt 0 1 }  	 ]
-  - location: 19 (remaining gas: 133035364 units remaining)
+  - location: 19 (remaining gas: 133034852 units remaining)
     [ 1  	@parameter
       { Elt 0 1 }  	
       { Elt 0 1 }  	 ]
-  - location: 23 (remaining gas: 133035320 units remaining)
+  - location: 23 (remaining gas: 133034808 units remaining)
     [ False  	
       { Elt 0 1 }  	 ]
-  - location: 24 (remaining gas: 133035260 units remaining)
+  - location: 24 (remaining gas: 133034748 units remaining)
     [ (Some False)  	
       { Elt 0 1 }  	 ]
-  - location: 25 (remaining gas: 133035200 units remaining)
+  - location: 25 (remaining gas: 133034688 units remaining)
     [ { Elt 0 1 }  	
       (Some False)  	 ]
-  - location: 26 (remaining gas: 133035140 units remaining)
+  - location: 26 (remaining gas: 133034628 units remaining)
     [ (Pair { Elt 0 1 } (Some False))  	 ]
-  - location: 27 (remaining gas: 133035080 units remaining)
+  - location: 27 (remaining gas: 133034568 units remaining)
     [ {}  	
       (Pair { Elt 0 1 } (Some False))  	 ]
-  - location: 29 (remaining gas: 133035020 units remaining)
+  - location: 29 (remaining gas: 133034508 units remaining)
     [ (Pair {} (Pair { Elt 0 1 } (Some False)))  	 ]
-  - location: -1 (remaining gas: 133035000 units remaining)
+  - location: -1 (remaining gas: 133034488 units remaining)
     [ (Pair {} (Pair { Elt 0 1 } (Some False)))  	 ]
 

@@ -7,24 +7,24 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133082112 units remaining)
+  - location: 8 (remaining gas: 133081856 units remaining)
     [ (Pair { "World!" } {})  	 ]
-  - location: 9 (remaining gas: 133082052 units remaining)
+  - location: 9 (remaining gas: 133081796 units remaining)
     [ { "World!" }  	@parameter ]
-  - location: 12 (remaining gas: 133081832 units remaining)
+  - location: 12 (remaining gas: 133081576 units remaining)
     [ "Hello "  	@hello
       "World!"  	@parameter.elt ]
-  - location: 15 (remaining gas: 133081612 units remaining)
+  - location: 15 (remaining gas: 133081356 units remaining)
     [ "Hello World!"  	 ]
-  - location: -1 (remaining gas: 133081592 units remaining)
+  - location: -1 (remaining gas: 133081336 units remaining)
     [ "Hello World!"  	 ]
-  - location: 10 (remaining gas: 133081592 units remaining)
+  - location: 10 (remaining gas: 133081336 units remaining)
     [ { "Hello World!" }  	 ]
-  - location: 16 (remaining gas: 133081532 units remaining)
+  - location: 16 (remaining gas: 133081276 units remaining)
     [ {}  	
       { "Hello World!" }  	 ]
-  - location: 18 (remaining gas: 133081472 units remaining)
+  - location: 18 (remaining gas: 133081216 units remaining)
     [ (Pair {} { "Hello World!" })  	 ]
-  - location: -1 (remaining gas: 133081452 units remaining)
+  - location: -1 (remaining gas: 133081196 units remaining)
     [ (Pair {} { "Hello World!" })  	 ]
 

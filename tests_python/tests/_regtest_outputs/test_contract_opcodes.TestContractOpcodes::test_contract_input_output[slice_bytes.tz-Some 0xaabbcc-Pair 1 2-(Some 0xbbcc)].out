@@ -7,70 +7,70 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 133023232 units remaining)
+  - location: 9 (remaining gas: 133022976 units remaining)
     [ (Pair (Pair 1 2) (Some 0xaabbcc))  	 ]
-  - location: 12 (remaining gas: 133023132 units remaining)
+  - location: 12 (remaining gas: 133022876 units remaining)
     [ (Pair (Pair 1 2) (Some 0xaabbcc))  	
       (Pair (Pair 1 2) (Some 0xaabbcc))  	 ]
-  - location: 13 (remaining gas: 133023072 units remaining)
+  - location: 13 (remaining gas: 133022816 units remaining)
     [ (Pair 1 2)  	@parameter
       (Pair (Pair 1 2) (Some 0xaabbcc))  	 ]
-  - location: 16 (remaining gas: 133022952 units remaining)
+  - location: 16 (remaining gas: 133022696 units remaining)
     [ (Some 0xaabbcc)  	@storage ]
-  - location: 15 (remaining gas: 133022932 units remaining)
+  - location: 15 (remaining gas: 133022676 units remaining)
     [ (Some 0xaabbcc)  	@storage ]
-  - location: 14 (remaining gas: 133022932 units remaining)
+  - location: 14 (remaining gas: 133022676 units remaining)
     [ (Pair 1 2)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: -1 (remaining gas: 133022912 units remaining)
+  - location: -1 (remaining gas: 133022656 units remaining)
     [ (Pair 1 2)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: 10 (remaining gas: 133022892 units remaining)
+  - location: 10 (remaining gas: 133022636 units remaining)
     [ (Pair 1 2)  	@parameter
       (Some 0xaabbcc)  	@storage ]
-  - location: 17 (remaining gas: 133022832 units remaining)
+  - location: 17 (remaining gas: 133022576 units remaining)
     [ (Some 0xaabbcc)  	@storage
       (Pair 1 2)  	@parameter ]
-  - location: 25 (remaining gas: 133022692 units remaining)
+  - location: 25 (remaining gas: 133022436 units remaining)
     [ (Pair 1 2)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 28 (remaining gas: 133022592 units remaining)
+  - location: 28 (remaining gas: 133022336 units remaining)
     [ (Pair 1 2)  	@parameter
       (Pair 1 2)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 29 (remaining gas: 133022532 units remaining)
+  - location: 29 (remaining gas: 133022276 units remaining)
     [ 1  	
       (Pair 1 2)  	@parameter
       0xaabbcc  	@storage.some ]
-  - location: 32 (remaining gas: 133022412 units remaining)
+  - location: 32 (remaining gas: 133022156 units remaining)
     [ 2  	
       0xaabbcc  	@storage.some ]
-  - location: 31 (remaining gas: 133022392 units remaining)
+  - location: 31 (remaining gas: 133022136 units remaining)
     [ 2  	
       0xaabbcc  	@storage.some ]
-  - location: 30 (remaining gas: 133022392 units remaining)
+  - location: 30 (remaining gas: 133022136 units remaining)
     [ 1  	
       2  	
       0xaabbcc  	@storage.some ]
-  - location: -1 (remaining gas: 133022372 units remaining)
+  - location: -1 (remaining gas: 133022116 units remaining)
     [ 1  	
       2  	
       0xaabbcc  	@storage.some ]
-  - location: 26 (remaining gas: 133022352 units remaining)
+  - location: 26 (remaining gas: 133022096 units remaining)
     [ 1  	
       2  	
       0xaabbcc  	@storage.some ]
-  - location: 33 (remaining gas: 133022232 units remaining)
+  - location: 33 (remaining gas: 133021976 units remaining)
     [ (Some 0xbbcc)  	@storage.some.slice ]
-  - location: -1 (remaining gas: 133022212 units remaining)
+  - location: -1 (remaining gas: 133021956 units remaining)
     [ (Some 0xbbcc)  	@storage.some.slice ]
-  - location: 18 (remaining gas: 133022192 units remaining)
+  - location: 18 (remaining gas: 133021936 units remaining)
     [ (Some 0xbbcc)  	 ]
-  - location: 34 (remaining gas: 133022132 units remaining)
+  - location: 34 (remaining gas: 133021876 units remaining)
     [ {}  	
       (Some 0xbbcc)  	 ]
-  - location: 36 (remaining gas: 133022072 units remaining)
+  - location: 36 (remaining gas: 133021816 units remaining)
     [ (Pair {} (Some 0xbbcc))  	 ]
-  - location: -1 (remaining gas: 133022052 units remaining)
+  - location: -1 (remaining gas: 133021796 units remaining)
     [ (Pair {} (Some 0xbbcc))  	 ]
 
