@@ -329,7 +329,7 @@ class TestContractOpcodes:
             # element multiplicity
             ('contains_all.tz', 'None', '(Pair {} {})',
              '(Some True)'),
-            ('contains_all.tz', 'None', '(Pair { "a" } { "B" })',
+            ('contains_all.tz', 'None', '(Pair { "c" } { "B" })',
              '(Some False)'),
             ('contains_all.tz', 'None', '(Pair { "A" } { "B" })',
              '(Some False)'),
