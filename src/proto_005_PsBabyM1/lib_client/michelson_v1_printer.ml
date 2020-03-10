@@ -202,3 +202,282 @@ let unparse_invalid expanded =
     |> Format.asprintf "%a" Micheline_printer.print_expr_unwrapped
   in
   fst (Michelson_v1_parser.parse_toplevel source)
+
+let ocaml_constructor_of_prim =
+  let open Michelson_v1_primitives in
+  function
+  | K_parameter ->
+      "K_parameter"
+  | K_storage ->
+      "K_storage"
+  | K_code ->
+      "K_code"
+  | D_False ->
+      "D_False"
+  | D_Elt ->
+      "D_Elt"
+  | D_Left ->
+      "D_Left"
+  | D_None ->
+      "D_None"
+  | D_Pair ->
+      "D_Pair"
+  | D_Right ->
+      "D_Right"
+  | D_Some ->
+      "D_Some"
+  | D_True ->
+      "D_True"
+  | D_Unit ->
+      "D_Unit"
+  | I_PACK ->
+      "I_PACK"
+  | I_UNPACK ->
+      "I_UNPACK"
+  | I_BLAKE2B ->
+      "I_BLAKE2B"
+  | I_SHA256 ->
+      "I_SHA256"
+  | I_SHA512 ->
+      "I_SHA512"
+  | I_ABS ->
+      "I_ABS"
+  | I_ADD ->
+      "I_ADD"
+  | I_AMOUNT ->
+      "I_AMOUNT"
+  | I_AND ->
+      "I_AND"
+  | I_BALANCE ->
+      "I_BALANCE"
+  | I_CAR ->
+      "I_CAR"
+  | I_CDR ->
+      "I_CDR"
+  | I_CHAIN_ID ->
+      "I_CHAIN_ID"
+  | I_CHECK_SIGNATURE ->
+      "I_CHECK_SIGNATURE"
+  | I_COMPARE ->
+      "I_COMPARE"
+  | I_CONCAT ->
+      "I_CONCAT"
+  | I_CONS ->
+      "I_CONS"
+  | I_CREATE_ACCOUNT ->
+      "I_CREATE_ACCOUNT"
+  | I_CREATE_CONTRACT ->
+      "I_CREATE_CONTRACT"
+  | I_IMPLICIT_ACCOUNT ->
+      "I_IMPLICIT_ACCOUNT"
+  | I_DIP ->
+      "I_DIP"
+  | I_DROP ->
+      "I_DROP"
+  | I_DUP ->
+      "I_DUP"
+  | I_EDIV ->
+      "I_EDIV"
+  | I_EMPTY_BIG_MAP ->
+      "I_EMPTY_BIG_MAP"
+  | I_EMPTY_MAP ->
+      "I_EMPTY_MAP"
+  | I_EMPTY_SET ->
+      "I_EMPTY_SET"
+  | I_EQ ->
+      "I_EQ"
+  | I_EXEC ->
+      "I_EXEC"
+  | I_APPLY ->
+      "I_APPLY"
+  | I_FAILWITH ->
+      "I_FAILWITH"
+  | I_GE ->
+      "I_GE"
+  | I_GET ->
+      "I_GET"
+  | I_GT ->
+      "I_GT"
+  | I_HASH_KEY ->
+      "I_HASH_KEY"
+  | I_IF ->
+      "I_IF"
+  | I_IF_CONS ->
+      "I_IF_CONS"
+  | I_IF_LEFT ->
+      "I_IF_LEFT"
+  | I_IF_NONE ->
+      "I_IF_NONE"
+  | I_INT ->
+      "I_INT"
+  | I_LAMBDA ->
+      "I_LAMBDA"
+  | I_LE ->
+      "I_LE"
+  | I_LEFT ->
+      "I_LEFT"
+  | I_LOOP ->
+      "I_LOOP"
+  | I_LSL ->
+      "I_LSL"
+  | I_LSR ->
+      "I_LSR"
+  | I_LT ->
+      "I_LT"
+  | I_MAP ->
+      "I_MAP"
+  | I_MEM ->
+      "I_MEM"
+  | I_MUL ->
+      "I_MUL"
+  | I_NEG ->
+      "I_NEG"
+  | I_NEQ ->
+      "I_NEQ"
+  | I_NIL ->
+      "I_NIL"
+  | I_NONE ->
+      "I_NONE"
+  | I_NOT ->
+      "I_NOT"
+  | I_NOW ->
+      "I_NOW"
+  | I_OR ->
+      "I_OR"
+  | I_PAIR ->
+      "I_PAIR"
+  | I_PUSH ->
+      "I_PUSH"
+  | I_RIGHT ->
+      "I_RIGHT"
+  | I_SIZE ->
+      "I_SIZE"
+  | I_SOME ->
+      "I_SOME"
+  | I_SOURCE ->
+      "I_SOURCE"
+  | I_SENDER ->
+      "I_SENDER"
+  | I_SELF ->
+      "I_SELF"
+  | I_SLICE ->
+      "I_SLICE"
+  | I_STEPS_TO_QUOTA ->
+      "I_STEPS_TO_QUOTA"
+  | I_SUB ->
+      "I_SUB"
+  | I_SWAP ->
+      "I_SWAP"
+  | I_TRANSFER_TOKENS ->
+      "I_TRANSFER_TOKENS"
+  | I_SET_DELEGATE ->
+      "I_SET_DELEGATE"
+  | I_UNIT ->
+      "I_UNIT"
+  | I_UPDATE ->
+      "I_UPDATE"
+  | I_XOR ->
+      "I_XOR"
+  | I_ITER ->
+      "I_ITER"
+  | I_LOOP_LEFT ->
+      "I_LOOP_LEFT"
+  | I_ADDRESS ->
+      "I_ADDRESS"
+  | I_CONTRACT ->
+      "I_CONTRACT"
+  | I_ISNAT ->
+      "I_ISNAT"
+  | I_CAST ->
+      "I_CAST"
+  | I_RENAME ->
+      "I_RENAME"
+  | I_DIG ->
+      "I_DIG"
+  | I_DUG ->
+      "I_DUG"
+  | T_bool ->
+      "T_bool"
+  | T_contract ->
+      "T_contract"
+  | T_int ->
+      "T_int"
+  | T_key ->
+      "T_key"
+  | T_key_hash ->
+      "T_key_hash"
+  | T_lambda ->
+      "T_lambda"
+  | T_list ->
+      "T_list"
+  | T_map ->
+      "T_map"
+  | T_big_map ->
+      "T_big_map"
+  | T_nat ->
+      "T_nat"
+  | T_option ->
+      "T_option"
+  | T_or ->
+      "T_or"
+  | T_pair ->
+      "T_pair"
+  | T_set ->
+      "T_set"
+  | T_signature ->
+      "T_signature"
+  | T_string ->
+      "T_string"
+  | T_bytes ->
+      "T_bytes"
+  | T_mutez ->
+      "T_mutez"
+  | T_timestamp ->
+      "T_timestamp"
+  | T_unit ->
+      "T_unit"
+  | T_operation ->
+      "T_operation"
+  | T_address ->
+      "T_address"
+  | T_chain_id ->
+      "T_chain_id"
+
+let micheline_string_of_expression ~zero_loc expression =
+  let string_of_list : string list -> string =
+   fun xs -> String.concat "; " xs |> Format.asprintf "[%s]"
+  in
+  let show_loc loc = if zero_loc then 0 else loc in
+  let rec string_of_node = function
+    | Int (loc, i) ->
+        let z =
+          match Z.to_int i with
+          | 0 ->
+              "Z.zero"
+          | 1 ->
+              "Z.one"
+          | i ->
+              Format.asprintf "Z.of_int %d" i
+        in
+        Format.asprintf "Int (%d, %s)" (show_loc loc) z
+    | String (loc, s) ->
+        Format.asprintf "String (%d, \"%s\")" (show_loc loc) s
+    | Bytes (loc, b) ->
+        Format.asprintf
+          "Bytes (%d, Bytes.of_string \"%s\")"
+          (show_loc loc)
+          Bytes.(escaped b |> to_string)
+    | Prim (loc, prim, nodes, annot) ->
+        Format.asprintf
+          "Prim (%d, %s, %s, %s)"
+          (show_loc loc)
+          (ocaml_constructor_of_prim prim)
+          (string_of_list @@ List.map string_of_node nodes)
+          (string_of_list @@ List.map (Format.asprintf "\"%s\"") annot)
+    | Seq (loc, nodes) ->
+        Format.asprintf
+          "Seq (%d, %s)"
+          (show_loc loc)
+          (string_of_list @@ List.map string_of_node nodes)
+  in
+  string_of_node (root expression)

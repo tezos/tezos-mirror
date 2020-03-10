@@ -59,15 +59,14 @@ let int_parameter =
   parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
-let bytes_parameter =
-  parameter (fun _ s ->
-      try
-        if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
-        else
-          return (MBytes.of_hex (`Hex (String.sub s 2 (String.length s - 2))))
-      with _ ->
-        failwith
-          "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)")
+let bytes_of_prefixed_string s =
+  try
+    if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
+    else return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
+  with _ ->
+    failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
+
+let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
 let entrypoint_arg =
   arg

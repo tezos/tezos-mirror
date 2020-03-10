@@ -39,4 +39,6 @@ val tez_arg :
 
 val int_parameter : (int, full) Clic.parameter
 
+val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
+
 val bytes_parameter : (Bytes.t, full) Clic.parameter
