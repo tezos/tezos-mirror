@@ -5654,102 +5654,100 @@ let rec extract_big_map_updates :
     a ->
     (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t =
  fun ctxt fresh mode ids acc ty x ->
-  match (ty, x) with
-  | (Big_map_t (_, _, _), map) ->
-      diff_of_big_map ctxt fresh mode ids map
-      >>=? fun (diff, id, ctxt) ->
-      let (module Map) = map.diff in
-      let map = {map with diff = empty_map Map.key_ty; id = Some id} in
-      return (ctxt, map, Ids.add id ids, diff :: acc)
-  | (Pair_t ((tyl, _, _), (tyr, _, _), _, true), (xl, xr)) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-      >>=? fun ctxt ->
-      extract_big_map_updates ctxt fresh mode ids acc tyl xl
-      >>=? fun (ctxt, xl, ids, acc) ->
-      extract_big_map_updates ctxt fresh mode ids acc tyr xr
-      >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
-  | (Union_t ((ty, _), (_, _), _, true), L x) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-      >>=? fun ctxt ->
-      extract_big_map_updates ctxt fresh mode ids acc ty x
-      >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
-  | (Union_t ((_, _), (ty, _), _, true), R x) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-      >>=? fun ctxt ->
-      extract_big_map_updates ctxt fresh mode ids acc ty x
-      >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
-  | (Option_t (ty, _, true), Some x) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-      >>=? fun ctxt ->
-      extract_big_map_updates ctxt fresh mode ids acc ty x
-      >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
-  | (List_t (ty, _, true), l) ->
-      fold_left_s
-        (fun (ctxt, l, ids, acc) x ->
-          Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-          >>=? fun ctxt ->
-          extract_big_map_updates ctxt fresh mode ids acc ty x
-          >>=? fun (ctxt, x, ids, acc) -> return (ctxt, list_cons x l, ids, acc))
-        (ctxt, list_empty, ids, acc)
-        l.elements
-      >>=? fun (ctxt, l, ids, acc) ->
-      let reversed = {length = l.length; elements = List.rev l.elements} in
-      return (ctxt, reversed, ids, acc)
-  | (Map_t (_, ty, _, true), ((module M) as m)) ->
-      map_fold_m
-        (fun (k, x) (ctxt, m, ids, acc) ->
-          Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-          >>=? fun ctxt ->
-          extract_big_map_updates ctxt fresh mode ids acc ty x
-          >>=? fun (ctxt, x, ids, acc) ->
-          return (ctxt, M.OPS.add k x m, ids, acc))
-        m
-        (ctxt, M.OPS.empty, ids, acc)
-      >>=? fun (ctxt, m, ids, acc) ->
-      let module M = struct
-        module OPS = M.OPS
+  Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
+  >>=? fun ctxt ->
+  ( match (ty, x) with
+    | (Big_map_t (_, _, _), map) ->
+        diff_of_big_map ctxt fresh mode ids map
+        >>=? fun (diff, id, ctxt) ->
+        let (module Map) = map.diff in
+        let map = {map with diff = empty_map Map.key_ty; id = Some id} in
+        return (ctxt, map, Ids.add id ids, diff :: acc)
+    | (Pair_t ((tyl, _, _), (tyr, _, _), _, true), (xl, xr)) ->
+        extract_big_map_updates ctxt fresh mode ids acc tyl xl
+        >>=? fun (ctxt, xl, ids, acc) ->
+        extract_big_map_updates ctxt fresh mode ids acc tyr xr
+        >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
+    | (Union_t ((ty, _), (_, _), _, true), L x) ->
+        extract_big_map_updates ctxt fresh mode ids acc ty x
+        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
+    | (Union_t ((_, _), (ty, _), _, true), R x) ->
+        extract_big_map_updates ctxt fresh mode ids acc ty x
+        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
+    | (Option_t (ty, _, true), Some x) ->
+        extract_big_map_updates ctxt fresh mode ids acc ty x
+        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
+    | (List_t (ty, _, true), l) ->
+        fold_left_s
+          (fun (ctxt, l, ids, acc) x ->
+            Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
+            >>=? fun ctxt ->
+            extract_big_map_updates ctxt fresh mode ids acc ty x
+            >>=? fun (ctxt, x, ids, acc) ->
+            return (ctxt, list_cons x l, ids, acc))
+          (ctxt, list_empty, ids, acc)
+          l.elements
+        >>=? fun (ctxt, l, ids, acc) ->
+        let reversed = {length = l.length; elements = List.rev l.elements} in
+        return (ctxt, reversed, ids, acc)
+    | (Map_t (_, ty, _, true), ((module M) as m)) ->
+        map_fold_m
+          (fun (k, x) (ctxt, m, ids, acc) ->
+            Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
+            >>=? fun ctxt ->
+            extract_big_map_updates ctxt fresh mode ids acc ty x
+            >>=? fun (ctxt, x, ids, acc) ->
+            return (ctxt, M.OPS.add k x m, ids, acc))
+          m
+          (ctxt, M.OPS.empty, ids, acc)
+        >>=? fun (ctxt, m, ids, acc) ->
+        let module M = struct
+          module OPS = M.OPS
 
-        type key = M.key
+          type key = M.key
 
-        type value = M.value
+          type value = M.value
 
-        let key_ty = M.key_ty
+          let key_ty = M.key_ty
 
-        let boxed = (m, snd M.boxed)
-      end in
-      return
-        ( ctxt,
-          (module M : Boxed_map with type key = M.key and type value = M.value),
-          ids,
-          acc )
-  | (Option_t (_, _, _), None) ->
-      return (ctxt, None, ids, acc)
-  | (List_t (_, _, false), v)
-  | (Map_t (_, _, _, false), v)
-  | (Pair_t (_, _, _, false), v)
-  | (Union_t (_, _, _, false), v)
-  | (Option_t (_, _, false), v)
-  | (Chain_id_t _, v)
-  | (Set_t (_, _), v)
-  | (Unit_t _, v)
-  | (Int_t _, v)
-  | (Nat_t _, v)
-  | (Signature_t _, v)
-  | (String_t _, v)
-  | (Bytes_t _, v)
-  | (Mutez_t _, v)
-  | (Key_hash_t _, v)
-  | (Key_t _, v)
-  | (Timestamp_t _, v)
-  | (Address_t _, v)
-  | (Bool_t _, v)
-  | (Lambda_t (_, _, _), v)
-  | (Contract_t (_, _), v) ->
-      return (ctxt, v, ids, acc)
-  | (Operation_t _, _) ->
-      assert false
-  | (Never_t _, _) ->
-      .
+          let boxed = (m, snd M.boxed)
+        end in
+        return
+          ( ctxt,
+            (module M : Boxed_map
+              with type key = M.key
+               and type value = M.value ),
+            ids,
+            acc )
+    | (Option_t (_, _, _), None) ->
+        return (ctxt, None, ids, acc)
+    | (List_t (_, _, false), v)
+    | (Map_t (_, _, _, false), v)
+    | (Pair_t (_, _, _, false), v)
+    | (Union_t (_, _, _, false), v)
+    | (Option_t (_, _, false), v)
+    | (Chain_id_t _, v)
+    | (Set_t (_, _), v)
+    | (Unit_t _, v)
+    | (Int_t _, v)
+    | (Nat_t _, v)
+    | (Signature_t _, v)
+    | (String_t _, v)
+    | (Bytes_t _, v)
+    | (Mutez_t _, v)
+    | (Key_hash_t _, v)
+    | (Key_t _, v)
+    | (Timestamp_t _, v)
+    | (Address_t _, v)
+    | (Bool_t _, v)
+    | (Lambda_t (_, _, _), v)
+    | (Contract_t (_, _), v) ->
+        return (ctxt, v, ids, acc)
+    | (Operation_t _, _) ->
+        assert false
+    | (Never_t _, _) ->
+        .
+    : (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t )
 
 (* called only on parameters and storage, which cannot contain operations *)
 
@@ -5757,6 +5755,8 @@ let collect_big_maps ctxt ty x =
   let rec collect :
       type a. context -> a ty -> a -> Ids.t -> (Ids.t * context) tzresult =
    fun ctxt ty x acc ->
+    Gas.consume ctxt Typecheck_costs.cycle
+    >>? fun ctxt ->
     match (ty, x) with
     | (Big_map_t (_, _, _), {id = Some id}) ->
         Gas.consume ctxt Typecheck_costs.cycle
