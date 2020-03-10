@@ -65,7 +65,7 @@ Injected block [BLOCK_HASH]
 1000 ꜩ
 2000 ꜩ
 Node is bootstrapped.
-Estimated gas: 1442816 units (will add 12800 for safety)
+Estimated gas: 1443072 units (will add 12800 for safety)
 Estimated storage: 298 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -78,7 +78,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.00141
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1455616
+    Gas limit: 1455872
     Storage limit: 318 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.00141
@@ -97,7 +97,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 41 bytes
         Paid storage size diff: 41 bytes
-        Consumed gas: 1442816
+        Consumed gas: 1443072
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.041
           [CONTRACT_HASH] ... -ꜩ0.257
@@ -108,7 +108,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as store_input.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 1480264 units (will add 12800 for safety)
+Estimated gas: 1480648 units (will add 12800 for safety)
 Estimated storage: 7 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -121,7 +121,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.001436
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1493064
+    Gas limit: 1493448
     Storage limit: 27 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.001436
@@ -135,7 +135,7 @@ This sequence of operations was run:
       Updated storage: "abcdefg"
       Storage size: 48 bytes
       Paid storage size diff: 7 bytes
-      Consumed gas: 1480264
+      Consumed gas: 1480648
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.007
         [CONTRACT_HASH] ... -ꜩ100
@@ -145,7 +145,7 @@ Injected block [BLOCK_HASH]
 200 ꜩ
 "abcdefg"
 Node is bootstrapped.
-Estimated gas: 1481800 units (will add 12800 for safety)
+Estimated gas: 1482184 units (will add 12800 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -158,7 +158,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.001433
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1494600
+    Gas limit: 1494984
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.001433
@@ -171,7 +171,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: "xyz"
       Storage size: 44 bytes
-      Consumed gas: 1481800
+      Consumed gas: 1482184
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100

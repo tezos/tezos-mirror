@@ -7,19 +7,19 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133086080 units remaining)
+  - location: 8 (remaining gas: 133085824 units remaining)
     [ (Pair (Right 2) 0)  	 ]
-  - location: 9 (remaining gas: 133086020 units remaining)
+  - location: 9 (remaining gas: 133085764 units remaining)
     [ (Right 2)  	@parameter ]
-  - location: 14 (remaining gas: 133085798 units remaining)
+  - location: 14 (remaining gas: 133085542 units remaining)
     [ -2  	 ]
-  - location: 13 (remaining gas: 133085778 units remaining)
+  - location: 13 (remaining gas: 133085522 units remaining)
     [ -2  	 ]
-  - location: 15 (remaining gas: 133085718 units remaining)
+  - location: 15 (remaining gas: 133085462 units remaining)
     [ {}  	
       -2  	 ]
-  - location: 17 (remaining gas: 133085658 units remaining)
+  - location: 17 (remaining gas: 133085402 units remaining)
     [ (Pair {} -2)  	 ]
-  - location: -1 (remaining gas: 133085638 units remaining)
+  - location: -1 (remaining gas: 133085382 units remaining)
     [ (Pair {} -2)  	 ]
 

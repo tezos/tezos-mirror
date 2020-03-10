@@ -7,15 +7,15 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133086720 units remaining)
+  - location: 8 (remaining gas: 133086464 units remaining)
     [ (Pair { "asdf" ; "bcde" } {})  	 ]
-  - location: 9 (remaining gas: 133086660 units remaining)
+  - location: 9 (remaining gas: 133086404 units remaining)
     [ { "asdf" ; "bcde" }  	@parameter ]
-  - location: 10 (remaining gas: 133086600 units remaining)
+  - location: 10 (remaining gas: 133086344 units remaining)
     [ {}  	
       { "asdf" ; "bcde" }  	@parameter ]
-  - location: 12 (remaining gas: 133086540 units remaining)
+  - location: 12 (remaining gas: 133086284 units remaining)
     [ (Pair {} { "asdf" ; "bcde" })  	 ]
-  - location: -1 (remaining gas: 133086520 units remaining)
+  - location: -1 (remaining gas: 133086264 units remaining)
     [ (Pair {} { "asdf" ; "bcde" })  	 ]
 
