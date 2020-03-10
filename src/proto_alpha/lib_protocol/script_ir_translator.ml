@@ -109,19 +109,19 @@ let rec type_size : type t. t ty -> int =
   | Chain_id_t _
   | Never_t _ ->
       1
-  | Pair_t ((l, _, _), (r, _, _), _, _) ->
+  | Pair_t ((l, _, _), (r, _, _), _) ->
       1 + type_size l + type_size r
-  | Union_t ((l, _), (r, _), _, _) ->
+  | Union_t ((l, _), (r, _), _) ->
       1 + type_size l + type_size r
   | Lambda_t (arg, ret, _) ->
       1 + type_size arg + type_size ret
-  | Option_t (t, _, _) ->
+  | Option_t (t, _) ->
       1 + type_size t
-  | List_t (t, _, _) ->
+  | List_t (t, _) ->
       1 + type_size t
   | Set_t (k, _) ->
       1 + comparable_type_size k
-  | Map_t (k, v, _, _) ->
+  | Map_t (k, v, _) ->
       1 + comparable_type_size k + type_size v
   | Big_map_t (k, v, _) ->
       1 + comparable_type_size k + type_size v
@@ -619,13 +619,11 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Pair_t
         ( (ty_of_comparable_ty l, al, None),
           (ty_of_comparable_ty r, ar, None),
-          tname,
-          false )
+          tname )
   | Union_key ((l, al), (r, ar), tname) ->
-      Union_t
-        ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname, false)
+      Union_t ((ty_of_comparable_ty l, al), (ty_of_comparable_ty r, ar), tname)
   | Option_key (t, tname) ->
-      Option_t (ty_of_comparable_ty t, tname, false)
+      Option_t (ty_of_comparable_ty t, tname)
 
 let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
   function
@@ -649,7 +647,7 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       Some (Timestamp_key tname)
   | Address_t tname ->
       Some (Address_key tname)
-  | Pair_t ((l, al, _), (r, ar, _), pname, _) -> (
+  | Pair_t ((l, al, _), (r, ar, _), pname) -> (
     match comparable_ty_of_ty_no_gas l with
     | None ->
         None
@@ -659,7 +657,7 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
           None
       | Some rty ->
           Some (Pair_key ((lty, al), (rty, ar), pname)) ) )
-  | Union_t ((l, al), (r, ar), tname, _) -> (
+  | Union_t ((l, al), (r, ar), tname) -> (
     match comparable_ty_of_ty_no_gas l with
     | None ->
         None
@@ -669,7 +667,7 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
           None
       | Some rty ->
           Some (Union_key ((lty, al), (rty, ar), tname)) ) )
-  | Option_t (tt, tname, _) -> (
+  | Option_t (tt, tname) -> (
     match comparable_ty_of_ty_no_gas tt with
     | None ->
         None
@@ -768,7 +766,7 @@ let rec unparse_ty_no_lwt :
       unparse_ty_no_lwt ctxt ut
       >>? fun (t, ctxt) ->
       return ctxt (T_contract, [t], unparse_type_annot tname)
-  | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), tname, _) ->
+  | Pair_t ((utl, l_field, l_var), (utr, r_field, r_var), tname) ->
       let annot = unparse_type_annot tname in
       unparse_ty_no_lwt ctxt utl
       >>? fun (utl, ctxt) ->
@@ -777,7 +775,7 @@ let rec unparse_ty_no_lwt :
       >>? fun (utr, ctxt) ->
       let tr = add_field_annot r_field r_var utr in
       return ctxt (T_pair, [tl; tr], annot)
-  | Union_t ((utl, l_field), (utr, r_field), tname, _) ->
+  | Union_t ((utl, l_field), (utr, r_field), tname) ->
       let annot = unparse_type_annot tname in
       unparse_ty_no_lwt ctxt utl
       >>? fun (utl, ctxt) ->
@@ -792,17 +790,17 @@ let rec unparse_ty_no_lwt :
       unparse_ty_no_lwt ctxt utr
       >>? fun (tr, ctxt) ->
       return ctxt (T_lambda, [ta; tr], unparse_type_annot tname)
-  | Option_t (ut, tname, _) ->
+  | Option_t (ut, tname) ->
       let annot = unparse_type_annot tname in
       unparse_ty_no_lwt ctxt ut
       >>? fun (ut, ctxt) -> return ctxt (T_option, [ut], annot)
-  | List_t (ut, tname, _) ->
+  | List_t (ut, tname) ->
       unparse_ty_no_lwt ctxt ut
       >>? fun (t, ctxt) -> return ctxt (T_list, [t], unparse_type_annot tname)
   | Set_t (ut, tname) ->
       let t = unparse_comparable_ty ut in
       return ctxt (T_set, [t], unparse_type_annot tname)
-  | Map_t (uta, utr, tname, _) ->
+  | Map_t (uta, utr, tname) ->
       let ta = unparse_comparable_ty uta in
       unparse_ty_no_lwt ctxt utr
       >>? fun (tr, ctxt) ->
@@ -865,13 +863,13 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Chain_id_t tname
   | Never_t tname
   | Contract_t (_, tname)
-  | Pair_t (_, _, tname, _)
-  | Union_t (_, _, tname, _)
+  | Pair_t (_, _, tname)
+  | Union_t (_, _, tname)
   | Lambda_t (_, _, tname)
-  | Option_t (_, tname, _)
-  | List_t (_, tname, _)
+  | Option_t (_, tname)
+  | List_t (_, tname)
   | Set_t (_, tname)
-  | Map_t (_, _, tname, _)
+  | Map_t (_, _, tname)
   | Big_map_t (_, _, tname) ->
       tname
 
@@ -1091,7 +1089,7 @@ let merge_types :
         consume ctxt 0
         >>? fun ctxt ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
-    | (Map_t (tal, tar, tn1, has_big_map), Map_t (tbl, tbr, tn2, _)) ->
+    | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
         consume ctxt 2
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
@@ -1100,7 +1098,7 @@ let merge_types :
         >>? fun (Eq, value, ctxt) ->
         merge_comparable_types ~legacy ctxt tal tbl
         >|? fun (Eq, tk, ctxt) ->
-        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname, has_big_map), ctxt)
+        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname), ctxt)
     | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
         consume ctxt 2
         >>? fun ctxt ->
@@ -1119,9 +1117,8 @@ let merge_types :
         merge_comparable_types ~legacy ctxt ea eb
         >|? fun (Eq, e, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Set_t (e, tname), ctxt)
-    | ( Pair_t
-          ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1, has_big_map),
-        Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2, _) ) ->
+    | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
+        Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
         consume ctxt 2
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
@@ -1137,14 +1134,10 @@ let merge_types :
         help ctxt tar tbr
         >|? fun (Eq, right_ty, ctxt) ->
         ( (Eq : (ta ty, tb ty) eq),
-          Pair_t
-            ( (left_ty, l_field, l_var),
-              (right_ty, r_field, r_var),
-              tname,
-              has_big_map ),
+          Pair_t ((left_ty, l_field, l_var), (right_ty, r_field, r_var), tname),
           ctxt )
-    | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1, has_big_map),
-        Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2, _) ) ->
+    | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1),
+        Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2) ) ->
         consume ctxt 2
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
@@ -1158,8 +1151,7 @@ let merge_types :
         help ctxt tar tbr
         >|? fun (Eq, right_ty, ctxt) ->
         ( (Eq : (ta ty, tb ty) eq),
-          Union_t
-            ((left_ty, left_annot), (right_ty, right_annot), tname, has_big_map),
+          Union_t ((left_ty, left_annot), (right_ty, right_annot), tname),
           ctxt )
     | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
         consume ctxt 2
@@ -1179,22 +1171,22 @@ let merge_types :
         help ctxt tal tbl
         >|? fun (Eq, arg_ty, ctxt) ->
         ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname), ctxt)
-    | (Option_t (tva, tn1, has_big_map), Option_t (tvb, tn2, _)) ->
+    | (Option_t (tva, tn1), Option_t (tvb, tn2)) ->
         consume ctxt 1
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
         >|? fun (Eq, ty, ctxt) ->
-        ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname, has_big_map), ctxt)
-    | (List_t (tva, tn1, has_big_map), List_t (tvb, tn2, _)) ->
+        ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname), ctxt)
+    | (List_t (tva, tn1), List_t (tvb, tn2)) ->
         consume ctxt 1
         >>? fun ctxt ->
         merge_type_annot tn1 tn2
         >>? fun tname ->
         help ctxt tva tvb
         >|? fun (Eq, ty, ctxt) ->
-        ((Eq : (ta ty, tb ty) eq), List_t (ty, tname, has_big_map), ctxt)
+        ((Eq : (ta ty, tb ty) eq), List_t (ty, tname), ctxt)
     | (_, _) ->
         serialize_ty_for_error ctxt ty1
         >>? fun (ty1, ctxt) ->
@@ -1246,56 +1238,6 @@ let merge_stacks :
         error Bad_stack_length
   in
   help
-
-let has_big_map : type t. t ty -> bool = function
-  | Unit_t _ ->
-      false
-  | Int_t _ ->
-      false
-  | Nat_t _ ->
-      false
-  | Signature_t _ ->
-      false
-  | String_t _ ->
-      false
-  | Bytes_t _ ->
-      false
-  | Mutez_t _ ->
-      false
-  | Key_hash_t _ ->
-      false
-  | Key_t _ ->
-      false
-  | Timestamp_t _ ->
-      false
-  | Address_t _ ->
-      false
-  | Bool_t _ ->
-      false
-  | Lambda_t (_, _, _) ->
-      false
-  | Set_t (_, _) ->
-      false
-  | Big_map_t (_, _, _) ->
-      true
-  | Contract_t (_, _) ->
-      false
-  | Operation_t _ ->
-      false
-  | Chain_id_t _ ->
-      false
-  | Never_t _ ->
-      false
-  | Pair_t (_, _, _, has_big_map) ->
-      has_big_map
-  | Union_t (_, _, _, has_big_map) ->
-      has_big_map
-  | Option_t (_, _, has_big_map) ->
-      has_big_map
-  | List_t (_, _, has_big_map) ->
-      has_big_map
-  | Map_t (_, _, _, has_big_map) ->
-      has_big_map
 
 (* ---- Type checker results -------------------------------------------------*)
 
@@ -1606,11 +1548,7 @@ and parse_ty :
       Gas.consume ctxt (Typecheck_costs.type_ 2)
       >|? fun ctxt ->
       ( Ex_ty
-          (Pair_t
-             ( (tl, left_field, None),
-               (tr, right_field, None),
-               ty_name,
-               has_big_map tl || has_big_map tr )),
+          (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)),
         ctxt )
   | Prim (loc, T_or, [utl; utr], annot) ->
       extract_field_annot utl
@@ -1625,13 +1563,7 @@ and parse_ty :
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 2)
       >|? fun ctxt ->
-      ( Ex_ty
-          (Union_t
-             ( (tl, left_constr),
-               (tr, right_constr),
-               ty_name,
-               has_big_map tl || has_big_map tr )),
-        ctxt )
+      (Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt)
   | Prim (loc, T_lambda, [uta; utr], annot) ->
       parse_any_ty ctxt ~legacy uta
       >>? fun (Ex_ty ta, ctxt) ->
@@ -1653,14 +1585,14 @@ and parse_ty :
       parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
       >>? fun (Ex_ty t, ctxt) ->
       Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (Ex_ty (Option_t (t, ty_name, has_big_map t)), ctxt)
+      >|? fun ctxt -> (Ex_ty (Option_t (t, ty_name)), ctxt)
   | Prim (loc, T_list, [ut], annot) ->
       parse_ty ctxt ~legacy ~allow_big_map ~allow_operation ~allow_contract ut
       >>? fun (Ex_ty t, ctxt) ->
       parse_type_annot loc annot
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 1)
-      >|? fun ctxt -> (Ex_ty (List_t (t, ty_name, has_big_map t)), ctxt)
+      >|? fun ctxt -> (Ex_ty (List_t (t, ty_name)), ctxt)
   | Prim (loc, T_set, [ut], annot) ->
       parse_comparable_ty ctxt ut
       >>? fun (Ex_comparable_ty t, ctxt) ->
@@ -1676,7 +1608,7 @@ and parse_ty :
       parse_type_annot loc annot
       >>? fun ty_name ->
       Gas.consume ctxt (Typecheck_costs.type_ 2)
-      >|? fun ctxt -> (Ex_ty (Map_t (ta, tr, ty_name, has_big_map tr)), ctxt)
+      >|? fun ctxt -> (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
   | Prim (loc, T_big_map, args, annot) when allow_big_map ->
       parse_big_map_ty ctxt ~legacy loc args annot
       >>? fun (big_map_ty, ctxt) ->
@@ -1803,8 +1735,7 @@ and parse_storage_ty :
             (Pair_t
                ( (big_map_ty, map_field, None),
                  (remaining_storage, storage_field, None),
-                 ty_name,
-                 true )),
+                 ty_name )),
           ctxt ) )
   | _ ->
       parse_ty
@@ -1838,15 +1769,15 @@ let check_packable ~legacy loc root =
     | Set_t (_, _)
     | Lambda_t (_, _, _) ->
         ok ()
-    | Pair_t ((l_ty, _, _), (r_ty, _, _), _, _) ->
+    | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
         check l_ty >>? fun () -> check r_ty
-    | Union_t ((l_ty, _), (r_ty, _), _, _) ->
+    | Union_t ((l_ty, _), (r_ty, _), _) ->
         check l_ty >>? fun () -> check r_ty
-    | Option_t (v_ty, _, _) ->
+    | Option_t (v_ty, _) ->
         check v_ty
-    | List_t (elt_ty, _, _) ->
+    | List_t (elt_ty, _) ->
         check elt_ty
-    | Map_t (_, elt_ty, _, _) ->
+    | Map_t (_, elt_ty, _) ->
         check elt_ty
     | Contract_t (_, _) when legacy ->
         ok ()
@@ -1899,7 +1830,7 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
       type t. t ty -> string -> (Script.node -> Script.node) * ex_ty =
    fun t entrypoint ->
     match t with
-    | Union_t ((tl, al), (tr, ar), _, _) -> (
+    | Union_t ((tl, al), (tr, ar), _) -> (
         if
           match al with
           | None ->
@@ -1999,7 +1930,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
       prim list option * Entrypoints.t =
    fun t path reachable acc ->
     match t with
-    | Union_t ((tl, al), (tr, ar), _, _) ->
+    | Union_t ((tl, al), (tr, ar), _) ->
         let acc = merge (D_Left :: path) al tl reachable acc in
         let acc = merge (D_Right :: path) ar tr reachable acc in
         let acc =
@@ -2381,7 +2312,7 @@ let rec parse_data :
         (fail
            (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
   (* Pairs *)
-  | (Pair_t ((ta, _, _), (tb, _, _), _, _), Prim (loc, D_Pair, [va; vb], annot))
+  | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, [va; vb], annot))
     ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
@@ -2396,7 +2327,7 @@ let rec parse_data :
   | (Pair_t _, expr) ->
       traced (fail (unexpected expr [] Constant_namespace [D_Pair]))
   (* Unions *)
-  | (Union_t ((tl, _), _, _, _), Prim (loc, D_Left, [v], annot)) ->
+  | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
@@ -2405,7 +2336,7 @@ let rec parse_data :
       >>=? fun (v, ctxt) -> return (L v, ctxt)
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
-  | (Union_t (_, (tr, _), _, _), Prim (loc, D_Right, [v], annot)) ->
+  | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
       fail_unexpected_annot loc annot
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
@@ -2432,7 +2363,7 @@ let rec parse_data :
   | (Lambda_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Options *)
-  | (Option_t (t, _, _), Prim (loc, D_Some, [v], annot)) ->
+  | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.some)
@@ -2441,7 +2372,7 @@ let rec parse_data :
       >>=? fun (v, ctxt) -> return (Some v, ctxt)
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
-  | (Option_t (_, _, _), Prim (loc, D_None, [], annot)) ->
+  | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.none)
@@ -2451,7 +2382,7 @@ let rec parse_data :
   | (Option_t _, expr) ->
       traced (fail (unexpected expr [] Constant_namespace [D_Some; D_None]))
   (* Lists *)
-  | (List_t (t, _ty_name, _), Seq (_loc, items)) ->
+  | (List_t (t, _ty_name), Seq (_loc, items)) ->
       traced
       @@ fold_right_s
            (fun v (rest, ctxt) ->
@@ -2494,7 +2425,7 @@ let rec parse_data :
   | (Set_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Maps *)
-  | (Map_t (tk, tv, _ty_name, _), (Seq (loc, vs) as expr)) ->
+  | (Map_t (tk, tv, _ty_name), (Seq (loc, vs) as expr)) ->
       parse_items ?type_logger loc ctxt expr tk tv vs (fun x -> x)
   | (Map_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
@@ -2790,11 +2721,7 @@ and parse_instr :
   | (Prim (loc, I_SOME, [], annot), Item_t (t, rest, _)) ->
       Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
-      typed
-        ctxt
-        loc
-        Cons_some
-        (Item_t (Option_t (t, ty_name, has_big_map t), rest, annot))
+      typed ctxt loc Cons_some (Item_t (Option_t (t, ty_name), rest, annot))
   | (Prim (loc, I_NONE, [t], annot), stack) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy t
       >>=? fun (Ex_ty t, ctxt) ->
@@ -2804,9 +2731,9 @@ and parse_instr :
         ctxt
         loc
         (Cons_none t)
-        (Item_t (Option_t (t, ty_name, has_big_map t), stack, annot))
+        (Item_t (Option_t (t, ty_name), stack, annot))
   | ( Prim (loc, I_IF_NONE, [bt; bf], annot),
-      (Item_t (Option_t (t, _, _), rest, option_annot) as bef) ) ->
+      (Item_t (Option_t (t, _), rest, option_annot) as bef) ) ->
       check_kind [Seq_kind] bt
       >>=? fun () ->
       check_kind [Seq_kind] bf
@@ -2844,16 +2771,12 @@ and parse_instr :
         loc
         Cons_pair
         (Item_t
-           ( Pair_t
-               ( (a, l_field, fst_annot),
-                 (b, r_field, snd_annot),
-                 ty_name,
-                 has_big_map a || has_big_map b ),
+           ( Pair_t ((a, l_field, fst_annot), (b, r_field, snd_annot), ty_name),
              rest,
              annot ))
   | ( Prim (loc, I_CAR, [], annot),
       Item_t
-        (Pair_t ((a, expected_field_annot, a_annot), _, _, _), rest, pair_annot)
+        (Pair_t ((a, expected_field_annot, a_annot), _, _), rest, pair_annot)
     ) ->
       Lwt.return
       @@ parse_destr_annot
@@ -2868,7 +2791,7 @@ and parse_instr :
       >>=? fun () -> typed ctxt loc Car (Item_t (a, rest, annot))
   | ( Prim (loc, I_CDR, [], annot),
       Item_t
-        (Pair_t (_, (b, expected_field_annot, b_annot), _, _), rest, pair_annot)
+        (Pair_t (_, (b, expected_field_annot, b_annot), _), rest, pair_annot)
     ) ->
       Lwt.return
       @@ parse_destr_annot
@@ -2895,14 +2818,7 @@ and parse_instr :
         ctxt
         loc
         Cons_left
-        (Item_t
-           ( Union_t
-               ( (tl, l_field),
-                 (tr, r_field),
-                 tname,
-                 has_big_map tl || has_big_map tr ),
-             rest,
-             annot ))
+        (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest, stack_annot)) ->
       Lwt.return @@ parse_any_ty ctxt ~legacy tl
       >>=? fun (Ex_ty tl, ctxt) ->
@@ -2916,16 +2832,9 @@ and parse_instr :
         ctxt
         loc
         Cons_right
-        (Item_t
-           ( Union_t
-               ( (tl, l_field),
-                 (tr, r_field),
-                 tname,
-                 has_big_map tl || has_big_map tr ),
-             rest,
-             annot ))
+        (Item_t (Union_t ((tl, l_field), (tr, r_field), tname), rest, annot))
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
-      ( Item_t (Union_t ((tl, l_field), (tr, r_field), _, _), rest, union_annot)
+      ( Item_t (Union_t ((tl, l_field), (tr, r_field), _), rest, union_annot)
       as bef ) ) ->
       check_kind [Seq_kind] bt
       >>=? fun () ->
@@ -2966,24 +2875,16 @@ and parse_instr :
       >>=? fun (Ex_ty t, ctxt) ->
       Lwt.return @@ parse_var_type_annot loc annot
       >>=? fun (annot, ty_name) ->
-      typed
-        ctxt
-        loc
-        Nil
-        (Item_t (List_t (t, ty_name, has_big_map t), stack, annot))
+      typed ctxt loc Nil (Item_t (List_t (t, ty_name), stack, annot))
   | ( Prim (loc, I_CONS, [], annot),
-      Item_t (tv, Item_t (List_t (t, ty_name, has_big_map), rest, _), _) ) ->
+      Item_t (tv, Item_t (List_t (t, ty_name), rest, _), _) ) ->
       check_item_ty ctxt tv t loc I_CONS 1 2
       >>=? fun (Eq, t, ctxt) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Cons_list
-        (Item_t (List_t (t, ty_name, has_big_map), rest, annot))
+      typed ctxt loc Cons_list (Item_t (List_t (t, ty_name), rest, annot))
   | ( Prim (loc, I_IF_CONS, [bt; bf], annot),
-      (Item_t (List_t (t, ty_name, has_big_map), rest, list_annot) as bef) ) ->
+      (Item_t (List_t (t, ty_name), rest, list_annot) as bef) ) ->
       check_kind [Seq_kind] bt
       >>=? fun () ->
       check_kind [Seq_kind] bf
@@ -2998,10 +2899,7 @@ and parse_instr :
         ctxt
         ~legacy
         bt
-        (Item_t
-           ( t,
-             Item_t (List_t (t, ty_name, has_big_map), rest, tl_annot),
-             hd_annot ))
+        (Item_t (t, Item_t (List_t (t, ty_name), rest, tl_annot), hd_annot))
       >>=? fun (btr, ctxt) ->
       parse_instr ?type_logger tc_context ctxt ~legacy bf rest
       >>=? fun (bfr, ctxt) ->
@@ -3015,7 +2913,7 @@ and parse_instr :
       >>=? fun (annot, tname) ->
       typed ctxt loc List_size (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_MAP, [body], annot),
-      Item_t (List_t (elt, _, _), starting_rest, list_annot) ) -> (
+      Item_t (List_t (elt, _), starting_rest, list_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
       Lwt.return @@ parse_var_type_annot loc annot
@@ -3043,16 +2941,14 @@ and parse_instr :
               ctxt
               loc
               (List_map ibody)
-              (Item_t
-                 (List_t (ret, list_ty_name, has_big_map ret), rest, ret_annot))
-            )
+              (Item_t (List_t (ret, list_ty_name), rest, ret_annot)) )
       | Typed {aft; _} ->
           serialize_stack_for_error ctxt aft
           >>=? fun (aft, _ctxt) -> fail (Invalid_map_body (loc, aft))
       | Failed _ ->
           fail (Invalid_map_block_fail loc) )
   | ( Prim (loc, I_ITER, [body], annot),
-      Item_t (List_t (elt, _, _), rest, list_annot) ) -> (
+      Item_t (List_t (elt, _), rest, list_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
       fail_unexpected_annot loc annot
@@ -3153,9 +3049,9 @@ and parse_instr :
         ctxt
         loc
         (Empty_map (tk, tv))
-        (Item_t (Map_t (tk, tv, ty_name, has_big_map tv), stack, annot))
+        (Item_t (Map_t (tk, tv, ty_name), stack, annot))
   | ( Prim (loc, I_MAP, [body], annot),
-      Item_t (Map_t (ck, elt, _, _), starting_rest, _map_annot) ) -> (
+      Item_t (Map_t (ck, elt, _), starting_rest, _map_annot) ) -> (
       let k = ty_of_comparable_ty ck in
       check_kind [Seq_kind] body
       >>=? fun () ->
@@ -3170,8 +3066,7 @@ and parse_instr :
         ~legacy
         body
         (Item_t
-           ( Pair_t
-               ((k, None, k_name), (elt, None, e_name), None, has_big_map elt),
+           ( Pair_t ((k, None, k_name), (elt, None, e_name), None),
              starting_rest,
              None ))
       >>=? fun (judgement, ctxt) ->
@@ -3189,16 +3084,14 @@ and parse_instr :
               ctxt
               loc
               (Map_map ibody)
-              (Item_t
-                 (Map_t (ck, ret, ty_name, has_big_map ret), rest, ret_annot))
-            )
+              (Item_t (Map_t (ck, ret, ty_name), rest, ret_annot)) )
       | Typed {aft; _} ->
           serialize_stack_for_error ctxt aft
           >>=? fun (aft, _ctxt) -> fail (Invalid_map_body (loc, aft))
       | Failed _ ->
           fail (Invalid_map_block_fail loc) )
   | ( Prim (loc, I_ITER, [body], annot),
-      Item_t (Map_t (comp_elt, element_ty, _, _), rest, _map_annot) ) -> (
+      Item_t (Map_t (comp_elt, element_ty, _), rest, _map_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
       fail_unexpected_annot loc annot
@@ -3213,11 +3106,7 @@ and parse_instr :
         ~legacy
         body
         (Item_t
-           ( Pair_t
-               ( (key, None, k_name),
-                 (element_ty, None, e_name),
-                 None,
-                 has_big_map element_ty ),
+           ( Pair_t ((key, None, k_name), (element_ty, None, e_name), None),
              rest,
              None ))
       >>=? fun (judgement, ctxt) ->
@@ -3237,7 +3126,7 @@ and parse_instr :
       | Failed {descr} ->
           typed ctxt loc (Map_iter (descr rest)) rest )
   | ( Prim (loc, I_MEM, [], annot),
-      Item_t (vk, Item_t (Map_t (ck, _, _, _), rest, _), _) ) ->
+      Item_t (vk, Item_t (Map_t (ck, _, _), rest, _), _) ) ->
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_MEM 1 2
       >>=? fun (Eq, _, ctxt) ->
@@ -3245,23 +3134,19 @@ and parse_instr :
       >>=? fun annot ->
       typed ctxt loc Map_mem (Item_t (Bool_t None, rest, annot))
   | ( Prim (loc, I_GET, [], annot),
-      Item_t (vk, Item_t (Map_t (ck, elt, _, has_big_map), rest, _), _) ) ->
+      Item_t (vk, Item_t (Map_t (ck, elt, _), rest, _), _) ) ->
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET 1 2
       >>=? fun (Eq, _, ctxt) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Map_get
-        (Item_t (Option_t (elt, None, has_big_map), rest, annot))
+      typed ctxt loc Map_get (Item_t (Option_t (elt, None), rest, annot))
   | ( Prim (loc, I_UPDATE, [], annot),
       Item_t
         ( vk,
           Item_t
-            ( Option_t (vv, _, _),
-              Item_t (Map_t (ck, v, map_name, has_big_map), rest, map_annot),
+            ( Option_t (vv, _),
+              Item_t (Map_t (ck, v, map_name), rest, map_annot),
               _ ),
           _ ) ) ->
       let k = ty_of_comparable_ty ck in
@@ -3271,12 +3156,8 @@ and parse_instr :
       >>=? fun (Eq, v, ctxt) ->
       Lwt.return @@ parse_var_annot loc annot ~default:map_annot
       >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Map_update
-        (Item_t (Map_t (ck, v, map_name, has_big_map), rest, annot))
-  | (Prim (loc, I_SIZE, [], annot), Item_t (Map_t (_, _, _, _), rest, _)) ->
+      typed ctxt loc Map_update (Item_t (Map_t (ck, v, map_name), rest, annot))
+  | (Prim (loc, I_SIZE, [], annot), Item_t (Map_t (_, _, _), rest, _)) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Map_size (Item_t (Nat_t None, rest, annot))
@@ -3308,16 +3189,12 @@ and parse_instr :
       >>=? fun (Eq, _, ctxt) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Big_map_get
-        (Item_t (Option_t (elt, None, has_big_map elt), rest, annot))
+      typed ctxt loc Big_map_get (Item_t (Option_t (elt, None), rest, annot))
   | ( Prim (loc, I_UPDATE, [], annot),
       Item_t
         ( set_key,
           Item_t
-            ( Option_t (set_value, _, _),
+            ( Option_t (set_value, _),
               Item_t (Big_map_t (map_key, map_value, map_name), rest, map_annot),
               _ ),
           _ ) ) ->
@@ -3411,8 +3288,8 @@ and parse_instr :
           let ibody = descr stack in
           typed ctxt loc (Loop ibody) rest )
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
-      ( Item_t (Union_t ((tl, l_field), (tr, _), _, _), rest, union_annot) as
-      stack ) ) -> (
+      (Item_t (Union_t ((tl, l_field), (tr, _), _), rest, union_annot) as stack)
+    ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
       Lwt.return @@ parse_var_annot loc annot
@@ -3478,9 +3355,7 @@ and parse_instr :
         ( capture,
           Item_t
             ( Lambda_t
-                ( Pair_t ((capture_ty, _, _), (arg_ty, _, _), lam_annot, _),
-                  ret,
-                  _ ),
+                (Pair_t ((capture_ty, _, _), (arg_ty, _, _), lam_annot), ret, _),
               rest,
               _ ),
           _ ) ) ->
@@ -3610,7 +3485,7 @@ and parse_instr :
       >>=? fun tname ->
       typed ctxt loc Concat_string_pair (Item_t (String_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
-      Item_t (List_t (String_t tname, _, _), rest, list_annot) ) ->
+      Item_t (List_t (String_t tname, _), rest, list_annot) ) ->
       Lwt.return @@ parse_var_annot ~default:list_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Concat_string (Item_t (String_t tname, rest, annot))
@@ -3629,7 +3504,7 @@ and parse_instr :
         ctxt
         loc
         Slice_string
-        (Item_t (Option_t (String_t tname, None, false), rest, annot))
+        (Item_t (Option_t (String_t tname, None), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (String_t _, rest, _)) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
@@ -3643,7 +3518,7 @@ and parse_instr :
       >>=? fun tname ->
       typed ctxt loc Concat_bytes_pair (Item_t (Bytes_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
-      Item_t (List_t (Bytes_t tname, _, _), rest, list_annot) ) ->
+      Item_t (List_t (Bytes_t tname, _), rest, list_annot) ) ->
       Lwt.return @@ parse_var_annot ~default:list_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Concat_bytes (Item_t (Bytes_t tname, rest, annot))
@@ -3662,7 +3537,7 @@ and parse_instr :
         ctxt
         loc
         Slice_bytes
-        (Item_t (Option_t (Bytes_t tname, None, false), rest, annot))
+        (Item_t (Option_t (Bytes_t tname, None), rest, annot))
   | (Prim (loc, I_SIZE, [], annot), Item_t (Bytes_t _, rest, _)) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
@@ -3724,11 +3599,7 @@ and parse_instr :
   | (Prim (loc, I_ISNAT, [], annot), Item_t (Int_t _, rest, int_annot)) ->
       Lwt.return @@ parse_var_annot loc annot ~default:int_annot
       >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Is_nat
-        (Item_t (Option_t (Nat_t None, None, false), rest, annot))
+      typed ctxt loc Is_nat (Item_t (Option_t (Nat_t None, None), rest, annot))
   | (Prim (loc, I_INT, [], annot), Item_t (Nat_t _, rest, _)) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
@@ -3826,10 +3697,8 @@ and parse_instr :
                ( Pair_t
                    ( (Mutez_t tname, None, None),
                      (Mutez_t tname, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                     None ),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
@@ -3845,12 +3714,8 @@ and parse_instr :
         (Item_t
            ( Option_t
                ( Pair_t
-                   ( (Nat_t None, None, None),
-                     (Mutez_t tname, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                   ((Nat_t None, None, None), (Mutez_t tname, None, None), None),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
@@ -3866,12 +3731,8 @@ and parse_instr :
         (Item_t
            ( Option_t
                ( Pair_t
-                   ( (Int_t tname, None, None),
-                     (Nat_t None, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                   ((Int_t tname, None, None), (Nat_t None, None, None), None),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
@@ -3885,12 +3746,8 @@ and parse_instr :
         (Item_t
            ( Option_t
                ( Pair_t
-                   ( (Int_t tname, None, None),
-                     (Nat_t None, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                   ((Int_t tname, None, None), (Nat_t None, None, None), None),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
@@ -3904,12 +3761,8 @@ and parse_instr :
         (Item_t
            ( Option_t
                ( Pair_t
-                   ( (Int_t None, None, None),
-                     (Nat_t tname, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                   ((Int_t None, None, None), (Nat_t tname, None, None), None),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_EDIV, [], annot),
@@ -3925,12 +3778,8 @@ and parse_instr :
         (Item_t
            ( Option_t
                ( Pair_t
-                   ( (Nat_t tname, None, None),
-                     (Nat_t tname, None, None),
-                     None,
-                     false ),
-                 None,
-                 false ),
+                   ((Nat_t tname, None, None), (Nat_t tname, None, None), None),
+                 None ),
              rest,
              annot ))
   | ( Prim (loc, I_LSL, [], annot),
@@ -4055,14 +3904,7 @@ and parse_instr :
           annot
           ~default:(gen_access_annot packed_annot default_unpack_annot)
       in
-      typed
-        ctxt
-        loc
-        (Unpack t)
-        (Item_t
-           ( Option_t (t, ty_name, false) (* cannot unpack big_maps *),
-             rest,
-             annot ))
+      typed ctxt loc (Unpack t) (Item_t (Option_t (t, ty_name), rest, annot))
   (* protocol *)
   | ( Prim (loc, I_ADDRESS, [], annot),
       Item_t (Contract_t _, rest, contract_annot) ) ->
@@ -4099,7 +3941,7 @@ and parse_instr :
         ctxt
         loc
         (Contract (t, entrypoint))
-        (Item_t (Option_t (Contract_t (t, None), None, false), rest, annot))
+        (Item_t (Option_t (Contract_t (t, None), None), rest, annot))
   | ( Prim (loc, I_TRANSFER_TOKENS, [], annot),
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest, _), _), _)
     ) ->
@@ -4109,7 +3951,7 @@ and parse_instr :
       >>=? fun annot ->
       typed ctxt loc Transfer_tokens (Item_t (Operation_t None, rest, annot))
   | ( Prim (loc, I_SET_DELEGATE, [], annot),
-      Item_t (Option_t (Key_hash_t _, _, _), rest, _) ) ->
+      Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Set_delegate (Item_t (Operation_t None, rest, annot))
@@ -4117,7 +3959,7 @@ and parse_instr :
       Item_t
         ( Key_hash_t _,
           Item_t
-            ( Option_t (Key_hash_t _, _, _),
+            ( Option_t (Key_hash_t _, _),
               Item_t (Bool_t _, Item_t (Mutez_t _, rest, _), _),
               _ ),
           _ ) ) ->
@@ -4149,7 +3991,7 @@ and parse_instr :
       Item_t
         ( Key_hash_t _,
           Item_t
-            ( Option_t (Key_hash_t _, _, _),
+            ( Option_t (Key_hash_t _, _),
               Item_t
                 ( Bool_t _,
                   Item_t
@@ -4193,15 +4035,13 @@ and parse_instr :
           Pair_t
             ( (arg_type, None, arg_annot),
               (storage_type, None, storage_annot),
-              None,
-              has_big_map arg_type || has_big_map storage_type )
+              None )
         in
         let ret_type_full =
           Pair_t
-            ( (List_t (Operation_t None, None, false), None, None),
+            ( (List_t (Operation_t None, None), None, None),
               (storage_type, None, None),
-              None,
-              has_big_map storage_type )
+              None )
         in
         trace
           (Ill_typed_contract (cannonical_code, []))
@@ -4245,7 +4085,7 @@ and parse_instr :
   | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     Item_t
-      ( Option_t (Key_hash_t _, _, _),
+      ( Option_t (Key_hash_t _, _),
         Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
         _ ) ) ->
       Lwt.return @@ parse_two_var_annot loc annot
@@ -4279,15 +4119,13 @@ and parse_instr :
         Pair_t
           ( (arg_type, None, arg_annot),
             (storage_type, None, storage_annot),
-            None,
-            has_big_map arg_type || has_big_map storage_type )
+            None )
       in
       let ret_type_full =
         Pair_t
-          ( (List_t (Operation_t None, None, false), None, None),
+          ( (List_t (Operation_t None, None), None, None),
             (storage_type, None, None),
-            None,
-            has_big_map storage_type )
+            None )
       in
       trace
         (Ill_typed_contract (cannonical_code, []))
@@ -4991,17 +4829,13 @@ let parse_code :
   in
   let arg_type_full =
     Pair_t
-      ( (arg_type, None, arg_annot),
-        (storage_type, None, storage_annot),
-        None,
-        has_big_map arg_type || has_big_map storage_type )
+      ((arg_type, None, arg_annot), (storage_type, None, storage_annot), None)
   in
   let ret_type_full =
     Pair_t
-      ( (List_t (Operation_t None, None, false), None, None),
+      ( (List_t (Operation_t None, None), None, None),
         (storage_type, None, None),
-        None,
-        has_big_map storage_type )
+        None )
   in
   trace
     (Ill_typed_contract (code, []))
@@ -5082,17 +4916,13 @@ let typecheck_code :
   in
   let arg_type_full =
     Pair_t
-      ( (arg_type, None, arg_annot),
-        (storage_type, None, storage_annot),
-        None,
-        has_big_map arg_type || has_big_map storage_type )
+      ((arg_type, None, arg_annot), (storage_type, None, storage_annot), None)
   in
   let ret_type_full =
     Pair_t
-      ( (List_t (Operation_t None, None, false), None, None),
+      ( (List_t (Operation_t None, None), None, None),
         (storage_type, None, None),
-        None,
-        has_big_map storage_type )
+        None )
   in
   let result =
     parse_returning
@@ -5169,7 +4999,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       (prim list list * (prim list * Script.node) Entrypoints_map.t) tzresult =
    fun t path reachable acc ->
     match t with
-    | Union_t ((tl, al), (tr, ar), _, _) ->
+    | Union_t ((tl, al), (tr, ar), _) ->
         merge (D_Left :: path) al tl reachable acc
         >>? fun acc ->
         merge (D_Right :: path) ar tr reachable acc
@@ -5341,24 +5171,24 @@ let rec unparse_data :
       in
       Lwt.return (Gas.consume ctxt (Unparse_costs.chain_id bytes))
       >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
-  | (Pair_t ((tl, _, _), (tr, _, _), _, _), (l, r)) ->
+  | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.pair)
       >>=? fun ctxt ->
       unparse_data ctxt mode tl l
       >>=? fun (l, ctxt) ->
       unparse_data ctxt mode tr r
       >>=? fun (r, ctxt) -> return (Prim (-1, D_Pair, [l; r], []), ctxt)
-  | (Union_t ((tl, _), _, _, _), L l) ->
+  | (Union_t ((tl, _), _, _), L l) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.union)
       >>=? fun ctxt ->
       unparse_data ctxt mode tl l
       >>=? fun (l, ctxt) -> return (Prim (-1, D_Left, [l], []), ctxt)
-  | (Union_t (_, (tr, _), _, _), R r) ->
+  | (Union_t (_, (tr, _), _), R r) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.union)
       >>=? fun ctxt ->
       unparse_data ctxt mode tr r
       >>=? fun (r, ctxt) -> return (Prim (-1, D_Right, [r], []), ctxt)
-  | (Option_t (t, _, _), Some v) ->
+  | (Option_t (t, _), Some v) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.some)
       >>=? fun ctxt ->
       unparse_data ctxt mode t v
@@ -5366,7 +5196,7 @@ let rec unparse_data :
   | (Option_t _, None) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.none)
       >>=? fun ctxt -> return (Prim (-1, D_None, [], []), ctxt)
-  | (List_t (t, _, _), items) ->
+  | (List_t (t, _), items) ->
       fold_left_s
         (fun (l, ctxt) element ->
           Lwt.return (Gas.consume ctxt Unparse_costs.list_element)
@@ -5388,7 +5218,7 @@ let rec unparse_data :
         ([], ctxt)
         (set_fold (fun e acc -> e :: acc) set [])
       >>=? fun (items, ctxt) -> return (Micheline.Seq (-1, items), ctxt)
-  | (Map_t (kt, vt, _, _), map) ->
+  | (Map_t (kt, vt, _), map) ->
       let kt = ty_of_comparable_ty kt in
       fold_left_s
         (fun (l, ctxt) (k, v) ->
@@ -5705,15 +5535,15 @@ let rec has_big_map : type t. t ty -> t has_big_map =
   | Chain_id_t _
   | Never_t _ ->
       False_f
-  | Pair_t ((l, _, _), (r, _, _), _, _) ->
+  | Pair_t ((l, _, _), (r, _, _), _) ->
       aux2 (fun l r -> Pair_f (l, r)) l r
-  | Union_t ((l, _), (r, _), _, _) ->
+  | Union_t ((l, _), (r, _), _) ->
       aux2 (fun l r -> Union_f (l, r)) l r
-  | Option_t (t, _, _) ->
+  | Option_t (t, _) ->
       aux1 (fun h -> Option_f h) t
-  | List_t (t, _, _) ->
+  | List_t (t, _) ->
       aux1 (fun h -> List_f h) t
-  | Map_t (_, t, _, _) ->
+  | Map_t (_, t, _) ->
       aux1 (fun h -> Map_f h) t
 
 let extract_big_map_updates ctxt fresh mode ids acc ty x =
@@ -5740,21 +5570,21 @@ let extract_big_map_updates ctxt fresh mode ids acc ty x =
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         return (ctxt, map, Ids.add id ids, diff :: acc)
-    | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _, _), (xl, xr)) ->
+    | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt fresh mode ids acc tyl xl ~has_big_map:hl
         >>=? fun (ctxt, xl, ids, acc) ->
         aux ctxt fresh mode ids acc tyr xr ~has_big_map:hr
         >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
-    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _, _), L x) ->
+    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _), L x) ->
         aux ctxt fresh mode ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
-    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _, _), R x) ->
+    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _), R x) ->
         aux ctxt fresh mode ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
-    | (Option_f has_big_map, Option_t (ty, _, _), Some x) ->
+    | (Option_f has_big_map, Option_t (ty, _), Some x) ->
         aux ctxt fresh mode ids acc ty x ~has_big_map
         >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
-    | (List_f has_big_map, List_t (ty, _, _), l) ->
+    | (List_f has_big_map, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
@@ -5767,7 +5597,7 @@ let extract_big_map_updates ctxt fresh mode ids acc ty x =
         >>=? fun (ctxt, l, ids, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
         return (ctxt, reversed, ids, acc)
-    | (Map_f has_big_map, Map_t (_, ty, _, _), ((module M) as m)) ->
+    | (Map_f has_big_map, Map_t (_, ty, _), ((module M) as m)) ->
         map_fold_m
           (fun (k, x) (ctxt, m, ids, acc) ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
@@ -5796,7 +5626,7 @@ let extract_big_map_updates ctxt fresh mode ids acc ty x =
                and type value = M.value ),
             ids,
             acc )
-    | (_, Option_t (_, _, _), None) ->
+    | (_, Option_t (_, _), None) ->
         return (ctxt, None, ids, acc)
     | (_, Never_t _, _) ->
         .
@@ -5825,22 +5655,22 @@ let collect_big_maps ctxt ty x =
     | (_, Big_map_t (_, _, _), {id = Some id}) ->
         Gas.consume ctxt Typecheck_costs.cycle
         >>? fun ctxt -> ok (Ids.add id acc, ctxt)
-    | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _, _), (xl, xr)) ->
+    | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         collect ctxt tyl xl ~has_big_map:hl acc
         >>? fun (acc, ctxt) -> collect ctxt tyr xr ~has_big_map:hr acc
-    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _, _), L x) ->
+    | (Union_f (has_big_map, _), Union_t ((ty, _), (_, _), _), L x) ->
         collect ctxt ty x ~has_big_map acc
-    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _, _), R x) ->
+    | (Union_f (_, has_big_map), Union_t ((_, _), (ty, _), _), R x) ->
         collect ctxt ty x ~has_big_map acc
-    | (Option_f has_big_map, Option_t (ty, _, _), Some x) ->
+    | (Option_f has_big_map, Option_t (ty, _), Some x) ->
         collect ctxt ty x ~has_big_map acc
-    | (List_f has_big_map, List_t (ty, _, _), l) ->
+    | (List_f has_big_map, List_t (ty, _), l) ->
         List.fold_left
           (fun acc x ->
             acc >>? fun (acc, ctxt) -> collect ctxt ty x ~has_big_map acc)
           (ok (acc, ctxt))
           l.elements
-    | (Map_f has_big_map, Map_t (_, ty, _, _), m) ->
+    | (Map_f has_big_map, Map_t (_, ty, _), m) ->
         map_fold
           (fun _ v acc ->
             acc >>? fun (acc, ctxt) -> collect ctxt ty v ~has_big_map acc)
@@ -5848,7 +5678,7 @@ let collect_big_maps ctxt ty x =
           (ok (acc, ctxt))
     | (_, Big_map_t (_, _, _), {id = None}) ->
         ok (acc, ctxt)
-    | (_, Option_t (_, _, _), None) ->
+    | (_, Option_t (_, _), None) ->
         ok (acc, ctxt)
     | (_, Never_t _, _) ->
         .

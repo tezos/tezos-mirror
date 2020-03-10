@@ -916,7 +916,7 @@ let rec step :
       unparse_ty ctxt capture_ty
       >>=? fun (ty_expr, ctxt) ->
       match full_arg_ty with
-      | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _, _) ->
+      | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
           let arg_stack_ty = Item_t (arg_ty, Empty_t, None) in
           let const_descr =
             ( {

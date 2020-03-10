@@ -135,21 +135,17 @@ and 'ty ty =
       ('a ty * field_annot option * var_annot option)
       * ('b ty * field_annot option * var_annot option)
       * type_annot option
-      * bool
       -> ('a, 'b) pair ty
   | Union_t :
       ('a ty * field_annot option)
       * ('b ty * field_annot option)
       * type_annot option
-      * bool
       -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty * type_annot option -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * type_annot option * bool -> 'v option ty
-  | List_t : 'v ty * type_annot option * bool -> 'v boxed_list ty
+  | Option_t : 'v ty * type_annot option -> 'v option ty
+  | List_t : 'v ty * type_annot option -> 'v boxed_list ty
   | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
-  | Map_t :
-      'k comparable_ty * 'v ty * type_annot option * bool
-      -> ('k, 'v) map ty
+  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
   | Big_map_t :
       'k comparable_ty * 'v ty * type_annot option
       -> ('k, 'v) big_map ty
