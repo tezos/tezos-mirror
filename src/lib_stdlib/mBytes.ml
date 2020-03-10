@@ -53,19 +53,19 @@ let set_char = Bytes.set
 include TzEndian
 
 module LE = struct
-  let get_uint16 = Bytes_encodings.get_uint16_le
+  let get_uint16 = Bytes.get_uint16_le
 
-  let get_int16 = Bytes_encodings.get_int16_le
+  let get_int16 = Bytes.get_int16_le
 
-  let get_int32 = Bytes_encodings.get_int32_le
+  let get_int32 = Bytes.get_int32_le
 
-  let get_int64 = Bytes_encodings.get_int64_le
+  let get_int64 = Bytes.get_int64_le
 
-  let set_int16 = Bytes_encodings.set_int16_le
+  let set_int16 = Bytes.set_int16_le
 
-  let set_int32 = Bytes_encodings.set_int32_le
+  let set_int32 = Bytes.set_int32_le
 
-  let set_int64 = Bytes_encodings.set_int64_le
+  let set_int64 = Bytes.set_int64_le
 end
 
 let ( = ) = Stdlib.( = )

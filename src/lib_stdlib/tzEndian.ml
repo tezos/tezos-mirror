@@ -23,28 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bytes_encodings
+let set_int32 = Bytes.set_int32_be
 
-let set_int32 = set_int32_be
+let get_int32 = Bytes.get_int32_be
 
-let get_int32 = get_int32_be
+let set_int8 = Bytes.set_int8
 
-let set_int8 = set_int8
+let get_int8 = Bytes.get_int8
 
-let get_int8 = get_int8
+let set_int16 = Bytes.set_int16_be
 
-let set_int16 = set_int16_be
+let get_int16 = Bytes.get_int16_be
 
-let get_int16 = get_int16_be
+let set_int64 = Bytes.set_int64_be
 
-let set_int64 = set_int64_be
+let get_int64 = Bytes.get_int64_be
 
-let get_int64 = get_int64_be
+let get_uint8 = Bytes.get_uint8
 
-let get_uint8 = get_uint8
+let get_uint16 = Bytes.get_uint16_be
 
-let get_uint16 = get_uint16_be
+let get_double buff i = Int64.float_of_bits (Bytes.get_int64_be buff i)
 
-let get_double buff i = Int64.float_of_bits (get_int64_be buff i)
-
-let set_double buff i v = set_int64_be buff i (Int64.bits_of_float v)
+let set_double buff i v = Bytes.set_int64_be buff i (Int64.bits_of_float v)
