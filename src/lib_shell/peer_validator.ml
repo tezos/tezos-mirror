@@ -338,7 +338,9 @@ let may_validate_new_branch w distant_hash locator =
         pv.peer_id ;
       fail Validation_errors.Unknown_ancestor
   | Some unknown_prefix ->
-      let (_, history) = Block_locator.raw unknown_prefix in
+      let (_, history) =
+        (unknown_prefix : Block_locator.t :> Block_header.t * _)
+      in
       if history <> [] then
         bootstrap_new_branch w distant_header unknown_prefix
       else return_unit

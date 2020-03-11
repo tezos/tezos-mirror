@@ -23,13 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A type for sparse block locator (/à la/ Bitcoin). *)
-type t = private raw
+(** A locator [t] is a data structure which roughly represents a list
+    of block hashes in the chain. These hashes go from the top of the
+    chain to the bottom. It is sparse in the sense that the distance between
+    two hashes increases exponentially when we move away from the head.
 
-(** Non private version of Block_store_locator.t for coercions. *)
-and raw = Block_header.t * Block_hash.t list
+    The distance between two hashes of a locator is randomized to prevent from
+    attacks. The seed is determined uniquely from the peer_id of the sender and
+    the receiver so that the distance between two hashes can be recomputed locally.
+    This is the purpose of the function [to_steps].
 
-val raw : t -> raw
+    The [step] representation is mostly used by the [peer_validator] module and the
+    [bootstrap_pipeline} modules.
+
+    The last step of a locator may be truncated. There are two typcal case of this:
+    1. When the last step hit the genesis block hash
+    2. In [Rolling] or [Full] mode, we are not instered into blocks below the
+    [save point]. A step which is not truncated is said [strict]. *)
+
+(** Type for sparse block locators (/à la/ Bitcoin). *)
+type t = private Block_header.t * Block_hash.t list
 
 val pp : Format.formatter -> t -> unit
 

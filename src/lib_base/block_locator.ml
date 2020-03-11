@@ -25,11 +25,7 @@
 
 open Lwt.Infix
 
-type t = raw
-
-and raw = Block_header.t * Block_hash.t list
-
-let raw x = x
+type t = Block_header.t * Block_hash.t list
 
 let pp ppf (hd, h_lst) =
   let repeats = 10 in
