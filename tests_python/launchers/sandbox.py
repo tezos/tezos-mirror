@@ -110,6 +110,7 @@ class Sandbox:
         return self
 
     def register_node(self, node_id: int,
+                      node_dir: str = None,
                       peers: List[int] = None,
                       params: List[str] = None,
                       log_levels: Dict[str, str] = None,
@@ -150,7 +151,7 @@ class Sandbox:
         params = params + ['--network=sandbox']
         peers_rpc = [self.p2p + p for p in peers]
         node_bin = self._wrap_path(NODE, branch)
-        node = Node(node_bin, self.sandbox_file,
+        node = Node(node_bin, self.sandbox_file, node_dir=node_dir,
                     p2p_port=p2p_node, rpc_port=rpc_node,
                     peers=peers_rpc, log_file=log_file, params=params,
                     log_levels=log_levels, use_tls=use_tls)
@@ -258,6 +259,7 @@ class Sandbox:
 
     def add_node(self,
                  node_id: int,
+                 node_dir: str = None,
                  peers: List[int] = None,
                  params: List[str] = None,
                  log_levels: Dict[str, str] = None,
@@ -273,6 +275,7 @@ class Sandbox:
         Args:
             node_id (int): id of the node, defines its RPC/P2P port and serves
                            as an identifier for client and daemons
+            node_dir (str): path to the node's data directory
             peer (list): id of peers initialized trusted by this nodes
             params (list): list of additional parameters to run the node
             log_levels (dict): log levels. e.g. {"p2p.connection-pool":"debug"}
@@ -301,8 +304,8 @@ class Sandbox:
         Whenever a node has been added with `add_node()`, we can access a
         corresponding client object `client()` to interact with this node.
         """
-        node = self.register_node(node_id, peers, params, log_levels,
-                                  private, use_tls, branch)
+        node = self.register_node(node_id, node_dir, peers, params,
+                                  log_levels, private, use_tls, branch)
 
         self.init_node(node, snapshot, reconstruct)
 
@@ -559,6 +562,7 @@ class SandboxMultiBranch(Sandbox):
 
     def add_node(self,
                  node_id: int,
+                 node_dir: str = None,
                  peers: List[int] = None,
                  params: List[str] = None,
                  log_levels: Dict[str, str] = None,
@@ -571,6 +575,6 @@ class SandboxMultiBranch(Sandbox):
                  client_factory: Callable = Client) -> None:
         assert not branch
         branch = self._branch_map[node_id]
-        super().add_node(node_id, peers, params, log_levels, private,
+        super().add_node(node_id, node_dir, peers, params, log_levels, private,
                          config_client, use_tls, snapshot, reconstruct,
                          branch, client_factory)
