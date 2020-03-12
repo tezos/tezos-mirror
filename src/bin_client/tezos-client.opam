@@ -42,6 +42,7 @@ depends: [
   "tezos-baking-006-PsCARTHA-commands"
 
   "tezos-client-base-unix"
+  "tezos-mockup-commands"
   "tezos-signer-backends"
   "tezos-node" { with-test }
   "tezos-protocol-compiler" { with-test }

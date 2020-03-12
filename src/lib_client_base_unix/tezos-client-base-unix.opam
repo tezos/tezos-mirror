@@ -14,6 +14,8 @@ depends: [
   "tezos-rpc-http-client"
   "tezos-signer-backends"
   "tezos-client-commands"
+  "tezos-mockup-registration"
+  "tezos-mockup-commands"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

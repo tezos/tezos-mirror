@@ -10,6 +10,9 @@ depends: [
   "dune" { >= "1.7" }
   "tezos-base"
   "tezos-client-commands"
+  "tezos-client-base"
+  "tezos-mockup"
+  "tezos-mockup-registration"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

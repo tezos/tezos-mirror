@@ -8,10 +8,13 @@ license: "MIT"
 depends: [
   "ocamlfind" { build }
   "dune" { >= "1.7" }
+  "tezos-stdlib-unix"
   "tezos-base"
-  "tezos-shell-services"
-  "tezos-protocol-environment"
+  "tezos-rpc"
+  "tezos-shell"
   "tezos-p2p"
+  "tezos-protocol-environment"
+  "tezos-mockup-registration"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
