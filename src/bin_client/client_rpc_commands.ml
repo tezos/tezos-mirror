@@ -453,7 +453,7 @@ let display_answer (cctxt : #Client_context.full) = function
   | `Error None | `Unauthorized _ | `Forbidden _ | `Conflict _ ->
       cctxt#message "Unexpected server answer\n%!" >>= fun () -> return_unit
 
-let call meth raw_url (cctxt : #Client_context.full) =
+let call ?body meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
   RPC_description.describe cctxt ~recurse:false args
@@ -467,21 +467,32 @@ let call meth raw_url (cctxt : #Client_context.full) =
            %!"
         >>= fun () -> return_unit
     | Some {input = None; _} ->
-        cctxt#generic_json_call meth uri >>=? display_answer cctxt
+        ( match body with
+        | None ->
+            Lwt.return_unit
+        | Some _ ->
+            cctxt#warning
+              "This URL did not expect a JSON input but one was provided\n%!"
+        )
+        >>= fun () ->
+        cctxt#generic_json_call meth ?body uri >>=? display_answer cctxt
     | Some {input = Some input; _} -> (
-        fill_in ~show_optionals:false (fst (Lazy.force input))
+        ( match body with
+        | None ->
+            fill_in ~show_optionals:false (fst (Lazy.force input))
+        | Some body ->
+            Lwt.return (Ok body) )
         >>= function
         | Error msg ->
             cctxt#error "%s" msg >>= fun () -> return_unit
-        | Ok json ->
-            cctxt#generic_json_call meth ~body:json uri
-            >>=? display_answer cctxt ) )
+        | Ok body ->
+            cctxt#generic_json_call meth ~body uri >>=? display_answer cctxt )
+    )
   | _ ->
       cctxt#message "No service found at this URL\n%!"
       >>= fun () -> return_unit
 
 let call_with_json meth raw_url json (cctxt : #Client_context.full) =
-  let uri = Uri.of_string raw_url in
   match Data_encoding.Json.from_string json with
   | exception Assert_failure _ ->
       (* Ref : https://github.com/mirage/ezjsonm/issues/31 *)
@@ -490,7 +501,7 @@ let call_with_json meth raw_url json (cctxt : #Client_context.full) =
   | Error err ->
       cctxt#error "Failed to parse the provided json: %s\n%!" err
   | Ok body ->
-      cctxt#generic_json_call meth ~body uri >>=? display_answer cctxt
+      call meth ~body raw_url cctxt
 
 let call_with_file_or_json meth url maybe_file (cctxt : #Client_context.full) =
   ( match TzString.split ':' ~limit:1 maybe_file with
