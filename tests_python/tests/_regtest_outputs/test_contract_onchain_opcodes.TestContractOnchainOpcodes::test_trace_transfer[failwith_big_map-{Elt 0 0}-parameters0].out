@@ -85,7 +85,34 @@ with { Elt 1 1 }
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
-"Assert_failure src/proto_alpha/lib_protocol/script_ir_translator.ml:5219:8"
+This simulation failed:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 1040000000
+    Storage limit: 60000 bytes
+    Transaction:
+      Amount: ꜩ0
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: 0
+      This operation FAILED.
+
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter (big_map int int) ;
+  02:   storage (big_map int int) ;
+  03:   code { CAR ;
+  04:          PUSH (option int) (Some 1) ;
+  05:          PUSH int 1 ;
+  06:          UPDATE ;
+  07:          PUSH (option int) None ;
+  08:          PUSH int 2 ;
+  09:          UPDATE ;
+  10:          FAILWITH } }
+At line 10 characters 9 to 17,
+script reached FAILWITH instruction
+with (Pair 0 { Elt 1 (Some 1) ; Elt 2 None })
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
@@ -126,11 +153,20 @@ This simulation failed:
       Parameter: (Pair 0 {})
       This operation FAILED.
 
-Invalid argument passed to contract [CONTRACT_HASH].
-At (unshown) location 0, value (Pair 0 {})
-is invalid for type big_map int int.
-At (unshown) location 0, unexpected primitive, only a sequence or an int
-can be used here.
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter (big_map int int) ;
+  02:   storage (big_map int int) ;
+  03:   code { CAR ;
+  04:          PUSH (option int) (Some 1) ;
+  05:          PUSH int 1 ;
+  06:          UPDATE ;
+  07:          PUSH (option int) None ;
+  08:          PUSH int 2 ;
+  09:          UPDATE ;
+  10:          FAILWITH } }
+At line 10 characters 9 to 17,
+script reached FAILWITH instruction
+with (Pair 0 { Elt 1 (Some 1) ; Elt 2 None })
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
@@ -148,11 +184,20 @@ This simulation failed:
       Parameter: (Pair 0 { Elt 0 None })
       This operation FAILED.
 
-Invalid argument passed to contract [CONTRACT_HASH].
-At (unshown) location 0, value (Pair 0 { Elt 0 None })
-is invalid for type big_map int int.
-At (unshown) location 0, unexpected primitive, only a sequence or an int
-can be used here.
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter (big_map int int) ;
+  02:   storage (big_map int int) ;
+  03:   code { CAR ;
+  04:          PUSH (option int) (Some 1) ;
+  05:          PUSH int 1 ;
+  06:          UPDATE ;
+  07:          PUSH (option int) None ;
+  08:          PUSH int 2 ;
+  09:          UPDATE ;
+  10:          FAILWITH } }
+At line 10 characters 9 to 17,
+script reached FAILWITH instruction
+with (Pair 0 { Elt 0 None ; Elt 1 (Some 1) ; Elt 2 None })
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
@@ -170,11 +215,20 @@ This simulation failed:
       Parameter: (Pair 0 { Elt 0 (Some 4) })
       This operation FAILED.
 
-Invalid argument passed to contract [CONTRACT_HASH].
-At (unshown) location 0, value (Pair 0 { Elt 0 (Some 4) })
-is invalid for type big_map int int.
-At (unshown) location 0, unexpected primitive, only a sequence or an int
-can be used here.
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter (big_map int int) ;
+  02:   storage (big_map int int) ;
+  03:   code { CAR ;
+  04:          PUSH (option int) (Some 1) ;
+  05:          PUSH int 1 ;
+  06:          UPDATE ;
+  07:          PUSH (option int) None ;
+  08:          PUSH int 2 ;
+  09:          UPDATE ;
+  10:          FAILWITH } }
+At line 10 characters 9 to 17,
+script reached FAILWITH instruction
+with (Pair 0 { Elt 0 (Some 4) ; Elt 1 (Some 1) ; Elt 2 None })
 Fatal error:
   transfer simulation failed
 Node is bootstrapped.
@@ -192,11 +246,20 @@ This simulation failed:
       Parameter: (Pair 0 { Elt 1 (Some 4) })
       This operation FAILED.
 
-Invalid argument passed to contract [CONTRACT_HASH].
-At (unshown) location 0, value (Pair 0 { Elt 1 (Some 4) })
-is invalid for type big_map int int.
-At (unshown) location 0, unexpected primitive, only a sequence or an int
-can be used here.
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter (big_map int int) ;
+  02:   storage (big_map int int) ;
+  03:   code { CAR ;
+  04:          PUSH (option int) (Some 1) ;
+  05:          PUSH int 1 ;
+  06:          UPDATE ;
+  07:          PUSH (option int) None ;
+  08:          PUSH int 2 ;
+  09:          UPDATE ;
+  10:          FAILWITH } }
+At line 10 characters 9 to 17,
+script reached FAILWITH instruction
+with (Pair 0 { Elt 1 (Some 1) ; Elt 2 None })
 Fatal error:
   transfer simulation failed
 Injected block [BLOCK_HASH]
