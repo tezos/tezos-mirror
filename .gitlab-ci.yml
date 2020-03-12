@@ -103,75 +103,35 @@ build:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
-unit:signer_backends/unix:
+unit:lwt_result_stdlib:
   <<: *test_definition
   script:
-    - dune build @src/lib_signer_backends/unix/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
-
-unit:crypto:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_crypto/runtest
-
-unit:stdlib_unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_stdlib_unix/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
+    - dune build @src/lib_lwt_result_stdlib/runtest
 
 unit:stdlib:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib/runtest
 
-unit:shell:
+unit:storage:
   <<: *test_definition
   script:
-    - dune build @src/lib_shell/runtest
-
-unit:protocol_compiler:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_compiler/runtest
-
-unit:src/bin_client:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest
+    - dune build @src/lib_storage/runtest
 
 unit:error_monad:
   <<: *test_definition
   script:
     - dune build @src/lib_error_monad/runtest
 
-unit:micheline:
+unit:shell:
   <<: *test_definition
   script:
-    - dune build @src/lib_micheline/runtest
+    - dune build @src/lib_shell/runtest
 
-unit:storage:
+unit:p2p:
   <<: *test_definition
   script:
-    - dune build @src/lib_storage/runtest
-
-unit:src/proto_006_PsCARTHA/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
-
-unit:src/proto_006_PsCARTHA/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
+    - dune build @src/lib_p2p/runtest
 
 unit:src/proto_alpha/lib_client:
   <<: *test_definition
@@ -183,40 +143,85 @@ unit:src/proto_alpha/lib_protocol:
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
 
-unit:lwt_result_stdlib:
+unit:src/proto_006_PsCARTHA/lib_client:
   <<: *test_definition
   script:
-    - dune build @src/lib_lwt_result_stdlib/runtest
+    - dune build @src/proto_006_PsCARTHA/lib_client/runtest
+
+unit:src/proto_006_PsCARTHA/lib_protocol:
+  <<: *test_definition
+  script:
+    - dune build @src/proto_006_PsCARTHA/lib_protocol/runtest
+
+unit:signer_backends:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/runtest
+
+unit:signer_backends/unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/unix/runtest
+
+unit:stdlib_unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_stdlib_unix/runtest
+
+unit:micheline:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_micheline/runtest
+
+unit:protocol_environment:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_environment/runtest
 
 unit:client_base:
   <<: *test_definition
   script:
     - dune build @src/lib_client_base/runtest
 
+unit:src/bin_client:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest
+
+unit:protocol_compiler:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_compiler/runtest
+
+unit:crypto:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_crypto/runtest
+
 unit:requester:
   <<: *test_definition
   script:
     - dune build @src/lib_requester/runtest
 
-unit:p2p:
+unit:ocaml-bls12-381:
   <<: *test_definition
   script:
-    - dune build @src/lib_p2p/runtest
+    - dune build @vendors/ocaml-bls12-381/runtest
 
 unit:ocaml-lmdb:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-lmdb/runtest
 
-unit:ocaml-ledger-wallet:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-ledger-wallet/runtest
-
 unit:ocaml-uecc:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-uecc/runtest
+
+unit:ocaml-ledger-wallet:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-ledger-wallet/runtest
 
 
 ##END_UNITEST##
@@ -350,6 +355,12 @@ integration:codec:
     - pytest tests_python/tests/test_codec.py -s --log-dir=tmp
   stage: test
 
+integration:contract:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
+  stage: test
+
 integration:contract_annotations:
   <<: *integration_python_definition
   script:
@@ -360,6 +371,12 @@ integration:contract_baker:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_contract_baker.py -s --log-dir=tmp
+  stage: test
+
+integration:contract_bls12_381:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract_bls12_381.py -s --log-dir=tmp
   stage: test
 
 integration:contract_caching:
@@ -384,12 +401,6 @@ integration:contract_opcodes:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_contract_opcodes.py -s --log-dir=tmp
-  stage: test
-
-integration:contract:
-  <<: *integration_python_definition
-  script:
-    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:cors:
@@ -500,12 +511,6 @@ integration:proto_demo_noops_manual_bake:
     - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
-integration:bls12_381:
-  <<: *integration_definition
-  script:
-    - pytest tests_python/tests/test_bls12_381.py
-  stage: test
-
 integration:rpc:
   <<: *integration_python_definition
   script:
@@ -524,16 +529,16 @@ integration:tls:
     - pytest tests_python/tests/test_tls.py -s --log-dir=tmp
   stage: test
 
-integration:voting_full:
-  <<: *integration_python_definition
-  script:
-    - pytest tests_python/tests/test_voting_full.py -s --log-dir=tmp
-  stage: test
-
 integration:voting:
   <<: *integration_python_definition
   script:
     - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
+  stage: test
+
+integration:voting_full:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_voting_full.py -s --log-dir=tmp
   stage: test
 
 integration:examples_forge_transfer:
