@@ -118,7 +118,9 @@ def client_regtest(client_regtest_bis, regtest):
 regression test fixture."""
     deregister_converter_pre(_std_conversion)
     client_regtest_bis.set_regtest(regtest)
+    register_converter_pre(utils.client_always_output_converter)
     yield client_regtest_bis
+    deregister_converter_pre(utils.client_always_output_converter)
 
 
 @pytest.fixture(scope="function")

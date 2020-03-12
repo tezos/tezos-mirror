@@ -419,6 +419,15 @@ def client_output_converter(pre):
     return pre
 
 
+def client_always_output_converter(pre):
+    """Remove strings we always want to convert"""
+
+    pre = re.sub(r'Runtime error in contract \w+:',
+                 'Runtime error in contract [CONTRACT_HASH]:', pre)
+
+    return pre
+
+
 def assert_transfer_failwith(client: Client,
                              amount: float,
                              sender: str,
