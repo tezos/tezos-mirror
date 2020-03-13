@@ -9,15 +9,10 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-base"
-  "tezos-stdlib-unix"
-  "tezos-p2p-services"
-  "alcotest-lwt" { with-test & = "0.8.5" }
-  "lwt" { < "4.3" }
-  "lwt-watcher" { = "0.1" }
-  "lwt-canceler" { = "0.2" }
+  "tezos-workers"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: library for a pool of P2P connections"
+synopsis: "Tezos: descriptions of RPCs exported by `tezos-p2p`"

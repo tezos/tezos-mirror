@@ -10,6 +10,7 @@
             tezos-p2p
             tezos-stdlib-unix
             tezos-shell-services
+            tezos-p2p-services
             tezos-protocol-updater
             tezos-requester
             tezos-workers
@@ -20,6 +21,7 @@
                    -open Tezos_p2p
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
+                   -open Tezos_p2p_services
                    -open Tezos_protocol_updater
                    -open Tezos_requester
                    -open Tezos_workers

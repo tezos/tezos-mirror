@@ -10,9 +10,10 @@ depends: [
   "dune" { >= "1.11" }
   "tezos-base"
   "tezos-workers"
+  "tezos-p2p-services"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: descriptions of RPCs exported by `tezos-node`"
+synopsis: "Tezos: descriptions of RPCs exported by `tezos-shell`"

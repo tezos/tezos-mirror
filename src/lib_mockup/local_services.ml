@@ -82,8 +82,8 @@ let init_fake_p2p =
   let open Tezos_p2p in
   let peer_meta_config =
     {
-      P2p_params.peer_meta_encoding = Peer_metadata.encoding;
-      peer_meta_initial = Peer_metadata.empty;
+      P2p_params.peer_meta_encoding = Tezos_p2p_services.Peer_metadata.encoding;
+      peer_meta_initial = Tezos_p2p_services.Peer_metadata.empty;
       score = (fun _ -> 0.0);
     }
   in
@@ -99,12 +99,13 @@ let init_fake_p2p =
     P2p.faked_network
       message_config
       peer_meta_config
-      Connection_metadata.{disable_mempool = true; private_node = true}
+      Tezos_p2p_services.Connection_metadata.
+        {disable_mempool = true; private_node = true}
 
 (* Create dummy RPC directory for the p2p *)
 let p2p () =
   let fake_p2p = init_fake_p2p () in
-  Tezos_shell.P2p_directory.build_rpc_directory fake_p2p
+  Tezos_p2p.P2p_directory.build_rpc_directory fake_p2p
 
 let chain () =
   Directory.prefix

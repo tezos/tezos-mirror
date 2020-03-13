@@ -12,6 +12,7 @@ depends: [
   "tezos-version"
   "tezos-p2p"
   "tezos-shell-services"
+  "tezos-p2p-services"
   "tezos-protocol-updater"
   "tezos-validation"
   "tezos-stdlib-unix"

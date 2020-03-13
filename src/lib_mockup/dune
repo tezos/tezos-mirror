@@ -15,7 +15,7 @@
  (libraries
    tezos-base
    tezos-rpc
-   tezos-shell ; for accessing directories
+   tezos-p2p-services
    tezos-p2p ; for registering the relevant RPCs
    tezos-protocol-environment
    tezos-stdlib-unix

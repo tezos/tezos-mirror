@@ -1029,6 +1029,11 @@ opam:tezos-p2p:
   variables:
     package: tezos-p2p
 
+opam:tezos-p2p-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p-services
+
 opam:tezos-protocol-000-Ps9mPmXa:
   <<: *opam_definition
   variables:
