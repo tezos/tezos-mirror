@@ -12,7 +12,7 @@
  (name resto_test)
  (modules directory resto_test services)
  (flags (:standard -safe-string))
- (libraries resto-directory resto-json ocplib-json-typed ocplib-json-typed-bson lwt lwt.unix))
+ (libraries resto-directory resto-json json-data-encoding json-data-encoding-bson lwt lwt.unix))
 
 (alias
  (name runtest_resto)

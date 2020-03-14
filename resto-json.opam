@@ -15,6 +15,6 @@ depends: [
   "ocaml" { >= "4.07" }
   "dune" { >= "1.7" }
   "resto" {= version }
-  "ocplib-json-typed" {= "0.7.1" }
-  "ocplib-json-typed-bson" {= "0.7.1" }
+  "json-data-encoding" {= "0.8" }
+  "json-data-encoding-bson" {= "0.8" }
 ]

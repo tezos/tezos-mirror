@@ -58,6 +58,6 @@
  (name resto_json)
  (public_name resto-json)
  (modules resto_json)
- (libraries ocplib-json-typed ocplib-json-typed-bson resto)
+ (libraries json-data-encoding json-data-encoding-bson resto)
  (flags (:standard -safe-string))
  (wrapped false))
