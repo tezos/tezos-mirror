@@ -598,7 +598,7 @@ Control structures
 
     :: 'a : lambda (pair 'a 'b) 'c : 'C   ->   lambda 'b 'c : 'C
 
-    > APPLY / a : f : S  => { PUSH t v ; PAIR ; code } : S
+    > APPLY / a : f : S  => { PUSH 'a a ; PAIR ; f } : S
 
 Stack operations
 ~~~~~~~~~~~~~~~~
