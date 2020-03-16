@@ -564,6 +564,8 @@ let change_baker_owner_key () =
         Submit_ballot (protocol, vote);
         Set_active true;
         Set_active false;
+        Toggle_delegations true;
+        Toggle_delegations false;
         Set_consensus_key acc2.pk;
         Set_owner_keys (Z.one, [acc2.pk]);
         Generic

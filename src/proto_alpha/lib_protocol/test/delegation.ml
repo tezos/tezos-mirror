@@ -990,6 +990,43 @@ let cannot_delegate_to_unregistered_baker ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
+(* delegation on baker that declines delegations *)
+let cannot_delegate_to_declining_baker () =
+  Context.init 1
+  >>=? fun (b, bootstrap_contracts, bootstrap_bakers) ->
+  Incremental.begin_construction b
+  >>=? fun i ->
+  let bootstrap = List.hd bootstrap_contracts in
+  let baker = List.hd bootstrap_bakers in
+  (* set the baker to decline delegations *)
+  Op.baker_action (I i) ~action:(Toggle_delegations false) bootstrap baker
+  >>=? fun deactivation ->
+  Incremental.add_operation i deactivation
+  >>=? fun i ->
+  Op.delegation (I i) bootstrap (Some baker)
+  >>=? fun op ->
+  Incremental.add_operation i op
+  >>= fun err ->
+  Assert.proto_error ~loc:__LOC__ err (function
+      | Delegation_storage.Baker_declines_delegations baker0
+        when baker = baker0 ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  (* set the baker to accept delegations again *)
+  Op.baker_action (I i) ~action:(Toggle_delegations true) bootstrap baker
+  >>=? fun deactivation ->
+  Incremental.add_operation i deactivation
+  >>=? fun i ->
+  Op.delegation (I i) bootstrap (Some baker)
+  >>=? fun op ->
+  Incremental.add_operation i op
+  >>=? fun i ->
+  Context.Contract.delegate (I i) bootstrap
+  >>=? fun delegate ->
+  Assert.equal_baker ~loc:__LOC__ delegate baker >>=? fun () -> return_unit
+
 (* delegation on registered contract *)
 let delegate_to_registered_baker () =
   Context.init 1
@@ -1132,6 +1169,11 @@ let tests_delegation =
       "cannot delegate to unregistered baker (large fee)"
       `Quick
       (cannot_delegate_to_unregistered_baker ~fee:Tez.max_tez);
+    (* delegation on registered baker that declines delegations *)
+    Test.tztest
+      "cannot delegate to baker that declines delegations"
+      `Quick
+      cannot_delegate_to_declining_baker;
     (* delegation on registered baker *)
     Test.tztest
       "delegate to registered baker"
