@@ -1077,6 +1077,47 @@ let test_cannot_delegate_to_unregistered_baker ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
+(* delegation on baker that declines delegations *)
+let test_cannot_delegate_to_declining_baker () =
+  Context.init 1
+  >>=? fun (b, bootstrap_contracts, bootstrap_bakers) ->
+  Incremental.begin_construction b
+  >>=? fun i ->
+  let bootstrap =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
+  in
+  let baker =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_bakers
+  in
+  (* set the baker to decline delegations *)
+  Op.baker_action (I i) ~action:(Toggle_delegations false) bootstrap baker
+  >>=? fun deactivation ->
+  Incremental.add_operation i deactivation
+  >>=? fun i ->
+  Op.delegation (I i) bootstrap (Some baker)
+  >>=? fun op ->
+  Incremental.add_operation i op
+  >>= fun err ->
+  Assert.proto_error ~loc:__LOC__ err (function
+      | Delegation_storage.Baker_declines_delegations baker0
+        when baker = baker0 ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  (* set the baker to accept delegations again *)
+  Op.baker_action (I i) ~action:(Toggle_delegations true) bootstrap baker
+  >>=? fun deactivation ->
+  Incremental.add_operation i deactivation
+  >>=? fun i ->
+  Op.delegation (I i) bootstrap (Some baker)
+  >>=? fun op ->
+  Incremental.add_operation i op
+  >>=? fun i ->
+  Context.Contract.delegate (I i) bootstrap
+  >>=? fun delegate ->
+  Assert.equal_baker ~loc:__LOC__ delegate baker >>=? fun () -> return_unit
+
 (* Test that delegation to a registered baker account works *)
 let test_delegate_to_registered_baker () =
   Context.init 1
@@ -1227,6 +1268,11 @@ let tests_delegate_registration =
       "cannot delegate to unregistered baker (large fee)"
       `Quick
       (test_cannot_delegate_to_unregistered_baker ~fee:Tez.max_tez);
+    (* delegation on registered baker that declines delegations *)
+    Test_services.tztest
+      "cannot delegate to baker that declines delegations"
+      `Quick
+      test_cannot_delegate_to_declining_baker;
     (* delegation on registered baker *)
     Test_services.tztest
       "delegate to registered baker"
