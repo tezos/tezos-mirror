@@ -1550,3 +1550,8 @@ class Client:
         cmd = ['find', 'baker', 'with', 'consensus', 'key', pkh]
         res = client_output.FindBakerWithConsensusKeyResult(self.run(cmd))
         return res.baker
+
+    def toggle_baker_delegations(self, account: str, accept: bool) -> str:
+        accept_str = 'accepting' if accept else 'declining'
+        cmd = ['set', 'baker', account, accept_str, 'new', 'delegations']
+        return self.run(cmd)
