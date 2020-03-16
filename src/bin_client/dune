@@ -1,3 +1,7 @@
+; See src/bin_node/dune to understand in detail how this file abuses
+; the alternative dependency mecanism of dune to implement optional
+; dependendies.
+
 (executables
  (names main_client main_admin)
  (public_names tezos-client tezos-admin-client)
@@ -10,27 +14,48 @@
             tezos-client-commands
             tezos-mockup-commands
 
-            tezos-client-genesis
-            tezos-client-genesis-carthagenet
-            tezos-client-alpha
-            tezos-client-000-Ps9mPmXa
-            tezos-client-001-PtCJ7pwo
-            tezos-client-002-PsYLVpVv
-            tezos-client-003-PsddFKi3
-            tezos-client-004-Pt24m4xi
-            tezos-client-005-PsBabyM1
-            tezos-client-006-PsCARTHA
-            tezos-client-demo-counter
-            tezos-client-alpha-commands.registration
-            tezos-client-001-PtCJ7pwo-commands.registration
-            tezos-client-002-PsYLVpVv-commands.registration
-            tezos-client-003-PsddFKi3-commands.registration
-            tezos-client-004-Pt24m4xi-commands.registration
-            tezos-client-005-PsBabyM1-commands.registration
-            tezos-client-006-PsCARTHA-commands.registration
+            (select void_for_linking-genesis from
+              (tezos-client-genesis -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-genesis-carthagenet from
+              (tezos-client-genesis-carthagenet -> void_for_linking)
+              (-> void_for_linking))
 
-            tezos-baking-alpha-commands.registration
-            tezos-baking-006-PsCARTHA-commands.registration
+            (select void_for_linking-000-Ps9mPmXa from
+              (tezos-client-000-Ps9mPmXa -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-001-PtCJ7pwo from
+              (tezos-client-001-PtCJ7pwo-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-002-PsYLVpVv from
+              (tezos-client-002-PsYLVpVv-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-003-PsddFKi3 from
+              (tezos-client-003-PsddFKi3-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-004-Pt24m4xi from
+              (tezos-client-004-Pt24m4xi-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-005-PsBabyM1 from
+              (tezos-client-005-PsBabyM1-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-006-PsCARTHA from
+              (tezos-client-006-PsCARTHA-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+
+            (select void_for_linking-alpha from
+              (tezos-client-alpha-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-demo-counter from
+              (tezos-client-demo-counter -> void_for_linking)
+              (-> void_for_linking))
+
+            (select void_for_linking-baking-alpha from
+              (tezos-baking-alpha-commands.registration -> void_for_linking)
+              (-> void_for_linking))
+            (select void_for_linking-baking-006-PsCARTHA from
+              (tezos-baking-006-PsCARTHA-commands.registration -> void_for_linking)
+              (-> void_for_linking))
 
             tezos-stdlib-unix
             tezos-client-base-unix
@@ -44,6 +69,10 @@
                     -open Tezos_mockup_commands
                     -open Tezos_client_base_unix
                     -linkall)))
+
+(rule
+  (target void_for_linking)
+  (action (write-file ${target} "")))
 
 (install
  (package tezos-client)
