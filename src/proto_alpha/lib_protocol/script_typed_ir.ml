@@ -532,6 +532,7 @@ and ('bef, 'aft) instr =
       : (string boxed_list * 'rest, baker_operation * 'rest) instr
   | Submit_ballot : (string * (string * 'rest), baker_operation * 'rest) instr
   | Set_baker_active : (bool * 'rest, baker_operation * 'rest) instr
+  | Toggle_baker_delegations : (bool * 'rest, baker_operation * 'rest) instr
   | Set_baker_consensus_key
       : (public_key * 'rest, baker_operation * 'rest) instr
   | Set_baker_pvss_key

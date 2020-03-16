@@ -317,6 +317,8 @@ module Cost_of : sig
     val set_baker_consensus_key : Gas.cost
 
     val set_baker_pvss_key : Gas.cost
+
+    val toggle_baker_delegations : Gas.cost
   end
 
   module Typechecking : sig

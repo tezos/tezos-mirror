@@ -1297,6 +1297,8 @@ module Cost_of = struct
     let set_baker_consensus_key = (* TODO how much *) Gas.(push +@ push)
 
     let set_baker_pvss_key = (* TODO how much *) Gas.(push +@ push)
+
+    let toggle_baker_delegations = (* TODO how much *) Gas.(push +@ push)
   end
 
   module Typechecking = struct
