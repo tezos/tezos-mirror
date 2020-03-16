@@ -1530,6 +1530,10 @@ Domain specific data types
 
 -  ``chain_id``: An identifier for a chain, used to distinguish the test and the main chains.
 
+-  ``bls12_381_g1``, ``bls12_381_g2`` : Points on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ , respectively.
+
+-  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
+
 Domain specific operations
 --------------------------
 
@@ -1956,6 +1960,41 @@ Cryptographic primitives
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
+BLS12-381 primitives
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  ``NEG``: Negate a curve point or field element.
+
+::
+
+    :: bls12_381_g1 : 'S -> bls12_381_g1 : 'S
+    :: bls12_381_g2 : 'S -> bls12_381_g2 : 'S
+    :: bls12_381_fr : 'S -> bls12_381_fr : 'S
+
+-  ``ADD``: Add two curve points or field elements.
+
+::
+
+    :: bls12_381_g1 : bls12_381_g1 : 'S -> bls12_381_g1 : 'S
+    :: bls12_381_g2 : bls12_381_g2 : 'S -> bls12_381_g2 : 'S
+    :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
+
+-  ``MUL``: Multiply a curve point or field element by a scalar field element.
+
+::
+
+    :: bls12_381_g1 : bls12_381_fr : 'S -> bls12_381_g1 : 'S
+    :: bls12_381_g2 : bls12_381_fr : 'S -> bls12_381_g2 : 'S
+    :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
+
+-  ``PAIRING_CHECK``:
+   Verify that the product of pairings of the given list of points is equal to 1 in Fq12. Returns ``true`` if the list is empty.
+   Can be used to verify if two pairings P1 and P2 are equal by verifying P1 * P2^(-1) = 1.
+
+::
+
+    :: list (pair bls12_381_g1 bls12_381_g2) : 'S -> bool : 'S
+
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
@@ -2260,6 +2299,8 @@ readable one in a string and an optimized.
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
    are written as strings, in their usual Base58 encoded versions
    (readable), or as their raw bytes (optimized).
+-  ``bls12_381_g1``\ s and ``bls12_381_g2``\ s are written as their raw bytes, using a big-endian point encoding, `as specified here <https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization>`__.
+-  ``bls12_381_fr``\ s are written as their raw bytes, using a little-endian encoding.
 
 The optimized versions should not reach the RPCs, the protocol code
 will convert to optimized by itself when forging operations, storing
@@ -3250,6 +3291,7 @@ Full grammar
       | ADDRESS
       | CHAIN_ID
       | TOTAL_VOTING_POWER
+      | PAIRING_CHECK
     <type> ::=
       | <comparable type>
       | option <type>
@@ -3262,6 +3304,9 @@ Full grammar
       | lambda <type> <type>
       | map <comparable type> <type>
       | big_map <comparable type> <type>
+      | bls12_381_g1
+      | bls12_381_g2
+      | bls12_381_fr
     <comparable type> ::=
       | unit
       | never
