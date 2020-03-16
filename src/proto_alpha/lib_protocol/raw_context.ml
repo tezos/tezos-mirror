@@ -47,6 +47,8 @@ type t = {
   temporary_big_map : Z.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
+  contract_code_cache : Script_repr.expr Contract_repr.Map.t;
+  contract_storage_cache : Script_repr.expr Contract_repr.Map.t;
 }
 
 type context = t
@@ -197,6 +199,32 @@ let increment_origination_nonce ctxt =
       ok ({ctxt with origination_nonce}, cur_origination_nonce)
 
 let unset_origination_nonce ctxt = {ctxt with origination_nonce = None}
+
+let get_cached_code ctxt contract =
+  Contract_repr.Map.find_opt contract ctxt.contract_code_cache
+
+let init_set_cached_code ctxt contract code =
+  {
+    ctxt with
+    contract_code_cache =
+      Contract_repr.Map.add contract code ctxt.contract_code_cache;
+  }
+
+let clear_cached_code ctxt =
+  {ctxt with contract_code_cache = Contract_repr.Map.empty}
+
+let get_cached_storage ctxt contract =
+  Contract_repr.Map.find_opt contract ctxt.contract_storage_cache
+
+let init_set_cached_storage ctxt contract code =
+  {
+    ctxt with
+    contract_storage_cache =
+      Contract_repr.Map.add contract code ctxt.contract_storage_cache;
+  }
+
+let clear_cached_storage ctxt =
+  {ctxt with contract_storage_cache = Contract_repr.Map.empty}
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -538,6 +566,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       temporary_big_map = Z.sub Z.zero Z.one;
       internal_nonce = 0;
       internal_nonces_used = Int_set.empty;
+      contract_code_cache = Contract_repr.Map.empty;
+      contract_storage_cache = Contract_repr.Map.empty;
     }
 
 type previous_protocol =

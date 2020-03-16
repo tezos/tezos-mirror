@@ -99,6 +99,7 @@ and _ successful_manager_operation_result =
     }
       -> Kind.reveal successful_manager_operation_result
   | Transaction_result : {
+      code : Script.expr option;
       storage : Script.expr option;
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;

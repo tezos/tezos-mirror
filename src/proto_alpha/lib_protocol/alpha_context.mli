@@ -724,11 +724,24 @@ module Contract : sig
   val get_script_code :
     context -> contract -> (context * Script.lazy_expr option) tzresult Lwt.t
 
+  val get_script_code_cached : context -> contract -> Script.expr option
+
+  val init_set_script_code_cached :
+    context -> contract -> Script.expr -> context
+
+  val clear_script_code_cached : context -> context
+
   val get_script :
     context -> contract -> (context * Script.t option) tzresult Lwt.t
 
   val get_storage :
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
+
+  val get_storage_cached : context -> contract -> Script.expr option
+
+  val init_set_storage_cached : context -> contract -> Script.expr -> context
+
+  val clear_storage_cached : context -> context
 
   val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 

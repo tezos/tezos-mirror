@@ -31,6 +31,8 @@ type contract = t
 
 include Compare.S with type t := contract
 
+module Map : S.MAP with type key = t
+
 (** {2 Implicit contracts} *)
 
 val implicit_contract : Signature.Public_key_hash.t -> contract

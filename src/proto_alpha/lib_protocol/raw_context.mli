@@ -158,6 +158,18 @@ val increment_origination_nonce :
 
 val unset_origination_nonce : t -> t
 
+val get_cached_code : t -> Contract_repr.t -> Script_repr.expr option
+
+val init_set_cached_code : t -> Contract_repr.t -> Script_repr.expr -> t
+
+val clear_cached_code : t -> t
+
+val get_cached_storage : t -> Contract_repr.t -> Script_repr.expr option
+
+val init_set_cached_storage : t -> Contract_repr.t -> Script_repr.expr -> t
+
+val clear_cached_storage : t -> t
+
 (** {1 Generic accessors} *)
 
 type key = string list

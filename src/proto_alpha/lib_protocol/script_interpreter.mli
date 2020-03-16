@@ -45,6 +45,7 @@ type error += Cannot_serialize_storage
 
 type execution_result = {
   ctxt : context;
+  code : Script.expr;
   storage : Script.expr;
   big_map_diff : Contract.big_map_diff option;
   operations : packed_internal_operation list;

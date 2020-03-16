@@ -205,6 +205,7 @@ let pp_manager_operation_contents_and_result ppf
       (Transaction_result
         { balance_updates;
           consumed_gas;
+          code = _;
           storage;
           originated_contracts;
           storage_size;

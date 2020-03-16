@@ -50,6 +50,7 @@ type _ successful_manager_operation_result =
     }
       -> Kind.reveal successful_manager_operation_result
   | Transaction_result : {
+      code : Script.expr option;
       storage : Script.expr option;
       big_map_diff : Contract.big_map_diff option;
       balance_updates : Delegate.balance_updates;
@@ -188,7 +189,8 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.transaction_case
       ~encoding:
-        (obj8
+        (obj9
+           (opt "code" Script.expr_encoding)
            (opt "storage" Script.expr_encoding)
            (opt "big_map_diff" Contract.big_map_diff_encoding)
            (dft "balance_updates" Delegate.balance_updates_encoding [])
@@ -211,7 +213,8 @@ module Manager_result = struct
       ~kind:Kind.Transaction_manager_kind
       ~proj:(function
         | Transaction_result
-            { storage;
+            { code;
+              storage;
               big_map_diff;
               balance_updates;
               originated_contracts;
@@ -219,7 +222,8 @@ module Manager_result = struct
               storage_size;
               paid_storage_size_diff;
               allocated_destination_contract } ->
-            ( storage,
+            ( code,
+              storage,
               big_map_diff,
               balance_updates,
               originated_contracts,
@@ -228,7 +232,8 @@ module Manager_result = struct
               paid_storage_size_diff,
               allocated_destination_contract ))
       ~inj:
-        (fun ( storage,
+        (fun ( code,
+               storage,
                big_map_diff,
                balance_updates,
                originated_contracts,
@@ -238,6 +243,7 @@ module Manager_result = struct
                allocated_destination_contract ) ->
         Transaction_result
           {
+            code;
             storage;
             big_map_diff;
             balance_updates;

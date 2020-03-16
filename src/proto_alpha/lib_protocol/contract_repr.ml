@@ -44,6 +44,12 @@ end)
 
 type contract = t
 
+module Map = Map.Make (struct
+  type nonrec t = t
+
+  let compare = compare
+end)
+
 type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function

@@ -97,6 +97,14 @@ val get_script_code :
   Contract_repr.t ->
   (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
 
+val get_script_code_cached :
+  Raw_context.t -> Contract_repr.t -> Script_repr.expr option
+
+val init_set_script_code_cached :
+  Raw_context.t -> Contract_repr.t -> Script_repr.expr -> Raw_context.t
+
+val clear_script_code_cached : Raw_context.t -> Raw_context.t
+
 val get_script :
   Raw_context.t ->
   Contract_repr.t ->
@@ -106,6 +114,14 @@ val get_storage :
   Raw_context.t ->
   Contract_repr.t ->
   (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
+
+val get_storage_cached :
+  Raw_context.t -> Contract_repr.t -> Script_repr.expr option
+
+val init_set_storage_cached :
+  Raw_context.t -> Contract_repr.t -> Script_repr.expr -> Raw_context.t
+
+val clear_storage_cached : Raw_context.t -> Raw_context.t
 
 type big_map_diff_item =
   | Update of {

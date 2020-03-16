@@ -1244,6 +1244,7 @@ and interp :
 (* ---- contract handling ---------------------------------------------------*)
 let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     ( Script.expr
+    * Script.expr
     * packed_internal_operation list
     * context
     * Contract.big_map_diff option )
@@ -1291,10 +1292,12 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     | diff ->
         Some diff
   in
-  return (Micheline.strip_locations storage, ops, ctxt, big_map_diff)
+  let storage = Micheline.strip_locations storage in
+  return (script_code, storage, ops, ctxt, big_map_diff)
 
 type execution_result = {
   ctxt : context;
+  code : Script.expr;
   storage : Script.expr;
   big_map_diff : Contract.big_map_diff option;
   operations : packed_internal_operation list;
@@ -1311,7 +1314,7 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     ~entrypoint
     script
     (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, big_map_diff) ->
+  >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
   let trace =
     match Logger.get_log () with
     | None ->
@@ -1319,7 +1322,7 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     | Some trace ->
         trace
   in
-  return ({ctxt; storage; big_map_diff; operations}, trace)
+  return ({ctxt; code; storage; big_map_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
   let logger = (module No_trace : STEP_LOGGER) in
@@ -1331,5 +1334,5 @@ let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
     ~entrypoint
     script
     (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, big_map_diff) ->
-  return {ctxt; storage; big_map_diff; operations}
+  >>=? fun (code, storage, operations, ctxt, big_map_diff) ->
+  return {ctxt; code; storage; big_map_diff; operations}
