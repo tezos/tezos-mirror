@@ -142,6 +142,7 @@ type prim =
   | I_SUBMIT_PROPOSALS
   | I_SUBMIT_BALLOT
   | I_SET_BAKER_ACTIVE
+  | I_TOGGLE_BAKER_DELEGATIONS
   | I_SET_BAKER_CONSENSUS_KEY
   | I_SET_BAKER_PVSS_KEY
   | T_bool
@@ -270,6 +271,7 @@ let namespace = function
   | I_SELF_ADDRESS
   | I_SENDER
   | I_SET_BAKER_ACTIVE
+  | I_TOGGLE_BAKER_DELEGATIONS
   | I_SET_BAKER_CONSENSUS_KEY
   | I_SET_BAKER_PVSS_KEY
   | I_SET_DELEGATE
@@ -555,6 +557,8 @@ let string_of_prim = function
       "SUBMIT_BALLOT"
   | I_SET_BAKER_ACTIVE ->
       "SET_BAKER_ACTIVE"
+  | I_TOGGLE_BAKER_DELEGATIONS ->
+      "TOGGLE_BAKER_DELEGATIONS"
   | I_SET_BAKER_CONSENSUS_KEY ->
       "SET_BAKER_CONSENSUS_KEY"
   | I_SET_BAKER_PVSS_KEY ->
@@ -835,6 +839,8 @@ let prim_of_string = function
       ok I_SUBMIT_BALLOT
   | "SET_BAKER_ACTIVE" ->
       ok I_SET_BAKER_ACTIVE
+  | "TOGGLE_BAKER_DELEGATIONS" ->
+      ok I_TOGGLE_BAKER_DELEGATIONS
   | "SET_BAKER_CONSENSUS_KEY" ->
       ok I_SET_BAKER_CONSENSUS_KEY
   | "SET_BAKER_PVSS_KEY" ->
@@ -1094,6 +1100,7 @@ let prim_encoding =
          ("SUBMIT_PROPOSALS", I_SUBMIT_PROPOSALS);
          ("SUBMIT_BALLOT", I_SUBMIT_BALLOT);
          ("SET_BAKER_ACTIVE", I_SET_BAKER_ACTIVE);
+         ("TOGGLE_BAKER_DELEGATIONS", I_TOGGLE_BAKER_DELEGATIONS);
          ("SET_BAKER_CONSENSUS_KEY", I_SET_BAKER_CONSENSUS_KEY);
          ("SET_BAKER_PVSS_KEY", I_SET_BAKER_PVSS_KEY)
          (* New instructions must be added here, for backward compatibility of the encoding. *)

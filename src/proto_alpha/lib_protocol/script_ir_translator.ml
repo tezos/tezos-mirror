@@ -480,6 +480,8 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Set_baker_active ->
       0
+  | Toggle_baker_delegations ->
+      0
   | Set_baker_consensus_key ->
       0
   | Set_baker_pvss_key ->
@@ -5033,6 +5035,15 @@ and parse_instr :
         loc
         Set_baker_active
         (Item_t (Baker_operation_t None, rest, annot))
+  | ( Prim (loc, I_TOGGLE_BAKER_DELEGATIONS, [], annot),
+      Item_t (Bool_t _, rest, _) ) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed
+        ctxt
+        loc
+        Toggle_baker_delegations
+        (Item_t (Baker_operation_t None, rest, annot))
   | ( Prim (loc, I_SET_BAKER_CONSENSUS_KEY, [], annot),
       Item_t (Key_t _, rest, _) ) ->
       Lwt.return @@ parse_var_annot loc annot
@@ -5120,6 +5131,7 @@ and parse_instr :
             | I_SUBMIT_PROPOSALS
             | I_SUBMIT_BALLOT
             | I_SET_BAKER_ACTIVE
+            | I_TOGGLE_BAKER_DELEGATIONS
             | I_SET_BAKER_CONSENSUS_KEY
             | I_SET_BAKER_PVSS_KEY ) as name ),
           (_ :: _ as l),
@@ -5383,6 +5395,7 @@ and parse_instr :
              I_SUBMIT_PROPOSALS;
              I_SUBMIT_BALLOT;
              I_SET_BAKER_ACTIVE;
+             I_TOGGLE_BAKER_DELEGATIONS;
              I_SET_BAKER_CONSENSUS_KEY;
              I_SET_BAKER_PVSS_KEY ]
 

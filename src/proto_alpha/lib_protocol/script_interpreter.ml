@@ -604,6 +604,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.baker_operation
     | (Set_baker_pvss_key, _) ->
         Interp_costs.baker_operation
+    | (Toggle_baker_delegations, _) ->
+        Interp_costs.baker_operation
   in
   Gas.(cycle_cost +@ instr_cost)
 
@@ -1315,6 +1317,16 @@ let rec step :
       >>=? fun (ctxt, nonce) ->
       let operation : _ Alpha_context.baker_operation =
         Set_baker_active active
+      in
+      logged_return
+        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
+  | (Toggle_baker_delegations, (accept, rest)) ->
+      is_self_baker
+      >>=? fun baker ->
+      Lwt.return (fresh_internal_nonce ctxt)
+      >>=? fun (ctxt, nonce) ->
+      let operation : _ Alpha_context.baker_operation =
+        Toggle_baker_delegations accept
       in
       logged_return
         ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)

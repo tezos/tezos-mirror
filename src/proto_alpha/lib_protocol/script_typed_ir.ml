@@ -471,6 +471,7 @@ and ('bef, 'aft) instr =
           baker_operation * 'rest )
         instr
   | Set_baker_active : (bool * 'rest, baker_operation * 'rest) instr
+  | Toggle_baker_delegations : (bool * 'rest, baker_operation * 'rest) instr
   | Set_baker_consensus_key
       : (public_key * 'rest, baker_operation * 'rest) instr
   | Set_baker_pvss_key

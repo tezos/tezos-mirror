@@ -892,6 +892,8 @@ module Cost_of = struct
           alloc_cost 1
       | Set_baker_pvss_key ->
           alloc_cost 1
+      | Toggle_baker_delegations ->
+          alloc_cost 1
   end
 
   module Unparse = struct
