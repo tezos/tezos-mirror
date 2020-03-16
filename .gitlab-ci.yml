@@ -634,10 +634,10 @@ opam:pbkdf:
   variables:
     package: pbkdf
 
-opam:secp256k1:
+opam:secp256k1-internal:
   <<: *opam_definition
   variables:
-    package: secp256k1
+    package: secp256k1-internal
 
 opam:tezos-005-PsBabyM1-test-helpers:
   <<: *opam_definition

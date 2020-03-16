@@ -1,6 +1,6 @@
 (library
  (name            libsecp256k1)
- (public_name     secp256k1)
+ (public_name     secp256k1-internal)
  (modules         internal external)
  (libraries       bigstring cstruct)
  (c_names         secp256k1

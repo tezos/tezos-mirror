@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "secp256k1"
+name: "secp256k1-internal"
 version: "0.1"
 authors: "Vincent Bernardoff <vb@luminar.eu.org>"
 maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
@@ -17,5 +17,5 @@ depends: [
   "cstruct" {>= "3.2.1"}
   "bigstring" {>= "0.1.1"}
   "hex" {with-test & >= "1.4.0"}
-  "alcotest"
+  "alcotest" {with-test}
 ]

@@ -17,7 +17,7 @@ depends: [
   "blake2"
   "hacl"
   "zarith"
-  "secp256k1"
+  "secp256k1-internal"
   "uecc"
   "alcotest" { with-test & = "0.8.5" }
 ]
