@@ -257,3 +257,41 @@ class TestBaker:
             with utils.assert_run_failure(expected_failure):
                 client.call('bootstrap1', 'proxy',
                             ['--arg', proxy_param, '--burn-cap', '0.312'])
+
+    def test_toggle_baker_delegations(self, client):
+        client.set_delegate('bootstrap1', 'baker3')
+        client.bake('baker5', BAKE_ARGS)
+        delegate = BOOTSTRAP_BAKERS[2]['hash']
+        assert client.get_delegate('bootstrap1', []).delegate == delegate
+
+        client.toggle_baker_delegations('baker3', False)
+        client.bake('baker5', BAKE_ARGS)
+
+        # new delegation should be declined
+        expected_error = "Baker declines new delegations"
+        with utils.assert_run_failure(expected_error):
+            client.set_delegate('bootstrap2', 'baker3')
+        assert client.get_delegate('bootstrap2', []).delegate is None
+
+        # re-delegation should be declined too
+        expected_error = "Baker declines new delegations"
+        with utils.assert_run_failure(expected_error):
+            client.set_delegate('bootstrap1', 'baker3')
+        assert client.get_delegate('bootstrap2', []).delegate is None
+
+        # existing delegation can be withdrawn
+        client.withdraw_delegate('bootstrap1')
+        client.bake('baker5', BAKE_ARGS)
+        assert client.get_delegate('bootstrap1', []).delegate is None
+
+        # trying to delegate again after withdrawing should be declined
+        expected_error = "Baker declines new delegations"
+        with utils.assert_run_failure(expected_error):
+            client.set_delegate('bootstrap1', 'baker3')
+        assert client.get_delegate('bootstrap2', []).delegate is None
+
+        # allow delegations and try again
+        client.toggle_baker_delegations('baker3', True)
+        client.bake('baker5', BAKE_ARGS)
+        client.set_delegate('bootstrap1', 'baker3')
+        client.set_delegate('bootstrap2', 'baker3')
