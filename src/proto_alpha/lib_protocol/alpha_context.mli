@@ -936,6 +936,9 @@ module Baker : sig
 
   val set_active : context -> baker_hash -> bool -> context tzresult Lwt.t
 
+  val toggle_delegations :
+    context -> baker_hash -> bool -> context tzresult Lwt.t
+
   val fold : context -> init:'a -> f:(baker_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val list : context -> baker_hash list Lwt.t

@@ -347,6 +347,10 @@ module Baker : sig
   module Inactive :
     Data_set_storage with type elt = Baker_hash.t and type t = Raw_context.t
 
+  (** Bakers that decline any new delegation **)
+  module Delegation_decliners :
+    Data_set_storage with type elt = Baker_hash.t and type t = Raw_context.t
+
   (** The cycle where the baker should be deactivated. *)
   module Deactivation :
     Indexed_data_storage

@@ -50,6 +50,10 @@ type error +=
   | (* `Temporary *)
       Allocated_consensus_key_account of
       Signature.Public_key_hash.t
+  | (* `Temporary *)
+      Baker_accepts_delegations of Baker_hash.t
+  | (* `Temporary *)
+      Baker_declines_delegations of Baker_hash.t
 
 val fresh_baker_from_current_nonce :
   Raw_context.t -> (Raw_context.t * Baker_hash.t) tzresult Lwt.t
@@ -70,6 +74,9 @@ val must_be_registered : Raw_context.t -> Baker_hash.t -> unit tzresult Lwt.t
 
 (** Active or deactivate a baker. *)
 val set_active :
+  Raw_context.t -> Baker_hash.t -> bool -> Raw_context.t tzresult Lwt.t
+
+val toggle_delegations :
   Raw_context.t -> Baker_hash.t -> bool -> Raw_context.t tzresult Lwt.t
 
 (** Check if a given baker hash is registered as a baker. *)

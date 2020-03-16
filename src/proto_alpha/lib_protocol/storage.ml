@@ -585,6 +585,13 @@ module Baker = struct
         let name = ["inactive"]
       end)
 
+  module Delegation_decliners =
+    Indexed_context.Make_set
+      (Storage_functors.Registered)
+      (struct
+        let name = ["Delegation_decliners"]
+      end)
+
   module Deactivation =
     Indexed_context.Make_map
       (struct
