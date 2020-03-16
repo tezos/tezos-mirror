@@ -60,6 +60,10 @@ type error +=
   | (* `Temporary *)
       Allocated_consensus_key_account of
       Signature.Public_key_hash.t
+  | (* `Temporary *)
+      Baker_accepts_delegations of Baker_hash.t
+  | (* `Temporary *)
+      Baker_declines_delegations of Baker_hash.t
 
 let () =
   let open Data_encoding in
@@ -179,7 +183,35 @@ let () =
         k)
     (obj1 (req "key" Signature.Public_key_hash.encoding))
     (function Allocated_consensus_key_account k -> Some k | _ -> None)
-    (fun k -> Allocated_consensus_key_account k)
+    (fun k -> Allocated_consensus_key_account k) ;
+  register_error_kind
+    `Temporary
+    ~id:"baker.baker_accepts_delegations"
+    ~title:"Baker already accepts delegations"
+    ~description:"Useless baker setting to accept delegations"
+    ~pp:(fun ppf baker ->
+      Format.fprintf
+        ppf
+        "The baker %a already accepts delegations, no need to set it again"
+        Baker_hash.pp
+        baker)
+    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
+    (function Baker_accepts_delegations baker -> Some baker | _ -> None)
+    (fun baker -> Baker_accepts_delegations baker) ;
+  register_error_kind
+    `Temporary
+    ~id:"baker.baker_declines_delegations"
+    ~title:"Baker already declines delegations"
+    ~description:"Useless baker setting to decline delegations"
+    ~pp:(fun ppf baker ->
+      Format.fprintf
+        ppf
+        "The baker %a already declines delegations, no need to set it again"
+        Baker_hash.pp
+        baker)
+    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
+    (function Baker_declines_delegations baker -> Some baker | _ -> None)
+    (fun baker -> Baker_declines_delegations baker)
 
 let fresh_baker_from_current_nonce ctxt =
   Lwt.return (Raw_context.increment_origination_nonce ctxt)
@@ -298,6 +330,23 @@ let set_active ctxt baker new_active_state =
       Roll_storage.Delegate.set_active ctxt baker
   | (true, false) ->
       Roll_storage.Delegate.set_inactive ctxt baker
+
+let toggle_delegations ctxt baker new_delegations_state =
+  registered ctxt baker
+  >>= fun is_registered ->
+  fail_unless is_registered (Unregistered_baker baker)
+  >>=? fun () ->
+  Storage.Baker.Delegation_decliners.mem ctxt baker
+  >>= fun delegation_decliners ->
+  match (new_delegations_state, delegation_decliners) with
+  | (true, false) ->
+      fail @@ Baker_accepts_delegations baker
+  | (false, true) ->
+      fail @@ Baker_declines_delegations baker
+  | (true, _) ->
+      Storage.Baker.Delegation_decliners.remove ctxt baker >|= ok
+  | (false, _) ->
+      Storage.Baker.Delegation_decliners.add ctxt baker >|= ok
 
 let fold = Storage.Baker.Registered.fold
 
@@ -437,7 +486,7 @@ let activate_pending_consensus_keys ctxt cycle =
       Lwt.return acc
       >>=? fun ctxt ->
       if Cycle_repr.equal cycle activation_cycle then
-        Storage.Baker.Consensus_key.set ctxt baker_hash consensus_key
+        Storage.Baker.Consensus_key.update ctxt baker_hash consensus_key
         >>=? fun ctxt ->
         Storage.Baker.Pending_consensus_key.remove ctxt baker_hash >|= ok
       else return ctxt)

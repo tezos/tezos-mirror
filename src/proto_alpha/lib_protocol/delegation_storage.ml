@@ -30,6 +30,8 @@ type error +=
       Current_delegate
   | (* `Temporary *)
       Inactive_baker of Baker_hash.t
+  | (* `Temporary *)
+      Baker_declines_delegations of Baker_hash.t
 
 let () =
   register_error_kind
@@ -69,7 +71,21 @@ let () =
         hash)
     Data_encoding.(obj1 (req "hash" Baker_hash.encoding))
     (function Inactive_baker k -> Some k | _ -> None)
-    (fun k -> Inactive_baker k)
+    (fun k -> Inactive_baker k) ;
+  register_error_kind
+    `Temporary
+    ~id:"delegate.baker_declines_delegations"
+    ~title:"Baker declines delegations"
+    ~description:"Tried to delegate to baker which declines new delegations"
+    ~pp:(fun ppf baker ->
+      Format.fprintf
+        ppf
+        "Baker declines new delegations (%a)"
+        Baker_hash.pp
+        baker)
+    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
+    (function Baker_declines_delegations c -> Some c | _ -> None)
+    (fun c -> Baker_declines_delegations c)
 
 let link ctxt contract delegate =
   Storage.Contract.Balance.get ctxt contract
@@ -100,6 +116,11 @@ let get = Roll_storage.get_contract_delegate
 let set_delegate ctxt contract delegate =
   (* check that the delegate is a registered baker *)
   Baker_storage.must_be_registered ctxt delegate
+  >>=? fun () ->
+  (* check that the delegate accepts new delegations *)
+  Storage.Baker.Delegation_decliners.mem ctxt delegate
+  >>= fun delegation_decliners ->
+  fail_when delegation_decliners (Baker_declines_delegations delegate)
   >>=? fun () ->
   (* check that the delegate is an active baker *)
   Baker_storage.deactivated ctxt delegate

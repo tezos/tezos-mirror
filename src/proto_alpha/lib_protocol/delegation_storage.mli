@@ -44,3 +44,5 @@ type error +=
       Current_delegate
   | (* `Temporary *)
       Inactive_baker of Baker_hash.t
+  | (* `Temporary *)
+      Baker_declines_delegations of Baker_hash.t
