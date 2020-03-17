@@ -8,6 +8,10 @@
                    -open Tezos_micheline))
  (wrapped false)
  (modules Tezos_protocol_environment
+          Environment_V1
+          Environment_context
+          Environment_protocol_T
+          Environment_protocol_T_V1
           Dummy_context
           Memory_context))
 
