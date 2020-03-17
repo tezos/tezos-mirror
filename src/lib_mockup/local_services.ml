@@ -164,40 +164,37 @@ let preapply (mockup_env : Registration.mockup_environment)
        (fun _prefix () op_list ->
          let outcome =
            Lwt_main.run
-             (let open Mockup_environment.Protocol_error_monad in
-             let predecessor = rpc_context.block_hash in
-             let header = rpc_context.block_header in
-             let predecessor_context = rpc_context.context in
-             let chain_id = Chain_id.zero in
-             Mockup_environment.Protocol.begin_construction
-               ~chain_id
-               ~predecessor_context
-               ~predecessor_timestamp:header.timestamp
-               ~predecessor_level:header.level
-               ~predecessor_fitness:header.fitness
-               ~predecessor
-               ~timestamp:
-                 (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
-               ()
-             >>=? fun state ->
-             fold_left_s
-               (fun (state, acc) op ->
-                 Mockup_environment.Protocol.apply_operation state op
-                 >>=? fun (state, result) ->
-                 return (state, (op.protocol_data, result) :: acc))
-               (state, [])
-               op_list
-             >>=? fun (state, acc) ->
-             Mockup_environment.Protocol.finalize_block state
-             >>=? fun _ -> return (List.rev acc))
+             (let predecessor = rpc_context.block_hash in
+              let header = rpc_context.block_header in
+              let predecessor_context = rpc_context.context in
+              let chain_id = Chain_id.zero in
+              Mockup_environment.Protocol.begin_construction
+                ~chain_id
+                ~predecessor_context
+                ~predecessor_timestamp:header.timestamp
+                ~predecessor_level:header.level
+                ~predecessor_fitness:header.fitness
+                ~predecessor
+                ~timestamp:
+                  (Time.System.to_protocol
+                     (Tezos_stdlib_unix.Systime_os.now ()))
+                ()
+              >>=? fun state ->
+              fold_left_s
+                (fun (state, acc) op ->
+                  Mockup_environment.Protocol.apply_operation state op
+                  >>=? fun (state, result) ->
+                  return (state, (op.protocol_data, result) :: acc))
+                (state, [])
+                op_list
+              >>=? fun (state, acc) ->
+              Mockup_environment.Protocol.finalize_block state
+              >>=? fun _ -> return (List.rev acc))
          in
          match outcome with
          | Ok result ->
              RPC_answer.return result
          | Error errs ->
-             let errs =
-               List.map Mockup_environment.Protocol_error_monad.lift_error errs
-             in
              RPC_answer.fail errs))
 
 let inject_operation (mockup_env : Registration.mockup_environment)
@@ -233,7 +230,6 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                     protocol_data = operation_data;
                   }
                 in
-                let open Mockup_environment.Protocol_error_monad in
                 let predecessor = rpc_context.block_hash in
                 let header = rpc_context.block_header in
                 let predecessor_context = rpc_context.context in
@@ -270,11 +266,6 @@ let inject_operation (mockup_env : Registration.mockup_environment)
                         | Error errs ->
                             RPC_answer.fail errs)
                 | Error errs ->
-                    let errs =
-                      List.map
-                        Mockup_environment.Protocol_error_monad.lift_error
-                        errs
-                    in
                     RPC_answer.fail errs ) ))
 
 let build_shell_directory (mockup_env : Registration.mockup_environment)

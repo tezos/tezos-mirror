@@ -36,33 +36,10 @@ module type Mockup_sig = sig
 
   val protocol_hash : Protocol_hash.t
 
-  module Protocol_error_monad : sig
-    type error
-
-    type 'a tzresult = ('a, error list) result
-
-    val return : 'a -> 'a tzresult Lwt.t
-
-    val ( >>=? ) :
-      'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
-
-    val fold_left_s :
-      ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
-
-    val lift_error : error -> Error_monad.error
-  end
-
   module Protocol : sig
     val hash : Protocol_hash.t
 
-    include
-      Tezos_protocol_environment.T
-        with type context := Tezos_protocol_environment.Context.t
-         and type quota := Tezos_protocol_environment.quota
-         and type validation_result :=
-              Tezos_protocol_environment.validation_result
-         and type rpc_context := Tezos_protocol_environment.rpc_context
-         and type 'a tzresult := 'a Protocol_error_monad.tzresult
+    include Tezos_protocol_environment.PROTOCOL
   end
 
   module Block_services :
