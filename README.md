@@ -14,11 +14,13 @@ encoding to serialise and deserialise values of the type `t`.
 Example:
 
 ```
+open Data_encoding
+
 type t = (string * int) list
 let encoding = list (tup2 string int31)
 let v = [("foo", 32); ("bar", 0)]
 let j = Json.construct encoding v
-let w = Json.destruct j
+let w = Json.destruct encoding j
 let () = assert (v = w)
 ```
 
