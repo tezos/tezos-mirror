@@ -198,13 +198,7 @@ let () =
 
     let protocol_hash = Protocol.hash
 
-    module Protocol_error_monad = struct
-      include Protocol.Environment.Error_monad
-
-      let lift_error e = Protocol.Environment.Ecoproto_error e
-    end
-
-    module Protocol = Protocol
+    module Protocol = Protocol_client_context.Lifted_protocol
     module Block_services = Protocol_client_context.Alpha_block_services
 
     let directory = Protocol.rpc_services
