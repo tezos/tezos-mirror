@@ -72,6 +72,7 @@ type ('o, 'e) rest_result =
   | `Error of 'e
   | `Forbidden of 'e
   | `Not_found of 'e
+  | `Gone of 'e
   | `Unauthorized of 'e ]
   tzresult
 
@@ -90,6 +91,7 @@ class type json =
 
 type error +=
   | Not_found of {meth : RPC_service.meth; uri : Uri.t}
+  | Gone of {meth : RPC_service.meth; uri : Uri.t}
   | Generic_error of {meth : RPC_service.meth; uri : Uri.t}
 
 let base = Uri.make ~scheme:"ocaml" ()
@@ -99,6 +101,12 @@ let not_found s p q =
     RPC_service.forge_partial_request s ~base p q
   in
   fail (Not_found {meth; uri})
+
+let gone s p q =
+  let {RPC_service.meth; uri; _} =
+    RPC_service.forge_partial_request s ~base p q
+  in
+  fail (Gone {meth; uri})
 
 let generic_error s p q =
   let {RPC_service.meth; uri; _} =
@@ -124,10 +132,13 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
                 shutdown () ; return v
             | None ->
                 shutdown () ; not_found s p q )
+        | `Gone None ->
+            gone s p q
         | `Not_found None ->
             not_found s p q
         | `Unauthorized (Some err)
         | `Forbidden (Some err)
+        | `Gone (Some err)
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
@@ -163,10 +174,13 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
             on_chunk v ;
             on_close () ;
             return (fun () -> ())
+        | `Gone None ->
+            gone s p q
         | `Not_found None ->
             not_found s p q
         | `Unauthorized (Some err)
         | `Forbidden (Some err)
+        | `Gone (Some err)
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
@@ -217,3 +231,25 @@ let () =
         uri)
     (function Not_found {meth; uri} -> Some (meth, uri) | _ -> None)
     (fun (meth, uri) -> Not_found {meth; uri})
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Branch
+    ~id:"RPC_context.Gone"
+    ~title:"RPC lookup failed because of deleted data"
+    ~description:
+      "RPC lookup failed. Block has been pruned and requested data deleted."
+    (obj2
+       (req "method" RPC_service.meth_encoding)
+       (req "uri" RPC_encoding.uri_encoding))
+    ~pp:(fun ppf (meth, uri) ->
+      Format.fprintf
+        ppf
+        "RPC lookup failed. Block has been pruned and requested data deleted, \
+         service: %s %a"
+        (RPC_service.string_of_meth meth)
+        Uri.pp_hum
+        uri)
+    (function Gone {meth; uri} -> Some (meth, uri) | _ -> None)
+    (fun (meth, uri) -> Gone {meth; uri})

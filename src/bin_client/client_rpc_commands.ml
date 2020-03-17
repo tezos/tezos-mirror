@@ -436,6 +436,12 @@ let display_answer (cctxt : #Client_context.full) = function
   | `Not_found _ ->
       cctxt#message "No service found at this URL\n%!"
       >>= fun () -> return_unit
+  | `Gone _ ->
+      cctxt#message
+        "Requested data concerns a pruned block and target resource is no \
+         longer available\n\
+         %!"
+      >>= fun () -> return_unit
   | `Error (Some json) ->
       cctxt#message
         "@[<v 2>Command failed :@[ %a@]@]@."

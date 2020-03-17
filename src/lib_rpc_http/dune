@@ -3,7 +3,7 @@
  (public_name tezos-rpc-http)
  (modules RPC_client_errors media_type)
  (libraries tezos-base
-            ocplib-resto-cohttp)
+            resto-cohttp)
  (flags (:standard -open Tezos_base__TzPervasives)))
 
 (library
@@ -11,7 +11,7 @@
  (public_name tezos-rpc-http-client)
  (modules RPC_client)
  (libraries tezos-base
-            ocplib-resto-cohttp-client
+            resto-cohttp-client
             tezos-rpc-http)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http)))
@@ -23,7 +23,7 @@
  (libraries tezos-stdlib-unix
             tezos-base
             cohttp-lwt-unix
-            ocplib-resto-cohttp-client
+            resto-cohttp-client
             tezos-rpc-http-client)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http_client)))
@@ -32,7 +32,7 @@
  (name tezos_rpc_http_server)
  (public_name tezos-rpc-http-server)
  (libraries tezos-base
-            ocplib-resto-cohttp-server
+            resto-cohttp-server
             tezos-rpc-http)
  (modules RPC_server)
  (flags (:standard -open Tezos_base__TzPervasives

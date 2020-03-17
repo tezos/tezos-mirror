@@ -33,6 +33,7 @@ type 'o t =
   | `Forbidden of RPC_service.error option (* 403 *)
   | `Not_found of RPC_service.error option (* 404 *)
   | `Conflict of RPC_service.error option (* 409 *)
+  | `Gone of RPC_service.error option (* 410 *)
   | `Error of RPC_service.error option (* 500 *) ]
 
 and 'a stream = 'a Resto_directory.Answer.stream = {
@@ -47,5 +48,7 @@ val return_unit : unit t Lwt.t
 val return_stream : 'o stream -> 'o t Lwt.t
 
 val not_found : 'o t Lwt.t
+
+val gone : 'o t Lwt.t
 
 val fail : Error_monad.error list -> 'a t Lwt.t

@@ -1,6 +1,0 @@
-(library
- (name resto_json)
- (public_name ocplib-resto-json)
- (libraries json-data-encoding json-data-encoding-bson ocplib-resto)
- (flags (:standard ))
- (wrapped false))

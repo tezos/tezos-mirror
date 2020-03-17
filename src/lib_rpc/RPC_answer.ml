@@ -33,6 +33,7 @@ type 'o t =
   | `Forbidden of RPC_service.error option (* 403 *)
   | `Not_found of RPC_service.error option (* 404 *)
   | `Conflict of RPC_service.error option (* 409 *)
+  | `Gone of RPC_service.error option (* 410 *)
   | `Error of RPC_service.error option (* 500 *) ]
 
 and 'a stream = 'a Resto_directory.Answer.stream = {
@@ -47,5 +48,7 @@ let return_unit = Lwt.return (`Ok ())
 let return_stream x = Lwt.return (`OkStream x)
 
 let not_found = Lwt.return (`Not_found None)
+
+let gone = Lwt.return (`Gone None)
 
 let fail err = Lwt.return (`Error (Some err))

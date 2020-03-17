@@ -139,8 +139,12 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         return (`Ok v)
     | `Ok None ->
         request_failed meth uri Empty_answer
-    | (`Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _ | `Not_found _)
-      as v ->
+    | ( `Conflict _
+      | `Error _
+      | `Forbidden _
+      | `Unauthorized _
+      | `Not_found _
+      | `Gone _ ) as v ->
         return v
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map media_type ~f:Media_type.name in
@@ -274,6 +278,8 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         handle_error meth uri body (fun v -> `Forbidden v)
     | `Not_found body ->
         handle_error meth uri body (fun v -> `Not_found v)
+    | `Gone body ->
+        handle_error meth uri body (fun v -> `Gone v)
     | `Unauthorized body ->
         handle_error meth uri body (fun v -> `Unauthorized v)
 
@@ -283,12 +289,15 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
         return v
     | `Ok None ->
         request_failed meth uri Empty_answer
+    | `Gone None ->
+        fail (RPC_context.Gone {meth; uri})
     | `Not_found None ->
         fail (RPC_context.Not_found {meth; uri})
     | `Conflict (Some err)
     | `Error (Some err)
     | `Forbidden (Some err)
     | `Unauthorized (Some err)
+    | `Gone (Some err)
     | `Not_found (Some err) ->
         Lwt.return_error err
     | `Conflict None | `Error None | `Forbidden None | `Unauthorized None ->

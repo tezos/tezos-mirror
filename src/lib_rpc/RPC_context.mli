@@ -72,6 +72,7 @@ type ('o, 'e) rest_result =
   | `Error of 'e
   | `Forbidden of 'e
   | `Not_found of 'e
+  | `Gone of 'e
   | `Unauthorized of 'e ]
   tzresult
 
@@ -92,6 +93,7 @@ class ['pr] of_directory : 'pr RPC_directory.t -> ['pr] gen
 
 type error +=
   | Not_found of {meth : RPC_service.meth; uri : Uri.t}
+  | Gone of {meth : RPC_service.meth; uri : Uri.t}
   | Generic_error of {meth : RPC_service.meth; uri : Uri.t}
 
 val make_call :

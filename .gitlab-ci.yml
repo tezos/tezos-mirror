@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 5aca652afd01bf0d66a9d74aa192309dcb9554b2
+  build_deps_image_version: 3fa284bda863ab029e801005ab70ec01460ffdb8
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
@@ -186,16 +186,6 @@ unit:ocaml-pbkdf:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-pbkdf/runtest
-
-unit:ocplib-resto/lib_resto-directory:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocplib-resto/lib_resto-directory/runtest
-
-unit:ocplib-resto/lib_ezresto-directory:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocplib-resto/lib_ezresto-directory/runtest
 
 unit:ocaml-secp256k1:
   <<: *test_definition
@@ -588,46 +578,6 @@ opam:lmdb:
   <<: *opam_definition
   variables:
     package: lmdb
-
-opam:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:ocplib-resto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto
-
-opam:ocplib-resto-cohttp:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-cohttp
-
-opam:ocplib-resto-cohttp-client:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-cohttp-client
-
-opam:ocplib-resto-cohttp-server:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-cohttp-server
-
-opam:ocplib-resto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-directory
-
-opam:ocplib-resto-json:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-json
 
 opam:pbkdf:
   <<: *opam_definition

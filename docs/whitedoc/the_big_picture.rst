@@ -63,7 +63,7 @@ Finally, the RPC layer (in yellow on the right in the picture) is an
 important part of the node. It is how the client, third party
 applications and daemons can interact with the node and introspect its
 state. This component uses the mainstream JSON format and HTTP protocol.
-It uses in-house libraries ``ocplib-resto``. It
+It uses in-house libraries ``resto``. It
 is fully inter-operable, and auto descriptive, using JSON schema.
 
 .. |Tezos architecture diagram| image:: octopus.svg
@@ -108,7 +108,7 @@ that are used everywhere for basic operations.
  - :package:`tezos-rpc` provides the basics of Tezos' RPC service
    mechanism. It provides combinators for building service hierarchies
    à la Ocsigen/Eliom, registering and calling services. This module
-   is based on :opam:`ocplib-resto`, that allows for automatic
+   is based on :opam:`resto`, that allows for automatic
    generation of a machine and human-readable of the hierarchy of
    services: the structure of URLs and the expected formats for input
    and output bodies, via the use of ``data_encoding``.

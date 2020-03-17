@@ -3,8 +3,8 @@
  (public_name tezos-rpc)
  (libraries data-encoding
             tezos-error-monad
-            ocplib-resto
-            ocplib-resto-directory)
+            resto
+            resto-directory)
  (flags (:standard -open Data_encoding
                    -open Tezos_error_monad)))
 
