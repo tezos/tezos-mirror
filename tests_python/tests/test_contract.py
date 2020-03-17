@@ -37,6 +37,7 @@ def originate(client,
 
 
 @pytest.mark.contract
+@pytest.mark.incremental
 class TestManager:
 
     def test_manager_origination(self, client: Client, session: dict):
@@ -113,11 +114,11 @@ class TestManager:
         amount = 10.001
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'bootstrap2', 'manager',
-                        ['--gas-limit', f'{128 * 15443 + 108}'])
+                        ['--gas-limit', f'{128 * 15450 + 108}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.001796 + 0.000001
+        fee = 0.001797 + 0.000001
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
         assert (balance_bootstrap - fee_mutez - amount_mutez
@@ -129,11 +130,11 @@ class TestManager:
         amount = 10.1
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'bootstrap2',
-                        ['--gas-limit', f'{128 * 26342 + 12}'])
+                        ['--gas-limit', f'{128 * 26350 + 12}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.002947 + 0.000001
+        fee = 0.002948 + 0.000001
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (balance_bootstrap + amount_mutez - fee_mutez
@@ -146,12 +147,12 @@ class TestManager:
         amount = 10
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'manager2',
-                        ['--gas-limit', f'{128 * 44942 + 112}'])
+                        ['--gas-limit', f'{128 * 44950 + 112}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.004836 + 0.000001
+        fee = 0.004837 + 0.000001
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance_bootstrap - fee_mutez == new_balance_bootstrap
         assert balance - amount_mutez == new_balance
