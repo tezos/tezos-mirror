@@ -4,6 +4,8 @@
  (modules (:standard \ no_ledger with_ledger))
  (libraries ocplib-endian.bigstring
             tezos-signer-backends
+            tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
             (select ledger.ml from

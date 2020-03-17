@@ -3,6 +3,7 @@
  (public_names tezos-signer)
  (package tezos-signer)
  (libraries tezos-base
+            tezos-base.unix
             tezos-client-base
             tezos-client-base-unix
             tezos-client-commands

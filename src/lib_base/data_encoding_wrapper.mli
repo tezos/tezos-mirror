@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val run :
-  ?magic_bytes:int list ->
-  ?timeout:Time.System.Span.t ->
-  check_high_watermark:bool ->
-  require_auth:bool ->
-  #Client_context.io_wallet ->
-  Tezos_base_unix.Socket.addr ->
-  'a list tzresult Lwt.t
+(** Errors that can happen when using [send]. *)
+type Error_monad.error +=
+  | Encoding_error of Data_encoding.Binary.write_error
+  | Unexpected_size_of_encoded_value
+
+(** Error that can happen when using [recv]. *)
+type Error_monad.error += Decoding_error of Data_encoding.Binary.read_error

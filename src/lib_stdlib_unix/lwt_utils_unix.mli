@@ -79,49 +79,6 @@ module Json : sig
   val write_file : string -> Data_encoding.json -> unit tzresult Lwt.t
 end
 
-module Socket : sig
-  type addr =
-    | Unix of string
-    | Tcp of string * string * Unix.getaddrinfo_option list
-
-  (** [connect ?timeout addr] tries connecting to [addr] and returns
-      the resulting socket file descriptor on success. When using TCP,
-      [Unix.getaddrinfo] is used to resolve the hostname and service
-      (port). The different socket addresses returned by
-      [Unix.getaddrinfo] are tried sequentially, and the [?timeout]
-      argument (default: 5s) governs how long it waits to get a
-      connection. If a connection is not obtained in less than
-      [?timeout], the connection is canceled and and the next socket
-      address (if it exists) is tried. *)
-  val connect :
-    ?timeout:Ptime.Span.t -> addr -> Lwt_unix.file_descr tzresult Lwt.t
-
-  val with_connection :
-    ?timeout:Ptime.Span.t ->
-    addr ->
-    (Lwt_unix.file_descr -> 'a tzresult Lwt.t) ->
-    'a tzresult Lwt.t
-
-  val bind : ?backlog:int -> addr -> Lwt_unix.file_descr list tzresult Lwt.t
-
-  (** Errors that can happen when using [send]. *)
-  type error +=
-    | Encoding_error of Data_encoding.Binary.write_error
-    | Unexpected_size_of_encoded_value
-
-  (** Error that can happen when using [recv]. *)
-  type error += Decoding_error of Data_encoding.Binary.read_error
-
-  val send :
-    Lwt_unix.file_descr -> 'a Data_encoding.t -> 'a -> unit tzresult Lwt.t
-
-  val recv :
-    ?timeout:Ptime.Span.t ->
-    Lwt_unix.file_descr ->
-    'a Data_encoding.t ->
-    'a tzresult Lwt.t
-end
-
 val retry :
   ?log:('error -> unit Lwt.t) ->
   ?n:int ->

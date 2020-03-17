@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val run :
-  ?magic_bytes:int list ->
-  ?timeout:Time.System.Span.t ->
-  check_high_watermark:bool ->
-  require_auth:bool ->
-  #Client_context.io_wallet ->
-  Tezos_base_unix.Socket.addr ->
-  'a list tzresult Lwt.t
+open Error_monad
+
+type error +=
+  | Encoding_error of Data_encoding.Binary.write_error
+  | Unexpected_size_of_encoded_value
+
+type error += Decoding_error of Data_encoding.Binary.read_error
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"encoding_error"
+    ~title:"Encoding error"
+    ~description:"Error while encoding a value for a socket"
+    ~pp:(fun ppf we ->
+      Format.fprintf
+        ppf
+        "Could not encode a value: %a"
+        Data_encoding.Binary.pp_write_error
+        we)
+    Data_encoding.(obj1 (req "error" Binary.write_error_encoding))
+    (function Encoding_error we -> Some we | _ -> None)
+    (fun we -> Encoding_error we) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexepcted_size_of_encoded_value"
+    ~title:"Unexpected size of encoded value"
+    ~description:"An encoded value is not of the expected size."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "An encoded value is not of the expected size.")
+    Data_encoding.empty
+    (function Unexpected_size_of_encoded_value -> Some () | _ -> None)
+    (fun () -> Unexpected_size_of_encoded_value) ;
+  register_error_kind
+    `Permanent
+    ~id:"decoding_error"
+    ~title:"Decoding error"
+    ~description:"Error while decoding a value"
+    ~pp:(fun ppf re ->
+      Format.fprintf
+        ppf
+        "Could not decode a value: %a"
+        Data_encoding.Binary.pp_read_error
+        re)
+    Data_encoding.(obj1 (req "error" Binary.read_error_encoding))
+    (function Decoding_error re -> Some re | _ -> None)
+    (fun re -> Decoding_error re)
