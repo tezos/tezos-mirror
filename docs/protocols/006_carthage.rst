@@ -19,7 +19,7 @@ and instructions to join in :ref:`How to get Tezos<howtoget>`.
 
 The code can be found in the Gitlab branch
 `proto-006`_ and its
-full hash is ``PtXXX``.
+full hash is ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``.
 
 **This protocol contains several breaking changes with respect to Babylon.**
 Developers are particularly encouraged to carefully read this page and
