@@ -29,7 +29,9 @@ type error +=
   | Encoding_error of Data_encoding.Binary.write_error
   | Unexpected_size_of_encoded_value
 
-type error += Decoding_error of Data_encoding.Binary.read_error
+type error +=
+  | Decoding_error of Data_encoding.Binary.read_error
+  | Unexpected_size_of_decoded_buffer
 
 let () =
   register_error_kind
@@ -69,4 +71,16 @@ let () =
         re)
     Data_encoding.(obj1 (req "error" Binary.read_error_encoding))
     (function Decoding_error re -> Some re | _ -> None)
-    (fun re -> Decoding_error re)
+    (fun re -> Decoding_error re) ;
+  register_error_kind
+    `Permanent
+    ~id:"socket.unexepcted_size_of_decoded_value"
+    ~title:"Unexpected size of decoded value"
+    ~description:"A decoded value comes from a buffer of unexpected size."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "A decoded value's origin buffer is not of the expected size.")
+    Data_encoding.empty
+    (function Unexpected_size_of_decoded_buffer -> Some () | _ -> None)
+    (fun () -> Unexpected_size_of_decoded_buffer)

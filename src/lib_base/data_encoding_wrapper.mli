@@ -29,4 +29,6 @@ type Error_monad.error +=
   | Unexpected_size_of_encoded_value
 
 (** Error that can happen when using [recv]. *)
-type Error_monad.error += Decoding_error of Data_encoding.Binary.read_error
+type Error_monad.error +=
+  | Decoding_error of Data_encoding.Binary.read_error
+  | Unexpected_size_of_decoded_buffer

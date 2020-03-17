@@ -35,10 +35,6 @@ type error += Invalid_message_size
 
 type error += Invalid_incoming_ciphertext_size
 
-type error += Encoding_error of Data_encoding.Binary.write_error
-
-type error += Unexpected_size_of_encoded_message
-
 type error += Rejected_socket_connection
 
 type error +=
