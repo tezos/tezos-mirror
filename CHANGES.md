@@ -8,3 +8,9 @@ v0.3:
 * Schemas are now lazy (to speed up initialisation and because schemas are not
   always used) (by Romain)
 - depend on json-data-encoding (new) fork of ocplib-json-typed (deprecated)
+
+v0.4:
+
+* client does not depend on Unix anymore. Users must pass `gettimeofday`
+  function directly.
+* Added `Gone response code
