@@ -2110,11 +2110,12 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
              ~default:[]
              command)
     | Extra_arguments (extra, command) ->
-        Format.fprintf
-          ppf
-          "Extra command line arguments:@, @[<h>%a@]."
-          (Format.pp_print_list (fun ppf -> Format.fprintf ppf "%s"))
-          extra ;
+        Format.(
+          fprintf
+            ppf
+            "Extra command line arguments:@, @[<h>%a@]."
+            (pp_print_list ~pp_sep:pp_print_space pp_print_string)
+            extra) ;
         Some [Ex command]
     | Unterminated_command (_, commands) ->
         Format.fprintf
