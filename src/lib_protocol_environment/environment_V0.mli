@@ -80,6 +80,7 @@ module type V0 = sig
   module Lift (P : Updater.PROTOCOL) :
     PROTOCOL
       with type block_header_data = P.block_header_data
+       and type block_header_metadata = P.block_header_metadata
        and type block_header = P.block_header
        and type operation_data = P.operation_data
        and type operation_receipt = P.operation_receipt
