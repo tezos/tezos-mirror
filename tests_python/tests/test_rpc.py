@@ -11,6 +11,7 @@ BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
 CONTRACT_ID = ""  # TODO
+NODE_PARAMS = ['--connections', '3']
 
 
 @pytest.mark.mempool
@@ -22,8 +23,8 @@ class TestRPCs:
     block_hash = ""
 
     def test_init(self, sandbox):
-        sandbox.add_node(1)
-        sandbox.add_node(2)
+        sandbox.add_node(1, params=NODE_PARAMS)
+        sandbox.add_node(2, params=NODE_PARAMS)
         utils.activate_alpha(sandbox.client(1))
         time.sleep(2)
 

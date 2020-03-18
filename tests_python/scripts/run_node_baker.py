@@ -6,6 +6,9 @@ from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
+NODE_PARAMS = ['--connections', '3']
+
+
 def scenario(contract, storage, time_between_blocks, proto):
     if proto is None:
         proto = 'alpha'
@@ -23,7 +26,7 @@ def scenario(contract, storage, time_between_blocks, proto):
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = [str(time_between_blocks), "0"]
 
-        sandbox.add_node(1)
+        sandbox.add_node(1, params=NODE_PARAMS)
         utils.activate_alpha(sandbox.client(1), parameters, proto=proto_hash)
         sandbox.add_baker(1, 'bootstrap5', proto=proto_daemon)
         client = sandbox.client(1)

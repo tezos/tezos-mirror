@@ -3,12 +3,13 @@ import pytest
 from tools import paths, utils
 
 BAKE_ARGS = ['--minimal-timestamp']
+NODE_PARAMS = ['--connections', '3']
 
 
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node running protocol alpha and a baker."""
-    sandbox.add_node(0)
+    sandbox.add_node(0, params=NODE_PARAMS)
     utils.activate_alpha(sandbox.client(0))
     yield sandbox.client(0)
 

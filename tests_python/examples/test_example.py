@@ -3,15 +3,18 @@ from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
+NODE_PARAMS = ['--connections', '3']
+
+
 @pytest.fixture(scope="class")
 def sandbox():
     """Example of sandbox fixture."""
     with Sandbox(paths.TEZOS_HOME,
                  constants.IDENTITIES,
                  constants.GENESIS_PK) as sandbox:
-        sandbox.add_node(0)
+        sandbox.add_node(0, params=NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
-        sandbox.add_node(1)
+        sandbox.add_node(1, params=NODE_PARAMS)
         sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
         yield sandbox
         assert sandbox.are_daemons_alive()

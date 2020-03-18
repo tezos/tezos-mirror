@@ -81,7 +81,7 @@ def sandbox(log_dir):
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node with protocol alpha."""
-    sandbox.add_node(0)
+    sandbox.add_node(0, params=['--connections', '3'])
     client = sandbox.client(0)
     utils.activate_alpha(client)
     yield client
@@ -106,7 +106,8 @@ def client_regtest_bis(sandbox):
                                   disable_disclaimer)
         return client
 
-    sandbox.add_node(1, client_factory=reg_client_factory)
+    sandbox.add_node(1, client_factory=reg_client_factory,
+                     params=['--connections', '3'])
     client = sandbox.client(1)
     utils.activate_alpha(client)
     yield client

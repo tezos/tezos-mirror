@@ -3,6 +3,9 @@ from tools import constants, paths, utils
 from launchers.sandbox import Sandbox
 
 
+NODE_PARAMS = ['--connections', '3']
+
+
 def scenario():
     """ a private tezos network, initialized with network parameters
         and some accounts. """
@@ -10,10 +13,10 @@ def scenario():
                  constants.IDENTITIES,
                  constants.GENESIS_PK) as sandbox:
         # Launch node running protocol alpha
-        sandbox.add_node(0)
+        sandbox.add_node(0, params=NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         # Launch a second node on the same private tezos network
-        sandbox.add_node(1)
+        sandbox.add_node(1, params=NODE_PARAMS)
         # Launch a baker associated to node 0, baking on behalf of delegate
         # bootstrap5
         sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)

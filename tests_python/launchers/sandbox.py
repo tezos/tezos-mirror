@@ -148,7 +148,6 @@ class Sandbox:
            --sandbox=SANDBOX_FILE
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
            --private-mode # if private is True
-           --connections 3 # overriden by params if not None
         """
         assert node_id not in self.nodes, f'Already a node for id={node_id}'
         rpc_node = self.rpc + node_id
@@ -165,10 +164,7 @@ class Sandbox:
             self.logs.append(log_file)
             self.counter += 1
 
-        if params is None:
-            # TODO this option is confusing as it sets several parameters at
-            # once
-            params = ['--connections', '3']
+        params = [] if params is None else params
         if private:
             params = params + ['--private-mode']
         params = params + ['--network=sandbox']

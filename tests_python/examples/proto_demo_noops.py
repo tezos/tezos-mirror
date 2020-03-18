@@ -6,6 +6,7 @@ from launchers.sandbox import Sandbox
 PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
 PARAMS = ['-p', PROTO_GENESIS]
+NODE_PARAMS = ['--connections', '3']
 
 
 def forge_block_header_data(protocol_data):
@@ -30,7 +31,7 @@ def main():
                  constants.GENESIS_PK,
                  log_dir='tmp') as sandbox:
         # launch a sandbox node
-        sandbox.add_node(0)
+        sandbox.add_node(0, params=NODE_PARAMS)
         client = sandbox.client(0)
 
         protocols = client.list_protocols()
