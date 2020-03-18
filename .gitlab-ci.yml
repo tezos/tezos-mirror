@@ -464,6 +464,12 @@ integration:voting:
     - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
   stage: test
 
+integration:voting_full:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_voting_full.py -s --log-dir=tmp
+  stage: test
+
 integration:examples_forge_transfer:
   <<: *integration_definition
   script:

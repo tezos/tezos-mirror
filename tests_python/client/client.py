@@ -161,7 +161,7 @@ class Client:
             verb: str,
             path: str,
             data: Any = None,
-            params: List[str] = None) -> dict:
+            params: List[str] = None) -> Any:
         """Run an arbitrary RPC command
 
         Args:
@@ -321,8 +321,13 @@ class Client:
                  amount: float,
                  giver: str,
                  receiver: str,
-                 args: List[str] = None) -> client_output.TransferResult:
+                 args: List[str] = None,
+                 chain: str = None
+                 ) -> client_output.TransferResult:
         cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
+        if chain is not None:
+            cmd = ['--chain', chain] + cmd
+
         if args is None:
             args = []
         cmd += args
@@ -507,8 +512,9 @@ class Client:
             'get', '/chains/main/blocks/head/helpers/current_level?offset=1')
         return rpc_res['voting_period_position']
 
-    def get_level(self, params: List[str] = None) -> int:
-        rpc_res = self.rpc('get', '/chains/main/blocks/head/header/shell',
+    def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc('get', f'/chains/{chain}/blocks/head/header/shell',
                            params=params)
         return int(rpc_res['level'])
 
@@ -566,8 +572,12 @@ class Client:
     def bootstrapped(self) -> str:
         return self.run(['bootstrapped'])
 
-    def sync_state(self) -> dict:
+    def sync_state(self) -> str:
         return self.rpc('get', 'chains/main/sync_state')
+
+    def is_bootstrapped(self, chain: str = 'main') -> bool:
+        assert chain in {'main', 'test'}
+        return self.rpc('get', f'chains/{chain}/is_bootstrapped')
 
     def cleanup(self) -> None:
         """Remove base dir, only if not provided by user."""

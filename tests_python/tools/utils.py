@@ -70,13 +70,15 @@ def check_protocol(client: Client, proto: str,
 
 
 @retry(timeout=2., attempts=10)
-def check_level(client: Client, level) -> bool:
-    return client.get_level() == level
+def check_level(client: Client, level, chain: str = 'main') -> bool:
+    return client.get_level(chain=chain) == level
 
 
-@retry(timeout=1., attempts=10)
-def check_level_greater_than(client: Client, level) -> bool:
-    return client.get_level() >= level
+@retry(timeout=2., attempts=10)
+def check_level_greater_than(client: Client,
+                             level,
+                             chain: str = 'main') -> bool:
+    return client.get_level(chain=chain) >= level
 
 
 @retry(timeout=2., attempts=20)
@@ -95,6 +97,11 @@ def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
     """Return when nodes head levels are within max_diff units"""
     levels = [client.get_level() for client in clients]
     return max(levels) - min(levels) <= max_diff
+
+
+@retry(timeout=2, attempts=2)
+def check_is_bootstrapped(client: Client, chain: str = 'main') -> bool:
+    return client.is_bootstrapped(chain)
 
 
 def get_block_at_level(client: Client, level: int) -> dict:
