@@ -40,16 +40,14 @@ class TestMultisig:
         session['sig2'] = sign.signature
 
     def test_transfer_failure(self, client, session):
-        def cmd():
-            client.msig_transfer('msig', 10, 'bootstrap2',
-                                 'bootstrap1',
-                                 [session['sig2']])
-
         error_pattern = (r"Not enough signatures: " +
                          r"only 1 signatures were given " +
                          r"but the threshold is currently 2")
 
-        utils.assert_run_failure(cmd, error_pattern)
+        with utils.assert_run_failure(error_pattern):
+            client.msig_transfer('msig', 10, 'bootstrap2',
+                                 'bootstrap1',
+                                 [session['sig2']])
 
     def test_transfer_success(self, client, session):
         client.msig_transfer('msig', 10, 'bootstrap2', 'bootstrap1',

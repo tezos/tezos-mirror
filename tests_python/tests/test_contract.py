@@ -245,10 +245,8 @@ class TestContracts:
          r'unexpected annotation'),
     ])
     def test_ill_typecheck(self, client, contract, error_pattern):
-        def cmd():
+        with utils.assert_run_failure(error_pattern):
             client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
-
-        utils.assert_run_failure(cmd, error_pattern)
 
 
 FIRST_EXPLOSION = '''
@@ -317,22 +315,19 @@ class TestGasBound:
         client.typecheck(contract)
         args = ['-G', '8000', '--burn-cap', '10']
 
-        def client_cmd():
-            client.originate(f'{name}', 0,
-                             'bootstrap1', contract, args)
         expected_error = "Gas limit exceeded during typechecking or execution"
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.originate(f'{name}', 0, 'bootstrap1', contract, args)
 
     def test_originate_big_type(self, client, session):
         name = 'first_explosion_bigtype.tz'
         contract = session[name]
 
-        def client_cmd():
-            client.typecheck(contract)
         # We could not be bothered with finding how to escape parentheses
         # so we put dots
         expected_error = "type size .1023. exceeded maximum type size .1000."
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.typecheck(contract)
 
     def test_originate_second_explosion(self, client, session):
         name = 'second_explosion.tz'
@@ -348,48 +343,43 @@ class TestGasBound:
         inp = ('{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1' +
                ';1;1;1;1;1;1;1;1;1;1;1;1;1;1}')
 
-        def client_cmd():
-            client.run_script(contract, storage, inp)
         expected_error = \
             ("Cannot serialize the resulting storage" +
              " value within the provided gas bounds.")
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.run_script(contract, storage, inp)
 
     def test_typecheck_map_dup_key(self, client):
 
-        def client_cmd():
-            client.typecheck_data('{ Elt 0 1 ; Elt 0 1}', '(map nat nat)')
         expected_error = \
             ('Map literals cannot contain duplicate' +
              ' keys, however a duplicate key was found')
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data('{ Elt 0 1 ; Elt 0 1}', '(map nat nat)')
 
     def test_typecheck_map_bad_ordering(self, client):
 
-        def client_cmd():
-            client.typecheck_data('{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }',
-                                  '(map nat nat)')
         expected_error = \
             ("Keys in a map literal must be in strictly" +
              " ascending order, but they were unordered in literal")
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data('{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }',
+                                  '(map nat nat)')
 
     def test_typecheck_set_bad_ordering(self, client):
 
-        def client_cmd():
-            client.typecheck_data('{ "A" ; "C" ; "B" }', '(set string)')
         expected_error = \
             ("Values in a set literal must be in strictly" +
              " ascending order, but they were unordered in literal")
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data('{ "A" ; "C" ; "B" }', '(set string)')
 
     def test_typecheck_set_no_duplicates(self, client):
-        def client_cmd():
-            client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
         expected_error = \
             ("Set literals cannot contain duplicate values," +
              " however a duplicate value was found")
-        utils.assert_run_failure(client_cmd, expected_error)
+        with utils.assert_run_failure(expected_error):
+            client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
 
 
 @pytest.mark.contract
@@ -465,10 +455,8 @@ class TestMiniScenarios:
         originate(client, session, path, 'Unit', 0)
 
     def test_replay_transfer_fail(self, client):
-        def client_cmd():
+        with utils.assert_run_failure("Internal operation replay attempt"):
             client.transfer(0, "bootstrap1", "replay", [])
-        utils.assert_run_failure(client_cmd,
-                                 "Internal operation replay attempt")
 
     # create_contract.tz related tests
     def test_create_contract_originate(self, client, session):
@@ -559,12 +547,10 @@ class TestMiniScenarios:
                 'VQ6LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8')
         arg = f'(Pair {byt} "{sign}")'
 
-        def client_cmd():
+        # We check failure of ASSERT_CMPEQ in the script.
+        with utils.assert_run_failure("At line 8 characters 9 to 21"):
             client.transfer(0, "bootstrap1", "reveal_signed_preimage",
                             ['-arg', arg, '--burn-cap', '10'])
-        # We check failure of ASSERT_CMPEQ in the script.
-        utils.assert_run_failure(client_cmd,
-                                 "At line 8 characters 9 to 21")
 
     def test_wrong_signature(self, client):
         byt = ('0x050100000027566f756c657a2d766f757320636' +
@@ -573,12 +559,10 @@ class TestMiniScenarios:
                 'LJsbFrU2idPvnvwJhf5v9DhM9ZTX1euS9DgWozVw6BTHiK9VcQVpAU8')
         arg = f'(Pair {byt} "{sign}")'
 
-        def client_cmd():
+        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
+        with utils.assert_run_failure("At line 15 characters 9 to 15"):
             client.transfer(0, "bootstrap1", "reveal_signed_preimage",
                             ['-arg', arg, '--burn-cap', '10'])
-        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        utils.assert_run_failure(client_cmd,
-                                 "At line 15 characters 9 to 15")
 
     def test_good_preimage_and_signature(self, client):
         byt = ('0x050100000027566f756c657a2d766f757320636f7563' +
@@ -601,20 +585,16 @@ class TestMiniScenarios:
         assert client.get_delegate('vote_for_delegate').delegate is None
 
     def test_vote_for_delegate_wrong_identity1(self, client):
-        def client_cmd():
+        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
+        with utils.assert_run_failure("At line 15 characters 57 to 61"):
             client.transfer(0, "bootstrap1", "vote_for_delegate",
                             ['-arg', 'None', '--burn-cap', '10'])
-        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        utils.assert_run_failure(client_cmd,
-                                 "At line 15 characters 57 to 61")
 
     def test_vote_for_delegate_wrong_identity2(self, client):
-        def client_cmd():
+        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
+        with utils.assert_run_failure("At line 15 characters 57 to 61"):
             client.transfer(0, "bootstrap2", "vote_for_delegate",
                             ['-arg', 'None', '--burn-cap', '10'])
-        # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        utils.assert_run_failure(client_cmd,
-                                 "At line 15 characters 57 to 61")
 
     def test_vote_for_delegate_b3_vote_for_b5(self, client):
         b_5 = IDENTITIES['bootstrap5']['identity']
@@ -824,14 +804,11 @@ class TestComparablePairs:
 @pytest.mark.contract
 class TestTypecheckingErrors:
     def test_big_map_arity_error(self, client):
-        def cmd():
+        error_pattern = ('primitive EMPTY_BIG_MAP expects 2 arguments but is '
+                         'given 1.')
+        with utils.assert_run_failure(error_pattern):
             client.typecheck(os.path.join(CONTRACT_PATH, 'ill_typed',
                                           'big_map_arity.tz'))
-
-        utils.assert_run_failure(
-            cmd,
-            'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
-        )
 
 
 BAD_ANNOT_TEST = '''

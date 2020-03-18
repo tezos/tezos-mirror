@@ -157,12 +157,10 @@ class TestContractOnchainOpcodes:
         bake(client)
         addr = client.get_contract_address('contract')
 
-        def cmd():
+        with assert_run_failure(r'script reached FAILWITH instruction'):
             client.transfer(
                 0, 'bootstrap1', 'contract',
                 ['-arg', f'"{addr}"', '--burn-cap', '10'])
-
-        assert_run_failure(cmd, r'script reached FAILWITH instruction')
 
     def test_init_proxy(self, client_regtest_scrubbed):
         client = client_regtest_scrubbed
@@ -233,12 +231,10 @@ class TestContractOnchainOpcodes:
     def test_slice_fails(self, client_regtest_scrubbed, contract_arg):
         client = client_regtest_scrubbed
 
-        def cmd():
+        with assert_run_failure(r'script reached FAILWITH instruction'):
             client.transfer(
                 0, 'bootstrap1', 'slices',
                 ['-arg', contract_arg, '--burn-cap', '10'])
-
-        assert_run_failure(cmd, r'script reached FAILWITH instruction')
         # bake(client)
 
     @pytest.mark.parametrize('contract_arg',

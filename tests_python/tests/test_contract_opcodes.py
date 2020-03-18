@@ -838,20 +838,18 @@ class TestContractOpcodes:
         client = client_regtest_scrubbed
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
 
-        def cmd():
+        with assert_run_failure(r'unexpected arithmetic overflow'):
             client.run_script(contract, param, storage)
-        assert_run_failure(cmd, r'unexpected arithmetic overflow')
 
     @pytest.mark.skip(reason="Bug in annotation system")
     def test_fails_annotated_set_car_cdr(self, client_regtest):
         """Tests the SET_CAR and SET_CDR instructions."""
         client = client_regtest
 
-        def cmd():
+        with assert_run_failure(r'The two annotations do not match'):
             client.run_script(path.join(OPCODES_CONTRACT_PATH, 'set_car.tz'),
                               '(Pair %wrong %field "hello" 0)',
                               '""')
-        assert_run_failure(cmd, r'The two annotations do not match')
 
     @pytest.mark.skip(reason="To be fixed in next protocol")
     @pytest.mark.parametrize(

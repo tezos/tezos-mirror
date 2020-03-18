@@ -1,9 +1,9 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import Any, Callable, List, \
-    Pattern
+from typing import Any, List, Pattern
 import hashlib
+import contextlib
 import json
 import os
 import re
@@ -285,31 +285,48 @@ def mutez_of_tez(tez: float):
     return int(tez*1000000)
 
 
-def assert_run_failure(code: Callable,
-                       pattern: Pattern[Any],
-                       mode='stderr') -> None:
-    """Executes [code()] and expects the code to fail and raise
-    [subprocess.CalledProcessError]. If so, the [pattern] is searched
-    in stderr. If it is found, returns True; else returns False.
-    """
-    try:
-        code()
-        assert False, "Code ran without throwing exception"
-    except subprocess.CalledProcessError as caught_exc:
-        exc = caught_exc
+@contextlib.contextmanager
+def assert_run_failure(pattern: Pattern[Any],
+                       mode: str = 'stderr'):
+    """Context manager that checks enclosed code fails with expected error.
 
-    stdout_output = exc.args[2]
-    stderr_output = exc.args[3]
-    data = []  # type: List[str]
-    if mode == 'stderr':
-        data = stderr_output.split('\n')
-    else:
-        data = stdout_output.split('\n')
-    for line in data:
-        if re.search(pattern, line):
-            return
-    data_pretty = "\n".join(data)
-    assert False, f"Could not find '{pattern}' in {data_pretty}"
+    This context manager checks the contextualized code (in the [with]
+    statement) raises [subprocess.CalledProcessError] exception, and
+    that the called process stdout or stderr matches [pattern].
+
+    It fails with an [assert False] otherwise.
+
+    Args:
+        pattern (Pattern): the pattern that the process output should match
+        mode (str): if [mode = stderr], try to match process stderr, otherwise
+                    stdout
+
+    Note: the contextualized code must fork a subprocess using
+          [subprocess.run] and make sure [capture_output=True].
+    """
+    # TODO this is similar to the pytest context manager [pytest.raises]
+    #      that we already use in some tests. See if we can only use one
+    #      construct.
+
+    try:
+        yield None
+        assert False, "Code ran without throwing exception"
+    except subprocess.CalledProcessError as exc:
+        stdout_output = exc.stdout
+        stderr_output = exc.stderr
+        data = []  # type: List[str]
+        if mode == 'stderr':
+            data = stderr_output.split('\n')
+        else:
+            data = stdout_output.split('\n')
+        for line in data:
+            if re.search(pattern, line):
+                return
+        data_pretty = "\n".join(data)
+        assert False, f"Could not find '{pattern}' in {data_pretty}"
+    except Exception as exc:  # pylint: disable=broad-except
+        assert_msg = f'Expected CalledProcessError but got {type(exc)}'
+        assert False, assert_msg
 
 
 def assert_storage_contains(client: Client,
@@ -361,10 +378,10 @@ def assert_run_script_failwith(client: Client,
                                contract: str,
                                param: str,
                                storage: str) -> None:
-    def cmd():
-        client.run_script(contract, param, storage, None, True)
 
-    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))
+    pattern = re.compile(r'script reached FAILWITH instruction')
+    with assert_run_failure(pattern):
+        client.run_script(contract, param, storage, None, True)
 
 
 def assert_typecheck_data_failure(
@@ -372,10 +389,8 @@ def assert_typecheck_data_failure(
         data: str,
         typ: str,
         err: Pattern[Any] = re.compile(r'ill-typed data')) -> None:
-    def cmd():
+    with assert_run_failure(err):
         client.typecheck_data(data, typ)
-
-    assert_run_failure(cmd, err)
 
 
 def client_output_converter(pre):
@@ -437,7 +452,6 @@ def assert_transfer_failwith(client: Client,
                              sender: str,
                              receiver: str,
                              args) -> None:
-    def cmd():
+    pattern = re.compile(r'script reached FAILWITH instruction')
+    with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)
-
-    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))
