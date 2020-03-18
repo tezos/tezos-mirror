@@ -125,7 +125,20 @@ val to_string : t -> string
 
 val read : string -> t tzresult Lwt.t
 
+(** Write configuration file.
+
+    Also check whether the directory of the given filename
+    is a data directory. *)
 val write : string -> t -> unit tzresult Lwt.t
+
+(** Write configuration file if it does not already exist.
+
+    Call this to ensure that critical initialization options
+    such as [--network] are saved.
+
+    Contrary to {!write}, this does not check whether the
+    directory of the specified filename is a data directory. *)
+val write_if_not_exists : string -> t -> unit tzresult Lwt.t
 
 val resolve_listening_addrs : string -> (P2p_addr.t * int) list Lwt.t
 

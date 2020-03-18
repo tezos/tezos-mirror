@@ -325,6 +325,8 @@ let process sandbox verbosity checkpoint singleprocess args =
         (match sandbox with Some _ -> true | None -> false)
       args
     >>=? fun config ->
+    Node_config_file.write_if_not_exists args.config_file config
+    >>=? fun () ->
     ( match sandbox with
     | Some _ ->
         if config.data_dir = Node_config_file.default_data_dir then

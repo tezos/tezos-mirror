@@ -75,6 +75,8 @@ module Term = struct
             snapshot_file
             ~block
       | Import ->
+          Node_config_file.write_if_not_exists args.config_file node_config
+          >>=? fun () ->
           Node_data_version.ensure_data_dir ~bare:true data_dir
           >>=? fun () ->
           Lwt_lock_file.create
