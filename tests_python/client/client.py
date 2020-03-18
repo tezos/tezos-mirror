@@ -3,9 +3,9 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
+import sys
 from typing import Any, List, Optional
 
 from . import client_output
@@ -116,33 +116,25 @@ class Client:
 
         print(format_command(cmd))
 
-        stdout = ""
-        stderr = ""
         new_env = os.environ.copy()
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
-        # in python3.7, cleaner to use capture_output=true, text=True
-        with subprocess.Popen(cmd,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE,
-                              bufsize=1,
-                              universal_newlines=True,
-                              env=new_env) as process:
-            assert process.stdout is not None
-            assert process.stderr is not None
-            for line in process.stdout:
-                print(line, end='')
-                stdout += line
-            for line in process.stderr:
-                print(line, end='', file=sys.stderr)
-                stderr += line
-        if check and process.returncode:
-            raise subprocess.CalledProcessError(process.returncode,
-                                                process.args,
-                                                stdout,
-                                                stderr)
-
-        return stdout
+        completed_process = subprocess.run(cmd,
+                                           capture_output=True,
+                                           text=True,
+                                           check=False,
+                                           env=new_env)
+        stdout = completed_process.stdout
+        stderr = completed_process.stderr
+        if stdout:
+            print(stdout)
+        if stderr:
+            print(stderr, file=sys.stderr)
+        if check:
+            completed_process.check_returncode()
+        # `+ ""` makes pylint happy. It can't infer stdout can't
+        # be `None` thanks to the `capture_output=True` option.
+        return stdout + ""
 
     def rpc(self,
             verb: str,
