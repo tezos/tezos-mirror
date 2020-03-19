@@ -119,6 +119,7 @@ let first_error_location errs =
       | Invalid_namespace (loc, _, _, _)
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
+      | Invalid_never_expr loc
       | Fail_not_in_tail_position loc
       | Undefined_binop (loc, _, _, _)
       | Undefined_unop (loc, _, _)
