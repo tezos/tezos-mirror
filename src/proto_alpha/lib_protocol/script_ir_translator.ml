@@ -5722,50 +5722,28 @@ let rec extract_big_map_updates :
           (module M : Boxed_map with type key = M.key and type value = M.value),
           ids,
           acc )
-  | (Option_t (_, _, true), None) ->
+  | (Option_t (_, _, _), None) ->
       return (ctxt, None, ids, acc)
-  | (List_t (_, _, false), v) ->
-      return (ctxt, v, ids, acc)
-  | (Map_t (_, _, _, false), v) ->
-      return (ctxt, v, ids, acc)
-  | (Option_t (_, _, false), None) ->
-      return (ctxt, None, ids, acc)
-  | (Pair_t (_, _, _, false), v) ->
-      return (ctxt, v, ids, acc)
-  | (Union_t (_, _, _, false), v) ->
-      return (ctxt, v, ids, acc)
-  | (Option_t (_, _, false), v) ->
-      return (ctxt, v, ids, acc)
-  | (Chain_id_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Set_t (_, _), v) ->
-      return (ctxt, v, ids, acc)
-  | (Unit_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Int_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Nat_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Signature_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (String_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Bytes_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Mutez_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Key_hash_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Key_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Timestamp_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Address_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Bool_t _, v) ->
-      return (ctxt, v, ids, acc)
-  | (Lambda_t (_, _, _), v) ->
-      return (ctxt, v, ids, acc)
+  | (List_t (_, _, false), v)
+  | (Map_t (_, _, _, false), v)
+  | (Pair_t (_, _, _, false), v)
+  | (Union_t (_, _, _, false), v)
+  | (Option_t (_, _, false), v)
+  | (Chain_id_t _, v)
+  | (Set_t (_, _), v)
+  | (Unit_t _, v)
+  | (Int_t _, v)
+  | (Nat_t _, v)
+  | (Signature_t _, v)
+  | (String_t _, v)
+  | (Bytes_t _, v)
+  | (Mutez_t _, v)
+  | (Key_hash_t _, v)
+  | (Key_t _, v)
+  | (Timestamp_t _, v)
+  | (Address_t _, v)
+  | (Bool_t _, v)
+  | (Lambda_t (_, _, _), v)
   | (Contract_t (_, _), v) ->
       return (ctxt, v, ids, acc)
   | (Operation_t _, _) ->
@@ -5801,50 +5779,28 @@ let collect_big_maps ctxt ty x =
           (fun _ v acc -> acc >>? fun (acc, ctxt) -> collect ctxt ty v acc)
           m
           (ok (acc, ctxt))
-    | (List_t (_, _, false), _) ->
-        ok (acc, ctxt)
-    | (Map_t (_, _, _, false), _) ->
-        ok (acc, ctxt)
-    | (Big_map_t (_, _, _), {id = None}) ->
-        ok (acc, ctxt)
-    | (Option_t (_, _, true), None) ->
-        ok (acc, ctxt)
-    | (Option_t (_, _, false), _) ->
-        ok (acc, ctxt)
-    | (Union_t (_, _, _, false), _) ->
-        ok (acc, ctxt)
-    | (Pair_t (_, _, _, false), _) ->
-        ok (acc, ctxt)
-    | (Chain_id_t _, _) ->
-        ok (acc, ctxt)
-    | (Set_t (_, _), _) ->
-        ok (acc, ctxt)
-    | (Unit_t _, _) ->
-        ok (acc, ctxt)
-    | (Int_t _, _) ->
-        ok (acc, ctxt)
-    | (Nat_t _, _) ->
-        ok (acc, ctxt)
-    | (Signature_t _, _) ->
-        ok (acc, ctxt)
-    | (String_t _, _) ->
-        ok (acc, ctxt)
-    | (Bytes_t _, _) ->
-        ok (acc, ctxt)
-    | (Mutez_t _, _) ->
-        ok (acc, ctxt)
-    | (Key_hash_t _, _) ->
-        ok (acc, ctxt)
-    | (Key_t _, _) ->
-        ok (acc, ctxt)
-    | (Timestamp_t _, _) ->
-        ok (acc, ctxt)
-    | (Address_t _, _) ->
-        ok (acc, ctxt)
-    | (Bool_t _, _) ->
-        ok (acc, ctxt)
-    | (Lambda_t (_, _, _), _) ->
-        ok (acc, ctxt)
+    | (List_t (_, _, false), _)
+    | (Map_t (_, _, _, false), _)
+    | (Big_map_t (_, _, _), {id = None})
+    | (Option_t (_, _, true), None)
+    | (Option_t (_, _, false), _)
+    | (Union_t (_, _, _, false), _)
+    | (Pair_t (_, _, _, false), _)
+    | (Chain_id_t _, _)
+    | (Set_t (_, _), _)
+    | (Unit_t _, _)
+    | (Int_t _, _)
+    | (Nat_t _, _)
+    | (Signature_t _, _)
+    | (String_t _, _)
+    | (Bytes_t _, _)
+    | (Mutez_t _, _)
+    | (Key_hash_t _, _)
+    | (Key_t _, _)
+    | (Timestamp_t _, _)
+    | (Address_t _, _)
+    | (Bool_t _, _)
+    | (Lambda_t (_, _, _), _)
     | (Contract_t (_, _), _) ->
         ok (acc, ctxt)
     | (Operation_t _, _) ->
