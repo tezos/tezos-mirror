@@ -104,6 +104,7 @@ let collect_error_locations errs =
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
         | Invalid_kind (loc, _, _)
+        | Invalid_never_expr loc
         | Duplicate_field (loc, _)
         | Unexpected_big_map loc
         | Unexpected_operation loc
@@ -467,6 +468,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                    let (a, n) = human_kind k in
                    a ^ " " ^ n)
                  exp)
+        | Invalid_never_expr loc ->
+            Format.fprintf
+              ppf
+              "@[%athis expression should have type never but type never has \
+               no inhabitant."
+              print_loc
+              loc
         | Duplicate_map_keys (_, expr) ->
             Format.fprintf
               ppf
