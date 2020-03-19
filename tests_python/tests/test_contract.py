@@ -264,6 +264,10 @@ class TestContracts:
         # error message for DROP over the limit
         ("big_drop.tz",
          r'expected a positive 31-bit integer'),
+        # error message for attempting to push a value of type never
+        ("never_literal.tz",
+         r'this expression should have type never ' +
+         'but type never has no inhabitant'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
