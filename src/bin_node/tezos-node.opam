@@ -17,7 +17,6 @@ depends: [
   "tezos-protocol-updater"
   "tezos-validator"
   "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-genesis-alphanet"
   "tezos-embedded-protocol-genesis-babylonnet"
   "tezos-embedded-protocol-genesis-carthagenet"
   "tezos-embedded-protocol-demo-noops"

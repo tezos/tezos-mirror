@@ -55,8 +55,6 @@ The ``--network`` option can be used with the following built-in networks:
 
 - ``zeronet``
 
-- ``alphanet`` (deprecated)
-
 - ``babylonnet``
 
 - ``carthagenet``

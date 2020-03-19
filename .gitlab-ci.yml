@@ -24,10 +24,8 @@ stages:
   stage: build
   except:
     - master
-    - alphanet
     - zeronet
     - mainnet
-    - alphanet-staging
     - zeronet-staging
     - mainnet-staging
     - zeronet-snapshots
@@ -794,11 +792,6 @@ opam:tezos-client-genesis:
   variables:
     package: tezos-client-genesis
 
-opam:tezos-client-genesis-alphanet:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis-alphanet
-
 opam:tezos-client-genesis-babylonnet:
   <<: *opam_definition
   variables:
@@ -878,11 +871,6 @@ opam:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
-
-opam:tezos-embedded-protocol-genesis-alphanet:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis-alphanet
 
 opam:tezos-embedded-protocol-genesis-babylonnet:
   <<: *opam_definition
@@ -1089,11 +1077,6 @@ opam:tezos-protocol-genesis:
   variables:
     package: tezos-protocol-genesis
 
-opam:tezos-protocol-genesis-alphanet:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-genesis-alphanet
-
 opam:tezos-protocol-genesis-babylonnet:
   <<: *opam_definition
   variables:
@@ -1232,10 +1215,8 @@ publish:docker:
   stage: publish
   only:
     - master@tezos/tezos
-    - alphanet@tezos/tezos
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
-    - alphanet-staging@tezos/tezos
     - zeronet-staging@tezos/tezos
     - mainnet-staging@tezos/tezos
     - zeronet-snapshots@tezos/tezos

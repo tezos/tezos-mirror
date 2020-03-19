@@ -100,24 +100,6 @@ let blockchain_network_mainnet =
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
     ~default_bootstrap_peers:["boot.tzbeta.net"]
 
-let blockchain_network_alphanet =
-  make_blockchain_network
-    ~alias:"alphanet"
-    {
-      time = Time.Protocol.of_notation_exn "2018-11-30T15:30:56Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisb83baZgbyZe";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps6mwMrF2ER2s51cp9yYpjDcuzQjsc2yAz8bQsRgdaRxw4Fk95H";
-    }
-    ~chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
-    ~old_chain_name:"TEZOS_ALPHANET_2018-11-30T15:30:56Z"
-    ~incompatible_chain_name:"INCOMPATIBLE"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
-    ~default_bootstrap_peers:["boot.tzalpha.net"; "bootalpha.tzbeta.net"]
-
 let blockchain_network_zeronet =
   make_blockchain_network
     ~alias:"zeronet"
@@ -248,7 +230,6 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (2, blockchain_network_zeronet);
-    (3, blockchain_network_alphanet);
     (4, blockchain_network_mainnet);
     (5, blockchain_network_babylonnet);
     (6, blockchain_network_carthagenet) ]
