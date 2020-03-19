@@ -288,3 +288,21 @@ A useful command to debug a node that is not syncing is:
 ::
 
    tezos-admin-client p2p stat
+
+Failing_noop operation
+-------------------
+
+Starting with protocol 007 an `Failing_noop` operation is added. This operation
+is not executable in the protocol and will always fail when injected. It allows
+to sign an arbitrary string that cannot be misinterpreted in the protocol.
+
+The client has commands to sign a message with a given key or to check that
+message has been signed by a given key. These commands create an `failing_noop`
+operation from the message that is being signed or checked.
+
+::
+
+   tezos-client sign message "hello world" for <account>
+
+   tezos-client check that message "hello world" was signed by <account> to
+   produce <signature>
