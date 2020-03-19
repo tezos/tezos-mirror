@@ -71,26 +71,16 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
  fun ty ->
   (* No wildcard to force the update when comparable_ty changes. *)
   match ty with
-  | Unit_key _ ->
-      1
-  | Never_key _ ->
-      1
-  | Int_key _ ->
-      1
-  | Nat_key _ ->
-      1
-  | String_key _ ->
-      1
-  | Bytes_key _ ->
-      1
-  | Mutez_key _ ->
-      1
-  | Bool_key _ ->
-      1
-  | Key_hash_key _ ->
-      1
-  | Timestamp_key _ ->
-      1
+  | Unit_key _
+  | Never_key _
+  | Int_key _
+  | Nat_key _
+  | String_key _
+  | Bytes_key _
+  | Mutez_key _
+  | Bool_key _
+  | Key_hash_key _
+  | Timestamp_key _
   | Address_key _ ->
       1
   | Pair_key ((t1, _), (t2, _), _) ->
@@ -103,31 +93,21 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
 let rec type_size : type t. t ty -> int =
  fun ty ->
   match ty with
-  | Unit_t _ ->
-      1
-  | Int_t _ ->
-      1
-  | Nat_t _ ->
-      1
-  | Signature_t _ ->
-      1
-  | Bytes_t _ ->
-      1
-  | String_t _ ->
-      1
-  | Mutez_t _ ->
-      1
-  | Key_hash_t _ ->
-      1
-  | Key_t _ ->
-      1
-  | Timestamp_t _ ->
-      1
-  | Address_t _ ->
-      1
-  | Bool_t _ ->
-      1
-  | Operation_t _ ->
+  | Unit_t _
+  | Int_t _
+  | Nat_t _
+  | Signature_t _
+  | Bytes_t _
+  | String_t _
+  | Mutez_t _
+  | Key_hash_t _
+  | Key_t _
+  | Timestamp_t _
+  | Address_t _
+  | Bool_t _
+  | Operation_t _
+  | Chain_id_t _
+  | Never_t _ ->
       1
   | Pair_t ((l, _, _), (r, _, _), _, _) ->
       1 + type_size l + type_size r
@@ -147,10 +127,6 @@ let rec type_size : type t. t ty -> int =
       1 + comparable_type_size k + type_size v
   | Contract_t (arg, _) ->
       1 + type_size arg
-  | Chain_id_t _ ->
-      1
-  | Never_t _ ->
-      1
 
 let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
  fun stack ~up_to ->
@@ -177,264 +153,147 @@ let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
 *)
 let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   function
-  | Drop ->
-      0
-  | Dup ->
-      0
-  | Swap ->
-      0
-  | Const _ ->
-      1
-  | Cons_pair ->
-      1
-  | Car ->
-      0
-  | Cdr ->
-      0
-  | Cons_some ->
-      1
-  | Cons_none _ ->
-      1
-  | If_none _ ->
-      0
-  | Cons_left ->
-      1
-  | Cons_right ->
-      1
-  | If_left _ ->
-      0
-  | Cons_list ->
-      0
-  | Nil ->
-      1
-  | If_cons _ ->
-      0
-  | List_map _ ->
-      1
-  | List_size ->
-      0
-  | List_iter _ ->
-      0
-  | Empty_set _ ->
-      1
-  | Set_iter _ ->
-      0
-  | Set_mem ->
-      0
-  | Set_update ->
-      0
-  | Set_size ->
-      0
-  | Empty_map _ ->
-      1
-  | Map_map _ ->
-      1
-  | Map_iter _ ->
-      0
-  | Map_mem ->
-      0
-  | Map_get ->
-      0
-  | Map_update ->
-      0
-  | Map_size ->
-      0
-  | Empty_big_map _ ->
-      1
-  | Big_map_get ->
-      0
-  | Big_map_update ->
-      0
-  | Big_map_mem ->
-      0
-  | Concat_string ->
-      0
-  | Concat_string_pair ->
-      0
-  | Slice_string ->
-      0
-  | String_size ->
-      0
-  | Concat_bytes ->
-      0
-  | Concat_bytes_pair ->
-      0
-  | Slice_bytes ->
-      0
-  | Bytes_size ->
-      0
-  | Add_seconds_to_timestamp ->
-      0
-  | Add_timestamp_to_seconds ->
-      0
-  | Sub_timestamp_seconds ->
-      0
-  | Diff_timestamps ->
-      0
-  | Add_tez ->
-      0
-  | Sub_tez ->
-      0
-  | Mul_teznat ->
-      0
-  | Mul_nattez ->
-      0
-  | Ediv_teznat ->
-      0
-  | Ediv_tez ->
-      0
-  | Or ->
-      0
-  | And ->
-      0
-  | Xor ->
-      0
-  | Not ->
-      0
-  | Is_nat ->
-      0
-  | Neg_nat ->
-      0
-  | Neg_int ->
-      0
-  | Abs_int ->
-      0
-  | Int_nat ->
-      0
-  | Add_intint ->
-      0
-  | Add_intnat ->
-      0
-  | Add_natint ->
-      0
-  | Add_natnat ->
-      0
-  | Sub_int ->
-      0
-  | Mul_intint ->
-      0
-  | Mul_intnat ->
-      0
-  | Mul_natint ->
-      0
-  | Mul_natnat ->
-      0
-  | Ediv_intint ->
-      0
-  | Ediv_intnat ->
-      0
-  | Ediv_natint ->
-      0
-  | Ediv_natnat ->
-      0
-  | Lsl_nat ->
-      0
-  | Lsr_nat ->
-      0
-  | Or_nat ->
-      0
-  | And_nat ->
-      0
-  | And_int_nat ->
-      0
-  | Xor_nat ->
-      0
-  | Not_nat ->
-      0
-  | Not_int ->
-      0
-  | Seq _ ->
-      0
-  | If _ ->
-      0
-  | Loop _ ->
-      0
-  | Loop_left _ ->
-      0
-  | Dip _ ->
-      0
-  | Exec ->
-      0
-  | Apply _ ->
-      0
-  | Lambda _ ->
-      1
-  | Failwith _ ->
-      0
-  | Nop ->
-      0
-  | Compare _ ->
-      0
-  | Eq ->
-      0
-  | Neq ->
-      0
-  | Lt ->
-      0
-  | Gt ->
-      0
-  | Le ->
-      0
-  | Ge ->
-      0
-  | Address ->
-      0
+  (* Constructors *)
+  | Const _
+  | Cons_pair
+  | Cons_some
+  | Cons_none _
+  | Cons_left
+  | Cons_right
+  | Nil
+  | Empty_set _
+  | Empty_map _
+  | Empty_big_map _
+  | Lambda _
+  | Self _
   | Contract _ ->
       1
-  | Transfer_tokens ->
-      0
-  | Create_account ->
-      0
-  | Implicit_account ->
-      0
-  | Create_contract _ ->
-      0
-  | Create_contract_2 _ ->
-      0
-  | Now ->
-      0
-  | Level ->
-      0
-  | Balance ->
-      0
-  | Check_signature ->
-      0
-  | Hash_key ->
-      0
-  | Blake2b ->
-      0
-  | Sha256 ->
-      0
-  | Sha512 ->
-      0
-  | Steps_to_quota ->
-      0
-  | Source ->
-      0
-  | Sender ->
-      0
-  | Self _ ->
-      1
-  | Self_address ->
-      0
-  | Amount ->
-      0
-  | Set_delegate ->
-      0
-  | Pack _ ->
-      0
+  (* Magic constructor *)
   | Unpack _ ->
       1
-  | Dig _ ->
-      0
-  | Dug _ ->
-      0
-  | Dipn _ ->
-      0
-  | Dropn _ ->
-      0
-  | ChainId ->
-      0
+  (* Mappings *)
+  | List_map _ | Map_map _ ->
+      1
+  (* Others:
+     - don't add types
+     - don't change types
+     - decrease type sizes
+     - produce only constants
+     - have types bounded by parameters
+     - etc. *)
+  | Drop
+  | Dup
+  | Swap
+  | Car
+  | Cdr
+  | If_none _
+  | If_left _
+  | Cons_list
+  | If_cons _
+  | List_size
+  | List_iter _
+  | Set_iter _
+  | Set_mem
+  | Set_update
+  | Set_size
+  | Map_iter _
+  | Map_mem
+  | Map_get
+  | Map_update
+  | Map_size
+  | Big_map_get
+  | Big_map_update
+  | Big_map_mem
+  | Concat_string
+  | Concat_string_pair
+  | Slice_string
+  | String_size
+  | Concat_bytes
+  | Concat_bytes_pair
+  | Slice_bytes
+  | Bytes_size
+  | Add_seconds_to_timestamp
+  | Add_timestamp_to_seconds
+  | Sub_timestamp_seconds
+  | Diff_timestamps
+  | Add_tez
+  | Sub_tez
+  | Mul_teznat
+  | Mul_nattez
+  | Ediv_teznat
+  | Ediv_tez
+  | Or
+  | And
+  | Xor
+  | Not
+  | Is_nat
+  | Neg_nat
+  | Neg_int
+  | Abs_int
+  | Int_nat
+  | Add_intint
+  | Add_intnat
+  | Add_natint
+  | Add_natnat
+  | Sub_int
+  | Mul_intint
+  | Mul_intnat
+  | Mul_natint
+  | Mul_natnat
+  | Ediv_intint
+  | Ediv_intnat
+  | Ediv_natint
+  | Ediv_natnat
+  | Lsl_nat
+  | Lsr_nat
+  | Or_nat
+  | And_nat
+  | And_int_nat
+  | Xor_nat
+  | Not_nat
+  | Not_int
+  | Seq _
+  | If _
+  | Loop _
+  | Loop_left _
+  | Dip _
+  | Exec
+  | Apply _
+  | Failwith _
+  | Nop
+  | Compare _
+  | Eq
+  | Neq
+  | Lt
+  | Gt
+  | Le
+  | Ge
+  | Address
+  | Transfer_tokens
+  | Create_account
+  | Implicit_account
+  | Create_contract _
+  | Create_contract_2 _
+  | Now
+  | Level
+  | Balance
+  | Check_signature
+  | Hash_key
+  | Blake2b
+  | Sha256
+  | Sha512
+  | Steps_to_quota
+  | Source
+  | Sender
+  | Self_address
+  | Amount
+  | Set_delegate
+  | Pack _
+  | Dig _
+  | Dug _
+  | Dipn _
+  | Dropn _
+  | ChainId
   | Never ->
       0
 
