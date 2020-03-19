@@ -168,7 +168,13 @@ let rec type_size_of_stack_head : type st. st stack_ty -> up_to:int -> int =
    only need to check the produced types that can be larger than the
    arguments. That's why Swap is 0 for instance as no type grows.
    Constant sized types are not checked: it is assumed they are lower
-   than the bound (otherwise every program would be rejected). *)
+   than the bound (otherwise every program would be rejected).
+
+   In a [(b, a) instr], it is the number of types in [a] that may exceed the
+   limit, knowing than types in [b] don't.
+   If the instr is parameterized by [(b', a') descr] then you may assume that
+   types in [a'] don't exceed the limit.
+*)
 let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   function
   | Drop ->
@@ -192,13 +198,13 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | If_none _ ->
       0
   | Cons_left ->
-      0
+      1
   | Cons_right ->
-      0
+      1
   | If_left _ ->
       0
   | Cons_list ->
-      1
+      0
   | Nil ->
       1
   | If_cons _ ->
@@ -208,7 +214,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | List_size ->
       0
   | List_iter _ ->
-      1
+      0
   | Empty_set _ ->
       1
   | Set_iter _ ->
@@ -224,7 +230,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Map_map _ ->
       1
   | Map_iter _ ->
-      1
+      0
   | Map_mem ->
       0
   | Map_get ->
@@ -354,11 +360,11 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Lambda _ ->
       1
   | Failwith _ ->
-      1
+      0
   | Nop ->
       0
   | Compare _ ->
-      1
+      0
   | Eq ->
       0
   | Neq ->
@@ -376,15 +382,15 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Contract _ ->
       1
   | Transfer_tokens ->
-      1
+      0
   | Create_account ->
       0
   | Implicit_account ->
       0
   | Create_contract _ ->
-      1
+      0
   | Create_contract_2 _ ->
-      1
+      0
   | Now ->
       0
   | Level ->
