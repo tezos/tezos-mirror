@@ -181,9 +181,9 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       1
   | If_none _ ->
       0
-  | Left ->
+  | Cons_left ->
       0
-  | Right ->
+  | Cons_right ->
       0
   | If_left _ ->
       0
@@ -2942,7 +2942,7 @@ and parse_instr :
       typed
         ctxt
         loc
-        Left
+        Cons_left
         (Item_t
            ( Union_t
                ( (tl, l_field),
@@ -2963,7 +2963,7 @@ and parse_instr :
       typed
         ctxt
         loc
-        Right
+        Cons_right
         (Item_t
            ( Union_t
                ( (tl, l_field),
