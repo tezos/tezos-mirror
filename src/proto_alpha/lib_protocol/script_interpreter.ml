@@ -313,9 +313,9 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.pair_access
     | (Cdr, _) ->
         Interp_costs.pair_access
-    | (Left, _) ->
+    | (Cons_left, _) ->
         Interp_costs.wrap
-    | (Right, _) ->
+    | (Cons_right, _) ->
         Interp_costs.wrap
     | (If_left _, _) ->
         Interp_costs.branch
@@ -610,9 +610,9 @@ let rec step :
   | (Cdr, ((_, b), rest)) ->
       logged_return ((b, rest), ctxt)
   (* unions *)
-  | (Left, (v, rest)) ->
+  | (Cons_left, (v, rest)) ->
       logged_return ((L v, rest), ctxt)
-  | (Right, (v, rest)) ->
+  | (Cons_right, (v, rest)) ->
       logged_return ((R v, rest), ctxt)
   | (If_left (bt, _), (L v, rest)) ->
       step logger ctxt step_constants bt (v, rest)

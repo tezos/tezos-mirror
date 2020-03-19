@@ -201,8 +201,8 @@ and ('bef, 'aft) instr =
       ('bef, 'aft) descr * ('a * 'bef, 'aft) descr
       -> ('a option * 'bef, 'aft) instr
   (* unions *)
-  | Left : ('l * 'rest, ('l, 'r) union * 'rest) instr
-  | Right : ('r * 'rest, ('l, 'r) union * 'rest) instr
+  | Cons_left : ('l * 'rest, ('l, 'r) union * 'rest) instr
+  | Cons_right : ('r * 'rest, ('l, 'r) union * 'rest) instr
   | If_left :
       ('l * 'bef, 'aft) descr * ('r * 'bef, 'aft) descr
       -> (('l, 'r) union * 'bef, 'aft) instr

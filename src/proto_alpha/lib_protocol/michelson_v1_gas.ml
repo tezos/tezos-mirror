@@ -499,9 +499,9 @@ module Cost_of = struct
           alloc_cost 3
       | If_none _ ->
           alloc_cost 2
-      | Left ->
+      | Cons_left ->
           alloc_cost 3
-      | Right ->
+      | Cons_right ->
           alloc_cost 3
       | If_left _ ->
           alloc_cost 2
