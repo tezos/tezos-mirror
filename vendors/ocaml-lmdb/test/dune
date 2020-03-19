@@ -1,8 +1,8 @@
 (executable
  (name test)
- (libraries cstruct rresult lmdb alcotest))
+ (libraries cstruct rresult tezos-lmdb alcotest))
 
 (alias
  (name    runtest)
- (package lmdb)
+ (package tezos-lmdb)
  (action  (run %{exe:test.exe})))

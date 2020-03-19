@@ -3,7 +3,7 @@
  (public_name tezos-storage)
  (libraries tezos-base
             tezos-shell-services
-            lmdb
+            tezos-lmdb
             logs.fmt
             digestif.c
             irmin

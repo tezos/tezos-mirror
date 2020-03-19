@@ -1,6 +1,6 @@
 (library
  (name            lmdb)
- (public_name     lmdb)
+ (public_name     tezos-lmdb)
  (libraries       rresult)
  (c_names         mdb midl lmdb_stubs)
  (c_flags         (:include c_flags.sexp))

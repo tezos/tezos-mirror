@@ -572,11 +572,6 @@ opam:ledgerwallet-tezos:
   variables:
     package: ledgerwallet-tezos
 
-opam:lmdb:
-  <<: *opam_definition
-  variables:
-    package: lmdb
-
 opam:pbkdf:
   <<: *opam_definition
   variables:
@@ -921,6 +916,11 @@ opam:tezos-event-logging:
   <<: *opam_definition
   variables:
     package: tezos-event-logging
+
+opam:tezos-lmdb:
+  <<: *opam_definition
+  variables:
+    package: tezos-lmdb
 
 opam:tezos-mempool-005-PsBabyM1:
   <<: *opam_definition
