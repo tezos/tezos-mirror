@@ -144,7 +144,6 @@ struct
     let of_bits bytes = of_bits (Bytes.to_string bytes)
   end
 
-  module Lwt_sequence = Lwt_sequence
   module Lwt = Lwt
   module Lwt_list = Lwt_list
   module Uri = Uri
