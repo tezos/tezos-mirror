@@ -167,6 +167,34 @@ module Term = struct
           `Error s),
       pp )
 
+  let network_name_converter =
+    let of_string s =
+      try
+        let ntw =
+          List.assoc
+            (String.lowercase_ascii s)
+            Node_config_file.builtin_blockchain_networks
+        in
+        Ok ntw
+      with Not_found ->
+        Error
+          (`Msg
+            (Format.asprintf
+               "invalid value '%s', expected one of '%a'"
+               s
+               (Format.pp_print_list
+                  ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+                  Format.pp_print_string)
+               (List.map fst Node_config_file.builtin_blockchain_networks)))
+    in
+    let printer ppf ({alias; _} : Node_config_file.blockchain_network) =
+      (* Should not fail by construction of Node_config_file.block_chain_network *)
+      let alias = Option.unopt_assert ~loc:__POS__ alias in
+      Format.fprintf ppf "%s" alias
+    in
+    ( (of_string : string -> ('a, [`Msg of string]) result),
+      (printer : 'a Cmdliner.Arg.printer) )
+
   (* misc args *)
 
   let docs = Manpage.misc_section
@@ -224,7 +252,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some (enum Node_config_file.builtin_blockchain_networks)) None
+      & opt (some (conv network_name_converter)) None
       & info ~docs ~doc ~docv:"NETWORK" ["network"])
 
   (* P2p args *)
