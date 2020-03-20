@@ -1,468 +1,280 @@
-(* Lightweight thread library for OCaml
- * http://www.ocsigen.org/lwt
- * Interface Lwt
- * Copyright (C) 2005-2008 J�r�me Vouillon
- * Laboratoire PPS - CNRS Universit� Paris Diderot
- *               2009-2012 J�r�mie Dimino
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, with linking exceptions;
- * either version 2.1 of the License, or (at your option) any later
- * version. See COPYING file for details.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
- * 02111-1307, USA.
- *)
+(* This file is part of Lwt, released under the MIT license. See LICENSE.md for
+   details, or visit https://github.com/ocsigen/lwt/blob/master/LICENSE.md. *)
 
-(* TEZOS CHANGES
 
-   * import version 2.4.5
-   * Comment a few function that shouldn't be used in the protocol:
-     * choose: scheduling may be system dependent.
-     * wait/wakeup
-     * state
-     * cancel
-     * pause
-     * async
-     * thread storage
-     * lwt exceptions
-*)
 
-(** Module [Lwt]: cooperative light-weight threads. *)
+(** {2 Fundamentals} *)
 
-(** This module defines {e cooperative light-weight threads} with
-    their primitives. A {e light-weight thread} represent a
-    computation that may be not terminated, for example because it is
-    waiting for some event to happen.
+(** {3 Promises} *)
 
-    Lwt threads are cooperative in the sense that switching to another
-    thread is awlays explicit (with {!wakeup} or {!wakeup_exn}). When a
-    thread is running, it executes as much as possible, and then
-    returns (a value or an eror) or sleeps.
-
-    Note that inside a Lwt thread, exceptions must be raised with
-    {!fail} instead of [raise]. Also the [try ... with ...]
-    construction will not catch Lwt errors. You must use {!catch}
-    instead. You can also use {!wrap} for functions that may raise
-    normal exception.
-
-    Lwt also provides the syntax extension {!Pa_lwt} to make code
-    using Lwt more readable.
-*)
-
-(** {2 Definitions and basics} *)
-
-(** The type of threads returning a result of type ['a]. *)
 type +'a t
+(** Promises for values of type ['a].
 
-(** [return e] is a thread whose return value is the value of the
-    expression [e]. *)
+    A {b promise} is a memory cell that is always in one of three {b states}:
+
+    - {e fulfilled}, and containing one value of type ['a],
+    - {e rejected}, and containing one exception, or
+    - {e pending}, in which case it may become fulfilled or rejected later.
+
+    A {e resolved} promise is one that is either fulfilled or rejected, i.e. not
+    pending. Once a promise is resolved, its content cannot change. So, promises
+    are {e write-once references}. The only possible state changes are (1) from
+    pending to fulfilled and (2) from pending to rejected.
+
+    Promises are typically “read” by attaching {b callbacks} to them. The most
+    basic functions for that are {!Lwt.bind}, which attaches a callback that is
+    called when a promise becomes fulfilled, and {!Lwt.catch}, for rejection.
+
+    Promise variables of this type, ['a Lwt.t], are actually {b read-only} in
+    Lwt. Separate {e resolvers} of type ['a ]{!Lwt.u} are used to write to them.
+    Promises and their resolvers are created together by calling {!Lwt.task}.
+    There is one exception to this: most promises can be {e canceled} by calling
+    {!Lwt.cancel}, without going through a resolver. *)
+
 val return : 'a -> 'a t
+(** [Lwt.return v] creates a new {{: #TYPEt} promise} that is {e already
+    fulfilled} with value [v].
 
-(* val fail : exn -> 'a t *)
-(*   (\** [fail e] is a thread that fails with the exception [e]. *\) *)
+    This is needed to satisfy the type system in some cases. For example, in a
+    [match] expression where one case evaluates to a promise, the other cases
+    have to evaluate to promises as well:
 
-(** [bind t f] is a thread which first waits for the thread [t] to
-    terminate and then, if the thread succeeds, behaves as the
-    application of function [f] to the return value of [t].  If the
-    thread [t] fails, [bind t f] also fails, with the same
-    exception.
+{[
+match need_input with
+| true -> Lwt_io.(read_line stdin)   (* Has type string Lwt.t... *)
+| false -> Lwt.return ""             (* ...so wrap empty string in a promise. *)
+]}
 
-    The expression [bind t (fun x -> t')] can intuitively be read as
-    [let x = t in t'], and if you use the {e lwt.syntax} syntax
-    extension, you can write a bind operation like that: [lwt x = t in t'].
+    Another typical usage is in {{: #VALbind} [let%lwt]}. The expression after
+    the “[in]” has to evaluate to a promise. So, if you compute an ordinary
+    value instead, you have to wrap it:
 
-    Note that [bind] is also often used just for synchronization
-    purpose: [t'] will not execute before [t] is terminated.
+{[
+let%lwt line = Lwt_io.(read_line stdin) in
+Lwt.return (line ^ ".")
+]} *)
 
-    The result of a thread can be bound several time. *)
+
+
+(** {3 Callbacks} *)
+
 val bind : 'a t -> ('a -> 'b t) -> 'b t
+(** [Lwt.bind p_1 f] makes it so that [f] will run when [p_1] is {{: #TYPEt}
+    {e fulfilled}}.
 
-(** [t >>= f] is an alternative notation for [bind t f]. *)
-val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+    When [p_1] is fulfilled with value [v_1], the callback [f] is called with
+    that same value [v_1]. Eventually, after perhaps starting some I/O or other
+    computation, [f] returns promise [p_2].
 
-(** [f =<< t] is [t >>= f] *)
-val ( =<< ) : ('a -> 'b t) -> 'a t -> 'b t
+    [Lwt.bind] itself returns immediately. It only attaches the callback [f] to
+    [p_1] – it does not wait for [p_2]. {e What} [Lwt.bind] returns is yet a
+    third promise, [p_3]. Roughly speaking, fulfillment of [p_3] represents both
+    [p_1] and [p_2] becoming fulfilled, one after the other.
 
-(** [map f m] map the result of a thread. This is the same as [bind
-    m (fun x -> return (f x))] *)
+    A minimal example of this is an echo program:
+
+{[
+let () =
+  let p_3 =
+    Lwt.bind
+      Lwt_io.(read_line stdin)
+      (fun line -> Lwt_io.printl line)
+  in
+  Lwt_main.run p_3
+
+(* ocamlfind opt -linkpkg -package lwt.unix code.ml && ./a.out *)
+]}
+
+    Rejection of [p_1] and [p_2], and raising an exception in [f], are all
+    forwarded to rejection of [p_3].
+
+    {b Precise behavior}
+
+    [Lwt.bind] returns a promise [p_3] immediately. [p_3] starts out pending,
+    and is resolved as follows:
+
+    - The first condition to wait for is that [p_1] becomes resolved. It does
+      not matter whether [p_1] is already resolved when [Lwt.bind] is called, or
+      becomes resolved later – the rest of the behavior is the same.
+    - If and when [p_1] becomes resolved, it will, by definition, be either
+      fulfilled or rejected.
+    - If [p_1] is rejected, [p_3] is rejected with the same exception.
+    - If [p_1] is fulfilled, with value [v], [f] is applied to [v].
+    - [f] may finish by returning the promise [p_2], or raising an exception.
+    - If [f] raises an exception, [p_3] is rejected with that exception.
+    - Finally, the remaining case is when [f] returns [p_2]. From that point on,
+      [p_3] is effectively made into a reference to [p_2]. This means they have
+      the same state, undergo the same state changes, and performing any
+      operation on one is equivalent to performing it on the other.
+
+    {b Syntactic sugar}
+
+    [Lwt.bind] is almost never written directly, because sequences of [Lwt.bind]
+    result in growing indentation and many parentheses:
+
+{[
+let () =
+  Lwt_main.run begin
+    Lwt.bind Lwt_io.(read_line stdin) (fun line ->
+      Lwt.bind (Lwt_unix.sleep 1.) (fun () ->
+        Lwt_io.printf "One second ago, you entered %s\n" line))
+  end
+
+(* ocamlfind opt -linkpkg -package lwt.unix code.ml && ./a.out *)
+]}
+
+    The recommended way to write [Lwt.bind] is using the [let%lwt] syntactic
+    sugar:
+
+{[
+let () =
+  Lwt_main.run begin
+    let%lwt line = Lwt_io.(read_line stdin) in
+    let%lwt () = Lwt_unix.sleep 1. in
+    Lwt_io.printf "One second ago, you entered %s\n" line
+  end
+
+(* ocamlfind opt -linkpkg -package lwt_ppx,lwt.unix code.ml && ./a.out *)
+]}
+
+    This uses the Lwt {{: Ppx_lwt.html} PPX} (preprocessor). Note that we had to
+    add package [lwt_ppx] to the command line for building this program. We will
+    do that throughout this manual.
+
+    Another way to write [Lwt.bind], that you may encounter while reading code,
+    is with the [>>=] operator:
+
+{[
+open Lwt.Infix
+
+let () =
+  Lwt_main.run begin
+    Lwt_io.(read_line stdin) >>= fun line ->
+    Lwt_unix.sleep 1. >>= fun () ->
+    Lwt_io.printf "One second ago, you entered %s\n" line
+  end
+
+(* ocamlfind opt -linkpkg -package lwt.unix code.ml && ./a.out *)
+]}
+
+    The [>>=] operator comes from the module {!Lwt.Infix}, which is why we
+    opened it at the beginning of the program.
+
+    See also {!Lwt.map}. *)
+
+
+
+(** {2 Convenience} *)
+
+(** {3 Callback helpers} *)
+
 val map : ('a -> 'b) -> 'a t -> 'b t
+(** [Lwt.map f p_1] is similar to {!Lwt.bind}[ p_1 f], but [f] is not expected
+    to return a promise.
 
-(** [m >|= f] is [map f m] *)
-val ( >|= ) : 'a t -> ('a -> 'b) -> 'b t
+    This function is more convenient that {!Lwt.bind} when [f] inherently does
+    not return a promise. An example is [Pervasives.int_of_string]:
 
-(** [f =|< m] is [map f m] *)
-val ( =|< ) : ('a -> 'b) -> 'a t -> 'b t
+{[
+let read_int : unit -> int Lwt.t = fun () ->
+  Lwt.map
+    int_of_string
+    Lwt_io.(read_line stdin)
 
-(** {3 Pre-allocated threads} *)
+let () =
+  Lwt_main.run begin
+    let%lwt number = read_int () in
+    Lwt_io.printf "%i\n" number
+  end
 
-(** [return_unit = return ()] *)
+(* ocamlfind opt -linkpkg -package lwt_ppx,lwt.unix code.ml && ./a.out *)
+]}
+
+    By comparison, the {!Lwt.bind} version is more awkward:
+
+{[
+let read_int : unit -> int Lwt.t = fun () ->
+  Lwt.bind
+    Lwt_io.(read_line stdin)
+    (fun line -> Lwt.return (int_of_string line))
+]}
+
+    As with {!Lwt.bind}, sequences of calls to [Lwt.map] result in excessive
+    indentation and parentheses. The recommended syntactic sugar for avoiding
+    this is the {{: #VAL(>|=)} [>|=]} operator, which comes from module
+    [Lwt.Infix]:
+
+{[
+open Lwt.Infix
+
+let read_int : unit -> int Lwt.t = fun () ->
+  Lwt_io.(read_line stdin) >|= int_of_string
+]}
+
+    The detailed operation follows. For consistency with the promises in
+    {!Lwt.bind}, the {e two} promises involved are named [p_1] and [p_3]:
+
+    - [p_1] is the promise passed to [Lwt.map].
+    - [p_3] is the promise returned by [Lwt.map].
+
+    [Lwt.map] returns a promise [p_3]. [p_3] starts out pending. It is resolved
+    as follows:
+
+    - [p_1] may be, or become, resolved. In that case, by definition, it will
+      become fulfilled or rejected. Fulfillment is the interesting case, but the
+      behavior on rejection is simpler, so we focus on rejection first.
+    - When [p_1] becomes rejected, [p_3] is rejected with the same exception.
+    - When [p_1] instead becomes fulfilled, call the value it is fulfilled with
+      [v].
+    - [f v] is applied. If this finishes, it may either return another value, or
+      raise an exception.
+    - If [f v] returns another value [v'], [p_3] is fulfilled with [v'].
+    - If [f v] raises exception [exn], [p_3] is rejected with [exn]. *)
+
+
+
+(** {3 Pre-allocated promises} *)
+
 val return_unit : unit t
+(** [Lwt.return_unit] is defined as {!Lwt.return}[ ()], but this definition is
+    evaluated only once, during initialization of module [Lwt], at the beginning
+    of your program.
 
-(** [return_none = return None] *)
-val return_none : 'a option t
+    This means the promise is allocated only once. By contrast, each time
+    {!Lwt.return}[ ()] is evaluated, it allocates a new promise.
 
-(** [return_nil = return \[\]] *)
-val return_nil : 'a list t
+    It is recommended to use [Lwt.return_unit] only where you know the
+    allocations caused by an instance of {!Lwt.return}[ ()] are a performance
+    bottleneck. Generally, the cost of I/O tends to dominate the cost of
+    {!Lwt.return}[ ()] anyway.
 
-(** [return_true = return true] *)
+    In future Lwt, we hope to perform this optimization, of using a single,
+    pre-allocated promise, automatically, wherever {!Lwt.return}[ ()] is
+    written. *)
+
+val return_none : (_ option) t
+(** [Lwt.return_none] is like {!Lwt.return_unit}, but for
+    {!Lwt.return}[ None]. *)
+
+val return_nil : (_ list) t
+(** [Lwt.return_nil] is like {!Lwt.return_unit}, but for {!Lwt.return}[ []]. *)
+
 val return_true : bool t
+(** [Lwt.return_true] is like {!Lwt.return_unit}, but for
+    {!Lwt.return}[ true]. *)
 
-(** [return_false = return false] *)
 val return_false : bool t
+(** [Lwt.return_false] is like {!Lwt.return_unit}, but for
+    {!Lwt.return}[ false]. *)
 
-(* (\** {2 Thread storage} *\) *)
 
-(* type 'a key *)
-(*   (\** Type of a key. Keys are used to store local values into *)
-(*       threads *\) *)
 
-(* val new_key : unit -> 'a key *)
-(*   (\** [new_key ()] creates a new key. *\) *)
+(** {3 Unscoped infix operators} *)
 
-(* val get : 'a key -> 'a option *)
-(*   (\** [get key] returns the value associated with [key] in the current *)
-(*       thread. *\) *)
-
-(* val with_value : 'a key -> 'a option -> (unit -> 'b) -> 'b *)
-(*   (\** [with_value key value f] executes [f] with [value] associated to *)
-(*       [key]. The previous value associated to [key] is restored after *)
-(*       [f] terminates. *\) *)
-
-(* (\** {2 Exceptions handling} *\) *)
-
-(* val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t *)
-(*   (\** [catch t f] is a thread that behaves as the thread [t ()] if *)
-(*       this thread succeeds.  If the thread [t ()] fails with some *)
-(*       exception, [catch t f] behaves as the application of [f] to this *)
-(*       exception. *\) *)
-
-(* val try_bind : (unit -> 'a t) -> ('a -> 'b t) -> (exn -> 'b t) -> 'b t *)
-(*   (\** [try_bind t f g] behaves as [bind (t ()) f] if [t] does not *)
-(*       fail.  Otherwise, it behaves as the application of [g] to the *)
-(*       exception associated to [t ()]. *\) *)
-
-(* val finalize : (unit -> 'a t) -> (unit -> unit t) -> 'a t *)
-(*   (\** [finalize f g] returns the same result as [f ()] whether it *)
-(*       fails or not. In both cases, [g ()] is executed after [f]. *\) *)
-
-(* val wrap : (unit -> 'a) -> 'a t *)
-(*   (\** [wrap f] calls [f] and transform the result into a monad. If [f] *)
-(*       raise an exception, it is catched by Lwt. *)
-
-(*       This is actually the same as: *)
-
-(*       {[ *)
-(*         try *)
-(*           return (f ()) *)
-(*         with exn -> *)
-(*           fail exn *)
-(*       ]} *)
-(*   *\) *)
-
-(* val wrap1 : ('a -> 'b) -> 'a -> 'b t *)
-(*   (\** [wrap1 f x] applies [f] on [x] and returns the result as a *)
-(*       thread. If the application of [f] to [x] raise an exception it *)
-(*       is catched and a thread is returned. *)
-
-(*       Note that you must use {!wrap} instead of {!wrap1} if the *)
-(*       evaluation of [x] may raise an exception. *)
-
-(*       for example the following code is not ok: *)
-
-(*       {[ *)
-(*         wrap1 f (Hashtbl.find table key) *)
-(*       ]} *)
-
-(*       you should write instead: *)
-
-(*       {[ *)
-(*         wrap (fun () -> f (Hashtbl.find table key)) *)
-(*       ]} *)
-(*   *\) *)
-
-(* val wrap2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c t *)
-(* val wrap3 : ('a -> 'b -> 'c -> 'd) -> 'a -> 'b -> 'c -> 'd t *)
-(* val wrap4 : ('a -> 'b -> 'c -> 'd -> 'e) -> 'a -> 'b -> 'c -> 'd -> 'e t *)
-(* val wrap5 : ('a -> 'b -> 'c -> 'd -> 'e -> 'f) -> 'a -> 'b -> 'c -> 'd -> 'e -> 'f t *)
-(* val wrap6 : ('a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'g) -> 'a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'g t *)
-(* val wrap7 : ('a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'g -> 'h) -> 'a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'g -> 'h t *)
-
-(** {2 Multi-threads composition} *)
-
-(* we shouldn't use choose: the scheduling may be system dependent *)
-
-(* val choose : 'a t list -> 'a t *)
-(*   (\** [choose l] behaves as the first thread in [l] to terminate.  If *)
-(*       several threads are already terminated, one is choosen at *)
-(*       random. *)
-
-(*       Note: {!choose} leaves the local values of the current thread *)
-(*       unchanged. *\) *)
-
-(* val nchoose : 'a t list -> 'a list t *)
-(*   (\** [nchoose l] returns the value of all that have succcessfully *)
-(*       terminated. If all threads are sleeping, it waits for at least *)
-(*       one to terminates. If one the threads of [l] fails, [nchoose] *)
-(*       fails with the same exception. *)
-
-(*       Note: {!nchoose} leaves the local values of the current thread *)
-(*       unchanged. *\) *)
-
-(* val nchoose_split : 'a t list -> ('a list * 'a t list) t *)
-(*   (\** [nchoose_split l] does the same as {!nchoose} but also retrurns *)
-(*       the list of threads that have not yet terminated. *\) *)
-
-(** [join l] waits for all threads in [l] to terminate. If one of
-    the threads fails, then [join l] will fails with the same
-    exception as the first one to terminate.
-
-    Note: {!join} leaves the local values of the current thread
-    unchanged. *)
-(* val join : unit t list -> unit t *)
-
-(* val ( <?> ) : 'a t -> 'a t -> 'a t *)
-(*   (\** [t <?> t'] is the same as [choose [t; t']] *\) *)
-
-(** [t <&> t'] is the same as [join [t; t']] *)
-(* val ( <&> ) : unit t -> unit t -> unit t *)
-
-(* val async : (unit -> 'a t) -> unit *)
-(*   (\** [async f] starts a thread without waiting for the result. If it *)
-(*       fails (now or later), the exception is given to *)
-(*       {!async_exception_hook}. *)
-
-(*       You should use this function if you want to start a thread that *)
-(*       might fail and don't care what its return value is, nor when it *)
-(*       terminates (for instance, because it is looping). *\) *)
-
-(* val ignore_result : 'a t -> unit *)
-(*   (\** [ignore_result t] is like [Pervasives.ignore t] except that: *)
-
-(*       - if [t] already failed, it raises the exception now, *)
-(*       - if [t] is sleeping and fails later, the exception will be *)
-(*         given to {!async_exception_hook}. *\) *)
-
-(* val async_exception_hook : (exn -> unit) ref *)
-(*   (\** Function called when a asynchronous exception is thrown. *)
-
-(*       The default behavior is to print an error message with a *)
-(*       backtrace if available and to exit the program. *)
-
-(*       The behavior is undefined if this function raise an *)
-(*       exception. *\) *)
-
-(* (\** {2 Sleeping and resuming} *\) *)
-
-(* type 'a u *)
-(*   (\** The type of thread wakeners. *\) *)
-
-(* val wait : unit -> 'a t * 'a u *)
-(*   (\** [wait ()] is a pair of a thread which sleeps forever (unless it *)
-(*       is resumed by one of the functions [wakeup], [wakeup_exn] below) *)
-(*       and the corresponding wakener.  This thread does not block the *)
-(*       execution of the remainder of the program (except of course, if *)
-(*       another thread tries to wait for its termination). *\) *)
-
-(* val wakeup : 'a u -> 'a -> unit *)
-(*   (\** [wakeup t e] makes the sleeping thread [t] terminate and return *)
-(*       the value of the expression [e]. *\) *)
-
-(* val wakeup_exn : 'a u -> exn -> unit *)
-(*   (\** [wakeup_exn t e] makes the sleeping thread [t] fail with the *)
-(*       exception [e]. *\) *)
-
-(* val wakeup_later : 'a u -> 'a -> unit *)
-(*   (\** Same as {!wakeup} but it is not guaranteed that the thread will *)
-(*       be woken up immediately. *\) *)
-
-(* val wakeup_later_exn : 'a u -> exn -> unit *)
-(*   (\** Same as {!wakeup_exn} but it is not guaranteed that the thread *)
-(*       will be woken up immediately. *\) *)
-
-(* val waiter_of_wakener : 'a u -> 'a t *)
-(*   (\** Returns the thread associated to a wakener. *\) *)
-
-(* type +'a result *)
-(*   (\** Either a value of type ['a], either an exception. *\) *)
-
-(* val make_value : 'a -> 'a result *)
-(*   (\** [value x] creates a result containing the value [x]. *\) *)
-
-(* val make_error : exn -> 'a result *)
-(*   (\** [error e] creates a result containing the exception [e]. *\) *)
-
-(* val of_result : 'a result -> 'a t *)
-(*   (\** Returns a thread from a result. *\) *)
-
-(* val wakeup_result : 'a u -> 'a result -> unit *)
-(*   (\** [wakeup_result t r] makes the sleeping thread [t] terminate with *)
-(*       the result [r]. *\) *)
-
-(* val wakeup_later_result : 'a u -> 'a result -> unit *)
-(*   (\** Same as {!wakeup_result} but it is not guaranteed that the *)
-(*       thread will be woken up immediately. *\) *)
-
-(* (\** {2 Threads state} *\) *)
-
-(* (\** State of a thread *\) *)
-(* type 'a state = *)
-(*   | Return of 'a *)
-(*       (\** The thread which has successfully terminated *\) *)
-(*   | Fail of exn *)
-(*       (\** The thread raised an exception *\) *)
-(*   | Sleep *)
-(*       (\** The thread is sleeping *\) *)
-
-(* val state : 'a t -> 'a state *)
-(*   (\** [state t] returns the state of a thread *\) *)
-
-(* val is_sleeping : 'a t -> bool *)
-(*   (\** [is_sleeping t] returns [true] iff [t] is sleeping. *\) *)
-
-(* (\** {2 Cancelable threads} *\) *)
-
-(* (\** Cancelable threads are the same as regular threads except that *)
-(*     they can be canceled. *\) *)
-
-(* exception Canceled *)
-(*   (\** Canceled threads fails with this exception *\) *)
-
-(* val task : unit -> 'a t * 'a u *)
-(*   (\** [task ()] is the same as [wait ()] except that threads created *)
-(*       with [task] can be canceled. *\) *)
-
-(* val on_cancel : 'a t -> (unit -> unit) -> unit *)
-(*   (\** [on_cancel t f] executes [f] when [t] is canceled. [f] will be *)
-(*       executed before all other threads waiting on [t]. *)
-
-(*       If [f] raises an exception it is given to *)
-(*       {!async_exception_hook}. *\) *)
-
-(* val add_task_r : 'a u Lwt_sequence.t -> 'a t *)
-(*   (\** [add_task_r seq] creates a sleeping thread, adds its wakener to *)
-(*       the right of [seq] and returns its waiter. When the thread is *)
-(*       canceled, it is removed from [seq]. *\) *)
-
-(* val add_task_l : 'a u Lwt_sequence.t -> 'a t *)
-(*   (\** [add_task_l seq] creates a sleeping thread, adds its wakener to *)
-(*       the left of [seq] and returns its waiter. When the thread is *)
-(*       canceled, it is removed from [seq]. *\) *)
-
-(* val cancel : 'a t -> unit *)
-(*   (\** [cancel t] cancels the threads [t]. This means that the deepest *)
-(*       sleeping thread created with [task] and connected to [t] is *)
-(*       woken up with the exception {!Canceled}. *)
-
-(*       For example, in the following code: *)
-
-(*       {[ *)
-(*         let waiter, wakener = task () in *)
-(*         cancel (waiter >> printl "plop") *)
-(*       ]} *)
-
-(*       [waiter] will be woken up with {!Canceled}. *)
-(*   *\) *)
-
-(* val pick : 'a t list -> 'a t *)
-(*   (\** [pick l] is the same as {!choose}, except that it cancels all *)
-(*       sleeping threads when one terminates. *)
-
-(*       Note: {!pick} leaves the local values of the current thread *)
-(*       unchanged. *\) *)
-
-(* val npick : 'a t list -> 'a list t *)
-(*   (\** [npick l] is the same as {!nchoose}, except that it cancels all *)
-(*       sleeping threads when one terminates. *)
-
-(*       Note: {!npick} leaves the local values of the current thread *)
-(*       unchanged. *\) *)
-
-(* val protected : 'a t -> 'a t *)
-(*   (\** [protected thread] creates a new cancelable thread which behave *)
-(*       as [thread] except that cancelling it does not cancel *)
-(*       [thread]. *\) *)
-
-(* val no_cancel : 'a t -> 'a t *)
-(*   (\** [no_cancel thread] creates a thread which behave as [thread] *)
-(*       except that it cannot be canceled. *\) *)
-
-(* (\** {2 Pause} *\) *)
-
-(* val pause : unit -> unit t *)
-(*   (\** [pause ()] is a sleeping thread which is wake up on the next *)
-(*       call to {!wakeup_paused}. A thread created with [pause] can be *)
-(*       canceled. *\) *)
-
-(* val wakeup_paused : unit -> unit *)
-(*   (\** [wakeup_paused ()] wakes up all threads which suspended *)
-(*       themselves with {!pause}. *)
-
-(*       This function is called by the scheduler, before entering the *)
-(*       main loop. You usually do not have to call it directly, except *)
-(*       if you are writing a custom scheduler. *)
-
-(*       Note that if a paused thread resumes and pauses again, it will not *)
-(*       be woken up at this point. *\) *)
-
-(* val paused_count : unit -> int *)
-(*   (\** [paused_count ()] returns the number of currently paused *)
-(*       threads. *\) *)
-
-(* val register_pause_notifier : (int -> unit) -> unit *)
-(*   (\** [register_pause_notifier f] register a function [f] that will be *)
-(*       called each time pause is called. The parameter passed to [f] is *)
-(*       the new number of threads paused. It is usefull to be able to *)
-(*       call {!wakeup_paused} when there is no scheduler *\) *)
-
-(* (\** {2 Misc} *\) *)
-
-(* val on_success : 'a t -> ('a -> unit) -> unit *)
-(*   (\** [on_success t f] executes [f] when [t] terminates without *)
-(*       failing. If [f] raises an exception it is given to *)
-(*       {!async_exception_hook}. *\) *)
-
-(* val on_failure : 'a t -> (exn -> unit) -> unit *)
-(*   (\** [on_failure t f] executes [f] when [t] terminates and fails. If *)
-(*       [f] raises an exception it is given to *)
-(*       {!async_exception_hook}. *\) *)
-
-(* val on_termination : 'a t -> (unit -> unit) -> unit *)
-(*   (\** [on_termination t f] executes [f] when [t] terminates. If [f] *)
-(*       raises an exception it is given to {!async_exception_hook}. *\) *)
-
-(* val on_any : 'a t -> ('a -> unit) -> (exn -> unit) -> unit *)
-(*   (\** [on_any t f g] executes [f] or [g] when [t] terminates. If [f] *)
-(*       or [g] raises an exception it is given to *)
-(*       {!async_exception_hook}. *\) *)
-
-(* (\**/**\) *)
-
-(* (\* The functions below are probably not useful for the casual user. *)
-(*    They provide the basic primitives on which can be built multi- *)
-(*    threaded libraries such as Lwt_unix. *\) *)
-
-(* val poll : 'a t -> 'a option *)
-(*       (\* [poll e] returns [Some v] if the thread [e] is terminated and *)
-(*          returned the value [v].  If the thread failed with some *)
-(*          exception, this exception is raised.  If the thread is still *)
-(*          running, [poll e] returns [None] without blocking. *\) *)
-
-(* val apply : ('a -> 'b t) -> 'a -> 'b t *)
-(*       (\* [apply f e] apply the function [f] to the expression [e].  If *)
-(*          an exception is raised during this application, it is caught *)
-(*          and the resulting thread fails with this exception. *\) *)
-(* (\* Q: Could be called 'glue' or 'trap' or something? *\) *)
-
-(* val backtrace_bind : (exn -> exn) -> 'a t -> ('a -> 'b t) -> 'b t *)
-(* val backtrace_catch : (exn -> exn) -> (unit -> 'a t) -> (exn -> 'a t) -> 'a t *)
-(* val backtrace_try_bind : (exn -> exn) -> (unit -> 'a t) -> ('a -> 'b t) -> (exn -> 'b t) -> 'b t *)
-(* val backtrace_finalize : (exn -> exn) -> (unit -> 'a t) -> (unit -> unit t) -> 'a t *)
+val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+val (>|=) : 'a t -> ('a -> 'b) -> 'b t
+val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
+val (=|<) : ('a -> 'b) -> 'a t -> 'b t
+(** Use the operators in module {{: #MODULEInfix} [Lwt.Infix]} instead. Using
+    these instances of the operators directly requires opening module [Lwt],
+    which brings an excessive number of other names into scope. *)
