@@ -1821,33 +1821,22 @@ let check_packable ~legacy loc root =
         error (Unexpected_big_map loc)
     | Operation_t _ ->
         error (Unexpected_operation loc)
-    | Unit_t _ ->
-        ok ()
-    | Int_t _ ->
-        ok ()
-    | Nat_t _ ->
-        ok ()
-    | Signature_t _ ->
-        ok ()
-    | String_t _ ->
-        ok ()
-    | Bytes_t _ ->
-        ok ()
-    | Mutez_t _ ->
-        ok ()
-    | Key_hash_t _ ->
-        ok ()
-    | Key_t _ ->
-        ok ()
-    | Timestamp_t _ ->
-        ok ()
-    | Address_t _ ->
-        ok ()
-    | Bool_t _ ->
-        ok ()
-    | Chain_id_t _ ->
-        ok ()
-    | Never_t _ ->
+    | Unit_t _
+    | Int_t _
+    | Nat_t _
+    | Signature_t _
+    | String_t _
+    | Bytes_t _
+    | Mutez_t _
+    | Key_hash_t _
+    | Key_t _
+    | Timestamp_t _
+    | Address_t _
+    | Bool_t _
+    | Chain_id_t _
+    | Never_t _
+    | Set_t (_, _)
+    | Lambda_t (_, _, _) ->
         ok ()
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _, _) ->
         check l_ty >>? fun () -> check r_ty
@@ -1857,12 +1846,8 @@ let check_packable ~legacy loc root =
         check v_ty
     | List_t (elt_ty, _, _) ->
         check elt_ty
-    | Set_t (_, _) ->
-        ok ()
     | Map_t (_, elt_ty, _, _) ->
         check elt_ty
-    | Lambda_t (_l_ty, _r_ty, _) ->
-        ok ()
     | Contract_t (_, _) when legacy ->
         ok ()
     | Contract_t (_, _) ->
