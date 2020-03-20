@@ -136,11 +136,8 @@ module Make (T : QTY) : S = struct
         let len = String.length s in
         String.init 6 (fun i -> if Compare.Int.(i < len) then s.[i] else '0')
       in
-      try
-        Some
-          (Int64.of_string
-             (remove_commas left ^ pad_to_six (remove_commas right)))
-      with _ -> None
+      Int64.of_string_opt
+        (remove_commas left ^ pad_to_six (remove_commas right))
     in
     match String.split_on_char '.' s with
     | [left; right] ->
