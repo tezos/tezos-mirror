@@ -1,2 +1,3 @@
 lwt.mli
+lwt_list.mli
 bytes.mli
