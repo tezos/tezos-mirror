@@ -154,6 +154,37 @@ let test_dealer_proof () =
     done
   done
 
+module Proof = struct
+  module G = Sp.Group
+
+  type exponent = G.Scalar.t
+
+  type proof = exponent * exponent list
+
+  type t = proof
+
+  let encoding =
+    Data_encoding.(tup2 G.Scalar.encoding (list G.Scalar.encoding))
+
+  let mangle : t -> t = fun (e, es) -> (G.Scalar.(mul e e), es)
+end
+
+let test_invalid_dealer_proof () =
+  let proof : Proof.t =
+    Setup.convert_encoding Pvss.proof_encoding Proof.encoding Setup.proof
+  in
+  let mangled =
+    Proof.mangle proof
+    |> Setup.convert_encoding Proof.encoding Pvss.proof_encoding
+  in
+  assert (
+    not
+      (Pvss.check_dealer_proof
+         Setup.shares
+         Setup.commitments
+         ~proof:mangled
+         ~public_keys:Setup.public_keys) )
+
 let test_share_reveal () =
   (* check reveal shares *)
   let shares_valid =
@@ -167,6 +198,41 @@ let test_share_reveal () =
     (fun i b ->
       print_endline (string_of_int i) ;
       assert b)
+    shares_valid
+
+module Encrypted_share = struct
+  include Sp.Group
+
+  let mangle : t -> t = fun share -> Sp.Group.(share + share)
+end
+
+let test_invalid_share_reveal () =
+  let mangle_share : Pvss.Encrypted_share.t -> Pvss.Encrypted_share.t =
+   fun share ->
+    let share : Encrypted_share.t =
+      Setup.convert_encoding
+        Pvss.Encrypted_share.encoding
+        Encrypted_share.encoding
+        share
+    in
+    Encrypted_share.mangle share
+    |> Setup.convert_encoding
+         Encrypted_share.encoding
+         Pvss.Encrypted_share.encoding
+  in
+  (* check invalid reveal shares *)
+  let shares_valid =
+    List.map2
+      (fun (share, (reveal, proof)) public_key ->
+        let share = mangle_share share in
+        Pvss.check_revealed_share share reveal ~public_key proof)
+      Setup.reveals
+      Setup.public_keys
+  in
+  List.iteri
+    (fun i b ->
+      print_endline (string_of_int i) ;
+      assert (not b))
     shares_valid
 
 let test_reconstruct () =
@@ -191,9 +257,34 @@ let test_reconstruct () =
          Setup.group_encoding
          Setup.public_secret) )
 
+let test_invalid_reconstruct () =
+  (* try to reconstruct with n < threshold *)
+  let indices = [0; 1; 2; 3] in
+  let reconstructed =
+    Pvss.reconstruct
+      (List.map
+         (fun n ->
+           let (_, (r, _)) = List.nth Setup.reveals n in
+           r)
+         indices)
+      indices
+  in
+  assert (
+    Setup.convert_encoding
+      Pvss.Public_key.encoding
+      Setup.group_encoding
+      reconstructed
+    != Setup.convert_encoding
+         Pvss.Public_key.encoding
+         Setup.group_encoding
+         Setup.public_secret )
+
 let tests =
-  [ ("dealer_proof", `Quick, test_dealer_proof);
+  [ ("dealer proof", `Quick, test_dealer_proof);
+    ("invalid dealer proof", `Quick, test_invalid_dealer_proof);
     ("reveal", `Quick, test_share_reveal);
-    ("reconstruct", `Quick, test_reconstruct) ]
+    ("invalid reveal", `Quick, test_invalid_share_reveal);
+    ("reconstruct", `Quick, test_reconstruct);
+    ("invalid reconstruct", `Quick, test_invalid_reconstruct) ]
 
 let () = Alcotest.run "test-pvss" [("pvss", tests)]
