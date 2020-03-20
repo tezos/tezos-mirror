@@ -47,7 +47,8 @@ Note that this ``--network`` option must be given everytime you restart your nod
 It also must be given with the ``snapshot export`` and ``snapshot import`` commands.
 One way to avoid this is to `Set Network in Configuration File`_.
 
-The ``--network`` option can be used with the following built-in networks:
+The ``--network`` option is non case-sensitive and can be used with
+the following built-in networks:
 
 - ``mainnet`` (this is the default)
 
