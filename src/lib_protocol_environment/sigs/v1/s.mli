@@ -606,3 +606,83 @@ module type SIGNATURE = sig
   (** Check a signature *)
   val check : ?watermark:watermark -> Public_key.t -> t -> bytes -> bool
 end
+
+module type PVSS = sig
+  type proof
+
+  module Clear_share : sig
+    type t
+
+    include B58_DATA with type t := t
+
+    include ENCODER with type t := t
+  end
+
+  module Commitment : sig
+    type t
+
+    include B58_DATA with type t := t
+
+    include ENCODER with type t := t
+  end
+
+  module Encrypted_share : sig
+    type t
+
+    include B58_DATA with type t := t
+
+    include ENCODER with type t := t
+  end
+
+  module Public_key : sig
+    type t
+
+    val pp : Format.formatter -> t -> unit
+
+    include Compare.S with type t := t
+
+    include RAW_DATA with type t := t
+
+    include B58_DATA with type t := t
+
+    include ENCODER with type t := t
+  end
+
+  module Secret_key : sig
+    type t
+
+    include ENCODER with type t := t
+
+    val to_public_key : t -> Public_key.t
+  end
+
+  val proof_encoding : proof Data_encoding.t
+
+  val dealer_shares_and_proof :
+    secret:Secret_key.t ->
+    threshold:int ->
+    public_keys:Public_key.t list ->
+    Encrypted_share.t list * Commitment.t list * proof
+
+  val check_dealer_proof :
+    Encrypted_share.t list ->
+    Commitment.t list ->
+    proof:proof ->
+    public_keys:Public_key.t list ->
+    bool
+
+  val reveal_share :
+    Encrypted_share.t ->
+    secret_key:Secret_key.t ->
+    public_key:Public_key.t ->
+    Clear_share.t * proof
+
+  val check_revealed_share :
+    Encrypted_share.t ->
+    Clear_share.t ->
+    public_key:Public_key.t ->
+    proof ->
+    bool
+
+  val reconstruct : Clear_share.t list -> int list -> Public_key.t
+end

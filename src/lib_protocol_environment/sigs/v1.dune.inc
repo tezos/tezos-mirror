@@ -51,6 +51,7 @@
    v1/operation_list_list_hash.mli
    v1/protocol_hash.mli
    v1/context_hash.mli
+   v1/pvss_secp256k1.mli
 
    ;; Tezos specifics
    v1/micheline.mli

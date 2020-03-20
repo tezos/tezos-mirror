@@ -62,6 +62,12 @@ module type V1 = sig
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
        and type Signature.watermark = Signature.watermark
+       and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
+       and type Pvss_secp256k1.Encrypted_share.t =
+            Pvss_secp256k1.Encrypted_share.t
+       and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
+       and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
+       and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
