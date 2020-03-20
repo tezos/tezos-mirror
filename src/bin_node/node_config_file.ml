@@ -255,11 +255,10 @@ let builtin_blockchain_networks =
 let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
   let builtin_encoding (tag, network_alias, network) =
-    let constructor = String.capitalize_ascii network_alias in
     case
       (Tag tag)
-      ~title:constructor
-      (constant constructor)
+      ~title:network_alias
+      (constant network_alias)
       (fun candidate ->
         match candidate.alias with
         | None ->
