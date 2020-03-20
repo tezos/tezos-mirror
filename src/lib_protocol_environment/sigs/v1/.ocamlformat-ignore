@@ -1,3 +1,9 @@
+bytes.mli
+int32.mli
 lwt.mli
 lwt_list.mli
-bytes.mli
+map.mli
+s.mli
+set.mli
+pervasives.mli
+string.mli
