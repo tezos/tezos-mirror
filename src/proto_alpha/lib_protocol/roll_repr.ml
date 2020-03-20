@@ -52,8 +52,8 @@ module Index = struct
     :: Int32.to_string roll :: l
 
   let of_path = function
-    | _ :: _ :: s :: _ -> (
-      try Some (Int32.of_string s) with _ -> None )
+    | _ :: _ :: s :: _ ->
+        Int32.of_string_opt s
     | _ ->
         None
 
