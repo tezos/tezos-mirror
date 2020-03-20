@@ -1,4 +1,5 @@
 bytes.mli
+format.mli
 hex.mli
 lwt.mli
 lwt_list.mli
