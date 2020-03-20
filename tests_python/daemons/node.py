@@ -118,9 +118,11 @@ class Node:
         self._run_called_before = True
 
     def init_config(self):
+        # The configuration file may already exists,
+        # so we use 'reset' instead of 'init'.
         node_config = [self.node,
                        'config',
-                       'init',
+                       'reset',
                        '--data-dir', self.node_dir,
                        '--net-addr', f'127.0.0.1:{self.p2p_port}',
                        '--rpc-addr', f'127.0.0.1:{self.rpc_port}',
