@@ -307,6 +307,17 @@ let location = function
   | Seq (loc, _) ->
       loc
 
+let kind_equal a b =
+  match (a, b) with
+  | (Int_kind, Int_kind)
+  | (String_kind, String_kind)
+  | (Bytes_kind, Bytes_kind)
+  | (Prim_kind, Prim_kind)
+  | (Seq_kind, Seq_kind) ->
+      true
+  | _ ->
+      false
+
 let kind = function
   | Int _ ->
       Int_kind
@@ -341,7 +352,7 @@ let unexpected expr exp_kinds exp_ns exp_prims =
 
 let check_kind kinds expr =
   let kind = kind expr in
-  if List.mem kind kinds then return_unit
+  if List.exists (kind_equal kind) kinds then return_unit
   else
     let loc = location expr in
     fail (Invalid_kind (loc, kinds, kind))
@@ -5468,7 +5479,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
 
     This flag is built in [has_big_map] and used only in
     [extract_big_map_updates] and [collect_big_maps].
-    
+
     This flag is necessary to avoid these two functions to have a quadratic
     complexity in the size of the type.
 

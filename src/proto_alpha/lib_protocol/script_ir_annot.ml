@@ -203,6 +203,7 @@ let parse_annots loc ?(allow_special_var = false)
   (* allow emtpty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard ~specials wrap s acc =
+    let mem_char c cs = List.exists (Char.equal c) cs in
     let len = String.length s in
     ( if Compare.Int.(len > max_annot_length) then
       error (Unexpected_annotation loc)
@@ -215,9 +216,9 @@ let parse_annots loc ?(allow_special_var = false)
           (* check that all characters are valid*)
           string_iter (check_char loc) s 2
           >>? fun () -> ok @@ (wrap (Some (String.sub s 1 (len - 1))) :: acc)
-      | '@' when Compare.Int.(len = 2) && List.mem '@' specials ->
+      | '@' when Compare.Int.(len = 2) && mem_char '@' specials ->
           ok @@ (wrap (Some "@") :: acc)
-      | '%' when List.mem '%' specials ->
+      | '%' when mem_char '%' specials ->
           if Compare.Int.(len = 2) then ok @@ (wrap (Some "%") :: acc)
           else if Compare.Int.(len = 3) && Compare.Char.(s.[2] = '%') then
             ok @@ (wrap (Some "%%") :: acc)
