@@ -2,6 +2,7 @@ bytes.mli
 format.mli
 hex.mli
 int32.mli
+int64.mli
 list.mli
 lwt.mli
 lwt_list.mli
