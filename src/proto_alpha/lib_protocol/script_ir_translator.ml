@@ -849,52 +849,29 @@ let serialize_stack_for_error ctxt stack_ty =
   trace Cannot_serialize_error (unparse_stack ctxt stack_ty)
 
 let name_of_ty : type a. a ty -> type_annot option = function
-  | Unit_t tname ->
-      tname
-  | Int_t tname ->
-      tname
-  | Nat_t tname ->
-      tname
-  | String_t tname ->
-      tname
-  | Bytes_t tname ->
-      tname
-  | Mutez_t tname ->
-      tname
-  | Bool_t tname ->
-      tname
-  | Key_hash_t tname ->
-      tname
-  | Key_t tname ->
-      tname
-  | Timestamp_t tname ->
-      tname
-  | Address_t tname ->
-      tname
-  | Signature_t tname ->
-      tname
-  | Operation_t tname ->
-      tname
-  | Chain_id_t tname ->
-      tname
-  | Never_t tname ->
-      tname
-  | Contract_t (_, tname) ->
-      tname
-  | Pair_t (_, _, tname, _) ->
-      tname
-  | Union_t (_, _, tname, _) ->
-      tname
-  | Lambda_t (_, _, tname) ->
-      tname
-  | Option_t (_, tname, _) ->
-      tname
-  | List_t (_, tname, _) ->
-      tname
-  | Set_t (_, tname) ->
-      tname
-  | Map_t (_, _, tname, _) ->
-      tname
+  | Unit_t tname
+  | Int_t tname
+  | Nat_t tname
+  | String_t tname
+  | Bytes_t tname
+  | Mutez_t tname
+  | Bool_t tname
+  | Key_hash_t tname
+  | Key_t tname
+  | Timestamp_t tname
+  | Address_t tname
+  | Signature_t tname
+  | Operation_t tname
+  | Chain_id_t tname
+  | Never_t tname
+  | Contract_t (_, tname)
+  | Pair_t (_, _, tname, _)
+  | Union_t (_, _, tname, _)
+  | Lambda_t (_, _, tname)
+  | Option_t (_, tname, _)
+  | List_t (_, tname, _)
+  | Set_t (_, tname)
+  | Map_t (_, _, tname, _)
   | Big_map_t (_, _, tname) ->
       tname
 
