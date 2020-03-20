@@ -1,4 +1,5 @@
 bytes.mli
+format.mli
 int32.mli
 list.mli
 lwt.mli
