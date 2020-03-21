@@ -626,6 +626,18 @@ struct
       Lwt.return_unit
     in
     let rec loop () =
+      (* The call to [protect] here allows the call to [pop] (responsible
+         for fetching the next request) to be canceled by the use of the
+         [canceler].
+
+         These cancellations cannot affect the processing of ongoing requests.
+         This is due to the limited scope of the argument of [protect]. As a
+         result, ongoing requests are never canceled by this mechanism.
+
+         In the case when the [canceler] is canceled whilst a request is being
+         processed, the processing eventually resolves, at which point a
+         recursive call to this [loop] at which point this call to [protect]
+         fails immediately with [Canceled]. *)
       protect ~canceler:w.canceler (fun () -> pop w)
       >>=? (function
              | None ->
@@ -777,6 +789,10 @@ struct
       return w
 
   let shutdown w =
+    (* The actual cancellation ([Lwt_canceler.cancel w.canceler]) resolves
+       immediately because no hooks are registered on the canceler. However, the
+       worker ([w.worker]) resolves only once the ongoing request has resolved
+       (if any) and some clean-up operations have completed. *)
     lwt_emit w Triggering_shutdown
     >>= fun () -> Lwt_canceler.cancel w.canceler >>= fun () -> w.worker
 
