@@ -446,8 +446,8 @@ module Overcrowded = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"test_p2p_pool.Overcrowded.advertisment_failure"
-      ~title:"Advertisment Failure"
+      ~id:"test_p2p_pool.Overcrowded.advertisement_failure"
+      ~title:"Advertisement Failure"
       ~description:"The given list of points should be known, but are not."
       ~pp:(fun ppf lst ->
         Format.fprintf
