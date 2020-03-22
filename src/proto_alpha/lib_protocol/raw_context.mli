@@ -295,11 +295,13 @@ val init_endorsements :
 (** Marks an endorsement in the map as used. *)
 val record_endorsement : context -> Signature.Public_key_hash.t -> context
 
-(** Provide a fresh identifier for a temporary big map (negative index). *)
-val fresh_temporary_big_map : context -> context * Z.t
+(** Provide a fresh identifier for a temporary lazy storage (negative index). *)
+val fresh_temporary_lazy_storage :
+  (_, _) Lazy_storage_kind.t -> context -> context * Z.t
 
-(** Reset the temporary big_map identifier generator to [-1]. *)
-val reset_temporary_big_map : context -> context
-
-(** Iterate over all created temporary big maps since the last {!reset_temporary_big_map}. *)
-val temporary_big_maps : context -> ('a -> Z.t -> 'a Lwt.t) -> 'a -> 'a Lwt.t
+(** Apply the [cleanup_fs] functions over all created temporary lazy storage
+    ids since the last call and reset the identifier generators to [-1]. *)
+val cleanup_temporary_lazy_storage :
+  cleanup_fs:(context -> Z.t -> context Lwt.t) Lazy_storage_kind.Record.t ->
+  context ->
+  context Lwt.t

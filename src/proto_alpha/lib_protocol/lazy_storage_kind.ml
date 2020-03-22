@@ -75,3 +75,24 @@ let eq :
 
 let compare : type a1 u1 a2 u2. (a1, u1) t -> (a2, u2) t -> int =
  fun k1 k2 -> match (k1, k2) with (Big_map, Big_map) -> 0
+
+module Record = struct
+  type ('a, 'u) kind = ('a, 'u) t
+
+  (** A record type, mapping each kind to some ['v] value. *)
+  type 'v t = {big_map : 'v}
+
+  let init x = {big_map = x}
+
+  let map_get_one :
+      type a u. ('v -> 'v * 'res) -> (a, u) kind -> 'v t -> 'v t * 'res =
+   fun f k r ->
+    match k with
+    | Big_map ->
+        let (big_map, acc) = f r.big_map in
+        ({big_map}, acc)
+
+  let fold2_s :
+      ('a -> 'b -> 'acc -> 'acc Lwt.t) -> 'a t -> 'b t -> 'acc -> 'acc Lwt.t =
+   fun f r1 r2 acc -> f r1.big_map r2.big_map acc
+end

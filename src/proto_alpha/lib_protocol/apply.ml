@@ -842,7 +842,7 @@ let apply_manager_contents_list ctxt mode baker chain_id contents_list =
   | Failure ->
       Lwt.return (ctxt (* backtracked *), mark_backtracked results)
   | Success ctxt ->
-      Big_map.cleanup_temporary ctxt >>= fun ctxt -> Lwt.return (ctxt, results)
+      Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :

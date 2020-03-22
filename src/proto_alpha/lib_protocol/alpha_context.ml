@@ -172,19 +172,13 @@ end
 module Big_map = struct
   type id = Z.t
 
-  let fresh ~temporary c =
-    if temporary then return (Raw_context.fresh_temporary_big_map c)
-    else Storage.Big_map.Next.incr c
+  let fresh ~temporary c = Lazy_storage.fresh Big_map ~temporary c
 
   let mem c m k = Storage.Big_map.Contents.mem (c, m) k
 
   let get_opt c m k = Storage.Big_map.Contents.get_option (c, m) k
 
   let rpc_arg = Storage.Big_map.rpc_arg
-
-  let cleanup_temporary c =
-    Raw_context.temporary_big_maps c Storage.Big_map.remove_rec c
-    >>= fun c -> Lwt.return (Raw_context.reset_temporary_big_map c)
 
   let exists c id =
     Lwt.return

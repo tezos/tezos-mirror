@@ -689,8 +689,6 @@ module Big_map : sig
 
   val rpc_arg : id RPC_arg.t
 
-  val cleanup_temporary : context -> context Lwt.t
-
   val exists :
     context ->
     id ->
@@ -739,6 +737,8 @@ module Lazy_storage : sig
   val encoding : diffs Data_encoding.t
 
   val legacy_big_map_diff_encoding : diffs Data_encoding.t
+
+  val cleanup_temporaries : context -> context Lwt.t
 end
 
 module Contract : sig
