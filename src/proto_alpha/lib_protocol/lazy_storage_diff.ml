@@ -51,6 +51,10 @@ module type OPS = sig
   val apply_updates :
     Raw_context.t -> id:Z.t -> updates -> (Raw_context.t * Z.t) tzresult Lwt.t
 
+  module Next : sig
+    val incr : Raw_context.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+  end
+
   module Total_bytes : sig
     val init : Raw_context.t -> Z.t -> Z.t -> Raw_context.t tzresult Lwt.t
 
@@ -292,3 +296,19 @@ let apply ctxt diffs =
         else Z.add total_size added_size ))
     (ctxt, Z.zero)
     diffs
+
+let fresh :
+    type a u.
+    (a, u) Lazy_storage_kind.t ->
+    temporary:bool ->
+    Raw_context.t ->
+    (Raw_context.t * Z.t) tzresult Lwt.t =
+ fun kind ~temporary ctxt ->
+  if temporary then return (Raw_context.fresh_temporary_lazy_storage kind ctxt)
+  else
+    let (module OPS) = get_ops kind in
+    OPS.Next.incr ctxt
+
+let cleanup_temporaries =
+  let cleanup_fs = Lazy_storage_kind.Record.{big_map = Big_map.remove_rec} in
+  fun ctxt -> Raw_context.cleanup_temporary_lazy_storage ~cleanup_fs ctxt

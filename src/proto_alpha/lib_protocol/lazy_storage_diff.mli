@@ -68,3 +68,11 @@ val encoding : diffs Data_encoding.t
   here the returned [Z.t] is the size added by the application of the diffs.
 *)
 val apply : Raw_context.t -> diffs -> (Raw_context.t * Z.t) tzresult Lwt.t
+
+val fresh :
+  (_, _) Lazy_storage_kind.t ->
+  temporary:bool ->
+  Raw_context.t ->
+  (Raw_context.t * Z.t) tzresult Lwt.t
+
+val cleanup_temporaries : Raw_context.t -> Raw_context.t Lwt.t
