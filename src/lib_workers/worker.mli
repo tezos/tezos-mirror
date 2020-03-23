@@ -26,108 +26,6 @@
 
 (** Lwt based local event loops with automated introspection *)
 
-(** {2 Parameters to build a worker group} *)
-
-(** The name of the group of workers corresponding to an instantiation
-    of {!Make}, as well as the name of each worker in that group. *)
-module type NAME = sig
-  (** The name/path of the worker group *)
-  val base : string list
-
-  (** The abstract name of a single worker *)
-  type t
-
-  (** Serializer for the introspection RPCs *)
-  val encoding : t Data_encoding.t
-
-  (** Pretty printer for displaying the worker name *)
-  val pp : Format.formatter -> t -> unit
-end
-
-(** Events that are used for logging and introspection.
-    Events are pretty printed immediately in the log, and stored in
-    the worker's event backlog for introspection. *)
-module type EVENT = sig
-  (** The type of an event. *)
-  type t
-
-  (** Assigns a logging level to each event.
-      Events can be ignored for logging w.r.t. the global node configuration.
-      Events can be ignored for introspection w.r.t. to the worker's
-      {!Worker_types.limits}. *)
-  val level : t -> Internal_event.level
-
-  (** Serializer for the introspection RPCs *)
-  val encoding : t Data_encoding.t
-
-  (** Pretty printer, also used for logging *)
-  val pp : Format.formatter -> t -> unit
-end
-
-(** The type of messages that are fed to the worker's event loop. *)
-module type REQUEST = sig
-  (** The type of events.
-      It is possible to wait for an event to be processed from outside
-      the worker using {!push_request_and_wait}. In this case, the
-      handler for this event can return a value. The parameter is the
-      type of this value. *)
-  type 'a t
-
-  (** As requests can contain arbitrary data that may not be
-      serializable and are polymorphic, this view type is a
-      monomorphic projection sufficient for introspection. *)
-  type view
-
-  (** The projection function from full request to simple views. *)
-  val view : 'a t -> view
-
-  (** Serializer for the introspection RPCs *)
-  val encoding : view Data_encoding.t
-
-  (** Pretty printer, also used for logging by {!Request_event}. *)
-  val pp : Format.formatter -> view -> unit
-end
-
-(** The (imperative) state of the event loop. *)
-module type TYPES = sig
-  (** The internal state that is passed to the event handlers. *)
-  type state
-
-  (** The parameters provided when launching a new worker. *)
-  type parameters
-
-  (** A simplified view of the worker's state for introspection. *)
-  type view
-
-  (** The projection function from full state to simple views. *)
-  val view : state -> parameters -> view
-
-  (** Serializer for the introspection RPCs *)
-  val encoding : view Data_encoding.t
-
-  (** Pretty printer for introspection. *)
-  val pp : Format.formatter -> view -> unit
-end
-
-module type LOGGER = sig
-  module Event : EVENT
-
-  type status =
-    | WorkerEvent of Event.t
-    | Request of
-        (string Lazy.t * Worker_types.request_status * error list option)
-    | Terminated
-    | Timeout
-    | Crashed of error list
-    | Started of string option
-    | Triggering_shutdown
-    | Duplicate of string
-
-  type t = status Time.System.stamped
-
-  module LogEvent : Internal_event.EVENT with type t = t
-end
-
 (** {2 Worker group maker} *)
 
 (** An error returned when trying to communicate with a worker that
@@ -141,13 +39,13 @@ type Error_monad.error += Closed of worker_name
     but the actual parameters and event handlers can be tweaked
     for each individual worker. *)
 module type T = sig
-  module Name : NAME
+  module Name : Worker_intf.NAME
 
-  module Event : EVENT
+  module Event : Worker_intf.EVENT
 
-  module Request : REQUEST
+  module Request : Worker_intf.REQUEST
 
-  module Types : TYPES
+  module Types : Worker_intf.TYPES
 
   (** A handle to a specific worker, parameterized by the type of
       internal message buffer. *)
@@ -333,11 +231,13 @@ module type T = sig
 end
 
 module Make
-    (Name : NAME)
-    (Event : EVENT)
-    (Request : REQUEST)
-    (Types : TYPES)
-    (Logger : LOGGER with module Event = Event) :
+    (Name : Worker_intf.NAME)
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.REQUEST)
+    (Types : Worker_intf.TYPES)
+    (Logger : Worker_intf.LOGGER
+                with module Event = Event
+                 and type Request.view = Request.view) :
   T
     with module Name = Name
      and module Event = Event

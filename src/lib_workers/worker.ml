@@ -24,71 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type NAME = sig
-  val base : string list
-
-  type t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
-
-module type EVENT = sig
-  type t
-
-  val level : t -> Internal_event.level
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
-
-module type REQUEST = sig
-  type 'a t
-
-  type view
-
-  val view : 'a t -> view
-
-  val encoding : view Data_encoding.t
-
-  val pp : Format.formatter -> view -> unit
-end
-
-module type TYPES = sig
-  type state
-
-  type parameters
-
-  type view
-
-  val view : state -> parameters -> view
-
-  val encoding : view Data_encoding.t
-
-  val pp : Format.formatter -> view -> unit
-end
-
-module type LOGGER = sig
-  module Event : EVENT
-
-  type status =
-    | WorkerEvent of Event.t
-    | Request of
-        (string Lazy.t * Worker_types.request_status * error list option)
-    | Terminated
-    | Timeout
-    | Crashed of error list
-    | Started of string option
-    | Triggering_shutdown
-    | Duplicate of string
-
-  type t = status Time.System.stamped
-
-  module LogEvent : Internal_event.EVENT with type t = t
-end
-
 (** An error returned when trying to communicate with a worker that
     has been closed.*)
 type worker_name = {base : string; name : string}
@@ -113,13 +48,13 @@ let () =
     (fun w -> Closed w)
 
 module type T = sig
-  module Name : NAME
+  module Name : Worker_intf.NAME
 
-  module Event : EVENT
+  module Event : Worker_intf.EVENT
 
-  module Request : REQUEST
+  module Request : Worker_intf.REQUEST
 
-  module Types : TYPES
+  module Types : Worker_intf.TYPES
 
   (** A handle to a specific worker, parameterized by the type of
       internal message buffer. *)
@@ -300,11 +235,13 @@ module type T = sig
 end
 
 module Make
-    (Name : NAME)
-    (Event : EVENT)
-    (Request : REQUEST)
-    (Types : TYPES)
-    (Logger : LOGGER with module Event = Event) =
+    (Name : Worker_intf.NAME)
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.REQUEST)
+    (Types : Worker_intf.TYPES)
+    (Logger : Worker_intf.LOGGER
+                with module Event = Event
+                 and type Request.view = Request.view) =
 struct
   module Name = Name
   module Event = Event
@@ -567,7 +504,7 @@ struct
           el
 
   let log_event w evt =
-    lwt_emit w (Logger.WorkerEvent evt)
+    lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
     >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
       Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
@@ -658,13 +595,7 @@ struct
                      let status = Worker_types.{pushed; treated; completed} in
                      Handlers.on_completion w request res status
                      >>= fun () ->
-                     lwt_emit
-                       w
-                       (Request
-                          ( lazy
-                              (Format.asprintf "%a" Request.pp current_request),
-                            status,
-                            None ))
+                     lwt_emit w (Request (current_request, status, None))
                      >>= fun () -> return_unit
                  | Some u ->
                      Handlers.on_request w request
@@ -679,13 +610,7 @@ struct
                      w.current_request <- None ;
                      Handlers.on_completion w request res status
                      >>= fun () ->
-                     lwt_emit
-                       w
-                       (Request
-                          ( lazy
-                              (Format.asprintf "%a" Request.pp current_request),
-                            status,
-                            None ))
+                     lwt_emit w (Request (current_request, status, None))
                      >>= fun () -> return_unit ))
       >>= function
       | Ok () ->

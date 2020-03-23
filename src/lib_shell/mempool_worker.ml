@@ -68,14 +68,23 @@ module type STATIC = sig
   val max_size_parsed_cache : int
 end
 
+module Request_view : Worker_intf.VIEW with type view = Operation_hash.t =
+struct
+  type view = Operation_hash.t
+
+  let encoding = Operation_hash.encoding
+
+  let pp ppf hash =
+    Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
+end
+
 module Event = struct
   type t =
     | Request of
-        (string Lazy.t * Worker_types.request_status * error list option)
+        (Request_view.view * Worker_types.request_status * error list option)
     | Debug of string
 
-  let level req =
-    match req with
+  let level = function
     | Debug _ ->
         Internal_event.Debug
     | Request _ ->
@@ -94,24 +103,20 @@ module Event = struct
           (Tag 1)
           ~title:"Request"
           (obj2
-             (req "request" string)
+             (req "request" Request_view.encoding)
              (req "status" Worker_types.request_status_encoding))
-          (function
-            | Request (req, t, None) -> Some (Lazy.force req, t) | _ -> None)
-          (fun (req, t) -> Request (lazy req, t, None));
+          (function Request (req, t, None) -> Some (req, t) | _ -> None)
+          (fun (req, t) -> Request (req, t, None));
         case
           (Tag 2)
           ~title:"Failed request"
           (obj3
              (req "error" RPC_error.encoding)
-             (req "failed_request" string)
+             (req "failed_request" Request_view.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function
-            | Request (req, t, Some errs) ->
-                Some (errs, Lazy.force req, t)
-            | _ ->
-                None)
-          (fun (errs, req, t) -> Request (lazy req, t, Some errs)) ]
+            | Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)
+          (fun (errs, req, t) -> Request (req, t, Some errs)) ]
 
   let pp ppf = function
     | Debug msg ->
@@ -119,15 +124,17 @@ module Event = struct
     | Request (view, {pushed; treated; completed}, None) ->
         Format.fprintf
           ppf
-          "@[<v 0>%s@, %a@]"
-          (Lazy.force view)
+          "@[<v 0>%a@, %a@]"
+          Request_view.pp
+          view
           Worker_types.pp_status
           {pushed; treated; completed}
     | Request (view, {pushed; treated; completed}, Some errors) ->
         Format.fprintf
           ppf
-          "@[<v 0>%s@, %a, %a@]"
-          (Lazy.force view)
+          "@[<v 0>%a@, %a, %a@]"
+          Request_view.pp
+          view
           Worker_types.pp_status
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
@@ -135,8 +142,7 @@ module Event = struct
 end
 
 module Logger =
-  Worker_logger.Make
-    (Event)
+  Worker_logger.Make (Event) (Request_view)
     (struct
       let worker_name = "node_mempol_worker"
     end)
@@ -216,16 +222,6 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
     | Not_in_branch ->
         Format.pp_print_string ppf "not in branch"
 
-  let operation_encoding =
-    let open Data_encoding in
-    conv
-      (fun {hash; raw; protocol_data} -> (hash, raw, protocol_data))
-      (fun (hash, raw, protocol_data) -> {hash; raw; protocol_data})
-      (obj3
-         (req "hash" Operation_hash.encoding)
-         (req "raw" Operation.encoding)
-         (req "protocol_data" Proto.operation_data_encoding))
-
   module Name = struct
     type t = Chain_id.t
 
@@ -245,19 +241,10 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
   module Request = struct
     type 'a t = Validate : operation -> result t [@@ocaml.unboxed]
 
-    type view = View : _ t -> view
+    include Request_view
 
-    let view req = View req
-
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun (View (Validate op)) -> op)
-        (fun op -> View (Validate op))
-        operation_encoding
-
-    let pp ppf (View (Validate {hash; _})) =
-      Format.fprintf ppf "Validating new operation %a" Operation_hash.pp hash
+    let view : type a. a t -> view =
+     fun t -> match t with Validate {hash; _} -> (hash : view)
   end
 
   (* parsed operations' cache. used for memoization *)
@@ -584,16 +571,11 @@ module Make (Static : STATIC) (Proto : Registered_protocol.T) :
     Lwt.return_unit
 
   let on_error w r st errs =
-    Worker.record_event
-      w
-      (Event.Request (lazy (Format.asprintf "%a" Request.pp r), st, Some errs)) ;
+    Worker.record_event w (Event.Request (r, st, Some errs)) ;
     Lwt.return_error errs
 
   let on_completion w r _ st =
-    Worker.record_event
-      w
-      (Event.Request
-         (lazy (Format.asprintf "%a" Request.pp (Request.view r)), st, None)) ;
+    Worker.record_event w (Event.Request (Request.view r, st, None)) ;
     Lwt.return_unit
 
   let table = Worker.create_table Queue

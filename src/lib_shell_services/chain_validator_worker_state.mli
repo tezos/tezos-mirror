@@ -45,6 +45,10 @@ module Event : sig
       }
     | Could_not_switch_testchain of error list
 
+  type view = t
+
+  val view : t -> view
+
   val level : t -> Internal_event.level
 
   val encoding : t Data_encoding.encoding

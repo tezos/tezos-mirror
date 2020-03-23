@@ -62,6 +62,10 @@ module Event = struct
         Request.view * Worker_types.request_status * error list
     | Debug of string
 
+  type view = t
+
+  let view t = t
+
   let level req =
     match req with
     | Debug _ ->

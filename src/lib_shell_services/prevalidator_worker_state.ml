@@ -124,6 +124,10 @@ module Event = struct
         (Request.view * Worker_types.request_status * error list option)
     | Debug of string
 
+  type view = t
+
+  let view t = t
+
   let level req =
     let open Request in
     match req with

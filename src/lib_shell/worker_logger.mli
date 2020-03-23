@@ -27,5 +27,8 @@ module type STATIC = sig
   val worker_name : string
 end
 
-module Make (Event : Worker.EVENT) (Static : STATIC) :
-  Worker.LOGGER with module Event = Event
+module Make
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.VIEW)
+    (Static : STATIC) :
+  Worker_intf.LOGGER with module Event = Event and module Request = Request

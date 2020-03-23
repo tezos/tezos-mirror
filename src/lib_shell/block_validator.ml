@@ -80,8 +80,7 @@ module Request = struct
 end
 
 module Logger =
-  Worker_logger.Make
-    (Event)
+  Worker_logger.Make (Event) (Request)
     (struct
       let worker_name = "node_block_validator"
     end)

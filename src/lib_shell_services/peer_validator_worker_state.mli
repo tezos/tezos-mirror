@@ -37,6 +37,10 @@ module Event : sig
         (Request.view * Worker_types.request_status * error list option)
     | Debug of string
 
+  type view = t
+
+  val view : t -> view
+
   val level : t -> Internal_event.level
 
   val encoding : t Data_encoding.encoding

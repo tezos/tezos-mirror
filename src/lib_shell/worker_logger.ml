@@ -23,20 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Worker
-
 module type STATIC = sig
   val worker_name : string
 end
 
-module Make (Event : EVENT) (Static : STATIC) :
-  LOGGER with module Event = Event = struct
+module Make
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.VIEW)
+    (Static : STATIC) :
+  Worker_intf.LOGGER with module Event = Event and module Request = Request =
+struct
   module Event = Event
+  module Request = Request
 
   type status =
-    | WorkerEvent of Event.t
+    | WorkerEvent of (Event.t * Internal_event.level)
     | Request of
-        (string Lazy.t * Worker_types.request_status * error list option)
+        (Request.view * Worker_types.request_status * error list option)
     | Terminated
     | Timeout
     | Crashed of error list
@@ -53,19 +56,20 @@ module Make (Event : EVENT) (Static : STATIC) :
          [ case
              (Tag 0)
              ~title:"Event"
-             Event.encoding
-             (function WorkerEvent e -> Some e | _ -> None)
-             (fun e -> WorkerEvent e);
+             (obj2
+                (req "event" @@ dynamic_size Event.encoding)
+                (req "level" Internal_event.Level.encoding))
+             (function WorkerEvent (e, l) -> Some (e, l) | _ -> None)
+             (fun (e, l) -> WorkerEvent (e, l));
            case
              (Tag 1)
              ~title:"Request"
              (obj3
-                (req "request_view" string)
+                (req "request_view" @@ dynamic_size Request.encoding)
                 (req "request_status" Worker_types.request_status_encoding)
                 (req "errors" (option (list error_encoding))))
-             (function
-               | Request (v, s, e) -> Some (Lazy.force v, s, e) | _ -> None)
-             (fun (v, s, e) -> Request (lazy v, s, e));
+             (function Request (v, s, e) -> Some (v, s, e) | _ -> None)
+             (fun (v, s, e) -> Request (v, s, e));
            case
              (Tag 2)
              ~title:"Terminated"
@@ -104,20 +108,22 @@ module Make (Event : EVENT) (Static : STATIC) :
              (fun n -> Duplicate n) ]
 
   let pp base_name ppf = function
-    | WorkerEvent evt ->
+    | WorkerEvent (evt, _) ->
         Format.fprintf ppf "%a" Event.pp evt
     | Request (view, {pushed; treated; completed}, None) ->
         Format.fprintf
           ppf
-          "@[<v 0>%s@, %a@]"
-          (Lazy.force view)
+          "@[<v 0>%a@, %a@]"
+          Request.pp
+          view
           Worker_types.pp_status
           {pushed; treated; completed}
     | Request (view, {pushed; treated; completed}, Some errors) ->
         Format.fprintf
           ppf
-          "@[<v 0>%s@, %a, %a@]"
-          (Lazy.force view)
+          "@[<v 0>%a@, %a, %a@]"
+          Request.pp
+          view
           Worker_types.pp_status
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
@@ -163,8 +169,8 @@ module Make (Event : EVENT) (Static : STATIC) :
 
     let level (status : t) =
       match status.data with
-      | WorkerEvent evt ->
-          Event.level evt
+      | WorkerEvent (_, level) ->
+          level
       | Request _ ->
           Internal_event.Debug
       | Terminated | Timeout | Started _ ->

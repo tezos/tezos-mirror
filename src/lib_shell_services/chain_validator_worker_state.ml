@@ -45,6 +45,10 @@ module Event = struct
       }
     | Could_not_switch_testchain of error list
 
+  type view = t
+
+  let view t = t
+
   let level = function
     | Processed_block req -> (
       match req.update with

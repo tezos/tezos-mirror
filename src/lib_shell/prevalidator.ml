@@ -36,8 +36,7 @@ type limits = {
 type name_t = Chain_id.t * Protocol_hash.t
 
 module Logger =
-  Worker_logger.Make
-    (Event)
+  Worker_logger.Make (Event) (Request)
     (struct
       let worker_name = "node_prevalidator"
     end)
@@ -83,9 +82,9 @@ module type T = sig
     mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   }
 
-  module Name : Worker.NAME with type t = name_t
+  module Name : Worker_intf.NAME with type t = name_t
 
-  module Types : Worker.TYPES with type state = types_state
+  module Types : Worker_intf.TYPES with type state = types_state
 
   module Worker :
     Worker.T
