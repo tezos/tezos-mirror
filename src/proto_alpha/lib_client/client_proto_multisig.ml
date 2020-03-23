@@ -686,7 +686,7 @@ let multisig_bytes ~counter ~action ~contract ~chain_id ~descr () =
     Data_encoding.Binary.to_bytes_exn Script.expr_encoding
     @@ Tezos_micheline.Micheline.strip_locations @@ triple
   in
-  return @@ Bytes.concat (Bytes.of_string "") [Bytes.of_string "\005"; bytes]
+  return @@ Bytes.cat (Bytes.of_string "\005") bytes
 
 let check_threshold ~threshold ~keys () =
   let nkeys = List.length keys in
