@@ -37,7 +37,7 @@ let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
 let init = "Laissez-faire les proprietaires."
 
-let zero_bytes = Bytes.of_string (String.make Nonce_hash.size '\000')
+let zero_bytes = Bytes.make Nonce_hash.size '\000'
 
 let state_hash_encoding =
   let open Data_encoding in
