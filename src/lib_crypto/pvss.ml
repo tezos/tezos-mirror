@@ -214,7 +214,7 @@ module type PVSS = sig
 
   val dealer_shares_and_proof :
     secret:Secret_key.t ->
-    t:int ->
+    threshold:int ->
     public_keys:Public_key.t list ->
     Encrypted_share.t list * Commitment.t list * proof
 
@@ -297,11 +297,11 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     let poly = PZ_m.of_list coefs in
     (coefs, poly)
 
-  (* Hides secret s in a random polynomial of degree t, publishes t commitments
-     to the polynomial coefficients and n encrypted shares for the holders of
-     the public keys *)
-  let dealer_shares_and_proof ~secret ~t ~public_keys =
-    let (coefs, poly) = random_polynomial secret t in
+  (* Hides secret s in a random polynomial of degree t = threshold, publishes t
+     commitments to the polynomial coefficients and n encrypted shares for the
+     holders of the public keys *)
+  let dealer_shares_and_proof ~secret ~threshold ~public_keys =
+    let (coefs, poly) = random_polynomial secret threshold in
     let
         (*  Cⱼ represents the commitment to the coefficients of the polynomial
           Cⱼ = g₁^(aⱼ) for j in 0 to t-1  *)

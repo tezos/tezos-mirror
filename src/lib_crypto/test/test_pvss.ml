@@ -96,7 +96,7 @@ end = struct
         in
         {secret_key; public_key = Pvss.Secret_key.to_public_key secret_key})
 
-  let t = 5
+  let threshold = 5
 
   let n = 8
 
@@ -119,8 +119,9 @@ end = struct
 
   let ( (shares, commitments, proof),
         (other_shares, other_commitments, other_proof) ) =
-    ( Pvss.dealer_shares_and_proof ~secret ~t ~public_keys,
-      Pvss.dealer_shares_and_proof ~secret:other_secret ~t ~public_keys )
+    ( Pvss.dealer_shares_and_proof ~secret ~threshold ~public_keys,
+      Pvss.dealer_shares_and_proof ~secret:other_secret ~threshold ~public_keys
+    )
 
   let reveals =
     List.map2
