@@ -741,7 +741,7 @@ let rec step :
       logged_return ((Script_int.(abs (of_int (String.length s))), rest), ctxt)
   (* bytes operations *)
   | (Concat_bytes_pair, (x, (y, rest))) ->
-      let s = Bytes.concat Bytes.empty [x; y] in
+      let s = Bytes.cat x y in
       logged_return ((s, rest), ctxt)
   | (Concat_bytes, (ss, rest)) ->
       let s = Bytes.concat Bytes.empty ss.elements in

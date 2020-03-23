@@ -5337,7 +5337,7 @@ let pack_data ctxt typ data =
   in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
   >>=? fun ctxt ->
-  let bytes = Bytes.concat Bytes.empty [Bytes.of_string "\005"; bytes] in
+  let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
   >>=? fun ctxt -> return (bytes, ctxt)
 
