@@ -331,7 +331,7 @@ val equal: t -> t -> bool
     always-correct {!Bytes.to_string} and {!Bytes.of_string} instead.
 *)
 
-val unsafe_to_string : bytes -> string
+(* val unsafe_to_string : bytes -> string *)
 (** Unsafely convert a byte sequence into a string.
 
     To reason about the use of [unsafe_to_string], it is convenient to
@@ -407,7 +407,7 @@ let bytes_length (s : bytes) =
    closure is fully applied and returns ownership.
 *)
 
-val unsafe_of_string : string -> bytes
+(* val unsafe_of_string : string -> bytes *)
 (** Unsafely convert a shared string to a byte sequence that should
     not be mutated.
 
