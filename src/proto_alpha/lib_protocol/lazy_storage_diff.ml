@@ -52,6 +52,8 @@ module type OPS = sig
     Raw_context.t -> id:Z.t -> updates -> (Raw_context.t * Z.t) tzresult Lwt.t
 
   module Next : sig
+    val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
     val incr : Raw_context.t -> (Raw_context.t * Z.t) tzresult Lwt.t
   end
 
@@ -308,6 +310,14 @@ let fresh :
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
+
+let init ctxt =
+  fold_left_s
+    (fun ctxt (_tag, Lazy_storage_kind.E k) ->
+      let (module OPS) = get_ops k in
+      OPS.Next.init ctxt)
+    ctxt
+    Lazy_storage_kind.all
 
 let cleanup_temporaries =
   let cleanup_fs = Lazy_storage_kind.Record.{big_map = Big_map.remove_rec} in
