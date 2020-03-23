@@ -75,4 +75,6 @@ val fresh :
   Raw_context.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
+val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 val cleanup_temporaries : Raw_context.t -> Raw_context.t Lwt.t
