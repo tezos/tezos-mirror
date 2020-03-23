@@ -797,7 +797,7 @@ let credit c contract amount =
 
 let init c =
   Storage.Contract.Global_counter.init c Z.zero
-  >>=? fun c -> Storage.Big_map.Next.init c
+  >>=? fun c -> Lazy_storage_diff.init c
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract
