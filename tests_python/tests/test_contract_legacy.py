@@ -14,10 +14,8 @@ class TestContractLegacy:
     def test_legacy_typecheck(self, client_regtest, contract):
         client = client_regtest
 
-        def cmd():
+        with utils.assert_run_failure(r'Use of deprecated instruction'):
             client.typecheck(path.join(CONTRACT_PATH, contract))
-
-        utils.assert_run_failure(cmd, r'Use of deprecated instruction')
 
     @pytest.mark.parametrize(
         "contract,param,storage,expected",
