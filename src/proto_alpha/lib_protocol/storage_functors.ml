@@ -47,7 +47,7 @@ module Make_encoder (V : VALUE) = struct
     | Some b ->
         b
     | None ->
-        Bytes.create 0
+        Bytes.empty
 end
 
 let len_name = "len"

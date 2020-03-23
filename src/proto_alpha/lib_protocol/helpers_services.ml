@@ -563,8 +563,7 @@ module Forge = struct
         RPC_path.(path / "operations")
 
     let empty_proof_of_work_nonce =
-      Bytes.of_string
-        (String.make Constants_repr.proof_of_work_nonce_size '\000')
+      Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
     let protocol_data =
       RPC_service.post_service
@@ -742,8 +741,7 @@ module Forge = struct
     operation ctxt block ~branch (Double_endorsement_evidence {op1; op2})
 
   let empty_proof_of_work_nonce =
-    Bytes.of_string
-      (String.make Constants_repr.proof_of_work_nonce_size '\000')
+    Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
   let protocol_data ctxt block ~priority ?seed_nonce_hash
       ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
