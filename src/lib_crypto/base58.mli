@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,6 +38,12 @@ module Prefix : sig
   val protocol_hash : string
 
   val context_hash : string
+
+  val operation_metadata_hash : string
+
+  val operation_metadata_list_hash : string
+
+  val operation_metadata_list_list_hash : string
 
   val ed25519_public_key_hash : string
 
