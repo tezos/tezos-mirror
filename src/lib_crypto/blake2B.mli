@@ -54,7 +54,7 @@ end
 (** Builds a new Hash type using Blake2B. *)
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 
-module Make (Register : sig
+module type Register = sig
   val register_encoding :
     prefix:string ->
     length:int ->
@@ -62,8 +62,9 @@ module Make (Register : sig
     of_raw:(string -> 'a option) ->
     wrap:('a -> Base58.data) ->
     'a Base58.encoding
-end)
-(Name : PrefixedName) : S.HASH
+end
+
+module Make (Register : Register) (Name : PrefixedName) : S.HASH
 
 (**/**)
 
