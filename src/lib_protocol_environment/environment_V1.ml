@@ -376,6 +376,18 @@ struct
 
     module type MAP = Tezos_protocol_environment_structs.V0.M.S.MAP
 
+    module type INDEXES_Set = sig
+      include SET
+
+      val encoding : t Data_encoding.t
+    end
+
+    module type INDEXES_Map = sig
+      include MAP
+
+      val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+    end
+
     module type INDEXES = sig
       type t
 
@@ -389,17 +401,9 @@ struct
 
       val path_length : int
 
-      module Set : sig
-        include SET with type elt = t
+      module Set : INDEXES_Set with type elt = t
 
-        val encoding : t Data_encoding.t
-      end
-
-      module Map : sig
-        include MAP with type key = t
-
-        val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
-      end
+      module Map : INDEXES_Map with type key = t
     end
 
     module type HASH = sig
@@ -432,42 +436,49 @@ struct
       val path_encoding : path Data_encoding.t
     end
 
+    module type SPublic_key_hash = sig
+      type t
+
+      val pp : Format.formatter -> t -> unit
+
+      val pp_short : Format.formatter -> t -> unit
+
+      include Compare.S with type t := t
+
+      include RAW_DATA with type t := t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+
+      include INDEXES with type t := t
+
+      val zero : t
+    end
+
+    module type SPublic_key = sig
+      type t
+
+      val pp : Format.formatter -> t -> unit
+
+      include Compare.S with type t := t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+
+      type public_key_hash_t
+
+      val hash : t -> public_key_hash_t
+
+      val size : t -> int (* in bytes *)
+    end
+
     module type SIGNATURE = sig
-      module Public_key_hash : sig
-        type t
+      module Public_key_hash : SPublic_key_hash
 
-        val pp : Format.formatter -> t -> unit
-
-        val pp_short : Format.formatter -> t -> unit
-
-        include Compare.S with type t := t
-
-        include RAW_DATA with type t := t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-
-        include INDEXES with type t := t
-
-        val zero : t
-      end
-
-      module Public_key : sig
-        type t
-
-        val pp : Format.formatter -> t -> unit
-
-        include Compare.S with type t := t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-
-        val hash : t -> Public_key_hash.t
-
-        val size : t -> int (* in bytes *)
-      end
+      module Public_key :
+        SPublic_key with type public_key_hash_t := Public_key_hash.t
 
       type t
 

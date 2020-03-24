@@ -169,7 +169,7 @@ module Make_minimal (K : Name) = struct
   end)
 end
 
-module Make (R : sig
+module type SRegister = sig
   val register_encoding :
     prefix:string ->
     length:int ->
@@ -177,9 +177,9 @@ module Make (R : sig
     of_raw:(string -> 'a option) ->
     wrap:('a -> Base58.data) ->
     'a Base58.encoding
-end)
-(K : PrefixedName) =
-struct
+end
+
+module Make (R : SRegister) (K : PrefixedName) = struct
   include Make_minimal (K)
 
   (* Serializers *)
