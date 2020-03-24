@@ -151,12 +151,81 @@ module Topology = struct
     make ~prefix:"" network
 end
 
+module Queries = struct
+  let all_levels ?(chain = "main") state ~nodes =
+    List.fold nodes ~init:(return [])
+      ~f:(fun prevm {Tezos_node.id; rpc_port; _} ->
+        prevm
+        >>= fun prev ->
+        Running_processes.run_cmdf state
+          (* the header RPC is the most consistent across protocols: *)
+          "curl http://localhost:%d/chains/%s/blocks/head/header" rpc_port
+          chain
+        >>= fun metadata ->
+        Console.display_errors_of_command state metadata ~should_output:true
+        >>= (function
+              | true -> (
+                try
+                  `Level
+                    ( Jqo.of_lines metadata#out |> Jqo.field ~k:"level"
+                    |> Jqo.get_int )
+                  |> return
+                with _ -> return `Failed )
+              | false -> return `Failed)
+        >>= fun res -> return ((id, res) :: prev))
+    >>= fun results ->
+    let sorted =
+      List.sort results ~compare:(fun (a, _) (b, _) -> String.compare a b)
+    in
+    return sorted
+
+  let wait_for_all_levels_to_be ?attempts_factor ?chain state ~attempts
+      ~seconds nodes level =
+    let check_level =
+      match level with
+      | `Equal_to l -> ( = ) l
+      | `At_least l -> fun x -> x >= l in
+    let level_string =
+      match level with
+      | `Equal_to l -> sprintf "= %d" l
+      | `At_least l -> sprintf "≥ %d" l in
+    let msg ids =
+      let show_node (id, res) =
+        sprintf "%s (%s)" id
+          ( match res with
+          | `Failed -> "failed"
+          | `Level l -> sprintf "%d" l
+          | `Null -> "null"
+          | `Unknown s -> sprintf "¿¿ %S ??" s ) in
+      sprintf "Waiting for %s to reach level %s"
+        (String.concat (List.map ~f:show_node ids) ~sep:", ")
+        level_string in
+    Console.say state
+      EF.(
+        wf "Checking for all levels to be %s (nodes: %s%s)" level_string
+          (String.concat ~sep:", "
+             (List.map nodes ~f:(fun n -> n.Tezos_node.id)))
+          (Option.value_map chain ~default:"" ~f:(sprintf ", chain: %s")))
+    >>= fun () ->
+    Helpers.wait_for state ?attempts_factor ~attempts ~seconds (fun _nth ->
+        all_levels state ~nodes ?chain
+        >>= fun results ->
+        let not_readys =
+          List.filter_map results ~f:(function
+            | _, `Level n when check_level n -> None
+            | id, res -> Some (id, res)) in
+        match not_readys with
+        | [] -> return (`Done ())
+        | ids -> return (`Not_done (msg ids)))
+end
+
 module Network = struct
   type t = {nodes: Tezos_node.t list}
 
   let make nodes = {nodes}
 
-  let start_up ?(check_ports = true) state ~client_exec {nodes} =
+  let start_up ?(do_activation = true) ?(check_ports = true) state ~client_exec
+      {nodes} =
     ( if check_ports then
       Helpers.Netstat.used_listening_ports state
       >>= fun all_used ->
@@ -195,17 +264,30 @@ module Network = struct
     Dbg.e EF.(af "Trying to bootstrap client") ;
     Tezos_client.wait_for_node_bootstrap state client
     >>= fun () ->
-    Tezos_client.activate_protocol state client protocol
+    Tezos_client.rpc state ~client `Get ~path:"/chains/main/blocks/head/header"
+    >>= fun json ->
+    let do_activation =
+      (* If the level is 0 we still do the activation. *)
+      do_activation
+      ||
+      try Int.equal Jqo.(field ~k:"level" json |> get_int) 0 with _ -> false
+    in
+    ( if do_activation then Tezos_client.activate_protocol state client protocol
+    else return () )
     >>= fun () ->
     Dbg.e EF.(af "Waiting for all nodes to be bootstrapped") ;
     List_sequential.iter nodes ~f:(fun node ->
         let client = Tezos_client.of_node node ~exec:client_exec in
         Tezos_client.wait_for_node_bootstrap state client)
+    >>= fun () ->
+    (* We make sure all nodes got activation before trying to continue: *)
+    Queries.wait_for_all_levels_to_be state ~attempts:20 ~seconds:0.5
+      ~attempts_factor:0.8 nodes (`At_least 1)
 end
 
-let network_with_protocol ?node_custom_network ?external_peer_ports ?base_port
-    ?(size = 5) ?protocol ?(nodes_history_mode_edits = return) state ~node_exec
-    ~client_exec =
+let network_with_protocol ?do_activation ?node_custom_network
+    ?external_peer_ports ?base_port ?(size = 5) ?protocol
+    ?(nodes_history_mode_edits = return) state ~node_exec ~client_exec =
   let pre_edit_nodes =
     Topology.build ?base_port ?external_peer_ports
       ~make_node:(fun id ~expected_connections ~rpc_port ~p2p_port peers ->
@@ -221,71 +303,5 @@ let network_with_protocol ?node_custom_network ?external_peer_ports ?base_port
   >>= fun protocol ->
   Inconsistency_error.should_be_one_timestamp_delay protocols
   >>= fun () ->
-  Network.start_up state ~client_exec (Network.make nodes)
+  Network.start_up ?do_activation state ~client_exec (Network.make nodes)
   >>= fun () -> return (nodes, protocol)
-
-module Queries = struct
-  let all_levels ?(chain = "main") state ~nodes =
-    List.fold nodes ~init:(return [])
-      ~f:(fun prevm {Tezos_node.id; rpc_port; _} ->
-        prevm
-        >>= fun prev ->
-        Running_processes.run_cmdf state
-          "curl http://localhost:%d/chains/%s/blocks/head/metadata" rpc_port
-          chain
-        >>= fun metadata ->
-        Console.display_errors_of_command state metadata ~should_output:true
-        >>= (function
-              | true -> (
-                try
-                  `Level
-                    ( Jqo.of_lines metadata#out |> Jqo.field ~k:"level"
-                    |> Jqo.field ~k:"level" |> Jqo.get_int )
-                  |> return
-                with _ -> return `Failed )
-              | false -> return `Failed)
-        >>= fun res -> return ((id, res) :: prev))
-    >>= fun results ->
-    let sorted =
-      List.sort results ~compare:(fun (a, _) (b, _) -> String.compare a b)
-    in
-    return sorted
-
-  let wait_for_all_levels_to_be ?chain state ~attempts ~seconds nodes level =
-    let check_level =
-      match level with
-      | `Equal_to l -> ( = ) l
-      | `At_least l -> fun x -> x >= l in
-    let level_string =
-      match level with
-      | `Equal_to l -> sprintf "= %d" l
-      | `At_least l -> sprintf "≥ %d" l in
-    let msg ids =
-      let show_node (id, res) =
-        sprintf "%s (%s)" id
-          ( match res with
-          | `Failed -> "failed"
-          | `Level l -> sprintf "%d" l
-          | `Null -> "null"
-          | `Unknown s -> sprintf "¿¿ %S ??" s ) in
-      sprintf "Waiting for %s to reach level %s"
-        (String.concat (List.map ~f:show_node ids) ~sep:", ")
-        level_string in
-    Console.say state
-      EF.(
-        wf "Checking for all levels to be %s (nodes: %s%s)" level_string
-          (String.concat ~sep:", "
-             (List.map nodes ~f:(fun n -> n.Tezos_node.id)))
-          (Option.value_map chain ~default:"" ~f:(sprintf ", chain: %s")))
-    >>= fun () ->
-    Helpers.wait_for state ~attempts ~seconds (fun _nth ->
-        all_levels state ~nodes ?chain
-        >>= fun results ->
-        let not_readys =
-          List.filter_map results ~f:(function
-            | _, `Level n when check_level n -> None
-            | id, res -> Some (id, res)) in
-        match not_readys with
-        | [] -> return (`Done ())
-        | ids -> return (`Not_done (msg ids)))
-end

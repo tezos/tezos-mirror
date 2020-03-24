@@ -84,6 +84,7 @@ module History_modes : sig
 end
 
 module Config_file : sig
+  val network : ?genesis_hash:string -> unit -> (string * Ezjsonm.value) list
   val default_network : (string * Ezjsonm.value) list
   val of_node : < paths: Paths.t ; .. > -> t -> string
 end

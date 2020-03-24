@@ -27,18 +27,19 @@ let clear_root state =
   | Unix.WEXITED 0 -> return ()
   | _ -> System_error.fail_fatalf "cannot delete root path (%S)" root
 
-let wait_for state ~attempts ~seconds f =
+let wait_for ?(attempts_factor = 0.) state ~attempts ~seconds f =
   let rec attempt nth =
     let again () = attempt (nth + 1) in
     f nth
     >>= function
     | `Done x -> return x
     | `Not_done msg when nth < attempts ->
+        let sleep_time = Float.((attempts_factor * of_int nth) + seconds) in
         say state
           EF.(
             wf "%s: attempt %d/%d, sleeping %.02f seconds" msg nth attempts
-              seconds)
-        >>= fun () -> System.sleep seconds >>= fun () -> again ()
+              sleep_time)
+        >>= fun () -> System.sleep sleep_time >>= fun () -> again ()
     | `Not_done msg -> fail (`Waiting_for (msg, `Time_out)) in
   attempt 1
 

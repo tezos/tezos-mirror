@@ -71,7 +71,8 @@ module Network : sig
   val make : Tezos_node.t list -> t
 
   val start_up :
-       ?check_ports:bool
+       ?do_activation:bool
+    -> ?check_ports:bool
     -> < Base_state.base
        ; env_config: Environment_configuration.t
        ; paths: Paths.t
@@ -86,12 +87,21 @@ module Network : sig
          | Process_result.Error.t
          | Process_result.Error.t
          | `Too_many_protocols of Tezos_protocol.t list
-         | `Too_many_timestamp_delays of Tezos_protocol.t list ] )
+         | `Too_many_timestamp_delays of Tezos_protocol.t list
+         | `Waiting_for of string * [`Time_out] ] )
        Asynchronous_result.t
+  (** Start the nodes, bootstrap the client, and (potentially)
+      activate the protocol of a network.
+
+      - [?do_activation]: if [true] the start-up will try to activate
+        the protocol, if [false] it will do it only if the current
+        level of the chain is [0].
+ *)
 end
 
 val network_with_protocol :
-     ?node_custom_network:[`Json of Ezjsonm.value]
+     ?do_activation:bool
+  -> ?node_custom_network:[`Json of Ezjsonm.value]
   -> ?external_peer_ports:int list
   -> ?base_port:int
   -> ?size:int
@@ -102,7 +112,8 @@ val network_with_protocol :
                                 | Process_result.Error.t
                                 | `Too_many_protocols of Tezos_protocol.t list
                                 | `Too_many_timestamp_delays of
-                                  Tezos_protocol.t list ]
+                                  Tezos_protocol.t list
+                                | `Waiting_for of string * [`Time_out] ]
                                 as
                                 'errors)
                                Tezos_node.History_modes.edit
@@ -116,7 +127,7 @@ val network_with_protocol :
   -> client_exec:Tezos_executable.t
   -> (Tezos_node.t list * Tezos_protocol.t, 'errors) Asynchronous_result.t
 (** [network_with_protocol] is a wrapper simply starting-up a
-    {!Topology.mesh}. *)
+    {!Topology.mesh}. See {!Network.start_up} for details on some arguments. *)
 
 (** Run queries on running networks. *)
 module Queries : sig
@@ -136,7 +147,8 @@ module Queries : sig
       node-ID × level } values. *)
 
   val wait_for_all_levels_to_be :
-       ?chain:string
+       ?attempts_factor:float
+    -> ?chain:string
     -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t

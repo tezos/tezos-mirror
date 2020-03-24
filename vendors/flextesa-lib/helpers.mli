@@ -14,7 +14,8 @@ val clear_root :
 (** Remove (["rm -fr .."]) the root-path of the current [state]. *)
 
 val wait_for :
-     < application_name: string ; console: Console.t ; .. >
+     ?attempts_factor:float
+  -> < application_name: string ; console: Console.t ; .. >
   -> attempts:int
   -> seconds:float
   -> (   int
@@ -24,7 +25,9 @@ val wait_for :
             'errors) )
          Asynchronous_result.t)
   -> ('a, 'errors) Asynchronous_result.t
-(** Try to wait for an event. *)
+(** Try to wait for an event. The pause between attempts is
+    [(attempts_factor * attempts) + seconds] where the default
+    [attempts_factor] is [0.]. *)
 
 val kill_node :
      < runner: Running_processes.State.t ; .. >

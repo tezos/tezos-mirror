@@ -96,3 +96,10 @@ val ensure :
 val cli_term : < manpager: Manpage_builder.State.t ; .. > -> t Cmdliner.Term.t
 (** Create a [Cmdliner] term which configures protocol-parameters
     (e.g. options like ["--time-between-blocks"]). *)
+
+(** Pretty-printers for protocol-dependent things (e.g. RPC JSON blobs). *)
+module Pretty_print : sig
+  val verbatim_protection : Ezjsonm.value Fmt.t -> Ezjsonm.value Fmt.t
+  val mempool_pending_operations_rpc : Ezjsonm.value Fmt.t
+  val block_head_rpc : Ezjsonm.value Fmt.t
+end

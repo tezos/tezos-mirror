@@ -42,7 +42,7 @@ module Markup_fmt = struct
       | `Text s -> text ppf s
       | `Concat l -> List.iter l ~f:(pp_in_par ppf)
       | `Highlight s ->
-          Caml.Format.pp_open_stag ppf (Caml.Format.String_tag "prompt") ;
+          Caml.Format.(pp_open_stag ppf (String_tag "prompt")) ;
           pp_in_par ppf s ;
           Caml.Format.pp_close_stag ppf () in
     vertical_box ppf (fun ppf ->

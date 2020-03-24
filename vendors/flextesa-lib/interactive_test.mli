@@ -62,6 +62,7 @@ module Commands : sig
 
   val curl_unit_display :
        ?jq:(Ezjsonm.value -> Ezjsonm.value)
+    -> ?pp_json:(Formatter.t -> Ezjsonm.value -> unit)
     -> < application_name: string
        ; console: Console.t
        ; paths: Paths.t
@@ -173,6 +174,17 @@ module Commands : sig
     -> Console.Prompt.item list
 
   val bake_command :
+       < application_name: string
+       ; console: Console.t
+       ; operations_log: Log_recorder.Operations.t
+       ; env_config: Environment_configuration.t
+       ; paths: Paths.t
+       ; runner: Running_processes.State.t
+       ; .. >
+    -> clients:Tezos_client.Keyed.t list
+    -> Console.Prompt.item
+
+  val generate_traffic_command :
        < application_name: string
        ; console: Console.t
        ; operations_log: Log_recorder.Operations.t

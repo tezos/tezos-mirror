@@ -46,19 +46,21 @@ let default () =
 type 'a state = < env_config: t ; .. > as 'a
 
 let prefix state = state#env_config.prefix
+let varname pref var = Fmt.str "%s%s" pref var.name
 
 let init state env_config =
   let reg_var vf =
     let v = vf env_config in
-    Manpage_builder.State.register_env_variable state v.name v.doc in
+    Manpage_builder.State.register_env_variable state
+      (varname env_config.prefix v)
+      v.doc in
   reg_var (fun e -> e.default_cors_origin) ;
   reg_var (fun e -> e.better_call_dev_base_url) ;
   reg_var (fun e -> e.default_events_level)
 
 let get_var_from_environment state varf =
   let var = varf state#env_config in
-  let varname = Fmt.str "%s%s" (prefix state) var.name in
-  Caml.Sys.getenv_opt varname |> var.transform
+  Caml.Sys.getenv_opt (varname state#env_config.prefix var) |> var.transform
 
 let default_cors_origin state =
   get_var_from_environment state (fun e -> e.default_cors_origin)

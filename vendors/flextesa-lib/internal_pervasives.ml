@@ -108,7 +108,7 @@ module More_fmt = struct
         string ppf (String.make 45 '`'))
 
   let tag tag ppf f =
-    Caml.Format.pp_open_stag ppf (Caml.Format.String_tag tag) ;
+    Caml.Format.(pp_open_stag ppf (String_tag tag)) ;
     (f ppf : unit) ;
     Caml.Format.pp_close_stag ppf ()
 
@@ -119,6 +119,10 @@ module More_fmt = struct
     match String.sub s ~pos:0 ~len:(max - 2) with
     | s -> pf ppf "%S" (s ^ "...")
     | exception _ -> pf ppf "%S" s
+
+  let json ppf json =
+    markdown_verbatim_list ppf
+      (Ezjsonm.value_to_string ~minify:false json |> String.split ~on:'\n')
 end
 
 (** An “decorated result type” based on polymorphic variants *)
@@ -361,6 +365,9 @@ module System_error = struct
       (fun () -> Lwt.bind (f x) @@ fun r -> return r)
       (fun exn -> fail_fatal ?attach (Exception exn))
 
+  let catch_exn ?attach f =
+    try return (f ()) with exn -> fail_fatal ?attach (Exception exn)
+
   let fail_fatalf ?attach fmt =
     Fmt.kstr (fun e -> fail_fatal ?attach (Message e)) fmt
 
@@ -541,4 +548,5 @@ module Jqo = struct
   let get_string = Ezjsonm.get_string
   let get_strings = Ezjsonm.get_strings
   let get_int = Ezjsonm.get_int
+  let get_list = Ezjsonm.get_list (fun e -> e)
 end

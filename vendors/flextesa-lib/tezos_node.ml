@@ -54,19 +54,30 @@ let log_output config t = make_path "node-output.log" ~config t
 let exec_path config t = make_path ~config "exec" t
 
 module Config_file = struct
-  (* 
+  (*
      This module pruposedly avoids using the node's modules because we
      want the sandbox to be able to configure ≥ 1 versions of the
      node.
-  *)
 
-  let default_network =
+     Choosing the default hash:
+
+      $ ./flextesa vani SBox --att 10_000_000
+     Flextesa.vanity-chain-id:  Looking for "SBox"
+     Flextesa.vanity-chain-id:
+       Results:
+         * Seed: "flextesa5316422" → block: "BLdZYwNF8Rn6zrTWkuRRNyrj6bQWPkfBog2YKhWhn5z3ApmpzBf" → chain-id: "NetXKMbjQL2SBox"
+
+
+   *)
+
+  let network
+      ?(genesis_hash = "BLdZYwNF8Rn6zrTWkuRRNyrj6bQWPkfBog2YKhWhn5z3ApmpzBf")
+      () =
     let open Ezjsonm in
     [ ( "genesis"
       , dict
           [ ("timestamp", string "2018-06-30T16:07:32Z")
-          ; ( "block"
-            , string "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" )
+          ; ("block", string genesis_hash)
           ; ( "protocol"
             , string "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" ) ]
       )
@@ -74,6 +85,8 @@ module Config_file = struct
     ; ("old_chain_name", string "TEZOS_BETANET_2018-06-30T16:07:32Z")
     ; ("incompatible_chain_name", string "INCOMPATIBLE")
     ; ("sandboxed_chain_name", string "SANDBOXED_TEZOS_MAINNET") ]
+
+  let default_network = network ()
 
   let of_node state t =
     let open Ezjsonm in
@@ -89,8 +102,9 @@ module Config_file = struct
                     | `Full -> string "full"
                     | `Rolling -> string "rolling" ) ] ) ] in
     let network =
-      Option.value_map t.custom_network ~default:[] ~f:(function `Json j ->
-          [("network", j)]) in
+      Option.value_map t.custom_network
+        ~default:[("network", `O default_network)]
+        ~f:(function `Json j -> [("network", j)]) in
     [ ("data-dir", data_dir state t |> string)
     ; ( "rpc"
       , dict [("listen-addrs", strings [sprintf "0.0.0.0:%d" t.rpc_port])] )
@@ -174,7 +188,7 @@ let connections node_list =
       | `Duplex (a, b), `Duplex (c, d) when equal a d && equal b c -> 0
       | `Duplex _, _ -> -1
       | _, `Duplex _ -> 1
-      | _, _ -> Stdlib.compare a b
+      | _, _ -> Caml.compare a b
   end in
   let module Connection_set = Caml.Set.Make (Connection) in
   let res = ref Connection_set.empty in

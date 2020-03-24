@@ -357,3 +357,94 @@ let cli_term state =
                    a tezos-node point of view, use at your own risk)."
                 ~docv:"JSON-FILE" ~docs)))
   $ Protocol_kind.cmdliner_term () ~docs
+
+module Pretty_print = struct
+  open More_fmt
+
+  let verbatim_protection f ppf json_blob =
+    try f ppf json_blob with e -> json ppf json_blob ; cut ppf () ; exn ppf e
+
+  let fail_expecting s = failwith "PP: Expecting %s" s
+
+  let mempool_pending_operations_rpc ppf mempool_json =
+    let pp_op_list_short ppf l =
+      let kinds =
+        List.map l ~f:(fun js -> Jqo.(field ~k:"kind" js |> get_string)) in
+      pf ppf "%s"
+        ( List.fold kinds ~init:[] ~f:(fun prev k ->
+              match prev with
+              | (kind, n) :: more when String.equal kind k ->
+                  (kind, n + 1) :: more
+              | other -> (k, 1) :: other)
+        |> List.map ~f:(function k, 1 -> k | k, n -> str "%s×%d" k n)
+        |> String.concat ~sep:"+" ) in
+    let open Jqo in
+    match mempool_json with
+    | `O four_fields ->
+        List.iter four_fields ~f:(fun (name, content) ->
+            pf ppf "@,* `%s`: " (String.capitalize name) ;
+            match content with
+            | `A [] -> pf ppf "Empty."
+            | `A l -> (
+              match name with
+              | "applied" ->
+                  List.iter l ~f:(fun op ->
+                      let contents = field ~k:"contents" op |> get_list in
+                      let pp_op_long ppf js =
+                        match field ~k:"kind" js |> get_string with
+                        | "transaction" ->
+                            pf ppf "@,       * Mutez:%s: `%s` -> `%s`%s"
+                              (field ~k:"amount" js |> get_string)
+                              (field ~k:"source" js |> get_string)
+                              (field ~k:"destination" js |> get_string)
+                              ( try
+                                  let _ = field ~k:"parameters" js in
+                                  "+parameters"
+                                with _ -> "" )
+                        | "origination" ->
+                            pf ppf
+                              "@,       * Mutez:%s, source: `%s`, fee: `%s`"
+                              (field ~k:"balance" js |> get_string)
+                              (field ~k:"source" js |> get_string)
+                              (field ~k:"fee" js |> get_string)
+                        | _ -> () in
+                      pf ppf "@,   * [%a] %a" pp_op_list_short contents
+                        (long_string ~max:15)
+                        (field ~k:"hash" op |> get_string) ;
+                      List.iter contents ~f:(pp_op_long ppf))
+              | _other ->
+                  List.iter l ~f:(function
+                    | `A [`String opid; op] ->
+                        let contents = field ~k:"contents" op |> get_list in
+                        pf ppf "@,    * [%s]: %a" opid pp_op_list_short
+                          contents ;
+                        pf ppf "@,    TODO: %a" json content
+                    | _ -> fail_expecting "a operation tuple") )
+            | _ -> fail_expecting "a list of operations")
+    | _ -> fail_expecting "a JSON object"
+
+  let block_head_rpc ppf block_json =
+    let open Jqo in
+    let proto = field ~k:"protocol" block_json |> get_string in
+    let hash = field ~k:"hash" block_json |> get_string in
+    let metadata = field ~k:"metadata" block_json in
+    let next_protocol = metadata |> field ~k:"next_protocol" |> get_string in
+    let header = field ~k:"header" block_json in
+    let level = field ~k:"level" header |> get_int in
+    let timestamp = field ~k:"timestamp" header |> get_string in
+    let voting_kind = metadata |> field ~k:"voting_period_kind" |> get_string in
+    let voting_pos =
+      metadata |> field ~k:"level"
+      |> field ~k:"voting_period_position"
+      |> get_int in
+    let voting_nth =
+      metadata |> field ~k:"level" |> field ~k:"voting_period" |> get_int in
+    let baker = metadata |> field ~k:"baker" |> get_string in
+    pf ppf "Level %d | `%s` | %s" level hash timestamp ;
+    pf ppf "@,* Protocol: `%s`" proto ;
+    if String.equal proto next_protocol then pf ppf " (also next)"
+    else pf ppf "@,* Next-protocol: `%s`" next_protocol ;
+    pf ppf "@,* Voting period %d: `%s` (level: %d)" voting_nth voting_kind
+      voting_pos ;
+    pf ppf "@,* Baker: `%s`" baker
+end

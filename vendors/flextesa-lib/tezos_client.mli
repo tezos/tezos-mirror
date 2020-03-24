@@ -328,7 +328,7 @@ module Keyed : sig
        ; runner: Running_processes.State.t
        ; .. >
     -> t
-    -> json:Ezjsonm.t
+    -> json:Ezjsonm.value
     -> ( Ezjsonm.value
        , [> Process_result.Error.t | System_error.t] )
        Asynchronous_result.t

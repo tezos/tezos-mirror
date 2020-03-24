@@ -72,7 +72,7 @@ let wait_for_node_bootstrap state client =
       ~id_prefix:(client.id ^ "-bootstrapped")
       state client ["bootstrapped"]
     >>= fun res -> return Poly.(res#status = Unix.WEXITED 0) in
-  let attempts = 12 in
+  let attempts = 20 in
   let rec loop nth =
     if nth >= attempts then failf "Bootstrapping failed %d times." nth
     else
@@ -80,7 +80,7 @@ let wait_for_node_bootstrap state client =
       >>= function
       | true -> return ()
       | false ->
-          System.sleep Float.(0.3 + (of_int nth * 0.5))
+          System.sleep Float.(0.3 + (of_int nth * 0.6))
           >>= fun () -> loop (nth + 1) in
   loop 1
 
@@ -373,7 +373,7 @@ module Keyed = struct
 
   let forge_and_inject state {client; key_name; _} ~json =
     rpc state ~client ~path:"/chains/main/blocks/head/helpers/forge/operations"
-      (`Post (Ezjsonm.to_string json))
+      (`Post (Ezjsonm.value_to_string json))
     >>= fun res ->
     let operation_bytes = match res with `String s -> s | _ -> assert false in
     let bytes_to_sign = "0x03" ^ operation_bytes in

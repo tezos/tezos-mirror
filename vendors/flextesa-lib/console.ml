@@ -18,26 +18,22 @@ let make with_timestamp color =
   let reset = "\027[m" in
   if color then (
     let color_of_tag = function
-      | "prompt" -> Some bold
-      | "shout" -> Some red
+      | Caml.Format.String_tag "prompt" -> Some bold
+      | Caml.Format.String_tag "shout" -> Some red
       | _ -> None in
     Caml.Format.(
       pp_set_formatter_stag_functions formatter
         { mark_open_stag= (fun _ -> "")
         ; mark_close_stag= (fun _ -> "")
         ; print_open_stag=
-            (function
-             | String_tag tag ->
-              (match color_of_tag tag with
+            (fun tag ->
+              match color_of_tag tag with
               | Some c -> fprintf formatter "%s" c
               | None -> ())
-              | _ -> ())
         ; print_close_stag=
-            (function
-             | String_tag tag ->
+            (fun tag ->
               if Poly.(color_of_tag tag <> None) then
-                fprintf formatter "%s" reset
-             | _ -> ()) } ;
+                fprintf formatter "%s" reset) } ;
       pp_set_tags formatter true) ) ;
   {color; buffer= b; channel; formatter; with_timestamp}
 

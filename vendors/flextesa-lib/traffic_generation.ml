@@ -119,3 +119,38 @@ module Random = struct
       | None -> continue_or_not () in
     loop 0
 end
+
+module Forge = struct
+  let batch_transfer
+      ?(protocol_kind : Tezos_protocol.Protocol_kind.t = `Babylon)
+      ?(counter = 0) ?(dst = [("tz2KZPgf2rshxNUBXFcTaCemik1LH1v9qz3F", 1)])
+      ~src ~fee ~branch n : Ezjsonm.value =
+    let open Ezjsonm in
+    ignore protocol_kind ;
+    dict
+      [ ("branch", `String branch)
+      ; ( "contents"
+        , `A
+            (List.map (List.range 0 n) ~f:(fun i ->
+                 let dest, amount = List.nth_exn dst (i % List.length dst) in
+                 `O
+                   [ ("kind", `String "transaction")
+                   ; ("source", `String src)
+                   ; ("destination", `String dest)
+                   ; ("amount", `String (Int.to_string amount))
+                   ; ( "fee"
+                     , `String (Int.to_string (Float.to_int (fee *. 1000000.)))
+                     )
+                   ; ("counter", `String (Int.to_string (counter + i)))
+                   ; ("gas_limit", `String (Int.to_string 127))
+                   ; ("storage_limit", `String (Int.to_string 277)) ])) ) ]
+
+  let endorsement ?(protocol_kind : Tezos_protocol.Protocol_kind.t = `Babylon)
+      ~branch level : Ezjsonm.value =
+    let open Ezjsonm in
+    ignore protocol_kind ;
+    dict
+      [ ("branch", `String branch)
+      ; ( "contents"
+        , `A [`O [("kind", `String "endorsement"); ("level", int level)]] ) ]
+end
