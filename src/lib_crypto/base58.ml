@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -353,6 +354,12 @@ module Prefix = struct
   let protocol_hash = "\002\170" (* P(51) *)
 
   let context_hash = "\079\199" (* Co(52) *)
+
+  let operation_metadata_hash = "\005\183" (* r(51) *)
+
+  let operation_metadata_list_hash = "\134\039" (* Lr(52) *)
+
+  let operation_metadata_list_list_hash = "\029\159\182" (* LLr(53) *)
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)
