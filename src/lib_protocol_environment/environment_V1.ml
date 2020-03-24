@@ -376,6 +376,18 @@ struct
 
     module type MAP = S.MAP
 
+    module type INDEXES_SET = sig
+      include SET
+
+      val encoding : t Data_encoding.t
+    end
+
+    module type INDEXES_MAP = sig
+      include MAP
+
+      val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+    end
+
     module type INDEXES = sig
       type t
 
@@ -389,17 +401,9 @@ struct
 
       val path_length : int
 
-      module Set : sig
-        include SET with type elt = t
+      module Set : INDEXES_SET with type elt = t
 
-        val encoding : t Data_encoding.t
-      end
-
-      module Map : sig
-        include MAP with type key = t
-
-        val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
-      end
+      module Map : INDEXES_MAP with type key = t
     end
 
     module type HASH = sig
@@ -432,42 +436,49 @@ struct
       val path_encoding : path Data_encoding.t
     end
 
+    module type SIGNATURE_PUBLIC_KEY_HASH = sig
+      type t
+
+      val pp : Format.formatter -> t -> unit
+
+      val pp_short : Format.formatter -> t -> unit
+
+      include Compare.S with type t := t
+
+      include RAW_DATA with type t := t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+
+      include INDEXES with type t := t
+
+      val zero : t
+    end
+
+    module type SIGNATURE_PUBLIC_KEY = sig
+      type t
+
+      val pp : Format.formatter -> t -> unit
+
+      include Compare.S with type t := t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+
+      type public_key_hash_t
+
+      val hash : t -> public_key_hash_t
+
+      val size : t -> int (* in bytes *)
+    end
+
     module type SIGNATURE = sig
-      module Public_key_hash : sig
-        type t
+      module Public_key_hash : SIGNATURE_PUBLIC_KEY_HASH
 
-        val pp : Format.formatter -> t -> unit
-
-        val pp_short : Format.formatter -> t -> unit
-
-        include Compare.S with type t := t
-
-        include RAW_DATA with type t := t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-
-        include INDEXES with type t := t
-
-        val zero : t
-      end
-
-      module Public_key : sig
-        type t
-
-        val pp : Format.formatter -> t -> unit
-
-        include Compare.S with type t := t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-
-        val hash : t -> Public_key_hash.t
-
-        val size : t -> int (* in bytes *)
-      end
+      module Public_key :
+        SIGNATURE_PUBLIC_KEY with type public_key_hash_t := Public_key_hash.t
 
       type t
 
@@ -577,54 +588,50 @@ struct
       val pairing : G1.t -> G2.t -> Gt.t
     end
 
+    module type PVSS_ELEMENT = sig
+      type t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+    end
+
+    module type PVSS_PUBLIC_KEY = sig
+      type t
+
+      val pp : Format.formatter -> t -> unit
+
+      include Compare.S with type t := t
+
+      include RAW_DATA with type t := t
+
+      include B58_DATA with type t := t
+
+      include ENCODER with type t := t
+    end
+
+    module type PVSS_SECRET_KEY = sig
+      type public_key
+
+      type t
+
+      include ENCODER with type t := t
+
+      val to_public_key : t -> public_key
+    end
+
     module type PVSS = sig
       type proof
 
-      module Clear_share : sig
-        type t
+      module Clear_share : PVSS_ELEMENT
 
-        include B58_DATA with type t := t
+      module Commitment : PVSS_ELEMENT
 
-        include ENCODER with type t := t
-      end
+      module Encrypted_share : PVSS_ELEMENT
 
-      module Commitment : sig
-        type t
+      module Public_key : PVSS_PUBLIC_KEY
 
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-      end
-
-      module Encrypted_share : sig
-        type t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-      end
-
-      module Public_key : sig
-        type t
-
-        val pp : Format.formatter -> t -> unit
-
-        include Compare.S with type t := t
-
-        include RAW_DATA with type t := t
-
-        include B58_DATA with type t := t
-
-        include ENCODER with type t := t
-      end
-
-      module Secret_key : sig
-        type t
-
-        include ENCODER with type t := t
-
-        val to_public_key : t -> Public_key.t
-      end
+      module Secret_key : PVSS_SECRET_KEY with type public_key := Public_key.t
 
       val proof_encoding : proof Data_encoding.t
 
