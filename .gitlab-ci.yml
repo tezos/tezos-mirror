@@ -56,6 +56,7 @@ check_linting:
   script:
     - src/tooling/lint.sh check.ci
     - src/tooling/lint.sh check_scripts
+    - src/tooling/lint.sh check.ocamlformat
 
 check_python_linting:
   <<: *build_definition

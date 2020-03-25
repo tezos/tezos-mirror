@@ -8,6 +8,7 @@ Where <action> can be:
 
 * update.ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
+* check.ocamlformat: check the above does nothing.
 * check.dune: check formatting while assuming running under Dune's
   rule (\`dune build @runtest_lint\`).
 * check.ci: check formatting using git (for GitLabCI's verbose run).
@@ -89,7 +90,6 @@ update_all_dot_ocamlformats () {
         esac
         git add "$ofmt"
     done
-    git commit -m 'Update .ocamlformat files'
 }
 
 check_with_dune () {
@@ -146,7 +146,11 @@ files=$(echo "$files" | sed "s/\S\+\.pp\.mli\?\b//g")
 
 case "$action" in
     "update.ocamlformat" )
-        update_all_dot_ocamlformats ;;
+        update_all_dot_ocamlformats
+        git commit -m 'Update .ocamlformat files' ;;
+    "check.ocamlformat" )
+        update_all_dot_ocamlformats
+        git diff --name-only HEAD --exit-code ;;
     "check.dune" )
         check_with_dune $files ;;
     "check.ci" )
