@@ -195,6 +195,18 @@ val parse_packable_ty :
 val parse_parameter_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
+(** We expose [parse_ty] for convenience to external tools. Please use
+    specialized versions such as [parse_packable_ty] and [parse_parameter_ty]
+    if possible. *)
+val parse_ty :
+  context ->
+  legacy:bool ->
+  allow_big_map:bool ->
+  allow_operation:bool ->
+  allow_contract:bool ->
+  Script.node ->
+  (ex_ty * context) tzresult
+
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
 
