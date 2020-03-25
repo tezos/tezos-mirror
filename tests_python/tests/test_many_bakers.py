@@ -3,8 +3,6 @@ import pytest
 from tools import utils, constants
 
 
-PARAMS = ['--connections', '500']
-
 # TODO parameterize test
 
 
@@ -17,7 +15,7 @@ class TestManyBakers:
 
     def test_init(self, sandbox):
         for i in range(10):
-            sandbox.add_node(i, params=PARAMS)
+            sandbox.add_node(i, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         for i in range(5):
             sandbox.add_baker(i, f'bootstrap{i + 1}',

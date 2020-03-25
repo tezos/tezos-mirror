@@ -1,6 +1,6 @@
 import pytest
+from tools import constants
 
-PARAMS = ['--connections', '500']
 
 NUM_NODES = 5
 
@@ -15,8 +15,8 @@ class TestTrustedRing:
 
     def test_init(self, sandbox):
         for i in range(NUM_NODES):
-            sandbox.add_node(i, private=False, peers=[], params=PARAMS,
-                             config_client=False)
+            sandbox.add_node(i, private=False, peers=[],
+                             params=constants.NODE_PARAMS, config_client=False)
 
     def test_no_peers(self, sandbox):
         """ Initially, nobody knows other peers. """

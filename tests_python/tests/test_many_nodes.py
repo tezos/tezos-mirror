@@ -7,7 +7,6 @@ NUM_NODES = 2
 NEW_NODES = 2
 REPLACE = False
 ERROR_PATTERN = r"Uncaught|registered"
-PARAMS = ['--connections', '500']
 
 
 @pytest.mark.baker
@@ -18,17 +17,17 @@ class TestManyNodesBootstrap:
     """Run many nodes, wait a while, run more nodes, check logs"""
 
     def test_init(self, sandbox):
-        sandbox.add_node(0, params=PARAMS)
+        sandbox.add_node(0, params=constants.NODE_PARAMS)
         parameters = dict(constants.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         utils.activate_alpha(sandbox.client(0), parameters)
         sandbox.add_baker(0, 'bootstrap1', proto=constants.ALPHA_DAEMON)
-        sandbox.add_node(1, params=PARAMS)
+        sandbox.add_node(1, params=constants.NODE_PARAMS)
         sandbox.add_baker(1, 'bootstrap2', proto=constants.ALPHA_DAEMON)
 
     def test_add_nodes(self, sandbox):
         for i in range(2, NUM_NODES):
-            sandbox.add_node(i, params=PARAMS)
+            sandbox.add_node(i, params=constants.NODE_PARAMS)
 
     def test_sleep_10s(self):
         time.sleep(10)
@@ -41,7 +40,7 @@ class TestManyNodesBootstrap:
                 running_nodes.remove(0)
                 running_nodes.remove(1)
                 sandbox.rm_node(random.choice(running_nodes))
-            sandbox.add_node(new_node + i, params=PARAMS)
+            sandbox.add_node(new_node + i, params=constants.NODE_PARAMS)
 
     def test_kill_baker(self, sandbox):
         assert utils.check_logs(sandbox.logs, ERROR_PATTERN)

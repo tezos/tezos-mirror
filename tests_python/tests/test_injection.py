@@ -1,7 +1,7 @@
 import os
 import subprocess
 import pytest
-from tools import utils, paths
+from tools import utils, paths, constants
 
 
 @pytest.fixture(scope="class")
@@ -9,7 +9,7 @@ def clients(sandbox):
     """Launches 3 nodes in sandbox mode (genesis, doesn't activate alpha)."""
     num_nodes = 3
     for i in range(num_nodes):
-        sandbox.add_node(i, params=['--connections', '30'])
+        sandbox.add_node(i, params=constants.NODE_PARAMS)
     yield sandbox.all_clients()
 
 

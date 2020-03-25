@@ -1,8 +1,7 @@
 import pytest
-from tools import utils
+from tools import utils, constants
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
-PARAMS = ['--connections', '500']
 
 
 @pytest.mark.mempool
@@ -13,9 +12,9 @@ class TestMempool:
     " Tests mempool"
 
     def test_init(self, sandbox):
-        sandbox.add_node(1, params=PARAMS)
-        sandbox.add_node(2, params=PARAMS)
-        sandbox.add_node(3, params=PARAMS+['--disable-mempool'])
+        sandbox.add_node(1, params=constants.NODE_PARAMS)
+        sandbox.add_node(2, params=constants.NODE_PARAMS)
+        sandbox.add_node(3, params=constants.NODE_PARAMS+['--disable-mempool'])
         utils.activate_alpha(sandbox.client(1))
 
     def test_level1(self, sandbox):

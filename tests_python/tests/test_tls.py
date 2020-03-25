@@ -2,13 +2,10 @@ import pytest
 from tools import constants
 
 
-NODE_PARAMS = ['--connections', '3']
-
-
 @pytest.fixture(scope="class")
 def client(sandbox):
     sandbox.add_node(0, use_tls=(constants.TEZOS_CRT, constants.TEZOS_KEY),
-                     params=NODE_PARAMS)
+                     params=constants.NODE_PARAMS)
     yield sandbox.client(0)
 
 

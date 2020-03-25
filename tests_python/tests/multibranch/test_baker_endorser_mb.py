@@ -60,9 +60,8 @@ ALPHA_DAEMON = '003-PsddFKi3'
 
 
 def params(i):
-    params = ['--connections', '500']
     extra = ['--history-mode', 'full'] if i % 2 == 1 else []
-    return params + extra
+    return constants.NODE_PARAMS + extra
 
 
 @pytest.mark.parametrize('sandbox_multibranch', [MAP], indirect=True)

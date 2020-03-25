@@ -23,7 +23,7 @@ BAKE_ARGS = ['--minimal-fees', '0', '--minimal-nanotez-per-byte', '0',
              '--minimal-nanotez-per-gas-unit', '0', '--max-priority', '512',
              '--minimal-timestamp']
 ERROR_PATTERN = r"Uncaught|registered|error"
-NODE_PARAMS = ['--connections', '500', '--enable-testchain']
+NODE_PARAMS = constants.NODE_PARAMS + ['--enable-testchain']
 PARAMETERS = dict(constants.PARAMETERS)
 PARAMETERS["time_between_blocks"] = ["1", "0"]
 PARAMETERS["blocks_per_voting_period"] = 20

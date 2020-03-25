@@ -11,15 +11,12 @@ RECEIVER_ID = constants.IDENTITIES['bootstrap2']['identity']
 SENDER_SK = constants.IDENTITIES['bootstrap1']['secret'][len('unencrypted:'):]
 
 
-NODE_PARAMS = ['--connections', '3']
-
-
 def scenario():
     with Sandbox(paths.TEZOS_HOME,
                  constants.IDENTITIES,
                  constants.GENESIS_PK) as sandbox:
         # Launch node running protocol alpha
-        sandbox.add_node(0, params=NODE_PARAMS)
+        sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         port = sandbox.node(0).rpc_port
 

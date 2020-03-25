@@ -81,7 +81,7 @@ def sandbox(log_dir):
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node with protocol alpha."""
-    sandbox.add_node(0, params=['--connections', '3'])
+    sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
     utils.activate_alpha(client)
     yield client
@@ -107,7 +107,7 @@ def client_regtest_bis(sandbox):
         return client
 
     sandbox.add_node(1, client_factory=reg_client_factory,
-                     params=['--connections', '3'])
+                     params=constants.NODE_PARAMS)
     client = sandbox.client(1)
     utils.activate_alpha(client)
     yield client
@@ -143,7 +143,7 @@ def clients(sandbox, request):
     num_nodes = request.param
     for i in range(num_nodes):
         # Large number may increases peers connection time
-        sandbox.add_node(i, params=['--connections', '500'])
+        sandbox.add_node(i, params=constants.NODE_PARAMS)
     utils.activate_alpha(sandbox.client(0))
     clients = sandbox.all_clients()
     for client in clients:

@@ -1,10 +1,10 @@
 import time
 import pytest
-from tools import utils
+from tools import utils, constants
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
-PARAMS = ['--connections', '500', '--history-mode', 'full']
+PARAMS = constants.NODE_PARAMS + ['--history-mode', 'full']
 LEVEL_A = 10
 LEVEL_B = 20
 GROUP1 = [0]

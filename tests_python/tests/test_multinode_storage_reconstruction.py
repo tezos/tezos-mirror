@@ -1,10 +1,10 @@
 import time
 from datetime import datetime, timedelta
 import pytest
-from tools import utils
+from tools import utils, constants
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
-PARAMS = ['--connections', '500', '--history-mode', 'full']
+PARAMS = constants.NODE_PARAMS + ['--history-mode', 'full']
 BATCH = 16
 
 

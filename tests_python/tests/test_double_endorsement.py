@@ -4,7 +4,6 @@ from tools import utils, constants
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 NUM_NODES = 3
-PARAMS = ['--connections', '500']
 
 
 @pytest.mark.multinode
@@ -14,7 +13,7 @@ class TestDoubleEndorsement:
 
     def test_init(self, sandbox):
         for i in range(NUM_NODES):
-            sandbox.add_node(i, params=PARAMS)
+            sandbox.add_node(i, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.client(0).bake('bootstrap1', BAKE_ARGS)
 
