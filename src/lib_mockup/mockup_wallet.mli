@@ -24,4 +24,5 @@
 (*****************************************************************************)
 
 (** Initializes a wallet with bootstrap accounts (including secret keys). *)
-val populate : Tezos_client_base.Client_context.full -> unit tzresult Lwt.t
+val populate :
+  #Tezos_client_base.Client_context.io_wallet -> unit tzresult Lwt.t

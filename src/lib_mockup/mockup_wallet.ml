@@ -86,7 +86,7 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
   >>= fun () ->
   Client_keys.register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
 
-let populate (cctxt : Tezos_client_base.Client_context.full) =
+let populate (cctxt : #Tezos_client_base.Client_context.io_wallet) =
   Tezos_base.TzPervasives.iter_s
     (add_bootstrap_secret cctxt)
     bootstrap_accounts

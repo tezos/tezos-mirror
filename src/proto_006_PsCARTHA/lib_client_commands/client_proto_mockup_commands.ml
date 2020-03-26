@@ -25,38 +25,30 @@
 
 open Tezos_clic
 
-let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
+let create_mockup_command_handler _ (cctxt : Protocol_client_context.full) =
+  Tezos_mockup_commands.Mockup_commands.get_base_dir cctxt
+  >>=? (fun base_dir ->
+         match Tezos_mockup.Persistence.classify_base_dir base_dir with
+         | Tezos_mockup.Persistence.Base_dir_is_nonempty ->
+             cctxt#error "directory %s is nonempty" base_dir
+         | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+             cctxt#error
+               "%s seems to have already been initialized as a mockup directory"
+               base_dir
+         | Tezos_mockup.Persistence.Base_dir_does_not_exist
+         | Tezos_mockup.Persistence.Base_dir_is_empty ->
+             Tezos_mockup.Persistence.create_mockup
+               ~protocol_hash:Protocol.hash
+               ~base_dir)
+  >>=? fun () -> Tezos_mockup_commands.Mockup_wallet.populate cctxt
 
-(* Workaround for the fact that the client directory is not available from
-   the client context. *)
-let base_dir = ref None
-
-let set_base_dir dir = base_dir := Some dir
-
-let get_base_dir (cctxt : #Tezos_client_base.Client_context.io) =
-  match !base_dir with
-  | None ->
-      cctxt#error "--base-dir not set"
-  | Some base_dir ->
-      return base_dir
-
-let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_contexts () in
-  List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
-      let module Mockup = (val mockup) in
-      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
-    available ;
-  return ()
-
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
+let create_mockup_command : Protocol_client_context.full Clic.command =
   let open Clic in
   command
-    ~group
-    ~desc:"List available protocols available for mockup construction."
+    ~group:Tezos_mockup_commands.Mockup_commands.group
+    ~desc:"Create a mockup environment."
     no_options
-    (prefixes ["list"; "mockup"; "protocols"] @@ stop)
-    list_mockup_command_handler
+    (prefixes ["create"; "mockup"] @@ stop)
+    create_mockup_command_handler
 
-let commands () = [list_mockup_command]
+let commands () = [create_mockup_command]
