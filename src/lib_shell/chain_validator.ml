@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,10 +25,6 @@
 (*****************************************************************************)
 
 open Chain_validator_worker_state
-
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "node.chain_validator"
-end)
 
 module Name = struct
   type t = Chain_id.t
@@ -141,7 +137,7 @@ let may_toggle_bootstrapped_chain w =
     && P2p_peer.Table.length nv.bootstrapped_peers
        >= nv.parameters.limits.bootstrap_threshold
   then (
-    Log.log_info "bootstrapped" ;
+    Lwt.async (fun () -> Chain_validator_event.(emit chain_bootstrapped) ()) ;
     nv.bootstrapped <- true ;
     Lwt.wakeup_later nv.bootstrapped_wakener () )
 
@@ -192,12 +188,9 @@ let may_update_checkpoint chain_state new_head =
         | None ->
             assert false (* should not happen *)
         | Some new_checkpoint -> (
-            Log.log_notice
-              "@[Update to checkpoint %a (running in mode %a).@]"
-              Block_hash.pp
-              (State.Block.hash new_checkpoint)
-              History_mode.pp
-              history_mode ;
+            Chain_validator_event.(emit updated_to_checkpoint)
+              (State.Block.hash new_checkpoint, history_mode)
+            >>= fun () ->
             let new_checkpoint = State.Block.header new_checkpoint in
             match history_mode with
             | History_mode.Archive ->
@@ -346,10 +339,8 @@ let safe_get_prevalidator_filter hash =
           Protocol_hash.pp_short
           hash
     | Some protocol ->
-        Log.log_notice
-          "no prevalidator filter found for protocol '%a'"
-          Protocol_hash.pp_short
-          hash ;
+        Chain_validator_event.(emit prevalidator_filter_not_found) hash
+        >>= fun () ->
         let (module Proto) = protocol in
         let module Filter = Prevalidator_filters.No_filter (Proto) in
         return (module Filter : Prevalidator_filters.FILTER) )
@@ -399,10 +390,11 @@ let on_request (type a) w start_testchain active_chains spawn_child
           Prevalidator.create limits (module Filter) chain_db
           >>= function
           | Error errs ->
-              Log.lwt_log_error
-                "@[Failed to reinstantiate prevalidator:@ %a@]"
-                pp_print_error
-                errs
+              let fst_err_msg =
+                Format.asprintf "%a" Error_monad.pp (List.hd errs)
+              in
+              Chain_validator_event.(emit prevalidator_reinstantiation_failure)
+                (fst_err_msg, errs)
               >>= fun () ->
               nv.prevalidator <- None ;
               Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
@@ -474,19 +466,19 @@ let on_launch start_prevalidator w _ parameters =
           (module Proto)
           parameters.chain_db
         >>= function
-        | Error err ->
-            Log.lwt_log_error
-              "@[Failed to instantiate prevalidator:@ %a@]"
-              pp_print_error
-              err
+        | Error errs ->
+            let fst_err_msg =
+              Format.asprintf "%a" Error_monad.pp (List.hd errs)
+            in
+            Chain_validator_event.(emit prevalidator_reinstantiation_failure)
+              (fst_err_msg, errs)
             >>= fun () -> return_none
         | Ok prevalidator ->
             return_some prevalidator )
-    | Error err ->
-        Log.lwt_log_error
-          "@[Failed to instantiate prevalidator:@ %a@]"
-          pp_print_error
-          err
+    | Error errs ->
+        let fst_err_msg = Format.asprintf "%a" Error_monad.pp (List.hd errs) in
+        Chain_validator_event.(emit prevalidator_reinstantiation_failure)
+          (fst_err_msg, errs)
         >>= fun () -> return_none
   else return_none )
   >>=? fun prevalidator ->
