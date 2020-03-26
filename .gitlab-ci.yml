@@ -517,6 +517,7 @@ documentation:linkcheck:
   only:
     - master
     - /^.*opam.*$/
+    - /-release$/
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
@@ -1216,6 +1217,8 @@ publish:docker:
   stage: publish
   only:
     - master@tezos/tezos
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
     - zeronet@tezos/tezos
     - mainnet@tezos/tezos
     - zeronet-staging@tezos/tezos
