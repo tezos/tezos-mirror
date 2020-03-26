@@ -483,6 +483,18 @@ class Client:
                            params=params)
         return int(rpc_res['level'])
 
+    def get_checkpoint(self) -> dict:
+        rpc_res = self.rpc('get', '/chains/main/checkpoint')
+        return rpc_res
+
+    def get_savepoint(self) -> str:
+        rpc_res = self.get_checkpoint()
+        return rpc_res['savepoint']
+
+    def get_caboose(self) -> str:
+        rpc_res = self.get_checkpoint()
+        return rpc_res['caboose']
+
     def wait_for_inclusion(self,
                            operation_hash: str,
                            branch: str = None,
