@@ -221,10 +221,10 @@ type cli_args = {
   protocol : Protocol_hash.t option;
   print_timings : bool;
   log_requests : bool;
-  mockup_mode : mockup_mode option;
+  mockup_mode : mockup_mode;
 }
 
-and mockup_mode = Mode_default | Mode_mockup
+and mockup_mode = Mode_client | Mode_mockup
 
 let default_cli_args =
   {
@@ -235,7 +235,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
-    mockup_mode = None;
+    mockup_mode = Mode_client;
   }
 
 open Clic
@@ -386,15 +386,16 @@ let password_filename_arg () =
 
 let mockup_mode_arg () =
   let parse_mockup_mode (str : string) : mockup_mode tzresult Lwt.t =
-    if str = "client" then return Mode_default
+    if str = "client" then return Mode_client
     else if str = "mockup" then return Mode_mockup
     else fail (Invalid_mockup_arg str)
   in
-  arg
+  default_arg
     ~short:'M'
     ~long:"mode"
     ~placeholder:"client|mockup"
     ~doc:"how to interact with the node"
+    ~default:"client"
     (parameter
        ~autocomplete:(fun _ -> return ["client"; "mockup"])
        (fun _ param -> parse_mockup_mode param))
@@ -632,7 +633,7 @@ type t =
   * bool
   * Uri.t option
   * string option
-  * mockup_mode option
+  * mockup_mode
 
 module type Remote_params = sig
   val authenticate :

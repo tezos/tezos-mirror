@@ -190,9 +190,9 @@ let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
       setup_http_rpc_client_config parsed_args base_dir rpc_config
   | Some args -> (
     match args.Client_config.mockup_mode with
-    | None | Some Client_config.Mode_default ->
+    | Client_config.Mode_client ->
         setup_http_rpc_client_config parsed_args base_dir rpc_config
-    | Some Client_config.Mode_mockup ->
+    | Client_config.Mode_mockup ->
         setup_mockup_rpc_client_config args base_dir )
 
 (* Main (lwt) entry *)
