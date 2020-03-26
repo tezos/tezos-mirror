@@ -61,7 +61,7 @@ EOF
 source_directories="src docs/doc_gen"
 
 update_all_dot_ocamlformats () {
-    interesting_directories=$(find $source_directories \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | sort -u)
+    interesting_directories=$(find $source_directories \( -name "*.ml" -o -name "*.mli"  \) -type f | sed 's:/[^/]*$::' | LC_COLLATE=C sort -u)
     if git diff --name-only HEAD --exit-code
     then
         say "Repository clean :thumbsup:"
@@ -80,7 +80,7 @@ update_all_dot_ocamlformats () {
             src/proto_*/lib_protocol )
                 say "This a protocol"
                 make_dot_ocamlformat "$ofmt"
-                ( cd "$d" ; ls -1 *.mli *.ml > .ocamlformat-ignore ; )
+                ( cd "$d" ; ls -1 *.mli *.ml | LC_COLLATE=C sort > .ocamlformat-ignore ; )
                 git add "$d/.ocamlformat-ignore"
                 ;;
             * )
