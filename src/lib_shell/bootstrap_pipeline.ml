@@ -25,6 +25,96 @@
 
 open Validation_errors
 
+(** Workflow of the bootstrap pipeline.
+
+            +-------+
+            |Locator|
+            +---+---+
+                |
+                |
+      +---------v---------+                 +----------------------+
+      |      promise      <-----------------+                      |
+      |  fetching headers |                 |    distributed_db    |
+      |                   +----------------->                      |
+      +---------+---------+                 +----------------------+
+                |
+                |
+            +---v---+
+            | pipe  |
+            +---+---+
+                |
+                |
+      +---------v---------+                 +----------------------+
+      |      promise      <-----------------+                      |
+      |fetching operations|                 |    distributed_db    |
+      |                   +----------------->                      |
+      +---------+---------+                 +----------------------+
+                |
+                |
+            +---v---+
+            | pipe  |
+            +---+---+
+                |
+                |
+      +---------v---------+                 +----------------------+
+      |      promsie      <-----------------+       block          |
+      | validating blocks |                 |     validator        |
+      |                   +----------------->                      |
+      +-------------------+                 +----------------------+
+*)
+
+(** Overview:
+
+   The [bootstrap_pipeline] is a promise which is fulfilled when all
+   block hashes of a locator has been valided. It is canceled if one
+   of the three premises above fails.
+
+   The promise "fetching headers" fetches headers step by step (a
+   locator being a list of steps). [steps] are processed bottom to
+   top. A [step] is a subchain delimited by two block hashes. A
+   subchain being a list of block [[b1;...;bn]] such that [bi.pred] =
+   hash([bj]) where i = j + 1. Headers are fetched from the
+   [distributed_db] top to bottom but are enqueued in the [pipe]
+   bottom to top.  The promise is fulfilled if every hashes contain in
+   the locator steps were successfuly enqueued in the [pipe]. The
+   promise is canceled if an error from the [distrubted_db] is raised,
+   or if the [locator] was invalid.
+
+   The promise "fetching operations" dequeue block headers and for
+   each block header fetches the operations contained in the
+   block. Once all the operations are fetched, it enqueues the headers
+   and the operations in a [pipe] used by the promise validating
+   blocks. This promise is fulfilled when it fetches all the
+   operations for all the blocks that were in the input [pipe]. It is
+   canceled if the [distributed_db] raised an error.
+
+   The promise "validating blocks" dequeue full blocks and give them
+   to the [Block_validator]. The promise is fulfilled is all blocks
+   were validated successfuly. It is canceled otherwise. *)
+
+(** An event is trigerred when the node is fetching large steps of a
+   [Block_locator] from the network. A large step is defined by
+   [big_step_size]. In that case an event is made every
+   [big_step_size_announced]. *)
+let (big_step_size, big_step_size_announce) = (2000, 1000)
+
+(** The promises which fetches headers and operations communicate
+   through a [Lwt_pipe]. This pipe stores headers by batch. The size
+   of the batch is defined by [header_batch_size]. *)
+let header_batch_size = 20
+
+(** Size of the [Lwt_pipe] containing the fetched headers. If this
+   size is reached, the promise which fetches headers holds and wait
+   that the promise which fetches operations to dequeue some
+   headers. This means that the maximum number of headers the queue
+   can contain is [fetched_headers_queue_size] *
+   [batch_header_size]. *)
+let fetched_headers_queue_size = 1024
+
+(** Size of the queue containing a full blocks (block + operations)
+   before they are processed by the [Block_validator]. *)
+let fetched_blocks_queue_size = 128
+
 type t = {
   canceler : Lwt_canceler.t;
   block_header_timeout : Time.System.Span.t;
@@ -41,10 +131,26 @@ type t = {
   fetched_blocks :
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
     Lwt_pipe.t;
-  (* HACK, a worker should be able to return the 'error'. *)
+  (* HACK, a worker should be able
+   to return the 'error'. *)
   mutable errors : Error_monad.error list;
 }
 
+(* FIXME: this function may be called many times by different
+   bootstrap pipelines on the same hash (and therefore same
+   header). This can be fixed by having only one
+   bootstrap_pipeline. *)
+
+(** A block is NOT acceptable if one of the following holds:
+
+    - The timestamp of the block is more than 15 seconds ahead in the
+   future.
+
+    - The block is at the same level as the checkpoint, but they are
+   different.
+
+    - The checkpoint has been reached (that is, the head of the chain
+   is past the checkpoint) but the block is not yet in the chain. *)
 let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_state = Distributed_db.chain_state pipeline.chain_db in
   let time_now = Systime_os.now () in
@@ -69,7 +175,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     (State.Block.header head).shell.level >= checkpoint.shell.level
   in
   if checkpoint_reached then
-    (* If reached the checkpoint, every block before the checkpoint
+    (* If the checkpoint is reached, every block before the checkpoint
        must be part of the chain. *)
     if header.shell.level <= checkpoint.shell.level then
       Chain.mem chain_state hash
@@ -78,6 +184,21 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     else return_unit
   else return_unit
 
+(** [fetch_step] fetches block headers given a [Block_locator.step]
+   and returns them as a list. It fetches headers iteratively starting
+   from the top block down to the bottom block. Blocks are returned in
+   the reverse order. At each iteration, the function does the
+   following:
+
+    1. First, it does some sanity check to ensure that the locator is
+   valid.
+
+    2. Then it asks to the [Distributed_db] for the block header
+   associated to the hash of the block.
+
+    3. It checks whether the received header is acceptable.
+
+    4. It loops on the predecessor of the current block. *)
 let fetch_step pipeline (step : Block_locator.step) =
   Bootstrap_pipeline_event.(emit fetching_step_from_peer)
     (step.block, step.predecessor, step.step, pipeline.peer_id)
@@ -85,7 +206,9 @@ let fetch_step pipeline (step : Block_locator.step) =
   let rec fetch_loop acc hash cpt =
     Lwt_unix.yield ()
     >>= fun () ->
-    ( if step.step > 2000 && step.step <> cpt && (step.step - cpt) mod 1000 = 0
+    ( if
+      step.step > big_step_size && step.step <> cpt
+      && (step.step - cpt) mod big_step_size_announce = 0
     then
       Bootstrap_pipeline_event.(emit still_fetching_large_step_from_peer)
         (step.step - cpt, step.step, pipeline.peer_id)
@@ -126,10 +249,20 @@ let fetch_step pipeline (step : Block_locator.step) =
   in
   fetch_loop [] step.block step.step
 
+(** [headers_fetch_work_loop] is a promise which fetches headers
+   locator step by locator step and store them in a queue. Each
+   locator step is processed bottom to top by the [fetch_step]
+   function. This promise is fulfilled if it fetches all the locators
+   and store them successfuly in the queue. It is canceled the first
+   time it was unable to fetch a header or if the [locator] was
+   invalid.
+
+   A step may be truncated in [rolling] or in [full] mode if the
+   blocks are below the [savepoint].*)
 let headers_fetch_worker_loop pipeline =
   (let sender_id = Distributed_db.my_peer_id pipeline.chain_db in
-   (* sender and receiver are inverted here because they are from
-       the point of view of the node sending the locator *)
+   (* sender and receiver are inverted here because they are from the
+      point of view of the node sending the locator *)
    let seed =
      {Block_locator.sender_id = pipeline.peer_id; receiver_id = sender_id}
    in
@@ -144,9 +277,9 @@ let headers_fetch_worker_loop pipeline =
        let chain_state = Distributed_db.chain_state pipeline.chain_db in
        State.Chain.save_point chain_state >>= Lwt.return_some )
    >>= fun save_point ->
-   (* In Full and Rolling mode, we do not want to receive blocks
-         that are past our save point's level, otherwise we would
-         start validating them again. *)
+   (* In Full and Rolling mode, we do not want to receive blocks that
+      are past our savepoint's level, otherwise we would start
+      validating them again.  *)
    let steps =
      match save_point with
      | None ->
@@ -169,13 +302,19 @@ let headers_fetch_worker_loop pipeline =
    | {Block_locator.predecessor; _} :: _ -> (
        State.Block.known chain_state predecessor
        >>= fun predecessor_known ->
-       (* Check that the locator is anchored in a block locally known *)
+       (* Check that the locator is anchored in a block locally
+          known. *)
        fail_unless
          predecessor_known
          (Too_short_locator (sender_id, pipeline.locator))
        >>=? fun () ->
+       (* We add the headers by batch to the fetched_headers queue.
+          If the queue is full, the [Lwt_pipe.push] promise is pending
+          until some headers are popped from the queue. *)
        let rec process_headers headers =
-         let (batch, remaining_headers) = List.split_n 20 headers in
+         let (batch, remaining_headers) =
+           List.split_n header_batch_size headers
+         in
          protect ~canceler:pipeline.canceler (fun () ->
              Lwt_pipe.push pipeline.fetched_headers batch
              >>= fun () -> return_unit)
@@ -192,10 +331,10 @@ let headers_fetch_worker_loop pipeline =
        | [single] ->
            fetch_step pipeline single >>=? process_headers
        | first :: (_ :: _ as rest) ->
-           (* With respect to concurrency, [pipe] sits between [iter_s] and
-              [iter_p]: it keeps up to two promises pending. This is acheived by
-              passing the promise started at the current step as argument in
-              the next recursive call. *)
+           (* With respect to concurrency, [pipe] sits between [iter_s]
+            and [iter_p]: it keeps up to two promises pending. This is
+            acheived by passing the promise started at the current
+            step as argument in the next recursive call. *)
            let first = fetch_step pipeline first in
            let rec pipe previous = function
              | [] ->
@@ -234,6 +373,12 @@ let headers_fetch_worker_loop pipeline =
         ()
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
+(** [operations_fetch_worker_loop] is a promise which fethches
+   operations and store them with the corresponding header to a
+   queue. Operations are fetched block by block bottom to top. The
+   promise is fulfilled if every operation was fetched and stored
+   successfuly in the queue. It is canceled if one operation could not
+   be fetched. *)
 let rec operations_fetch_worker_loop pipeline =
   Lwt_unix.yield ()
   >>= (fun () ->
@@ -289,6 +434,11 @@ let rec operations_fetch_worker_loop pipeline =
         ()
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
+(** [validation_work_loop] is a promise which validates blocks one by
+   one using the [Block_validator.validate] function. Each validated
+   block calls the [notify_new_block] callback. The promise is
+   fulfilled if every block from the locator was validated. It is
+   canceled if the validation of one block fails. *)
 let rec validation_worker_loop pipeline =
   Lwt_unix.yield ()
   >>= (fun () ->
@@ -332,11 +482,25 @@ let rec validation_worker_loop pipeline =
         ()
       >>= fun () -> Lwt_canceler.cancel pipeline.canceler
 
+(** The creation of the bootstrap starts three promises:
+
+    - One to fetch block headers
+
+    - One to fetch block operations
+
+    - One which validates operations
+
+    It intializes two pipes so that promises can communicate each
+   others (see diagram at the begining of the file). *)
 let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
     ~block_operations_timeout block_validator peer_id chain_db locator =
   let canceler = Lwt_canceler.create () in
-  let fetched_headers = Lwt_pipe.create ~size:(1024, fun _ -> 1) () in
-  let fetched_blocks = Lwt_pipe.create ~size:(128, fun _ -> 1) () in
+  let fetched_headers =
+    Lwt_pipe.create ~size:(fetched_headers_queue_size, fun _ -> 1) ()
+  in
+  let fetched_blocks =
+    Lwt_pipe.create ~size:(fetched_blocks_queue_size, fun _ -> 1) ()
+  in
   let pipeline =
     {
       canceler;
