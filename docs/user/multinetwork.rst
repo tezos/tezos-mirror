@@ -31,6 +31,8 @@ By default, the multinetwork node connects to Mainnet.
 To connect to other networks, you can either
 `Select Network From Command-Line`_ to connect to a built-in network,
 or configure the node to connect to `Custom Networks`_.
+See also `Alias Versus Explicit Configuration`_ for a discussion
+regarding what happens when you update your node.
 
 Select Network From Command-Line
 --------------------------------
@@ -105,7 +107,9 @@ Here is an example configuration file for Mainnet::
   }
 
 This is equivalent to using ``--network mainnet``, or ``"network": "Mainnet"`` in the
-configuration file (or to doing nothing, as Mainnet is the default).
+configuration file (or to doing nothing, as Mainnet is the default), except
+that you will not automatically get updates to the list of bootstrap peers and
+user-activated upgrades (see `Alias Versus Explicit Configuration`_).
 
 - ``genesis`` is the description of the genesis block, i.e. the first block of the chain.
   Inspect the genesis block using ``tezos-client rpc get /chains/main/blocks/0``
@@ -173,6 +177,37 @@ Note that the genesis parameters that you specify in the configuration file
 can be overridden by the ``--sandbox`` parameter on the command-line.
 Similarly, if you are using a built-in network and if this built-in network
 comes with genesis parameters, you can override them with ``--sandbox``.
+
+Alias Versus Explicit Configuration
+-----------------------------------
+
+If you `Select Network From Command-Line`_, the configuration file stores
+the name of the network to connect to. For instance, if you configured it
+to connect to Carthagenet, it will contain something like::
+
+  {
+    "p2p": {},
+    "network": "carthagenet"
+  }
+
+For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
+
+When you update your node to new versions, built-in network parameters may
+change. For instance, the list of bootstrap peers may be updated with
+new addresses. Or, new user-activated upgrades or user-activated protocol
+overrides may be added. Because the configuration file only contains the name
+of the network and not its parameters, it will automatically use the updated values.
+
+However, if you configure `Custom Networks`_, the configuration file will
+no longer contain an alias such as ``mainnet`` or ``carthagenet``. Instead,
+it will explicitely contain the list of bootstrap peers, user-activated upgrades
+and user-activated protocol overrides that you specify. This means that when
+you update your node, updates to built-in network parameters will have no effect.
+
+As a consequence, if you configure a custom network, you need to update
+its parameters yourself. Reciprocally, if you wish to update your node to
+a new version but do not wish to use the new built-in network parameters,
+you can configure a custom network.
 
 Development
 -----------
