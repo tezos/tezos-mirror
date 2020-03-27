@@ -68,11 +68,10 @@ Here is an example configuration file to run Carthagenet::
 
   {
     "p2p": {},
-    "network": "Carthagenet"
+    "network": "carthagenet"
   }
 
-You can specify any built-in network from the list in `Select Network From Command-Line`_,
-but its name must be capitalized.
+You can specify any built-in network from the list in `Select Network From Command-Line`_.
 
 (The ``p2p`` field is unrelated, but it is mandatory, although it can be empty.)
 
