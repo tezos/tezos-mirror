@@ -29,8 +29,8 @@ a very small branch.
 
 By default, the multinetwork node connects to Mainnet.
 To connect to other networks, you can either
-`Select Network From Command-Line`_ or `Set Network in Configuration File`_.
-You can also configure the node to connect to `Custom Networks`_.
+`Select Network From Command-Line`_ to connect to a built-in network,
+or configure the node to connect to `Custom Networks`_.
 
 Select Network From Command-Line
 --------------------------------
@@ -39,13 +39,6 @@ The simplest way to select the network to connect to is to use the new ``--netwo
 option. For instance, to run Carthagenet::
 
   tezos-node run --data-dir ~/tezos-carthagenet --network carthagenet
-
-The ``--data-dir`` option is not mandatory, but it is a good idea to prevent
-accidentally running, say, a Mainnet data directory with the Carthagenet network.
-
-Note that this ``--network`` option must be given everytime you restart your node.
-It also must be given with the ``snapshot export`` and ``snapshot import`` commands.
-One way to avoid this is to `Set Network in Configuration File`_.
 
 The ``--network`` option is non case-sensitive and can be used with
 the following built-in networks:
@@ -60,25 +53,17 @@ the following built-in networks:
 
 - ``babylonnet`` (deprecated)
 
-Set Network in Configuration File
----------------------------------
+If you run ``tezos-node run`` or ``tezos-node snapshot import`` and your node has
+no configuration file yet, a configuration file is created and stores the value of the
+``--network`` option so that you do not have to specify ``--network`` everytime.
+This also prevents you from accidentally running with the wrong network.
 
-Instead of using ``--network`` you can set the network in the configuration file.
-Here is an example configuration file to run Carthagenet::
+If you want to initialize a configuration file without running ``tezos-node run``
+or ``tezos-node snapshot import``, you can use ``tezos-node config init``.
+For instance, to configure your node to run Carthagenet assuming your
+data directory is ``~/tezos-carthagenet``, use::
 
-  {
-    "p2p": {},
-    "network": "carthagenet"
-  }
-
-You can specify any built-in network from the list in `Select Network From Command-Line`_.
-
-(The ``p2p`` field is unrelated, but it is mandatory, although it can be empty.)
-
-To use this configuration file, run the node with ``--config-file FILENAME``
-where ``FILENAME`` is the name of this file. Alternatively, put the file in your
-data directory with the name ``config.json``. By default, this is
-``~/.tezos-node/config.json``.
+  tezos-node config init --data-dir ~/tezos-carthagenet --network carthagenet
 
 Custom Networks
 ---------------
