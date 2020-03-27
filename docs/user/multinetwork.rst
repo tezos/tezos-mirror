@@ -19,9 +19,9 @@ their own networks for various reasons. Networks differ in various ways:
   to change the protocol without going through the voting process.
 
 The current ``master`` branch is capable of connecting to multiple networks,
-including Mainnet and the test networks Zeronet, Babylonnet and Carthagenet. By contrast,
+including Mainnet and the test networks Carthagenet and Zeronet. By contrast,
 the ``mainnet`` branch is only capable of connecting to Mainnet,
-the ``babylonnet`` branch is only capable of connecting to Babylonnet,
+the ``carthagenet`` branch is only capable of connecting to Carthagenet,
 and so on. The goal is to remove the need for such branches.
 Currently, the multinetwork node has not been released, but we hope that
 the next major Mainnet release is nothing but a tag on ``master``, or maybe
@@ -36,12 +36,12 @@ Select Network From Command-Line
 --------------------------------
 
 The simplest way to select the network to connect to is to use the new ``--network``
-option. For instance, to run Babylonnet::
+option. For instance, to run Carthagenet::
 
-  tezos-node run --data-dir ~/tezos-babylonnet --network babylonnet
+  tezos-node run --data-dir ~/tezos-carthagenet --network carthagenet
 
 The ``--data-dir`` option is not mandatory, but it is a good idea to prevent
-accidentally running, say, a Mainnet data directory with the Babylonnet network.
+accidentally running, say, a Mainnet data directory with the Carthagenet network.
 
 Note that this ``--network`` option must be given everytime you restart your node.
 It also must be given with the ``snapshot export`` and ``snapshot import`` commands.
@@ -54,11 +54,11 @@ the following built-in networks:
 
 - ``sandbox``
 
+- ``carthagenet``
+
 - ``zeronet``
 
-- ``babylonnet``
-
-- ``carthagenet``
+- ``babylonnet`` (deprecated)
 
 Set Network in Configuration File
 ---------------------------------
