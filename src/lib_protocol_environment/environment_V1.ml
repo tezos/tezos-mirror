@@ -120,6 +120,8 @@ struct
     module LE = EndianBytes.LittleEndian
   end
 
+  module Hex = Hex
+
   module String = struct
     include String
     include EndianString.BigEndian

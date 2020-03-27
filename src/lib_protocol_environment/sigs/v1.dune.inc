@@ -11,6 +11,7 @@
    v1/format.mli
 
    ;; Part of external libraries
+   v1/hex.mli
    v1/mBytes.mli
    v1/z.mli
    v1/lwt.mli
