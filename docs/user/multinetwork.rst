@@ -23,9 +23,6 @@ including Mainnet and the test networks Carthagenet and Zeronet. By contrast,
 the ``mainnet`` branch is only capable of connecting to Mainnet,
 the ``carthagenet`` branch is only capable of connecting to Carthagenet,
 and so on. The goal is to remove the need for such branches.
-Currently, the multinetwork node has not been released, but we hope that
-the next major Mainnet release is nothing but a tag on ``master``, or maybe
-a very small branch.
 
 By default, the multinetwork node connects to Mainnet.
 To connect to other networks, you can either
@@ -37,7 +34,7 @@ regarding what happens when you update your node.
 Select Network From Command-Line
 --------------------------------
 
-The simplest way to select the network to connect to is to use the new ``--network``
+The simplest way to select the network to connect to is to use the ``--network``
 option. For instance, to run Carthagenet::
 
   tezos-node run --data-dir ~/tezos-carthagenet --network carthagenet
