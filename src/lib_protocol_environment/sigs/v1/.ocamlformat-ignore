@@ -1,2 +1,3 @@
+hex.mli
 lwt.mli
 lwt_list.mli
