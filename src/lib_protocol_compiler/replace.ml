@@ -96,7 +96,8 @@ let sources_name (c : Protocol.component) =
   | Some _ ->
       Printf.sprintf "%s.mli %s.ml" name name
 
-let process ~template ~destination (protocol : Protocol.t) lib_version hash =
+let process ~template ~destination (protocol : Protocol.t) lib_version hash
+    check_hash =
   let version = String.concat "-" (String.split_on_char '_' lib_version) in
   let vars =
     StringMap.empty
@@ -107,6 +108,9 @@ let process ~template ~destination (protocol : Protocol.t) lib_version hash =
          (Protocol.module_name_of_env_version protocol.expected_env)
     |> StringMap.add "HASH" (Protocol_hash.to_b58check hash)
     |> StringMap.add
+         "COMPILE_OPTION"
+         (if check_hash then "" else "-no-hash-check")
+    |> StringMap.add
          "MODULES"
          (String.concat "\n   " (List.map module_name protocol.components))
     |> StringMap.add
@@ -115,30 +119,39 @@ let process ~template ~destination (protocol : Protocol.t) lib_version hash =
   in
   replace ~template ~destination vars
 
-let read_proto destination =
+let read_proto destination final_protocol_file =
   let source_dir =
     if Filename.is_relative destination then
       Filename.concat current_dir (Filename.dirname destination)
     else Filename.dirname destination
   in
-  match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
-  | Ok (None, proto) ->
-      (Protocol.hash proto, proto)
-  | Ok (Some hash, proto) ->
-      (hash, proto)
-  | Error err ->
-      Format.kasprintf
-        Stdlib.failwith
-        "Failed to read TEZOS_PROTOCOL in %s:@ %a"
-        source_dir
-        pp_print_error
-        err
+  Lwt_main.run
+    ( Lwt_utils_unix.read_file final_protocol_file
+    >>= fun final_protocol ->
+    let final_protocol =
+      List.map Protocol_hash.of_b58check_exn
+      @@ String.split_on_char '\n' final_protocol
+    in
+    Tezos_base_unix.Protocol_files.read_dir source_dir
+    >|= function
+    | Ok (None, proto) ->
+        (Protocol.hash proto, proto, false)
+    | Ok (Some hash, proto) ->
+        (hash, proto, List.mem hash final_protocol)
+    | Error err ->
+        Format.kasprintf
+          Stdlib.failwith
+          "Failed to read TEZOS_PROTOCOL in %s:@ %a"
+          source_dir
+          pp_print_error
+          err )
 
 let main () =
   let template = Sys.argv.(1) in
   let destination = Sys.argv.(2) in
-  let version = try Sys.argv.(3) with _ -> guess_version () in
-  let (hash, proto) = read_proto destination in
-  process ~template ~destination proto version hash
+  let final_protocol_file = Sys.argv.(3) in
+  let version = try Sys.argv.(4) with _ -> guess_version () in
+  let (hash, proto, check_hash) = read_proto destination final_protocol_file in
+  process ~template ~destination proto version hash check_hash
 
 let () = main ()

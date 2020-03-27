@@ -101,6 +101,10 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler} %%COMPILE_OPTION%% .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_%%LIB_VERSION%%.objs/native/tezos_protocol_%%LIB_VERSION%%.cmx))
 

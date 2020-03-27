@@ -117,6 +117,10 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_000_Ps9mPmXa.objs/native/tezos_protocol_000_Ps9mPmXa.cmx))
 

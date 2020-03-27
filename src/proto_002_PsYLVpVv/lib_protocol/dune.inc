@@ -373,6 +373,10 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_002_PsYLVpVv.objs/native/tezos_protocol_002_PsYLVpVv.cmx))
 

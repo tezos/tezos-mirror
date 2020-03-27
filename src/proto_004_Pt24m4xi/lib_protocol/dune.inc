@@ -377,6 +377,10 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_004_Pt24m4xi.objs/native/tezos_protocol_004_Pt24m4xi.cmx))
 

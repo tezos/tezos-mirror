@@ -141,8 +141,11 @@ build-sandbox:
 build-test: build-sandbox
 	@dune build @buildtest
 
-.PHONY: test
-test:
+.PHONY: test_protocol_compile
+test_protocol_compile:
+	@dune build  @runtest_compile_protocol
+
+test: test_protocol_compile
 	@dune build @runtest_dune_template @runtest @runtest_flextesa
 	@./scripts/check_opam_test.sh
 

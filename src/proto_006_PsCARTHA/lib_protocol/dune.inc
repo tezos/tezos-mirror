@@ -381,6 +381,10 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_006_PsCARTHA.objs/native/tezos_protocol_006_PsCARTHA.cmx))
 

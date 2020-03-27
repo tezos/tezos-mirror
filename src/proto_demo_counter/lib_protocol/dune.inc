@@ -141,6 +141,10 @@ include Tezos_raw_protocol_demo_counter.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_demo_counter.objs/native/tezos_protocol_demo_counter.cmx))
 

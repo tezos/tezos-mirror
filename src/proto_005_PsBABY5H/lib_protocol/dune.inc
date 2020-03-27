@@ -381,6 +381,10 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_005_PsBABY5H.objs/native/tezos_protocol_005_PsBABY5H.cmx))
 

@@ -111,6 +111,11 @@ unit:src/proto_005_PsBabyM1/lib_client:
   script:
     - dune build @src/proto_005_PsBabyM1/lib_client/runtest
 
+unit:protocol_compiles:
+  <<: *test_definition
+  script:
+    - dune build @runtest_compile_protocol
+
 unit:error_monad:
   <<: *test_definition
   script:

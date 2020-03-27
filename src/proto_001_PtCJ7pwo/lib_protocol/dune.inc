@@ -373,6 +373,10 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler}  .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_001_PtCJ7pwo.objs/native/tezos_protocol_001_PtCJ7pwo.cmx))
 

@@ -117,6 +117,10 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_genesis_carthagenet.objs/native/tezos_protocol_genesis_carthagenet.cmx))
 

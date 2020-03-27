@@ -131,7 +131,7 @@ sed -i.old -e 's/"alpha"/"'${version}_${short_hash}'"/' \
 
 rename s/alpha/${version}-${short_hash}/ $(find . -name \*.opam)
 
-dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template dune.inc ${version}_${short_hash}
+dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template dune.inc ${version}_${short_hash} ../final_protocol_versions
 
 cd ..
 

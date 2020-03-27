@@ -381,6 +381,10 @@ include Tezos_raw_protocol_alpha.Main
  (modules Registerer))
 
 (alias
+ (name runtest_compile_protocol)
+ (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+
+(alias
  (name runtest_sandbox)
  (deps .tezos_protocol_alpha.objs/native/tezos_protocol_alpha.cmx))
 
