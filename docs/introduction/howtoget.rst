@@ -24,23 +24,23 @@ architecture **x86_64**.
 Although we only officially support Linux, the script has been tested
 with success in the past on windows/mac/linux.
 
-The same script can be used to run Mainnet, Babylonnet or Zeronet, it
+The same script can be used to run Mainnet, Carthagenet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Babylonnet test network::
+For example, to run Carthagenet test network::
 
-    wget -O babylonnet.sh https://gitlab.com/tezos/tezos/raw/babylonnet/scripts/alphanet.sh
-    chmod +x babylonnet.sh
+    wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/carthagenet/scripts/alphanet.sh
+    chmod +x carthagenet.sh
 
 Alternatively, to run Mainnet::
 
-    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/master/scripts/alphanet.sh
+    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/mainnet/scripts/alphanet.sh
     chmod +x mainnet.sh
 
-In the following we assume you are running Babylonnet test network.
+In the following we assume you are running Carthagenet test network.
 You are now one step away from a working node::
 
-    ./babylonnet.sh start
+    ./carthagenet.sh start
 
 This will download the right docker image for your chosen network, launch 3
 docker containers running the node, the baker and the endorser. Keep in mind
@@ -49,23 +49,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``babylonnet.sh`` will check for updates of the node and
+Every call to ``carthagenet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./babylonnet.sh restart
+    ./carthagenet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
     export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./babylonnet.sh --help`` for more informations about the
-script. In particular see ``./babylonnet.sh client --help`` or the
+See ``./carthagenet.sh --help`` for more informations about the
+script. In particular see ``./carthagenet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed using ``./babylonnet.sh client``. Similary, ``tezos-admin-client``
-can be executed using ``./babylonnet.sh admin-client``.
+executed using ``./carthagenet.sh client``. Similary, ``tezos-admin-client``
+can be executed using ``./carthagenet.sh admin-client``.
 
 
 Build from sources
@@ -81,7 +81,7 @@ Build from sources
    sudo chmod a+x /usr/local/bin/opam
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
-   git checkout mainnet # or babylonnet or zeronet
+   git checkout mainnet # or carthagenet or zeronet
    opam init --bare
    make build-deps
    eval $(opam env)
@@ -123,7 +123,7 @@ Tezos *git* repository is hosted at `GitLab
 which we don't use anymore and only mirrors what happens on GitLab.
 
 You also need to **choose the branch** of the network you want to connect
-to: *babylonnet*, *zeronet* or *mainnet*.
+to: *carthagenet*, *zeronet* or *mainnet*.
 
 The *master* branch is where code is merged, but there is no test
 network using the master branch directly.
