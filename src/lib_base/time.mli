@@ -129,6 +129,8 @@ module System : sig
 
     val rpc_arg : t RPC_arg.t
 
+    val pp_hum : Format.formatter -> t -> unit
+
     val encoding : t Data_encoding.t
   end
 

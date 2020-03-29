@@ -148,6 +148,8 @@ module System = struct
       | Some s ->
           s
 
+    let pp_hum = Ptime.Span.pp
+
     let encoding =
       let open Data_encoding in
       def
