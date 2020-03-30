@@ -41,10 +41,15 @@ let init_validator
         Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
         >>=? fun p2p ->
         let db = Distributed_db.create state p2p in
+        let validator_environment =
+          {
+            Block_validator_process.genesis = Shell_test_helpers.genesis;
+            user_activated_upgrades = [];
+            user_activated_protocol_overrides = [];
+          }
+        in
         Block_validator_process.init
-          ~genesis:Shell_test_helpers.genesis
-          ~user_activated_upgrades:[]
-          ~user_activated_protocol_overrides:[]
+          validator_environment
           (Block_validator_process.Internal idx)
         >>=? fun block_validator ->
         Validator.create

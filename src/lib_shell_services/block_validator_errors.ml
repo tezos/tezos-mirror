@@ -361,6 +361,7 @@ type error +=
       found : Operation_list_list_hash.t;
     }
   | Failed_to_checkout_context of Context_hash.t
+  | Failed_to_get_alive_blocks of Block_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
@@ -452,6 +453,20 @@ let () =
     Data_encoding.(obj1 (req "hash" Context_hash.encoding))
     (function Failed_to_checkout_context h -> Some h | _ -> None)
     (fun h -> Failed_to_checkout_context h) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"Block_validator_process.failed_to_get_alive_block"
+    ~title:"Fail to get alive blocks"
+    ~description:"Unable to get alive blocks from a given hash"
+    ~pp:(fun ppf (hash : Block_hash.t) ->
+      Format.fprintf
+        ppf
+        "@[Failed to get alive blocks from block hash %a@]"
+        Block_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    (function Failed_to_get_alive_blocks h -> Some h | _ -> None)
+    (fun h -> Failed_to_get_alive_blocks h) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"Validator_process.system_error_while_validating"

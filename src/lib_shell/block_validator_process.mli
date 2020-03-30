@@ -24,23 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type validator_environment = {
+  genesis : Genesis.t;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+}
+
 type validator_kind =
-  | Internal of Context.index
-  | External of {
+  | Internal : Context.index -> validator_kind
+  | External : {
       context_root : string;
       protocol_root : string;
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
     }
+      -> validator_kind
 
 type t
 
-val init :
-  genesis:Genesis.t ->
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  validator_kind ->
-  t tzresult Lwt.t
+val init : validator_environment -> validator_kind -> t tzresult Lwt.t
 
 val close : t -> unit Lwt.t
 

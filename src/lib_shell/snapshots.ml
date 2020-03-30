@@ -789,19 +789,24 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
             >>=? fun operations ->
             let predecessor_block_hash = block_header.shell.predecessor in
             State.Block.Header.read (block_store, predecessor_block_hash)
-            >>=? fun pred_block_header ->
-            let context_hash = pred_block_header.shell.context in
-            Context.checkout_exn context_index context_hash
-            >>= fun pred_context ->
-            Tezos_validation.Block_validation.apply
-              chain_id
-              ~user_activated_upgrades
-              ~user_activated_protocol_overrides
-              ~max_operations_ttl:(Int32.to_int pred_block_header.shell.level)
-              ~predecessor_block_header:pred_block_header
-              ~predecessor_context:pred_context
-              ~block_header
-              operations
+            >>=? fun predecessor_block_header ->
+            let pred_context_hash = predecessor_block_header.shell.context in
+            Context.checkout_exn context_index pred_context_hash
+            >>= fun predecessor_context ->
+            let max_operations_ttl =
+              Int32.to_int predecessor_block_header.shell.level
+            in
+            let env =
+              {
+                Block_validation.max_operations_ttl;
+                chain_id;
+                predecessor_block_header;
+                predecessor_context;
+                user_activated_upgrades;
+                user_activated_protocol_overrides;
+              }
+            in
+            Tezos_validation.Block_validation.apply env block_header operations
             >>=? fun block_validation_result ->
             check_context_hash_consistency
               block_validation_result.validation_store
@@ -1056,16 +1061,21 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
       let pred_context_hash = predecessor_block_header.shell.context in
       checkout_exn context_index pred_context_hash
       >>= fun predecessor_context ->
+      let max_operations_ttl =
+        Int32.to_int predecessor_block_header.shell.level
+      in
+      let env =
+        {
+          Block_validation.max_operations_ttl;
+          chain_id;
+          predecessor_block_header;
+          predecessor_context;
+          user_activated_upgrades;
+          user_activated_protocol_overrides;
+        }
+      in
       (* ... we can now call apply ... *)
-      Tezos_validation.Block_validation.apply
-        chain_id
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        ~max_operations_ttl:(Int32.to_int predecessor_block_header.shell.level)
-        ~predecessor_block_header
-        ~predecessor_context
-        ~block_header
-        operations
+      Tezos_validation.Block_validation.apply env block_header operations
       >>=? fun block_validation_result ->
       check_context_hash_consistency
         block_validation_result.validation_store

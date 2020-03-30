@@ -286,21 +286,18 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     disable_mempool
   >>=? fun p2p ->
   (let open Block_validator_process in
+  let validator_environment =
+    {genesis; user_activated_upgrades; user_activated_protocol_overrides}
+  in
   if singleprocess then
     State.init ~store_root ~context_root ?history_mode ?patch_context genesis
     >>=? fun (state, mainchain_state, context_index, history_mode) ->
-    init
-      ~genesis
-      ~user_activated_upgrades
-      ~user_activated_protocol_overrides
-      (Internal context_index)
+    init validator_environment (Internal context_index)
     >>=? fun validator_process ->
     return (validator_process, state, mainchain_state, history_mode)
   else
     init
-      ~genesis
-      ~user_activated_upgrades
-      ~user_activated_protocol_overrides
+      validator_environment
       (External
          {
            context_root;

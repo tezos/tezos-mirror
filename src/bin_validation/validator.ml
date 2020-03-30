@@ -97,15 +97,17 @@ let run stdin stdout =
                      >>= fun protocol_hash ->
                      load_protocol protocol_hash protocol_root
                      >>=? fun () ->
-                     Block_validation.apply
-                       chain_id
-                       ~user_activated_upgrades
-                       ~user_activated_protocol_overrides
-                       ~max_operations_ttl
-                       ~predecessor_block_header
-                       ~predecessor_context
-                       ~block_header
-                       operations
+                     let env =
+                       {
+                         Block_validation.chain_id;
+                         user_activated_upgrades;
+                         user_activated_protocol_overrides;
+                         max_operations_ttl;
+                         predecessor_block_header;
+                         predecessor_context;
+                       }
+                     in
+                     Block_validation.apply env block_header operations
                      >>= function
                      | Error
                          [ Block_validator_errors.Unavailable_protocol
@@ -116,15 +118,8 @@ let run stdin stdout =
                          | Error _ ->
                              Lwt.return err
                          | Ok () ->
-                             Block_validation.apply
-                               chain_id
-                               ~user_activated_upgrades
-                               ~user_activated_protocol_overrides
-                               ~max_operations_ttl
-                               ~predecessor_block_header
-                               ~predecessor_context
-                               ~block_header
-                               operations )
+                             Block_validation.apply env block_header operations
+                         )
                      | result ->
                          Lwt.return result)
               >>= fun res ->

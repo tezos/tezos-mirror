@@ -24,32 +24,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_context index hash =
-  Context.checkout index hash
-  >>= function
-  | None ->
-      fail (Block_validator_errors.Failed_to_checkout_context hash)
-  | Some ctx ->
-      return ctx
+type validator_environment = {
+  genesis : Genesis.t;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+}
+
+type validator_kind =
+  | Internal : Context.index -> validator_kind
+  | External : {
+      context_root : string;
+      protocol_root : string;
+      process_path : string;
+      sandbox_parameters : Data_encoding.json option;
+    }
+      -> validator_kind
+
+module type S = sig
+  type t
+
+  val close : t -> unit Lwt.t
+
+  val restore_context_integrity : t -> int option tzresult Lwt.t
+
+  val apply_block :
+    t ->
+    predecessor:State.Block.t ->
+    max_operations_ttl:int ->
+    Block_header.t ->
+    Operation.t list list ->
+    Block_validation.result tzresult Lwt.t
+
+  val commit_genesis :
+    t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
+
+  (** [init_test_chain] must only be called on a forking block. *)
+  val init_test_chain : t -> State.Block.t -> Block_header.t tzresult Lwt.t
+end
+
+type t =
+  | E : {validator_process : (module S with type t = 'a); validator : 'a} -> t
 
 (** The standard block validation method *)
-module Seq_validator = struct
+module Internal_validator_process = struct
   include Block_validator_process_state.Seq_validator_events
 
-  type validation_context = {
+  type t = {
     context_index : Context.index;
     genesis : Genesis.t;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
   }
 
-  type t = validation_context
-
-  let init ~genesis ~user_activated_upgrades ~user_activated_protocol_overrides
-      context_index =
+  let init
+      ({genesis; user_activated_upgrades; user_activated_protocol_overrides} :
+        validator_environment) context_index =
     lwt_emit Init
     >>= fun () ->
-    Lwt.return
+    return
       {
         context_index;
         genesis;
@@ -59,36 +91,66 @@ module Seq_validator = struct
 
   let close _ = lwt_emit Close
 
-  let apply_block validator_process chain_state ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t) ~block_header operations =
+  let make_apply_environment
+      { user_activated_upgrades;
+        user_activated_protocol_overrides;
+        context_index;
+        _ } predecessor max_operations_ttl =
+    let chain_state = State.Block.chain_state predecessor in
     let chain_id = State.Chain.id chain_state in
-    get_context
-      validator_process.context_index
-      predecessor_block_header.shell.context
+    let predecessor_block_header = State.Block.header predecessor in
+    let context_hash = predecessor_block_header.shell.context in
+    Context.checkout context_index context_hash
+    >>= (function
+          | None ->
+              fail
+                (Block_validator_errors.Failed_to_checkout_context context_hash)
+          | Some ctx ->
+              return ctx)
     >>=? fun predecessor_context ->
+    return
+      {
+        Block_validation.max_operations_ttl;
+        chain_id;
+        predecessor_block_header;
+        predecessor_context;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+      }
+
+  let apply_block validator ~predecessor ~max_operations_ttl block_header
+      operations =
+    make_apply_environment validator predecessor max_operations_ttl
+    >>=? fun env ->
     lwt_timed_emit
-      (Validation_request (Block_header.hash block_header, chain_id))
+      (Validation_request (Block_header.hash block_header, env.chain_id))
     >>= fun event_start ->
-    Block_validation.apply
-      chain_id
-      ~user_activated_upgrades:validator_process.user_activated_upgrades
-      ~user_activated_protocol_overrides:
-        validator_process.user_activated_protocol_overrides
-      ~max_operations_ttl
-      ~predecessor_block_header
-      ~predecessor_context
-      ~block_header
-      operations
+    Block_validation.apply env block_header operations
     >>=? fun result ->
     lwt_emit (Validation_success (Block_header.hash block_header, event_start))
     >>= fun () -> return result
+
+  let commit_genesis validator ~chain_id =
+    Context.commit_genesis
+      validator.context_index
+      ~chain_id
+      ~time:validator.genesis.time
+      ~protocol:validator.genesis.protocol
+
+  let init_test_chain _ forking_block =
+    let forked_header = State.Block.header forking_block in
+    State.Block.context forking_block
+    >>=? fun context -> Block_validation.init_test_chain context forked_header
+
+  let restore_context_integrity validator =
+    Lwt.return (Context.restore_integrity validator.context_index)
 end
 
 (** Block validation using an external process *)
-module External_validator = struct
+module External_validator_process = struct
   include Block_validator_process_state.External_validator_events
 
-  type validation_context = {
+  type t = {
     context_root : string;
     protocol_root : string;
     genesis : Genesis.t;
@@ -99,51 +161,6 @@ module External_validator = struct
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
   }
-
-  type t = validation_context
-
-  let init ?sandbox_parameters ~context_root ~protocol_root ~genesis
-      ~user_activated_upgrades ~user_activated_protocol_overrides ~process_path
-      =
-    lwt_emit Init
-    >>= fun () ->
-    Lwt.return
-      {
-        context_root;
-        protocol_root;
-        genesis;
-        user_activated_upgrades;
-        user_activated_protocol_overrides;
-        process_path;
-        validator_process = None;
-        lock = Lwt_mutex.create ();
-        sandbox_parameters;
-      }
-
-  let close vp =
-    lwt_emit Close
-    >>= fun () ->
-    match vp.validator_process with
-    | Some process ->
-        let request = External_validation.Terminate in
-        lwt_emit (Request request)
-        >>= fun () ->
-        External_validation.send
-          process#stdin
-          External_validation.request_encoding
-          request
-        >>= fun () ->
-        process#status
-        >>= (function
-              | Unix.WEXITED 0 ->
-                  Lwt.return_unit
-              | _ ->
-                  process#terminate ; Lwt.return_unit)
-        >>= fun () ->
-        vp.validator_process <- None ;
-        Lwt.return_unit
-    | None ->
-        Lwt.return_unit
 
   let send_request vp request result_encoding =
     let start_process () =
@@ -217,125 +234,145 @@ module External_validator = struct
             >>= fun () ->
             vp.validator_process <- None ;
             Lwt.return (error_exn errors))
+
+  let init
+      ({genesis; user_activated_upgrades; user_activated_protocol_overrides} :
+        validator_environment) context_root protocol_root process_path
+      sandbox_parameters =
+    lwt_emit Init
+    >>= fun () ->
+    let validator =
+      {
+        context_root;
+        protocol_root;
+        genesis;
+        user_activated_upgrades;
+        user_activated_protocol_overrides;
+        process_path;
+        validator_process = None;
+        lock = Lwt_mutex.create ();
+        sandbox_parameters;
+      }
+    in
+    send_request validator External_validation.Init Data_encoding.empty
+    >>=? fun () -> return validator
+
+  let apply_block validator ~predecessor ~max_operations_ttl block_header
+      operations =
+    let chain_state = State.Block.chain_state predecessor in
+    let predecessor_block_header = State.Block.header predecessor in
+    let chain_id = State.Chain.id chain_state in
+    let request =
+      External_validation.Validate
+        {
+          chain_id;
+          block_header;
+          predecessor_block_header;
+          operations;
+          max_operations_ttl;
+        }
+    in
+    send_request validator request Block_validation.result_encoding
+
+  let commit_genesis validator ~chain_id =
+    let request = External_validation.Commit_genesis {chain_id} in
+    send_request validator request Context_hash.encoding
+
+  let init_test_chain validator forking_block =
+    let forked_header = State.Block.header forking_block in
+    let context_hash = forked_header.shell.context in
+    let request =
+      External_validation.Fork_test_chain {context_hash; forked_header}
+    in
+    send_request validator request Block_header.encoding
+
+  let restore_context_integrity validator =
+    let request = External_validation.Restore_context_integrity in
+    send_request validator request Data_encoding.(option int31)
+
+  let close vp =
+    lwt_emit Close
+    >>= fun () ->
+    match vp.validator_process with
+    | Some process ->
+        let request = External_validation.Terminate in
+        lwt_emit (Request request)
+        >>= fun () ->
+        External_validation.send
+          process#stdin
+          External_validation.request_encoding
+          request
+        >>= fun () ->
+        process#status
+        >>= (function
+              | Unix.WEXITED 0 ->
+                  Lwt.return_unit
+              | _ ->
+                  process#terminate ; Lwt.return_unit)
+        >>= fun () ->
+        vp.validator_process <- None ;
+        Lwt.return_unit
+    | None ->
+        Lwt.return_unit
 end
 
-type validator_kind =
-  | Internal of Context.index
-  | External of {
-      context_root : string;
-      protocol_root : string;
-      process_path : string;
-      sandbox_parameters : Data_encoding.json option;
-    }
-
-type t = Sequential of Seq_validator.t | External of External_validator.t
-
-let init ~genesis ~user_activated_upgrades ~user_activated_protocol_overrides
-    kind =
-  match kind with
+let init : validator_environment -> validator_kind -> t tzresult Lwt.t =
+ fun validator_environment validator_kind ->
+  match validator_kind with
   | Internal index ->
-      Seq_validator.init
-        ~genesis
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        index
-      >>= fun v -> return (Sequential v)
+      Internal_validator_process.init validator_environment index
+      >>=? fun (validator : 'a) ->
+      let validator_process : (module S with type t = 'a) =
+        (module Internal_validator_process)
+      in
+      return (E {validator_process; validator})
   | External {context_root; protocol_root; process_path; sandbox_parameters} ->
-      External_validator.init
-        ?sandbox_parameters
-        ~context_root
-        ~protocol_root
-        ~genesis
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        ~process_path
-      >>= fun v ->
-      External_validator.send_request
-        v
-        External_validation.Init
-        Data_encoding.empty
-      >>=? fun () -> return (External v)
+      External_validator_process.init
+        validator_environment
+        context_root
+        protocol_root
+        process_path
+        sandbox_parameters
+      >>=? fun (validator : 'b) ->
+      let validator_process : (module S with type t = 'b) =
+        (module External_validator_process)
+      in
+      return (E {validator_process; validator})
 
-let close = function
-  | Sequential vp ->
-      Seq_validator.close vp
-  | External vp ->
-      External_validator.close vp
+let close (E {validator_process = (module VP); validator}) = VP.close validator
 
-let apply_block bvp ~predecessor block_header operations =
+let restore_context_integrity (E {validator_process = (module VP); validator})
+    =
+  VP.restore_context_integrity validator
+
+let apply_block (E {validator_process = (module VP); validator}) ~predecessor
+    header operations =
   let chain_state = State.Block.chain_state predecessor in
-  let predecessor_block_header = State.Block.header predecessor in
   State.Block.max_operations_ttl predecessor
   >>=? fun max_operations_ttl ->
-  let block_hash = Block_header.hash block_header in
   Chain.data chain_state
-  >>= (fun chain_data ->
-        if State.Block.equal chain_data.current_head predecessor then
-          return (chain_data.live_blocks, chain_data.live_operations)
-        else Chain_traversal.live_blocks predecessor max_operations_ttl)
+  >>= fun chain_data ->
+  ( if State.Block.equal chain_data.current_head predecessor then
+    return (chain_data.live_blocks, chain_data.live_operations)
+  else
+    let hash = State.Block.hash predecessor in
+    trace
+      (Block_validator_errors.Failed_to_get_alive_blocks hash)
+      (Chain_traversal.live_blocks predecessor max_operations_ttl) )
   >>=? fun (live_blocks, live_operations) ->
-  Block_validation.check_liveness
-    ~live_operations
-    ~live_blocks
-    block_hash
-    operations
+  let block_hash = Block_header.hash header in
+  Lwt.return
+    (Block_validation.check_liveness
+       ~live_operations
+       ~live_blocks
+       block_hash
+       operations)
   >>=? fun () ->
-  match bvp with
-  | Sequential vp ->
-      Seq_validator.apply_block
-        vp
-        ~max_operations_ttl
-        chain_state
-        ~predecessor_block_header
-        ~block_header
-        operations
-  | External vp ->
-      let chain_id = State.Chain.id chain_state in
-      let request =
-        External_validation.Validate
-          {
-            chain_id;
-            block_header;
-            predecessor_block_header;
-            operations;
-            max_operations_ttl;
-          }
-      in
-      External_validator.send_request
-        vp
-        request
-        Block_validation.result_encoding
+  VP.apply_block validator ~predecessor ~max_operations_ttl header operations
 
-let commit_genesis bvp ~chain_id =
-  match bvp with
-  | Sequential {context_index; genesis; _} ->
-      Context.commit_genesis
-        context_index
-        ~chain_id
-        ~time:genesis.time
-        ~protocol:genesis.protocol
-  | External vp ->
-      let request = External_validation.Commit_genesis {chain_id} in
-      External_validator.send_request vp request Context_hash.encoding
+let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
+  VP.commit_genesis validator ~chain_id
 
-let init_test_chain bvp forking_block =
-  let forked_header = State.Block.header forking_block in
-  match bvp with
-  | Sequential _ ->
-      State.Block.context forking_block
-      >>=? fun context ->
-      Block_validation.init_test_chain context forked_header
-  | External vp ->
-      let context_hash = forked_header.shell.context in
-      let request =
-        External_validation.Fork_test_chain {context_hash; forked_header}
-      in
-      External_validator.send_request vp request Block_header.encoding
-
-let restore_context_integrity bvp =
-  match bvp with
-  | Sequential {context_index; _} ->
-      Lwt.return (Context.restore_integrity context_index)
-  | External vp ->
-      let request = External_validation.Restore_context_integrity in
-      External_validator.send_request vp request Data_encoding.(option int31)
+let init_test_chain (E {validator_process = (module VP); validator})
+    forked_block =
+  VP.init_test_chain validator forked_block

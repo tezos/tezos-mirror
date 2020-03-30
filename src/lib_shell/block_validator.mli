@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module is the main entry point to valide blocks and protocols. *)
+
 type t
 
 type limits = {
@@ -31,6 +33,7 @@ type limits = {
   worker_limits : Worker_types.limits;
 }
 
+(** [create limits ddb bvp test_chain] creates a block_validator. *)
 val create :
   limits ->
   Distributed_db.t ->
@@ -38,6 +41,11 @@ val create :
   start_testchain:bool ->
   t tzresult Lwt.t
 
+(** [validate ddb hash header ops] validate a block. It makes the following
+    assumptions:
+    1. The fitness of the block is greater than the current head
+    2. The block is after the checkpoint (see State.acceptabe_block)
+ *)
 val validate :
   t ->
   ?canceler:Lwt_canceler.t ->

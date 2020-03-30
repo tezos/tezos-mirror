@@ -45,13 +45,6 @@ val update_testchain_status :
 val init_test_chain :
   Context.t -> Block_header.t -> Block_header.t tzresult Lwt.t
 
-val check_liveness :
-  live_blocks:Block_hash.Set.t ->
-  live_operations:Operation_hash.Set.t ->
-  Block_hash.t ->
-  Operation.t list list ->
-  unit tzresult Lwt.t
-
 type result = {
   validation_store : validation_store;
   block_metadata : Bytes.t;
@@ -61,13 +54,24 @@ type result = {
 
 val result_encoding : result Data_encoding.t
 
+type apply_environment = {
+  max_operations_ttl : int;
+  chain_id : Chain_id.t;
+  predecessor_block_header : Block_header.t;
+  predecessor_context : Context.t;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+}
+
+val check_liveness :
+  live_blocks:Block_hash.Set.t ->
+  live_operations:Operation_hash.Set.t ->
+  Block_hash.t ->
+  Operation.t list list ->
+  unit tzresult
+
 val apply :
-  Chain_id.t ->
-  user_activated_upgrades:User_activated.upgrades ->
-  user_activated_protocol_overrides:User_activated.protocol_overrides ->
-  max_operations_ttl:int ->
-  predecessor_block_header:Block_header.t ->
-  predecessor_context:Context.t ->
-  block_header:Block_header.t ->
+  apply_environment ->
+  Block_header.t ->
   Operation.t list list ->
   result tzresult Lwt.t

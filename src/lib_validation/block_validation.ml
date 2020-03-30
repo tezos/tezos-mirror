@@ -389,39 +389,58 @@ module Make (Proto : Registered_protocol.T) = struct
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
-  fold_left_s
-    (fold_left_s (fun live_operations op ->
-         let oph = Operation.hash op in
-         fail_when
-           (Operation_hash.Set.mem oph live_operations)
-           (invalid_block block_hash @@ Replayed_operation oph)
-         >>=? fun () -> return (Operation_hash.Set.add oph live_operations)))
-    live_operations
-    operations
-  >>=? fun _ -> return_unit
+  let exception Duplicate of block_error in
+  try
+    ok
+      (List.fold_left
+         (List.fold_left (fun live_operations op ->
+              let oph = Operation.hash op in
+              if Operation_hash.Set.mem oph live_operations then
+                raise (Duplicate (Replayed_operation oph))
+              else Operation_hash.Set.add oph live_operations))
+         live_operations
+         operations)
+  with Duplicate err -> error (invalid_block block_hash err)
 
 let assert_operation_liveness block_hash live_blocks operations =
-  iter_s
-    (iter_s (fun op ->
-         fail_unless
-           (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
-           ( invalid_block block_hash
-           @@ Outdated_operation
-                {
-                  operation = Operation.hash op;
-                  originating_block = op.shell.branch;
-                } )))
-    operations
+  let exception Outdated of block_error in
+  try
+    ok
+      (List.iter
+         (List.iter (fun op ->
+              if not (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+              then
+                let error =
+                  Outdated_operation
+                    {
+                      operation = Operation.hash op;
+                      originating_block = op.shell.branch;
+                    }
+                in
+                raise (Outdated error)))
+         operations)
+  with Outdated err -> error (invalid_block block_hash err)
 
 let check_liveness ~live_blocks ~live_operations block_hash operations =
   assert_no_duplicate_operations block_hash live_operations operations
-  >>=? fun () ->
-  assert_operation_liveness block_hash live_blocks operations
-  >>=? fun () -> return_unit
+  >>? fun _ -> assert_operation_liveness block_hash live_blocks operations
 
-let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
-    ~predecessor_context ~(block_header : Block_header.t) operations =
+type apply_environment = {
+  max_operations_ttl : int;
+  chain_id : Chain_id.t;
+  predecessor_block_header : Block_header.t;
+  predecessor_context : Context.t;
+  user_activated_upgrades : User_activated.upgrades;
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+}
+
+let apply
+    { chain_id;
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
+      max_operations_ttl;
+      predecessor_block_header;
+      predecessor_context } block_header operations =
   let block_hash = Block_header.hash block_header in
   Context.get_protocol predecessor_context
   >>= fun pred_protocol_hash ->
