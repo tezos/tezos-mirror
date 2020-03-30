@@ -27,14 +27,12 @@ open Lwt.Infix
 
 let rec producer queue = function
   | 0 ->
-      Format.eprintf "Done producing." ;
       Lwt.return_unit
   | n ->
       Lwt_pipe.push queue () >>= fun () -> producer queue (pred n)
 
 let rec consumer queue = function
   | 0 ->
-      Format.eprintf "Done consuming." ;
       Lwt.return_unit
   | n ->
       Lwt_pipe.pop queue >>= fun _ -> consumer queue (pred n)
