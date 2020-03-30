@@ -2054,10 +2054,7 @@ language can only be one of the five following constructs.
 4. The application of a primitive to a sequence of expressions.
 5. A sequence of expressions.
 
-This simple five cases notation is called Micheline.
-
-The encoding of a Micheline source file must be UTF-8, and non-ASCII
-characters can only appear in comments and strings.
+This simple five cases notation is called :ref:`Micheline`.
 
 Constants
 ~~~~~~~~~
@@ -2066,75 +2063,12 @@ There are three kinds of constants:
 
 1. Integers or naturals in decimal notation.
 2. Strings, with some usual escape sequences: ``\n``, ``\\``,
-   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``)
-   cannot appear in a string.
+   ``\"``. Unescaped line-breaks (both ``\n`` and ``\r``) cannot
+   appear in a Michelson string. Moreover, the current version of
+   Michelson restricts strings to be the printable subset of 7-bit
+   ASCII, namely characters with codes from within `[32, 126]` range,
+   plus the escaped characters mentioned above.
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
-
-The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, namely characters with codes from within `[32, 126]`
-range, plus the escaped characters mentioned above.
-
-Primitive applications
-~~~~~~~~~~~~~~~~~~~~~~
-
-A primitive application is a name followed by arguments
-
-::
-
-    prim arg1 arg2
-
-When a primitive application is the argument to another primitive
-application, it must be wrapped with parentheses.
-
-::
-
-    prim (prim1 arg11 arg12) (prim2 arg21 arg22)
-
-Sequences
-~~~~~~~~~
-
-Successive expression can be grouped as a single sequence expression
-using curly braces as delimiters and semicolon as separators.
-
-::
-
-    { expr1 ; expr2 ; expr3 ; expr4 }
-
-A sequence can be passed as argument to a primitive.
-
-::
-
-    prim arg1 arg2 { arg3_expr1 ; arg3_expr2 }
-
-Primitive applications right inside a sequence cannot be wrapped.
-
-::
-
-    { (prim arg1 arg2) } # is not ok
-
-Indentation
-~~~~~~~~~~~
-
-To remove ambiguities for human readers, the parser enforces some
-indentation rules.
-
--  For sequences:
-
-   -  All expressions in a sequence must be aligned on the same column.
-   -  An exception is made when consecutive expressions fit on the same
-      line, as long as the first of them is correctly aligned.
-   -  All expressions in a sequence must be indented to the right of the
-      opening curly brace by at least one column.
-   -  The closing curly brace cannot be on the left of the opening one.
-
--  For primitive applications:
-
-   -  All arguments in an application must be aligned on the same
-      column.
-   -  An exception is made when consecutive arguments fit on the same
-      line, as long as the first of them is correctly aligned.
-   -  All arguments in a sequence must be indented to the right of the
-      primitive name by at least one column.
 
 Differences with the formal notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2177,22 +2111,6 @@ of three primitive applications (in no particular order) that provide its
 ``code``, ``parameter`` and ``storage`` fields.
 
 See the next section for a concrete example.
-
-Comments
-~~~~~~~~
-
-A hash sign (``#``) anywhere outside of a string literal will make the
-rest of the line (and itself) completely ignored, as in the following
-example.
-
-::
-
-    { PUSH nat 1 ; # pushes 1
-      PUSH nat 2 ; # pushes 2
-      ADD }        # computes 2 + 1
-
-Comments that span on multiple lines or that stop before the end of the
-line can also be written, using C-like delimiters (``/* ... */``).
 
 Annotations
 -----------
