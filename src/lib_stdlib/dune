@@ -2,7 +2,6 @@
  (name tezos_stdlib)
  (public_name tezos-stdlib)
  (libraries hex
-            re
             zarith
             lwt)
  (flags :standard))

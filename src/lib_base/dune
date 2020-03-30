@@ -18,7 +18,6 @@
             tezos-rpc
             tezos-clic
             tezos-micheline
-            re.str
             ptime
             ezjsonm
             lwt

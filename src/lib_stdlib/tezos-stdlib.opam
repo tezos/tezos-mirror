@@ -8,13 +8,11 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
-  "bigstring"
   "hex"
-  "re"
   "lwt"
-  "lwt_log" { with-test }
   "zarith"
-  "mtime"
+  "bigstring" { with-test }
+  "lwt_log" { with-test }
   "alcotest" { with-test & = "0.8.5" }
 ]
 build: [
