@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module is a proxy for the shell of the protocol (for the application
+    part). The main function of this module is [apply] whichs calls the one of
+    the protocol. *)
+
 type validation_store = {
   context_hash : Context_hash.t;
   message : string option;
@@ -54,15 +58,8 @@ type result = {
 
 val result_encoding : result Data_encoding.t
 
-type apply_environment = {
-  max_operations_ttl : int;
-  chain_id : Chain_id.t;
-  predecessor_block_header : Block_header.t;
-  predecessor_context : Context.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-}
-
+(** [check_liveness live_blocks live_operations hash ops] checks
+    there is no duplicate operation and that is not outdate *)
 val check_liveness :
   live_blocks:Block_hash.Set.t ->
   live_operations:Operation_hash.Set.t ->
@@ -70,6 +67,25 @@ val check_liveness :
   Operation.t list list ->
   unit tzresult
 
+type apply_environment = {
+  max_operations_ttl : int;  (** time to live of an operation *)
+  chain_id : Chain_id.t;  (** chain_id of the current branch *)
+  predecessor_block_header : Block_header.t;
+      (** header of the predecessor block being validated *)
+  predecessor_context : Context.t;
+      (** context associated to the predecessor block *)
+  user_activated_upgrades : User_activated.upgrades;
+      (** user activated upgrades *)
+  user_activated_protocol_overrides : User_activated.protocol_overrides;
+      (** user activated protocol overrides *)
+}
+
+(** [apply env header ops] get the protocol [P] of the context of the predecessor
+    block and calls successively:
+    1. [P.begin_application]
+    2. [P.apply]
+    3. [P.finalize_block]
+*)
 val apply :
   apply_environment ->
   Block_header.t ->

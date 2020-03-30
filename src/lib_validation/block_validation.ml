@@ -421,6 +421,8 @@ let assert_operation_liveness block_hash live_blocks operations =
          operations)
   with Outdated err -> error (invalid_block block_hash err)
 
+(* Maybe this function should be moved somewhere else since it used
+   once by [Block_validator_process] *)
 let check_liveness ~live_blocks ~live_operations block_hash operations =
   assert_no_duplicate_operations block_hash live_operations operations
   >>? fun _ -> assert_operation_liveness block_hash live_blocks operations

@@ -40,6 +40,7 @@ type validator_kind =
     }
       -> validator_kind
 
+(* A common interface for the two type of validation *)
 module type S = sig
   type t
 
@@ -62,6 +63,8 @@ module type S = sig
   val init_test_chain : t -> State.Block.t -> Block_header.t tzresult Lwt.t
 end
 
+(* We hide the validator (of type [S.t]) and the according module in a GADT.
+   This way, we avoid one pattern matching. *)
 type t =
   | E : {validator_process : (module S with type t = 'a); validator : 'a} -> t
 
@@ -357,7 +360,7 @@ let apply_block (E {validator_process = (module VP); validator}) ~predecessor
   else
     let hash = State.Block.hash predecessor in
     trace
-      (Block_validator_errors.Failed_to_get_alive_blocks hash)
+      (Block_validator_errors.Failed_to_get_live_blocks hash)
       (Chain_traversal.live_blocks predecessor max_operations_ttl) )
   >>=? fun (live_blocks, live_operations) ->
   let block_hash = Block_header.hash header in

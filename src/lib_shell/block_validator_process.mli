@@ -24,12 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Block_validator_process is used to validate new blocks. This validation can be
+    - internal: the same processus is used to run the node and to validate blocks
+    - external: another processus is used to validate blocks
+    This module also ensures the liveness of the operations
+    (see [Block_validation:check_liveness]). *)
+
 type validator_environment = {
-  genesis : Genesis.t;
+  genesis : Genesis.t;  (** genesis block of the current chain *)
   user_activated_upgrades : User_activated.upgrades;
+      (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+      (** user activated protocol overrides *)
 }
 
+(** For performances reasons, it may be interesting to use another processus
+    (from the OS) to validate blocks (External). However, in that case, only
+    one processus has a write access to the context. Currently informations
+    are exchanged via the file system. *)
 type validator_kind =
   | Internal : Context.index -> validator_kind
   | External : {
@@ -40,6 +52,7 @@ type validator_kind =
     }
       -> validator_kind
 
+(** Internal representation of the block validator process *)
 type t
 
 val init : validator_environment -> validator_kind -> t tzresult Lwt.t
@@ -48,6 +61,8 @@ val close : t -> unit Lwt.t
 
 val restore_context_integrity : t -> int option tzresult Lwt.t
 
+(** [apply_block bvp predecessor header os] checks the liveness of
+    the operations and then call [Block_validation.apply] *)
 val apply_block :
   t ->
   predecessor:State.Block.t ->
