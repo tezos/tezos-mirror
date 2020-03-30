@@ -221,10 +221,10 @@ type cli_args = {
   protocol : Protocol_hash.t option;
   print_timings : bool;
   log_requests : bool;
-  mockup_mode : mockup_mode;
+  client_mode : client_mode;
 }
 
-and mockup_mode = Mode_client | Mode_mockup
+and client_mode = Mode_client | Mode_mockup
 
 let default_cli_args =
   {
@@ -235,7 +235,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
-    mockup_mode = Mode_client;
+    client_mode = Mode_client;
   }
 
 open Clic
@@ -384,8 +384,8 @@ let password_filename_arg () =
     ~doc:"path to the password filename"
     (string_parameter ())
 
-let mockup_mode_arg () =
-  let parse_mockup_mode (str : string) : mockup_mode tzresult Lwt.t =
+let client_mode_arg () =
+  let parse_client_mode (str : string) : client_mode tzresult Lwt.t =
     if str = "client" then return Mode_client
     else if str = "mockup" then return Mode_mockup
     else fail (Invalid_mockup_arg str)
@@ -398,7 +398,7 @@ let mockup_mode_arg () =
     ~default:"client"
     (parameter
        ~autocomplete:(fun _ -> return ["client"; "mockup"])
-       (fun _ param -> parse_mockup_mode param))
+       (fun _ param -> parse_client_mode param))
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file
@@ -501,7 +501,7 @@ let global_options () =
     (tls_switch ())
     (remote_signer_arg ())
     (password_filename_arg ())
-    (mockup_mode_arg ())
+    (client_mode_arg ())
 
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
@@ -537,7 +537,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                tls,
                remote_signer,
                password_filename,
-               mockup_mode ),
+               client_mode ),
              remaining ) ->
   ( match base_dir with
   | None ->
@@ -545,13 +545,18 @@ let parse_config_args (ctx : #Client_context.full) argv =
       unless (Sys.file_exists base_dir) (fun () ->
           Lwt_utils_unix.create_dir base_dir >>= return)
       >>=? fun () -> return base_dir
-  | Some dir ->
-      if not (Sys.file_exists dir) then
-        failwith
-          "Specified -base-dir does not exist. Please create the directory \
-           and try again."
-      else if Sys.is_directory dir then return dir
-      else failwith "Specified -base-dir must be a directory" )
+  | Some dir -> (
+    match client_mode with
+    | Mode_client ->
+        if not (Sys.file_exists dir) then
+          failwith
+            "Specified -base-dir does not exist. Please create the directory \
+             and try again."
+        else if Sys.is_directory dir then return dir
+        else failwith "Specified -base-dir must be a directory"
+    | Mode_mockup ->
+        (* In mockup mode base dir may be created automatically. *)
+        return dir ) )
   >>=? fun base_dir ->
   ( match config_file with
   | None ->
@@ -613,7 +618,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
               log_requests;
               password_filename;
               protocol;
-              mockup_mode;
+              client_mode;
             };
         config_commands = commands config_file cfg;
       },
@@ -633,7 +638,7 @@ type t =
   * bool
   * Uri.t option
   * string option
-  * mockup_mode
+  * client_mode
 
 module type Remote_params = sig
   val authenticate :

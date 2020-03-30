@@ -49,7 +49,9 @@ val get_mockup_context_from_disk :
 (** Initializes an on-disk mockup environment in [base_dir] for the specified
     protocol. *)
 val create_mockup :
-  protocol_hash:Protocol_hash.t -> base_dir:string -> unit tzresult Lwt.t
+  cctxt:Tezos_client_base.Client_context.full ->
+  protocol_hash:Protocol_hash.t ->
+  unit tzresult Lwt.t
 
 (** Overwrites an on-disk mockup environment. *)
 val overwrite_mockup :
@@ -60,6 +62,7 @@ val overwrite_mockup :
 
 type base_dir_class =
   | Base_dir_does_not_exist
+  | Base_dir_is_file
   | Base_dir_is_mockup
   | Base_dir_is_nonempty
   | Base_dir_is_empty

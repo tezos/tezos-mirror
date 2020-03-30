@@ -14,6 +14,7 @@
  (modules local_services RPC_client persistence)
  (libraries
    tezos-base
+   tezos-client-base
    tezos-rpc
    tezos-p2p-services
    tezos-p2p ; for registering the relevant RPCs

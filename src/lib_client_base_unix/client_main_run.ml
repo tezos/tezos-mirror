@@ -171,6 +171,7 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
   let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
   ( match base_dir_class with
   | Tezos_mockup.Persistence.Base_dir_is_empty
+  | Tezos_mockup.Persistence.Base_dir_is_file
   | Tezos_mockup.Persistence.Base_dir_is_nonempty
   | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
       let mem_only = true in
@@ -188,7 +189,7 @@ let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
   | None ->
       setup_http_rpc_client_config parsed_args base_dir rpc_config
   | Some args -> (
-    match args.Client_config.mockup_mode with
+    match args.Client_config.client_mode with
     | Client_config.Mode_client ->
         setup_http_rpc_client_config parsed_args base_dir rpc_config
     | Client_config.Mode_mockup ->
