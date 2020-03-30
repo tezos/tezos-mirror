@@ -1,4 +1,5 @@
 bytes.mli
+char.mli
 format.mli
 hex.mli
 int32.mli

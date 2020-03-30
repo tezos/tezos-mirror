@@ -112,6 +112,7 @@ struct
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
+  module Char = Char
   module Bytes = Bytes
   module Hex = Hex
   module String = String
