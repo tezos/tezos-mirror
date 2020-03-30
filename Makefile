@@ -20,6 +20,7 @@ DOCKER_DEPS_IMAGE_VERSION := ${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := minimal--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COVERAGE_OUTPUT := _coverage_output
+MERLIN_INSTALLED := $(shell opam list merlin --installed --silent; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
@@ -59,6 +60,9 @@ endif
 	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
 	   cp _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
 	 done
+ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
+	@dune build @check
+endif
 
 PROTOCOLS := $(wildcard src/proto_*)
 DUNE_INCS=$(patsubst %,%/lib_protocol/dune.inc, ${PROTOCOLS})
@@ -135,7 +139,6 @@ build-sandbox:
 
 .PHONY: build-test
 build-test: build-sandbox
-	@dune build @check # here we build all the files required for merlin
 	@dune build @buildtest
 
 .PHONY: test
