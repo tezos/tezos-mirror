@@ -6,6 +6,7 @@
    v1/pervasives.mli
    v1/list.mli
    v1/string.mli
+   v1/char.mli
    v1/hex.mli
    v1/bytes.mli
    v1/int32.mli
