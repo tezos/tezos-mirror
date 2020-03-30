@@ -28,10 +28,21 @@
 
 open Shell_test_helpers
 
-(** A [Alcotest_protocol_validator] extends [Test_services] with protocol validator-specific
-   testables and helpers *)
+(** A [Alcotest_protocol_validator] extends [Test_services] with protocol
+   validator-specific testables and helpers *)
 module Alcotest_protocol_validator = struct
   include Test_services
+
+  module type HASHEQ = sig
+    type t
+
+    val eq : t -> t -> bool
+
+    val pp : Format.formatter -> t -> unit
+  end
+
+  (* type hasheq = *)
+  (* let from_hasheq (module ) *)
 
   let registered_protocol : Registered_protocol.t testable =
     let open Registered_protocol in
