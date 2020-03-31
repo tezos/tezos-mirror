@@ -183,20 +183,20 @@ Typical use cases:
 
 Example tests:
  - Testing the node's script interpreter through ``tezos-client run script`` (in :src:`pytest tests_python/tests/test_contract_opcodes.py`).
-   To execute it locally, run ``pytest tests_python/tests/test_contract_opcodes.py`` in
+   To execute it locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py`` in
    the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:contract_opcodes``.
  - Setting up networks of nodes and ensuring their connection
    (in :src:`tests_python/tests/test_p2p.py`).
-   To execute it locally, run ``pytest tests_python/tests/test_p2p.py`` in
+   To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
    the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:p2p``.
  - Detecting unintended changes in the behavior of the Michelson
    interpreter (in
    :src:`tests_python/tests/test_contract_opcodes.py`).  To execute it
-   locally, run ``pytest tests_python/tests/test_contract_opcodes.py``
+   locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
    in the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:contract_opcodes``.

@@ -1,0 +1,33 @@
+# If you modify this file, generate the lock file using `poetry lock` and copy
+# the resulting poetry.lock file with this one in https://gitlab.com/tezos/opam-repository
+[tool.poetry]
+name = "tezos-python-integration-tests"
+version = "0.1.0"
+description = "Python tests suites for Tezos"
+
+readme = "README.md"
+
+authors = [
+  "Tezos community <tezos@tezos.com>"
+]
+repository = "https://gitlab.com/tezos/tezos"
+homepage = "https://gitlab.com/tezos/tezos"
+
+keywords = ["tezos"]
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+base58check = "1.0.2"
+ed25519 = "1.4"
+mypy = "*"
+mypy-extensions = "*"
+pyblake2 = "1.1.2"
+pycodestyle = "*"
+py_ecc = "2.0.0"
+pylint = "*"
+pytest = "*"
+pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
+pytest-timeout = "*"
+requests = "*"

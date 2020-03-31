@@ -25,7 +25,7 @@ for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); d
 integration:$testname:
   <<: *integration_python_definition
   script:
-    - pytest $test -s --log-dir=tmp
+    - poetry run pytest ${test#tests_python/} -s --log-dir=tmp
   stage: test
 
 EOF
@@ -34,21 +34,21 @@ done
 
 cat >> $tmp <<EOF
 integration:examples_forge_transfer:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/forge_transfer.py
+    - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
   stage: test
 
 integration:examples_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/example.py
+    - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
   stage: test
 
 integration:examples_test_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/examples/test_example.py
+    - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 EOF
 

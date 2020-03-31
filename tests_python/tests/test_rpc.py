@@ -32,7 +32,7 @@ class TestRPCs:
         sandbox.client(1).bake('bootstrap1', BAKE_ARGS)
 
     def test_network_self(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/self')
+        sandbox.client(1).rpc('get', '/network/self')
 
     def test_constants(self, sandbox: Sandbox):
         sandbox.client(2).rpc('get', '/network/self')
@@ -58,7 +58,7 @@ class TestRPCs:
 
     @pytest.mark.skip
     def test_describe(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/describe')
+        sandbox.client(1).rpc('get', '/describe')
 
     @pytest.mark.skip(reason="bug on double encoding registration")
     def test_errors(self, sandbox: Sandbox):
@@ -68,17 +68,17 @@ class TestRPCs:
         sandbox.client(1).rpc('get', f'/fetch_protocol/{PROTOCOL_HASH}')
 
     def test_network_connections(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/connections')
+        sandbox.client(1).rpc('get', '/network/connections')
 
     def test_network_connections_peer_id(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
         sandbox.client(1).rpc('get', f'/network/connections/{peer_id}')
 
     def test_network_greylist_clear(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/greylist/clear')
+        sandbox.client(1).rpc('get', '/network/greylist/clear')
 
     def test_network_peers(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/peers')
+        sandbox.client(1).rpc('get', '/network/peers')
 
     def test_network_peers_peer_id(self, sandbox: Sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
@@ -105,59 +105,59 @@ class TestRPCs:
         sandbox.client(1).rpc('get', f'/network/peers/{peer_id}/trust')
 
     def test_network_points(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/points')
+        sandbox.client(1).rpc('get', '/network/points')
 
     def test_network_points_point(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}')
 
     def test_network_points_point_ban(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/ban')
 
     def test_network_points_point_banned(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/banned')
 
     def test_network_points_point_trust(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/trust')
 
     def test_network_points_point_unban(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/unban')
 
     def test_network_points_point_untrust(self, sandbox: Sandbox):
-        points = sandbox.client(1).rpc('get', f'/network/points')
+        points = sandbox.client(1).rpc('get', '/network/points')
         point = points[-1][0]
         sandbox.client(1).rpc('get', f'/network/points/{point}/untrust')
 
     def test_network_stat(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/stat')
+        sandbox.client(1).rpc('get', '/network/stat')
 
     def test_network_version(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/version')
+        sandbox.client(1).rpc('get', '/network/version')
 
     @pytest.mark.skip
     def test_network_versions(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/network/versions')
+        sandbox.client(1).rpc('get', '/network/versions')
 
     def test_protocols(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/protocols')
+        sandbox.client(1).rpc('get', '/protocols')
 
     def test_protocols_protocol_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/protocols/{PROTOCOL_HASH}')
 
     def test_workers_block_validator(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/workers/block_validator')
+        sandbox.client(1).rpc('get', '/workers/block_validator')
 
     def test_workers_chain_validators(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/workers/chain_validators')
+        sandbox.client(1).rpc('get', '/workers/chain_validators')
 
     def test_workers_chain_validator(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
@@ -171,7 +171,7 @@ class TestRPCs:
                                                       sandbox):
         sandbox.client(1).rpc('get',
                               f'/workers/chain_validators/{CHAIN_ID}/'
-                              f'peers_validators')
+                              'peers_validators')
 
     @pytest.mark.skip
     def test_workers_chain_validator_peer_validator(self, sandbox: Sandbox):
@@ -181,7 +181,7 @@ class TestRPCs:
                               f'/peers_validators/{peer_id}')
 
     def test_workers_prevalidators(self, sandbox: Sandbox):
-        sandbox.client(1).rpc('get', f'/workers/prevalidators')
+        sandbox.client(1).rpc('get', '/workers/prevalidators')
 
     def test_workers_prevalidators_chain_id(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get', f'/workers/prevalidators/{CHAIN_ID}')
@@ -193,19 +193,19 @@ class TestRPCs:
     def test_chain_block_context_constants(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/constants')
+                              'context/constants')
 
     def test_chain_block_context_constants_errors(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/constants/errors')
+                              'context/constants/errors')
 
     @pytest.mark.skip
     # TODO
     def test_chain_block_context_contracts(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/contracts')
+                              'context/contracts')
 
     @pytest.mark.skip
     # TODO
@@ -282,7 +282,7 @@ class TestRPCs:
     def test_chain_block_context_delegates(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/delegates')
+                              'context/delegates')
 
     @pytest.mark.skip
     # TODO
@@ -337,7 +337,7 @@ class TestRPCs:
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'context/delegates/{PKH}/'
-                              f'frozen_balance_by_cycle')
+                              'frozen_balance_by_cycle')
 
     @pytest.mark.skip
     # TODO
@@ -362,7 +362,7 @@ class TestRPCs:
     def test_chain_block_context_raw_bytes(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'context/raw/bytes')
+                              'context/raw/bytes')
 
     def test_chain_block_hash(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
@@ -371,32 +371,32 @@ class TestRPCs:
     def test_chain_block_header(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header')
+                              'header')
 
     def test_chain_block_header_protocol_data(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/protocol_data')
+                              'header/protocol_data')
 
     def test_chain_block_header_protocol_data_raw(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/protocol_data/raw')
+                              'header/protocol_data/raw')
 
     def test_chain_block_header_raw(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/raw')
+                              'header/raw')
 
     def test_chain_block_header_shell(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'header/shell')
+                              'header/shell')
 
     def test_chain_block_helpers_baking_rights(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/baking_rights')
+                              'helpers/baking_rights')
 
     def test_chain_block_helpers_complete_prefix1(self, sandbox: Sandbox):
         prefix = PKH[:10]
@@ -414,33 +414,33 @@ class TestRPCs:
     def test_chain_block_helpers_current_level(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/current_level')
+                              'helpers/current_level')
 
     def test_chain_block_helpers_endorsing_rights(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/endorsing_rights')
+                              'helpers/endorsing_rights')
 
     def test_chain_block_helpers_levels_in_current_cycle(self,
                                                          sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'helpers/levels_in_current_cycle')
+                              'helpers/levels_in_current_cycle')
 
     def test_chain_block_live_blocks(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'live_blocks')
+                              'live_blocks')
 
     def test_chain_block_metadata(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'metadata')
+                              'metadata')
 
     def test_chain_block_operation_hashes(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'operation_hashes')
+                              'operation_hashes')
 
     def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
@@ -464,7 +464,7 @@ class TestRPCs:
     def test_chain_block_operations(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'operations')
+                              'operations')
 
     def test_chain_block_operations_list(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
@@ -485,7 +485,7 @@ class TestRPCs:
     def test_chain_block_votes_ballots(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/ballots')
+                              'votes/ballots')
 
     def test_chain_block_votes_current_period_kind(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
@@ -505,12 +505,12 @@ class TestRPCs:
     def test_chain_block_votes_listings(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/listings')
+                              'votes/listings')
 
     def test_chain_block_votes_proposals(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              f'votes/proposals')
+                              'votes/proposals')
 
     def test_stat_gc(self, sandbox: Sandbox):
         assert sandbox.client(1).rpc('get', "/stats/gc")

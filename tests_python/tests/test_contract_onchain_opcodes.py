@@ -306,7 +306,7 @@ class TestContractOnchainOpcodes:
         assert client.get_delegate('set_delegate').delegate == addr
 
         client.transfer(0, 'bootstrap1', 'set_delegate',
-                        ['-arg', f'None'])
+                        ['-arg', 'None'])
         bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None

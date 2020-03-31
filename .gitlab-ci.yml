@@ -1,6 +1,6 @@
 variables:
   ## Please update `scripts/version.sh` accordingly
-  build_deps_image_version: 3718dd48d5e502c0fe8fc64ed4bf6b0c8040fadc
+  build_deps_image_version: 06c6af764c3951f59a369b92d98ae0d2068b4cb4
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}
   GIT_STRATEGY: fetch
@@ -55,6 +55,9 @@ sanity:
     - tags
   before_script:
     - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
 
 check_opam_deps:
   <<: *build_definition
@@ -344,7 +347,11 @@ integration:sandboxes:daemons-upgrade:
     - build
   before_script:
     - make
-    - mkdir tmp
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+    - mkdir tests_python/tmp
+    - cd tests_python
   after_script:
     - tail -n +1 tmp/*
 
@@ -353,211 +360,211 @@ integration:sandboxes:daemons-upgrade:
 integration:baker_endorser:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_baker_endorser.py -s --log-dir=tmp
+    - poetry run pytest tests/test_baker_endorser.py -s --log-dir=tmp
   stage: test
 
 integration:basic:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_basic.py -s --log-dir=tmp
+    - poetry run pytest tests/test_basic.py -s --log-dir=tmp
   stage: test
 
 integration:bootstrap:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_bootstrap.py -s --log-dir=tmp
+    - poetry run pytest tests/test_bootstrap.py -s --log-dir=tmp
   stage: test
 
 integration:client_without_node:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_client_without_node.py -s --log-dir=tmp
+    - poetry run pytest tests/test_client_without_node.py -s --log-dir=tmp
   stage: test
 
 integration:codec:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_codec.py -s --log-dir=tmp
+    - poetry run pytest tests/test_codec.py -s --log-dir=tmp
   stage: test
 
 integration:contract:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract.py -s --log-dir=tmp
   stage: test
 
 integration:contract_annotations:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_annotations.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_annotations.py -s --log-dir=tmp
   stage: test
 
 integration:contract_baker:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_baker.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
 integration:contract_legacy:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_legacy.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_legacy.py -s --log-dir=tmp
   stage: test
 
 integration:contract_macros:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_macros.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_macros.py -s --log-dir=tmp
   stage: test
 
 integration:contract_onchain_opcodes:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_onchain_opcodes.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_onchain_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:contract_opcodes:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_contract_opcodes.py -s --log-dir=tmp
+    - poetry run pytest tests/test_contract_opcodes.py -s --log-dir=tmp
   stage: test
 
 integration:cors:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_cors.py -s --log-dir=tmp
+    - poetry run pytest tests/test_cors.py -s --log-dir=tmp
   stage: test
 
 integration:double_endorsement:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_double_endorsement.py -s --log-dir=tmp
+    - poetry run pytest tests/test_double_endorsement.py -s --log-dir=tmp
   stage: test
 
 integration:fork:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_fork.py -s --log-dir=tmp
+    - poetry run pytest tests/test_fork.py -s --log-dir=tmp
   stage: test
 
 integration:injection:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_injection.py -s --log-dir=tmp
+    - poetry run pytest tests/test_injection.py -s --log-dir=tmp
   stage: test
 
 integration:many_bakers:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_many_bakers.py -s --log-dir=tmp
+    - poetry run pytest tests/test_many_bakers.py -s --log-dir=tmp
   stage: test
 
 integration:many_nodes:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_many_nodes.py -s --log-dir=tmp
+    - poetry run pytest tests/test_many_nodes.py -s --log-dir=tmp
   stage: test
 
 integration:mempool:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_mempool.py -s --log-dir=tmp
+    - poetry run pytest tests/test_mempool.py -s --log-dir=tmp
   stage: test
 
 integration:mockup:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_mockup.py -s --log-dir=tmp
+    - poetry run pytest tests/test_mockup.py -s --log-dir=tmp
   stage: test
 
 integration:multinode:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode.py -s --log-dir=tmp
+    - poetry run pytest tests/test_multinode.py -s --log-dir=tmp
   stage: test
 
 integration:multinode_snapshot:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode_snapshot.py -s --log-dir=tmp
+    - poetry run pytest tests/test_multinode_snapshot.py -s --log-dir=tmp
   stage: test
 
 integration:multinode_storage_reconstruction:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multinode_storage_reconstruction.py -s --log-dir=tmp
+    - poetry run pytest tests/test_multinode_storage_reconstruction.py -s --log-dir=tmp
   stage: test
 
 integration:multisig:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_multisig.py -s --log-dir=tmp
+    - poetry run pytest tests/test_multisig.py -s --log-dir=tmp
   stage: test
 
 integration:p2p:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_p2p.py -s --log-dir=tmp
+    - poetry run pytest tests/test_p2p.py -s --log-dir=tmp
   stage: test
 
 integration:programs:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_programs.py -s --log-dir=tmp
+    - poetry run pytest tests/test_programs.py -s --log-dir=tmp
   stage: test
 
 integration:proto_demo_counter:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_proto_demo_counter.py -s --log-dir=tmp
+    - poetry run pytest tests/test_proto_demo_counter.py -s --log-dir=tmp
   stage: test
 
 integration:proto_demo_noops_manual_bake:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
+    - poetry run pytest tests/test_proto_demo_noops_manual_bake.py -s --log-dir=tmp
   stage: test
 
 integration:rpc:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_rpc.py -s --log-dir=tmp
+    - poetry run pytest tests/test_rpc.py -s --log-dir=tmp
   stage: test
 
 integration:tls:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_tls.py -s --log-dir=tmp
+    - poetry run pytest tests/test_tls.py -s --log-dir=tmp
   stage: test
 
 integration:voting:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_voting.py -s --log-dir=tmp
+    - poetry run pytest tests/test_voting.py -s --log-dir=tmp
   stage: test
 
 integration:voting_full:
   <<: *integration_python_definition
   script:
-    - pytest tests_python/tests/test_voting_full.py -s --log-dir=tmp
+    - poetry run pytest tests/test_voting_full.py -s --log-dir=tmp
   stage: test
 
 integration:examples_forge_transfer:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/forge_transfer.py
+    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/forge_transfer.py
   stage: test
 
 integration:examples_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - PYTHONPATH=tests_python/ python3 tests_python/examples/example.py
+    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
   stage: test
 
 integration:examples_test_example:
-  <<: *integration_definition
+  <<: *integration_python_definition
   script:
-    - pytest tests_python/examples/test_example.py
+    - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 ##END_INTEGRATION_PYTHON##
 

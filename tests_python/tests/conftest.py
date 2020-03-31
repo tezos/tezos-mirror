@@ -23,8 +23,7 @@ def sanity_check(request) -> None:
     """Sanity checks before running the tests."""
     log_dir = request.config.getoption("--log-dir")
     if not (log_dir is None or os.path.isdir(log_dir)):
-        print(f"{log_dir} doesn't exist")
-        pytest.exit(1)
+        pytest.exit(f"{log_dir} doesn't exist")
 
 
 @pytest.fixture(scope="session")

@@ -173,7 +173,7 @@ class Node:
     def snapshot_export(self, file, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         snapshot_cmd = ([self.node, 'snapshot',
                          'export'] + list(params) + [file])
         _run_and_print(snapshot_cmd)
@@ -181,7 +181,7 @@ class Node:
     def snapshot_import(self, file, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         snapshot_cmd = ([self.node, 'snapshot',
                          'import'] + list(params) + [file])
         _run_and_print(snapshot_cmd)
@@ -189,7 +189,7 @@ class Node:
     def reconstruct(self, params=None):
         if params is None:
             params = []
-        params = [f'--data-dir', self.node_dir] + params
+        params = ['--data-dir', self.node_dir] + params
         reconstruct_cmd = ([self.node, 'reconstruct'] + list(params))
         _run_and_print(reconstruct_cmd)
 

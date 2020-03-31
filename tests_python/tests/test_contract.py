@@ -551,7 +551,7 @@ class TestMiniScenarios:
                             'reveal_signed_preimage.tz')
         byt = ('0x9995c2ef7bcc7ae3bd15bdd9b02' +
                'dc6e877c27b26732340d641a4cbc6524813bb')
-        sign = f'p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz'
+        sign = 'p2pk66uq221795tFxT7jfNmXtBMdjMf6RAaxRTwv1dbuSHbH6yfqGwz'
         storage = f'(Pair {byt} "{sign}")'
         originate(client, session, path, storage, 1000)
 

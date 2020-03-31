@@ -12,7 +12,7 @@ For the moment this script:
 
 * executes python tests of staged *.py test files
   The point is to execute a subset of "pytest" that is required
-  for a commit to pass CI.
+  for a commit to pass CI. Be sure you ran "poetry install" first.
 
   This is most useful when working on the python tests themselves.
 * lints and typechecks staged *.py files.
@@ -244,7 +244,7 @@ def _call_pytest(files: List[str]) -> int:
     """
     result = 0
     for file_ in files:
-        cmd = ["pytest", file_]
+        cmd = ["poetry", "run", "pytest", file_]
         print(" ".join(cmd))
         py_test_result = subprocess.run(cmd, check=False)
         result = max(result, py_test_result.returncode)

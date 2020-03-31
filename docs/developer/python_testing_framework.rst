@@ -34,35 +34,29 @@ Installation
 Prerequisites:
 
 - A working environment (see `documentation <http://tezos.gitlab.io/introduction/howtoget.html#environment>`_) with the binaries compiled,
-- ``python`` (version 3.7),
 - A local copy of the tezos `repository <https://gitlab.com/tezos/tezos>`_
-- the ``pip`` package manager.
+- `python 3.8.2`. It is recommended to use `pyenv
+  <https://github.com/pyenv/pyenv>`_ to manage the python versions. If ``pyenv``
+  is used, you can use ``pyenv install 3.8.2`` followed by ``pyenv global 3.8.2`` to
+  set the python version to ``3.8.2`` globally. If you want to use ``python 3.8.2`` only in the
+  current shell, you can use ``pyenv shell 3.8.2``. Be sure ``eval $(pyenv init -)``
+  has been executed first during the shell session.
+- `poetry <https://python-poetry.org/>`_ to manage the python dependencies and
+  run the tests in a sandboxed python environment. All poetry commands are to be
+  run in ``tests_python``. Before running the tests for the first time, the
+  dependencies must be installed. To achieve this, run ``poetry install``.
 
-On some systems (e.g. Mac OS X), several versions of ``python`` coexist. You need to explicitly
-use ``python3`` and ``pip3`` (instead of `python` and `pip`).
 
-Python packages can be installed with
-
-::
-
-    cd PATH_TO_YOUR_TEZOS_DIR/tests_python
-    pip3 install -r requirements.txt
 
 Examples of test executions:
 
 ::
 
-    pytest examples/test_example.py  # simple test example
-    pytest -m "not slow"  # run all tests not marked as slow
-    pytest -s tests/test_injection.py  # run a specific test with traces
-    pytest  # run all tests
+    poetry run pytest examples/test_example.py  # simple test example
+    poetry run pytest -m "not slow"  # run all tests not marked as slow
+    poetry run pytest -s tests/test_injection.py  # run a specific test with traces
+    poetry run pytest  # run all tests
 
-On systems where python packages are installed locally (e.g. test server
-at Nomadic), you need to export the local python binaries path.
-
-::
-
-    export PATH=$PATH:~/.local/bin/
 
 A simple sandbox scenario
 -------------------------
@@ -107,8 +101,9 @@ a transfer operation.
         scenario()
 
 
-This can be run with ``python3 examples/example.py``. It should display all the
-clients commands and their results.
+This can be run with
+``PYTHONPATH=./:$PYTHONPATH poetry run python examples/example.py``.
+It should display all the clients commands and their results.
 
 The ``sandbox`` object allows users to add nodes, bakers or endorsers
 running in tezos sandboxed mode. Whenever a node has been added, one can
@@ -215,17 +210,17 @@ To run a specific test, we usually want client and server traces
 ::
 
     # Launch a simple test without capturing stdout
-    > pytest -s examples/test_example.py
+    > poetry run pytest -s examples/test_example.py
     # run all tests about vote
-    > pytest -m "vote"
+    > poetry run pytest -m "vote"
     # run all vote and non-slow tests
-    > pytest -m "vote and not slow"
+    > poetry run pytest -m "vote and not slow"
     # run module test_voting.py, display all output, save server logs in tmp
-    > pytest -s tests/test_voting.py --log-dir=tmp
+    > poetry run pytest -s tests/test_voting.py --log-dir=tmp
     # run all tests using a daemon
-    > pytest -m "endorser or baker"
+    > poetry run pytest -m "endorser or baker"
     # run everything
-    > pytest
+    > poetry run pytest
 
 Anatomy of a test
 ~~~~~~~~~~~~~~~~~
@@ -308,7 +303,7 @@ The list of fixtures available is given by
 
 ::
 
-    pytest --fixtures
+    poetry run pytest --fixtures
 
 Most fixtures are defined in ``conftest.py``.
 The most general fixture is ``sandbox``. It allows to instantiate an arbitrary
@@ -465,7 +460,7 @@ Run the test with
 ::
 
     # mkdir tmp
-    pytest tests/multibranch/test_baker_endorser_mb.py --log-dir=tmp
+    poetry run pytest tests/multibranch/test_baker_endorser_mb.py --log-dir=tmp
 
 Example 2: A full voting scenario ``test_voting_full.py``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -492,7 +487,7 @@ It can be run with
 
 ::
 
-    pytest tests/multibranch/test_baker_endorser_mb.py`
+    poetry run pytest tests/multibranch/test_baker_endorser_mb.py`
 
 Note: this test uses only one revision but it can't run
 on branch ``master`` as we need an extra protocol with bakers.
@@ -539,7 +534,7 @@ If the logs need to be updated, pass ``--regtest-reset`` to ``pytest``:
 
 ::
 
-    pytest --regtest-reset <test-file>
+    poetry run pytest --regtest-reset <test-file>
 
 The resulting changes should be committed after thoroughly verifying
 that they are as expected.
@@ -571,7 +566,7 @@ flag as described above:
 
 .. code-block:: bash
 
-    $ pytest --regtest-reset tests_python/tests/test_regtest.py
+    $ poetry run pytest --regtest-reset tests_python/tests/test_regtest.py
 
 We find the generated test log in ``tests_python/tests/_regtest_outputs/test_regtest.TestDemonstrateRegtest\:\:test_hash_regtest.out``:
 
@@ -660,3 +655,11 @@ See discussion `here <https://pypi.org/project/pytest-timeout/>`_.
 To avoid this issue, one can use polling functions
 such as ``utils.check_contains_operations(client, [op_hash])``
 instead of using blocking commands.
+
+Adding new dependencies
+-----------------------
+
+Dependencies are managed by poetry in the file pyproject.toml. See `here <https://python-poetry.org/docs/pyproject/>`_.
+The file ``poetry.lock`` is generated by running ``poetry lock``, and must never be changed manually.
+The resulting ``poetry.lock`` and its generator ``pyproject.toml`` must be
+copied in `this repository <https://gitlab.com/tezos/opam-repository>`_.

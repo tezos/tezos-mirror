@@ -436,13 +436,13 @@ class Client:
         offset by time_between_blocks"""
         rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
         timestamp = self.rpc(
-            'get', f'/chains/main/blocks/head~1/header'
+            'get', '/chains/main/blocks/head~1/header'
             )['timestamp']
         timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
         timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
 
         constants = self.rpc(
-            'get', f'/chains/main/blocks/head/context/constants'
+            'get', '/chains/main/blocks/head/context/constants'
         )
         delta = datetime.timedelta(
             seconds=int(constants['time_between_blocks'][0])
