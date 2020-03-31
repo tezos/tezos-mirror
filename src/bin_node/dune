@@ -28,7 +28,6 @@
             tezos-embedded-protocol-005-PsBABY5H
             tezos-embedded-protocol-005-PsBabyM1
             tezos-embedded-protocol-006-PsCARTHA
-            tezos-mempool-005-PsBabyM1
             tezos-mempool-006-PsCARTHA
             cmdliner
             tls)
