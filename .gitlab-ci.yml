@@ -91,6 +91,16 @@ build:
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITEST##
+unit:shell:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_shell/runtest
+
+unit:client_base:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_client_base/runtest
+
 unit:requester:
   <<: *test_definition
   script:
@@ -101,50 +111,10 @@ unit:src/proto_005_PsBabyM1/lib_client:
   script:
     - dune build @src/proto_005_PsBabyM1/lib_client/runtest
 
-unit:src/proto_005_PsBabyM1/lib_protocol:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_005_PsBabyM1/lib_protocol/runtest
-
-unit:storage:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_storage/runtest
-
-unit:shell:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_shell/runtest
-
-unit:signer_backends/unix:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/unix/runtest
-
-unit:signer_backends:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_signer_backends/runtest
-
-unit:protocol_environment:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_protocol_environment/runtest
-
 unit:error_monad:
   <<: *test_definition
   script:
     - dune build @src/lib_error_monad/runtest
-
-unit:src/bin_client:
-  <<: *test_definition
-  script:
-    - dune build @src/bin_client/runtest
-
-unit:micheline:
-  <<: *test_definition
-  script:
-    - dune build @src/lib_micheline/runtest
 
 unit:src/proto_006_PsCARTHA/lib_client:
   <<: *test_definition
@@ -166,60 +136,85 @@ unit:src/proto_alpha/lib_protocol:
   script:
     - dune build @src/proto_alpha/lib_protocol/runtest
 
+unit:crypto:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_crypto/runtest
+
 unit:stdlib:
   <<: *test_definition
   script:
     - dune build @src/lib_stdlib/runtest
+
+unit:storage:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_storage/runtest
 
 unit:p2p:
   <<: *test_definition
   script:
     - dune build @src/lib_p2p/runtest
 
-unit:crypto:
+unit:micheline:
   <<: *test_definition
   script:
-    - dune build @src/lib_crypto/runtest
+    - dune build @src/lib_micheline/runtest
+
+unit:protocol_environment:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_protocol_environment/runtest
+
+unit:signer_backends/unix:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/unix/runtest
+
+unit:signer_backends:
+  <<: *test_definition
+  script:
+    - dune build @src/lib_signer_backends/runtest
+
+unit:src/bin_client:
+  <<: *test_definition
+  script:
+    - dune build @src/bin_client/runtest
 
 unit:ocaml-pbkdf:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-pbkdf/runtest
 
-unit:ocaml-secp256k1:
+unit:ocaml-uecc:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-secp256k1/runtest
+    - dune build @vendors/ocaml-uecc/runtest
+
+unit:ocaml-hacl:
+  <<: *test_definition
+  script:
+    - dune build @vendors/ocaml-hacl/runtest
 
 unit:ocaml-ledger-wallet:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-ledger-wallet/runtest
 
-unit:ocaml-uecc:
+unit:ocaml-secp256k1:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-uecc/runtest
-
-unit:ocaml-blake2:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-blake2/runtest
+    - dune build @vendors/ocaml-secp256k1/runtest
 
 unit:ocaml-lmdb:
   <<: *test_definition
   script:
     - dune build @vendors/ocaml-lmdb/runtest
 
-unit:ocaml-bip39:
+unit:ocaml-blake2:
   <<: *test_definition
   script:
-    - dune build @vendors/ocaml-bip39/runtest
-
-unit:ocaml-hacl:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-hacl/runtest
+    - dune build @vendors/ocaml-blake2/runtest
 
 
 ##END_UNITEST##
@@ -528,11 +523,6 @@ documentation:linkcheck:
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
-
-opam:bip39:
-  <<: *opam_definition
-  variables:
-    package: bip39
 
 opam:blake2:
   <<: *opam_definition

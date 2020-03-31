@@ -3,11 +3,19 @@
  (public_name tezos-client-base)
  (libraries tezos-base
             tezos-shell-services
-            tezos-rpc)
+            tezos-rpc
+	    pbkdf)
+ (modules (:standard bip39_english))
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc
                    -open Tezos_shell_services)))
+
+(rule
+ (targets bip39_english.ml)
+ (deps    (:exe gen/bip39_generator.exe)
+          gen/bip39_english.txt)
+ (action  (run %{exe} %{targets})))
 
 (alias
  (name runtest_lint)

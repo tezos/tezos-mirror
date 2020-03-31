@@ -14,8 +14,7 @@ depends: [
   "tezos-storage"
   "tezos-rpc-http"
   "cmdliner"
-  "pbkdf"
-  "bip39"
+  "alcotest" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

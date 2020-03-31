@@ -1,9 +1,0 @@
-(executable
- (name test)
- (libraries bip39 hex alcotest))
-
-(alias
- (name    runtest)
- (package bip39)
- (deps    (:exe test.exe))
- (action  (run %{exe})))

@@ -71,7 +71,7 @@ type secret_account = {
 let secrets () =
   (* Exported from proto_alpha client - TODO : remove when relocated to lib_crypto *)
   let read_key mnemonic email password =
-    match Bip39.of_words mnemonic with
+    match Tezos_client_base.Bip39.of_words mnemonic with
     | None ->
         assert false
     | Some t ->
@@ -79,7 +79,7 @@ let secrets () =
         let passphrase =
           Bigstring.(concat "" [of_string email; of_string password])
         in
-        let sk = Bip39.to_seed ~passphrase t in
+        let sk = Tezos_client_base.Bip39.to_seed ~passphrase t in
         let sk = Bigstring.sub_bytes sk 0 32 in
         let sk : Signature.Secret_key.t =
           Ed25519

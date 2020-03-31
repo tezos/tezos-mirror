@@ -3,41 +3,42 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type t
 (** Abstract type of a mnemonic *)
+type t
 
 val pp : Format.formatter -> t -> unit
+
 val show : t -> string
 
-val index_of_word : string -> int option
 (** [find_index word] is [Some i] where is is the index of [word] in
     the BIP39 word list, or [None] if no such word is in the list. *)
+val index_of_word : string -> int option
 
-val of_indices : int list -> t option
 (** [of_indices idxs] is [Some mnemonic] if indices are all in range
     [0-2047] or [None] otherwise. *)
+val of_indices : int list -> t option
 
-val to_indices : t -> int list
 (** [to_indices t] is the list of indices corresponding to [t]. *)
+val to_indices : t -> int list
 
-val of_words : string list -> t option
 (** [of_words words] is [Some mnemonic] if [words] is a list
     containing a valids number of valid english words. *)
+val of_words : string list -> t option
 
-val to_words : t -> string list
 (** [to_words mnemonic] is the list of words corresponding to
     [mnemonic]. *)
+val to_words : t -> string list
 
-val of_entropy : Bigstring.t -> t
 (** [of_entropy bytes] is the mnemonic derived from [bytes].
 
     @raise [Invalid_argument] is [List.length bytes] is not in [ 16,
     20, 24, 28, 32 ]. *)
+val of_entropy : Bigstring.t -> t
 
-val to_seed : ?passphrase:Bigstring.t -> t -> Bigstring.t
 (** [to_seed ?passphrase mnemonic] is 64 bytes derived from a BIP39
     mnemonic [mnemonic], using the optional passphrase [passphrase] if
     provided. *)
+val to_seed : ?passphrase:Bigstring.t -> t -> Bigstring.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff

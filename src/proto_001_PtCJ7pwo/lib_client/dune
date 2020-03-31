@@ -6,8 +6,7 @@
             tezos-shell-services
             tezos-client-base-unix
             tezos-rpc
-            tezos-signer-backends
-            bip39)
+            tezos-signer-backends)
  (library_flags (:standard -linkall))
  (flags (:standard -w -9+27-30-32-40@8
                    -open Tezos_base__TzPervasives

@@ -15,7 +15,6 @@ depends: [
   "tezos-signer-services"
   "tezos-shell-services"
   "pbkdf"
-  "bip39"
   "ledgerwallet-tezos"
   "alcotest" {with-test & = "0.8.5"}
   "alcotest-lwt" {with-test & = "0.8.5"}

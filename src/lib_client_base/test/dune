@@ -1,0 +1,10 @@
+(executable
+ (name bip39_tests)
+ (libraries tezos-client-base alcotest)
+ (flags (:standard -open Tezos_client_base)))
+
+(alias
+ (name    runtest)
+ (package tezos-client-base)
+ (deps    (:exe bip39_tests.exe))
+ (action  (run %{exe})))

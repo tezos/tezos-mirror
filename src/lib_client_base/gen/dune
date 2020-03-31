@@ -1,0 +1,3 @@
+(executable
+ (name bip39_generator))
+

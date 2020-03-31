@@ -6,7 +6,7 @@
             alcotest-lwt
             tezos-006-PsCARTHA-test-helpers
             tezos-stdlib-unix
-            bip39
+            tezos-client-base
             tezos-protocol-006-PsCARTHA-parameters)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline

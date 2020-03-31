@@ -6,7 +6,7 @@
             alcotest-lwt
             tezos-alpha-test-helpers
             tezos-stdlib-unix
-            bip39
+	    tezos-client-base
             tezos-protocol-alpha-parameters)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline

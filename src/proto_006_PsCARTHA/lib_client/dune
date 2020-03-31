@@ -8,8 +8,7 @@
             tezos-mockup-registration
             tezos-rpc
             tezos-signer-backends
-            tezos-protocol-006-PsCARTHA-parameters
-            bip39)
+            tezos-protocol-006-PsCARTHA-parameters)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
