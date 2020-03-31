@@ -130,6 +130,15 @@ let setup_remote_signer (module C : M) client_config
         () )
 
 let setup_http_rpc_client_config parsed_args base_dir rpc_config =
+  (* Make sure that base_dir is not a mockup. *)
+  ( match Tezos_mockup.Persistence.classify_base_dir base_dir with
+  | Base_dir_is_mockup ->
+      failwith
+        "%s is setup as a mockup, yet mockup mode is not active"
+        base_dir
+  | _ ->
+      return_unit )
+  >>=? fun () ->
   return
   @@ new unix_full
        ~chain:
