@@ -69,7 +69,7 @@ module Protocol_kind = struct
   let names =
     [("Athens", `Athens); ("Babylon", `Babylon); ("Carthage", `Carthage)]
 
-  let default = `Babylon
+  let default = `Carthage
 
   let cmdliner_term ~docs () : t Cmdliner.Term.t =
     let open Cmdliner in
