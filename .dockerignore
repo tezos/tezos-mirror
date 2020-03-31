@@ -31,7 +31,7 @@ docs/api/rpc.rst
 docs/api/p2p.rst
 
 src/bin_client/test/LOG.*
-_coverage_output
+_coverage_output/*.coverage
 _coverage_report
 
 **/*.install

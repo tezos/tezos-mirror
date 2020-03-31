@@ -19,7 +19,6 @@ DOCKER_DEPS_IMAGE_NAME := registry.gitlab.com/tezos/opam-repository
 DOCKER_DEPS_IMAGE_VERSION := ${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := minimal--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
-COVERAGE_OUTPUT := _coverage_output
 MERLIN_INSTALLED := $(shell opam list merlin --installed --silent; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
@@ -109,27 +108,9 @@ doc-html: all
 doc-html-and-linkcheck: doc-html
 	@${MAKE} -C docs all
 
-EXPECTED_BISECT_FILE := ${CURDIR}/${COVERAGE_OUTPUT}/bisect
-
-.PHONY: coverage-setup
-coverage-setup:
-	@mkdir -p ${COVERAGE_OUTPUT}
-	@echo "Before compiling, use ./scripts/instrument_dune_bisect.sh to add the"
-	@echo "bisect_ppx preprocessing directive to the dune files of the packages"
-	@echo "to be analyzed."
-	@echo
-	@echo "Examples:"
-	@echo "  ./scripts/instrument_dune_bisect.sh src/lib_p2p/dune"
-	@echo "  ./scripts/instrument_dune_bisect.sh src/proto_alpha/lib_protocol/dune.inc"
-	@echo
-ifneq (${EXPECTED_BISECT_FILE}, ${BISECT_FILE})
-	@echo "Warning: BISECT_FILE isn't properly set. Run:"
-	@echo "  export BISECT_FILE=${EXPECTED_BISECT_FILE}"
-endif
-
 .PHONY: coverage-report
 coverage-report:
-	@bisect-ppx-report -ignore-missing-files -html ${COVERAGE_REPORT} ${COVERAGE_OUTPUT}/*.out
+	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
 
 .PHONY: build-sandbox
@@ -224,7 +205,7 @@ uninstall:
 
 .PHONY: coverage-clean
 coverage-clean:
-	@-rm -Rf ${COVERAGE_OUTPUT} ${COVERAGE_REPORT}
+	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
 .PHONY: clean
 clean: coverage-clean
