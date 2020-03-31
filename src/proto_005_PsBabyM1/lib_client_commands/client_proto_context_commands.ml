@@ -222,11 +222,13 @@ let commands () =
           ~block:cctxt#block
           ~contract
           ~entrypoint
-        >>= Michelson_v1_entrypoints.print_entrypoint_type
-              cctxt
-              ~emacs:false
-              ~contract
-              ~entrypoint);
+        >>= fun e ->
+        Michelson_v1_entrypoints.print_entrypoint_type
+          cctxt
+          ~emacs:false
+          ~contract
+          ~entrypoint
+          e);
     command
       ~group
       ~desc:"Get the entrypoint list of a contract."
@@ -240,10 +242,12 @@ let commands () =
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~contract
-        >>= Michelson_v1_entrypoints.print_entrypoints_list
-              cctxt
-              ~emacs:false
-              ~contract);
+        >>= fun el ->
+        Michelson_v1_entrypoints.print_entrypoints_list
+          cctxt
+          ~emacs:false
+          ~contract
+          el);
     command
       ~group
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
@@ -257,10 +261,12 @@ let commands () =
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~contract
-        >>= Michelson_v1_entrypoints.print_unreachables
-              cctxt
-              ~emacs:false
-              ~contract);
+        >>= fun u ->
+        Michelson_v1_entrypoints.print_unreachables
+          cctxt
+          ~emacs:false
+          ~contract
+          u);
     command
       ~group
       ~desc:"Get the delegate of a contract."
