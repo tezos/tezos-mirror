@@ -216,8 +216,8 @@ val parse_toplevel :
   (Script.node * Script.node * Script.node * string option) tzresult
 
 val add_field_annot :
-  [`Field_annot of string] option ->
-  [`Var_annot of string] option ->
+  Script_typed_ir.field_annot option ->
+  Script_typed_ir.var_annot option ->
   Script.node ->
   Script.node
 

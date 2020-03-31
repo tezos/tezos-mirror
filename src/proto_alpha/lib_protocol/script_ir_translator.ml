@@ -1832,14 +1832,14 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
           match al with
           | None ->
               false
-          | Some (`Field_annot l) ->
+          | Some (Field_annot l) ->
               Compare.String.(l = entrypoint)
         then ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
         else if
           match ar with
           | None ->
               false
-          | Some (`Field_annot r) ->
+          | Some (Field_annot r) ->
               Compare.String.(r = entrypoint)
         then ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
         else
@@ -1901,7 +1901,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((first_unreachable, all) as acc) =
     match annot with
-    | None | Some (`Field_annot "") -> (
+    | None | Some (Field_annot "") -> (
         if reachable then acc
         else
           match ty with
@@ -1913,7 +1913,7 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
                 (Some (List.rev path), all)
             | Some _ ->
                 acc ) )
-    | Some (`Field_annot name) ->
+    | Some (Field_annot name) ->
         if Compare.Int.(String.length name > 31) then raise (Too_long name)
         else if Entrypoints.mem name all then raise (Duplicate name)
         else (first_unreachable, Entrypoints.add name all)
@@ -2354,7 +2354,7 @@ let rec parse_data :
            ?type_logger
            ctxt
            ~legacy
-           (ta, Some (`Var_annot "@arg"))
+           (ta, Some (Var_annot "@arg"))
            tr
            script_instr
   | (Lambda_t _, expr) ->
@@ -3927,9 +3927,9 @@ and parse_instr :
       match entrypoint with
       | None ->
           Ok "default"
-      | Some (`Field_annot "default") ->
+      | Some (Field_annot "default") ->
           error (Unexpected_annotation loc)
-      | Some (`Field_annot entrypoint) ->
+      | Some (Field_annot entrypoint) ->
           if Compare.Int.(String.length entrypoint > 31) then
             error (Entrypoint_name_too_long entrypoint)
           else Ok entrypoint )
@@ -4226,7 +4226,7 @@ and parse_instr :
       >>=? fun (annot, entrypoint) ->
       let entrypoint =
         Option.unopt_map
-          ~f:(fun (`Field_annot annot) -> annot)
+          ~f:(fun (Field_annot annot) -> annot)
           ~default:"default"
           entrypoint
       in
@@ -4757,7 +4757,7 @@ and parse_toplevel :
             Script_ir_annot.extract_field_annot p
             >>? fun (p, root_name) ->
             match root_name with
-            | Some (`Field_annot root_name) ->
+            | Some (Field_annot root_name) ->
                 ok (p, pannot, Some root_name)
             | None -> (
               match pannot with
@@ -4965,7 +4965,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((unreachables, all) as acc) =
     match annot with
-    | None | Some (`Field_annot "") -> (
+    | None | Some (Field_annot "") -> (
         ok
         @@
         if reachable then acc
@@ -4975,7 +4975,7 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
               acc
           | _ ->
               (List.rev path :: unreachables, all) )
-    | Some (`Field_annot name) ->
+    | Some (Field_annot name) ->
         if Compare.Int.(String.length name > 31) then
           ok (List.rev path :: unreachables, all)
         else if Entrypoints_map.mem name all then
@@ -5311,7 +5311,7 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
   >>=? fun (storage_type, ctxt) ->
   let arg_type =
     add_field_annot
-      (Option.map ~f:(fun n -> `Field_annot n) root_name)
+      (Option.map ~f:(fun n -> Field_annot n) root_name)
       None
       arg_type
   in

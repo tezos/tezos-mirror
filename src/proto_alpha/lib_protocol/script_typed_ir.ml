@@ -28,13 +28,11 @@ open Script_int
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 
-type var_annot = [`Var_annot of string]
+type var_annot = Var_annot of string
 
-type type_annot = [`Type_annot of string]
+type type_annot = Type_annot of string
 
-type field_annot = [`Field_annot of string]
-
-type annot = [var_annot | type_annot | field_annot]
+type field_annot = Field_annot of string
 
 type address = Contract.t * string
 

@@ -1119,7 +1119,7 @@ let rec step :
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
         Script_ir_translator.add_field_annot
-          (Option.map ~f:(fun n -> `Field_annot n) root_name)
+          (Option.map ~f:(fun n -> Field_annot n) root_name)
           None
           unparsed_param_type
       in
@@ -1190,7 +1190,7 @@ let rec step :
       >>=? fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
         Script_ir_translator.add_field_annot
-          (Option.map ~f:(fun n -> `Field_annot n) root_name)
+          (Option.map ~f:(fun n -> Field_annot n) root_name)
           None
           unparsed_param_type
       in
