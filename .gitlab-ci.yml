@@ -181,11 +181,6 @@ unit:src/bin_client:
   script:
     - dune build @src/bin_client/runtest
 
-unit:ocaml-pbkdf:
-  <<: *test_definition
-  script:
-    - dune build @vendors/ocaml-pbkdf/runtest
-
 unit:ocaml-uecc:
   <<: *test_definition
   script:
@@ -563,11 +558,6 @@ opam:ledgerwallet-tezos:
   <<: *opam_definition
   variables:
     package: ledgerwallet-tezos
-
-opam:pbkdf:
-  <<: *opam_definition
-  variables:
-    package: pbkdf
 
 opam:secp256k1-internal:
   <<: *opam_definition

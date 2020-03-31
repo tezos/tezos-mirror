@@ -14,7 +14,6 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-signer-services"
   "tezos-shell-services"
-  "pbkdf"
   "ledgerwallet-tezos"
   "alcotest" {with-test & = "0.8.5"}
   "alcotest-lwt" {with-test & = "0.8.5"}

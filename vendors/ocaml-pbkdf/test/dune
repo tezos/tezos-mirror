@@ -1,7 +1,0 @@
-(executable
- (name pbkdf_tests)
- (libraries pbkdf alcotest))
-
-(alias
- (name    runtest-pbkdf)
- (action  (run %{exe:pbkdf_tests.exe})))
