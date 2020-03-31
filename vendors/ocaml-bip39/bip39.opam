@@ -16,8 +16,6 @@ build: [
 ]
 depends: [
   "dune" {build & >= "1.7"}
-  "base" {build & >= "v0.10.0"}
-  "stdio" {build & >= "v0.10.0"}
   "hacl"
   "bigstring" {>= "0.2"}
   "pbkdf" {>= "0.2.0"}

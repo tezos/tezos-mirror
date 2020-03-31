@@ -7,10 +7,9 @@
 (rule
  (targets english.ml)
  (deps    (:exe generator.exe)
-          (source_tree ../gen))
+          (source_tree gen))
  (action  (run %{exe} %{targets})))
 
 (executable
  (name generator)
- (modules generator)
- (libraries stdio))
+ (modules generator))
