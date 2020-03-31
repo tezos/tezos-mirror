@@ -584,25 +584,10 @@ opam:secp256k1-internal:
   variables:
     package: secp256k1-internal
 
-opam:tezos-005-PsBabyM1-test-helpers:
-  <<: *opam_definition
-  variables:
-    package: tezos-005-PsBabyM1-test-helpers
-
 opam:tezos-006-PsCARTHA-test-helpers:
   <<: *opam_definition
   variables:
     package: tezos-006-PsCARTHA-test-helpers
-
-opam:tezos-accuser-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-005-PsBabyM1
-
-opam:tezos-accuser-005-PsBabyM1-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-accuser-005-PsBabyM1-commands
 
 opam:tezos-accuser-006-PsCARTHA:
   <<: *opam_definition
@@ -629,11 +614,6 @@ opam:tezos-alpha-test-helpers:
   variables:
     package: tezos-alpha-test-helpers
 
-opam:tezos-baker-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-    package: tezos-baker-005-PsBabyM1
-
 opam:tezos-baker-006-PsCARTHA:
   <<: *opam_definition
   variables:
@@ -643,16 +623,6 @@ opam:tezos-baker-alpha:
   <<: *opam_definition
   variables:
     package: tezos-baker-alpha
-
-opam:tezos-baking-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-005-PsBabyM1
-
-opam:tezos-baking-005-PsBabyM1-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-baking-005-PsBabyM1-commands
 
 opam:tezos-baking-006-PsCARTHA:
   <<: *opam_definition
@@ -879,16 +849,6 @@ opam:tezos-embedded-protocol-genesis-carthagenet:
   variables:
     package: tezos-embedded-protocol-genesis-carthagenet
 
-opam:tezos-endorser-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-005-PsBabyM1
-
-opam:tezos-endorser-005-PsBabyM1-commands:
-  <<: *opam_definition
-  variables:
-    package: tezos-endorser-005-PsBabyM1-commands
-
 opam:tezos-endorser-006-PsCARTHA:
   <<: *opam_definition
   variables:
@@ -923,11 +883,6 @@ opam:tezos-lmdb:
   <<: *opam_definition
   variables:
     package: tezos-lmdb
-
-opam:tezos-mempool-005-PsBabyM1:
-  <<: *opam_definition
-  variables:
-    package: tezos-mempool-005-PsBabyM1
 
 opam:tezos-mempool-006-PsCARTHA:
   <<: *opam_definition
@@ -1008,16 +963,6 @@ opam:tezos-protocol-005-PsBabyM1:
   <<: *opam_definition
   variables:
     package: tezos-protocol-005-PsBabyM1
-
-opam:tezos-protocol-005-PsBabyM1-parameters:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-005-PsBabyM1-parameters
-
-opam:tezos-protocol-005-PsBabyM1-tests:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-005-PsBabyM1-tests
 
 opam:tezos-protocol-006-PsCARTHA:
   <<: *opam_definition

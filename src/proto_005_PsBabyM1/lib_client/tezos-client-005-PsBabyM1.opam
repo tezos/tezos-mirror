@@ -13,9 +13,7 @@ depends: [
   "tezos-protocol-005-PsBabyM1"
   "tezos-shell-services"
   "tezos-client-base-unix"
-  "tezos-mockup-registration"
   "tezos-signer-backends"
-  "tezos-protocol-005-PsBabyM1-parameters"
   "alcotest-lwt" { with-test & = "0.8.5" }
 ]
 build: [
