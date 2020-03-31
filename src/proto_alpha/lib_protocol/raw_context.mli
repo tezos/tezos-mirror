@@ -67,7 +67,7 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha_previous
-  | Babylon_005
+  | Carthage_006
 
 val prepare_first_block :
   level:int32 ->

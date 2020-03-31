@@ -54,7 +54,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Vote_storage.freeze_listings ctxt >>=? fun ctxt -> return ctxt
   | Alpha_previous ->
       return ctxt
-  | Babylon_005 ->
+  | Carthage_006 ->
       return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =

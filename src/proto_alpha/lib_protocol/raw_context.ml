@@ -558,7 +558,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha_previous
-  | Babylon_005
+  | Carthage_006
 
 let check_and_update_protocol_version ctxt =
   Context.get ctxt version_key
@@ -575,8 +575,8 @@ let check_and_update_protocol_version ctxt =
               >>=? fun (param, ctxt) -> return (Genesis param, ctxt)
             else if Compare.String.(s = "alpha_previous") then
               return (Alpha_previous, ctxt)
-            else if Compare.String.(s = "babylon_005") then
-              return (Babylon_005, ctxt)
+            else if Compare.String.(s = "carthage_006") then
+              return (Carthage_006, ctxt)
             else storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key (MBytes.of_string version_value)
@@ -592,7 +592,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_first_level ctxt first_level
       >>=? fun ctxt ->
       set_constants ctxt param.constants >>= fun ctxt -> return ctxt
-  | Alpha_previous | Babylon_005 ->
+  | Alpha_previous | Carthage_006 ->
       return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
