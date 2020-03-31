@@ -31,7 +31,6 @@
             tezos-client-006-PsCARTHA-commands.registration
 
             tezos-baking-alpha-commands.registration
-            tezos-baking-005-PsBabyM1-commands.registration
             tezos-baking-006-PsCARTHA-commands.registration
 
             tezos-stdlib-unix
