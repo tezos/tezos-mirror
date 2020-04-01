@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 module Message = Distributed_db_message
+module P2p_reader_event = Distributed_db_event.P2p_reader_event
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
@@ -103,10 +104,6 @@ let may_handle_global state chain_id f =
       Lwt.return_unit
   | Some chain_db ->
       f chain_db
-
-module Handle_msg_Logging = Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.distributed_db.p2p_reader"
-end)
 
 let find_pending_operations {peer_active_chains; _} h i =
   Chain_id.Table.fold
@@ -214,15 +211,8 @@ let my_peer_id state = P2p.peer_id state.p2p
 
 let handle_msg state msg =
   let open Message in
-  let open Handle_msg_Logging in
   let meta = P2p.get_peer_metadata state.p2p state.gid in
-  lwt_debug
-    Tag.DSL.(
-      fun f ->
-        f "Read message from %a: %a"
-        -% t event "read_message"
-        -% a P2p_peer.Id.Logging.tag state.gid
-        -% a Message.Logging.tag msg)
+  P2p_reader_event.(emit read_message) (state.gid, P2p_message.Message msg)
   >>= fun () ->
   match msg with
   | Get_current_branch chain_id ->
@@ -257,17 +247,12 @@ let handle_msg state msg =
         Lwt.return_unit )
       else if Time.System.(soon () < of_protocol_exn head.shell.timestamp) then (
         Peer_metadata.incr meta Future_block ;
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "Received future block %a from peer %a."
-              -% t event "received_future_block"
-              -% a Block_hash.Logging.tag (Block_header.hash head)
-              -% a P2p_peer.Id.Logging.tag state.gid) )
+        P2p_reader_event.(emit received_future_block)
+          (Block_header.hash head, state.gid) )
       else (
         chain_db.callback.notify_branch state.gid locator ;
         (* TODO discriminate between received advertisements
-             and responses? *)
+           and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Branch ;
         Lwt.return_unit )
   | Deactivate chain_id ->
@@ -316,17 +301,11 @@ let handle_msg state msg =
       else if Time.System.(soon () < of_protocol_exn header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "Received future block %a from peer %a."
-              -% t event "received_future_block"
-              -% a Block_hash.Logging.tag head
-              -% a P2p_peer.Id.Logging.tag state.gid) )
+        P2p_reader_event.(emit received_future_block) (head, state.gid) )
       else (
         chain_db.callback.notify_head state.gid header mempool ;
         (* TODO discriminate between received advertisements
-             and responses? *)
+           and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Head ;
         Lwt.return_unit )
   | Get_block_headers hashes ->

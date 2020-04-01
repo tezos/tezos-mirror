@@ -23,12 +23,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-module Logging = Internal_event.Legacy_logging.Make (struct
-  let name = "node.distributed_db_requester"
-end)
-
 module Message = Distributed_db_message
+module Requester_event = Distributed_db_event.Requester_event
 
 type 'a request_param = {
   p2p : (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.t;
@@ -136,7 +132,7 @@ end)
     Table.create ?global_input request_param disk
 
   let shutdown t =
-    Logging.lwt_log_notice "Shutting down the requester..."
+    Requester_event.(emit shutting_down_requester) ()
     >>= fun () -> Table.shutdown t
 end
 

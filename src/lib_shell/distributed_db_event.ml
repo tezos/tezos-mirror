@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,51 +22,40 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+module Requester_event = struct
+  include Internal_event.Simple
 
-(** Tezos Shell - Network message for the gossip P2P protocol. *)
+  let section = ["node"; "distributed_db"; "requester"]
 
-type t =
-  | Get_current_branch of Chain_id.t
-  | Current_branch of Chain_id.t * Block_locator.t
-  | Deactivate of Chain_id.t
-  | Get_current_head of Chain_id.t
-  | Current_head of Chain_id.t * Block_header.t * Mempool.t
-  | Get_block_headers of Block_hash.t list
-  | Block_header of Block_header.t
-  | Get_operations of Operation_hash.t list
-  | Operation of Operation.t
-  | Get_protocols of Protocol_hash.t list
-  | Protocol of Protocol.t
-  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
-  | Operation_hashes_for_block of
-      Block_hash.t
-      * int
-      * Operation_hash.t list
-      * Operation_list_list_hash.path
-  | Get_operations_for_blocks of (Block_hash.t * int) list
-  | Operations_for_block of
-      Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
+  let shutting_down_requester =
+    declare_0
+      ~section
+      ~name:"shutting_down_requester"
+      ~msg:"shutting down requester"
+      ~level:Notice
+      ()
+end
 
-val encoding : t P2p_params.app_message_encoding list
+module P2p_reader_event = struct
+  include Internal_event.Simple
 
-val distributed_db_versions : Distributed_db_version.t list
+  let section = ["node"; "distributed_db"; "p2p_reader"]
 
-val cfg : Distributed_db_version.Name.t -> t P2p_params.message_config
+  let read_message =
+    declare_2
+      ~section
+      ~name:"read_message"
+      ~msg:"read message from peer {peer_id}: {message}"
+      ~level:Debug
+      ("peer_id", P2p_peer.Id.encoding)
+      ("message", Distributed_db_message.(P2p_message.encoding encoding))
 
-val pp_json : Format.formatter -> t -> unit
-
-module Bounded_encoding : sig
-  val set_block_header_max_size : int option -> unit
-
-  val set_operation_max_size : int option -> unit
-
-  val set_operation_list_max_size : int option -> unit
-
-  val set_operation_list_max_length : int option -> unit
-
-  val set_operation_max_pass : int option -> unit
-
-  val set_protocol_max_size : int option -> unit
-
-  val set_mempool_max_operations : int option -> unit
+  let received_future_block =
+    declare_2
+      ~section
+      ~name:"received_future_block"
+      ~msg:"received future block {block_hash} from peer {peer_id}"
+      ~level:Notice
+      ("block_hash", Block_hash.encoding)
+      ("peer_id", P2p_peer.Id.encoding)
 end
