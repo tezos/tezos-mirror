@@ -26,7 +26,8 @@ def session():
 @pytest.mark.incremental
 class TestExample:
 
-    def test_wait_sync_proto(self, sandbox):
+    def test_wait_sync_proto(self, sandbox, session):
+        session['head_hash'] = sandbox.client(0).get_head()['hash']
         clients = sandbox.all_clients()
         for client in clients:
             proto = constants.ALPHA
@@ -35,6 +36,12 @@ class TestExample:
     def test_transfer(self, sandbox, session):
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
         session['operation_hash'] = receipt.operation_hash
+
+    @pytest.mark.timeout(5)
+    def test_inclusion(self, sandbox, session):
+        operation_hash = session['operation_hash']
+        sandbox.client(0).wait_for_inclusion(operation_hash,
+                                             branch=session['head_hash'])
 
     # TODO The next test fails due to a bug. It runs
     #
@@ -49,6 +56,6 @@ class TestExample:
     #
     @pytest.mark.skip
     @pytest.mark.timeout(5)
-    def test_inclusion(self, sandbox, session):
+    def test_inclusion_check_previous(self, sandbox, session):
         operation_hash = session['operation_hash']
         sandbox.client(0).wait_for_inclusion(operation_hash, check_previous=2)
