@@ -33,7 +33,9 @@ val default_mockup_context :
 
 (**  Returns a mockup environment for the specified protocol hash. *)
 val init_mockup_context_by_protocol_hash :
-  Protocol_hash.t ->
+  protocol_hash:Protocol_hash.t ->
+  constants_overrides_file:string option ->
+  bootstrap_accounts_file:string option ->
   (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
   tzresult
   Lwt.t
@@ -51,6 +53,8 @@ val get_mockup_context_from_disk :
 val create_mockup :
   cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
+  constants_overrides_file:string option ->
+  bootstrap_accounts_file:string option ->
   unit tzresult Lwt.t
 
 (** Overwrites an on-disk mockup environment. *)

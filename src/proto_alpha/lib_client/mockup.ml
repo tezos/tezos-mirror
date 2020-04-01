@@ -33,6 +33,19 @@ type mockup_protocol_parameters = {
   constants : Protocol.Constants_repr.parametric;
 }
 
+type protocol_constants_overrides = {
+  hard_gas_limit_per_operation : Z.t option;
+  hard_gas_limit_per_block : Z.t option;
+  hard_storage_limit_per_operation : Z.t option;
+  cost_per_byte : Protocol.Tez_repr.t option;
+}
+
+type parsed_account_repr = {
+  name : string;
+  sk_uri : Client_keys.sk_uri;
+  amount : Protocol.Tez_repr.t;
+}
+
 let bootstrap_account_encoding :
     Protocol.Parameters_repr.bootstrap_account Data_encoding.t =
   let open Data_encoding in
@@ -77,6 +90,30 @@ let mockup_protocol_parameters_encoding :
        (req "bootstrap_contracts" (list bootstrap_contract_encoding))
        (req "constants" Protocol.Constants_repr.parametric_encoding))
 
+let protocol_constants_overrides_encoding =
+  let open Data_encoding in
+  conv
+    (fun p ->
+      ( p.hard_gas_limit_per_operation,
+        p.hard_gas_limit_per_block,
+        p.hard_storage_limit_per_operation,
+        p.cost_per_byte ))
+    (fun ( hard_gas_limit_per_operation,
+           hard_gas_limit_per_block,
+           hard_storage_limit_per_operation,
+           cost_per_byte ) ->
+      {
+        hard_gas_limit_per_operation;
+        hard_gas_limit_per_block;
+        hard_storage_limit_per_operation;
+        cost_per_byte;
+      })
+    (obj4
+       (opt "hard_gas_limit_per_operation" z)
+       (opt "hard_gas_limit_per_block" z)
+       (opt "hard_storage_limit_per_operation" z)
+       (opt "cost_per_byte" Protocol.Tez_repr.encoding))
+
 let default_mockup_parameters : mockup_protocol_parameters =
   let parameters =
     Default_parameters.parameters_of_constants
@@ -88,6 +125,56 @@ let default_mockup_parameters : mockup_protocol_parameters =
     bootstrap_contracts = parameters.bootstrap_contracts;
     constants = parameters.constants;
   }
+
+let protocol_constants_no_overrides =
+  {
+    hard_gas_limit_per_operation = None;
+    hard_gas_limit_per_block = None;
+    hard_storage_limit_per_operation = None;
+    cost_per_byte = None;
+  }
+
+let apply_protocol_overrides (o : protocol_constants_overrides)
+    (c : Protocol.Constants_repr.parametric) =
+  {
+    c with
+    hard_gas_limit_per_operation =
+      Option.unopt
+        ~default:c.hard_gas_limit_per_operation
+        o.hard_gas_limit_per_operation;
+    hard_gas_limit_per_block =
+      Option.unopt
+        ~default:c.hard_gas_limit_per_block
+        o.hard_gas_limit_per_block;
+    hard_storage_limit_per_operation =
+      Option.unopt
+        ~default:c.hard_storage_limit_per_operation
+        o.hard_storage_limit_per_operation;
+    cost_per_byte = Option.unopt ~default:c.cost_per_byte o.cost_per_byte;
+  }
+
+let parsed_account_repr_encoding =
+  let open Data_encoding in
+  conv
+    (fun p -> (p.name, (p.sk_uri :> Uri.t), p.amount))
+    (fun (name, sk_uri, amount) ->
+      {name; sk_uri = Client_keys.make_sk_uri sk_uri; amount})
+    (obj3
+       (req "name" string)
+       (req "sk_uri" Client_keys.uri_encoding)
+       (req "amount" Protocol.Tez_repr.encoding))
+
+let parsed_accounts_reprs = Data_encoding.list parsed_account_repr_encoding
+
+let to_bootstrap_account repr =
+  Tezos_client_base.Client_keys.neuterize repr.sk_uri
+  >>=? fun pk_uri ->
+  Tezos_client_base.Client_keys.public_key pk_uri
+  >>=? fun public_key ->
+  let public_key_hash = Signature.Public_key.hash public_key in
+  return
+    Protocol.Parameters_repr.
+      {public_key_hash; public_key = Some public_key; amount = repr.amount}
 
 (* ------------------------------------------------------------------------- *)
 (* Blocks *)
@@ -158,9 +245,11 @@ let initial_context (header : Block_header.shell_header)
   >>=? fun {context; _} -> return context
 
 let mem_init :
-    mockup_protocol_parameters ->
+    parameters:mockup_protocol_parameters ->
+    constants_overrides_file:string option ->
+    bootstrap_accounts_file:string option ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
- fun constants ->
+ fun ~parameters ~constants_overrides_file ~bootstrap_accounts_file ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -169,11 +258,52 @@ let mem_init :
     Forge.make_shell
       ~level:0l
       ~predecessor:hash
-      ~timestamp:constants.initial_timestamp
+      ~timestamp:parameters.initial_timestamp
       ~fitness:(Protocol.Fitness_repr.from_int64 0L)
       ~operations_hash:Operation_list_list_hash.zero
   in
-  initial_context shell constants
+  ( match constants_overrides_file with
+  | None ->
+      return protocol_constants_no_overrides
+  | Some overrides_file -> (
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file overrides_file
+      >>=? fun json ->
+      match
+        Data_encoding.Json.destruct protocol_constants_overrides_encoding json
+      with
+      | x ->
+          return x
+      | exception _e ->
+          failwith
+            "cannot read protocol constants overrides in %s"
+            overrides_file ) )
+  >>=? fun protocol_overrides ->
+  ( match bootstrap_accounts_file with
+  | None ->
+      return None
+  | Some accounts_file -> (
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
+      >>=? fun json ->
+      match Data_encoding.Json.destruct parsed_accounts_reprs json with
+      | accounts ->
+          Tezos_base.TzPervasives.map_s to_bootstrap_account accounts
+          >>=? fun r -> return (Some r)
+      | exception _e ->
+          failwith
+            "cannot read definitions of bootstrap accounts in %s"
+            accounts_file ) )
+  >>=? fun bootstrap_accounts_custom ->
+  initial_context
+    shell
+    {
+      parameters with
+      bootstrap_accounts =
+        Option.unopt
+          ~default:parameters.bootstrap_accounts
+          bootstrap_accounts_custom;
+      constants =
+        apply_protocol_overrides protocol_overrides parameters.constants;
+    }
   >>=? fun context ->
   return
     {

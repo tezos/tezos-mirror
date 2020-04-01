@@ -45,7 +45,10 @@ module type Mockup_sig = sig
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
 
   val init :
-    parameters -> Tezos_protocol_environment.rpc_context tzresult Lwt.t
+    parameters:parameters ->
+    constants_overrides_file:string option ->
+    bootstrap_accounts_file:string option ->
+    Tezos_protocol_environment.rpc_context tzresult Lwt.t
 end
 
 type mockup_environment = (module Mockup_sig)

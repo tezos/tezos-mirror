@@ -27,7 +27,7 @@ open Tezos_client_base
 
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
-let bootstrap_accounts =
+let default_bootstrap_accounts =
   [ {
       name = "bootstrap1";
       sk_uri =
@@ -86,7 +86,31 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
   >>= fun () ->
   Client_keys.register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
 
-let populate (cctxt : #Tezos_client_base.Client_context.io_wallet) =
-  Tezos_base.TzPervasives.iter_s
-    (add_bootstrap_secret cctxt)
-    bootstrap_accounts
+let bootstrap_secret_encoding =
+  let open Data_encoding in
+  conv
+    (fun p -> (p.name, (p.sk_uri :> Uri.t), ""))
+    (fun (name, sk_uri, _) -> {name; sk_uri = Client_keys.make_sk_uri sk_uri})
+    (obj3
+       (req "name" string)
+       (req "sk_uri" Client_keys.uri_encoding)
+       (req "amount" string))
+
+let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
+
+let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
+    bootstrap_accounts_file =
+  ( match bootstrap_accounts_file with
+  | None ->
+      return default_bootstrap_accounts
+  | Some accounts_file -> (
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
+      >>=? fun json ->
+      match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
+      | accounts ->
+          return accounts
+      | exception _e ->
+          failwith
+            "cannot read definitions of bootstrap accounts in %s"
+            accounts_file ) )
+  >>=? Tezos_base.TzPervasives.iter_s (add_bootstrap_secret cctxt)

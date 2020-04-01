@@ -79,19 +79,27 @@ let default_mockup_context :
       failwith "default_mockup_context: no registered mockup environment"
   | mockup :: _ ->
       let (module Mockup) = mockup in
-      Mockup.init Mockup.default_parameters
+      Mockup.init
+        ~parameters:Mockup.default_parameters
+        ~constants_overrides_file:None
+        ~bootstrap_accounts_file:None
       >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let init_mockup_context_by_protocol_hash :
-    Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
+    constants_overrides_file:string option ->
+    bootstrap_accounts_file:string option ->
     (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
     tzresult
     Lwt.t =
- fun proto_hash ->
-  get_mockup_by_hash proto_hash
+ fun ~protocol_hash ~constants_overrides_file ~bootstrap_accounts_file ->
+  get_mockup_by_hash protocol_hash
   >>=? fun mockup ->
   let (module Mockup) = mockup in
-  Mockup.init Mockup.default_parameters
+  Mockup.init
+    ~parameters:Mockup.default_parameters
+    ~constants_overrides_file
+    ~bootstrap_accounts_file
   >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let mockup_dirname = "mockup"
@@ -163,7 +171,7 @@ let classify_base_dir base_dir =
     else Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
-    ~protocol_hash =
+    ~protocol_hash ~constants_overrides_file ~bootstrap_accounts_file =
   let base_dir = cctxt#get_base_dir in
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   let context_file = Filename.concat mockup_dir context_file in
@@ -189,7 +197,10 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   >>=? fun () ->
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
-  init_mockup_context_by_protocol_hash protocol_hash
+  init_mockup_context_by_protocol_hash
+    ~protocol_hash
+    ~constants_overrides_file
+    ~bootstrap_accounts_file
   >>=? fun (_mockup_env, rpc_context) ->
   let json =
     Data_encoding.Json.construct

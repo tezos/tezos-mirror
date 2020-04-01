@@ -61,6 +61,8 @@ module Logging : sig
   val tag : string Tag.def
 end
 
+val uri_encoding : Uri.t Data_encoding.t
+
 (** {2 Interface for external signing modules.} *)
 
 module type SIGNER = sig

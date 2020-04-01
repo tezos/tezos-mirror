@@ -173,9 +173,11 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
     match args.protocol with
     | None ->
         Tezos_mockup.Persistence.default_mockup_context ()
-    | Some proto_hash ->
+    | Some protocol_hash ->
         Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
-          proto_hash
+          ~protocol_hash
+          ~constants_overrides_file:None
+          ~bootstrap_accounts_file:None
   in
   let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
   ( match base_dir_class with

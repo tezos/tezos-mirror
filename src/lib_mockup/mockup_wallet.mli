@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Initializes a wallet with bootstrap accounts (including secret keys). *)
+(** Initializes a wallet with bootstrap accounts (including secret keys).
+    If the second argument is provided, it must be a path to a file
+    containing definitions of the bootstrap accounts in JSON format. *)
 val populate :
-  #Tezos_client_base.Client_context.io_wallet -> unit tzresult Lwt.t
+  #Tezos_client_base.Client_context.io_wallet ->
+  string option ->
+  unit tzresult Lwt.t
