@@ -2586,12 +2586,10 @@ that the modified field is the expected one.
    > MAP_CD(\rest=[AD]+)R @var %field code / S   =>
     { DUP ; DIP { CDR ; MAP_C(\rest)R %field code } ; CAR ; PAIR @var} / S
 
-Macros for nested ``PAIR`` and ``UNPAIR`` accept multiple
-annotations. Field annotations for ``PAIR`` give names to leaves of the
-constructed nested pair, in order. Variable annotations for ``UNPAIR``
-give names to deconstructed components on the stack. This next snippet
-gives examples instead of generic rewrite rules for readability
-purposes.
+Macros for nested ``PAIR`` accept multiple annotations. Field
+annotations for ``PAIR`` give names to leaves of the constructed
+nested pair, in order.  This next snippet gives examples instead of
+generic rewrite rules for readability purposes.
 
 ::
 
@@ -2602,12 +2600,7 @@ purposes.
    PAPAIR @p %x1 %x2 %x3
    :: 'a : 'b : 'c : 'S  ->  @p (pair ('a %x1) (pair ('b %x) ('c %x3))) : 'S
 
-   UNPAIR @x @y
-   :: (pair 'a 'b) : 'S -> @x 'a : @y 'b : 'S
-
-   UNPAPPAIIR @x1 @x2 @x3 @x4
-   :: (pair 'a (pair (pair 'b 'c) 'd )) : 'S
-      -> @x1 'a : @x2 'b : @x3 'c : @x4 'd : 'S
+Annotations for nested ``UNPAIR`` are deprecated.
 
 Automatic variable and field annotations inferring
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
