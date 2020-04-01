@@ -76,7 +76,7 @@ if [ -n "$local_snapshot_path" ]; then
   importer:
     image: $docker_image
     hostname: node
-    command: tezos-snapshot-import
+    command: tezos-snapshot-import $@
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
@@ -600,7 +600,8 @@ status() {
 snapshot_import() {
     pull_image
     local_snapshot_path="$1"
-    update_compose_file
+    shift
+    update_compose_file "$@"
     call_docker_compose up importer
     warn_script_uptodate
 }
@@ -701,51 +702,26 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    localnet.sh)
-        docker_base_dir="$HOME/.tezos-localnet"
-        docker_image=tezos:latest
-        docker_compose_base_name=localnet
-        default_port=14732
+    carthagenet.sh)
+        docker_base_dir="$HOME/.tezos-carthagenet"
+        docker_image=tezos/tezos:master
+        docker_compose_base_name=carthagenet
+        default_port=19732
+        network=carthagenet
         ;;
     zeronet.sh)
         docker_base_dir="$HOME/.tezos-zeronet"
-        docker_image=tezos/tezos:zeronet
+        docker_image=tezos/tezos:master
         docker_compose_base_name=zeronet
         default_port=19732
-        ;;
-    betanet.sh)
-        if [ -d "$HOME/.tezos-mainnet" ] ; then
-            echo 'You already upgraded, please only use `mainnet.sh` now.'
-            exit 1
-        else
-            echo 'A new script `mainnet.sh` is now available.'
-            echo 'The current `betanet.sh` still works, but we recommend that you upgrade.'
-        fi
-        docker_base_dir="$HOME/.tezos-betanet"
-        docker_image=tezos/tezos:mainnet
-        docker_compose_base_name=betanet
-        default_port=9732
-        ;;
-    mainnet.sh)
-        if [ -d "$HOME/.tezos-betanet" ] ; then
-            echo 'Folder "'$HOME'/.tezos-betanet" detected.'
-            echo 'To upgrade to the mainnet script, execute the following commands.'
-            echo '  `betanet.sh stop`'
-            echo 'Make sure that your node is stopped using `docker ps`.'
-            echo '  `mv "'$HOME'/.tezos-betanet" "'$HOME'/.tezos-mainnet"`'
-            echo '  `mainnet.sh start`'
-            exit 1
-        fi
-        docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:mainnet
-        docker_compose_base_name=mainnet
-        default_port=9732
+        network=zeronet
         ;;
     *)
-        docker_base_dir="$HOME/.tezos-alphanet"
-        docker_image=tezos/tezos:alphanet
-        docker_compose_base_name="alphanet"
+        docker_base_dir="$HOME/.tezos-mainnet"
+        docker_image=tezos/tezos:master
+        docker_compose_base_name="mainnet"
         default_port=9732
+        network=mainnet
         ;;
 esac
 
@@ -777,7 +753,7 @@ case "$command" in
     ## Main
 
     start)
-        start "$@"
+        start --network $network "$@"
         ;;
     restart)
         stop
@@ -805,7 +781,7 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
         case "$subcommand" in
             start)
-                start_node "$@"
+                start_node --network $network "$@"
                 ;;
             status)
                 status_node
@@ -832,7 +808,7 @@ case "$command" in
         snapshot_file="$1"
         case "$subcommand" in
             import)
-                snapshot_import "$snapshot_file"
+                snapshot_import "$snapshot_file" --network $network
                 ;;
             *)
                 usage
