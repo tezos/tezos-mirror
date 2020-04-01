@@ -1,1 +1,1 @@
-alphanet.sh
+tezos-docker-manager.sh
