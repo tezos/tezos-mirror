@@ -28,32 +28,21 @@ open Tezos_client_base
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
 let default_bootstrap_accounts =
-  Client_keys.make_sk_uri
-  @@ Uri.of_string
-       "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
-  >>=? fun sk_uri1 ->
-  Client_keys.make_sk_uri
-  @@ Uri.of_string
-       "unencrypted:edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo"
-  >>=? fun sk_uri2 ->
-  Client_keys.make_sk_uri
-  @@ Uri.of_string
-       "unencrypted:edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ"
-  >>=? fun sk_uri3 ->
-  Client_keys.make_sk_uri
-  @@ Uri.of_string
-       "unencrypted:edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3"
-  >>=? fun sk_uri4 ->
-  Client_keys.make_sk_uri
-  @@ Uri.of_string
-       "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm"
-  >>=? fun sk_uri5 ->
-  return
-    [ {name = "bootstrap1"; sk_uri = sk_uri1};
-      {name = "bootstrap2"; sk_uri = sk_uri2};
-      {name = "bootstrap3"; sk_uri = sk_uri3};
-      {name = "bootstrap4"; sk_uri = sk_uri4};
-      {name = "bootstrap5"; sk_uri = sk_uri5} ]
+  let unencrypted_keys =
+    [ "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+      "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
+      "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
+      "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
+      "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ]
+  in
+  let basename = "bootstrap" in
+  Error_monad.mapi_s
+    (fun i ukey ->
+      Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
+      >>=? fun sk_uri ->
+      let name = basename ^ string_of_int (i + 1) in
+      return {name; sk_uri})
+    unencrypted_keys
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
