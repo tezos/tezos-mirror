@@ -12,7 +12,6 @@ depends: [
   "tezos-client-base"
 
   "tezos-client-genesis"
-  "tezos-client-genesis-babylonnet"
   "tezos-client-genesis-carthagenet"
 
   "tezos-client-alpha"

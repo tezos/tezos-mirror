@@ -759,11 +759,6 @@ opam:tezos-client-genesis:
   variables:
     package: tezos-client-genesis
 
-opam:tezos-client-genesis-babylonnet:
-  <<: *opam_definition
-  variables:
-    package: tezos-client-genesis-babylonnet
-
 opam:tezos-client-genesis-carthagenet:
   <<: *opam_definition
   variables:
@@ -838,11 +833,6 @@ opam:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
-
-opam:tezos-embedded-protocol-genesis-babylonnet:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-protocol-genesis-babylonnet
 
 opam:tezos-embedded-protocol-genesis-carthagenet:
   <<: *opam_definition
@@ -1023,11 +1013,6 @@ opam:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
-
-opam:tezos-protocol-genesis-babylonnet:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-genesis-babylonnet
 
 opam:tezos-protocol-genesis-carthagenet:
   <<: *opam_definition

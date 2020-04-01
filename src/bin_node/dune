@@ -15,7 +15,6 @@
             tezos-shell-context
             tezos-protocol-updater
             tezos-embedded-protocol-genesis
-            tezos-embedded-protocol-genesis-babylonnet
             tezos-embedded-protocol-genesis-carthagenet
             tezos-embedded-protocol-demo-noops
             tezos-embedded-protocol-demo-counter

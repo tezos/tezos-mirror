@@ -11,7 +11,6 @@
             tezos-mockup-commands
 
             tezos-client-genesis
-            tezos-client-genesis-babylonnet
             tezos-client-genesis-carthagenet
             tezos-client-alpha
             tezos-client-000-Ps9mPmXa
