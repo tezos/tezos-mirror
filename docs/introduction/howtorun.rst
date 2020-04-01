@@ -291,8 +291,8 @@ Docker
 The docker image runs the daemons by default for all your keys.
 To know if you baked, just run::
 
-    ./babylonnet.sh baker log
-    ./babylonnet.sh endorser log
+    ./carthagenet.sh baker log
+    ./carthagenet.sh endorser log
 
 You should see lines such as::
 

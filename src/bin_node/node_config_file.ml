@@ -118,23 +118,6 @@ let blockchain_network_zeronet =
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:["bootstrap.zeronet.fun"; "bootzero.tzbeta.net"]
 
-let blockchain_network_babylonnet =
-  make_blockchain_network
-    ~alias:"babylonnet"
-    {
-      time = Time.Protocol.of_notation_exn "2019-09-27T07:43:32Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisd1f7bcGMoXy";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
-    }
-    ~chain_name:"TEZOS_ALPHANET_BABYLON_2019-09-27T07:43:32Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      ["35.246.251.120"; "34.89.154.253"; "babylonnet.kaml.fr"; "tezaria.com"]
-
 let blockchain_network_carthagenet =
   make_blockchain_network
     ~alias:"carthagenet"
@@ -238,7 +221,6 @@ let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (2, blockchain_network_zeronet);
     (4, blockchain_network_mainnet);
-    (5, blockchain_network_babylonnet);
     (6, blockchain_network_carthagenet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with

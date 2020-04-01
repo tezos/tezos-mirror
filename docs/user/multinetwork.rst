@@ -50,8 +50,6 @@ the following built-in networks:
 
 - ``zeronet``
 
-- ``babylonnet`` (deprecated)
-
 If you run ``tezos-node run`` or ``tezos-node snapshot import`` and your node has
 no configuration file yet, a configuration file is created and stores the value of the
 ``--network`` option so that you do not have to specify ``--network`` everytime.
