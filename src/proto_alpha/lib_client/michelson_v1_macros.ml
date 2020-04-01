@@ -498,7 +498,7 @@ let expand_pappaiir original =
 
 let expand_unpappaiir original =
   match original with
-  | Prim (loc, str, args, annot) ->
+  | Prim (loc, str, args, _annot) ->
       let len = String.length str in
       if
         len >= 6
@@ -511,31 +511,20 @@ let expand_unpappaiir original =
                    false)
       then
         try
-          let unpair car_annot cdr_annot =
+          let unpair =
             Seq
               ( loc,
                 [ Prim (loc, "DUP", [], []);
-                  Prim (loc, "CAR", [], car_annot);
-                  dip ~loc 1 (Seq (loc, [Prim (loc, "CDR", [], cdr_annot)])) ]
-              )
+                  Prim (loc, "CAR", [], []);
+                  dip ~loc 1 (Seq (loc, [Prim (loc, "CDR", [], [])])) ] )
           in
           let ast = parse_pair_substr str ~len 2 in
-          let annots_pos = pappaiir_annots_pos ast annot in
           let rec parse p (depth, acc) =
             match p with
-            | P (i, left, right) ->
-                let (car_annot, cdr_annot) =
-                  match IntMap.find_opt i annots_pos with
-                  | None ->
-                      ([], [])
-                  | Some (car_annot, cdr_annot) ->
-                      (car_annot, cdr_annot)
-                in
+            | P (_i, left, right) ->
                 let acc =
-                  if depth = 0 then unpair car_annot cdr_annot :: acc
-                  else
-                    dip ~loc depth (Seq (loc, [unpair car_annot cdr_annot]))
-                    :: acc
+                  if depth = 0 then unpair :: acc
+                  else dip ~loc depth (Seq (loc, [unpair])) :: acc
                 in
                 (depth, acc) |> parse left |> parse right
             | A | I ->
