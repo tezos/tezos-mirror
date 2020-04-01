@@ -80,7 +80,6 @@ module Types = struct
     block_validator : Block_validator.t;
     (* callback to chain_validator *)
     notify_new_block : State.Block.t -> unit;
-    notify_bootstrapped : unit -> unit;
     notify_termination : unit -> unit;
     limits : limits;
   }
@@ -88,9 +87,10 @@ module Types = struct
   type state = {
     peer_id : P2p_peer.Id.t;
     parameters : parameters;
-    mutable bootstrapped : bool;
     mutable pipeline : Bootstrap_pipeline.t option;
+    mutable started_validation : bool;
     mutable last_validated_head : Block_header.t;
+    mutable time_last_validated_head : Time.Protocol.t;
     mutable last_advertised_head : Block_header.t;
   }
 
@@ -101,12 +101,8 @@ module Types = struct
         Bootstrap_pipeline.length p
 
   let view (state : state) _ : view =
-    let {bootstrapped; pipeline; last_validated_head; last_advertised_head; _}
-        =
-      state
-    in
+    let {pipeline; last_validated_head; last_advertised_head; _} = state in
     {
-      bootstrapped;
       pipeline_length = pipeline_length pipeline;
       last_validated_head = Block_header.hash last_validated_head;
       last_advertised_head = Block_header.hash last_advertised_head;
@@ -125,11 +121,6 @@ open Types
 type t = Worker.dropbox Worker.t
 
 let debug w = Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
-
-let set_bootstrapped pv =
-  if not pv.bootstrapped then (
-    pv.bootstrapped <- true ;
-    pv.parameters.notify_bootstrapped () )
 
 let bootstrap_new_branch w _head unknown_prefix =
   let pv = Worker.state w in
@@ -164,7 +155,6 @@ let bootstrap_new_branch w _head unknown_prefix =
     (fun () -> Bootstrap_pipeline.wait pipeline)
   >>=? fun () ->
   pv.pipeline <- None ;
-  set_bootstrapped pv ;
   debug
     w
     "done validating new branch from peer %a."
@@ -214,7 +204,6 @@ let validate_new_head w hash (header : Block_header.t) =
     hash
     P2p_peer.Id.pp_short
     pv.peer_id ;
-  set_bootstrapped pv ;
   let meta =
     Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
   in
@@ -232,7 +221,6 @@ let only_if_fitness_increases w distant_header cont =
       (State.Block.fitness local_header)
     <= 0
   then (
-    set_bootstrapped pv ;
     debug
       w
       "ignoring head %a with non increasing fitness from peer: %a."
@@ -276,8 +264,8 @@ let may_validate_new_head w hash (header : Block_header.t) =
       hash
       P2p_peer.Id.pp_short
       pv.peer_id ;
-    set_bootstrapped pv ;
     pv.last_validated_head <- header ;
+    pv.started_validation <- true ;
     return_unit )
   else if invalid_block then (
     debug
@@ -473,13 +461,16 @@ let on_launch _ name parameters =
     {
       peer_id = snd name;
       parameters = {parameters with notify_new_block};
-      bootstrapped = false;
       pipeline = None;
+      started_validation = false;
       last_validated_head = State.Block.header genesis;
       last_advertised_head = State.Block.header genesis;
+      time_last_validated_head = Time.System.to_protocol @@ Systime_os.now ();
     }
   and notify_new_block block =
+    pv.started_validation <- true ;
     pv.last_validated_head <- State.Block.header block ;
+    pv.time_last_validated_head <- Time.System.to_protocol @@ Systime_os.now () ;
     parameters.notify_new_block block
   in
   return pv
@@ -506,18 +497,11 @@ let table =
   Worker.create_table (Dropbox {merge})
 
 let create ?(notify_new_block = fun _ -> ())
-    ?(notify_bootstrapped = fun () -> ()) ?(notify_termination = fun _ -> ())
-    limits block_validator chain_db peer_id =
+    ?(notify_termination = fun _ -> ()) limits block_validator chain_db peer_id
+    =
   let name = (State.Chain.id (Distributed_db.chain_state chain_db), peer_id) in
   let parameters =
-    {
-      chain_db;
-      notify_termination;
-      block_validator;
-      notify_new_block;
-      notify_bootstrapped;
-      limits;
-    }
+    {chain_db; notify_termination; block_validator; notify_new_block; limits}
   in
   let module Handlers = struct
     type self = t
@@ -562,13 +546,17 @@ let peer_id w =
   let pv = Worker.state w in
   pv.peer_id
 
-let bootstrapped w =
+let current_head_timestamp w =
   let pv = Worker.state w in
-  pv.bootstrapped
+  pv.last_validated_head.shell.timestamp
 
-let current_head w =
+let updated_once w =
   let pv = Worker.state w in
-  pv.last_validated_head
+  pv.started_validation
+
+let time_last_validated_head w =
+  let pv = Worker.state w in
+  pv.time_last_validated_head
 
 let status = Worker.status
 

@@ -44,7 +44,17 @@ module Request = struct
   let view (type a) (Validated block : a t) : view = State.Block.hash block
 end
 
-type limits = {bootstrap_threshold : int; worker_limits : Worker_types.limits}
+type bootstrap_conf = {
+  max_latency : Int64.t;
+  chain_stuck_delay : Int64.t;
+  sync_polling_period : float;
+  bootstrap_threshold : int;
+}
+
+type limits = {
+  bootstrap_conf : bootstrap_conf;
+  worker_limits : Worker_types.limits;
+}
 
 module Types = struct
   include Worker_state
@@ -73,17 +83,14 @@ module Types = struct
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     mutable prevalidator : Prevalidator.t option;
     active_peers : Peer_validator.t P2p_peer.Error_table.t;
-    bootstrapped_peers : unit P2p_peer.Table.t;
   }
 
   let view (state : state) _ : view =
-    let {bootstrapped; active_peers; bootstrapped_peers; _} = state in
+    let {bootstrapped; active_peers; _} = state in
     {
       bootstrapped;
       active_peers =
         P2p_peer.Error_table.fold_keys (fun id l -> id :: l) active_peers [];
-      bootstrapped_peers =
-        P2p_peer.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [];
     }
 end
 
@@ -129,28 +136,102 @@ let notify_new_block w block =
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
   Worker.Queue.push_request_now w (Validated block)
 
-let may_toggle_bootstrapped_chain w =
-  let nv = Worker.state w in
-  if
-    (not nv.bootstrapped)
-    && P2p_peer.Table.length nv.bootstrapped_peers
-       >= nv.parameters.limits.bootstrap_threshold
-  then (
-    Worker.record_event w Event.Bootstrapped ;
-    nv.bootstrapped <- true ;
-    Lwt.wakeup_later nv.bootstrapped_wakener () )
+(* Return [None] if there are less than [n] active peers. (an active peer
+   has updated its head at least once).
+   Otherwise, for the n active peers with the most recent head
+   returns [Some (min_head_time, max_head_time, most_recent_validation)] where
+   - [min_head_time] is the timestamp of the least recent validated head
+   - [max_head_time] is the timestamp of the most recent validated head
+   - [most_recent_validation] is most recent time a head has been validated
+
+   TODO this is inefficient, could be replaced by
+   structure updated on peers head update *)
+let time_peers active_peers n =
+  let head_time peer : Time.Protocol.t * Time.Protocol.t =
+    Peer_validator.(current_head_timestamp peer, time_last_validated_head peer)
+  in
+  let f _peer_id peer acc =
+    if Peer_validator.updated_once peer then head_time peer :: acc else acc
+  in
+  let time_list = P2p_peer.Error_table.fold_resolved f active_peers [] in
+  let active_peers_count = List.length time_list in
+  if active_peers_count < n then None
+  else
+    let compare (head_time_a, last_validation_a)
+        (head_time_b, last_validation_b) =
+      let u = Time.Protocol.compare head_time_a head_time_b in
+      let v = Time.Protocol.compare last_validation_a last_validation_b in
+      if u != 0 then u else v
+    in
+    (* take_n returns the n greatest elements, in *sorted* order *)
+    let sorted_time_trunc = List.take_n ~compare n time_list in
+    let (max_head_time, most_recent_validation) =
+      List.last_exn sorted_time_trunc
+    in
+    let (min_head_time, _) = List.hd sorted_time_trunc in
+    assert (min_head_time <= max_head_time) ;
+    Some (min_head_time, max_head_time, most_recent_validation)
+
+let sync_state nv =
+  let bootstrap_threshold =
+    nv.parameters.limits.bootstrap_conf.bootstrap_threshold
+  in
+  let chain_stuck_delay =
+    nv.parameters.limits.bootstrap_conf.chain_stuck_delay
+  in
+  let max_latency = nv.parameters.limits.bootstrap_conf.max_latency in
+  if bootstrap_threshold = 0 then `Sync
+  else
+    match time_peers nv.active_peers bootstrap_threshold with
+    | None ->
+        `Unsync
+    | Some (min_head_time, max_head_time, last_heard) ->
+        let now = Time.System.to_protocol @@ Systime_os.now () in
+        let some_time_from_now =
+          Time.Protocol.add now (Int64.neg chain_stuck_delay)
+        in
+        let almost_now = Time.Protocol.add now (Int64.neg max_latency) in
+        if Time.Protocol.(min_head_time >= almost_now) then `Sync
+        else if
+          min_head_time = max_head_time && last_heard <= some_time_from_now
+        then `Stuck
+        else `Unsync
+
+(** Check synchronization status every [sync_polling_period]. Wake up
+    bootstrap wakener and mark node as bootstrapped when synchronization status
+    is either stuck or sync. *)
+let poll_sync w nv =
+  let sync_polling_period =
+    nv.parameters.limits.bootstrap_conf.sync_polling_period
+  in
+  if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener ()
+  else
+    let wait_sync nv =
+      let rec loop () =
+        match sync_state nv with
+        | `Stuck ->
+            Lwt.return_unit
+        | `Sync ->
+            Lwt.return_unit
+        | `Unsync ->
+            Lwt_unix.sleep sync_polling_period >>= fun () -> loop ()
+      in
+      loop ()
+    in
+    Lwt.async (fun () ->
+        wait_sync nv
+        >>= fun () ->
+        nv.bootstrapped <- true ;
+        Worker.record_event w Event.Bootstrapped ;
+        Lwt.return (Lwt.wakeup_later nv.bootstrapped_wakener ()))
 
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
       Peer_validator.create
         ~notify_new_block:(notify_new_block w)
-        ~notify_bootstrapped:(fun () ->
-          P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
-          may_toggle_bootstrapped_chain w)
         ~notify_termination:(fun _pv ->
-          P2p_peer.Error_table.remove nv.active_peers peer_id ;
-          P2p_peer.Table.remove nv.bootstrapped_peers peer_id)
+          P2p_peer.Error_table.remove nv.active_peers peer_id)
         nv.parameters.peer_validator_limits
         nv.parameters.block_validator
         nv.parameters.chain_db
@@ -483,16 +564,14 @@ let on_launch start_prevalidator w _ parameters =
       new_head_input;
       bootstrapped_wakener;
       bootstrapped_waiter;
-      bootstrapped = parameters.limits.bootstrap_threshold <= 0;
+      bootstrapped = parameters.limits.bootstrap_conf.bootstrap_threshold <= 0;
       active_peers = P2p_peer.Error_table.create 50;
-      (* TODO use `2 * max_connection` *)
-      bootstrapped_peers = P2p_peer.Table.create 50;
       (* TODO use `2 * max_connection` *)
       child = None;
       prevalidator;
     }
   in
-  if nv.bootstrapped then Lwt.wakeup_later bootstrapped_wakener () ;
+  poll_sync w nv ;
   Distributed_db.set_callback
     parameters.chain_db
     {
@@ -716,3 +795,7 @@ let ddb_information t =
   let state = Worker.state t in
   let ddb = state.parameters.chain_db in
   Distributed_db.information ddb
+
+let sync_state w =
+  let nv = Worker.state w in
+  sync_state nv

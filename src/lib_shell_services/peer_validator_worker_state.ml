@@ -145,7 +145,6 @@ module Worker_state = struct
       (obj2 (req "fetched_headers" int31) (req "fetched_blocks" int31))
 
   type view = {
-    bootstrapped : bool;
     pipeline_length : pipeline_length;
     mutable last_validated_head : Block_hash.t;
     mutable last_advertised_head : Block_hash.t;
@@ -155,27 +154,12 @@ module Worker_state = struct
     let open Data_encoding in
     conv
       (function
-        | { bootstrapped;
-            pipeline_length;
-            last_validated_head;
-            last_advertised_head } ->
-            ( bootstrapped,
-              pipeline_length,
-              last_validated_head,
-              last_advertised_head ))
+        | {pipeline_length; last_validated_head; last_advertised_head} ->
+            (pipeline_length, last_validated_head, last_advertised_head))
       (function
-        | ( bootstrapped,
-            pipeline_length,
-            last_validated_head,
-            last_advertised_head ) ->
-            {
-              bootstrapped;
-              pipeline_length;
-              last_validated_head;
-              last_advertised_head;
-            })
-      (obj4
-         (req "bootstrapped" bool)
+        | (pipeline_length, last_validated_head, last_advertised_head) ->
+            {pipeline_length; last_validated_head; last_advertised_head})
+      (obj3
          (req "pipelines" pipeline_length_encoding)
          (req "last_validated_head" Block_hash.encoding)
          (req "last_advertised_head" Block_hash.encoding))
@@ -183,11 +167,9 @@ module Worker_state = struct
   let pp ppf state =
     Format.fprintf
       ppf
-      "@[<v 0>Bootstrapped: %s@,\
-       Pipeline_length: %d - %d @,\
+      "Pipeline_length: %d - %d @,\
        Last validated head: %a@,\
        Last advertised head: %a@]"
-      (if state.bootstrapped then "yes" else "no")
       state.pipeline_length.fetched_header_length
       state.pipeline_length.fetched_block_length
       Block_hash.pp

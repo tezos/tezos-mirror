@@ -36,13 +36,20 @@ type limits = {
 
 val peer_id : t -> P2p_peer.Id.t
 
-val bootstrapped : t -> bool
+(** Returns timestamp of the most recent head communicated (and validatd)
+    by this peer *)
+val current_head_timestamp : t -> Time.Protocol.t
 
-val current_head : t -> Block_header.t
+(** Returns the most recent time this peer validated a block.
+ (note that is *not* updated when receiving a new head which was
+  already validated) *)
+val time_last_validated_head : t -> Time.Protocol.t
+
+(** Return true if this peer has updated its head at least once *)
+val updated_once : t -> bool
 
 val create :
   ?notify_new_block:(State.Block.t -> unit) ->
-  ?notify_bootstrapped:(unit -> unit) ->
   ?notify_termination:(unit -> unit) ->
   limits ->
   Block_validator.t ->

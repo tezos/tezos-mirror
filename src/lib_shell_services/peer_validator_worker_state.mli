@@ -57,7 +57,6 @@ module Worker_state : sig
   val pipeline_length_encoding : pipeline_length Data_encoding.encoding
 
   type view = {
-    bootstrapped : bool;
     pipeline_length : pipeline_length;
     mutable last_validated_head : Block_hash.t;
     mutable last_advertised_head : Block_hash.t;

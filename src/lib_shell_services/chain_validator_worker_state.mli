@@ -58,11 +58,7 @@ module Event : sig
 end
 
 module Worker_state : sig
-  type view = {
-    active_peers : P2p_peer.Id.t list;
-    bootstrapped_peers : P2p_peer.Id.t list;
-    bootstrapped : bool;
-  }
+  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
 
   val encoding : view Data_encoding.encoding
 

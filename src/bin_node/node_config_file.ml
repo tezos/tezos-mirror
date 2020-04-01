@@ -840,22 +840,65 @@ let peer_validator_limits_encoding =
           default_limits.worker_limits.backlog_size
           default_limits.worker_limits.backlog_level))
 
+let bootstrap_conf_encoding default_max_latency default_chain_stuck_delay
+    default_sync_polling_period default_bootstrap_threshold =
+  let open Data_encoding in
+  conv
+    (fun { Chain_validator.max_latency;
+           chain_stuck_delay;
+           sync_polling_period;
+           bootstrap_threshold } ->
+      (max_latency, chain_stuck_delay, sync_polling_period, bootstrap_threshold))
+    (fun ( max_latency,
+           chain_stuck_delay,
+           sync_polling_period,
+           bootstrap_threshold ) ->
+      {
+        max_latency;
+        chain_stuck_delay;
+        sync_polling_period;
+        bootstrap_threshold;
+      })
+    (obj4
+       (dft
+          "max_latency"
+          ~description:
+            "Maximal delay that it should take for a block to reach other \
+             nodes in the network."
+          int64
+          default_max_latency)
+       (dft
+          "chain_stuck_delay"
+          ~description:"Delay after which we consider the chain is stuck."
+          int64
+          default_chain_stuck_delay)
+       (dft
+          "sync_polling_period"
+          ~description:"Polling period used to check for synchronization."
+          float
+          default_sync_polling_period)
+       (dft
+          "bootstrap_threshold"
+          ~description:
+            "Set the number of peers with whom a chain synchronization must \
+             be completed to bootstrap the node."
+          uint8
+          default_bootstrap_threshold))
+
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Chain_validator.bootstrap_threshold; worker_limits} ->
-      (bootstrap_threshold, worker_limits))
-    (fun (bootstrap_threshold, worker_limits) ->
-      {bootstrap_threshold; worker_limits})
+    (fun {Chain_validator.bootstrap_conf; worker_limits} ->
+      (bootstrap_conf, worker_limits))
+    (fun (bootstrap_conf, worker_limits) -> {bootstrap_conf; worker_limits})
     (merge_objs
-       (obj1
-          (dft
-             "bootstrap_threshold"
-             ~description:
-               "Set the number of peers with whom a chain synchronization \
-                must be completed to bootstrap the node."
-             uint8
-             default_shell.chain_validator_limits.bootstrap_threshold))
+       (bootstrap_conf_encoding
+          default_shell.chain_validator_limits.bootstrap_conf.max_latency
+          default_shell.chain_validator_limits.bootstrap_conf.chain_stuck_delay
+          default_shell.chain_validator_limits.bootstrap_conf
+            .sync_polling_period
+          default_shell.chain_validator_limits.bootstrap_conf
+            .bootstrap_threshold)
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
           default_shell.chain_validator_limits.worker_limits.backlog_level))
@@ -1068,7 +1111,13 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
         Option.unopt_map
           ~default:cfg.shell.chain_validator_limits
           ~f:(fun bootstrap_threshold ->
-            {cfg.shell.chain_validator_limits with bootstrap_threshold})
+            let bootstrap_conf =
+              {
+                cfg.shell.chain_validator_limits.bootstrap_conf with
+                bootstrap_threshold;
+              }
+            in
+            {cfg.shell.chain_validator_limits with bootstrap_conf})
           bootstrap_threshold;
       history_mode = Option.first_some history_mode cfg.shell.history_mode;
     }

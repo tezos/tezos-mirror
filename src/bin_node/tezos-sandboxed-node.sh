@@ -181,7 +181,7 @@ EOF
     fi
 
     [ -f "${node_dir}/identity.json" ] || $node identity generate "$expected_pow" --data-dir "$node_dir"
-    $node run --network "sandbox" --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
+    $node run --bootstrap-threshold 0 --network "sandbox" --data-dir "$node_dir" "${peers[@]}" "$sandbox_param" "$@" &
     node_pids+=("$!")
 
 }

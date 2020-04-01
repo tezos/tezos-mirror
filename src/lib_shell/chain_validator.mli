@@ -26,7 +26,24 @@
 
 type t
 
-type limits = {bootstrap_threshold : int; worker_limits : Worker_types.limits}
+(** Constants parameterizing the bootstrap heuristics. *)
+type bootstrap_conf = {
+  max_latency : Int64.t;
+      (** [max_latency] is the maximal delay that it should take for a block to reach
+          other nodes in the network *)
+  chain_stuck_delay : Int64.t;
+      (** [chain_stuck_delay] is the delay after which we consider the chain is stuck
+          if we don't get new heads from peers. *)
+  sync_polling_period : float;
+      (** [sync_polling_period] is the polling period used to check for
+          synchronisation. *)
+  bootstrap_threshold : int;
+}
+
+type limits = {
+  bootstrap_conf : bootstrap_conf;
+  worker_limits : Worker_types.limits;
+}
 
 val create :
   start_prevalidator:bool ->
@@ -43,11 +60,26 @@ val create :
   limits ->
   t tzresult Lwt.t
 
-val bootstrapped : t -> unit Lwt.t
-
 val chain_id : t -> Chain_id.t
 
 val chain_state : t -> State.Chain.t
+
+(** - If there are at least `boostrap_threshold` active peers, which validated
+      at least one block, we consider the peers with the most recent
+      heads:
+    . if all heads are *recent enough*, returns [`Sync]. Recent mean timestamp
+      is later than [now() - max_latency]
+    . if all heads have the same time, but haven't been updated for
+      [chain_stuck_delay] returns [`Stuck]
+    . otherwise, returns [`Unsync]
+    - If there are less than `bootstrap_threshold` such peers
+    . if bootstrap_threshold = 0, returns [`Sync] else [`Unsync`] *)
+val sync_state : t -> [`Sync | `Stuck | `Unsync]
+
+(** Poll synchronization state until it is `Sync or `Stuck.
+    Subsequent calls return immediately. In other words, once a node is
+    bootstrapped, it remains bootstrapped until it terminates. *)
+val bootstrapped : t -> unit Lwt.t
 
 val prevalidator : t -> Prevalidator.t option
 

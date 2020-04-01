@@ -141,35 +141,24 @@ module Event = struct
 end
 
 module Worker_state = struct
-  type view = {
-    active_peers : P2p_peer.Id.t list;
-    bootstrapped_peers : P2p_peer.Id.t list;
-    bootstrapped : bool;
-  }
+  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {bootstrapped; bootstrapped_peers; active_peers} ->
-        (bootstrapped, bootstrapped_peers, active_peers))
-      (fun (bootstrapped, bootstrapped_peers, active_peers) ->
-        {bootstrapped; bootstrapped_peers; active_peers})
-      (obj3
+      (fun {bootstrapped; active_peers} -> (bootstrapped, active_peers))
+      (fun (bootstrapped, active_peers) -> {bootstrapped; active_peers})
+      (obj2
          (req "bootstrapped" bool)
-         (req "bootstrapped_peers" (list P2p_peer.Id.encoding))
          (req "active_peers" (list P2p_peer.Id.encoding)))
 
-  let pp ppf {bootstrapped; bootstrapped_peers; active_peers} =
+  let pp ppf {bootstrapped; active_peers} =
     Format.fprintf
       ppf
-      "@[<v 0>Network is%s bootstrapped.@,\
-       @[<v 2>Active peers:%a@]@,\
-       @[<v 2>Bootstrapped peers:%a@]@]"
+      "@[<v 0>Network is%s bootstrapped.@,@[<v 2>Active peers:%a@]@]"
       (if bootstrapped then "" else " not yet")
       (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
       active_peers
-      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
-      bootstrapped_peers
 end
 
 module Distributed_db_state = struct

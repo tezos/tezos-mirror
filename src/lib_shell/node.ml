@@ -187,7 +187,15 @@ let default_peer_validator_limits =
 let default_chain_validator_limits =
   let open Chain_validator in
   {
-    bootstrap_threshold = 4;
+    (* TODO these are suited for sandbox tests, we should select better
+       values for mainnet *)
+    bootstrap_conf =
+      {
+        max_latency = Int64.of_int 1;
+        chain_stuck_delay = Int64.of_int 10;
+        sync_polling_period = 1.;
+        bootstrap_threshold = 4;
+      };
     worker_limits = {backlog_size = 1000; backlog_level = Internal_event.Info};
   }
 
