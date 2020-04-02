@@ -13,35 +13,35 @@ trace
     [ (Pair 4 { 0 ; 1 ; 2 ; 3 })  	
       (Pair 4 { 0 ; 1 ; 2 ; 3 })  	 ]
   - location: 11 (remaining gas: 132951392 units remaining)
-    [ 4  	@p
+    [ 4  	@parameter
       (Pair 4 { 0 ; 1 ; 2 ; 3 })  	 ]
   - location: 14 (remaining gas: 132951272 units remaining)
-    [ { 0 ; 1 ; 2 ; 3 }  	@s ]
+    [ { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 13 (remaining gas: 132951252 units remaining)
-    [ { 0 ; 1 ; 2 ; 3 }  	@s ]
+    [ { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 12 (remaining gas: 132951252 units remaining)
-    [ 4  	@p
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+    [ 4  	@parameter
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: -1 (remaining gas: 132951232 units remaining)
-    [ 4  	@p
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+    [ 4  	@parameter
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 8 (remaining gas: 132951212 units remaining)
-    [ 4  	@p
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+    [ 4  	@parameter
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 15 (remaining gas: 132951152 units remaining)
     [ { { { DUP ; CAR ; DIP { CDR } } } ;
         DIP { { { DUP ; CAR ; DIP { CDR } } } } ;
         ADD ;
         MUL }  	
-      4  	@p
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+      4  	@parameter
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 41 (remaining gas: 132951092 units remaining)
-    [ 4  	@p
+    [ 4  	@parameter
       { { { DUP ; CAR ; DIP { CDR } } } ;
         DIP { { { DUP ; CAR ; DIP { CDR } } } } ;
         ADD ;
         MUL }  	
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 42 (remaining gas: 132946572 units remaining)
     [ { PUSH int 4 ;
         PAIR ;
@@ -49,7 +49,7 @@ trace
           DIP { { { DUP ; CAR ; DIP { CDR } } } } ;
           ADD ;
           MUL } }  	
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 43 (remaining gas: 132946512 units remaining)
     [ 3  	
       { PUSH int 4 ;
@@ -58,7 +58,7 @@ trace
           DIP { { { DUP ; CAR ; DIP { CDR } } } } ;
           ADD ;
           MUL } }  	
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 46 (remaining gas: 132941992 units remaining)
     [ { PUSH int 3 ;
         PAIR ;
@@ -68,9 +68,9 @@ trace
             DIP { { { DUP ; CAR ; DIP { CDR } } } } ;
             ADD ;
             MUL } } }  	
-      { 0 ; 1 ; 2 ; 3 }  	@s ]
+      { 0 ; 1 ; 2 ; 3 }  	@storage ]
   - location: 47 (remaining gas: 132941932 units remaining)
-    [ { 0 ; 1 ; 2 ; 3 }  	@s
+    [ { 0 ; 1 ; 2 ; 3 }  	@storage
       { PUSH int 3 ;
         PAIR ;
         { PUSH int 4 ;
@@ -114,7 +114,7 @@ trace
             ADD ;
             MUL } } }  	 ]
   - location: 50 (remaining gas: 132941452 units remaining)
-    [ 0  	@s.elt
+    [ 0  	@storage.elt
       { PUSH int 3 ;
         PAIR ;
         { PUSH int 4 ;
@@ -250,7 +250,7 @@ trace
             ADD ;
             MUL } } }  	 ]
   - location: 50 (remaining gas: 132939928 units remaining)
-    [ 1  	@s.elt
+    [ 1  	@storage.elt
       { PUSH int 3 ;
         PAIR ;
         { PUSH int 4 ;
@@ -386,7 +386,7 @@ trace
             ADD ;
             MUL } } }  	 ]
   - location: 50 (remaining gas: 132938404 units remaining)
-    [ 2  	@s.elt
+    [ 2  	@storage.elt
       { PUSH int 3 ;
         PAIR ;
         { PUSH int 4 ;
@@ -522,7 +522,7 @@ trace
             ADD ;
             MUL } } }  	 ]
   - location: 50 (remaining gas: 132936880 units remaining)
-    [ 3  	@s.elt
+    [ 3  	@storage.elt
       { PUSH int 3 ;
         PAIR ;
         { PUSH int 4 ;

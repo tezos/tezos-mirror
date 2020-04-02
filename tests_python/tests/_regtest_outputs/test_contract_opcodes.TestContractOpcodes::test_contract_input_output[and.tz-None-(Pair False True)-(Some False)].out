@@ -43,21 +43,21 @@ trace
     [ (Pair {} (Some False))  	
       (Pair {} (Some False))  	 ]
   - location: 26 (remaining gas: 133035872 units remaining)
-    [ {}  	@x
+    [ {}  	@noop
       (Pair {} (Some False))  	 ]
   - location: 29 (remaining gas: 133035752 units remaining)
-    [ (Some False)  	@y ]
+    [ (Some False)  	@res ]
   - location: 28 (remaining gas: 133035732 units remaining)
-    [ (Some False)  	@y ]
+    [ (Some False)  	@res ]
   - location: 27 (remaining gas: 133035732 units remaining)
-    [ {}  	@x
-      (Some False)  	@y ]
+    [ {}  	@noop
+      (Some False)  	@res ]
   - location: -1 (remaining gas: 133035712 units remaining)
-    [ {}  	@x
-      (Some False)  	@y ]
+    [ {}  	@noop
+      (Some False)  	@res ]
   - location: 23 (remaining gas: 133035692 units remaining)
-    [ {}  	@x
-      (Some False)  	@y ]
+    [ {}  	@noop
+      (Some False)  	@res ]
   - location: 30 (remaining gas: 133035632 units remaining)
     [ (Pair {} (Some False))  	 ]
   - location: -1 (remaining gas: 133035612 units remaining)
