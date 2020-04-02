@@ -256,6 +256,8 @@ class TestContracts:
          r'big_map type not expected here'),
         ("invalid_self_entrypoint.tz",
          r'Contract has no entrypoint named D'),
+        ("contract_annotation_default.tz",
+         r'unexpected annotation'),
     ])
     def test_ill_typecheck(self, client, contract, error_pattern):
         def cmd():
@@ -631,6 +633,96 @@ class TestMiniScenarios:
         b_5 = IDENTITIES['bootstrap5']['identity']
         result = client.get_delegate('vote_for_delegate')
         assert result.delegate == b_5
+
+    def test_multiple_entrypoints_counter(self, session, client):
+        path = os.path.join(CONTRACT_PATH, 'mini_scenarios',
+                            'multiple_entrypoints_counter.tz')
+
+        storage = 'None'
+
+        # originate contract
+        originate(client, session, path, storage, 0)
+        client.bake('bootstrap5', BAKE_ARGS)
+
+        # call contract: creates the internal contract and calls it.
+        client.transfer(0, 'bootstrap1', 'multiple_entrypoints_counter',
+                        ['--burn-cap', '10'])
+        client.bake('bootstrap5', BAKE_ARGS)
+        assert client.get_storage('multiple_entrypoints_counter') == 'None', \
+            ("The storage of the multiple_entrypoints_counter contract"
+             " should be None")
+
+    # Test CONTRACT with/without entrypoint annotation on literal address
+    # parameters with/without entrypoint annotation
+    def test_originate_simple_entrypoints(self, session, client):
+        '''originates the contract simple_entrypoints.tz
+         with entrypoint %A of type unit used in
+        test_simple_entrypoints'''
+
+        contract_target = os.path.join(CONTRACT_PATH, 'entrypoints',
+                                       'simple_entrypoints.tz')
+        originate(client, session, contract_target, 'Unit', 0)
+        client.bake('bootstrap5', BAKE_ARGS)
+
+    @pytest.mark.parametrize(
+        'contract_annotation, contract_type, param, expected_storage', [
+            # tests passing adr to CONTRACT %A unit
+            # where adr has an entrypoint %A of type unit, is allowed.
+            ('%A', 'unit', '"{adr}"', '(Some "{adr}%A")'),
+            ('%B', 'string', '"{adr}"', '(Some "{adr}%B")'),
+            ('%C', 'nat', '"{adr}"', '(Some "{adr}%C")'),
+            # tests passing adr%A to CONTRACT %A unit: redundant specification
+            # of entrypoint not allowed so CONTRACT returns None
+            ('%A', 'unit', '"{adr}%A"', 'None'),
+            ('%A', 'unit', '"{adr}%B"', 'None'),
+            ('%A', 'unit', '"{adr}%D"', 'None'),
+            ('%A', 'unit', '"{adr}%A"', 'None'),
+            ('%B', 'unit', '"{adr}%A"', 'None'),
+            ('%D', 'unit', '"{adr}%A"', 'None'),
+            # tests passing adr%A to CONTRACT unit:
+            # where adr has an entrypoint %A of type unit, is allowed.
+            ('', 'unit', '"{adr}%A"', '(Some "{adr}%A")'),
+            ('', 'string', '"{adr}%B"', '(Some "{adr}%B")'),
+            ('', 'nat', '"{adr}%C"', '(Some "{adr}%C")'),
+            # tests passing adr%B to CONTRACT unit:
+            # as entrypoint %B of simple_entrypoints.tz has type string,
+            # CONTRACT will return None.
+            ('', 'unit', '"{adr}%B"', 'None'),
+            # tests passing adr%D to CONTRACT unit:
+            # as entrypoint %D does not exist in simple_entrypoints.tz,
+            # CONTRACT will return None.
+            ('', 'unit', '"{adr}%D"', 'None'),
+            # tests passing adr to CONTRACT unit:
+            # as adr does not have type unit, CONTRACT returns None.
+            ('', 'unit', '"{adr}"', 'None'),
+            # entrypoint that does not exist
+            ('%D', 'unit', '"{adr}"', 'None'),
+            # ill-typed entrypoints
+            ('%A', 'int', '"{adr}"', 'None'),
+            ('%B', 'unit', '"{adr}"', 'None'),
+            ('%C', 'int', '"{adr}"', 'None'),
+        ])
+    def test_simple_entrypoints(self,
+                                session,
+                                client,
+                                contract_annotation,
+                                contract_type,
+                                param,
+                                expected_storage):
+        contract = f'''parameter address;
+storage (option address);
+code {{
+       CAR;
+       CONTRACT {contract_annotation} {contract_type};
+       IF_SOME {{ ADDRESS; SOME }} {{ NONE address; }};
+       NIL operation;
+       PAIR
+     }};'''
+
+        param = param.format(adr=session['contract'])
+        expected_storage = expected_storage.format(adr=session['contract'])
+        run_script_res = client.run_script(contract, 'None', param, file=False)
+        assert run_script_res.storage == expected_storage
 
 
 @pytest.mark.contract

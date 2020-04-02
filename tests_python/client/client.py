@@ -172,8 +172,9 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
 
-    def typecheck(self, contract: str) -> str:
-        assert os.path.isfile(contract), f'{contract} is not a file'
+    def typecheck(self, contract: str, file: bool = True) -> str:
+        if file:
+            assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['typecheck', 'script', contract])
 
     def typecheck_data(self, data: str, typ: str) -> str:
@@ -184,8 +185,10 @@ class Client:
                    storage: str,
                    inp: str,
                    amount: float = None,
-                   trace_stack: bool = False) -> client_output.RunScriptResult:
-        assert os.path.isfile(contract), f'{contract} is not a file'
+                   trace_stack: bool = False,
+                   file: bool = True) -> client_output.RunScriptResult:
+        if file:
+            assert os.path.isfile(contract), f'{contract} is not a file'
         cmd = ['run', 'script', contract, 'on', 'storage', storage, 'and',
                'input', inp]
         if amount is not None:
