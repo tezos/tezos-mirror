@@ -709,13 +709,6 @@ case $(basename "$0") in
         default_port=19732
         network=carthagenet
         ;;
-    zeronet.sh)
-        docker_base_dir="$HOME/.tezos-zeronet"
-        docker_image=tezos/tezos:master
-        docker_compose_base_name=zeronet
-        default_port=19732
-        network=zeronet
-        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
         docker_image=tezos/tezos:master
