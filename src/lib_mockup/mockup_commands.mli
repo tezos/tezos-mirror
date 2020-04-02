@@ -25,9 +25,4 @@
 
 val group : Tezos_clic.Clic.group
 
-val set_base_dir : string -> unit
-
-val get_base_dir :
-  #Tezos_client_base.Client_context.io -> string tzresult Lwt.t
-
 val commands : unit -> Tezos_client_base.Client_context.full Clic.command list

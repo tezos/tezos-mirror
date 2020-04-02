@@ -83,6 +83,8 @@ class type wallet =
 
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
+
+    method get_base_dir : string
   end
 
 class type chain =
@@ -197,6 +199,8 @@ class proxy_context (obj : full) =
     method sleep : float -> unit Lwt.t = obj#sleep
 
     method now : unit -> Ptime.t = obj#now
+
+    method get_base_dir : string = obj#get_base_dir
   end
 
 let log _ _ = Lwt.return_unit

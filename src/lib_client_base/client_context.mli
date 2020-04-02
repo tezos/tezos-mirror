@@ -66,6 +66,8 @@ class type wallet =
 
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
+
+    method get_base_dir : string
   end
 
 class type chain =

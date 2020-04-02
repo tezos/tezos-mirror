@@ -26,20 +26,19 @@
 open Tezos_clic
 
 let create_mockup_command_handler _ (cctxt : Protocol_client_context.full) =
-  Tezos_mockup_commands.Mockup_commands.get_base_dir cctxt
-  >>=? (fun base_dir ->
-         match Tezos_mockup.Persistence.classify_base_dir base_dir with
-         | Tezos_mockup.Persistence.Base_dir_is_nonempty ->
-             cctxt#error "directory %s is nonempty" base_dir
-         | Tezos_mockup.Persistence.Base_dir_is_mockup ->
-             cctxt#error
-               "%s seems to have already been initialized as a mockup directory"
-               base_dir
-         | Tezos_mockup.Persistence.Base_dir_does_not_exist
-         | Tezos_mockup.Persistence.Base_dir_is_empty ->
-             Tezos_mockup.Persistence.create_mockup
-               ~protocol_hash:Protocol.hash
-               ~base_dir)
+  let base_dir = cctxt#get_base_dir in
+  ( match Tezos_mockup.Persistence.classify_base_dir base_dir with
+  | Tezos_mockup.Persistence.Base_dir_is_nonempty ->
+      cctxt#error "directory %s is nonempty" base_dir
+  | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+      cctxt#error
+        "%s seems to have already been initialized as a mockup directory"
+        base_dir
+  | Tezos_mockup.Persistence.Base_dir_does_not_exist
+  | Tezos_mockup.Persistence.Base_dir_is_empty ->
+      Tezos_mockup.Persistence.create_mockup
+        ~protocol_hash:Protocol.hash
+        ~base_dir )
   >>=? fun () -> Tezos_mockup_commands.Mockup_wallet.populate cctxt
 
 let create_mockup_command : Protocol_client_context.full Clic.command =

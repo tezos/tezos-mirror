@@ -28,19 +28,6 @@ open Tezos_clic
 let group =
   {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
 
-(* Workaround for the fact that the client directory is not available from
-   the client context. *)
-let base_dir = ref None
-
-let set_base_dir dir = base_dir := Some dir
-
-let get_base_dir (cctxt : #Tezos_client_base.Client_context.io) =
-  match !base_dir with
-  | None ->
-      cctxt#error "--base-dir not set"
-  | Some base_dir ->
-      return base_dir
-
 let list_mockup_command_handler _ _ =
   let available = Registration.get_registered_contexts () in
   List.iter

@@ -50,6 +50,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
         base_dir
         (String.map (function ' ' -> '_' | c -> c) alias_name ^ "s")
 
+    method get_base_dir = base_dir
+
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t =
       fun f ->
         let unlock fd =

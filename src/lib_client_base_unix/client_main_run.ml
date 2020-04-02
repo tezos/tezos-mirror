@@ -184,7 +184,6 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
 
 let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
     rpc_config =
-  Tezos_mockup_commands.Mockup_commands.set_base_dir base_dir ;
   match parsed_args with
   | None ->
       setup_http_rpc_client_config parsed_args base_dir rpc_config
