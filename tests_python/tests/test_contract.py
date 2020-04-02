@@ -270,8 +270,9 @@ class TestContracts:
          r'this expression should have type never ' +
          'but type never has no inhabitant'),
         # field annotation mismatch with UNPAIR
-        ("unpair_field_annotation_mismatch.tz",
-         r'The field access annotation does not match')
+        # Skipped until UNPAIR is promoted as instruction
+        # ("unpair_field_annotation_mismatch.tz",
+        # r'The field access annotation does not match')
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):
