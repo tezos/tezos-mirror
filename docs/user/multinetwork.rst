@@ -19,7 +19,7 @@ their own networks for various reasons. Networks differ in various ways:
   to change the protocol without going through the voting process.
 
 The current ``master`` branch is capable of connecting to multiple networks,
-including Mainnet and the test networks Carthagenet and Zeronet. By contrast,
+including Mainnet and the Carthagenet test network. By contrast,
 the ``mainnet`` branch is only capable of connecting to Mainnet,
 the ``carthagenet`` branch is only capable of connecting to Carthagenet,
 and so on. The goal is to remove the need for such branches.
@@ -47,8 +47,6 @@ the following built-in networks:
 - ``sandbox``
 
 - ``carthagenet``
-
-- ``zeronet``
 
 If you run ``tezos-node run`` or ``tezos-node snapshot import`` and your node has
 no configuration file yet, a configuration file is created and stores the value of the
