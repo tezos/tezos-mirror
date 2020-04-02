@@ -116,6 +116,10 @@ coverage-report:
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
 
+.PHONY: coverage-report-summary
+coverage-report-summary:
+	@bisect-ppx-report summary --coverage-path ${COVERAGE_OUTPUT}
+
 .PHONY: build-sandbox
 build-sandbox:
 	@dune build src/bin_sandbox/main.exe
