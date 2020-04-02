@@ -21,6 +21,10 @@ COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts
 COPY --chown=tezos:nogroup scripts/alphanet_version scripts/tezos-docker-manager.sh src/bin_client/bash-completion.sh active_protocol_versions /home/tezos/scripts/
 
+# Although alphanet.sh has been replaced by tezos-docker-manager.sh,
+# the built-in auto-update mechanism expects an alphanet.sh script to exist.
+# So we keep it for a while as a symbolic link.
+CMD ln -s tezos-docker-manager.sh /home/tezos/scripts/alphanet.sh
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug
 ARG BUILD_IMAGE
