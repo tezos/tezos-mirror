@@ -338,6 +338,9 @@ class TestContracts:
         # error message for attempting to push a value of type never
         ("never_literal.tz",
          r'type never has no inhabitant.'),
+        # field annotation mismatch with UNPAIR
+        ("unpair_field_annotation_mismatch.tz",
+         r'The field access annotation does not match'),
     ])
     def test_ill_typecheck(self, client: Client, contract, error_pattern):
         with utils.assert_run_failure(error_pattern):

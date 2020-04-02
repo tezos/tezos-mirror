@@ -635,7 +635,10 @@ class TestContractOpcodes:
             ('self_with_default_entrypoint.tz', 'Unit', 'Unit', 'Unit'),
 
             # Test SELF_ADDRESS
-            ('self_address.tz', 'Unit', 'Unit', 'Unit')
+            ('self_address.tz', 'Unit', 'Unit', 'Unit'),
+
+            # Test UNPAIR
+            ('unpair.tz', 'Unit', 'Unit', 'Unit'),
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
