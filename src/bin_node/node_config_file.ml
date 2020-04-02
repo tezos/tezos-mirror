@@ -102,22 +102,6 @@ let blockchain_network_mainnet =
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" ) ]
     ~default_bootstrap_peers:["boot.tzbeta.net"]
 
-let blockchain_network_zeronet =
-  make_blockchain_network
-    ~alias:"zeronet"
-    {
-      time = Time.Protocol.of_notation_exn "2019-08-06T15:18:56Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesiscde8db4cX94";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtBMwNZT94N7gXKw4i273CKcSaBrrBnqnt3RATExNKr9KNX2USV";
-    }
-    ~chain_name:"TEZOS_ZERONET_2019-08-06T15:18:56Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:["bootstrap.zeronet.fun"; "bootzero.tzbeta.net"]
-
 let blockchain_network_carthagenet =
   make_blockchain_network
     ~alias:"carthagenet"
@@ -219,7 +203,6 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
-    (2, blockchain_network_zeronet);
     (4, blockchain_network_mainnet);
     (6, blockchain_network_carthagenet) ]
   |> List.map (fun (tag, network) ->
