@@ -590,7 +590,7 @@ Control structures
         where f / a : []  =>  r : []
 
 -  ``APPLY``: Partially apply a tuplified function from the stack.
-   Such a lambda is packable, and thus values that cannot be packed
+   Values that are not both pushable and storable
    (values of type ``operation``, ``contract _`` and ``big map _ _``)
    cannot be captured by ``APPLY`` (cannot appear in ``'a``).
 
