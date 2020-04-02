@@ -51,4 +51,6 @@ complete -F _tezos-client_complete tezos-admin-client
 complete -F _tezos-client_complete tezos-baker-alpha
 complete -F _tezos-client_complete tezos-endorser-alpha
 complete -F _tezos-client_complete tezos-accuser-alpha
-complete -F _tezos-alphanet_complete alphanet.sh
+complete -F _tezos-alphanet_complete mainnet.sh
+complete -F _tezos-alphanet_complete carthagenet.sh
+complete -F _tezos-alphanet_complete tezos-docker-manager.sh

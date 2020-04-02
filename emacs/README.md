@@ -27,20 +27,21 @@ You must also start a tezos node to enable typechecking features.
 This option is recommended because it is faster than operating through
 the docker container.
 
-If you wish to run the Emacs mode with the alphanet script,
-use the path of the `alphanet.sh` script, plus the word `client`.
-You must also set the `michelson-alphanet` variable to be `t`.
-If you do not set this option, the mode will not work with the alphanet.
+If you wish to run the Emacs mode with one of the Docker scripts
+(mainnet.sh, carthagenet.sh...), use the path of the script, plus the
+word `client`. You must also set the `michelson-alphanet` variable to
+be `t`.  If you do not set this option, the mode will not work with
+the Docker script.
 
 Here are examples of the client configuration:
-### Without the alphanet
+### Without the Docker script
 ```elisp
 (setq michelson-client-command "~/tezos/tezos/tezos-client")
 (setq michelson-alphanet nil)
 ```
-### With the alphanet
+### With the Docker script for Carthagenet
 ```elisp
-(setq michelson-client-command "~/tezos/alphanet/alphanet.sh client")
+(setq michelson-client-command "~/tezos/alphanet/carthagenet.sh client")
 (setq michelson-alphanet t)
 ```
 

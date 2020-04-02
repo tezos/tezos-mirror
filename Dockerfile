@@ -19,7 +19,7 @@ COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-signer /home/t
 # Add entrypoint scripts
 COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts
-COPY --chown=tezos:nogroup scripts/alphanet_version scripts/alphanet.sh src/bin_client/bash-completion.sh active_protocol_versions /home/tezos/scripts/
+COPY --chown=tezos:nogroup scripts/alphanet_version scripts/tezos-docker-manager.sh src/bin_client/bash-completion.sh active_protocol_versions /home/tezos/scripts/
 
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as debug

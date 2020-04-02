@@ -611,24 +611,24 @@ warn_script_uptodate() {
        return
     fi
     docker run --entrypoint /bin/cat "$docker_image" \
-       "/usr/local/share/tezos/alphanet.sh" > ".alphanet.sh.new"
-    if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
-        echo -e "\033[33mWarning: the container contains a new version of 'alphanet.sh'.\033[0m"
+       "/usr/local/share/tezos/tezos-docker-manager.sh" > ".tezos-docker-manager.sh.new"
+    if ! diff .tezos-docker-manager.sh.new  "$0" >/dev/null 2>&1 ; then
+        echo -e "\033[33mWarning: the container contains a new version of 'tezos-docker-manager.sh'.\033[0m"
         echo -e "\033[33mYou might run '$0 update_script' to synchronize.\033[0m"
     elif [ "$1" = "verbose" ] ; then
         echo -e "\033[32mThe script is up to date.\033[0m"
     fi
-    rm .alphanet.sh.new
+    rm .tezos-docker-manager.sh.new
 }
 
 update_script() {
     docker run --entrypoint /bin/cat "$docker_image" \
-       "/usr/local/share/tezos/alphanet.sh" > ".alphanet.sh.new"
-    if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
-        mv .alphanet.sh.new "$0"
+       "/usr/local/share/tezos/tezos-docker-manager.sh" > ".tezos-docker-manager.sh.new"
+    if ! diff .tezos-docker-manager.sh.new  "$0" >/dev/null 2>&1 ; then
+        mv .tezos-docker-manager.sh.new "$0"
         echo -e "\033[32mThe script has been updated.\033[0m"
     else
-        rm .alphanet.sh.new
+        rm .tezos-docker-manager.sh.new
         echo -e "\033[32mThe script is up to date.\033[0m"
     fi
 }
@@ -671,7 +671,7 @@ usage() {
     echo "    $0 client <COMMAND>"
     echo "       Pass a command to the tezos client."
     echo "    $0 update_script"
-    echo "       Replace 'alphanet.sh' with the one found in the docker image."
+    echo "       Replace 'tezos-docker-manager.sh' with the one found in the docker image."
     echo "  Advanced commands:"
     echo "    $0 node <start|stop|status|log>"
     echo "    $0 node upgrade"

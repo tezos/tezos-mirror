@@ -27,7 +27,7 @@ The easier it is for us to understand your bug, the easier it is for us to fix.
 If you have found a potential vulnerability in the Tezos codebase and you think it should not be made public, 
 use the Tezos Bug Bounty program: https://tezos.com/bug-bounty
 
-### Environment (Alphanet, build from source, or both)
+### Environment (Mainnet, test network, build from source, ...)
 
 Please specify the version of the code you were running when the bug appeared.
 
@@ -35,9 +35,10 @@ If you've built the program from source, you can find the commit hash via the fo
 
 `git log -1 --format=format:%H`
 
-If you're running the alphanet, the status output is extremely useful:
+If you're using one of the Docker script (mainnet.sh, carthagenet.sh...),
+the status output is extremely useful:
 
-`./alphanet.sh status`
+`./mainnet.sh status`
 
 ### Summary
 
@@ -70,10 +71,11 @@ In which history mode are the node is running (full by default, archive, ...).
 
 Please include logs with your bug report whenever possible.
 
-On the alphanet, you can access the log from the node, baker, and endorser using the following commands:
-* `./alphanet.sh node log`
-* `./alphanet.sh baker log`
-* `./alphanet.sh endorser log`
+If you're using one of the Docker script (mainnet.sh, carthagenet.sh...),
+you can access the log from the node, baker, and endorser using the following commands:
+* `./mainnet.sh node log`
+* `./mainnet.sh baker log`
+* `./mainnet.sh endorser log`
 
 If you've encountered the bug when using the sandboxed node initialization scripts, there should be a file in the directory called `LOG.N`, where `N` is the number with which you started the node. 
 Please attach that log to the bug report.

@@ -23,7 +23,7 @@
   :group 'michelson-options)
 
 (defcustom michelson-alphanet nil
-  "Is the client command currently using the alphanet.sh script?"
+  "Is the client command currently using a Docker script such as mainnet.sh or carthagenet.sh?"
   :type 'boolean
   :group 'michelson-options)
 
