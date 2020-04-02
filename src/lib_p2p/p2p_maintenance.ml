@@ -195,18 +195,23 @@ let try_to_contact t min_to_contact max_to_contact =
   try_to_contact_loop t start_time min_to_contact max_to_contact ~seen_points
 
 (** not enough contacts, ask the pals of our pals,
-    discover the local network and then wait *)
+    discover the local network and then wait unless we are in private
+    mode, in which case we just wait to prevent the maintenance to loop endlessly *)
 let ask_for_more_contacts t =
-  broadcast_bootstrap_msg t.pool ;
-  Option.iter ~f:P2p_discovery.wakeup t.discovery ;
-  protect ~canceler:t.canceler (fun () ->
-      Lwt.pick
-        [ P2p_trigger.wait_new_peer t.triggers;
-          P2p_trigger.wait_new_point t.triggers;
-          (* TODO exponential back-off, or wait for the existence
+  if t.config.private_mode then
+    protect ~canceler:t.canceler (fun () ->
+        Lwt_unix.sleep time_between_looking_for_peers >>= fun () -> return_unit)
+  else (
+    broadcast_bootstrap_msg t.pool ;
+    Option.iter ~f:P2p_discovery.wakeup t.discovery ;
+    protect ~canceler:t.canceler (fun () ->
+        Lwt.pick
+          [ P2p_trigger.wait_new_peer t.triggers;
+            P2p_trigger.wait_new_point t.triggers;
+            (* TODO exponential back-off, or wait for the existence
          of a non grey-listed peer? *)
-          Lwt_unix.sleep time_between_looking_for_peers ]
-      >>= fun () -> return_unit)
+            Lwt_unix.sleep time_between_looking_for_peers ]
+        >>= fun () -> return_unit) )
 
 (** Selects [n] random connections. Ignore connections to
     nodes who are both private and trusted. *)
