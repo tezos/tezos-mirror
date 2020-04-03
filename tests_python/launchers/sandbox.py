@@ -184,6 +184,8 @@ class Sandbox:
                 "Please verify you wrapped the call to this method inside a " \
                 "with statement"
             assert self.sandbox_file is not None, assert_msg
+            node.init_id()
+            node.init_config()
             sandboxed_import = [f'--sandbox', self.sandbox_file]
             if reconstruct:
                 node.snapshot_import(snapshot,
@@ -192,8 +194,6 @@ class Sandbox:
             else:
                 node.snapshot_import(snapshot,
                                      ['--network=sandbox'] + sandboxed_import)
-            node.init_id()
-            node.init_config()
         node.run()
         client = client_factory(local_client, local_admin_client,
                                 rpc_port=rpc_node, use_tls=bool(use_tls))
