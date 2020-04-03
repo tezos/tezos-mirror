@@ -45,13 +45,20 @@ val default_config_file_name : string
 
 val default_peers_file_name : string
 
-(** [ensure_data_dir ~bare dir] performs a sanity check on [dir]. This check
-    returns successfully if either:
-    - [bare] is [false] (default) and [dir] contains a file that indicates the
-      data serialization format equal to [data_version], or
-    - [bare] is [true] and [dir] is empty (except for an [identity.json] file).
-*)
+(** Ensure that a directory is a valid data directory with the current version.
 
+    If the directory does not exist, create it and write a version file.
+
+    If the directory exists and contains no other file expect maybe:
+    - the version file;
+    - the identity file;
+    - the configuration file;
+    - the peer list file;
+    then write or overwrite the version file.
+
+    If the directory exists and contains other files than the ones listed above
+    and [bare] is [true], fail. If [bare] is [false] instead, check that
+    the version file exists and that its version is the expected one. *)
 val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
 
 (** Upgrade data directory from an older version.
