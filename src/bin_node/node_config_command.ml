@@ -60,7 +60,24 @@ let init (args : Node_shared_arg.t) =
     Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
     >>=? fun cfg ->
     Node_config_file.check cfg
-    >>= fun () -> Node_config_file.write args.config_file cfg
+    >>= fun () ->
+    Node_config_file.write args.config_file cfg
+    >>=? fun () ->
+    let default = if args.network = None then " default" else "" in
+    let alias =
+      match cfg.blockchain_network.alias with
+      | None ->
+          (* Cannot happen, as --network cannot take custom networks as arguments. *)
+          ""
+      | Some alias ->
+          ": " ^ alias
+    in
+    Format.eprintf
+      "Created %s for%s network%s.@."
+      args.config_file
+      default
+      alias ;
+    return_unit
 
 let update (args : Node_shared_arg.t) =
   if not (Sys.file_exists args.config_file) then
