@@ -26,7 +26,7 @@
 (** Unit tests for node. Currently only tests that
    events are emitted. *)
 
-let section = None
+let section = Some (Internal_event.Section.make_sanitized ["node"])
 
 let filter = Some section
 
@@ -160,6 +160,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
   (* Start tests *)
   let open Shell_test_helpers in
   let evs = Mock_sink.get_events ~filter () in
+  Alcotest.(check int) "should have one event" 1 (List.length evs) ;
   test_event
     "Should have an p2p_layer_disabled"
     (Internal_event.Notice, section, "p2p_layer_disabled")
@@ -187,6 +188,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
   (* Start tests *)
   let open Shell_test_helpers in
   let evs = Mock_sink.get_events ~filter () in
+  Alcotest.(check int) "should have two events" 2 (List.length evs) ;
   test_event
     "Should have a p2p bootstrapping event"
     (Internal_event.Notice, section, "bootstrapping")

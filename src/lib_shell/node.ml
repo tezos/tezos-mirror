@@ -29,62 +29,6 @@
 open Lwt.Infix
 open Tezos_base
 
-module Initialization_event = struct
-  type t = {
-    time_stamp : float;
-    status : [`P2p_layer_disabled | `Bootstrapping | `P2p_maintain_started];
-  }
-
-  let status_names =
-    [ ("p2p_layer_disabled", `P2p_layer_disabled);
-      ("bootstrapping", `Bootstrapping);
-      ("p2p_maintain_started", `P2p_maintain_started) ]
-
-  module Definition = struct
-    let name = "shell-node"
-
-    type nonrec t = t
-
-    let encoding =
-      let open Data_encoding in
-      let v0_encoding =
-        conv
-          (function {time_stamp; status} -> (time_stamp, status))
-          (fun (time_stamp, status) -> {time_stamp; status})
-          (obj2
-             (req "time-stamp" float)
-             (req "status" (string_enum status_names)))
-      in
-      With_version.(encoding ~name (first_version v0_encoding))
-
-    let pp ~short:_ ppf {status; _} =
-      Format.fprintf
-        ppf
-        "%s initialization: %s"
-        name
-        (List.find (fun (_, s) -> s = status) status_names |> fst)
-
-    let doc = "Status of the initialization of the P2P layer."
-
-    let level _ = Internal_event.Notice
-  end
-
-  module Event = Internal_event.Make (Definition)
-
-  let lwt_emit status =
-    let time_stamp = Unix.gettimeofday () in
-    Event.emit (fun () -> {time_stamp; status})
-    >>= function
-    | Ok () ->
-        Lwt.return_unit
-    | Error el ->
-        Format.kasprintf
-          Lwt.fail_with
-          "Initialization_event.emit: %a"
-          pp_print_error
-          el
-end
-
 type t = {
   state : State.t;
   distributed_db : Distributed_db.t;
@@ -124,13 +68,13 @@ let init_p2p chain_name p2p_params disable_mempool =
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None disable_mempool in
-      Initialization_event.lwt_emit `P2p_layer_disabled
+      Node_event.(emit_tagged p2p_event) "p2p_layer_disabled"
       >>= fun () ->
       return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) disable_mempool in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      Initialization_event.lwt_emit `Bootstrapping
+      Node_event.(emit_tagged p2p_event) "bootstrapping"
       >>= fun () ->
       P2p.create
         ~config
@@ -139,7 +83,7 @@ let init_p2p chain_name p2p_params disable_mempool =
         conn_metadata_cfg
         message_cfg
       >>=? fun p2p ->
-      Initialization_event.lwt_emit `P2p_maintain_started
+      Node_event.(emit_tagged p2p_event) "p2p_maintain_started"
       >>= fun () -> return p2p
 
 type config = {
@@ -221,55 +165,30 @@ module Local_logging = Internal_event.Legacy_logging.Make_semantic (struct
 end)
 
 let store_known_protocols state =
-  let open Local_logging in
   let embedded_protocols = Registered_protocol.list_embedded () in
   Lwt_list.iter_s
     (fun protocol_hash ->
       State.Protocol.known state protocol_hash
       >>= function
       | true ->
-          lwt_log_info
-            Tag.DSL.(
-              fun f ->
-                f "protocol %a is already in store: nothing to do"
-                -% a Protocol_hash.Logging.tag protocol_hash
-                -% t event "embedded_protocol_already_stored")
+          Node_event.(emit store_protocol_already_included) protocol_hash
       | false -> (
         match Registered_protocol.get_embedded_sources protocol_hash with
         | None ->
-            lwt_log_info
-              Tag.DSL.(
-                fun f ->
-                  f "protocol %a won't be stored: missing source files"
-                  -% a Protocol_hash.Logging.tag protocol_hash
-                  -% t event "embedded_protocol_missing_sources")
+            Node_event.(emit store_protocol_missing_files) protocol_hash
         | Some protocol -> (
             let hash = Protocol.hash protocol in
             if not (Protocol_hash.equal hash protocol_hash) then
-              lwt_log_info
-                Tag.DSL.(
-                  fun f ->
-                    f "protocol %a won't be stored: wrong hash"
-                    -% a Protocol_hash.Logging.tag protocol_hash
-                    -% t event "embedded_protocol_inconsistent_hash")
+              Node_event.(emit store_protocol_incorrect_hash) protocol_hash
             else
               State.Protocol.store state protocol
               >>= function
               | Some hash' ->
                   assert (hash = hash') ;
-                  lwt_log_info
-                    Tag.DSL.(
-                      fun f ->
-                        f "protocol %a successfully stored"
-                        -% a Protocol_hash.Logging.tag protocol_hash
-                        -% t event "embedded_protocol_stored")
+                  Node_event.(emit store_protocol_success) protocol_hash
               | None ->
-                  lwt_log_info
-                    Tag.DSL.(
-                      fun f ->
-                        f "protocol %a is already in store: nothing to do"
-                        -% a Protocol_hash.Logging.tag protocol_hash
-                        -% t event "embedded_protocol_already_stored") ) ))
+                  Node_event.(emit store_protocol_already_included)
+                    protocol_hash ) ))
     embedded_protocols
 
 type error += Non_recoverable_context
@@ -292,36 +211,19 @@ let () =
 
 let check_and_fix_storage_consistency state vp =
   let restore_context_integrity () =
-    let open Local_logging in
-    Local_logging.lwt_log_error
-      Tag.DSL.(
-        fun f ->
-          f
-            "Context corruption detected: restoring integrity. This may take \
-             a while..."
-          -% t event "corrupted_context_detected")
+    Node_event.(emit storage_corrupted_context_detected) ()
     >>= fun () ->
     (* Corrupted context for current block, backtracking head *)
     Block_validator_process.restore_context_integrity vp
     >>= function
     | Ok (Some n) ->
-        Local_logging.lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "Successfully restored context integrity - repaired %a entries"
-              -% a (Tag.def ~doc:"" "entries" Format.pp_print_int) n
-              -% t event "restored_context_integrity")
+        Node_event.(emit storage_restored_context_integrity) n
         >>= fun () -> return_unit
     | Ok None ->
-        Local_logging.lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "No corruption detected while scanning the context."
-              -% t event "context_already_consistent")
+        Node_event.(emit storage_context_already_consistent) ()
         >>= fun () -> return_unit
     | Error err ->
-        Local_logging.lwt_log_error
-          Tag.DSL.(fun f -> f "@[Error: %a@]" -% a Error_monad.errs_tag err)
+        Node_event.(emit storage_restore_context_integrity_error) err
         >>= fun () -> fail Non_recoverable_context
   in
   State.Chain.all state
@@ -445,29 +347,19 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     mainchain_state
   >>=? fun mainchain_validator ->
   let shutdown () =
-    let open Local_logging in
-    lwt_log_info
-      Tag.DSL.(
-        fun f -> f "Shutting down the p2p layer..." -% t event "shutdown")
+    Node_event.(emit shutdown_p2p_layer) ()
     >>= fun () ->
     P2p.shutdown p2p
     >>= fun () ->
-    lwt_log_info
-      Tag.DSL.(
-        fun f ->
-          f "Shutting down the distributed database..." -% t event "shutdown")
+    Node_event.(emit shutdown_ddb) ()
     >>= fun () ->
     Distributed_db.shutdown distributed_db
     >>= fun () ->
-    lwt_log_info
-      Tag.DSL.(
-        fun f -> f "Shutting down the validator..." -% t event "shutdown")
+    Node_event.(emit shutdown_validator) ()
     >>= fun () ->
     Validator.shutdown validator
     >>= fun () ->
-    lwt_log_info
-      Tag.DSL.(fun f -> f "Closing down the state..." -% t event "shutdown")
-    >>= fun () -> State.close state
+    Node_event.(emit shutdown_state) () >>= fun () -> State.close state
   in
   return
     {
