@@ -2,7 +2,7 @@ import os
 import re
 import pytest
 from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
-    all_contracts
+    all_contracts, all_legacy_contracts
 from tools import utils
 from tools.constants import IDENTITIES
 from client.client import Client
@@ -241,6 +241,15 @@ class TestContracts:
         assert contract.endswith('.tz'), \
             "test contract should have .tz extension"
         client.typecheck(os.path.join(CONTRACT_PATH, contract))
+
+    @pytest.mark.parametrize("contract", all_legacy_contracts())
+    def test_deprecated_typecheck_breaks(self, client, contract):
+        with utils.assert_run_failure(r'Use of deprecated instruction'):
+            client.typecheck(os.path.join(CONTRACT_PATH, contract))
+
+    @pytest.mark.parametrize("contract", all_legacy_contracts())
+    def test_deprecated_typecheck_in_legacy(self, client, contract):
+        client.typecheck(os.path.join(CONTRACT_PATH, contract), legacy=True)
 
     @pytest.mark.parametrize("contract,error_pattern", [
         # operations cannot be PACKed
