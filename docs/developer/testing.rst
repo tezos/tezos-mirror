@@ -230,7 +230,7 @@ References:
  - `Blog post introducing Flextesa
    <https://medium.com/@obsidian.systems/introducing-flextesa-robust-testing-tools-for-tezos-and-its-applications-edc1e336a209>`_
  - `GitLab repository <https://gitlab.com/tezos/flextesa>`_
- - `An example setting up a Babylon docker sandbox <https://assets.tqtezos.com/setup/2-sandbox>`_
+ - `An example setting up a Babylon docker sandbox <https://assets.tqtezos.com/docs/setup/2-sandbox/>`_
  - `API documentation <https://tezos.gitlab.io/flextesa/lib-index.html>`_
 
 ..
