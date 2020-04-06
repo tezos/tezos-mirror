@@ -59,6 +59,12 @@ let commands () =
   let zero_loc_switch =
     switch ~short:'z' ~long:"zero-loc" ~doc:"replace location with \"0\"" ()
   in
+  let legacy_switch =
+    switch
+      ~long:"legacy"
+      ~doc:"typecheck in legacy mode as if the data was taken from the chain"
+      ()
+  in
   let amount_arg =
     Client_proto_args.tez_arg
       ~parameter:"amount"
@@ -268,13 +274,14 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
-      (args4
+      (args5
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
-         custom_gas_flag)
+         custom_gas_flag
+         legacy_switch)
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas)
+      (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
            program
            cctxt ->
         match program with
@@ -286,6 +293,7 @@ let commands () =
               ~chain:cctxt#chain
               ~block:cctxt#block
               ~gas:original_gas
+              ~legacy
               program
             >>= fun res ->
             print_typecheck_result
@@ -316,13 +324,13 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
-      (args2 no_print_source_flag custom_gas_flag)
+      (args3 no_print_source_flag custom_gas_flag legacy_switch)
       ( prefixes ["typecheck"; "data"]
       @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
       @@ param ~name:"type" ~desc:"the expected type" data_parameter
       @@ stop )
-      (fun (no_print_source, custom_gas) data ty cctxt ->
+      (fun (no_print_source, custom_gas, legacy) data ty cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas
         >>=? fun original_gas ->
         Client_proto_programs.typecheck_data
@@ -330,6 +338,7 @@ let commands () =
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~gas:original_gas
+          ~legacy
           ~data
           ~ty
           ()
