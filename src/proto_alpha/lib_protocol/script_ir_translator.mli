@@ -222,9 +222,10 @@ val add_field_annot :
   Script.node
 
 val typecheck_code :
-  context -> Script.expr -> (type_map * context) tzresult Lwt.t
+  legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
 
 val typecheck_data :
+  legacy:bool ->
   ?type_logger:type_logger ->
   context ->
   Script.expr * Script.expr ->

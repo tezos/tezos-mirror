@@ -107,7 +107,11 @@ module Scripts = struct
       RPC_service.post_service
         ~description:"Typecheck a piece of code in the current context"
         ~query:RPC_query.empty
-        ~input:(obj2 (req "program" Script.expr_encoding) (opt "gas" z))
+        ~input:
+          (obj3
+             (req "program" Script.expr_encoding)
+             (opt "gas" z)
+             (opt "legacy" bool))
         ~output:
           (obj2
              (req "type_map" Script_tc_errors_registration.type_map_enc)
@@ -121,10 +125,11 @@ module Scripts = struct
            in the current context"
         ~query:RPC_query.empty
         ~input:
-          (obj3
+          (obj4
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
-             (opt "gas" z))
+             (opt "gas" z)
+             (opt "legacy" bool))
         ~output:(obj1 (req "gas" Gas.encoding))
         RPC_path.(path / "typecheck_data")
 
@@ -306,7 +311,8 @@ module Scripts = struct
         >>=? fun ( {Script_interpreter.storage; operations; big_map_diff; _},
                    trace ) ->
         return (storage, operations, trace, big_map_diff)) ;
-    register0 S.typecheck_code (fun ctxt () (expr, maybe_gas) ->
+    register0 S.typecheck_code (fun ctxt () (expr, maybe_gas, legacy) ->
+        let legacy = Option.unopt ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None ->
@@ -314,9 +320,10 @@ module Scripts = struct
           | Some gas ->
               Gas.set_limit ctxt gas
         in
-        Script_ir_translator.typecheck_code ctxt expr
+        Script_ir_translator.typecheck_code ~legacy ctxt expr
         >>=? fun (res, ctxt) -> return (res, Gas.level ctxt)) ;
-    register0 S.typecheck_data (fun ctxt () (data, ty, maybe_gas) ->
+    register0 S.typecheck_data (fun ctxt () (data, ty, maybe_gas, legacy) ->
+        let legacy = Option.unopt ~default:false legacy in
         let ctxt =
           match maybe_gas with
           | None ->
@@ -324,7 +331,7 @@ module Scripts = struct
           | Some gas ->
               Gas.set_limit ctxt gas
         in
-        Script_ir_translator.typecheck_data ctxt (data, ty)
+        Script_ir_translator.typecheck_data ~legacy ctxt (data, ty)
         >>=? fun ctxt -> return (Gas.level ctxt)) ;
     register0 S.pack_data (fun ctxt () (expr, typ, maybe_gas) ->
         let open Script_ir_translator in

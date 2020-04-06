@@ -77,13 +77,13 @@ module Scripts : sig
   val typecheck_code :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Z.t option ->
+    Script.expr * Z.t option * bool option ->
     (Script_tc_errors.type_map * Gas.t) shell_tzresult Lwt.t
 
   val typecheck_data :
     'a #RPC_context.simple ->
     'a ->
-    Script.expr * Script.expr * Z.t option ->
+    Script.expr * Script.expr * Z.t option * bool option ->
     Gas.t shell_tzresult Lwt.t
 
   val pack_data :

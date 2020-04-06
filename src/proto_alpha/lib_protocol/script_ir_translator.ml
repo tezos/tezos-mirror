@@ -4911,9 +4911,11 @@ let parse_script :
   return (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
 let typecheck_code :
-    context -> Script.expr -> (type_map * context) tzresult Lwt.t =
- fun ctxt code ->
-  let legacy = false in
+    legacy:bool ->
+    context ->
+    Script.expr ->
+    (type_map * context) tzresult Lwt.t =
+ fun ~legacy ctxt code ->
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
   let type_map = ref [] in
@@ -4969,12 +4971,12 @@ let typecheck_code :
   >>=? fun (Lam _, ctxt) -> return (!type_map, ctxt)
 
 let typecheck_data :
+    legacy:bool ->
     ?type_logger:type_logger ->
     context ->
     Script.expr * Script.expr ->
     context tzresult Lwt.t =
- fun ?type_logger ctxt (data, exp_ty) ->
-  let legacy = false in
+ fun ~legacy ?type_logger ctxt (data, exp_ty) ->
   trace
     (Ill_formed_type (None, exp_ty, 0))
     (Lwt.return @@ parse_parameter_ty ctxt ~legacy (root exp_ty))
