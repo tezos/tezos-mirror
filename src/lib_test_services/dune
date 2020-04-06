@@ -1,0 +1,12 @@
+(library
+ (name tezos_test_services)
+ (public_name tezos-test-services)
+ (libraries tezos-base
+            alcotest-lwt)
+ (flags (:standard -linkall
+          -open Tezos_base__TzPervasives)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

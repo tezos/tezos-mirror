@@ -1084,6 +1084,11 @@ opam:tezos-storage:
   variables:
     package: tezos-storage
 
+opam:tezos-test-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-test-services
+
 opam:tezos-tooling:
   <<: *opam_definition
   variables:
