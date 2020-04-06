@@ -45,7 +45,7 @@ type tc_context =
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
-      root_name : string option;
+      root_name : field_annot option;
       legacy_create_contract_literal : bool;
     }
       -> tc_context
@@ -1803,7 +1803,7 @@ type ('arg, 'storage) code = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage_type : 'storage ty;
-  root_name : string option;
+  root_name : field_annot option;
 }
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
@@ -1875,7 +1875,8 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     error (Entrypoint_name_too_long entrypoint)
   else
     match root_name with
-    | Some root_name when Compare.String.(entrypoint = root_name) ->
+    | Some (Field_annot root_name) when Compare.String.(entrypoint = root_name)
+      ->
         ok ((fun e -> e), Ex_ty full)
     | _ -> (
       try ok (find_entrypoint full entrypoint)
@@ -1890,7 +1891,7 @@ let find_entrypoint_for_type (type full exp) ~legacy ~(full : full ty)
     ~(expected : exp ty) ~root_name entrypoint ctxt loc :
     (context * string * exp ty) tzresult =
   match (entrypoint, root_name) with
-  | ("default", Some "root") -> (
+  | ("default", Some (Field_annot "root")) -> (
     match find_entrypoint full ~root_name entrypoint with
     | Error _ as err ->
         err
@@ -1964,9 +1965,9 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   try
     let (init, reachable) =
       match root_name with
-      | None | Some "" ->
+      | None | Some (Field_annot "") ->
           (Entrypoints.empty, false)
-      | Some name ->
+      | Some (Field_annot name) ->
           (Entrypoints.singleton name, true)
     in
     let (first_unreachable, all) = check full [] reachable (None, init) in
@@ -4730,7 +4731,7 @@ and parse_contract_for_script :
 and parse_toplevel :
     legacy:bool ->
     Script.expr ->
-    (Script.node * Script.node * Script.node * string option) tzresult =
+    (Script.node * Script.node * Script.node * field_annot option) tzresult =
  fun ~legacy toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
@@ -4797,17 +4798,15 @@ and parse_toplevel :
             Script_ir_annot.extract_field_annot p
             >>? fun (p, root_name) ->
             match root_name with
-            | Some (Field_annot root_name) ->
-                ok (p, pannot, Some root_name)
+            | Some _ ->
+                ok (p, pannot, root_name)
             | None -> (
               match pannot with
               | [single]
                 when Compare.Int.(String.length single > 0)
                      && Compare.Char.(single.[0] = '%') ->
-                  ok
-                    ( p,
-                      [],
-                      Some (String.sub single 1 (String.length single - 1)) )
+                  parse_field_annot ploc [single]
+                  >>? fun pannot -> ok (p, [], pannot)
               | _ ->
                   ok (p, pannot, None) )
           in
@@ -5061,9 +5060,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
-    | None | Some "" ->
+    | None | Some (Field_annot "") ->
         (Entrypoints_map.empty, false)
-    | Some name ->
+    | Some (Field_annot name) ->
         (Entrypoints_map.singleton name ([], unparsed_full), true)
   in
   fold_tree full [] reachable ([], init)
@@ -5351,12 +5350,7 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
   >>=? fun (arg_type, ctxt) ->
   unparse_ty ctxt storage_type
   >>=? fun (storage_type, ctxt) ->
-  let arg_type =
-    add_field_annot
-      (Option.map ~f:(fun n -> Field_annot n) root_name)
-      None
-      arg_type
-  in
+  let arg_type = add_field_annot root_name None arg_type in
   let open Micheline in
   let code =
     Seq

@@ -365,16 +365,12 @@ let extract_field_annot :
             else extract_first (s :: acc) rest
       in
       let (field_annot, annot) = extract_first [] annot in
-      let field_annot =
-        match field_annot with
-        | None ->
-            None
-        | Some field_annot ->
-            Some
-              (Field_annot
-                 (String.sub field_annot 1 (String.length field_annot - 1)))
-      in
-      ok (Prim (loc, prim, args, annot), field_annot)
+      ( match field_annot with
+      | None ->
+          ok None
+      | Some field_annot ->
+          parse_field_annot loc [field_annot] )
+      >>? fun field_annot -> ok (Prim (loc, prim, args, annot), field_annot)
   | expr ->
       ok (expr, None)
 

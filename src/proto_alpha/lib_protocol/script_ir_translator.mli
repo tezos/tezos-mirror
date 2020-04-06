@@ -46,7 +46,7 @@ type ('arg, 'storage) code = {
     Script_typed_ir.lambda;
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
-  root_name : string option;
+  root_name : Script_typed_ir.field_annot option;
 }
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
@@ -57,7 +57,7 @@ type tc_context =
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
-      root_name : string option;
+      root_name : Script_typed_ir.field_annot option;
       legacy_create_contract_literal : bool;
     }
       -> tc_context
@@ -219,7 +219,8 @@ val unparse_ty :
 val parse_toplevel :
   legacy:bool ->
   Script.expr ->
-  (Script.node * Script.node * Script.node * string option) tzresult
+  (Script.node * Script.node * Script.node * Script_typed_ir.field_annot option)
+  tzresult
 
 val add_field_annot :
   Script_typed_ir.field_annot option ->
@@ -287,7 +288,7 @@ val parse_contract_for_script :
 
 val find_entrypoint :
   't Script_typed_ir.ty ->
-  root_name:string option ->
+  root_name:Script_typed_ir.field_annot option ->
   string ->
   ((Script.node -> Script.node) * ex_ty) tzresult
 
@@ -296,7 +297,7 @@ module Entrypoints_map : S.MAP with type key = string
 val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
-  root_name:string option ->
+  root_name:Script_typed_ir.field_annot option ->
   ( Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t )
   tzresult

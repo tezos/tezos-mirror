@@ -104,7 +104,7 @@ type ('arg, 'storage) script = {
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
-  root_name : string option;
+  root_name : field_annot option;
 }
 
 and end_of_stack = unit
@@ -362,7 +362,7 @@ and ('bef, 'aft) instr =
       'g ty
       * 'p ty
       * ('p * 'g, operation boxed_list * 'g) lambda
-      * string option
+      * field_annot option
       -> ( public_key_hash
            * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
            operation * (address * 'rest) )
@@ -371,7 +371,7 @@ and ('bef, 'aft) instr =
       'g ty
       * 'p ty
       * ('p * 'g, operation boxed_list * 'g) lambda
-      * string option
+      * field_annot option
       -> ( public_key_hash option * (Tez.t * ('g * 'rest)),
            operation * (address * 'rest) )
          instr
