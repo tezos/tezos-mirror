@@ -5,7 +5,7 @@ module Small_utilities = struct
   let key_of_name_command () =
     let open Cmdliner in
     let open Term in
-    ( ( pure (fun n ->
+    ( ( const (fun n ->
             let open Tezos_protocol.Account in
             let account = of_name n in
             Fmt.pr
@@ -38,7 +38,7 @@ module Small_utilities = struct
     let open Term in
     Test_command_line.Run_command.make
       ~pp_error
-      ( pure (fun state ->
+      ( const (fun state ->
             ( state,
               fun () ->
                 Helpers.Netstat.used_listening_ports state
@@ -72,7 +72,7 @@ end
 
 let () =
   let open Cmdliner in
-  let help = Term.(ret (pure (`Help (`Auto, None))), info "help") in
+  let help = Term.(ret (const (`Help (`Auto, None))), info "help") in
   let pp_error = Flextesa.Test_command_line.Common_errors.pp in
   Term.exit
   @@ Term.eval_choice

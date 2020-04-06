@@ -203,7 +203,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
           state
           ~make_admin
           ~clients:(List.map nodes ~f:(Tezos_client.of_node ~exec:client_exec))) ;
-  (* 
+  (*
      For each node we try to see if the node knows about the protocol,
      if it does we're good, if not we inject it.
      This is because `inject` fails when the node already knows a protocol.
@@ -499,7 +499,7 @@ let cmd () =
          and hence stay on the same protocol." ) ]
   in
   let term =
-    pure
+    const
       (fun size
            base_port
            (`Attempts waiting_attempts)
@@ -558,7 +558,7 @@ let cmd () =
         value & opt int 20_000
         & info ["base-port"; "P"] ~docs ~doc:"Base port number to build upon.")
     $ Arg.(
-        pure (fun n -> `Attempts n)
+        const (fun n -> `Attempts n)
         $ value
             (opt
                int
@@ -569,7 +569,7 @@ let cmd () =
                   ~doc:
                     "Number of attempts done while waiting for voting periods")))
     $ Arg.(
-        pure (fun l -> `External_peers l)
+        const (fun l -> `External_peers l)
         $ value
             (opt_all
                int
@@ -580,7 +580,7 @@ let cmd () =
                   ~docs
                   ~doc:"Add $(docv) to the peers of the network nodes.")))
     $ Arg.(
-        pure (fun l -> `No_daemons_for l)
+        const (fun l -> `No_daemons_for l)
         $ value
             (opt_all
                string
@@ -601,7 +601,7 @@ let cmd () =
     $ Tezos_executable.cli_term base_state `Endorser "second"
     $ Tezos_executable.cli_term base_state `Accuser "second"
     $ Arg.(
-        pure (fun p -> `Protocol_path (Caml.Filename.dirname p))
+        const (fun p -> `Protocol_path (Caml.Filename.dirname p))
         $ required
             (pos
                0
@@ -613,7 +613,7 @@ let cmd () =
                   ~doc:"The protocol to inject and vote on."
                   ~docv:"PROTOCOL-PATH")))
     $ Arg.(
-        pure (fun l -> `Extra_dummy_proposals_batch_size l)
+        const (fun l -> `Extra_dummy_proposals_batch_size l)
         $ value
             (opt
                int
@@ -624,7 +624,7 @@ let cmd () =
                   ~docv:"NUMBER"
                   ~doc:"Submit $(docv) extra proposals per batch.")))
     $ Arg.(
-        pure (fun x -> `Extra_dummy_proposals_batch_levels x)
+        const (fun x -> `Extra_dummy_proposals_batch_levels x)
         $ value
             (opt
                (list ~sep:',' int)

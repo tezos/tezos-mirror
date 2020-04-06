@@ -811,7 +811,7 @@ let cmd () =
   in
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
-    pure
+    const
       (fun winner_path
            demo_path
            node_exec
@@ -847,7 +847,7 @@ let cmd () =
                 ~protocol
                 ?with_ledger)))
     $ Arg.(
-        pure Caml.Filename.dirname
+        const Caml.Filename.dirname
         $ required
             (pos
                0
@@ -861,7 +861,7 @@ let cmd () =
                     "The protocol to inject and make win the election, e.g. \
                      `src/proto_004_Pt24m4xi/lib_protocol/src/TEZOS_PROTOCOL`.")))
     $ Arg.(
-        pure Caml.Filename.dirname
+        const Caml.Filename.dirname
         $ required
             (pos
                1
@@ -882,7 +882,7 @@ let cmd () =
     $ Tezos_executable.cli_term base_state `Client "winner"
     $ Arg.(value (opt int 5 (info ["size"; "S"] ~doc:"Size of the Network.")))
     $ Arg.(
-        pure (fun b -> `Clueless_winner b)
+        const (fun b -> `Clueless_winner b)
         $ value
             (flag
                (info
@@ -893,7 +893,7 @@ let cmd () =
                      protocol.")))
     (*
 $ Arg.(
-        pure (fun p -> `Hash p)
+        const (fun p -> `Hash p)
         $ value
             (opt
                (some string)
@@ -903,14 +903,14 @@ $ Arg.(
                   ~doc:"The hash to advertise as the current protocol.")))
  *)
     $ Arg.(
-        pure (fun p -> `Base_port p)
+        const (fun p -> `Base_port p)
         $ value
             (opt
                int
                46_000
                (info ~docs ["base-port"] ~doc:"Base port number to build upon.")))
     $ Arg.(
-        pure (fun x -> `With_ledger x)
+        const (fun x -> `With_ledger x)
         $ value
             (opt
                (some string)
@@ -923,7 +923,7 @@ $ Arg.(
                     "Do the test with a Ledger Nano device as one of the \
                      bakers/voters.")))
     $ Arg.(
-        pure (fun x -> `Serialize_proposals x)
+        const (fun x -> `Serialize_proposals x)
         $ value
             (flag
                (info

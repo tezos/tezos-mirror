@@ -987,7 +987,7 @@ module Wallet_scenario = struct
     in
     let open Cmdliner in
     let open Term in
-    pure make
+    const make
     $ Arg.(
         value
           (flag (info ["no-rejections"] ~doc:"Do not test ledger rejections.")))
@@ -1350,7 +1350,7 @@ let cmd () =
   in
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
-    pure
+    const
       (fun uri
            node_exec
            client_exec
@@ -1391,7 +1391,7 @@ let cmd () =
     $ Tezos_executable.cli_term base_state `Admin "tezos"
     $ Arg.(value (opt int 2 (info ["size"; "S"] ~doc:"Size of the Network")))
     $ Arg.(
-        pure (fun p -> `Base_port p)
+        const (fun p -> `Base_port p)
         $ value
             (opt
                int

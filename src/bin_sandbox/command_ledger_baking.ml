@@ -498,7 +498,7 @@ let cmd () =
   in
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
-    pure
+    const
       (fun uri
            node_exec
            client_exec
@@ -539,7 +539,7 @@ let cmd () =
     $ Arg.(
         value (opt int 5 (info ["size"; "S"] ~docs ~doc:"Size of the Network")))
     $ Arg.(
-        pure (fun p -> `Base_port p)
+        const (fun p -> `Base_port p)
         $ value
             (opt
                int

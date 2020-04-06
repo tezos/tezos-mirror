@@ -797,7 +797,7 @@ let cmd () =
             accusation.") ]
   in
   let term =
-    pure
+    const
       (fun test
            base_port
            (`Starting_level starting_level)
@@ -861,7 +861,7 @@ let cmd () =
         value & opt int 30_000
         & info ["base-port"] ~docs ~doc:"Base port number to build upon.")
     $ Arg.(
-        pure (fun l -> `Starting_level l)
+        const (fun l -> `Starting_level l)
         $ value
             (opt
                int

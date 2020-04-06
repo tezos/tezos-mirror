@@ -36,7 +36,7 @@ let cmd () =
       ~command_name:"prevalidation"
       ()
   in
-  ( pure (fun bnod bcli state ->
+  ( const (fun bnod bcli state ->
         Test_command_line.Run_command.or_hard_fail
           state
           ~pp_error
