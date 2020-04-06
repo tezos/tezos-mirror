@@ -3,10 +3,12 @@
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-requester
+            tezos-test-services
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib
-                   -open Tezos_requester)))
+                   -open Tezos_requester
+                   -open Tezos_test_services)))
 
 
 (alias

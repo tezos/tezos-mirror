@@ -104,7 +104,7 @@ module Test_precheck = struct
 
   type value = test_value
 
-  let precheck (_k : key) (p : param) (nv : notified_value) =
+  let precheck (_ : key) (p : param) (nv : notified_value) =
     if p = precheck_pass then Some nv else None
 end
 
@@ -117,7 +117,7 @@ module Test_request = struct
 
   let initial_delay = Time.System.Span.of_seconds_exn 0.01
 
-  let active (_p : param) = P2p_peer.Set.of_list [P2p_peer.Id.zero]
+  let active (_ : param) = P2p_peer.Set.of_list [P2p_peer.Id.zero]
 
   let registered_requests : (param * P2p_peer.Id.t * key list) list ref =
     ref []
@@ -151,55 +151,16 @@ let init_full_requester_disk ?global_input () :
 let init_full_requester ?global_input () : Test_Requester.t =
   fst (init_full_requester_disk ?global_input ())
 
-(** Alcotest testable instantiations *)
+(** [] extends [Test_services] with Requester-specific
+   Alcotest testable instantiations *)
 
-let testable_exception = Alcotest.testable Fmt.exn ( = )
+open Test_services
 
-let testable_trace : trace Alcotest.testable =
-  Alcotest.testable pp_print_error ( = )
-
-let testable_tzresults (type a) (t : a Alcotest.testable) :
-    a tzresult Alcotest.testable =
-  Alcotest.result t testable_trace
-
-let testable_test_value = Alcotest.int
+let testable_test_value : test_value Alcotest.testable = Alcotest.int
 
 let testable_test_key : test_key Alcotest.testable = Alcotest.string
 
-let testable_p2p_peer_id : P2p_peer.Id.t Alcotest.testable =
-  Alcotest.testable P2p_peer.Id.pp P2p_peer.Id.equal
-
-let testable_map (type a b) (f : b -> a) (t : a Alcotest.testable) :
-    b Alcotest.testable =
-  let pp fmt v = Alcotest.pp t fmt (f v) in
-  let meq b1 b2 = Alcotest.equal t (f b1) (f b2) in
-  Alcotest.testable pp meq
-
-let testable_pair3 (type a b c) (t : (a * (b * c)) Alcotest.testable) :
-    (a * b * c) Alcotest.testable =
-  let nest ((x, y, z) : a * b * c) : a * (b * c) = (x, (y, z)) in
-  testable_map nest t
-
-let testable_tuple3 ta tb tc : ('a * 'b * 'c) Alcotest.testable =
-  testable_pair3 Alcotest.(pair ta (pair tb tc))
-
 (** Test helpers *)
-
-let alcotest_assert str b = Alcotest.(check bool) str true b
-
-let alcotest_assert_false str b = Alcotest.(check bool) str false b
-
-let lwt_alcotest_assert str b = Lwt.return (alcotest_assert str b)
-
-let lwt_alcotest_assert_false str b = Lwt.return (alcotest_assert_false str b)
-
-let lwt_alcotest_fail str = Lwt.return (Alcotest.(check bool) str false true)
-
-let lwt_assert_catch (p : unit -> 'a Lwt.t) (e : exn) =
-  let catcher e' = Lwt.return (Alcotest.check testable_exception "foo" e e') in
-  Lwt.catch p catcher
-  >>= fun () ->
-  lwt_alcotest_fail ("Expected an exception " ^ Printexc.to_string e)
 
 (** Lwt helpers *)
 
@@ -219,7 +180,7 @@ let test_full_requester_create _ () =
   >>= fun _ ->
   Test_Requester.known requester "foo"
   >>= fun r ->
-  alcotest_assert "injected value is known" r ;
+  assert_true "injected value is known" r ;
   Lwt.return_unit
 
 (* Testing creating a full requester with a Lwt_watcher global_input,
@@ -246,7 +207,8 @@ let test_full_requester_create_with_global_input _ () =
   >>= fun _ ->
   Lwt_stream.nget 2 stream
   >>= fun stream_list ->
-  Alcotest.(check (list (pair string int)))
+  check
+    (list (pair string int))
     "obtained stream"
     [("foo", 1); ("bar", 2)]
     stream_list ;
@@ -256,59 +218,52 @@ let test_full_requester_create_with_global_input _ () =
 let test_read_known_read_opt _ () =
   let requester = init_full_requester () in
   Test_Requester.known requester "baz"
-  >>= lwt_alcotest_assert_false "empty requester has no values"
+  >>= lwt_assert_false "empty requester has no values"
   >>= fun () ->
   Test_Requester.read requester "baz"
   >>= fun r ->
-  Alcotest.check
-    (testable_tzresults testable_test_value)
+  check
+    (tzresults testable_test_value)
     "missing data"
     (Error [Test_Requester.Missing_data "baz"; Exn Not_found])
     r ;
   Test_Requester.read_opt requester "baz"
   >>= fun ro ->
-  Alcotest.(check (option testable_test_value)) "should be none" None ro ;
+  check (option testable_test_value) "should be none" None ro ;
   Test_Requester.inject requester "baz" 1
   >>= fun _ ->
   Test_Requester.known requester "baz"
-  >>= lwt_alcotest_assert "baz is now known"
+  >>= lwt_assert_true "baz is now known"
   >>= fun () ->
   Test_Requester.read requester "baz"
   >>= fun r ->
-  Alcotest.check
-    (testable_tzresults testable_test_value)
-    "baz can be read"
-    (Ok 1)
-    r ;
+  check (tzresults testable_test_value) "baz can be read" (Ok 1) r ;
   Test_Requester.read_opt requester "baz"
   >>= fun ro ->
-  Alcotest.(check (option testable_test_value))
-    "read_opt baz is (Some 1)"
-    (Some 1)
-    ro ;
+  check (option testable_test_value) "read_opt baz is (Some 1)" (Some 1) ro ;
   Lwt.return_unit
 
 let test_full_requester_disk_found_value _ () =
   let (requester, store) = init_full_requester_disk () in
   Test_Requester.known requester "boo"
-  >>= lwt_alcotest_assert_false "empty requester has no values"
+  >>= lwt_assert_false "empty requester has no values"
   >>= fun () ->
   (* add initial value 'boo' to disk requester *)
   Test_disk_table_hash.add store "boo" 15 ;
   Test_disk_table_hash.known store "boo"
-  >>= lwt_alcotest_assert "disk now knows value"
+  >>= lwt_assert_true "disk now knows value"
   >>= fun () ->
   (* now, fetching the value from disk requesters it in memory *)
   Test_Requester.known requester "boo"
-  >>= lwt_alcotest_assert "requester now knows value"
+  >>= lwt_assert_true "requester now knows value"
 
 let test_full_requester_fetch_timeout _ () =
   let requester = init_full_requester () in
   let do_timeout t v =
     Test_Requester.fetch ~timeout:t requester v precheck_pass
     >>= fun res ->
-    Alcotest.check
-      (testable_tzresults testable_test_value)
+    check
+      (tzresults testable_test_value)
       "should timeout"
       (Error [Test_Requester.Timeout v])
       res ;
@@ -321,10 +276,8 @@ let test_full_requester_fetch_timeout _ () =
 let test_full_fetch_issues_request _ () =
   let requester = init_full_requester () in
   Test_request.clear_registered_requests () ;
-  Alcotest.(
-    check
-      (list
-         (testable_tuple3 unit testable_p2p_peer_id (list testable_test_key))))
+  check
+    (list (tuple3 unit p2p_peer_id (list testable_test_key)))
     "should have no requests"
     []
     !Test_request.registered_requests ;
@@ -338,12 +291,13 @@ let test_full_fetch_issues_request _ () =
   f1
   >>= fun _ ->
   (* expects 5 requests *)
-  Alcotest.(check int)
+  check
+    int
     "expects 5 requests"
     5
     (List.length !Test_request.registered_requests) ;
-  Alcotest.(
-    check (testable_tuple3 unit testable_p2p_peer_id (list testable_test_key)))
+  check
+    (tuple3 unit p2p_peer_id (list testable_test_key))
     "should have sent a request"
     ((), P2p_peer.Id.zero, ["baz"])
     (List.hd !Test_request.registered_requests) ;
@@ -355,32 +309,30 @@ let test_clear_or_cancel_removes _ () =
   Test_Requester.inject requester "foo" 1
   >>= (fun _ -> Test_Requester.known requester "foo")
   >>= fun r ->
-  alcotest_assert "injected value is known" r ;
+  assert_true "injected value is known" r ;
   Test_Requester.clear_or_cancel requester "foo" ;
   Test_Requester.known requester "foo"
-  >>= fun r -> lwt_alcotest_assert_false "injected value is cleared" r
+  >>= fun r -> lwt_assert_false "injected value is cleared" r
 
 let test_clear_or_cancel_cancels _ () =
   let requester = init_full_requester () in
   (* request "foo" *)
   Test_Requester.known requester "foo"
-  >>= lwt_alcotest_assert_false "injected value is not known"
+  >>= lwt_assert_false "injected value is not known"
   >>= fun () ->
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
-  alcotest_assert
-    "value is now pending"
-    (Test_Requester.pending requester "foo") ;
+  assert_true "value is now pending" (Test_Requester.pending requester "foo") ;
   Test_Requester.clear_or_cancel requester "foo" ;
-  alcotest_assert_false
+  assert_false
     "value is no longer pending after cancellation"
     (Test_Requester.pending requester "foo") ;
   Test_Requester.known requester "foo"
   >>= fun r ->
-  alcotest_assert_false "injected value is cleared" r ;
+  assert_false "injected value is cleared" r ;
   f1
   >>= fun res ->
-  Alcotest.check
-    (testable_tzresults testable_test_value)
+  check
+    (tzresults testable_test_value)
     "fetch returns cancellation"
     (Error [Test_Requester.Canceled "foo"])
     res ;
@@ -391,38 +343,38 @@ let test_clear_or_cancel_cancels _ () =
 (* Test that values are not pending after cancellation *)
 let test_pending_cancelled _ () =
   let requester = init_full_requester () in
-  alcotest_assert_false
+  assert_false
     "value is not pending initially"
     (Test_Requester.pending requester "foo") ;
   ignore (Test_Requester.fetch requester "foo" precheck_pass) ;
-  alcotest_assert
+  assert_true
     "value is pending after fetch"
     (Test_Requester.pending requester "foo") ;
   Test_Requester.clear_or_cancel requester "foo" ;
-  lwt_alcotest_assert_false
+  lwt_assert_false
     "value is no longer pending after cancellation"
     (Test_Requester.pending requester "foo")
 
 (* Test that values are not pending after notification *)
 let test_pending_notified _ () =
   let requester = init_full_requester () in
-  alcotest_assert_false
+  assert_false
     "value is not pending initially"
     (Test_Requester.pending requester "foo") ;
   ignore (Test_Requester.fetch requester "foo" precheck_pass) ;
-  alcotest_assert
+  assert_true
     "value is pending after fetch"
     (Test_Requester.pending requester "foo") ;
   Test_Requester.notify requester P2p_peer.Id.zero "foo" 1
   >>= fun () ->
-  lwt_alcotest_assert_false
+  lwt_assert_false
     "value is no longer pending after notification"
     (Test_Requester.pending requester "foo")
 
 (* Test that values are not pending after timeout *)
 let test_pending_timeout _ () =
   let requester = init_full_requester () in
-  alcotest_assert_false
+  assert_false
     "value is not pending initially"
     (Test_Requester.pending requester "foo") ;
   let f1 =
@@ -432,13 +384,13 @@ let test_pending_timeout _ () =
       "foo"
       precheck_pass
   in
-  alcotest_assert
+  assert_true
     "value is pending after fetch"
     (Test_Requester.pending requester "foo") ;
   f1
   >>= fun res ->
   assert (res = Error [Test_Requester.Timeout "foo"]) ;
-  lwt_alcotest_assert_false
+  lwt_assert_false
     "value is no longer pending after timeout"
     (Test_Requester.pending requester "foo")
 
@@ -463,7 +415,8 @@ let test_full_requester_test_simple_watch _ () =
   >>= fun _ ->
   Lwt_stream.nget 2 stream
   >>= fun stream_list ->
-  Alcotest.(check (list (pair string int)))
+  check
+    (list (pair string int))
     "obtained stream"
     [("foo", 1); ("bar", 2)]
     stream_list ;
@@ -480,7 +433,7 @@ let test_full_requester_test_notify_non_fetched_watch _ () =
   >>= fun () ->
   Lwt_watcher.shutdown stopper ;
   Lwt_stream.is_empty stream
-  >>= lwt_alcotest_assert "obtained stream should be empty"
+  >>= lwt_assert_true "obtained stream should be empty"
 
 (* Add two watchers, verify that both receive notified values.
  * Stop one watcher, verify that the remaining receives notified values. *)
@@ -499,17 +452,11 @@ let test_full_requester_test_double_watcher _ () =
   (* check first stream *)
   Lwt_stream.nget 1 stream1
   >>= fun stream_list1 ->
-  Alcotest.(check (list (pair string int)))
-    "obtained stream1"
-    [("foo", 1)]
-    stream_list1 ;
+  (check (list (pair string int))) "obtained stream1" [("foo", 1)] stream_list1 ;
   (* check second stream *)
   Lwt_stream.nget 1 stream2
   >>= fun stream_list2 ->
-  Alcotest.(check (list (pair string int)))
-    "obtained stream2"
-    [("foo", 1)]
-    stream_list2 ;
+  (check (list (pair string int))) "obtained stream2" [("foo", 1)] stream_list2 ;
   (* shutdown first stream *)
   Lwt_watcher.shutdown stopper1 ;
   (* Fetch a values *)
@@ -521,11 +468,11 @@ let test_full_requester_test_double_watcher _ () =
   f2
   >>= fun _ ->
   (* verify that the first stream is empty *)
-  alcotest_assert "stream1 is empty" (Lwt_stream.is_closed stream1) ;
+  assert_true "stream1 is empty" (Lwt_stream.is_closed stream1) ;
   (* check second stream received the value *)
   Lwt_stream.nget 1 stream2
   >>= fun stream_list2 ->
-  Alcotest.(check (list (pair string int)))
+  (check (list (pair string int)))
     "obtained second value in stream2 "
     [("bar", 2)]
     stream_list2 ;
@@ -539,20 +486,20 @@ let test_full_requester_test_double_watcher _ () =
 let test_full_requester_test_inject_memory _ () =
   let req = init_full_requester () in
   Test_Requester.inject req "foo" 1
-  >>= lwt_alcotest_assert "Inject is true  first time"
+  >>= lwt_assert_true "Inject is true  first time"
   >>= fun () ->
   Test_Requester.inject req "foo" 1
-  >>= lwt_alcotest_assert_false "Inject is false second time"
+  >>= lwt_assert_false "Inject is false second time"
   >>= fun () ->
   Test_Requester.inject req "foo" 2
-  >>= lwt_alcotest_assert_false "Inject is false third time with new value"
+  >>= lwt_assert_false "Inject is false third time with new value"
 
 (* Test injecting a value present on disk: false should be returned. *)
 let test_full_requester_test_inject_disk _ () =
   let (req, store) = init_full_requester_disk () in
   Test_disk_table_hash.add store "foo" 1 ;
   Test_Requester.inject req "foo" 1
-  >>= lwt_alcotest_assert_false "Inject is false when present on disk"
+  >>= lwt_assert_false "Inject is false when present on disk"
 
 (* Test injecting a value already requested: false should be returned. *)
 let test_full_requester_test_inject_requested _ () =
@@ -560,7 +507,7 @@ let test_full_requester_test_inject_requested _ () =
   (* Fetch a value *)
   ignore (Test_Requester.fetch req "foo" precheck_pass) ;
   Test_Requester.inject req "foo" 1
-  >>= lwt_alcotest_assert_false "Inject is false when already requested"
+  >>= lwt_assert_false "Inject is false when already requested"
   >>= fun () ->
   Test_Requester.clear_or_cancel req "foo" ;
   Lwt.return_unit
@@ -569,7 +516,7 @@ let test_full_requester_test_inject_requested _ () =
 let test_full_requester_test_inject _ () =
   let req = init_full_requester () in
   Test_Requester.inject req "foo" 1
-  >>= lwt_alcotest_assert
+  >>= lwt_assert_true
         "Inject is true if value not in disk/mem/already requested"
   >>= fun () -> Lwt.return_unit
 
@@ -580,7 +527,7 @@ let test_full_requester_test_inject _ () =
 let test_full_requester_test_notify_invalid _ () =
   let req = init_full_requester () in
   Test_Requester.known req "foo"
-  >>= lwt_alcotest_assert_false "fetched value is not known"
+  >>= lwt_assert_false "fetched value is not known"
   >>= fun () ->
   (* Fetch invalid value  *)
   let f1 = Test_Requester.fetch req "foo" precheck_fail in
@@ -588,8 +535,8 @@ let test_full_requester_test_notify_invalid _ () =
   Test_Requester.notify req P2p_peer.Id.zero "foo" 1
   >>= fun () ->
   Test_Requester.known req "foo"
-  >>= lwt_alcotest_assert_false "fetched value is still not known"
-  >>= fun () -> lwt_alcotest_assert "promise is still pending" (is_pending f1)
+  >>= lwt_assert_false "fetched value is still not known"
+  >>= fun () -> lwt_assert_true "promise is still pending" (is_pending f1)
 
 (* Test notifying a value with a value. The memory table should be
    updated, the promise resolved. *)
@@ -601,8 +548,8 @@ let test_full_requester_test_notify_valid _ () =
   Test_Requester.notify req P2p_peer.Id.zero "foo" 1
   >>= fun () ->
   Test_Requester.known req "foo"
-  >>= lwt_alcotest_assert "fetched value is now known"
-  >>= fun () -> lwt_alcotest_assert "promise is resolved" (is_resolved f1)
+  >>= lwt_assert_true "fetched value is now known"
+  >>= fun () -> lwt_assert_true "promise is resolved" (is_resolved f1)
 
 (* Test notifying a value that has not been fetched. The notification should be
    ignored. *)
@@ -612,7 +559,7 @@ let test_full_requester_test_notify_unfetched _ () =
   Test_Requester.notify req P2p_peer.Id.zero "foo" 1
   >>= fun () ->
   Test_Requester.known req "foo"
-  >>= lwt_alcotest_assert_false "fetched value is not known"
+  >>= lwt_assert_false "fetched value is not known"
 
 (* Test notifying a value that is already on disk. The notification
    should be ignored (not sure how to test this, but this code runs
@@ -646,27 +593,18 @@ let test_full_requester_test_notify_memory_duplicate _ () =
 let test_full_requester_test_pending_requests () =
   let req = init_full_requester () in
   (* Fetch value  *)
-  Alcotest.(check int)
-    "0 pending requests"
-    0
-    (Test_Requester.pending_requests req) ;
+  (check int) "0 pending requests" 0 (Test_Requester.pending_requests req) ;
   ignore (Test_Requester.fetch req "foo" precheck_pass) ;
-  Alcotest.(check int)
-    "1 pending requests"
-    1
-    (Test_Requester.pending_requests req) ;
+  (check int) "1 pending requests" 1 (Test_Requester.pending_requests req) ;
   ignore (Test_Requester.fetch req "bar" precheck_pass) ;
-  Alcotest.(check int)
-    "2 pending requests"
-    2
-    (Test_Requester.pending_requests req) ;
+  (check int) "2 pending requests" 2 (Test_Requester.pending_requests req) ;
   ignore (Test_Requester.fetch req "bar" precheck_pass) ;
-  Alcotest.(check int)
+  (check int)
     "still 2 pending requests"
     2
     (Test_Requester.pending_requests req) ;
   Test_Requester.clear_or_cancel req "foo" ;
-  Alcotest.(check int)
+  (check int)
     "back to 1 pending requests"
     1
     (Test_Requester.pending_requests req)
@@ -676,34 +614,22 @@ let test_full_requester_test_pending_requests () =
 (* Test injecting some values and checking the length of the memory table.  *)
 let test_full_requester_test_memory_table_length _ () =
   let req = init_full_requester () in
-  Alcotest.(check int)
-    "0 cached values"
-    0
-    (Test_Requester.memory_table_length req) ;
+  (check int) "0 cached values" 0 (Test_Requester.memory_table_length req) ;
   Test_Requester.inject req "foo" 1
   >>= fun _ ->
-  Alcotest.(check int)
-    "1 cached values"
-    1
-    (Test_Requester.memory_table_length req) ;
+  (check int) "1 cached values" 1 (Test_Requester.memory_table_length req) ;
   Test_Requester.inject req "bar" 2
   >>= fun _ ->
-  Alcotest.(check int)
-    "2 cached values"
-    2
-    (Test_Requester.memory_table_length req) ;
+  (check int) "2 cached values" 2 (Test_Requester.memory_table_length req) ;
   Test_Requester.inject req "bar" 2
   >>= fun _ ->
-  Alcotest.(check int)
+  (check int)
     "still 2 cached values"
     2
     (Test_Requester.memory_table_length req) ;
   Test_Requester.inject req "baz" 3
   >>= fun _ ->
-  Alcotest.(check int)
-    "now 3 cached values"
-    3
-    (Test_Requester.memory_table_length req) ;
+  (check int) "now 3 cached values" 3 (Test_Requester.memory_table_length req) ;
   Lwt.return_unit
 
 (** Test shutdown *)
