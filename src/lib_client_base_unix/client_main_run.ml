@@ -188,7 +188,26 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
   | Tezos_mockup.Persistence.Base_dir_is_mockup ->
       let mem_only = false in
       Tezos_mockup.Persistence.get_mockup_context_from_disk ~base_dir
-      >>=? fun res -> return (res, mem_only) )
+      >>=? fun (((module Mockup_environment), _) as res) ->
+      ( match args.protocol with
+      | None ->
+          return_unit
+      | Some desired_protocol ->
+          if
+            Protocol_hash.equal
+              Mockup_environment.protocol_hash
+              desired_protocol
+          then return_unit
+          else
+            failwith
+              "Protocol %a was requested via --protocol\n\
+               yet the mockup at %s was initialized with %a"
+              Protocol_hash.pp_short
+              Mockup_environment.protocol_hash
+              base_dir
+              Protocol_hash.pp_short
+              desired_protocol )
+      >>=? fun () -> return (res, mem_only) )
   >>=? fun ((mockup_env, rpc_context), mem_only) ->
   return (new unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context)
 
