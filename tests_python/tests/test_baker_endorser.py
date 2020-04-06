@@ -87,6 +87,10 @@ class TestAllDaemonsWithOperations:
     def test_synchronize(self, sandbox):
         utils.synchronize(sandbox.all_clients())
 
+    def test_progress(self, sandbox):
+        level = sandbox.client(0).get_level()
+        assert level >= 5
+
     def test_check_operations(self, sandbox):
         min_level = min([client.get_level()
                          for client in sandbox.all_clients()])

@@ -50,6 +50,10 @@ class TestManyNodesBootstrap:
     def test_synchronize(self, sandbox):
         utils.synchronize(sandbox.all_clients())
 
+    def test_progress(self, sandbox):
+        level = sandbox.client(0).get_level()
+        assert level >= 5
+
     def test_check_logs(self, sandbox):
         if not sandbox.log_dir:
             pytest.skip()

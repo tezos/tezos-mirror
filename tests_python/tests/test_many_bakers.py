@@ -24,6 +24,11 @@ class TestManyBakers:
     def test_wait(self):
         time.sleep(5)
 
+    def test_progress(self, sandbox):
+        min_level = min([client.get_level()
+                         for client in sandbox.all_clients()])
+        assert min_level >= 3
+
     @pytest.mark.xfail
     def test_check_logs(self, sandbox):
         if not sandbox.log_dir:
