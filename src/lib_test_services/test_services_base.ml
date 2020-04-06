@@ -39,7 +39,17 @@ let pair3 (type a b c) (t : (a * (b * c)) testable) : (a * b * c) testable =
   let nest ((x, y, z) : a * b * c) : a * (b * c) = (x, (y, z)) in
   map nest t
 
+let pair4 (type a b c d) (t : (a * (b * (c * d))) testable) :
+    (a * b * c * d) testable =
+  let nest ((x, y, z, w) : a * b * c * d) : a * (b * (c * d)) =
+    (x, (y, (z, w)))
+  in
+  map nest t
+
 let tuple3 ta tb tc : ('a * 'b * 'c) testable = pair3 (pair ta (pair tb tc))
+
+let tuple4 ta tb tc td : ('a * 'b * 'c * 'd) testable =
+  pair4 (pair ta (pair tb (pair tc td)))
 
 let assert_true str b = check bool str true b
 

@@ -35,3 +35,5 @@ let tzresults (type a) (t : a testable) : a tzresult testable = result t trace
 
 let p2p_peer_id : P2p_peer.Id.t Alcotest.testable =
   Alcotest.testable P2p_peer.Id.pp P2p_peer.Id.equal
+
+let json : Data_encoding.json testable = of_pp Data_encoding.Json.pp
