@@ -23,33 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
-
-(** Basic blocks *)
-
-let genesis_block =
-  Block_hash.of_b58check_exn
-    "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
-
-let genesis_protocol =
-  Protocol_hash.of_b58check_exn
-    "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
-
-let genesis_time = Time.Protocol.of_seconds 0L
-
-let proto =
-  match Registered_protocol.get genesis_protocol with
-  | None ->
-      assert false
-  | Some proto ->
-      proto
-
-module Proto = (val proto)
-
-let genesis : Genesis.t =
-  {time = genesis_time; block = genesis_block; protocol = genesis_protocol}
-
-let chain_id = Chain_id.of_block_hash genesis_block
+module Proto = Shell_test_helpers.Genesis_proto
 
 let incr_fitness fitness =
   let new_fitness =
@@ -68,7 +42,10 @@ let incr_timestamp timestamp =
 
 let operation op =
   let op : Operation.t =
-    {shell = {branch = genesis_block}; proto = Bytes.of_string op}
+    {
+      shell = {branch = Shell_test_helpers.genesis_block_hash};
+      proto = Bytes.of_string op;
+    }
   in
   (Operation.hash op, op, Data_encoding.Binary.to_bytes Operation.encoding op)
 
@@ -228,6 +205,7 @@ let build_example_tree chain =
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 
 let wrap_state_init f base_dir =
+  let ( // ) = Filename.concat in
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.init
@@ -235,7 +213,7 @@ let wrap_state_init f base_dir =
     ~context_mapsize:4_096_000_000L
     ~store_root
     ~context_root
-    genesis
+    Shell_test_helpers.genesis
   >>=? fun (state, chain, _index, _history_mode) ->
   build_example_tree chain >>= fun vblock -> f {state; chain; vblock}
 
@@ -267,7 +245,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
   let checkpoint_lvl = checkpoint.shell.level in
   let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
-  State.Block.read s.chain genesis_block
+  State.Block.read s.chain Shell_test_helpers.genesis_block_hash
   >>=? fun read_genesis ->
   let read_genesis_hash =
     Block_header.hash (State.Block.header read_genesis)
@@ -331,7 +309,7 @@ let test_set_checkpoint_then_purge_rolling (s : state) =
   let checkpoint_lvl = checkpoint.shell.level in
   let checkpoint_hash = Block_header.hash checkpoint in
   (* At the beginning the checkpoint is the genesis. *)
-  State.Block.read s.chain genesis_block
+  State.Block.read s.chain Shell_test_helpers.genesis_block_hash
   >>=? fun read_genesis ->
   let read_genesis_hash =
     Block_header.hash (State.Block.header read_genesis)
@@ -584,8 +562,12 @@ let test_known_heads s =
 let test_head s =
   Chain.head s.chain
   >>= fun head ->
-  if not (Block_hash.equal (State.Block.hash head) genesis_block) then
-    Assert.fail_msg "unexpected head" ;
+  if
+    not
+      (Block_hash.equal
+         (State.Block.hash head)
+         Shell_test_helpers.genesis_block_hash)
+  then Assert.fail_msg "unexpected head" ;
   Chain.set_head s.chain (vblock s "A6")
   >>= fun _ ->
   Chain.head s.chain
