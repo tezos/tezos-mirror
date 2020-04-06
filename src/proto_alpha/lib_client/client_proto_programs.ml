@@ -143,20 +143,20 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
       gas,
       entrypoint )
 
-let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas
+let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()
     =
   Alpha_services.Helpers.Scripts.typecheck_data
     cctxt
     (chain, block)
-    (data.expanded, ty.expanded, gas)
+    (data.expanded, ty.expanded, gas, legacy)
 
-let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas
+let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     (program : Michelson_v1_parser.parsed) =
   Alpha_services.Helpers.Scripts.typecheck_code
     cctxt
     (chain, block)
-    (program.expanded, gas)
+    (program.expanded, gas, legacy)
 
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error program
     res (cctxt : #Client_context.printer) =

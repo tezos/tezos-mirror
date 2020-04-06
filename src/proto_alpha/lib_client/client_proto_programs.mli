@@ -95,6 +95,7 @@ val typecheck_data :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?gas:Z.t ->
+  ?legacy:bool ->
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   unit ->
@@ -105,6 +106,7 @@ val typecheck_program :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?gas:Z.t ->
+  ?legacy:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
 
