@@ -436,7 +436,6 @@ let read_data_dir args =
 
 type error +=
   | Network_configuration_mismatch of {
-      configuration_file : string;
       configuration_file_chain_name : Distributed_db_version.Name.t;
       command_line_chain_name : Distributed_db_version.Name.t;
     }
@@ -447,42 +446,31 @@ let () =
     ~id:"node.config.network_configuration_mismatch"
     ~title:"Network configuration mismatch"
     ~description:
-      "You specified a --network argument on the command line, but the \
-       configuration file already contains another value"
-    ~pp:
-      (fun ppf
-           ( configuration_file,
-             configuration_file_chain_name,
-             command_line_chain_name ) ->
+      "You specified a --network argument on the command line, but it does \
+       not match your current configuration"
+    ~pp:(fun ppf (configuration_file_chain_name, command_line_chain_name) ->
       Format.fprintf
         ppf
-        "@[Specified@ --network@ has@ chain@ name@ %s,@ but configuration \
-         file@ %s@ specifies@ chain@ name@ %s.@]"
+        "@[Specified@ --network@ has@ chain@ name@ %s,@ but@ current@ \
+         configuration@ implies@ expected@ chain@ name@ %s.@ Use:@ tezos-node \
+         config init --network <NETWORK>@ to@ configure@ your@ node.@]"
         command_line_chain_name
-        configuration_file
         configuration_file_chain_name)
     Data_encoding.(
-      obj3
-        (req "configuration_file" string)
+      obj2
         (req "configuration_file_chain_name" string)
         (req "command_line_chain_name" string))
     (function
       | Network_configuration_mismatch
-          { configuration_file;
-            configuration_file_chain_name;
-            command_line_chain_name } ->
+          {configuration_file_chain_name; command_line_chain_name} ->
           Some
-            ( configuration_file,
-              (configuration_file_chain_name :> string),
+            ( (configuration_file_chain_name :> string),
               (command_line_chain_name :> string) )
       | _ ->
           None)
-    (fun ( configuration_file,
-           configuration_file_chain_name,
-           command_line_chain_name ) ->
+    (fun (configuration_file_chain_name, command_line_chain_name) ->
       Network_configuration_mismatch
         {
-          configuration_file;
           configuration_file_chain_name =
             Distributed_db_version.Name.of_string configuration_file_chain_name;
           command_line_chain_name =
@@ -528,7 +516,7 @@ let read_and_patch_config_file ?(may_override_network = false)
         bootstrap_threshold;
         history_mode;
         network;
-        config_file } =
+        config_file = _ } =
     args
   in
   (* Overriding the network with [--network] is a bad idea if the configuration
@@ -550,9 +538,7 @@ let read_and_patch_config_file ?(may_override_network = false)
         fail
           (Network_configuration_mismatch
              {
-               configuration_file = config_file;
-               configuration_file_chain_name =
-                 cfg.blockchain_network.chain_name;
+               configuration_file_chain_name = cfg.blockchain_network.chain_name;
                command_line_chain_name = network.chain_name;
              }) )
   >>=? fun () ->
