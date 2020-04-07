@@ -988,13 +988,6 @@ let write fp cfg =
   >>=? fun () ->
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
-let write_if_not_exists fp cfg =
-  if Sys.file_exists fp then return_unit
-  else
-    Lwt_utils_unix.Json.write_file
-      fp
-      (Data_encoding.Json.construct encoding cfg)
-
 let to_string cfg =
   Data_encoding.Json.to_string (Data_encoding.Json.construct encoding cfg)
 

@@ -247,7 +247,8 @@ module Term = struct
           (List.map fst Node_config_file.builtin_blockchain_networks)
       ^ ". Default is mainnet. You cannot specify custom networks on the \
          command-line, but you can specify them in the node configuration \
-         file."
+         file. With commands other than 'config init', specifying this option \
+         causes the node to fail if the configuration implies another network."
     in
     Arg.(
       value
@@ -423,12 +424,12 @@ end
 
 let read_config_file args =
   if Sys.file_exists args.config_file then
-    Node_config_file.read args.config_file >>=? fun cfg -> return (cfg, true)
-  else return (Node_config_file.default_config, false)
+    Node_config_file.read args.config_file
+  else return Node_config_file.default_config
 
 let read_data_dir args =
   read_config_file args
-  >>=? fun (cfg, _) ->
+  >>=? fun cfg ->
   let {data_dir; _} = args in
   let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   return data_dir
@@ -499,9 +500,10 @@ module Event = struct
       ()
 end
 
-let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
+let read_and_patch_config_file ?(may_override_network = false)
+    ?(ignore_bootstrap_peers = false) args =
   read_config_file args
-  >>=? fun (cfg, config_file_exists) ->
+  >>=? fun cfg ->
   let { data_dir;
         min_connections;
         expected_connections;
@@ -532,12 +534,14 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers = false) args =
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
-     config file uses the network I expect". *)
-  ( match (network, config_file_exists) with
-  | (None, _) | (Some _, false) ->
+     config file uses the network I expect". This behavior can be overriden
+     by [may_override_network], which is used when doing [config init]. *)
+  ( match network with
+  | None ->
       return_unit
-  | (Some network, true) ->
-      if
+  | Some network ->
+      if may_override_network then return_unit
+      else if
         Distributed_db_version.Name.equal
           cfg.blockchain_network.chain_name
           network.chain_name

@@ -63,7 +63,10 @@ end
 val read_data_dir : t -> string tzresult Lwt.t
 
 val read_and_patch_config_file :
-  ?ignore_bootstrap_peers:bool -> t -> Node_config_file.t tzresult Lwt.t
+  ?may_override_network:bool ->
+  ?ignore_bootstrap_peers:bool ->
+  t ->
+  Node_config_file.t tzresult Lwt.t
 
 module Manpage : sig
   val misc_section : string
