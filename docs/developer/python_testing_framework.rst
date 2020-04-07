@@ -251,11 +251,11 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
     def sandbox():
         """Example of sandbox fixture."""
         with Sandbox(paths.TEZOS_HOME,
-                    constants.IDENTITIES,
-                    constants.GENESIS_PK) as sandbox:
-            sandbox.add_node(0)
+                     constants.IDENTITIES,
+                     constants.GENESIS_PK) as sandbox:
+            sandbox.add_node(0, params=constants.NODE_PARAMS)
             utils.activate_alpha(sandbox.client(0))
-            sandbox.add_node(1)
+            sandbox.add_node(1, params=constants.NODE_PARAMS)
             sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
             yield sandbox
             assert sandbox.are_daemons_alive()
@@ -270,19 +270,22 @@ The following ``test_example.py`` is the ``pytest`` counterpart of the first exa
     @pytest.mark.incremental
     class TestExample:
 
-        def test_wait_sync_proto(self, sandbox):
+        def test_wait_sync_proto(self, sandbox, session):
+            session['head_hash'] = sandbox.client(0).get_head()['hash']
             clients = sandbox.all_clients()
             for client in clients:
-                proto = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+                proto = constants.ALPHA
                 assert utils.check_protocol(client, proto)
 
         def test_transfer(self, sandbox, session):
             receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')
             session['operation_hash'] = receipt.operation_hash
 
+        @pytest.mark.timeout(5)
         def test_inclusion(self, sandbox, session):
             operation_hash = session['operation_hash']
-            sandbox.client(0).wait_for_inclusion(operation_hash)
+            sandbox.client(0).wait_for_inclusion(operation_hash,
+                                                 branch=session['head_hash'])
 
 In this example, we defined the fixtures in the same module, but they are
 generally shared between tests and put in ``conftest.py``.
