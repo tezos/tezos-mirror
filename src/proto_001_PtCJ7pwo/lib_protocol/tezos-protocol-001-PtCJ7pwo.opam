@@ -19,6 +19,7 @@ build: [
     "%{tezos-protocol-compiler:lib}%/replace"
     "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
     "dune"
+    "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
     "001_PtCJ7pwo"
   ]
   ["dune" "build" "-p" name "-j" jobs]

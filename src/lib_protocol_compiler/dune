@@ -103,7 +103,8 @@
  (section libexec)
  (files (replace.exe as replace)
         dune_protocol
-        dune_protocol.template))
+        dune_protocol.template
+        final_protocol_versions))
 
 (alias
  (name runtest_lint)

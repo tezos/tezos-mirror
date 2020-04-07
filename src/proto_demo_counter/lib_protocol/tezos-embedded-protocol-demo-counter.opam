@@ -14,8 +14,10 @@ depends: [
 ]
 build: [
   [ "%{tezos-protocol-compiler:lib}%/replace"
-      "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
-      "dune" "demo_counter" ]
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "dune"
+    "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
+    "demo_counter" ]
   [ "dune" "build" "-p" name "-j" jobs ]
 ]
 run-test: [
