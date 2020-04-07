@@ -9,7 +9,6 @@
             tezos-mockup
             tezos-mockup-registration
             tezos-mockup-commands
-            tezos-client-base-unix
             tezos-client-006-PsCARTHA
             tezos-client-commands
             tezos-rpc)
@@ -20,7 +19,6 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_base_unix
                    -open Tezos_client_006_PsCARTHA
                    -open Tezos_client_commands
                    -open Tezos_rpc)))

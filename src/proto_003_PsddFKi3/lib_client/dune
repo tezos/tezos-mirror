@@ -4,7 +4,6 @@
  (libraries tezos-base
             tezos-protocol-003-PsddFKi3
             tezos-shell-services
-            tezos-client-base-unix
             tezos-rpc
             tezos-signer-backends)
  (library_flags (:standard -linkall))

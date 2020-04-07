@@ -12,7 +12,6 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-006-PsCARTHA"
   "tezos-shell-services"
-  "tezos-client-base-unix"
   "tezos-mockup-registration"
   "tezos-signer-backends"
   "tezos-protocol-006-PsCARTHA-parameters"

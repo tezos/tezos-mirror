@@ -12,7 +12,6 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-002-PsYLVpVv"
   "tezos-shell-services"
-  "tezos-client-base-unix"
   "tezos-signer-backends"
 ]
 build: [

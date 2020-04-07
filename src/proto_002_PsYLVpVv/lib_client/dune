@@ -5,7 +5,6 @@
             tezos-protocol-002-PsYLVpVv
             tezos-protocol-environment
             tezos-shell-services
-            tezos-client-base-unix
             tezos-rpc
             tezos-signer-backends)
  (library_flags (:standard -linkall))
@@ -13,7 +12,6 @@
                    -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_base_unix
                    -open Tezos_protocol_002_PsYLVpVv
                    -open Tezos_rpc)))
 

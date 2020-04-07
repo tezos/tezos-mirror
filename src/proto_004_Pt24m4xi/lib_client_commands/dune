@@ -6,7 +6,6 @@
             tezos-protocol-004-Pt24m4xi
             tezos-protocol-environment
             tezos-shell-services
-            tezos-client-base-unix
             tezos-client-004-Pt24m4xi
             tezos-client-commands
             tezos-rpc)
@@ -17,7 +16,6 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_base_unix
                    -open Tezos_client_004_Pt24m4xi
                    -open Tezos_client_commands
                    -open Tezos_rpc)))

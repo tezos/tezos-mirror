@@ -4,7 +4,6 @@
  (libraries tezos-base
             tezos-protocol-001-PtCJ7pwo
             tezos-shell-services
-            tezos-client-base-unix
             tezos-rpc
             tezos-signer-backends)
  (library_flags (:standard -linkall))
@@ -13,7 +12,6 @@
                    -open Tezos_protocol_001_PtCJ7pwo
                    -open Tezos_shell_services
                    -open Tezos_client_base
-                   -open Tezos_client_base_unix
                    -open Tezos_rpc)))
 
 (alias
