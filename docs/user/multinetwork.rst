@@ -25,19 +25,20 @@ the ``carthagenet`` branch is only capable of connecting to Carthagenet,
 and so on. The goal is to remove the need for such branches.
 
 By default, the multinetwork node connects to Mainnet.
-To connect to other networks, you can either
-`Select Network From Command-Line`_ to connect to a built-in network,
-or configure the node to connect to `Custom Networks`_.
+To connect to other networks, you can either use one of the
+`Built-In Networks`_ or configure the node to connect to `Custom Networks`_.
 See also `Alias Versus Explicit Configuration`_ for a discussion
 regarding what happens when you update your node.
 
-Select Network From Command-Line
---------------------------------
+Built-In Networks
+-----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option. For instance, to run Carthagenet::
+option when you initialize your node configuration. For instance, to run on Carthagenet::
 
-  tezos-node run --data-dir ~/tezos-carthagenet --network carthagenet
+  tezos-node config init --data-dir ~/tezos-carthagenet --network carthagenet
+  tezos-node identity generate --data-dir ~/tezos-carthagenet
+  tezos-node run --data-dir ~/tezos-carthagenet
 
 The ``--network`` option is non case-sensitive and can be used with
 the following built-in networks:
@@ -48,17 +49,16 @@ the following built-in networks:
 
 - ``carthagenet``
 
-If you run ``tezos-node run`` or ``tezos-node snapshot import`` and your node has
-no configuration file yet, a configuration file is created and stores the value of the
-``--network`` option so that you do not have to specify ``--network`` everytime.
-This also prevents you from accidentally running with the wrong network.
+If you did not initialize your node configuration, or if your configuration
+file contains no ``network`` field, the node assumes you want to run Mainnet.
+You can use the ``--network`` option with ``tezos-node run`` to make sure
+your node runs on the expected network. For instance, to make sure that
+it runs on Carthagenet::
 
-If you want to initialize a configuration file without running ``tezos-node run``
-or ``tezos-node snapshot import``, you can use ``tezos-node config init``.
-For instance, to configure your node to run Carthagenet assuming your
-data directory is ``~/tezos-carthagenet``, use::
+  tezos-node run --data-dir ~/tezos-carthagenet --network carthagenet
 
-  tezos-node config init --data-dir ~/tezos-carthagenet --network carthagenet
+This command will fail with an error if the configured network is not Carthagenet.
+The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 
 Custom Networks
 ---------------
@@ -99,8 +99,8 @@ Here is an example configuration file for Mainnet::
     }
   }
 
-This is equivalent to using ``--network mainnet``, or ``"network": "Mainnet"`` in the
-configuration file (or to doing nothing, as Mainnet is the default), except
+This is equivalent to using ``config init --network mainnet``, or ``"network": "Mainnet"``
+in the configuration file (or to doing nothing, as Mainnet is the default), except
 that you will not automatically get updates to the list of bootstrap peers and
 user-activated upgrades (see `Alias Versus Explicit Configuration`_).
 
@@ -174,7 +174,7 @@ comes with genesis parameters, you can override them with ``--sandbox``.
 Alias Versus Explicit Configuration
 -----------------------------------
 
-If you `Select Network From Command-Line`_, the configuration file stores
+If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
 to connect to Carthagenet, it will contain something like::
 
