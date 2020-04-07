@@ -216,7 +216,7 @@ let parse_annots loc ?(allow_special_var = false)
     if Compare.Int.(len = 1) then ok @@ (wrap None :: acc)
     else
       match s.[1] with
-      | 'a' .. 'z' | 'A' .. 'Z' | '_' ->
+      | 'a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9' ->
           (* check that all characters are valid*)
           string_iter (check_char loc) s 2
           >>? fun () -> ok @@ (wrap (Some (String.sub s 1 (len - 1))) :: acc)
