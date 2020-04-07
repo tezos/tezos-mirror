@@ -13,8 +13,8 @@ protocol before activating it.
 Delegates take part in the amendment procedure with an influence
 proportional to their stake, one roll one vote.
 
-The procedure consists of four periods, each of 32768 blocks (or
-~three weeks), for a total of approximately three months.
+The procedure consists of five periods, each of 32768 blocks (or
+~three weeks), for a total of approximately four months.
 
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium.
@@ -42,8 +42,10 @@ The voting procedure works as follows:
 - `Promotion_vote period`: delegates can cast one vote to promote or not the
   tested proposal using the `ballot` operation.
   At the end of a promotion_vote period if participation reaches the quorum
-  and the tested proposal has a super-majority in favor, it is activated as
-  the new protocol. Otherwise we go back to a proposal period.
+  and the tested proposal has a super-majority in favor, we proceed to
+  adoption period. Otherwise we go back to a proposal period.
+- `Adoption period`: at the end of the period the proposal is activated
+  as the new protocol and we go back to a proposal period.
 
 Each of the periods above are called a `voting period`. It is important to note
 that the stake of each delegate is computed at the beginning of each voting
