@@ -17,8 +17,8 @@ part in the amendment procedure. Furthermore, a delegate can cast a
 confidence (or influence) level to its vote or to reflect the
 preferences of its delegators.
 
-The procedure consists of four periods, each of 8 cycles, that is, 32768 blocks
-(roughly three weeks), for a total of approximately three months.
+The procedure consists of five periods, each of 8 cycles, that is, 32768 blocks
+(roughly three weeks), for a total of approximately four months.
 
 Other than this page, there is an excellent overview from `Jacob
 Arluck on medium.
@@ -47,8 +47,10 @@ The voting procedure works as follows:
 - `Promotion_vote period`: delegates can cast one ballot to promote or not the
   tested proposal using the `ballot` operation.
   At the end of a promotion_vote period if participation reaches the quorum
-  and the tested proposal has a super-majority in favor, it is activated as
-  the new protocol. Otherwise we go back to a proposal period.
+  and the tested proposal has a super-majority in favor, we proceed to
+  adoption period. Otherwise we go back to a proposal period.
+- `Adoption period`: at the end of the period the proposal is activated
+  as the new protocol and we go back to a proposal period.
 
 It is important to note that the stake of each delegate is computed
 at the beginning of each period.
