@@ -1,0 +1,89 @@
+.build-test-lint: &build_definition
+  stage: build
+  before_script:
+    # Always update system package manager + setup OPAM env
+    - sudo apt-get update && sudo apt-get upgrade -y
+    - eval $(opam env)
+    - opam update
+    - opam depext -i -y conf-rust conf-pkg-config conf-libffi
+    # Install rustup to manage different Rust versions. -y is required to bypass
+    # conf-rust installing cargo globally
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source $HOME/.cargo/env
+    # Install the rust version we want to deal with
+    - rustup toolchain install ${RUST_VERSION}
+    - rustup default ${RUST_VERSION}
+  script:
+    # Install external dependencies
+    - opam depext -i -y zarith
+    - opam install --deps-only --with-test -y .
+    # Install the static library from rustc
+    - ./build_deps.sh
+    # Install the package
+    - opam install . -y
+    # Run test
+    - opam install alcotest -y
+    - cd ${CI_PROJECT_DIR}
+    - dune runtest
+    # Lint. Use same version than Tezos
+    - opam install ocamlformat.0.10
+    - ocamlformat --check src/*.ml*
+    - ocamlformat --check test/*.ml*
+    - ocamlformat --check benchmark/*.ml*
+ 
+stages:
+  - build
+
+build-ocaml-4.07-rust-1.34.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.34.0"
+  image: ocaml/opam2:4.07
+
+build-ocaml-4.08-rust-1.34.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.34.0"
+  image: ocaml/opam2:4.08
+
+build-ocaml-4.09-rust-1.34.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.34.0"
+  image: ocaml/opam2:4.09
+
+build-ocaml-4.07-rust-1.36.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.36.0"
+  image: ocaml/opam2:4.07
+
+build-ocaml-4.08-rust-1.36.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.36.0"
+  image: ocaml/opam2:4.08
+
+build-ocaml-4.09-rust-1.36.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.36.0"
+  image: ocaml/opam2:4.09
+
+build-ocaml-4.07-rust-1.39.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.39.0"
+  image: ocaml/opam2:4.07
+
+build-ocaml-4.08-rust-1.39.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.39.0"
+  image: ocaml/opam2:4.08
+
+build-ocaml-4.09-rust-1.39.0:
+  <<: *build_definition
+  variables:
+    RUST_VERSION: "1.39.0"
+  image: ocaml/opam2:4.09

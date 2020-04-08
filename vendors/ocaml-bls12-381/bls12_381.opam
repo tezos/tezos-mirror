@@ -1,0 +1,21 @@
+opam-version: "2.0"
+name: "bls12-381"
+version: "0.3.4"
+authors: [ "Danny Willems <be.danny.willems@gmail.com>" ]
+maintainer: [ "Danny Willems <be.danny.willems@gmail.com>" ]
+synopsis: "OCaml binding for bls12-381 from librustzcash"
+homepage: "https://gitlab.com/dannywillems/ocaml-bls12-381"
+dev-repo: "git+https://gitlab.com/dannywillems/ocaml-bls12-381.git"
+bug-reports: "https://gitlab.com/dannywillems/ocaml-bls12-381/issues"
+license: "MIT"
+depends: [
+  "conf-rust" {build}
+  "dune" {build & >= "1.7"}
+  "dune-configurator" {build}
+  "zarith" {build & = "1.9.1"}
+  "ctypes" {build & = "0.17.1"}
+  "ctypes-foreign" {build & = "0.4.0"}
+  "alcotest" {with-test}
+]
+build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
+run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]

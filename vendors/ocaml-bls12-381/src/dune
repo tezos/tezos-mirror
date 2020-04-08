@@ -1,0 +1,15 @@
+(copy_files bindings/{rustc_bls12_381_ctypes_c_stubs.c,rustc_bls12_381_stubs.ml,rustc_bls12_381_bindings.ml})
+
+(library
+ (public_name bls12_381)
+ (name bls12_381)
+ (modules_without_implementation ff_sig elliptic_curve_sig)
+ (libraries zarith ctypes ctypes.foreign)
+ (library_flags :standard -linkall -ccopt -pthread)
+ (foreign_stubs
+  (language c)
+  (names rustc_bls12_381_ctypes_c_stubs )
+  (flags (-I%{env:OPAM_SWITCH_PREFIX=}/include))
+ )
+ (c_library_flags (-L%{env:OPAM_SWITCH_PREFIX=}/lib -lrustc_bls12_381 -lpthread))
+)

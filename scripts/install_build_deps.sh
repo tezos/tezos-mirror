@@ -45,3 +45,5 @@ if [ -n "$dev" ]; then
     opam repository add default --rank=-1 > /dev/null 2>&1 || true
     opam install merlin odoc --criteria="-changed,-removed"
 fi
+
+"$script_dir"/install_build_deps.rust.sh
