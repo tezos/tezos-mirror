@@ -27,14 +27,6 @@ include Internal_event.Simple
 
 let section = ["node"; "chain_validator"]
 
-let chain_bootstrapped =
-  declare_0
-    ~section
-    ~name:"chain_bootstrapped"
-    ~msg:"the chain is bootstrapped"
-    ~level:Info
-    ()
-
 let updated_to_checkpoint =
   declare_2
     ~section

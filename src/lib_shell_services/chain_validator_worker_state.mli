@@ -44,6 +44,7 @@ module Event : sig
         timestamp : Time.Protocol.t;
       }
     | Could_not_switch_testchain of error list
+    | Bootstrapped
 
   type view = t
 

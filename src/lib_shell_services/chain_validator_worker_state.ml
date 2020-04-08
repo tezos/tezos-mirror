@@ -44,6 +44,7 @@ module Event = struct
         timestamp : Time.Protocol.t;
       }
     | Could_not_switch_testchain of error list
+    | Bootstrapped
 
   type view = t
 
@@ -58,6 +59,8 @@ module Event = struct
           Internal_event.Notice )
     | Could_not_switch_testchain _ ->
         Internal_event.Error
+    | Bootstrapped ->
+        Internal_event.Info
 
   let encoding =
     let open Data_encoding in
@@ -92,7 +95,13 @@ module Event = struct
           ~title:"Could_not_switch_testchain"
           RPC_error.encoding
           (function Could_not_switch_testchain err -> Some err | _ -> None)
-          (fun err -> Could_not_switch_testchain err) ]
+          (fun err -> Could_not_switch_testchain err);
+        case
+          (Tag 2)
+          ~title:"Bootstrapped"
+          unit
+          (function Bootstrapped -> Some () | _ -> None)
+          (fun () -> Bootstrapped) ]
 
   let pp ppf = function
     | Processed_block req ->
@@ -127,6 +136,8 @@ module Event = struct
           "@[<v 0>Error while switching test chain:@ %a@]"
           (Format.pp_print_list Error_monad.pp)
           err
+    | Bootstrapped ->
+        Format.fprintf ppf "@[<v 0>Chain is bootstrapped@]"
 end
 
 module Worker_state = struct

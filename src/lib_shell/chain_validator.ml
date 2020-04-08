@@ -136,7 +136,7 @@ let may_toggle_bootstrapped_chain w =
     && P2p_peer.Table.length nv.bootstrapped_peers
        >= nv.parameters.limits.bootstrap_threshold
   then (
-    Lwt.async (fun () -> Chain_validator_event.(emit chain_bootstrapped) ()) ;
+    Worker.record_event w Event.Bootstrapped ;
     nv.bootstrapped <- true ;
     Lwt.wakeup_later nv.bootstrapped_wakener () )
 
