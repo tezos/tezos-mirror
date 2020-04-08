@@ -87,6 +87,12 @@ module Section : sig
   val to_string_list : t -> string list
 end
 
+(** All the section that has been registered. Currently, sections are registered
+    by the `Simple` module and the `Legacy_logging` module. *)
+val get_registered_sections : unit -> TzString.Set.t
+
+val register_section : Section.t -> unit
+
 (** Parameters defining an inspectable type of events. *)
 module type EVENT_DEFINITION = sig
   type t
@@ -585,8 +591,6 @@ module Legacy_logging : sig
 
     include SEMLOG
   end
-
-  val sections : string list ref
 end
 
 (** {3 Common Event-Sink Definitions } *)

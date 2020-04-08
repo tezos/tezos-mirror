@@ -519,7 +519,9 @@ module Manpage = struct
 
   let debug =
     let log_sections =
-      String.concat " " (List.rev !Internal_event.Legacy_logging.sections)
+      String.concat
+        " "
+        (TzString.Set.elements (Internal_event.get_registered_sections ()))
     in
     [ `S "DEBUG";
       `P

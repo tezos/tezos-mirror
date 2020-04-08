@@ -781,4 +781,8 @@ struct
 
   (* TODO? add a list of cancelers for nested protection ? *)
   let protect {canceler; _} ?on_error f = protect ?on_error ~canceler f
+
+  let () =
+    Internal_event.register_section
+      (Internal_event.Section.make_sanitized Name.base)
 end

@@ -121,6 +121,16 @@ end = struct
     list string
 end
 
+let registered_sections = ref TzString.Set.empty
+
+let get_registered_sections () = !registered_sections
+
+let register_section section =
+  registered_sections :=
+    TzString.Set.add
+      (Lwt_log_core.Section.name (Section.to_lwt_log section))
+      !registered_sections
+
 module type EVENT_DEFINITION = sig
   type t
 
@@ -428,7 +438,13 @@ module Simple = struct
           trace ;
         Lwt.return_unit
 
-  let make_section = Option.map ~f:Section.make_sanitized
+  let make_section names =
+    match names with
+    | None ->
+        None
+    | Some names ->
+        let section = Section.make_sanitized names in
+        register_section section ; Some section
 
   let pp_print_compact_float fmt value = Format.fprintf fmt "%g" value
 
@@ -1030,8 +1046,6 @@ module Simple = struct
 end
 
 module Legacy_logging = struct
-  let sections = ref []
-
   module type LOG = sig
     val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
@@ -1152,7 +1166,8 @@ module Legacy_logging = struct
       let level {level; _} = level
     end
 
-    let () = sections := P.name :: !sections
+    let () =
+      registered_sections := TzString.Set.add P.name !registered_sections
 
     module Event = Make (Definition)
 
