@@ -155,7 +155,7 @@ type config = {
   p2p : (P2p.config * P2p.limits) option;
   checkpoint : Block_header.t option;
   disable_mempool : bool;
-  disable_testchain : bool;
+  enable_testchain : bool;
 }
 
 and peer_validator_limits = Peer_validator.limits = {
@@ -383,13 +383,13 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       patch_context;
       p2p = p2p_params;
       disable_mempool;
-      disable_testchain;
+      enable_testchain;
       checkpoint } peer_validator_limits block_validator_limits
     prevalidator_limits chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some _ ->
-        (not disable_mempool, not disable_testchain)
+        (not disable_mempool, enable_testchain)
     | None ->
         (true, true)
   in

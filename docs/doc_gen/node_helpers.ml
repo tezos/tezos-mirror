@@ -52,7 +52,7 @@ let with_node f =
         p2p = None;
         checkpoint = None;
         disable_mempool = true;
-        disable_testchain = true;
+        enable_testchain = false;
       }
     in
     Node.create

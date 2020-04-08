@@ -41,8 +41,8 @@ type config = {
   checkpoint : Block_header.t option;
   disable_mempool : bool;
       (** If [true], all non-empty mempools will be ignored. *)
-  disable_testchain : bool;
-      (** If [true], testchain related messages will be ignored. *)
+  enable_testchain : bool;
+      (** If [false], testchain related messages will be ignored. *)
 }
 
 and peer_validator_limits = {

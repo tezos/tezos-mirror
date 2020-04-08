@@ -267,7 +267,7 @@ and p2p = {
   private_mode : bool;
   limits : P2p.limits;
   disable_mempool : bool;
-  disable_testchain : bool;
+  enable_testchain : bool;
   greylisting_config : P2p_point_state.Info.greylisting_config;
 }
 
@@ -325,7 +325,7 @@ let default_p2p =
     private_mode = false;
     limits = default_p2p_limits;
     disable_mempool = false;
-    disable_testchain = false;
+    enable_testchain = false;
     greylisting_config = P2p_point_state.Info.default_greylisting_config;
   }
 
@@ -555,7 +555,7 @@ let p2p =
            private_mode;
            limits;
            disable_mempool;
-           disable_testchain;
+           enable_testchain;
            greylisting_config } ->
       ( expected_pow,
         bootstrap_peers,
@@ -564,7 +564,7 @@ let p2p =
         private_mode,
         limits,
         disable_mempool,
-        disable_testchain,
+        enable_testchain,
         greylisting_config ))
     (fun ( expected_pow,
            bootstrap_peers,
@@ -573,7 +573,7 @@ let p2p =
            private_mode,
            limits,
            disable_mempool,
-           disable_testchain,
+           enable_testchain,
            greylisting_config ) ->
       {
         expected_pow;
@@ -583,7 +583,7 @@ let p2p =
         private_mode;
         limits;
         disable_mempool;
-        disable_testchain;
+        enable_testchain;
         greylisting_config;
       })
     (obj9
@@ -635,12 +635,12 @@ let p2p =
           bool
           false)
        (dft
-          "disable_testchain"
+          "enable_testchain"
           ~description:
-            "If set to [true], the node will not spawn a testchain during the \
+            "If set to [true], the node will spawn a testchain during the \
              protocol's testing voting period. Default value is [false]. It \
-             may be used used to decrease the node storage usage and \
-             computation by droping the validation of the test network blocks."
+             is disabled to decrease the node storage usage and computation \
+             by droping the validation of the test network blocks."
           bool
           false)
        (let open P2p_point_state.Info in
@@ -1002,7 +1002,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size ?peer_table_size
     ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
     ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
-    ?(disable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
+    ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?bootstrap_threshold ?history_mode ?network cfg =
   let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
@@ -1043,7 +1043,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       private_mode = cfg.p2p.private_mode || private_mode;
       limits;
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
-      disable_testchain = cfg.p2p.disable_testchain || disable_testchain;
+      enable_testchain = cfg.p2p.enable_testchain || enable_testchain;
       greylisting_config = cfg.p2p.greylisting_config;
     }
   and rpc : rpc =

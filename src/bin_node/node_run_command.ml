@@ -249,7 +249,7 @@ let init_node ?sandbox ?checkpoint ~singleprocess (config : Node_config_file.t)
       protocol_root = Node_data_version.protocol_dir config.data_dir;
       p2p = p2p_config;
       checkpoint;
-      disable_testchain = config.p2p.disable_testchain;
+      enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
     }
   in
