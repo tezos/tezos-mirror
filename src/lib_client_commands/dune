@@ -5,7 +5,6 @@
             tezos-client-base
             tezos-clic.unix
             tezos-rpc
-            tezos-p2p
             tezos-shell-services
             tezos-p2p-services
             tezos-stdlib-unix

@@ -151,10 +151,10 @@ let commands () =
               address
               port
             >>= fun () -> return_unit
-        | Error (Tezos_p2p.P2p_errors.Pending_connection :: _) ->
+        | Error (P2p_errors.Pending_connection :: _) ->
             cctxt#warning "Already connecting to peer %a" P2p_addr.pp address
             >>= fun () -> return_unit
-        | Error (Tezos_p2p.P2p_errors.Connected :: _) ->
+        | Error (P2p_errors.Connected :: _) ->
             cctxt#warning "Already connected to peer %a" P2p_addr.pp address
             >>= fun () -> return_unit
         | Error _ as e ->

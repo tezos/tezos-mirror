@@ -85,7 +85,7 @@ let receive conn =
     >>= function
     | Ok _ ->
         loop ()
-    | Error (P2p_errors.Connection_closed :: _) ->
+    | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) ->
         Lwt.return_unit
     | Error err ->
         Lwt.fail (Error err)

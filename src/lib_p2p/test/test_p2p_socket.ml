@@ -169,7 +169,7 @@ let connect sched addr port id =
   >>=? fun () -> return auth_fd
 
 let is_connection_closed = function
-  | Error (P2p_errors.Connection_closed :: _) ->
+  | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) ->
       true
   | Ok _ ->
       false
@@ -178,7 +178,7 @@ let is_connection_closed = function
       false
 
 let is_decoding_error = function
-  | Error (P2p_errors.Decoding_error :: _) ->
+  | Error (Tezos_p2p_services.P2p_errors.Decoding_error :: _) ->
       true
   | Ok _ ->
       false
@@ -210,7 +210,9 @@ module Crypto_test = struct
 
   let write_chunk fd cryptobox_data msg =
     let msglen = Bytes.length msg in
-    fail_unless (msglen <= max_content_length) P2p_errors.Invalid_message_size
+    fail_unless
+      (msglen <= max_content_length)
+      Tezos_p2p_services.P2p_errors.Invalid_message_size
     >>=? fun () ->
     let buf_length = msglen + Crypto_box.zerobytes in
     let buf = Bytes.make buf_length '\x00' in
@@ -248,7 +250,7 @@ module Crypto_test = struct
         buf
     with
     | false ->
-        fail P2p_errors.Decipher_error
+        fail Tezos_p2p_services.P2p_errors.Decipher_error
     | true ->
         return
           (Bytes.sub
@@ -310,7 +312,7 @@ module Kick = struct
   let encoding = Data_encoding.bytes
 
   let is_rejected = function
-    | Error (P2p_errors.Rejected_by_nack _ :: _) ->
+    | Error (Tezos_p2p_services.P2p_errors.Rejected_by_nack _ :: _) ->
         true
     | Ok _ ->
         false
