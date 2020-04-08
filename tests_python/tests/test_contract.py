@@ -303,6 +303,19 @@ class TestContracts:
         with utils.assert_run_failure(error_pattern):
             client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
 
+    def test_zero_transfer_to_implicit_contract(self, client):
+        pubkey = IDENTITIES['bootstrap3']['identity']
+        err = ('Transaction of 0ꜩ towards a contract without code are '
+               rf'forbidden \({pubkey}\).')
+        with utils.assert_run_failure(err):
+            client.transfer(0, 'bootstrap2', 'bootstrap3', [])
+
+    def test_zero_transfer_to_nonexistent_contract(self, client):
+        nonexistent = "KT1Fcq4inD44aMhmUiTEHR1QMQwJT7p2u641"
+        err = rf'Contract {nonexistent} does not exist'
+        with utils.assert_run_failure(err):
+            client.transfer(0, 'bootstrap2', nonexistent, [])
+
 
 FIRST_EXPLOSION = '''
 { parameter unit;

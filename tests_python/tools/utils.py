@@ -359,7 +359,7 @@ def assert_run_failure(pattern: str,
             if re.search(pattern, line):
                 return
         data_pretty = "\n".join(data)
-        assert False, f"Could not find '{pattern}' in {data_pretty}"
+        assert False, f"Could not find '{pattern}' in '{data_pretty}'"
     except Exception as exc:  # pylint: disable=broad-except
         assert_msg = f'Expected CalledProcessError but got {type(exc)}'
         assert False, assert_msg
