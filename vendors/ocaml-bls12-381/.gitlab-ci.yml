@@ -1,0 +1,68 @@
+stages:
+  - lint
+  - build
+
+lint:
+  stage: lint
+  image: registry.gitlab.com/dannywillems/docker-ocamlformat:0.15.0
+  before_script:
+    - eval $(opam env)
+  script:
+    - ocamlformat --check benchmark/*.ml*
+    - ocamlformat --check src/*.ml*
+    - ocamlformat --check test/*.ml*
+
+.build-test: &build_definition
+  stage: build
+  before_script:
+    # Always update system package manager + setup OPAM env
+    - sudo apt-get update
+    - eval $(opam env)
+    - opam update
+    - opam depext -i -y conf-pkg-config conf-libffi
+  script:
+    # Install external dependencies
+    - opam depext -i -y zarith
+    - opam install --deps-only --with-test -y .
+    # Install the static library from rustc
+    - ./build_deps.sh
+    # Install the package
+    - opam install . -y
+    # Run test
+    - opam install alcotest -y
+    - cd ${CI_PROJECT_DIR}
+    - dune runtest
+    # Benchmark
+    - opam install core_bench.v0.12.0
+    - dune build benchmark/bench_ec.exe
+    - dune build benchmark/bench_ff.exe
+    - dune build benchmark/bench_pairing.exe
+ 
+build-ocaml-4.07-rust-1.36.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.07-1.36.0
+
+build-ocaml-4.08-rust-1.36.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.08-1.36.0
+
+build-ocaml-4.09-rust-1.36.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.09-1.36.0
+
+build-ocaml-4.07-rust-1.40.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.07-1.40.0
+
+build-ocaml-4.08-rust-1.40.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.08-1.40.0
+
+build-ocaml-4.09-rust-1.40.0:
+  <<: *build_definition
+  image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.09-1.40.0
+
+# Core bench not compatible with 4.10
+# build-ocaml-4.10-rust-1.40.0:
+#   <<: *build_definition
+#   image: registry.gitlab.com/dannywillems/docker-ocaml-rust:4.10-1.40.0

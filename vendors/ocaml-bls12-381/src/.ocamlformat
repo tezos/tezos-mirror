@@ -1,0 +1,13 @@
+wrap-fun-args=false
+let-binding-spacing=compact
+field-space=loose
+sequence-style=separator
+doc-comments=before
+margin=80
+module-item-spacing=sparse
+parens-tuple=always
+parens-tuple-patterns=always
+break-string-literals=auto
+break-separators=after
+space-around-lists=false
+dock-collection-brackets=false
