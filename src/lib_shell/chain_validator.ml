@@ -146,7 +146,7 @@ let notify_new_block w block =
 
    TODO this is inefficient, could be replaced by
    structure updated on peers head update *)
-let time_peers active_peers n =
+let time_peers active_peers n event_recorder =
   let head_time peer : Time.Protocol.t * Time.Protocol.t =
     Peer_validator.(current_head_timestamp peer, time_last_validated_head peer)
   in
@@ -155,7 +155,10 @@ let time_peers active_peers n =
   in
   let time_list = P2p_peer.Error_table.fold_resolved f active_peers [] in
   let active_peers_count = List.length time_list in
-  if active_peers_count < n then None
+  if active_peers_count < n then (
+    event_recorder
+      (Event.Bootstrap_active_peers {active = active_peers_count; needed = n}) ;
+    None )
   else
     let compare (head_time_a, last_validation_a)
         (head_time_b, last_validation_b) =
@@ -170,9 +173,12 @@ let time_peers active_peers n =
     in
     let (min_head_time, _) = List.hd sorted_time_trunc in
     assert (min_head_time <= max_head_time) ;
+    event_recorder
+      (Event.Bootstrap_active_peers_heads_time
+         {min_head_time; max_head_time; most_recent_validation}) ;
     Some (min_head_time, max_head_time, most_recent_validation)
 
-let sync_state nv =
+let sync_state nv event_recorder =
   let bootstrap_threshold =
     nv.parameters.limits.bootstrap_conf.bootstrap_threshold
   in
@@ -182,7 +188,7 @@ let sync_state nv =
   let max_latency = nv.parameters.limits.bootstrap_conf.max_latency in
   if bootstrap_threshold = 0 then `Sync
   else
-    match time_peers nv.active_peers bootstrap_threshold with
+    match time_peers nv.active_peers bootstrap_threshold event_recorder with
     | None ->
         `Unsync
     | Some (min_head_time, max_head_time, last_heard) ->
@@ -200,7 +206,7 @@ let sync_state nv =
 (** Check synchronization status every [sync_polling_period]. Wake up
     bootstrap wakener and mark node as bootstrapped when synchronization status
     is either stuck or sync. *)
-let poll_sync w nv =
+let poll_sync nv event_recorder =
   let sync_polling_period =
     nv.parameters.limits.bootstrap_conf.sync_polling_period
   in
@@ -208,12 +214,15 @@ let poll_sync w nv =
   else
     let wait_sync nv =
       let rec loop () =
-        match sync_state nv with
+        match sync_state nv event_recorder with
         | `Stuck ->
+            event_recorder (Event.Sync_status Stuck) ;
             Lwt.return_unit
         | `Sync ->
+            event_recorder (Event.Sync_status Sync) ;
             Lwt.return_unit
         | `Unsync ->
+            event_recorder (Event.Sync_status Unsync) ;
             Lwt_unix.sleep (float_of_int sync_polling_period)
             >>= fun () -> loop ()
       in
@@ -223,7 +232,7 @@ let poll_sync w nv =
         wait_sync nv
         >>= fun () ->
         nv.bootstrapped <- true ;
-        Worker.record_event w Event.Bootstrapped ;
+        event_recorder Event.Bootstrapped ;
         Lwt.return (Lwt.wakeup_later nv.bootstrapped_wakener ()))
 
 let with_activated_peer_validator w peer_id f =
@@ -572,7 +581,7 @@ let on_launch start_prevalidator w _ parameters =
       prevalidator;
     }
   in
-  poll_sync w nv ;
+  poll_sync nv (Worker.record_event w) ;
   Distributed_db.set_callback
     parameters.chain_db
     {
@@ -799,4 +808,6 @@ let ddb_information t =
 
 let sync_state w =
   let nv = Worker.state w in
-  sync_state nv
+  (* we could pass the full worker here, but only the event recorder is
+     needed *)
+  sync_state nv (Worker.record_event w)

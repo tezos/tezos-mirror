@@ -34,6 +34,8 @@ end
 module Event = struct
   type update = Ignored_head | Branch_switch | Head_increment
 
+  type sync_status = Sync | Unsync | Stuck
+
   type t =
     | Processed_block of {
         request : Request.view;
@@ -45,6 +47,13 @@ module Event = struct
       }
     | Could_not_switch_testchain of error list
     | Bootstrapped
+    | Sync_status of sync_status
+    | Bootstrap_active_peers of {active : int; needed : int}
+    | Bootstrap_active_peers_heads_time of {
+        min_head_time : Time.Protocol.t;
+        max_head_time : Time.Protocol.t;
+        most_recent_validation : Time.Protocol.t;
+      }
 
   type view = t
 
@@ -61,6 +70,16 @@ module Event = struct
         Internal_event.Error
     | Bootstrapped ->
         Internal_event.Info
+    | Sync_status _ ->
+        Internal_event.Info
+    | Bootstrap_active_peers _ ->
+        Internal_event.Debug
+    | Bootstrap_active_peers_heads_time _ ->
+        Internal_event.Debug
+
+  let sync_status_encoding =
+    Data_encoding.string_enum
+      [("sync", Sync); ("unsync", Unsync); ("stuck", Stuck)]
 
   let encoding =
     let open Data_encoding in
@@ -101,7 +120,47 @@ module Event = struct
           ~title:"Bootstrapped"
           unit
           (function Bootstrapped -> Some () | _ -> None)
-          (fun () -> Bootstrapped) ]
+          (fun () -> Bootstrapped);
+        case
+          (Tag 3)
+          ~title:"Sync_status"
+          sync_status_encoding
+          (function Sync_status sync_status -> Some sync_status | _ -> None)
+          (fun sync_status -> Sync_status sync_status);
+        case
+          (Tag 4)
+          ~title:"Bootstrap_active_peers"
+          (obj2 (req "active" int31) (req "needed" int31))
+          (function
+            | Bootstrap_active_peers {active; needed} ->
+                Some (active, needed)
+            | _ ->
+                None)
+          (fun (active, needed) -> Bootstrap_active_peers {active; needed});
+        case
+          (Tag 5)
+          ~title:"Bootstrap_active_peers_heads_time"
+          (obj3
+             (req "min_head_time" Time.Protocol.encoding)
+             (req "max_head_time" Time.Protocol.encoding)
+             (req "most_recent_validation" Time.Protocol.encoding))
+          (function
+            | Bootstrap_active_peers_heads_time
+                {min_head_time; max_head_time; most_recent_validation} ->
+                Some (min_head_time, max_head_time, most_recent_validation)
+            | _ ->
+                None)
+          (fun (min_head_time, max_head_time, most_recent_validation) ->
+            Bootstrap_active_peers_heads_time
+              {min_head_time; max_head_time; most_recent_validation}) ]
+
+  let sync_status_to_string = function
+    | Sync ->
+        "sync"
+    | Unsync ->
+        "unsync"
+    | Stuck ->
+        "stuck"
 
   let pp ppf = function
     | Processed_block req ->
@@ -138,6 +197,29 @@ module Event = struct
           err
     | Bootstrapped ->
         Format.fprintf ppf "@[<v 0>Chain is bootstrapped@]"
+    | Sync_status ss ->
+        Format.fprintf
+          ppf
+          "@[<v 0>Sync_status: %s@]"
+          (sync_status_to_string ss)
+    | Bootstrap_active_peers {active; needed} ->
+        Format.fprintf
+          ppf
+          "@[<v 0>Bootstrap peers: active %d needed %d@]"
+          active
+          needed
+    | Bootstrap_active_peers_heads_time
+        {min_head_time; max_head_time; most_recent_validation} ->
+        Format.fprintf
+          ppf
+          "@[<v 0>Bootstrap peers: least recent head time stamp %a, \
+           most_recent_head_timestamp %a, most recent validation %a@]"
+          Time.Protocol.pp_hum
+          min_head_time
+          Time.Protocol.pp_hum
+          max_head_time
+          Time.Protocol.pp_hum
+          most_recent_validation
 end
 
 module Worker_state = struct

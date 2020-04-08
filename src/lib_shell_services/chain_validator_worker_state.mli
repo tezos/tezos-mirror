@@ -34,6 +34,8 @@ end
 module Event : sig
   type update = Ignored_head | Branch_switch | Head_increment
 
+  type sync_status = Sync | Unsync | Stuck
+
   type t =
     | Processed_block of {
         request : Request.view;
@@ -45,6 +47,13 @@ module Event : sig
       }
     | Could_not_switch_testchain of error list
     | Bootstrapped
+    | Sync_status of sync_status
+    | Bootstrap_active_peers of {active : int; needed : int}
+    | Bootstrap_active_peers_heads_time of {
+        min_head_time : Time.Protocol.t;
+        max_head_time : Time.Protocol.t;
+        most_recent_validation : Time.Protocol.t;
+      }
 
   type view = t
 
