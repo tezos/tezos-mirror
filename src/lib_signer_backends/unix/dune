@@ -1,10 +1,13 @@
 (library
  (name tezos_signer_backends_unix)
  (public_name tezos-signer-backends.unix)
+ (modules (:standard \ no_ledger with_ledger))
  (libraries tezos-signer-backends
             tezos-stdlib-unix
             tezos-rpc-http-client-unix
-            ledgerwallet-tezos)
+            (select ledger.ml from
+              (ledgerwallet-tezos -> with_ledger.ml)
+              (-> no_ledger.ml)))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib

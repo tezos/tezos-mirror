@@ -38,41 +38,12 @@ module Bip32_path = struct
 
   let tezos_root = [hard 44l; hard 1729l]
 
-  let node_of_string str =
-    match Int32.of_string_opt str with
-    | Some node ->
-        Some node
-    | None -> (
-      match Int32.of_string_opt String.(sub str 0 (length str - 1)) with
-      | None ->
-          None
-      | Some node ->
-          Some (hard node) )
-
-  let node_of_string_exn str =
-    match node_of_string str with
-    | None ->
-        invalid_arg (Printf.sprintf "node_of_string_exn: got %S" str)
-    | Some str ->
-        str
-
   let pp_node ppf node =
     match is_hard node with
     | true ->
         Fmt.pf ppf "%ldh" (unhard node)
     | false ->
         Fmt.pf ppf "%ld" node
-
-  let string_of_node = Fmt.to_to_string pp_node
-
-  let path_of_string_exn s =
-    match String.split_on_char '/' s with
-    | [""] ->
-        []
-    | nodes ->
-        List.map node_of_string_exn nodes
-
-  let path_of_string s = try Some (path_of_string_exn s) with _ -> None
 
   let pp_path = Fmt.(list ~sep:(const char '/') pp_node)
 

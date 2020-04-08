@@ -23,6 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Signer_implementation : Client_keys.SIGNER
+open Client_keys
 
-val commands : unit -> Client_context.full Clic.command list
+include Internal_event.Legacy_logging.Make (struct
+  let name = "client.signer.ledger"
+end)
+
+type error += NoLedgerSupport
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"signer.ledger"
+    ~title:"No Ledger support"
+    ~description:
+      "This client has been compiled without support for Ledger Nano device"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "This client has been compiled without support for Ledger Nano device")
+    Data_encoding.empty
+    (function NoLedgerSupport -> Some () | _ -> None)
+    (fun () -> NoLedgerSupport)
+
+(** The implementation of the “signer-plugin.” *)
+module Signer_implementation : Client_keys.SIGNER = struct
+  let scheme = "no_ledger"
+
+  let title = "Fake signer when Ledger Nano device support is disabled"
+
+  let description =
+    "In order to communicate with a Ledger Nano, recompile with \
+     ledgerwallet-tezos library installed"
+
+  let neuterize _sk = fail NoLedgerSupport
+
+  let public_key _sk_uri = fail NoLedgerSupport
+
+  let public_key_hash _sk_uri = fail NoLedgerSupport
+
+  let import_secret_key ~io:_ _pk_uri = fail NoLedgerSupport
+
+  let sign ?watermark:_k _sk_uri _msg = fail NoLedgerSupport
+
+  let deterministic_nonce _sk_uri _msg = fail NoLedgerSupport
+
+  let deterministic_nonce_hash _sk_uri _msg = fail NoLedgerSupport
+
+  let supports_deterministic_nonces _ = return_false
+end
+
+let commands () = []
