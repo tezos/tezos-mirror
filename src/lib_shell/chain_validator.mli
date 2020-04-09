@@ -83,6 +83,8 @@ val sync_state : t -> [`Sync | `Stuck | `Unsync]
     bootstrapped, it remains bootstrapped until it terminates. *)
 val bootstrapped : t -> unit Lwt.t
 
+val is_bootstrapped : t -> bool
+
 val prevalidator : t -> Prevalidator.t option
 
 val chain_db : t -> Distributed_db.chain_db

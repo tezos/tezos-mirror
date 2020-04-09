@@ -102,6 +102,9 @@ module S : sig
 
   val sync_state : ([`GET], prefix, prefix, unit, unit, string) RPC_service.t
 
+  val is_bootstrapped :
+    ([`GET], prefix, prefix, unit, unit, bool) RPC_service.t
+
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t
 

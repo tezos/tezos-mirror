@@ -779,6 +779,8 @@ let bootstrapped w =
   let {bootstrapped_waiter; _} = Worker.state w in
   Lwt.protected bootstrapped_waiter
 
+let is_bootstrapped w = (Worker.state w).bootstrapped
+
 let valid_block_watcher w =
   let {valid_block_input; _} = Worker.state w in
   Lwt_watcher.create_stream valid_block_input

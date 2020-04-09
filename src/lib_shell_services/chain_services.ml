@@ -83,6 +83,13 @@ module S = struct
       ~output:Encoding.string
       RPC_path.(path / "sync_state")
 
+  let is_bootstrapped =
+    RPC_service.get_service
+      ~description:"The bootstrap status of a chain"
+      ~query:RPC_query.empty
+      ~output:Encoding.bool
+      RPC_path.(path / "is_bootstrapped")
+
   module Blocks = struct
     let list_query =
       let open RPC_query in

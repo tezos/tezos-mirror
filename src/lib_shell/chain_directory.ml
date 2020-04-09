@@ -158,6 +158,12 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       State.history_mode (State.Chain.global_state chain)
       >>= fun history_mode ->
       return (checkpoint, save_point, caboose, history_mode)) ;
+  register0 S.is_bootstrapped (fun chain () () ->
+      match Validator.get validator (State.Chain.id chain) with
+      | Error _ ->
+          Lwt.fail Not_found
+      | Ok chain_validator ->
+          return (Chain_validator.is_bootstrapped chain_validator)) ;
   register0 S.sync_state (fun chain () () ->
       let chain_validator =
         match Validator.get validator (State.Chain.id chain) with
