@@ -4,17 +4,23 @@
  (libraries tezos-base
             tezos-storage
             tezos-shell-context
+            tezos-p2p
+            tezos-p2p-services
             tezos-protocol-updater
             tezos-shell
             tezos-shell-services
             tezos-embedded-protocol-demo-noops
             tezos-stdlib-unix
             tezos-validation
+            tezos-test-services
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_storage
                    -open Tezos_shell_context
                    -open Tezos_protocol_updater
+                   -open Tezos_p2p
+                   -open Tezos_p2p_services
+                   -open Tezos_test_services
                    -open Tezos_shell
                    -open Tezos_shell_services
                    -open Tezos_stdlib_unix

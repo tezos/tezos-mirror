@@ -41,6 +41,8 @@ module Name = struct
       string
 
   let equal = String.equal
+
+  let zero = ""
 end
 
 type t = int

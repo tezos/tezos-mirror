@@ -36,6 +36,8 @@ module Name : sig
   val encoding : t Data_encoding.t
 
   val equal : t -> t -> bool
+
+  val zero : t
 end
 
 (** An abstract version number for the high-level [Distributed_db] messages. *)

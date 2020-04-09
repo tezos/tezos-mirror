@@ -21,6 +21,7 @@ depends: [
   "lwt-canceler" { = "0.2" }
   "alcotest-lwt" { with-test & = "0.8.5" }
   "tezos-workers"
+  "tezos-test-services" { with-test }
   "tezos-embedded-protocol-demo-noops" { with-test }
 ]
 build: [

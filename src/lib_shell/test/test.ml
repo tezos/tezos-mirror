@@ -30,4 +30,5 @@ let () =
     [ ("store", Test_store.tests);
       ("state", Test_state.tests);
       ("store checkpoint", Test_store_checkpoint.tests);
-      ("state checkpoint", Test_state_checkpoint.tests) ]
+      ("state checkpoint", Test_state_checkpoint.tests);
+      ("test protocol validator", Test_protocol_validator.tests) ]
