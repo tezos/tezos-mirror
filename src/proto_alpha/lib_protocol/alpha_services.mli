@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,6 +35,11 @@ module Nonce : sig
 
   val get :
     'a #RPC_context.simple -> 'a -> Raw_level.t -> info shell_tzresult Lwt.t
+end
+
+module Global_counter : sig
+  val global_counter :
+    'a #RPC_context.simple -> 'a -> unit -> Z.t shell_tzresult Lwt.t
 end
 
 module Contract = Contract_services

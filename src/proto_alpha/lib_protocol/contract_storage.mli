@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -88,6 +89,8 @@ val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
 val get_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
+
+val get_global_counter : Raw_context.t -> Z.t tzresult Lwt.t
 
 val get_script_code :
   Raw_context.t ->

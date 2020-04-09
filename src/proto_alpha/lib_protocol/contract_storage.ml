@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -609,18 +610,12 @@ let get_storage ctxt contract =
       Lwt.return (Raw_context.consume_gas ctxt cost)
       >>=? fun ctxt -> return (ctxt, Some storage)
 
-let get_counter c manager =
+let get_counter ctxt manager =
   let contract = Contract_repr.implicit_contract manager in
-  Storage.Contract.Counter.get_option c contract
-  >>=? function
-  | None -> (
-    match Contract_repr.is_implicit contract with
-    | Some _ ->
-        Storage.Contract.Global_counter.get c
-    | None ->
-        failwith "get_counter" )
-  | Some v ->
-      return v
+  must_be_allocated ctxt contract
+  >>=? fun () -> Storage.Contract.Counter.get ctxt contract
+
+let get_global_counter c = Storage.Contract.Global_counter.get c
 
 let get_manager_key c manager =
   let contract = Contract_repr.implicit_contract manager in
