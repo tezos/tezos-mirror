@@ -53,10 +53,10 @@ let prevalidator_filter_not_found =
     ("protocol_hash", Protocol_hash.encoding)
 
 let prevalidator_reinstantiation_failure =
-  declare_2
+  declare_1
     ~section
     ~name:"prevalidator_reinstantiation_failure"
-    ~msg:"failed to reinstantiate prevalidator error {fst_error}"
+    ~msg:"failed to reinstantiate prevalidator error {trace}"
     ~level:Error
-    ("fst_error", Data_encoding.string)
-    ("errors", Data_encoding.list error_encoding)
+    ~pp1:Event.pp_first_error_of_trace
+    ("trace", trace_encoding)

@@ -389,11 +389,8 @@ let on_request (type a) w start_testchain active_chains spawn_child
           Prevalidator.create limits (module Filter) chain_db
           >>= function
           | Error errs ->
-              let fst_err_msg =
-                Format.asprintf "%a" Error_monad.pp (List.hd errs)
-              in
               Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-                (fst_err_msg, errs)
+                errs
               >>= fun () ->
               nv.prevalidator <- None ;
               Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
@@ -466,18 +463,13 @@ let on_launch start_prevalidator w _ parameters =
           parameters.chain_db
         >>= function
         | Error errs ->
-            let fst_err_msg =
-              Format.asprintf "%a" Error_monad.pp (List.hd errs)
-            in
             Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-              (fst_err_msg, errs)
+              errs
             >>= fun () -> return_none
         | Ok prevalidator ->
             return_some prevalidator )
     | Error errs ->
-        let fst_err_msg = Format.asprintf "%a" Error_monad.pp (List.hd errs) in
-        Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-          (fst_err_msg, errs)
+        Chain_validator_event.(emit prevalidator_reinstantiation_failure) errs
         >>= fun () -> return_none
   else return_none )
   >>=? fun prevalidator ->
