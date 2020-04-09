@@ -194,6 +194,32 @@ module Simple : sig
       For instance, the above example uses [declare_2] because
       it has two parameters: [level] and [hash].
 
+      Each parameter has a default pretty-printer that you can override
+      using the [?ppX] parameters. For instance, to override the default
+      pretty-printer of the second parameter, pass a [~pp2] argument.
+      This allows to, for instance, print only the first element of a list,
+      remove quotes for strings, decide how many decimal digits are printed
+      for floats, etc.
+
+      The default pretty-printer behaves as follows:
+      - for base types (booleans, integers, strings, floats), it uses OCaml syntax;
+      - for strings which are longer than 64 characters, it prints only the first characters
+        followed by an ellipsis [[...]];
+      - for null or similar encodings, it prints [N/A];
+      - for unions of [Null] and another encoding [e] (this is the encoding of options),
+        it prints [null] for [Null] and uses [e] to decide how to print the value otherwise;
+      - for other constructed values (arrays, lists, objects, tuples, unions, and recursive
+        types), it prints a placeholder like [<list>] or [<obj>] (see remark below).
+
+      Because constructed values such as lists and objects are printed as placeholders
+      such as [<list>] and [<obj>] and thus do not give any information, those parameters
+      are not automatically added in parentheses at the end of the messages.
+      You can override the default pretty-printer of those parameters to override
+      this behavior. In that case, values will be printed if your pretty-printer does
+      not output an empty string. Note that you should also override the default
+      pretty-printer of constructed types that you inline using braces, as they would
+      be printed using the placeholder otherwise.
+
       Then emit this event with some parameters like this:
       [Internal_event.Simple.emit inject (42, "BL654654654645654654564")]
       This event will be printed as:
@@ -222,6 +248,7 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
     'a t
 
@@ -231,7 +258,9 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
     ('a * 'b) t
 
@@ -241,8 +270,11 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
     ('a * 'b * 'c) t
 
@@ -252,9 +284,13 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
+    ?pp4:(Format.formatter -> 'd -> unit) ->
     string * 'd Data_encoding.t ->
     ('a * 'b * 'c * 'd) t
 
@@ -264,10 +300,15 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
+    ?pp4:(Format.formatter -> 'd -> unit) ->
     string * 'd Data_encoding.t ->
+    ?pp5:(Format.formatter -> 'e -> unit) ->
     string * 'e Data_encoding.t ->
     ('a * 'b * 'c * 'd * 'e) t
 
@@ -277,11 +318,17 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
+    ?pp4:(Format.formatter -> 'd -> unit) ->
     string * 'd Data_encoding.t ->
+    ?pp5:(Format.formatter -> 'e -> unit) ->
     string * 'e Data_encoding.t ->
+    ?pp6:(Format.formatter -> 'f -> unit) ->
     string * 'f Data_encoding.t ->
     ('a * 'b * 'c * 'd * 'e * 'f) t
 
@@ -291,12 +338,19 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
+    ?pp4:(Format.formatter -> 'd -> unit) ->
     string * 'd Data_encoding.t ->
+    ?pp5:(Format.formatter -> 'e -> unit) ->
     string * 'e Data_encoding.t ->
+    ?pp6:(Format.formatter -> 'f -> unit) ->
     string * 'f Data_encoding.t ->
+    ?pp7:(Format.formatter -> 'g -> unit) ->
     string * 'g Data_encoding.t ->
     ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
 
@@ -306,13 +360,21 @@ module Simple : sig
     name:string ->
     msg:string ->
     ?level:level ->
+    ?pp1:(Format.formatter -> 'a -> unit) ->
     string * 'a Data_encoding.t ->
+    ?pp2:(Format.formatter -> 'b -> unit) ->
     string * 'b Data_encoding.t ->
+    ?pp3:(Format.formatter -> 'c -> unit) ->
     string * 'c Data_encoding.t ->
+    ?pp4:(Format.formatter -> 'd -> unit) ->
     string * 'd Data_encoding.t ->
+    ?pp5:(Format.formatter -> 'e -> unit) ->
     string * 'e Data_encoding.t ->
+    ?pp6:(Format.formatter -> 'f -> unit) ->
     string * 'f Data_encoding.t ->
+    ?pp7:(Format.formatter -> 'g -> unit) ->
     string * 'g Data_encoding.t ->
+    ?pp8:(Format.formatter -> 'h -> unit) ->
     string * 'h Data_encoding.t ->
     ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 end

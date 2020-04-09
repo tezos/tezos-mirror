@@ -594,7 +594,13 @@ module Simple = struct
      | Delayed make_encoding ->
          pp_human_readable ~never_empty (make_encoding ()) fmt value
 
-  type parameter = Parameter : string * 'a Data_encoding.t * 'a -> parameter
+  type parameter =
+    | Parameter :
+        string
+        * 'a Data_encoding.t
+        * 'a
+        * (Format.formatter -> 'a -> unit) option
+        -> parameter
 
   type msg_atom = Text of string | Variable of int | Space
 
@@ -653,19 +659,30 @@ module Simple = struct
             (* Not supposed to happen, by construction.
                But it's just logging, no need to fail here. *)
             Format.pp_print_string fmt "???"
-        | Some (Parameter (_name, enc, value), used) ->
+        | Some (Parameter (_name, enc, value, pp), used) -> (
             used := true ;
-            pp_human_readable ~never_empty:true enc fmt value )
+            match pp with
+            | None ->
+                pp_human_readable ~never_empty:true enc fmt value
+            | Some pp ->
+                pp fmt value ) )
       | Space ->
           Format.pp_print_space fmt ()
     in
     List.iter pp_msg_atom msg ;
     (* Then, print variables that were not used by [msg]. *)
     let first_field = ref true in
-    let print_field (Parameter (name, enc, value), used) =
+    let print_field (Parameter (name, enc, value, pp), used) =
       if not !used then
         let value =
-          Format.asprintf "%a" (pp_human_readable ~never_empty:false enc) value
+          let pp =
+            match pp with
+            | None ->
+                pp_human_readable ~never_empty:false enc
+            | Some pp ->
+                pp
+          in
+          Format.asprintf "%a" pp value
         in
         if String.length value > 0 then
           if !first_field then (
@@ -700,7 +717,7 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun () -> Event.emit ?section (fun () -> ())
 
-  let declare_1 (type a) ?section ~name ~msg ?(level = Info)
+  let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name] msg in
@@ -712,7 +729,7 @@ module Simple = struct
       let name = name
 
       let pp fmt f1 =
-        pp_log_message parsed_msg fmt [Parameter (f1_name, f1_enc, f1)]
+        pp_log_message parsed_msg fmt [Parameter (f1_name, f1_enc, f1, pp1)]
 
       let encoding = with_version ~name f1_enc
 
@@ -721,8 +738,8 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameter -> Event.emit ?section (fun () -> parameter)
 
-  let declare_2 (type a b) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
+  let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
       (f2_name, (f2_enc : b Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name; f2_name] msg in
@@ -737,7 +754,8 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [Parameter (f1_name, f1_enc, f1); Parameter (f2_name, f2_enc, f2)]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2) ]
 
       let encoding =
         with_version ~name
@@ -750,9 +768,9 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_3 (type a b c) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
+  let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
       (f3_name, (f3_enc : c Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name] msg in
@@ -767,9 +785,9 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3) ]
 
       let encoding =
         with_version ~name
@@ -783,10 +801,10 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
-      (f3_name, (f3_enc : c Data_encoding.t))
+  let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
+      (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
       (f4_name, (f4_enc : d Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg = parse_msg [f1_name; f2_name; f3_name; f4_name] msg in
@@ -802,10 +820,10 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3);
-            Parameter (f4_name, f4_enc, f4) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3);
+            Parameter (f4_name, f4_enc, f4, pp4) ]
 
       let encoding =
         with_version ~name
@@ -820,11 +838,11 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
-      (f3_name, (f3_enc : c Data_encoding.t))
-      (f4_name, (f4_enc : d Data_encoding.t))
+  let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
+      (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
+      (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
       (f5_name, (f5_enc : e Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg =
@@ -842,11 +860,11 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3);
-            Parameter (f4_name, f4_enc, f4);
-            Parameter (f5_name, f5_enc, f5) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3);
+            Parameter (f4_name, f4_enc, f4, pp4);
+            Parameter (f5_name, f5_enc, f5, pp5) ]
 
       let encoding =
         with_version ~name
@@ -862,12 +880,12 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
-      (f3_name, (f3_enc : c Data_encoding.t))
-      (f4_name, (f4_enc : d Data_encoding.t))
-      (f5_name, (f5_enc : e Data_encoding.t))
+  let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
+      (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
+      (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
+      (f5_name, (f5_enc : e Data_encoding.t)) ?pp6
       (f6_name, (f6_enc : f Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg =
@@ -885,12 +903,12 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3);
-            Parameter (f4_name, f4_enc, f4);
-            Parameter (f5_name, f5_enc, f5);
-            Parameter (f6_name, f6_enc, f6) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3);
+            Parameter (f4_name, f4_enc, f4, pp4);
+            Parameter (f5_name, f5_enc, f5, pp5);
+            Parameter (f6_name, f6_enc, f6, pp6) ]
 
       let encoding =
         with_version ~name
@@ -907,13 +925,13 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
-      (f3_name, (f3_enc : c Data_encoding.t))
-      (f4_name, (f4_enc : d Data_encoding.t))
-      (f5_name, (f5_enc : e Data_encoding.t))
-      (f6_name, (f6_enc : f Data_encoding.t))
+  let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
+      (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
+      (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
+      (f5_name, (f5_enc : e Data_encoding.t)) ?pp6
+      (f6_name, (f6_enc : f Data_encoding.t)) ?pp7
       (f7_name, (f7_enc : g Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg =
@@ -933,13 +951,13 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3);
-            Parameter (f4_name, f4_enc, f4);
-            Parameter (f5_name, f5_enc, f5);
-            Parameter (f6_name, f6_enc, f6);
-            Parameter (f7_name, f7_enc, f7) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3);
+            Parameter (f4_name, f4_enc, f4, pp4);
+            Parameter (f5_name, f5_enc, f5, pp5);
+            Parameter (f6_name, f6_enc, f6, pp6);
+            Parameter (f7_name, f7_enc, f7, pp7) ]
 
       let encoding =
         with_version ~name
@@ -957,14 +975,14 @@ module Simple = struct
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
 
-  let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info)
-      (f1_name, (f1_enc : a Data_encoding.t))
-      (f2_name, (f2_enc : b Data_encoding.t))
-      (f3_name, (f3_enc : c Data_encoding.t))
-      (f4_name, (f4_enc : d Data_encoding.t))
-      (f5_name, (f5_enc : e Data_encoding.t))
-      (f6_name, (f6_enc : f Data_encoding.t))
-      (f7_name, (f7_enc : g Data_encoding.t))
+  let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
+      (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
+      (f2_name, (f2_enc : b Data_encoding.t)) ?pp3
+      (f3_name, (f3_enc : c Data_encoding.t)) ?pp4
+      (f4_name, (f4_enc : d Data_encoding.t)) ?pp5
+      (f5_name, (f5_enc : e Data_encoding.t)) ?pp6
+      (f6_name, (f6_enc : f Data_encoding.t)) ?pp7
+      (f7_name, (f7_enc : g Data_encoding.t)) ?pp8
       (f8_name, (f8_enc : h Data_encoding.t)) =
     let section = make_section section in
     let parsed_msg =
@@ -984,14 +1002,14 @@ module Simple = struct
         pp_log_message
           parsed_msg
           fmt
-          [ Parameter (f1_name, f1_enc, f1);
-            Parameter (f2_name, f2_enc, f2);
-            Parameter (f3_name, f3_enc, f3);
-            Parameter (f4_name, f4_enc, f4);
-            Parameter (f5_name, f5_enc, f5);
-            Parameter (f6_name, f6_enc, f6);
-            Parameter (f7_name, f7_enc, f7);
-            Parameter (f8_name, f8_enc, f8) ]
+          [ Parameter (f1_name, f1_enc, f1, pp1);
+            Parameter (f2_name, f2_enc, f2, pp2);
+            Parameter (f3_name, f3_enc, f3, pp3);
+            Parameter (f4_name, f4_enc, f4, pp4);
+            Parameter (f5_name, f5_enc, f5, pp5);
+            Parameter (f6_name, f6_enc, f6, pp6);
+            Parameter (f7_name, f7_enc, f7, pp7);
+            Parameter (f8_name, f8_enc, f8, pp8) ]
 
       let encoding =
         with_version ~name
