@@ -276,7 +276,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Address
   | Transfer_tokens
   | Implicit_account
-  | Create_contract_2 _
+  | Create_contract _
   | Now
   | Level
   | Balance
@@ -4122,7 +4122,7 @@ and parse_instr :
       typed
         ctxt
         loc
-        (Create_contract_2 (storage_type, arg_type, lambda, root_name))
+        (Create_contract (storage_type, arg_type, lambda, root_name))
         (Item_t
            ( Operation_t None,
              Item_t (Address_t None, rest, addr_annot),

@@ -358,7 +358,7 @@ and ('bef, 'aft) instr =
         instr
   | Implicit_account
       : (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract_2 :
+  | Create_contract :
       'g ty
       * 'p ty
       * ('p * 'g, operation boxed_list * 'g) lambda

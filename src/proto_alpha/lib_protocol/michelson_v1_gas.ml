@@ -712,7 +712,7 @@ module Cost_of = struct
           alloc_cost 1
       | Implicit_account ->
           alloc_cost 1
-      | Create_contract_2 _ ->
+      | Create_contract _ ->
           alloc_cost 7
       | Set_delegate ->
           alloc_cost 1

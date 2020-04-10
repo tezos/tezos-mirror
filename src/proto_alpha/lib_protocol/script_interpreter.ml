@@ -515,7 +515,7 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
         Interp_costs.transfer
     | (Implicit_account, _) ->
         Interp_costs.implicit_account
-    | (Create_contract_2 _, _) ->
+    | (Create_contract _, _) ->
         Interp_costs.create_contract
     | (Set_delegate, _) ->
         Interp_costs.set_delegate
@@ -1085,7 +1085,7 @@ let rec step :
   | (Implicit_account, (key, rest)) ->
       let contract = Contract.implicit_contract key in
       logged_return (((Unit_t None, (contract, "default")), rest), ctxt)
-  | ( Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
+  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     (delegate, (credit, (init, rest))) ) ->
       unparse_ty ctxt param_type
