@@ -28,3 +28,9 @@ val blake2b : bytes -> bytes
 val sha256 : bytes -> bytes
 
 val sha512 : bytes -> bytes
+
+val keccak256 : bytes -> bytes
+
+val sha3_256 : bytes -> bytes
+
+val sha3_512 : bytes -> bytes
