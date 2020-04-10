@@ -1,7 +1,8 @@
 """Structured representation of client output."""
-from typing import List
-import re
 import json
+import re
+from typing import List, Dict
+
 # TODO This is incomplete. Add additional attributes and result classes as
 #      they are needed
 
@@ -75,19 +76,20 @@ class RunScriptResult:
 
     def __init__(self, client_output: str):
         # read storage output
-        pattern = r"(?s)storage\n\s*(.*)\nemitted operations\n"
-        match = re.search(pattern, client_output)
+        pattern_str = r"(?s)storage\n\s*(.*)\nemitted operations\n"
+        match = re.search(pattern_str, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
         self.storage = match.groups()[0]
 
         # read map diff output
-        self.big_map_diff = []
-        pattern = r"big_map diff\n"
-        match = re.search(pattern, client_output)
+        self.big_map_diff = []  # type: List
+        pattern_str = r"big_map diff\n"
+        match = re.search(pattern_str, client_output)
         if match is not None:
-            pattern = re.compile(r"  ((New|Set|Del|Unset).*?)\n")
-            for match_diff in pattern.finditer(client_output, match.end(0)):
+            compiled_pattern = re.compile(r"  ((New|Set|Del|Unset).*?)\n")
+            for match_diff in compiled_pattern.finditer(client_output,
+                                                        match.end(0)):
                 self.big_map_diff.append([match_diff.group(1)])
 
         self.client_output = client_output
@@ -300,8 +302,8 @@ class P2pStatResult:
     """Result of a 'p2p stat' command."""
 
     def __init__(self, client_output: str):
-        self.peers = []
-        self.points = {}   # maps 'ip:port' to PointInfo
+        self.peers = []  # type: List[str]
+        self.points = {}  # type: Dict[str, PointInfo]
         lines = client_output.splitlines()
         j = lines.index('KNOWN PEERS')
         k = lines.index('KNOWN POINTS')

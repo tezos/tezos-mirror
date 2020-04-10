@@ -1,12 +1,12 @@
 import datetime
-import time
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from typing import List
+import time
+from typing import Any, List
 
 from . import client_output
 
@@ -145,7 +145,7 @@ class Client:
     def rpc(self,
             verb: str,
             path: str,
-            data: dict = None,
+            data: Any = None,
             params: List[str] = None) -> dict:
         """Run an arbitrary RPC command
 
@@ -321,7 +321,8 @@ class Client:
     def set_delegate(self,
                      account1: str,
                      account2: str,
-                     args: List[str] = None) -> client_output.TransferResult:
+                     args: List[str] = None
+                     ) -> client_output.SetDelegateResult:
         cmd = ['set', 'delegate', 'for', account1, 'to', account2]
         if args is None:
             args = []
@@ -331,7 +332,8 @@ class Client:
 
     def get_delegate(self,
                      account1: str,
-                     args: List[str] = None) -> client_output.TransferResult:
+                     args: List[str] = None
+                     ) -> client_output.GetDelegateResult:
         cmd = ['get', 'delegate', 'for', account1]
         if args is None:
             args = []
@@ -342,7 +344,7 @@ class Client:
     def withdraw_delegate(
             self,
             account1: str,
-            args: List[str] = None) -> client_output.TransferResult:
+            args: List[str] = None) -> str:
         cmd = ['withdraw', 'delegate', 'from', account1]
         if args is None:
             args = []
@@ -433,7 +435,7 @@ class Client:
     def get_contract_address(self, contract) -> str:
         return self.run(['show', 'known', 'contract', contract]).strip()
 
-    def get_known_addresses(self) -> str:
+    def get_known_addresses(self) -> client_output.GetAddressesResult:
         return client_output.GetAddressesResult(self.run(
             ['list', 'known', 'addresses']
         ))

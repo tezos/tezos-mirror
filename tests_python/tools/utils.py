@@ -1,19 +1,22 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import List, Callable, Pattern  # pylint: disable=unused-import
-import json
-import time
-import re
+from typing import Any, Callable, List, \
+    Pattern
 import hashlib
-import subprocess
+import json
 import os
-import requests
-import ed25519
+import re
+import subprocess
+import time
+
 import base58check
+import ed25519
 import pyblake2
+import requests
 from client.client import Client
 from client.client_output import BakeForResult, RunScriptResult
+
 from . import constants
 
 
@@ -94,7 +97,7 @@ def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
     return max(levels) - min(levels) <= max_diff
 
 
-def get_block_per_level(client: Client, level: int) -> str:
+def get_block_per_level(client: Client, level: int) -> dict:
     """ Return the block at a given level, level must be less or equal than
         current head. If the level is higher than the current, it will fail"""
     block = client.rpc('get', f'/chains/main/blocks/{level}')
@@ -283,7 +286,7 @@ def mutez_of_tez(tez: float):
 
 
 def assert_run_failure(code: Callable,
-                       pattern: Pattern,
+                       pattern: Pattern[Any],
                        mode='stderr') -> None:
     """Executes [code()] and expects the code to fail and raise
     [subprocess.CalledProcessError]. If so, the [pattern] is searched
@@ -297,7 +300,7 @@ def assert_run_failure(code: Callable,
 
     stdout_output = exc.args[2]
     stderr_output = exc.args[3]
-    data = []
+    data = []  # type: List[str]
     if mode == 'stderr':
         data = stderr_output.split('\n')
     else:
@@ -361,13 +364,14 @@ def assert_run_script_failwith(client: Client,
     def cmd():
         client.run_script(contract, param, storage, None, True)
 
-    assert_run_failure(cmd, r'script reached FAILWITH instruction')
+    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))
 
 
-def assert_typecheck_data_failure(client: Client,
-                                  data: str,
-                                  typ: str,
-                                  err: Pattern = r'ill-typed data') -> None:
+def assert_typecheck_data_failure(
+        client: Client,
+        data: str,
+        typ: str,
+        err: Pattern[Any] = re.compile(r'ill-typed data')) -> None:
     def cmd():
         client.typecheck_data(data, typ)
 
@@ -436,4 +440,4 @@ def assert_transfer_failwith(client: Client,
     def cmd():
         client.transfer(amount, sender, receiver, args)
 
-    assert_run_failure(cmd, r'script reached FAILWITH instruction')
+    assert_run_failure(cmd, re.compile(r'script reached FAILWITH instruction'))

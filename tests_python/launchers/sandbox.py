@@ -1,14 +1,14 @@
-from typing import Dict, Callable, List, Tuple
-import tempfile
-import shutil
+from typing import Dict, List, Tuple, Callable
 import json
 import os
+import shutil
+import tempfile
 import time
-from daemons.node import Node
+
+from client.client import Client
 from daemons.baker import Baker
 from daemons.endorser import Endorser
-from client.client import Client
-
+from daemons.node import Node
 
 NODE = 'tezos-node'
 CLIENT = 'tezos-client'
@@ -155,8 +155,7 @@ class Sandbox:
         assert 0 <= node_id < self.num_peers, f'{node_id} outside bounds'
         if peers is None:
             peers = list(range(self.num_peers))
-        else:
-            assert all(0 <= peer < self.num_peers for peer in peers)
+        assert all(0 <= peer < self.num_peers for peer in peers)
 
         log_file = None
         if self.log_dir:
@@ -181,6 +180,10 @@ class Sandbox:
             node.init_config()
         else:
             assert os.path.isfile(snapshot)
+            assert_msg = "The attribute sandbox_file can not be None. " \
+                "Please verify you wrapped the call to this method inside a " \
+                "with statement"
+            assert self.sandbox_file is not None, assert_msg
             sandboxed_import = [f'--sandbox', self.sandbox_file]
             if reconstruct:
                 node.snapshot_import(snapshot,
@@ -452,5 +455,5 @@ class SandboxMultiBranch(Sandbox):
         assert not branch
         branch = self._branch_map[node_id]
         super().add_node(node_id, peers, params, log_levels, private,
-                         config_client, use_tls, snapshot, branch,
-                         client_factory)
+                         config_client, use_tls, snapshot, reconstruct,
+                         branch, client_factory)

@@ -1,6 +1,6 @@
-from typing import (Optional, Union, TextIO,  # pylint: disable=unused-import
-                    List)
 import subprocess
+from typing import (IO, Any, List, Optional,  # pylint: disable=unused-import
+                    Union)
 
 
 # TODO factorize with client.format_command
@@ -16,7 +16,7 @@ def prepare_log(cmd: List[str],
                 log_file: Optional[str],
                 overwrite: bool = True):
     """ By default overwrite old log, append otherwise """
-    stdout = 0  # type: Union[int, TextIO]
+    stdout = 0  # type: Union[int, IO[Any]]
     cmd_str = format_command(cmd, color=False)
     if log_file:
         flag = 'w' if overwrite else 'a+'
