@@ -60,7 +60,8 @@ module Types = struct
   include Worker_state
 
   type parameters = {
-    parent : Name.t option;
+    parent : (Name.t * bool) option;
+    (* inherit bootstrap status from parent chain validator *)
     db : Distributed_db.t;
     chain_state : State.Chain.t;
     chain_db : Distributed_db.chain_db;
@@ -126,7 +127,7 @@ let shutdown_child nv active_chains =
 
 let notify_new_block w block =
   let nv = Worker.state w in
-  Option.iter nv.parameters.parent ~f:(fun id ->
+  Option.iter nv.parameters.parent ~f:(fun (id, _) ->
       try
         let w = List.assoc id (Worker.list table) in
         let nv = Worker.state w in
@@ -368,7 +369,7 @@ let may_switch_test_chain w active_chains spawn_child block =
          global initialization boilerplate (e.g. notifying [global_chains_input],
          adding the chain to the correct tables, ...) *)
       spawn_child
-        ~parent:(State.Chain.id chain_state)
+        ~parent:(State.Chain.id chain_state, nv.bootstrapped)
         nv.parameters.peer_validator_limits
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
@@ -567,6 +568,13 @@ let on_launch start_prevalidator w _ parameters =
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let (bootstrapped_waiter, bootstrapped_wakener) = Lwt.wait () in
+  let bootstrapped =
+    match parameters.parent with
+    | Some (_, bootstrap_status) ->
+        bootstrap_status
+    | None ->
+        parameters.limits.bootstrap_conf.bootstrap_threshold <= 0
+  in
   let nv =
     {
       parameters;
@@ -574,7 +582,7 @@ let on_launch start_prevalidator w _ parameters =
       new_head_input;
       bootstrapped_wakener;
       bootstrapped_waiter;
-      bootstrapped = parameters.limits.bootstrap_conf.bootstrap_threshold <= 0;
+      bootstrapped;
       active_peers = P2p_peer.Error_table.create 50;
       (* TODO use `2 * max_connection` *)
       child = None;
