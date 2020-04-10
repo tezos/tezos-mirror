@@ -63,6 +63,11 @@ check_python_linting:
   script:
     - make test-lint
 
+check_python_types:
+  <<: *build_definition
+  script:
+    - make -C tests_python typecheck
+
 build:
   <<: *build_definition
   script:

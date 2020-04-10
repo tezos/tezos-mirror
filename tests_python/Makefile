@@ -14,6 +14,7 @@ all:
 lint_all: lint lint2
 
 typecheck:
+	@echo "Typechecking with mypy version `mypy --version`"
 	$(TYPECHECK) $(PACKAGES)
 
 lint:
