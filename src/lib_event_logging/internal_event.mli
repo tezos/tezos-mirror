@@ -54,7 +54,7 @@ module Level : sig
   (** Alias of {!level}. *)
   type t = level
 
-  (** The default level is {!Info}, it is used in {!Event_defaults}. *)
+  (** The default level is {!Info}. *)
   val default : t
 
   (** Cast the level to a value of {!Lwt_log_core.level}. *)
@@ -110,13 +110,6 @@ module type EVENT_DEFINITION = sig
 
   (** Return the preferred {!level} for a given event instance. *)
   val level : t -> level
-end
-
-(** Default values for fields in {!EVENT_DEFINITION}. *)
-module Event_defaults : sig
-  (** Use this module as needed with [include Event_defaults]. *)
-
-  val level : 'a -> level
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)

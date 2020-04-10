@@ -145,10 +145,6 @@ module type EVENT_DEFINITION = sig
   val level : t -> level
 end
 
-module Event_defaults = struct
-  let level _ = Level.default
-end
-
 module type EVENT = sig
   include EVENT_DEFINITION
 
@@ -1359,7 +1355,7 @@ module Debug_event = struct
 
     let doc = "Generic event for semi-structured debug information."
 
-    include Event_defaults
+    let level _ = Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)

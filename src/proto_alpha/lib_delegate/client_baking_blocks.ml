@@ -133,7 +133,7 @@ module Block_seen_event = struct
 
     let doc = "Block observed while monitoring a blockchain."
 
-    include Internal_event.Event_defaults
+    let level _ = Internal_event.Info
   end
 
   module Event = Internal_event.Make (Definition)
