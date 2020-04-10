@@ -173,16 +173,14 @@ let classify_base_dir base_dir =
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash ~constants_overrides_file ~bootstrap_accounts_file =
   let base_dir = cctxt#get_base_dir in
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
-  let context_file = Filename.concat mockup_dir context_file in
   let create_base_dir () =
-    cctxt#message "created mockup client base dir in %s" base_dir
-    >>= fun () ->
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
+    >>= fun () ->
+    cctxt#message "created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
   ( match classify_base_dir base_dir with
-  | Base_dir_does_not_exist ->
+  | Base_dir_does_not_exist | Base_dir_is_empty ->
       create_base_dir ()
   | Base_dir_is_file ->
       failwith "%s is a file" base_dir
@@ -191,17 +189,17 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   | Base_dir_is_nonempty ->
       failwith
         "%s is not empty, please specify a fresh base directory"
-        base_dir
-  | Base_dir_is_empty ->
-      create_base_dir () )
+        base_dir )
   >>=? fun () ->
-  Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
-  >>= fun () ->
   init_mockup_context_by_protocol_hash
     ~protocol_hash
     ~constants_overrides_file
     ~bootstrap_accounts_file
   >>=? fun (_mockup_env, rpc_context) ->
+  let mockup_dir = Filename.concat base_dir mockup_dirname in
+  Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
+  >>= fun () ->
+  let context_file = Filename.concat mockup_dir context_file in
   let json =
     Data_encoding.Json.construct
       persisted_mockup_environment_encoding
