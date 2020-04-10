@@ -161,7 +161,7 @@ let parsed_account_repr_encoding =
       {name; sk_uri = Client_keys.make_sk_uri sk_uri; amount})
     (obj3
        (req "name" string)
-       (req "sk_uri" Client_keys.uri_encoding)
+       (req "sk_uri" RPC_encoding.uri_encoding)
        (req "amount" Protocol.Tez_repr.encoding))
 
 let parsed_accounts_reprs = Data_encoding.list parsed_account_repr_encoding

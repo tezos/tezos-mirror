@@ -93,7 +93,7 @@ let bootstrap_secret_encoding =
     (fun (name, sk_uri, _) -> {name; sk_uri = Client_keys.make_sk_uri sk_uri})
     (obj3
        (req "name" string)
-       (req "sk_uri" Client_keys.uri_encoding)
+       (req "sk_uri" RPC_encoding.uri_encoding)
        (req "amount" string))
 
 let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
