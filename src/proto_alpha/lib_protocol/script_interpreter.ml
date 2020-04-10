@@ -511,8 +511,6 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.transfer_tokens
   | (Implicit_account, _) ->
       Interp_costs.implicit_account
-  | (Create_contract _, _) ->
-      Interp_costs.create_contract
   | (Set_delegate, _) ->
       Interp_costs.set_delegate
   | (Balance, _) ->
@@ -551,12 +549,8 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.dropn n
   | (ChainId, _) ->
       Interp_costs.chain_id
-  | (Create_account, _) ->
-      Interp_costs.create_contract
   | (Create_contract_2 _, _) ->
       Interp_costs.create_contract
-  | (Steps_to_quota, _) ->
-      Interp_costs.push
   | (Never, (_, _)) ->
       .
 
@@ -1122,104 +1116,9 @@ let rec step_bounded :
               lazy_storage_diff ),
             rest ),
           ctxt )
-  | (Create_account, (manager, (delegate, (_delegatable, (credit, rest))))) ->
-      Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract) ->
-      (* store in optimized binary representation - as unparsed with [Optimized]. *)
-      let manager_bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Signature.Public_key_hash.encoding
-          manager
-      in
-      let storage =
-        Script_repr.lazy_expr @@ Micheline.strip_locations
-        @@ Micheline.Bytes (0, manager_bytes)
-      in
-      let script = {code = Legacy_support.manager_script_code; storage} in
-      let operation =
-        Origination {credit; delegate; preorigination = Some contract; script}
-      in
-      Lwt.return (fresh_internal_nonce ctxt)
-      >>=? fun (ctxt, nonce) ->
-      logged_return
-        ( ( ( Internal_operation
-                {source = step_constants.self; operation; nonce},
-              None ),
-            ((contract, "default"), rest) ),
-          ctxt )
   | (Implicit_account, (key, rest)) ->
       let contract = Contract.implicit_contract key in
       logged_return (((Unit_t None, (contract, "default")), rest), ctxt)
-  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
-      (manager, (delegate, (spendable, (delegatable, (credit, (init, rest))))))
-    ) ->
-      unparse_ty ctxt param_type
-      >>?= fun (unparsed_param_type, ctxt) ->
-      let unparsed_param_type =
-        Script_ir_translator.add_field_annot root_name None unparsed_param_type
-      in
-      unparse_ty ctxt storage_type
-      >>?= fun (unparsed_storage_type, ctxt) ->
-      let code =
-        Script.lazy_expr
-        @@ Micheline.strip_locations
-             (Seq
-                ( 0,
-                  [ Prim (0, K_parameter, [unparsed_param_type], []);
-                    Prim (0, K_storage, [unparsed_storage_type], []);
-                    Prim (0, K_code, [code], []) ] ))
-      in
-      collect_lazy_storage ctxt storage_type init
-      >>?= fun (to_duplicate, ctxt) ->
-      let to_update = no_lazy_storage_id in
-      extract_lazy_storage_diff
-        ctxt
-        Optimized
-        storage_type
-        init
-        ~to_duplicate
-        ~to_update
-        ~temporary:true
-      >>=? fun (init, lazy_storage_diff, ctxt) ->
-      unparse_data ctxt Optimized storage_type init
-      >>=? fun (storage, ctxt) ->
-      Gas.consume ctxt (Script.strip_locations_cost storage)
-      >>?= fun ctxt ->
-      let storage = Script.lazy_expr @@ Micheline.strip_locations storage in
-      ( if spendable then
-        Legacy_support.add_do
-          ~manager_pkh:manager
-          ~script_code:code
-          ~script_storage:storage
-      else if delegatable then
-        Legacy_support.add_set_delegate
-          ~manager_pkh:manager
-          ~script_code:code
-          ~script_storage:storage
-      else if Legacy_support.has_default_entrypoint code then
-        Legacy_support.add_root_entrypoint code
-        >>=? fun code -> return (code, storage)
-      else return (code, storage) )
-      >>=? fun (code, storage) ->
-      Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract) ->
-      let operation =
-        Origination
-          {
-            credit;
-            delegate;
-            preorigination = Some contract;
-            script = {code; storage};
-          }
-      in
-      Lwt.return (fresh_internal_nonce ctxt)
-      >>=? fun (ctxt, nonce) ->
-      logged_return
-        ( ( ( Internal_operation
-                {source = step_constants.self; operation; nonce},
-              lazy_storage_diff ),
-            ((contract, "default"), rest) ),
-          ctxt )
   | ( Create_contract_2 (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     (delegate, (credit, (init, rest))) ) ->
@@ -1314,10 +1213,6 @@ let rec step_bounded :
   | (Sha512, (bytes, rest)) ->
       let hash = Raw_hashes.sha512 bytes in
       logged_return ((hash, rest), ctxt)
-  | (Steps_to_quota, rest) ->
-      (* FIXME: to remove *)
-      let steps = Z.zero in
-      logged_return ((Script_int.(abs (of_zint steps)), rest), ctxt)
   | (Source, rest) ->
       logged_return (((step_constants.payer, "default"), rest), ctxt)
   | (Sender, rest) ->
