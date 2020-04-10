@@ -10,8 +10,10 @@ depends: [
   "dune" { >= "1.7" }
   "tezos-stdlib-unix"
   "tezos-base"
+  "tezos-client-base"
   "tezos-rpc"
   "tezos-shell"
+  "tezos-p2p-services"
   "tezos-p2p"
   "tezos-protocol-environment"
   "tezos-mockup-registration"
