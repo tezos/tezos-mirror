@@ -127,6 +127,12 @@ struct
     let sha512 = Hacl.Hash.SHA512.digest
 
     let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
+
+    let keccak256 msg = Hacl.Hash.Keccak_256.digest msg
+
+    let sha3_256 msg = Hacl.Hash.SHA3_256.digest msg
+
+    let sha3_512 msg = Hacl.Hash.SHA3_512.digest msg
   end
 
   module Z = struct
