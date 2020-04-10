@@ -710,17 +710,8 @@ module Cost_of = struct
           alloc_cost 2
       | Transfer_tokens ->
           alloc_cost 1
-      | Create_account ->
-          alloc_cost 2
       | Implicit_account ->
           alloc_cost 1
-      | Create_contract _ ->
-          alloc_cost 8
-      (* Deducted the cost of removed arguments manager, spendable and delegatable:
-           - manager: key_hash = 1
-           - spendable: bool = 0
-           - delegatable: bool = 0
-        *)
       | Create_contract_2 _ ->
           alloc_cost 7
       | Set_delegate ->
@@ -744,8 +735,6 @@ module Cost_of = struct
       | Sha256 ->
           alloc_cost 1
       | Sha512 ->
-          alloc_cost 1
-      | Steps_to_quota ->
           alloc_cost 1
       | Source ->
           alloc_cost 1
