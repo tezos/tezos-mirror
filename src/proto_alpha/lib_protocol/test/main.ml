@@ -40,5 +40,6 @@ let () =
       ("qty", Qty.tests);
       ("voting", Voting.tests);
       ("interpretation", Interpretation.tests);
-      ("gas properties", Gas_properties.tests) ]
+      ("gas properties", Gas_properties.tests);
+      ("Storage description", Storage.tests) ]
   |> Lwt_main.run
