@@ -356,21 +356,8 @@ and ('bef, 'aft) instr =
       : ( 'arg * (Tez.t * ('arg typed_contract * 'rest)),
           operation * 'rest )
         instr
-  | Create_account
-      : ( public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
-          operation * (address * 'rest) )
-        instr
   | Implicit_account
       : (public_key_hash * 'rest, unit typed_contract * 'rest) instr
-  | Create_contract :
-      'g ty
-      * 'p ty
-      * ('p * 'g, operation boxed_list * 'g) lambda
-      * field_annot option
-      -> ( public_key_hash
-           * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
-           operation * (address * 'rest) )
-         instr
   | Create_contract_2 :
       'g ty
       * 'p ty
@@ -391,9 +378,6 @@ and ('bef, 'aft) instr =
   | Blake2b : (bytes * 'rest, bytes * 'rest) instr
   | Sha256 : (bytes * 'rest, bytes * 'rest) instr
   | Sha512 : (bytes * 'rest, bytes * 'rest) instr
-  | Steps_to_quota
-      : (* TODO: check that it always returns a nat *)
-      ('rest, n num * 'rest) instr
   | Source : ('rest, address * 'rest) instr
   | Sender : ('rest, address * 'rest) instr
   | Self : 'p ty * string -> ('rest, 'p typed_contract * 'rest) instr

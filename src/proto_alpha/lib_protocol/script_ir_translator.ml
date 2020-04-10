@@ -406,11 +406,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Transfer_tokens ->
       0
-  | Create_account ->
-      0
   | Implicit_account ->
-      0
-  | Create_contract _ ->
       0
   | Create_contract_2 _ ->
       0
@@ -429,8 +425,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | Sha256 ->
       0
   | Sha512 ->
-      0
-  | Steps_to_quota ->
       0
   | Source ->
       0
@@ -4187,29 +4181,8 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Set_delegate (Item_t (Operation_t None, rest, annot))
-  | ( Prim (loc, I_CREATE_ACCOUNT, [], annot),
-      Item_t
-        ( Key_hash_t _,
-          Item_t
-            ( Option_t (Key_hash_t _, _),
-              Item_t (Bool_t _, Item_t (Mutez_t _, rest, _), _),
-              _ ),
-          _ ) ) ->
-      if legacy then
-        (* For existing contracts, this instruction is still allowed *)
-        Lwt.return @@ parse_two_var_annot loc annot
-        >>=? fun (op_annot, addr_annot) ->
-        typed
-          ctxt
-          loc
-          Create_account
-          (Item_t
-             ( Operation_t None,
-               Item_t (Address_t None, rest, addr_annot),
-               op_annot ))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_CREATE_ACCOUNT)
+  | (Prim (_, I_CREATE_ACCOUNT, _, _), _) ->
+      fail (Deprecated_instruction I_CREATE_ACCOUNT)
   | (Prim (loc, I_IMPLICIT_ACCOUNT, [], annot), Item_t (Key_hash_t _, rest, _))
     ->
       parse_var_annot loc annot
@@ -4221,105 +4194,9 @@ and parse_instr :
         (Item_t (Contract_t (Unit_t None, None), rest, annot))
   | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
       Item_t
-        ( Key_hash_t _,
-          Item_t
-            ( Option_t (Key_hash_t _, _),
-              Item_t
-                ( Bool_t _,
-                  Item_t
-                    ( Bool_t _,
-                      Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
-                      _ ),
-                  _ ),
-              _ ),
+        ( Option_t (Key_hash_t _, _),
+          Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
-      if legacy then
-        (* For existing contracts, this instruction is still allowed *)
-        Lwt.return @@ parse_two_var_annot loc annot
-        >>=? fun (op_annot, addr_annot) ->
-        let canonical_code = fst @@ Micheline.extract_locations code in
-        Lwt.return @@ parse_toplevel ~legacy canonical_code
-        >>=? fun (arg_type, storage_type, code_field, root_name) ->
-        trace
-          (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
-          (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
-        >>=? fun (Ex_ty arg_type, ctxt) ->
-        ( if legacy then Error_monad.return ()
-        else Lwt.return (well_formed_entrypoints ~root_name arg_type) )
-        >>=? fun () ->
-        trace
-          (Ill_formed_type
-             (Some "storage", canonical_code, location storage_type))
-          (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
-        >>=? fun (Ex_ty storage_type, ctxt) ->
-        let arg_annot =
-          default_annot
-            (type_to_var_annot (name_of_ty arg_type))
-            ~default:default_param_annot
-        in
-        let storage_annot =
-          default_annot
-            (type_to_var_annot (name_of_ty storage_type))
-            ~default:default_storage_annot
-        in
-        let arg_type_full =
-          Pair_t
-            ( (arg_type, None, arg_annot),
-              (storage_type, None, storage_annot),
-              None )
-        in
-        let ret_type_full =
-          Pair_t
-            ( (List_t (Operation_t None, None), None, None),
-              (storage_type, None, None),
-              None )
-        in
-        trace
-          (Ill_typed_contract (canonical_code, []))
-          (parse_returning
-             (Toplevel
-                {
-                  storage_type;
-                  param_type = arg_type;
-                  root_name;
-                  legacy_create_contract_literal = true;
-                })
-             ctxt
-             ~legacy
-             ?type_logger
-             ~stack_depth
-             (arg_type_full, None)
-             ret_type_full
-             code_field)
-        >>=? fun ( ( Lam
-                       ( { bef = Item_t (arg, Empty_t, _);
-                           aft = Item_t (ret, Empty_t, _);
-                           _ },
-                         _ ) as lambda ),
-                   ctxt ) ->
-        Lwt.return @@ merge_types ~legacy ctxt loc arg arg_type_full
-        >>=? fun (Eq, _, ctxt) ->
-        Lwt.return @@ merge_types ~legacy ctxt loc ret ret_type_full
-        >>=? fun (Eq, _, ctxt) ->
-        Lwt.return @@ merge_types ~legacy ctxt loc storage_type ginit
-        >>=? fun (Eq, _, ctxt) ->
-        typed
-          ctxt
-          loc
-          (Create_contract (storage_type, arg_type, lambda, root_name))
-          (Item_t
-             ( Operation_t None,
-               Item_t (Address_t None, rest, addr_annot),
-               op_annot ))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_CREATE_CONTRACT)
-  | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
-      (* Removed the instruction's arguments manager, spendable and delegatable *)
-    Item_t
-      ( Option_t (Key_hash_t _, _),
-        Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
-        _ ) ) ->
       parse_two_var_annot loc annot
       >>?= fun (op_annot, addr_annot) ->
       let canonical_code = fst @@ Micheline.extract_locations code in
@@ -4437,15 +4314,8 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
-  | (Prim (loc, I_STEPS_TO_QUOTA, [], annot), stack) ->
-      if legacy then
-        (* For existing contracts, this instruction is still allowed *)
-        parse_var_annot loc annot ~default:default_steps_annot
-        >>?= fun annot ->
-        typed ctxt loc Steps_to_quota (Item_t (Nat_t None, stack, annot))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_STEPS_TO_QUOTA)
+  | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
+      fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
       parse_var_annot loc annot ~default:default_source_annot
       >>?= fun annot ->
@@ -4534,7 +4404,6 @@ and parse_instr :
             | I_LE
             | I_GE
             | I_TRANSFER_TOKENS
-            | I_CREATE_ACCOUNT
             | I_SET_DELEGATE
             | I_NOW
             | I_IMPLICIT_ACCOUNT
@@ -4644,10 +4513,6 @@ and parse_instr :
       serialize_stack_for_error ctxt stack
       >>?= fun (stack, _ctxt) ->
       fail (Bad_stack (loc, I_CREATE_CONTRACT, 7, stack))
-  | (Prim (loc, I_CREATE_ACCOUNT, [], _), stack) ->
-      serialize_stack_for_error ctxt stack
-      >>?= fun (stack, _ctxt) ->
-      fail (Bad_stack (loc, I_CREATE_ACCOUNT, 4, stack))
   | (Prim (loc, I_TRANSFER_TOKENS, [], _), stack) ->
       Lwt.return
         ( serialize_stack_for_error ctxt stack
@@ -4778,7 +4643,6 @@ and parse_instr :
              I_LE;
              I_GE;
              I_TRANSFER_TOKENS;
-             I_CREATE_ACCOUNT;
              I_CREATE_CONTRACT;
              I_NOW;
              I_AMOUNT;
@@ -4790,7 +4654,6 @@ and parse_instr :
              I_SHA256;
              I_SHA512;
              I_HASH_KEY;
-             I_STEPS_TO_QUOTA;
              I_PUSH;
              I_NONE;
              I_LEFT;
