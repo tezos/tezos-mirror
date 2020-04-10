@@ -597,6 +597,14 @@ For other aspects of regression testing, we refer to the
 
 .. _pitfalls_to_regression_testing:
 
+Typechecking python code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We also enforce the types on the python codebase. We use `mypy`, a typechecker for python.
+Code can be typechecked using the Makefile target `make typecheck`. It is also
+enforced in the CI with the job `check_python_types`.
+
+
 Pitfalls to regression testing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -618,8 +626,6 @@ There are few simple possible improvements.
 - Use parametric fixtures more consistently: one can relaunch the same tests,
   with different parameters such as the number of peers,
 - Finish porting bash scripts,
-- improve typing annotations and ``mypy`` (typechecker) usage. Currently, only
-  part of the code is type-checked.
 
 Known issues
 ------------
