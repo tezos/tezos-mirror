@@ -111,16 +111,6 @@ unit:requester:
   script:
     - dune build @src/lib_requester/runtest
 
-unit:src/proto_005_PsBabyM1/lib_client:
-  <<: *test_definition
-  script:
-    - dune build @src/proto_005_PsBabyM1/lib_client/runtest
-
-unit:protocol_compiles:
-  <<: *test_definition
-  script:
-    - dune build @runtest_compile_protocol
-
 unit:error_monad:
   <<: *test_definition
   script:
@@ -223,6 +213,11 @@ unit:ocaml-blake2:
 
 
 ##END_UNITEST##
+
+unit:protocol_compiles:
+  <<: *test_definition
+  script:
+    - dune build @runtest_compile_protocol
 
 ############################################################
 ## Stage: run shell integration tests                     ##
