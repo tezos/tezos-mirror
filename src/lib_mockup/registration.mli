@@ -49,6 +49,7 @@ module type Mockup_sig = sig
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
 
   val init :
+    cctxt:Tezos_client_base.Client_context.full ->
     parameters:parameters ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->

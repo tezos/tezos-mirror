@@ -134,24 +134,52 @@ let protocol_constants_no_overrides =
     cost_per_byte = None;
   }
 
-let apply_protocol_overrides (o : protocol_constants_overrides)
-    (c : Protocol.Constants_repr.parametric) =
-  {
-    c with
-    hard_gas_limit_per_operation =
-      Option.unopt
-        ~default:c.hard_gas_limit_per_operation
-        o.hard_gas_limit_per_operation;
-    hard_gas_limit_per_block =
-      Option.unopt
-        ~default:c.hard_gas_limit_per_block
-        o.hard_gas_limit_per_block;
-    hard_storage_limit_per_operation =
-      Option.unopt
-        ~default:c.hard_storage_limit_per_operation
-        o.hard_storage_limit_per_operation;
-    cost_per_byte = Option.unopt ~default:c.cost_per_byte o.cost_per_byte;
-  }
+let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
+    (o : protocol_constants_overrides) (c : Protocol.Constants_repr.parametric)
+    =
+  let has_custom =
+    Stdlib.Option.is_some o.hard_gas_limit_per_operation
+    || Stdlib.Option.is_some o.hard_gas_limit_per_block
+    || Stdlib.Option.is_some o.hard_storage_limit_per_operation
+    || Stdlib.Option.is_some o.cost_per_byte
+  in
+  ( if has_custom then
+    let pp_opt_custom name pp ppf opt_value =
+      match opt_value with
+      | None ->
+          ()
+      | Some value ->
+          Format.fprintf ppf "@[<h>%s: %a@]@," name pp value
+    in
+    cctxt#message
+      "@[<v>mockup client uses protocol overrides:@,%a%a%a%a@]@?"
+      (pp_opt_custom "hard_gas_limit_per_operation" Z.pp_print)
+      o.hard_gas_limit_per_operation
+      (pp_opt_custom "hard_gas_limit_per_block" Z.pp_print)
+      o.hard_gas_limit_per_block
+      (pp_opt_custom "hard_storage_limit_per_operation" Z.pp_print)
+      o.hard_storage_limit_per_operation
+      (pp_opt_custom "cost_per_byte" Protocol.Tez_repr.pp)
+      o.cost_per_byte
+  else Lwt.return_unit )
+  >>= fun () ->
+  return
+    {
+      c with
+      hard_gas_limit_per_operation =
+        Option.unopt
+          ~default:c.hard_gas_limit_per_operation
+          o.hard_gas_limit_per_operation;
+      hard_gas_limit_per_block =
+        Option.unopt
+          ~default:c.hard_gas_limit_per_block
+          o.hard_gas_limit_per_block;
+      hard_storage_limit_per_operation =
+        Option.unopt
+          ~default:c.hard_storage_limit_per_operation
+          o.hard_storage_limit_per_operation;
+      cost_per_byte = Option.unopt ~default:c.cost_per_byte o.cost_per_byte;
+    }
 
 let parsed_account_repr_encoding =
   let open Data_encoding in
@@ -244,11 +272,12 @@ let initial_context (header : Block_header.shell_header)
   >>=? fun {context; _} -> return context
 
 let mem_init :
+    cctxt:Tezos_client_base.Client_context.full ->
     parameters:mockup_protocol_parameters ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
- fun ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
+ fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -276,6 +305,8 @@ let mem_init :
           (Data_encoding.Json.print_error ?print_unknown:None)
           error ) )
   >>=? fun protocol_overrides ->
+  apply_protocol_overrides cctxt protocol_overrides parameters.constants
+  >>=? fun protocol_custom ->
   ( match bootstrap_accounts_json with
   | None ->
       return None
@@ -298,8 +329,7 @@ let mem_init :
         Option.unopt
           ~default:parameters.bootstrap_accounts
           bootstrap_accounts_custom;
-      constants =
-        apply_protocol_overrides protocol_overrides parameters.constants;
+      constants = protocol_custom;
     }
   >>=? fun context ->
   return

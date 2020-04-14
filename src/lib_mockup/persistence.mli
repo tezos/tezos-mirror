@@ -26,13 +26,14 @@
 (** Returns a mockup environment for the default protocol (which is the first
     in the list of registered protocol, cf [Registration] module). *)
 val default_mockup_context :
-  unit ->
+  Tezos_client_base.Client_context.full ->
   (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
   tzresult
   Lwt.t
 
 (**  Returns a mockup environment for the specified protocol hash. *)
 val init_mockup_context_by_protocol_hash :
+  cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->

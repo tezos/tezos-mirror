@@ -168,13 +168,16 @@ let setup_http_rpc_client_config parsed_args base_dir rpc_config =
        ~base_dir
        ~rpc_config
 
-let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
+let setup_mockup_rpc_client_config
+    (cctxt : Tezos_client_base.Client_context.full)
+    (args : Client_config.cli_args) base_dir =
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
     | None ->
-        Tezos_mockup.Persistence.default_mockup_context ()
+        Tezos_mockup.Persistence.default_mockup_context cctxt
     | Some protocol_hash ->
         Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
+          ~cctxt
           ~protocol_hash
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
@@ -213,8 +216,8 @@ let setup_mockup_rpc_client_config (args : Client_config.cli_args) base_dir =
   >>=? fun ((mockup_env, rpc_context), mem_only) ->
   return (new unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context)
 
-let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
-    rpc_config =
+let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
+    (parsed_args : Client_config.cli_args option) base_dir rpc_config =
   match parsed_args with
   | None ->
       setup_http_rpc_client_config parsed_args base_dir rpc_config
@@ -223,7 +226,7 @@ let setup_client_config (parsed_args : Client_config.cli_args option) base_dir
     | Client_config.Mode_client ->
         setup_http_rpc_client_config parsed_args base_dir rpc_config
     | Client_config.Mode_mockup ->
-        setup_mockup_rpc_client_config args base_dir )
+        setup_mockup_rpc_client_config cctxt args base_dir )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
@@ -263,15 +266,16 @@ let main (module C : M) ~select_commands =
   >>= fun () ->
   Lwt.catch
     (fun () ->
-      C.parse_config_args
-        (new unix_full
-           ~chain:C.default_chain
-           ~block:C.default_block
-           ~confirmations:None
-           ~password_filename:None
-           ~base_dir:C.default_base_dir
-           ~rpc_config:RPC_client_unix.default_config)
-        original_args
+      let full =
+        new unix_full
+          ~chain:C.default_chain
+          ~block:C.default_block
+          ~confirmations:None
+          ~password_filename:None
+          ~base_dir:C.default_base_dir
+          ~rpc_config:RPC_client_unix.default_config
+      in
+      C.parse_config_args full original_args
       >>=? (fun (parsed, remaining) ->
              let parsed_config_file = parsed.Client_config.parsed_config_file
              and parsed_args = parsed.Client_config.parsed_args
@@ -323,7 +327,7 @@ let main (module C : M) ~select_commands =
                | None ->
                    rpc_config
              in
-             setup_client_config parsed_args base_dir rpc_config
+             setup_client_config full parsed_args base_dir rpc_config
              >>=? fun client_config ->
              setup_remote_signer
                (module C)

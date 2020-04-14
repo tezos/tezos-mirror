@@ -73,34 +73,37 @@ let get_mockup_by_hash :
       failwith "requested protocol not found in available mockup environments"
 
 let default_mockup_context :
-    unit ->
+    Tezos_client_base.Client_context.full ->
     (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
     tzresult
     Lwt.t =
- fun () ->
+ fun cctxt ->
   match Registration.get_registered_contexts () with
   | [] ->
       failwith "default_mockup_context: no registered mockup environment"
   | mockup :: _ ->
       let (module Mockup) = mockup in
       Mockup.init
+        ~cctxt
         ~parameters:Mockup.default_parameters
         ~constants_overrides_json:None
         ~bootstrap_accounts_json:None
       >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let init_mockup_context_by_protocol_hash :
+    cctxt:Tezos_client_base.Client_context.full ->
     protocol_hash:Protocol_hash.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
     tzresult
     Lwt.t =
- fun ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
+ fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
   get_mockup_by_hash protocol_hash
   >>=? fun mockup ->
   let (module Mockup) = mockup in
   Mockup.init
+    ~cctxt
     ~parameters:Mockup.default_parameters
     ~constants_overrides_json
     ~bootstrap_accounts_json
@@ -196,6 +199,12 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     cctxt#message "created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
+  init_mockup_context_by_protocol_hash
+    ~cctxt
+    ~protocol_hash
+    ~constants_overrides_json
+    ~bootstrap_accounts_json
+  >>=? fun (_mockup_env, rpc_context) ->
   ( match classify_base_dir base_dir with
   | Base_dir_does_not_exist | Base_dir_is_empty ->
       create_base_dir ()
@@ -208,11 +217,6 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
         "%s is not empty, please specify a fresh base directory"
         base_dir )
   >>=? fun () ->
-  init_mockup_context_by_protocol_hash
-    ~protocol_hash
-    ~constants_overrides_json
-    ~bootstrap_accounts_json
-  >>=? fun (_mockup_env, rpc_context) ->
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->

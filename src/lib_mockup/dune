@@ -4,6 +4,7 @@
  (modules registration)
  (libraries
    tezos-base
+   tezos-client-base
    tezos-shell-services
    tezos-protocol-environment)
  (flags (:standard -open Tezos_base__TzPervasives)))
