@@ -12,7 +12,6 @@ depends: [
   "tezos-base"
   "tezos-client-base"
   "tezos-rpc"
-  "tezos-shell"
   "tezos-p2p-services"
   "tezos-p2p"
   "tezos-protocol-environment"
