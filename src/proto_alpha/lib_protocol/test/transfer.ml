@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -194,7 +195,9 @@ let transfer_zero_implicit () =
   Incremental.begin_construction b
   >>=? fun i ->
   let src = Contract.implicit_contract account.Account.pkh in
-  Op.transaction (I i) src dest Tez.zero
+  Context.Contract.global_counter (I i)
+  >>=? fun counter ->
+  Op.transaction ~counter (I i) src dest Tez.zero
   >>=? fun op ->
   Incremental.add_operation i op
   >>= fun res ->
@@ -477,8 +480,10 @@ let empty_implicit () =
   let src = Contract.implicit_contract account.Account.pkh in
   two_nth_of_balance incr dest 3L
   >>=? fun amount ->
+  Context.Contract.global_counter (I incr)
+  >>=? fun counter ->
   (* transfer zero tez from an implicit contract *)
-  Op.transaction (I incr) src dest amount
+  Op.transaction ~counter (I incr) src dest amount
   >>=? fun op ->
   Incremental.add_operation incr op
   >>= fun res ->

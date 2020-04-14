@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -254,18 +255,25 @@ let miss_signed_endorsement ?level ctxt =
   let delegate = Account.find_alternate real_delegate_pkh in
   endorsement ~delegate:delegate.pkh ~level ctxt ()
 
-let transaction ?fee ?gas_limit ?storage_limit
+let transaction ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = "default") ctxt
     (src : Contract.t) (dst : Contract.t) (amount : Tez.t) =
   let top = Transaction {amount; parameters; destination = dst; entrypoint} in
-  manager_operation ?fee ?gas_limit ?storage_limit ~source:src ctxt top
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    top
   >>=? fun sop ->
   Context.Contract.manager ctxt src
   >>=? fun account -> return @@ sign account.sk ctxt sop
 
-let delegation ?fee ctxt source dst =
+let delegation ?counter ?fee ctxt source dst =
   let top = Delegation dst in
-  manager_operation ?fee ~source ctxt top
+  manager_operation ?counter ?fee ~source ctxt top
   >>=? fun sop ->
   Context.Contract.manager ctxt source
   >>=? fun account -> return @@ sign account.sk ctxt sop

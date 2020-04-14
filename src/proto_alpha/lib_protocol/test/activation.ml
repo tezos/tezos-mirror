@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -527,8 +528,11 @@ let invalid_transfer_from_unactivated_account () =
   let ({account; _} as _first_one) = List.hd secrets in
   let bootstrap_contract = List.hd contracts in
   let unactivated_commitment_contract = Contract.implicit_contract account in
+  Context.Contract.global_counter (B blk)
+  >>=? fun counter ->
   (* No activation *)
   Op.transaction
+    ~counter
     (B blk)
     unactivated_commitment_contract
     bootstrap_contract

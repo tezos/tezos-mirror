@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1024,8 +1025,10 @@ let failed_self_delegation_no_transaction () =
   >>=? fun balance ->
   Assert.equal_tez ~loc:__LOC__ Tez.zero balance
   >>=? fun _ ->
+  Context.Contract.global_counter (I i)
+  >>=? fun counter ->
   (* self delegation fails *)
-  Op.delegation (I i) impl_contract (Some unregistered_pkh)
+  Op.delegation ~counter (I i) impl_contract (Some unregistered_pkh)
   >>=? fun self_delegation ->
   Incremental.add_operation i self_delegation
   >>= fun err ->
@@ -1052,15 +1055,19 @@ let failed_self_delegation_emptied_implicit_contract amount () =
   >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount
   >>=? fun _ ->
+  Context.Contract.global_counter (I i)
+  >>=? fun counter ->
   (* empty implicit contract and check balance *)
-  Op.transaction (I i) impl_contract bootstrap amount
+  Op.transaction ~counter (I i) impl_contract bootstrap amount
   >>=? fun create_contract ->
   Incremental.add_operation i create_contract
   >>=? fun i ->
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero
   >>=? fun _ ->
+  Context.Contract.global_counter (I i)
+  >>=? fun counter ->
   (* self delegation fails *)
-  Op.delegation (I i) impl_contract (Some unregistered_pkh)
+  Op.delegation ~counter (I i) impl_contract (Some unregistered_pkh)
   >>=? fun self_delegation ->
   Incremental.add_operation i self_delegation
   >>= fun err ->

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -265,6 +266,9 @@ module Contract = struct
         invalid_arg "Helpers.Context.counter"
     | Some mgr ->
         Alpha_services.Contract.counter rpc_ctxt ctxt mgr
+
+  let global_counter ctxt =
+    Alpha_services.Global_counter.global_counter rpc_ctxt ctxt ()
 
   let manager _ contract =
     match Contract.is_implicit contract with

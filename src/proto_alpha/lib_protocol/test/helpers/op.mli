@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -40,6 +41,7 @@ val miss_signed_endorsement :
   Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction :
+  ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Z.t ->
   ?storage_limit:Z.t ->
@@ -52,6 +54,7 @@ val transaction :
   Operation.packed tzresult Lwt.t
 
 val delegation :
+  ?counter:Z.t ->
   ?fee:Tez.tez ->
   Context.t ->
   Contract.t ->

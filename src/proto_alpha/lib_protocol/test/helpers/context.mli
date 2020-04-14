@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -98,6 +99,8 @@ module Contract : sig
   val balance : ?kind:balance_kind -> t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val counter : t -> Contract.t -> Z.t tzresult Lwt.t
+
+  val global_counter : t -> Z.t tzresult Lwt.t
 
   val manager : t -> Contract.t -> Account.t tzresult Lwt.t
 
