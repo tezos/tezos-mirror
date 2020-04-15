@@ -348,6 +348,16 @@ class Client:
         res = self.run(cmd)
         return client_output.GetDelegateResult(res)
 
+    def get_contract_entrypoint_type(
+            self,
+            entrypoint: str,
+            contract_name: str) \
+            -> client_output .GetContractEntrypointTypeResult:
+        cmd = ['get', 'contract', 'entrypoint', 'type',
+               'of', entrypoint,
+               'for', contract_name]
+        return client_output.GetContractEntrypointTypeResult(self.run(cmd))
+
     def withdraw_delegate(
             self,
             account1: str,

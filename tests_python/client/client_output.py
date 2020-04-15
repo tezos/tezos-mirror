@@ -318,3 +318,14 @@ class P2pStatResult:
         points_list = (parse_point(line) for line in lines[k+1:])
         for addr, peer_id, is_connected, is_trusted in points_list:
             self.points[addr] = PointInfo(peer_id, is_connected, is_trusted)
+
+
+class GetContractEntrypointTypeResult():
+    """Result of a 'get contract entrypoint type of' command."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Entrypoint .*?: (.*)\n"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.entrypoint_type = match.groups()[0]
