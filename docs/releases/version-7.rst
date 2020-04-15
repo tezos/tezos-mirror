@@ -1,10 +1,7 @@
 .. _version-7:
 
-Version 7.0~rc1
-===============
-
-This is a release candidate for the next version.
-If this version proves to be stable, it will be released as version 7.0.
+Version 7.0
+===========
 
 Multinetwork Node
 -----------------
@@ -16,6 +13,8 @@ ones. See the :ref:`multinetwork` documentation page for more information.
 Thanks to this, the same release can be used for all networks
 instead of having one branch per network. This allows to name this release
 Version 7.0 instead of Mainnet April 2020, as releases are no longer tied to Mainnet.
+If you are following the ``mainnet`` branch, you should instead follow the
+``latest-release`` branch.
 
 If you are using the Docker script (``alphanet.sh``), note that
 this script has been renamed ``tezos-docker-manager.sh``. The ``alphanet.sh``
@@ -25,15 +24,15 @@ See :ref:`howtoget` for more information.
 Update Instructions
 -------------------
 
-If you wish to test this release candidate, you can update from sources::
+To update from sources::
 
   git fetch
-  git checkout v7.0-rc1
+  git checkout v7.0
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v7.0-rc1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v7.0`` Docker images of Tezos.
 
 Changelog
 ---------
