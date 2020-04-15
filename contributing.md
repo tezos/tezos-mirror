@@ -12,17 +12,16 @@ There are two classes of changes and both are treated differently:
 The shell is not part of the consensus state machine and hence every full node
 can have a different/custom version of the shell while still running the same
 protocol. A good example is how Ethereum has Parity and Geth, both are different
-shells but they are running the same protocol. 
+shells but they are running the same protocol.
 
 Making changes to the shell is straightforward. Fork this repo, and then branch
 from `master`. Once you have made your changes please submit a merge request on
-gitlab against the `master` branch. Periodically those changes will get merged
-into `zeronet`, `alphanet`, and `mainnet` by hand.
+gitlab against the `master` branch.
 
 ## Protocol Implementation
 The protocol is the Tezos state machine and run in consensus. It is fully
 deterministic and every node in the network has to arrive at the same output
-given the same input. 
+given the same input.
 
 Making changes to the protocol is slightly different than one would expect. You
 branch from the latest `master` branch, make changes to the protocol, and then
@@ -33,7 +32,7 @@ get merged only once the network has voted on your proposal and accepted it.
 After it has gone through the Tezos governance process it will also get merged
 into `zeronet` for testing and finally into `mainnet` for deployment.
 
-[Here](http://tezos.gitlab.io/developer/contributing.html) you can 
+[Here](http://tezos.gitlab.io/developer/contributing.html) you can
 find more documentation on the development flow and [here](http://tezos.gitlab.io/whitedoc/voting.html)
 you can find more information on the governance and voting process.
 
