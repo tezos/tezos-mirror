@@ -16,8 +16,8 @@ The recommended way for running an up-to-date Tezos node is to use the
 docker images that are automatically generated from the GitLab
 repository and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_.
-The script ``alphanet.sh`` is provided to help download the right
-image for each network and run a simple node.
+The script ``tezos-docker-manager.sh`` (formally known as ``alphanet.sh``)
+is provided to help download the right image for each network and run a simple node.
 Its only requirement is a working installation of `Docker
 <https://www.docker.com/>`__ and docker compose on a machine with
 architecture **x86_64**.
@@ -27,14 +27,14 @@ with success in the past on windows/mac/linux.
 The same script can be used to run Mainnet, Carthagenet or Zeronet, it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Carthagenet test network::
+For example, to run Carthagenet test network with the latest release::
 
-    wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/carthagenet/scripts/alphanet.sh
+    wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
     chmod +x carthagenet.sh
 
 Alternatively, to run Mainnet::
 
-    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/mainnet/scripts/alphanet.sh
+    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
     chmod +x mainnet.sh
 
 In the following we assume you are running Carthagenet test network.
@@ -81,7 +81,7 @@ Build from sources
    sudo chmod a+x /usr/local/bin/opam
    git clone https://gitlab.com/tezos/tezos.git
    cd tezos
-   git checkout mainnet # or carthagenet or zeronet
+   git checkout latest-release
    opam init --bare
    make build-deps
    eval $(opam env)
@@ -122,11 +122,8 @@ Tezos *git* repository is hosted at `GitLab
 **not** use our `GitHub mirror <https://github.com/tezos/tezos>`_
 which we don't use anymore and only mirrors what happens on GitLab.
 
-You also need to **choose the branch** of the network you want to connect
-to: *carthagenet*, *zeronet* or *mainnet*.
-
-The *master* branch is where code is merged, but there is no test
-network using the master branch directly.
+Checkout the ``latest-release`` branch to use the latest release.
+Alternatively, you can checkout a specific version from its tag.
 
 
 Install OPAM
