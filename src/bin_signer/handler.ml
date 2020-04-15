@@ -250,7 +250,7 @@ let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
     Tag.DSL.(
       fun f ->
         f
-          "Returns true if and only if signer can generate determinstic \
+          "Returns true if and only if signer can generate deterministic \
            nonces for key %s"
         -% t event "supports_deterministic_nonces"
         -% s Client_keys.Logging.tag name)
