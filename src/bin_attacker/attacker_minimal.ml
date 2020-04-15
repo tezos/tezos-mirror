@@ -281,7 +281,7 @@ let double_spend () conn =
   spend destination_account >>=? fun () -> spend another_account
 
 let long_chain n conn =
-  lwt_log_notice "propogating %d blocks" n
+  lwt_log_notice "propagating %d blocks" n
   >>= fun () ->
   let prev_ref = ref genesis_block_hashed in
   let rec loop k =
@@ -301,7 +301,7 @@ let lots_transactions amount fee n conn =
   in
   let ops = replicate n (Operation_hash.hash_bytes [signed_op]) in
   let signed_block = signed (block_forged ops) in
-  lwt_log_notice "propogating %d transactions" n
+  lwt_log_notice "propagating %d transactions" n
   >>= fun () ->
   loop n
   >>=? fun () ->
