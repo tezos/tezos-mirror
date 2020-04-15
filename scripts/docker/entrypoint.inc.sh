@@ -35,7 +35,7 @@ wait_for_the_node_to_be_ready() {
     echo " done."
 }
 
-wait_for_the_node_to_be_bootstraped() {
+wait_for_the_node_to_be_bootstrapped() {
     wait_for_the_node_to_be_ready
     echo "Waiting for the node to synchronize with the network..."
     "$client" bootstrapped
@@ -149,7 +149,7 @@ launch_baker_test() {
 
 launch_endorser() {
     configure_client
-    wait_for_the_node_to_be_bootstraped
+    wait_for_the_node_to_be_bootstrapped
     exec "$endorser" --chain main \
          --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
@@ -158,7 +158,7 @@ launch_endorser() {
 
 launch_endorser_test() {
     configure_client
-    wait_for_the_node_to_be_bootstraped
+    wait_for_the_node_to_be_bootstrapped
     exec "$endorser" --chain test \
          --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
@@ -167,7 +167,7 @@ launch_endorser_test() {
 
 launch_accuser() {
     configure_client
-    wait_for_the_node_to_be_bootstraped
+    wait_for_the_node_to_be_bootstrapped
     exec "$accuser" --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
          run "$@"
@@ -175,7 +175,7 @@ launch_accuser() {
 
 launch_accuser_test() {
     configure_client
-    wait_for_the_node_to_be_bootstraped
+    wait_for_the_node_to_be_bootstrapped
     exec "$accuser" --chain test \
          --base-dir "$client_dir" \
          --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \

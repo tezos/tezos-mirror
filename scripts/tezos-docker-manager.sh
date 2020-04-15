@@ -686,7 +686,7 @@ usage() {
     echo "Container prefix:"
     echo "    container:<FILE>"
     echo "      can be used anywhere 'file:<FILE>' is permitted in client commands."
-    echo "      It will cause the referenced file to be copied into the docker conainer."
+    echo "      It will cause the referenced file to be copied into the docker container."
     echo "      Files will be renamed, which may make errors difficult to read"
 }
 

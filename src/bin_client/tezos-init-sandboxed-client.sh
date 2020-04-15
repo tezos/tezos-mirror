@@ -59,7 +59,7 @@ wait_for_the_node_to_be_ready() {
     echo " done."
 }
 
-wait_for_the_node_to_be_bootstraped() {
+wait_for_the_node_to_be_bootstrapped() {
     wait_for_the_node_to_be_ready
     echo "Waiting for the node to synchronize with the network..."
     $client bootstrapped
