@@ -1,6 +1,6 @@
 ; See src/bin_node/dune to understand in detail how this file abuses
-; the alternative dependency mecanism of dune to implement optional
-; dependendies.
+; the alternative dependency mechanism of dune to implement optional
+; dependencies.
 
 (executables
  (names main_client main_admin)
