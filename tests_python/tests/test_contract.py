@@ -32,6 +32,7 @@ def originate(client,
     client.bake(baker, BAKE_ARGS)
     assert utils.check_block_contains_operations(
         client, [origination.operation_hash])
+    return origination
 
 
 @pytest.mark.contract
@@ -491,6 +492,38 @@ class TestMiniScenarios:
         assert client.get_storage(kt_1) == '"abcdefg"'
         assert client.get_balance(kt_1) == 100
         assert client.get_balance('create_contract') == 900
+
+    # Originates a contract that when called, creates a contract with a
+    # rootname annotation. Such annotations comes in two flavors, thus the
+    # parameterization. Then calls the first contract and verifies the
+    # existence and type of the root entrypoint of the create contract.
+    @pytest.mark.parametrize("contract", [
+        'create_contract_rootname.tz',
+        'create_contract_rootname_alt.tz',
+    ])
+    def test_create_contract_rootname_originate(
+            self, client, session, contract):
+        path = os.path.join(CONTRACT_PATH, 'opcodes', contract)
+        origination_res = originate(client, session, path, 'None', 1000)
+
+        transfer_result = client.transfer(0, "bootstrap1",
+                                          origination_res.contract,
+                                          ['-arg',
+                                           'Unit',
+                                           '--burn-cap',
+                                           '10'])
+        client.bake('bootstrap5', BAKE_ARGS)
+
+        pattern = r"New contract (\w*) originated"
+        match = re.search(pattern, transfer_result.client_output)
+        kt_1 = match.groups()[0]
+
+        entrypoint_type = client.get_contract_entrypoint_type('root', kt_1) \
+                                .entrypoint_type
+
+        assert entrypoint_type == 'unit', \
+            ('the entrypoint my_root of the originated contract should exist'
+             'with type unit')
 
     # default_account.tz related tests
     def test_default_account_originate(self, client, session):
