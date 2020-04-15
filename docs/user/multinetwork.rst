@@ -20,12 +20,6 @@ their own networks for various reasons. Networks differ in various ways:
 - they may have had user-activated upgrades or user-activated protocol overrides
   to change the protocol without going through the voting process.
 
-The current ``master`` branch is capable of connecting to multiple networks,
-including Mainnet and the Carthagenet test network. By contrast,
-the ``mainnet`` branch is only capable of connecting to Mainnet,
-the ``carthagenet`` branch is only capable of connecting to Carthagenet,
-and so on. The goal is to remove the need for such branches.
-
 By default, the multinetwork node connects to Mainnet.
 To connect to other networks, you can either use one of the
 `Built-In Networks`_ or configure the node to connect to `Custom Networks`_.
