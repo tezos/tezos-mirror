@@ -31,8 +31,8 @@ The keys obtained from this faucet can be used in all test networks.
 Carthagenet
 -----------
 
-- Git branch: ``carthagenet``
-- Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/carthagenet/scripts/alphanet.sh``
+- Built-in :ref:`multinetwork` alias: ``carthagenet``
+- Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Carthagenet is a test network running the Carthage protocol.
 Carthagenet will run until Carthage is replaced by another protocol on Mainnet.
