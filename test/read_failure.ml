@@ -79,6 +79,18 @@ let missing_enum = function
   | _ ->
       false
 
+let list_too_long = function
+  | Binary.Read_error List_too_long ->
+      true
+  | _ ->
+      false
+
+let array_too_long = function
+  | Binary.Read_error Array_too_long ->
+      true
+  | _ ->
+      false
+
 let json ?(expected = fun _ -> true) read_encoding json () =
   check_raises expected (fun () -> ignore (Json.destruct read_encoding json))
 
@@ -311,4 +323,28 @@ let tests =
           ~expected:extra_bytes
           (dynamic_size uint8)
           (Bytes.of_string "\x00\x00\x00\x02\x00\x00") );
+      ( "list.truncated",
+        `Quick,
+        binary
+          ~expected:not_enough_data
+          (list ~max_length:1 int8)
+          (Bytes.of_string "\x00\x00\x00\x02\x2a") );
+      ( "list.too_long",
+        `Quick,
+        binary
+          ~expected:list_too_long
+          (list ~max_length:1 int8)
+          (Bytes.of_string "\x00\x00\x00\x02\x2a\x2a") );
+      ( "array.truncated",
+        `Quick,
+        binary
+          ~expected:not_enough_data
+          (array ~max_length:1 int8)
+          (Bytes.of_string "\x00\x00\x00\x02\x2a") );
+      ( "array.too_long",
+        `Quick,
+        binary
+          ~expected:array_too_long
+          (array ~max_length:1 int8)
+          (Bytes.of_string "\x00\x00\x00\x02\x2a\x2a") );
     ]
