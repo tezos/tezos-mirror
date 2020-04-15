@@ -572,10 +572,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       contract_storage_cache = Contract_repr.Map.empty;
     }
 
-type previous_protocol =
-  | Genesis of Parameters_repr.t
-  | Alpha_previous
-  | Carthage_006
+type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
 
 let check_and_update_protocol_version ctxt =
   Context.get ctxt version_key
@@ -590,8 +587,6 @@ let check_and_update_protocol_version ctxt =
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
               >>=? fun (param, ctxt) -> return (Genesis param, ctxt)
-            else if Compare.String.(s = "alpha_previous") then
-              return (Alpha_previous, ctxt)
             else if Compare.String.(s = "carthage_006") then
               return (Carthage_006, ctxt)
             else storage_error (Incompatible_protocol_version s))
@@ -609,7 +604,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_first_level ctxt first_level
       >>=? fun ctxt ->
       set_constants ctxt param.constants >>= fun ctxt -> return ctxt
-  | Alpha_previous | Carthage_006 ->
+  | Carthage_006 ->
       get_constants ctxt
       >>=? fun constants ->
       let constants =
