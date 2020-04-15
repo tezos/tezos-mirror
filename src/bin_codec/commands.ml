@@ -34,7 +34,7 @@ let id_parameter =
       | Some record ->
           return record
       | None ->
-          cctxt#error "Unkown encoding id: %s" id)
+          cctxt#error "Unknown encoding id: %s" id)
 
 let json_parameter =
   parameter (fun (cctxt : #Client_context.printer) file_or_data ->
