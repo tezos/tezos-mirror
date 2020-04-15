@@ -210,7 +210,7 @@ let tests =
   @ all "float.neg_zero" Alcotest.float float (-0.)
   @ all "float.zero" Alcotest.float float 0.
   @ all "float.infinity" Alcotest.float float infinity
-  @ all "float.neg_infity" Alcotest.float float neg_infinity
+  @ all "float.neg_infinity" Alcotest.float float neg_infinity
   @ all "float.epsilon" Alcotest.float float epsilon_float
   @ all "float.nan" Alcotest.float float nan
   @ all_ranged_float ~-.100. 300.

@@ -41,7 +41,7 @@ module UF : sig
   val find : t -> string -> Binary_schema.description
 
   val union :
-    t -> new_cannonical:Binary_schema.description -> existing:string -> unit
+    t -> new_canonical:Binary_schema.description -> existing:string -> unit
 
   val empty : unit -> t
 end = struct
@@ -56,11 +56,11 @@ end = struct
   let rec find tbl key =
     match Hashtbl.find tbl key with Ref s -> find tbl s | Root desc -> desc
 
-  let union tbl ~new_cannonical ~existing =
-    add tbl new_cannonical ;
+  let union tbl ~new_canonical ~existing =
+    add tbl new_canonical ;
     let root = find tbl existing in
-    if root.title = new_cannonical.title then ()
-    else Hashtbl.replace tbl root.title (Ref new_cannonical.title)
+    if root.title = new_canonical.title then ()
+    else Hashtbl.replace tbl root.title (Ref new_canonical.title)
 
   let empty () = Hashtbl.create 128
 end
@@ -170,7 +170,7 @@ let dedup_canonicalize uf =
           Hashtbl.add tbl layout desc ;
           help prev_len ((desc.title, layout) :: acc) tl
       | Some original_desc ->
-          UF.union uf ~new_cannonical:original_desc ~existing:name ;
+          UF.union uf ~new_canonical:original_desc ~existing:name ;
           help prev_len acc tl )
   in
   help 0 []
@@ -308,15 +308,15 @@ let describe (type x) (encoding : x Encoding.t) =
       b desc ->
       string * references =
    fun ?description ~title name recursives references encoding ->
-    let new_cannonical = {Binary_schema.title; description} in
-    UF.add uf new_cannonical ;
+    let new_canonical = {Binary_schema.title; description} in
+    UF.add uf new_canonical ;
     let (layout, references) = layout None recursives references encoding in
     match layout with
     | Ref ref_name ->
-        UF.union uf ~existing:ref_name ~new_cannonical ;
+        UF.union uf ~existing:ref_name ~new_canonical ;
         (ref_name, references)
     | layout ->
-        UF.add uf new_cannonical ;
+        UF.add uf new_canonical ;
         ( name,
           add_reference
             name
@@ -637,7 +637,7 @@ let describe (type x) (encoding : x Encoding.t) =
       (fun (name, encoding) ->
         match encoding with
         | Binary_schema.Obj {fields = [Anonymous_field (_, Ref reference)]} ->
-            UF.union uf ~new_cannonical:(UF.find uf name) ~existing:reference ;
+            UF.union uf ~new_canonical:(UF.find uf name) ~existing:reference ;
             false
         | _ ->
             true)

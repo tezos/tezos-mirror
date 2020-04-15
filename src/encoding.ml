@@ -309,9 +309,9 @@ end
 
 let rec is_zeroable : type t. t encoding -> bool =
  fun e ->
-  (* Whether an encoding can ever produce zero-byte of encoding. It is dnagerous
+  (* Whether an encoding can ever produce zero-byte of encoding. It is dangerous
      to place zero-size elements in a collection (list/array) because
-     they are indistinguishable from the abscence of elements. *)
+     they are indistinguishable from the absence of elements. *)
   match e.encoding with
   (* trivially true *)
   | Null ->
@@ -366,7 +366,7 @@ let rec is_zeroable : type t. t encoding -> bool =
   | Obj (Req {encoding = e; _}) ->
       is_zeroable e (* represented as-is *)
   | Obj (Opt {kind = `Variable; _}) ->
-      true (* optional field ommited *)
+      true (* optional field omitted *)
   | Obj (Dft {encoding = e; _}) ->
       is_zeroable e (* represented as-is *)
   | Obj _ ->

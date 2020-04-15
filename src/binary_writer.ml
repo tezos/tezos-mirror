@@ -34,7 +34,7 @@ type state = {
       (** The offset of the next byte to be written in [buffer]. *)
   mutable allowed_bytes : int option;
       (** Maximum number of bytes that are allowed to be write in [buffer]
-      (after [offset]) before to fail (None = illimited). *)
+      (after [offset]) before to fail (None = unlimited). *)
 }
 
 let check_allowed_bytes state size =
@@ -362,7 +362,7 @@ and write_with_limit : type a. int -> a Encoding.t -> state -> a -> unit =
 (** Various entry points *)
 
 let write_exn e v buffer offset len =
-  (* By harcoding [allowed_bytes] with the buffer length,
+  (* By hardcoding [allowed_bytes] with the buffer length,
        we ensure that [write] will never reallocate the buffer. *)
   let state = {buffer; offset; allowed_bytes = Some len} in
   write_rec e state v ; state.offset

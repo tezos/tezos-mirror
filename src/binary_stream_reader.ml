@@ -32,11 +32,11 @@ type state = {
   stream : Binary_stream.t;  (** All the remaining data to be read. *)
   remaining_bytes : int option;
       (** Total number of bytes that should be from 'stream' (None =
-      illimited). Reading less bytes should raise [Extra_bytes] and
+      unlimited). Reading less bytes should raise [Extra_bytes] and
       trying to read more bytes should raise [Not_enough_data]. *)
   allowed_bytes : int option;
       (** Maximum number of bytes that are allowed to be read from 'stream'
-      before to fail (None = illimited). *)
+      before to fail (None = unlimited). *)
   total_read : int;
       (** Total number of bytes that has been read from [stream] since the
       beginning. *)
@@ -72,7 +72,7 @@ let check_allowed_bytes state size =
     with the decoded value and the updated state.
 
     The function [conv] is also allowed to raise [Read_error err].
-    In that case the exception is catched and [Error err] is returned.
+    In that case the exception is caught and [Error err] is returned.
 
     If there is not enough [remaining_bytes] to be read in [state], the
     function returns [Error Not_enough_data] instead of calling
