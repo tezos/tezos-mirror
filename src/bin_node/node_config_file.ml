@@ -640,7 +640,7 @@ let p2p =
             "If set to [true], the node will spawn a testchain during the \
              protocol's testing voting period. Default value is [false]. It \
              is disabled to decrease the node storage usage and computation \
-             by droping the validation of the test network blocks."
+             by dropping the validation of the test network blocks."
           bool
           false)
        (let open P2p_point_state.Info in
@@ -1225,7 +1225,7 @@ let check_connections config =
   if config.p2p.limits.min_connections > config.p2p.limits.expected_connections
   then
     fail
-      "Error: The minumum number of connections is greater than the expected \
+      "Error: The minimum number of connections is greater than the expected \
        number of connections"
       config.p2p.limits.min_connections
       config.p2p.limits.expected_connections ;

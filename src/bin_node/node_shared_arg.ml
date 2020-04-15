@@ -522,7 +522,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
-     config file uses the network I expect". This behavior can be overriden
+     config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
   ( match network with
   | None ->

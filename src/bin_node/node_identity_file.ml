@@ -62,7 +62,7 @@ let () =
     ~id:"main.identity.insufficient_proof_of_work"
     ~title:"Insufficient proof of work"
     ~description:
-      "The proof of work embeded by the current identity is not sufficient"
+      "The proof of work embedded by the current identity is not sufficient"
     ~pp:(fun ppf expected ->
       Format.fprintf
         ppf
@@ -144,7 +144,7 @@ let read ?expected_pow filename =
       (* check public_key hash *)
       if not (Crypto_box.Public_key_hash.equal pkh id.peer_id) then
         fail (Identity_mismatch {filename; peer_id = pkh})
-        (* check public/private keys correspondance *)
+        (* check public/private keys correspondence *)
       else if not Crypto_box.(equal (neuterize id.secret_key) id.public_key)
       then
         fail (Identity_keys_mismatch {filename; expected_key = id.public_key})
@@ -171,12 +171,12 @@ let () =
     `Permanent
     ~id:"main.identity.existent_file"
     ~title:"Cannot overwrite identity file"
-    ~description:"Cannot implicitely overwrite the current identity file"
+    ~description:"Cannot implicitly overwrite the current identity file"
     ~pp:(fun ppf file ->
       Format.fprintf
         ppf
-        "Cannot implicitely overwrite the current identity file: '%s'. See \
-         `%s identity --help` on how to generate a new identity."
+        "Cannot implicitly overwrite the current identity file: '%s'. See `%s \
+         identity --help` on how to generate a new identity."
         file
         Sys.argv.(0))
     Data_encoding.(obj1 (req "file" string))

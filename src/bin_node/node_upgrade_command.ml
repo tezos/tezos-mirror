@@ -87,7 +87,7 @@ module Term = struct
 
   let status =
     let open Cmdliner.Arg in
-    let doc = "Displays available upgardes." in
+    let doc = "Displays available upgrades." in
     value & flag & info ~doc ["status"]
 
   let term =
