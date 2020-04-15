@@ -57,7 +57,7 @@ Both of these options also have interactive toggles for easy access.
 
 ### Live printing
 You can disable live printing using the `michelson-live-editing` option.
-If this option is disabled, both type and error printing are supressed.
+If this option is disabled, both type and error printing are suppressed.
 No background command will be run, limiting the mode to syntax highlighting.
 This command can also be toggled interactively using the
 `michelson-toggle-live-editing` command.

@@ -257,7 +257,7 @@ Detailed Changelog
    Allow comb pairs as map keys and set elements, not only as operands of
    COMPARE.
 
-- Protocol/Michelson: allow all parameter types when typechecking a litteral
+- Protocol/Michelson: allow all parameter types when typechecking a literal
 
 ::
 

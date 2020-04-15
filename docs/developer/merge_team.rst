@@ -48,7 +48,7 @@ reviewer to work on the MR.
 
 - *Anticipate questions*: explain anything which may look surprising, as comments in the code itself if it has value to future readers, or in the MR description.
 
-- *Find reviewers*: it is the responsability of the author to find a
+- *Find reviewers*: it is the responsibility of the author to find a
   suitable reviewer, ideally before opening an MR. The reviewer(s)
   should be mentioned in the description or in the comments.
   An MR without a reviewer for several days will be closed (and happily

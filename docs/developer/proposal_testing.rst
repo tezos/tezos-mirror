@@ -102,7 +102,7 @@ Import a Mainnet context from a snapshot
 
 The simplest way to get a Mainnet context is to import it from a
 snapshot (see :ref:`snapshots`).
-We also generate a node identity and keep everything in a directoty
+We also generate a node identity and keep everything in a directory
 `-orig` that we will use to make single-use node directories for our
 tests::
 

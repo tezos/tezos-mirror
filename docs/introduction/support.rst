@@ -9,7 +9,7 @@ to find answers.
 
 - `This documentation! <http://tezos.gitlab.io/>`_
   Make sure to go through this technical documentation before asking
-  elsewhere, there is also a searchbox on the top left corner.
+  elsewhere, there is also a search box on the top left corner.
 - Tezos `Stack Exchange <https://tezos.stackexchange.com>`_ is live
   (still in beta). If you don't find the answers you are looking for,
   feel free to ask questions!

@@ -146,7 +146,7 @@ signer and it is not used as a Tezos account.
 
 All request are now signed with the *vps* key thus you are
 guaranteed authenticity and integrity.
-This set up **does not guarantee confidentiality**, an evesdropper can
+This set up **does not guarantee confidentiality**, an eavesdropper can
 see the transactions that you sign but on a public blockchain this is
 less of a concern.
 You can still use the ``https`` scheme or the tunnel to encrypt your

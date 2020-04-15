@@ -874,7 +874,7 @@ limit is gas.
 
     > MUL / x : y : S  =>  (x * y) : S
 
--  ``EDIV``: Perform Euclidian division
+-  ``EDIV``: Perform Euclidean division
 
 ::
 
@@ -2071,7 +2071,7 @@ There are three kinds of constants:
 3. Byte sequences in hexadecimal notation, prefixed with ``0x``.
 
 The current version of Michelson restricts strings to be the printable
-subset of 7-bit ASCII, namely charactes with codes from within `[32, 126]`
+subset of 7-bit ASCII, namely characters with codes from within `[32, 126]`
 range, plus the escaped characters mentioned above.
 
 Primitive applications
@@ -2972,7 +2972,7 @@ using the Coq proof assistant.
          {
            UNPAIR ;
            # pair the payload with the current contract address, to ensure signatures
-           # can't be replayed accross different contracts if a key is reused.
+           # can't be replayed across different contracts if a key is reused.
            DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;
            PACK ; # form the binary payload that we expect to be signed
            DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP

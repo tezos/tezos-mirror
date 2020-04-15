@@ -193,7 +193,7 @@ of the network and not its parameters, it will automatically use the updated val
 
 However, if you configure `Custom Networks`_, the configuration file will
 no longer contain an alias such as ``mainnet`` or ``carthagenet``. Instead,
-it will explicitely contain the list of bootstrap peers, user-activated upgrades
+it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.
 

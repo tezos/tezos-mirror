@@ -60,11 +60,11 @@ set an environment variable::
 
     export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./carthagenet.sh --help`` for more informations about the
+See ``./carthagenet.sh --help`` for more information about the
 script. In particular see ``./carthagenet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed using ``./carthagenet.sh client``. Similary, ``tezos-admin-client``
+executed using ``./carthagenet.sh client``. Similarly, ``tezos-admin-client``
 can be executed using ``./carthagenet.sh admin-client``.
 
 

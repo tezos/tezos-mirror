@@ -181,7 +181,7 @@ pitfalls a code reviewer should avoid.
 - Consider the person you are reviewing: Each developer is a person. If you
   know the person, consider their personality and experience while reviewing their
   code. Sometime it is possible with somebody to be more direct and terse, while
-  other people require a more thorough explaination.
+  other people require a more thorough explanation.
 
 - Avoid confrontational and authoritative language: The way we communicate has
   an impact on the receiver. If communicating a problem in the code or a

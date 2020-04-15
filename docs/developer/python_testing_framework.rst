@@ -129,7 +129,7 @@ will run something like
 
     tezos-client -base-dir /tmp/tezos-client.be22ya16 -addr 127.0.0.1 -port 18730 transfer 500 from bootstrap1 to bootstrap3
 
-``receipt`` is an object of type ``client_ouput.TransferResult`` which gives
+``receipt`` is an object of type ``client_output.TransferResult`` which gives
 access to some data of the ``tezos-client`` output.
 
 Alternatively, one can always construct the command manually:
@@ -169,7 +169,7 @@ Running tests
 Useful options
 """"""""""""""
 
-``pytest`` has a variety of launching options. Conventient options include:
+``pytest`` has a variety of launching options. Convenient options include:
 
 - ``-v`` display test names,
 - ``-x`` stop at first failure,
@@ -208,7 +208,7 @@ needed, but sometimes we want to stop at first failure using ``-x``, and some
 tests require the server logs to be saved (``--log-dir=tmp/``) as they check some assertions in the
 logs at some point in the test.
 
-To run a specifc test, we usually want client and server traces
+To run a specific test, we usually want client and server traces
 (``-s --log-dir=tmp/``).
 
 ::
@@ -294,7 +294,7 @@ Currently, all tests scenarios in the test suite are defined as classes,
 consisting of a sequence of methods that are run incrementally (as
 specified with the annotation ``@pytest.mark.incremental``). Classes are
 used to define the scope of a fixture, and a unit of incremental
-testing sequence. We don't directly instanciate them, or use ``self``.
+testing sequence. We don't directly instantiate them, or use ``self``.
 
 Data between methods are shared using a dictionary ``session``. For instance,
 we save the result of the ``transfer`` operation, and retrieve it in the next
@@ -310,7 +310,7 @@ The list of fixtures available is given by
     pytest --fixtures
 
 Most fixtures are defined in ``conftest.py``.
-The most general fixture is ``sandbox``. It allows to instanciate an arbitrary
+The most general fixture is ``sandbox``. It allows to instantiate an arbitrary
 number of nodes and daemons. Other fixtures, such as ``client``,
 are specialized versions (slightly more convenient than using
 ``sandbox`` directly). Fixtures can be defined directly in a module defining a
@@ -382,8 +382,8 @@ Methods ``add_node``, ``add_baker`` and ``add_endorser`` have an optional
 parameter ``branch`` that points to a subdirectory where binaries are to be
 looked for.
 
-2. The ``SandboxMultibranch`` launcher is instanciated by map from ids to
-branches. Then everytime we launch a node or a daemon the actual binary will
+2. The ``SandboxMultibranch`` launcher is instantiated by map from ids to
+branches. Then every time we launch a node or a daemon the actual binary will
 be selected according to the map.
 
 Tests using specific revisions are in ``tests/multibranch`` and aren't run by
@@ -637,7 +637,7 @@ Known issues
   termination,
 
 - One some occasions, the ``timeout`` marker doesn't play well with
-  blocking client commmands. for instance, this may not stop the test if
+  blocking client commands. for instance, this may not stop the test if
   ``wait_for_inclusion`` is stuck.
 
 ::
