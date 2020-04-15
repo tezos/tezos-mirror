@@ -6,7 +6,7 @@ How to use Tezos
 This How To illustrates the use of the various Tezos binaries as well
 as some concepts about the network.
 
-The binaries
+The Binaries
 ------------
 
 After a successful compilation, you should have the following binaries:
@@ -14,16 +14,14 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-node``: the tezos daemon itself;
 - ``tezos-client``: a command-line client and basic wallet;
 - ``tezos-admin-client``: administration tool for the node;
-- ``tezos-{baker,endorser,accuser}-alpha``: daemons to bake, endorse
-  and accuse on the Tezos network (see :ref:`howtorun`);
+- ``tezos-{baker,endorser,accuser}-*``: daemons to bake, endorse and
+  accuse on the Tezos network (see :ref:`howtorun`);
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 
-Note that on a production branch (Mainnet, Zeronet, etc.), the daemons
-are not suffixed with ``alpha`` but with the partial hash of the
-protocol they are bound to, such as
-``tezos-{baker,endorser,accuser}-002-PsYLVpVv``. (See `Node protocol`_
-section below for the meaning of `alpha`.)
+The daemons are suffixed with the name of the protocol that they are
+bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
+for the Carthage protocol. See also the `Node Protocol`_ section below.
 
 
 Read The Friendly Manual
@@ -75,7 +73,7 @@ concurrently and selects the best one based on its fitness (see
 :ref:`proof-of-stake`).
 
 
-Node identity
+Node Identity
 ~~~~~~~~~~~~~
 
 First we need to generate a new identity in order for the node to
@@ -90,8 +88,10 @@ dedicated to creating this identity.
 Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
+If you wish to run your node on a test network, now is also a good time
+to configure your node (see :ref:`multinetwork`).
 
-Node synchronization
+Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
 
 Whenever a node starts, it tries to retrieve the most current head of the chain
@@ -104,7 +104,7 @@ Some operations require the node to be bootstrapped.
 
 .. _node-protocol:
 
-Node protocol
+Node Protocol
 ~~~~~~~~~~~~~
 
 A Tezos node can switch from one protocol to another during its
@@ -137,7 +137,7 @@ If you are also running a baker make sure that it has access to the
 ``.tezos-node`` directory of the node.
 
 
-RPC interface
+RPC Interface
 ~~~~~~~~~~~~~
 
 The only interface to the node is through JSON RPC calls and it is disabled by
@@ -178,7 +178,7 @@ protocol run by the node. For instance, `get timestamp` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-A simple wallet
+A Simple Wallet
 ~~~~~~~~~~~~~~~
 
 The client is also a basic wallet and after the activation above you
@@ -218,7 +218,7 @@ For more advanced key management we offer :ref:`ledger support
 
 .. _faucet:
 
-Get free tez
+Get Free Tez
 ~~~~~~~~~~~~
 
 In order to test the networks and help users get familiar with the
@@ -248,7 +248,7 @@ Please drink carefully and don't abuse the faucet: it only contains
 30,000 wallets for a total amount of ꜩ760,000,000.
 
 
-Transfers and receipts
+Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
 
 In order to fund our newly created account we need to transfer some
@@ -365,7 +365,7 @@ operation that seems lost.
 
 .. _originated-accounts:
 
-Implicit accounts and smart contracts
+Implicit Accounts and Smart Contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
@@ -411,7 +411,7 @@ and returns the storage unchanged together with an empty list of
 operations.
 
 
-Gas and storage cost model
+Gas and Storage Cost Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A quick look at the balance updates on the receipt shows that on top of
@@ -499,7 +499,7 @@ this limits, they were computed for us.
 More information on validation can be found :ref:`here. <validation>`
 
 
-It's RPCs all the way down
+It's RPCs all the Way Down
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The client communicates with the node uniquely through RPC calls so
