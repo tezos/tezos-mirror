@@ -394,7 +394,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     state
     EF.
       [ af "Network up";
-        desc (haf "Protcols")
+        desc (haf "Protocols")
         @@ list
              (List.map after_injections_protocols ~f:(fun p ->
                   af
@@ -970,7 +970,7 @@ $ Arg.(
            `\"--with-ledger=ledger://...\"` option in which case some steps \
            have to be interactive. In this case, the option \
            `--serialize-proposals` is recommended, because if it is not \
-           provided, the proposal vote will be a “Sign Unverfied” \
+           provided, the proposal vote will be a “Sign Unverified” \
            operation." ]
     in
     info ~doc ~man "voting"

@@ -17,7 +17,7 @@ let run state node_exec client_exec () =
          - setting filter plugin config
 
          TODO: non-interactive test for propagation
-         TODO: commands for interactivea use *)
+         TODO: commands for interactive use *)
       Stdlib.ignore c1 ;
       Stdlib.ignore c2 ;
       return ()

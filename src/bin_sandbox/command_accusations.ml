@@ -677,7 +677,7 @@ let with_accusers ~state ~protocol ~base_port node_exec accuser_exec
     EF.
       [ af "Node 0 was killed";
         af "Node 1 was restarted";
-        af "Node 1 transfered";
+        af "Node 1 transferred";
         af "Node 1 baked";
         af "Node 1 was killed" ]
   >>= fun () ->
