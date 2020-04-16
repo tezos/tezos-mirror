@@ -26,7 +26,7 @@
 (** Tezos Protocol Environment - Protocol updater. *)
 
 (** Validation result: the record returned by the protocol
-    on the successfull validation of a block. *)
+    on the successful validation of a block. *)
 type validation_result = {
   context : Context.t;
       (** The resulting context, it will be used for the next block. *)
@@ -226,7 +226,7 @@ end
     been previously compiled successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 
-(** Fork a test chain. The forkerd chain will use the current block
+(** Fork a test chain. The forked chain will use the current block
     as genesis, and [protocol] as economic protocol. The chain will
     be destroyed when a (successor) block will have a timestamp greater
     than [expiration]. The protocol must have been previously compiled

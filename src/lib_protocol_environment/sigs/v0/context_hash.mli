@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Commited context hashes / IDs. *)
+(** Committed context hashes / IDs. *)
 include S.HASH

@@ -37,7 +37,7 @@ val prefix : ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
 
 val merge : 'a directory -> 'a directory -> 'a directory
 
-(** Possible error while registring services. *)
+(** Possible error while registering services. *)
 type step =
   | Static of string
   | Dynamic of RPC_arg.descr
@@ -53,7 +53,7 @@ type conflict =
 
 exception Conflict of step list * conflict
 
-(** Registring handler in service tree. *)
+(** Registering handler in service tree. *)
 val register :
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
@@ -78,7 +78,7 @@ val lwt_register :
   ('params -> 'query -> 'input -> 'output Lwt.t) ->
   'prefix directory
 
-(** Registring handler in service tree. Curryfied variant.  *)
+(** Registering handler in service tree. Curryfied variant.  *)
 
 val register0 :
   unit directory ->
@@ -248,7 +248,7 @@ val lwt_register5 :
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-(** Registring dynamic subtree. *)
+(** Registering dynamic subtree. *)
 val register_dynamic_directory :
   ?descr:string ->
   'prefix directory ->
