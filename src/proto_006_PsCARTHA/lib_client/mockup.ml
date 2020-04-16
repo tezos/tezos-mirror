@@ -46,6 +46,19 @@ type parsed_account_repr = {
   amount : Protocol.Tez_repr.t;
 }
 
+let parsed_account_repr_pp ppf account =
+  let open Format in
+  let format_amount ppf value =
+    fprintf ppf "amount:%a" Protocol.Tez_repr.pp value
+  in
+  fprintf
+    ppf
+    "@[<v>name:%s@,sk_uri:%s@,%a@]"
+    account.name
+    (Uri.to_string (account.sk_uri :> Uri.t))
+    format_amount
+    account.amount
+
 let bootstrap_account_encoding :
     Protocol.Parameters_repr.bootstrap_account Data_encoding.t =
   let open Data_encoding in
@@ -315,8 +328,18 @@ let mem_init :
   | Some json -> (
     match Data_encoding.Json.destruct parsed_accounts_reprs json with
     | accounts ->
+        cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
+        >>= fun () ->
+        let open Format in
+        cctxt#message
+          "@[%a@]"
+          (pp_print_list
+             ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+             parsed_account_repr_pp)
+          accounts
+        >>= fun () ->
         Tezos_base.TzPervasives.map_s to_bootstrap_account accounts
-        >>=? fun r -> return (Some r)
+        >>=? fun bootstrap_accounts -> return (Some bootstrap_accounts)
     | exception error ->
         failwith
           "cannot read definitions of bootstrap accounts: %a"
