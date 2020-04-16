@@ -11,7 +11,7 @@ PROTOCOL_HASH = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 BLOCK_LEVEL = "3"
 LIST_OFFSET = "0"
 OPERATION_OFFSET = "0"
-CONTRACT_ID = ""  # TODO
+CONTRACT_ID = constants.IDENTITIES['bootstrap1']['identity']
 
 
 @pytest.mark.mempool
@@ -221,12 +221,10 @@ class TestRPCs:
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               'context/contracts/{CONTRACT_ID}/balance')
 
-    @pytest.mark.skip
-    # TODO
     def test_chain_block_context_contract_counter(self, sandbox: Sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                              'context/contracts/{CONTRACT_ID}/counter')
+                              f'context/contracts/{CONTRACT_ID}/counter')
 
     @pytest.mark.skip
     # TODO
@@ -364,7 +362,12 @@ class TestRPCs:
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                               f'context/raw/bytes')
 
-    def test_chain_block_hash(self, sandbox: Sandbox):
+    def test_chain_block_context_global_counter(self, sandbox):
+        sandbox.client(1).rpc('get',
+                              f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
+                              'context/global_counter')
+
+    def test_chain_block_hash(self, sandbox):
         sandbox.client(1).rpc('get',
                               f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/hash')
 
