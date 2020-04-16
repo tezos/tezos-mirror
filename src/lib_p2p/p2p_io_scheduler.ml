@@ -370,8 +370,8 @@ let read_size = function
 (* we push Error only when we close the socket,
                     we don't fear memory leaks in that case... *)
 
-let write_size mbytes =
-  (Sys.word_size / 8 * 6) + Bytes.length mbytes + Lwt_pipe.push_overhead
+let write_size bytes =
+  (Sys.word_size / 8 * 6) + Bytes.length bytes + Lwt_pipe.push_overhead
 
 let register st fd =
   if st.closed then (

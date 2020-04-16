@@ -26,7 +26,7 @@
 
 (** An [Answerer.t] is a set of callback functions, parameterized by
     [conn_info] record. The [conn_info] records contains values useful
-    for the callback functions to perfom their task, and known after
+    for the callback functions to perform their task, and known after
     the connection is set up.
 
     The callback functions are called when the node receives `P2p_messages.t`

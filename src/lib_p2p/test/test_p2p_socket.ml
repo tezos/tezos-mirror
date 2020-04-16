@@ -39,7 +39,7 @@ let id1 = P2p_identity.generate proof_of_work_target
 let id2 = P2p_identity.generate proof_of_work_target
 
 let id0 =
-  (* Luckilly, this will be an insuficient proof of work! *)
+  (* Luckily, this will be an insufficient proof of work! *)
   P2p_identity.generate (Crypto_box.make_target 0.)
 
 let version =

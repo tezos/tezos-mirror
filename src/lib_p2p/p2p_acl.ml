@@ -150,7 +150,7 @@ let unban_addr acl addr =
 
 (* Check if [peer_id] is in either of the banned/greylisted
    collections. Caveat Emptor: it might be possible for a peer to have
-   its ip adress banned, but not its ID. *)
+   its ip address banned, but not its ID. *)
 let banned_peer acl peer_id =
   P2p_peer.Table.mem acl.banned_peers peer_id
   || PeerLRUCache.mem acl.greylist_peers peer_id

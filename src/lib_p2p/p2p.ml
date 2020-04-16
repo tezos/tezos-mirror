@@ -199,7 +199,7 @@ module Real = struct
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
        default answerer needs to initiate new connections using the
-       [P2p_connect_hander.connect] callback. *)
+       [P2p_connect_handler.connect] callback. *)
     let rec answerer =
       lazy
         ( if config.private_mode then P2p_protocol.create_private ()
@@ -262,7 +262,7 @@ module Real = struct
 
   let roll _net () = Lwt.return_unit (* TODO implement *)
 
-  (* returns when all workers have shutted down in the opposite
+  (* returns when all workers have shut down in the opposite
      creation order. *)
   let shutdown net () =
     lwt_log_notice "Shutting down the p2p's welcome worker..."

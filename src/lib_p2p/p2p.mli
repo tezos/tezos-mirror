@@ -112,7 +112,7 @@ type limits = {
   authentication_timeout : Time.System.Span.t;
       (** Delay granted to a peer to perform authentication. *)
   greylist_timeout : Time.System.Span.t;
-      (** GC delay for the grelists tables. *)
+      (** GC delay for the greylists tables. *)
   maintenance_idle_time : Time.System.Span.t;
       (** How long to wait at most before running a maintenance loop. *)
   min_connections : int;

@@ -334,7 +334,7 @@ let authenticate ~canceler ~proof_of_work_target ~incoming fd
     ((remote_addr, remote_socket_port) as point) ?listening_port identity
     announced_version metadata_config =
   let local_nonce_seed = Crypto_box.random_nonce () in
-  lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point
+  lwt_debug "Sending authentication to %a" P2p_point.Id.pp point
   >>= fun () ->
   Connection_message.write
     ~canceler

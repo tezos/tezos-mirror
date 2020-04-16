@@ -203,7 +203,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           >>= fun () ->
           sync iteration channel
           >>=? fun () ->
-          (* Sync interation 1 *)
+          (* Sync interaction 1 *)
           f
             iteration
             channel
@@ -609,7 +609,7 @@ module Overcrowded = struct
         (if legacy then " legacy" else "")
     else
       log_info
-        "@[<v 2>Not Good: advertisement failure. legacy %b. unkowns :  @[%a@]\n\
+        "@[<v 2>Not Good: advertisement failure. legacy %b. unknowns :  @[%a@]\n\
          \t knowns : @[%a@].@."
         legacy
         P2p_point.Id.pp_list

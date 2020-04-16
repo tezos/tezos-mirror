@@ -50,7 +50,7 @@ val peer_id : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t
     connection is in private mode *)
 val private_node : ('msg, 'peer, 'conn) t -> bool
 
-(** [trusted_node t] returns 'true' if the node assocatied to this
+(** [trusted_node t] returns 'true' if the node associated to this
     connection is trusted *)
 val trusted_node : ('msg, 'peer, 'conn) t -> bool
 

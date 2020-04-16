@@ -38,7 +38,7 @@
 (** {1 Pool management} *)
 
 (** The type of a pool of connections, parametrized by, resp., the type
-    of messages and the meta-informations associated to an identity and
+    of messages and the meta-information associated to an identity and
     a connection. *)
 type ('msg, 'peer, 'conn) t
 
@@ -114,7 +114,7 @@ val register_new_point :
 (** [register_list_of_new_point ?trusted medium source pool point_list]
 o    registers all points of the list as new points.
     [medium] and  [source] are for logging purpose. [medium] should indicate
-    through which medium the points have been acquiered (
+    through which medium the points have been acquired (
     advertisement, Nack, ..)  and [source] is the id of the peer which
     sent the list.
  *)
@@ -162,7 +162,7 @@ module Connection : sig
       - connections to private peers if [no_private] is set to [true]
       - connection [conn]
       - connections to peers who didn't provide a listening port at
-        session-establishement *)
+        session-establishment *)
   val random_addr :
     ?different_than:('msg, 'peer, 'conn) P2p_conn.t ->
     no_private:bool ->

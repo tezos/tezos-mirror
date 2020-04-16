@@ -33,7 +33,7 @@
 type ('msg, 'peer, 'conn) config = {
   swap_linger : Time.System.Span.t;
       (** Peer swapping does not occur more than once during a timespan of
-      [spap_linger]. *)
+      [swap_linger]. *)
   pool : ('msg, 'peer, 'conn) P2p_pool.t;
   log : P2p_connection.P2p_event.t -> unit;
   connect : P2p_point.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t tzresult Lwt.t;

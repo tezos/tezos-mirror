@@ -307,7 +307,7 @@ let raw_authenticate t ?point_info canceler fd point =
   *)
   if incoming then P2p_point.Table.remove t.incoming point ;
   Option.iter connection_point_info ~f:(fun point_info ->
-      (* set the point to private or not, depending on the [info] gethered
+      (* set the point to private or not, depending on the [info] gathered
            during authentication *)
       P2p_point_state.set_private point_info info.private_node) ;
   match acceptable with
