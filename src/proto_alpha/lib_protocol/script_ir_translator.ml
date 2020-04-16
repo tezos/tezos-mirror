@@ -639,6 +639,8 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
 
 let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
   function
+  | Unit_t tname ->
+      Some (Unit_key tname)
   | Never_t tname ->
       Some (Never_key tname)
   | Int_t tname ->
