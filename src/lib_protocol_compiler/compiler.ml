@@ -51,7 +51,7 @@ let load_cmi_from_file file =
     (String.capitalize_ascii Filename.(basename (chop_extension file)))
     {filename = file; cmi = Cmi_format.read_cmi file}
 
-let load_embeded_cmi (unit_name, content) =
+let load_embedded_cmi (unit_name, content) =
   let content = Bytes.of_string content in
   (* Read cmi magic *)
   let magic_len = String.length Config.cmi_magic_number in
@@ -75,7 +75,7 @@ let load_embeded_cmi (unit_name, content) =
       cmi = {cmi_name; cmi_sign; cmi_crcs; cmi_flags};
     }
 
-let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
+let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
 (** Compilation environment.
 
@@ -258,12 +258,12 @@ let main {compile_ml; pack_objects; link_shared} =
   Clflags.include_dirs := [Filename.dirname functor_file] ;
   Warnings.parse_options false warnings ;
   Warnings.parse_options true warn_error ;
-  load_embeded_cmis tezos_protocol_env ;
+  load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
   let register_objects =
     if not !register then []
     else (
-      load_embeded_cmis register_env ;
+      load_embedded_cmis register_env ;
       load_cmi_from_file proto_cmi ;
       (* Compiler the 'registering module' *)
       let register_file = Filename.dirname functor_file // "register.ml" in
