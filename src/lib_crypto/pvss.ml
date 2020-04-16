@@ -104,7 +104,7 @@ module type DLEQ = sig
   (** Creates a zero-knowledge proof of knowledge of the exponent list *)
   val make_proof : equation -> exponent list -> proof
 
-  (** Checkes the proof created by make_proof for a given equation *)
+  (** Checks the proof created by make_proof for a given equation *)
   val check_proof : equation -> proof -> bool
 end
 
@@ -281,7 +281,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
       [String.concat "||" [G.Z_m.to_bits secret]]
       |> H.hash_string |> H.to_string
     in
-    (* TODO: guard against buffer overlow *)
+    (* TODO: guard against buffer overflow *)
     let rec make_coefs = function
       | 0 ->
           []

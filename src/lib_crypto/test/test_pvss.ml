@@ -193,6 +193,6 @@ let test_reconstruct () =
 let tests =
   [ ("dealer_proof", `Quick, test_dealer_proof);
     ("reveal", `Quick, test_share_reveal);
-    ("recontruct", `Quick, test_reconstruct) ]
+    ("reconstruct", `Quick, test_reconstruct) ]
 
 let () = Alcotest.run "test-pvss" [("pvss", tests)]

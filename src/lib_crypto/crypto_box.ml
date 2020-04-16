@@ -176,7 +176,7 @@ let check_proof_of_work pk nonce target =
   compare_target hash target
 
 let generate_proof_of_work ?max pk target =
-  let may_interupt =
+  let may_interrupt =
     match max with
     | None ->
         fun _ -> ()
@@ -184,7 +184,7 @@ let generate_proof_of_work ?max pk target =
         fun cpt -> if max < cpt then raise Not_found
   in
   let rec loop nonce cpt =
-    may_interupt cpt ;
+    may_interrupt cpt ;
     if check_proof_of_work pk nonce target then nonce
     else loop (Nonce.increment nonce) (cpt + 1)
   in

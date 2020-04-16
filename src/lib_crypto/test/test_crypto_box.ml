@@ -37,7 +37,7 @@ let test_check_pow () =
     (Crypto_box.check_proof_of_work pk pow target)
     true
 
-let test_neutrize sk pk () =
+let test_neuterize sk pk () =
   Alcotest.check
     (Alcotest.testable Crypto_box.pp_pk Crypto_box.equal)
     "neuterize"
@@ -71,7 +71,7 @@ let test_fast_box msg () =
     msg
 
 let tests =
-  [ ("Neutrize Secret roundtrip", `Quick, test_neutrize sk pk);
+  [ ("Neuterize Secret roundtrip", `Quick, test_neuterize sk pk);
     ("Public Key Hash roundtrip", `Quick, test_hash pk pkh);
     ("Check PoW", `Slow, test_check_pow);
     ("Test hacl fastbox", `Quick, test_fast_box (Bytes.of_string "test")) ]

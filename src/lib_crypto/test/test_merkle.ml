@@ -91,4 +91,4 @@ let test_path _ = List.iter check_path (0 -- 128)
 
 let tests = [("compute", `Quick, test_compute); ("path", `Quick, test_path)]
 
-let () = Alcotest.run "tezos-crypto" [("merkel", tests)]
+let () = Alcotest.run "tezos-crypto" [("merkle", tests)]

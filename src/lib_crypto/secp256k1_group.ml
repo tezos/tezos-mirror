@@ -184,7 +184,7 @@ end = struct
 
     let title = "Secp256k1_group.Scalar"
 
-    let name = "Anscalar for the secp256k1 group"
+    let name = "A scalar for the secp256k1 group"
 
     include Helpers.MakeB58 (struct
       type nonrec t = t
