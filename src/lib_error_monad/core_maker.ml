@@ -177,26 +177,26 @@ end = struct
       :: !error_kinds
 
   (* Catch all error when 'deserializing' an error. *)
-  type error += Unregistred_error of Data_encoding.json
+  type error += Unregistered_error of Data_encoding.json
 
   let () =
     let id = "" in
     let category = Main `Temporary in
-    let to_error msg = Unregistred_error msg in
+    let to_error msg = Unregistered_error msg in
     let from_error = function
-      | Unregistred_error json ->
+      | Unregistered_error json ->
           Some json
       | _ ->
           None
     in
     let encoding_case =
       let open Data_encoding in
-      case Json_only ~title:"Unregistred error" json from_error to_error
+      case Json_only ~title:"Unregistered error" json from_error to_error
     in
     let pp ppf json =
       Format.fprintf
         ppf
-        "@[<v 2>Unregistred error:@ %a@]"
+        "@[<v 2>Unregistered error:@ %a@]"
         Data_encoding.Json.pp
         json
     in
@@ -227,7 +227,7 @@ end = struct
             match WEM.unwrap err with
             | Some (WEM.Unclassified _) ->
                 None
-            | Some (WEM.Unregistred_error _) ->
+            | Some (WEM.Unregistered_error _) ->
                 Format.eprintf "What %s@." name ;
                 None
             | res ->
@@ -237,7 +237,7 @@ end = struct
             match err with
             | WEM.Unclassified _ ->
                 failwith "ignore wrapped error when serializing"
-            | WEM.Unregistred_error _ ->
+            | WEM.Unregistered_error _ ->
                 failwith "ignore wrapped error when deserializing"
             | res ->
                 WEM.wrap res

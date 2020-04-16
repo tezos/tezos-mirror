@@ -81,7 +81,7 @@ module type EXT = sig
     | Unclassified of string
           (** Catch all error when 'deserializing' an error. *)
 
-  type error += private Unregistred_error of Data_encoding.json
+  type error += private Unregistered_error of Data_encoding.json
 
   (** An error serializer *)
   val json_of_error : error -> Data_encoding.json
@@ -163,7 +163,7 @@ module type MONAD = sig
 
   (** The error monad wrapper type, the error case holds a stack of
       error, initialized by the first call to {!fail} and completed by
-      each call to {!trace} as the stack is rewinded. The most general
+      each call to {!trace} as the stack is rewound. The most general
       error is thus at the top of the error stack, going down to the
       specific error that actually caused the failure. *)
   type 'a tzresult = ('a, trace) result
@@ -171,28 +171,28 @@ module type MONAD = sig
   (** A serializer for result of a given type *)
   val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
-  (** Sucessful result *)
+  (** Successful result *)
   val ok : 'a -> 'a tzresult
 
-  (** Sucessful return *)
+  (** Successful return *)
   val return : 'a -> 'a tzresult Lwt.t
 
-  (** Sucessful return of [()] *)
+  (** Successful return of [()] *)
   val return_unit : unit tzresult Lwt.t
 
-  (** Sucessful return of [None] *)
+  (** Successful return of [None] *)
   val return_none : 'a option tzresult Lwt.t
 
-  (** [return_some x] is a sucessful return of [Some x] *)
+  (** [return_some x] is a successful return of [Some x] *)
   val return_some : 'a -> 'a option tzresult Lwt.t
 
-  (** Sucessful return of [[]] *)
+  (** Successful return of [[]] *)
   val return_nil : 'a list tzresult Lwt.t
 
-  (** Sucessful return of [true] *)
+  (** Successful return of [true] *)
   val return_true : bool tzresult Lwt.t
 
-  (** Sucessful return of [false] *)
+  (** Successful return of [false] *)
   val return_false : bool tzresult Lwt.t
 
   (** Erroneous result *)

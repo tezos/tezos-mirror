@@ -1264,7 +1264,7 @@ let commands version () =
                   return_unit
               | Error errs ->
                   ( match errs with
-                  | [ Unregistred_error
+                  | [ Unregistered_error
                         (`O
                           [("kind", `String "generic"); ("error", `String msg)])
                     ] ->
