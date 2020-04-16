@@ -69,6 +69,7 @@ class Node:
                  rpc_port: int = 8732,
                  peers: List[int] = None,
                  log_levels: Dict[str, str] = None,
+                 singleprocess: bool = False,
                  env: Dict[str, str] = None):
 
         """Creates a new Popen instance for a tezos-node, and manages context.
@@ -97,9 +98,9 @@ class Node:
         self.node = node
         self._params = params
         self._run_called_before = False
-
+        singleprocess_opt = ['--singleprocess'] if singleprocess else []
         node_run = [node, 'run', '--data-dir', node_dir,
-                    '--no-bootstrap-peers'] + params
+                    '--no-bootstrap-peers'] + singleprocess_opt + params
 
         if peers is not None:
             for peer in peers:

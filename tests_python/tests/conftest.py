@@ -30,6 +30,12 @@ def log_dir(request):
     yield request.config.getoption("--log-dir")
 
 
+@pytest.fixture(scope="session")
+def singleprocess(request):
+    """Retrieve user-provided single process mode on the command line."""
+    yield request.config.getoption("--singleprocess")
+
+
 @pytest.fixture(scope="class")
 def session():
     """Dictionary to store data between tests."""
@@ -57,6 +63,9 @@ def pytest_addoption(parser):
     parser.addoption(
         "--log-dir", action="store", help="specify log directory"
     )
+    parser.addoption(
+        "--singleprocess", action='store_true', help="the node validates \
+        blocks using only one process, useful for debugging")
 
 
 DEAD_DAEMONS_WARN = '''
@@ -71,9 +80,11 @@ def sandbox(log_dir):
 
     Nodes, bakers and endorsers are added/removed dynamically."""
     # log_dir is None if not provided on command-line
+    # singleprocess is false if not provided on command-line
     with Sandbox(paths.TEZOS_HOME,
                  constants.IDENTITIES,
-                 log_dir=log_dir) as sandbox:
+                 log_dir=log_dir,
+                 singleprocess=singleprocess) as sandbox:
         yield sandbox
         assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
 

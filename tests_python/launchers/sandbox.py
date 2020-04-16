@@ -54,7 +54,8 @@ class Sandbox:
                  rpc: int = 18730,
                  p2p: int = 19730,
                  num_peers: int = 45,
-                 log_dir: str = None):
+                 log_dir: str = None,
+                 singleprocess: bool = False):
         """
         Args:
             binaries_path (str): path to the binaries (client, node, baker,
@@ -91,6 +92,7 @@ class Sandbox:
         self.endorsers = {}  # type: Dict[str, Dict[int, Endorser]]
         self.counter = 0
         self.logs = []  # type: List[str]
+        self.singleprocess = singleprocess
 
     def __enter__(self):
         return self
@@ -138,7 +140,8 @@ class Sandbox:
         node_bin = self._wrap_path(NODE, branch)
         node = Node(node_bin, node_dir=node_dir, p2p_port=p2p_node,
                     rpc_port=rpc_node, peers=peers_rpc, log_file=log_file,
-                    params=params, log_levels=log_levels, use_tls=use_tls)
+                    params=params, log_levels=log_levels, use_tls=use_tls,
+                    singleprocess=self.singleprocess)
 
         self.nodes[node_id] = node
         return node
@@ -510,14 +513,16 @@ class SandboxMultiBranch(Sandbox):
                  rpc: int = 18730,
                  p2p: int = 19730,
                  num_peers: int = 45,
-                 log_dir: str = None):
+                 log_dir: str = None,
+                 singleprocess: bool = False):
         """Same semantics as Sandbox class, plus a `branch_map` parameter"""
         super().__init__(binaries_path,
                          identities,
                          rpc,
                          p2p,
                          num_peers,
-                         log_dir)
+                         log_dir,
+                         singleprocess)
         self._branch_map = branch_map
         for branch in list(branch_map.values()):
             error_msg = f'{binaries_path}/{branch} not a dir'
