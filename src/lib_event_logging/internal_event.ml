@@ -402,7 +402,7 @@ end
 
 module Simple = struct
   (* This type is mostly there to make usage less error-prone, by
-     explicitely splitting the place where the partial application
+     explicitly splitting the place where the partial application
      takes place. Indeed, it is important that events are declared
      only once. *)
   type 'a t = 'a -> unit tzresult Lwt.t
