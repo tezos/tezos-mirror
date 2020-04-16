@@ -129,12 +129,12 @@ type error +=
 
 type error += Bad_option_argument : string * 'ctx command option -> error
 
-type error += Multiple_occurences : string * 'ctx command option -> error
+type error += Multiple_occurrences : string * 'ctx command option -> error
 
 type error += Extra_arguments : string list * 'ctx command -> error
 
 let trim s =
-  (* config-file wokaround *)
+  (* config-file workaround *)
   TzString.split '\n' s |> List.map String.trim |> String.concat "\n"
 
 let print_desc ppf doc =
@@ -848,7 +848,7 @@ let parse_arg :
         trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
         >>|? fun x -> Some x
     | Some (_ :: _) ->
-        fail (Multiple_occurences ("--" ^ long, command)) )
+        fail (Multiple_occurrences ("--" ^ long, command)) )
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
       converter ctx default
       >>= fun default ->
@@ -868,7 +868,7 @@ let parse_arg :
       | Some [s] ->
           trace (Bad_option_argument (long, command)) (converter ctx s)
       | Some (_ :: _) ->
-          fail (Multiple_occurences (long, command)) )
+          fail (Multiple_occurrences (long, command)) )
   | Switch {label = {long; short = _}; _} -> (
     match TzString.Map.find_opt long args_dict with
     | None | Some [] ->
@@ -876,7 +876,7 @@ let parse_arg :
     | Some [_] ->
         return_true
     | Some (_ :: _) ->
-        fail (Multiple_occurences (long, command)) )
+        fail (Multiple_occurrences (long, command)) )
   | Constant c ->
       return c
 
@@ -2076,7 +2076,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
              ~f:(fun command -> [Ex command])
              ~default:[]
              command)
-    | Multiple_occurences (arg, command) ->
+    | Multiple_occurrences (arg, command) ->
         Format.fprintf
           ppf
           "Command line option @{<opt>%s@} appears multiple times."
