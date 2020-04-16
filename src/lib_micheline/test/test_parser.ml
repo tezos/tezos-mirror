@@ -516,10 +516,10 @@ let test_basic_parsing () =
   >>=? fun () ->
   assert_toplevel_parsing
     ~loc:__LOC__
-    "LAMDA @name int int {}"
+    "LAMBDA @name int int {}"
     [ Prim
         ( (),
-          "LAMDA",
+          "LAMBDA",
           [Prim ((), "int", [], []); Prim ((), "int", [], []); Seq ((), [])],
           ["@name"] ) ]
   >>=? fun () ->
@@ -559,8 +559,8 @@ let test_list_append_parsing () =
   assert_toplevel_parsing
     ~loc:__LOC__
     "parameter (pair (list int)(list int));return (list int);storage \
-     unit;code { CAR; DUP; DIP{CDR}; CAR;NIL int; SWAP;LAMDA (pair int (list \
-     int))(list int){DUP; CAR; DIP {CDR}; CONS};REDUCE;LAMDA (pair int (list \
+     unit;code { CAR; DUP; DIP{CDR}; CAR;NIL int; SWAP;LAMBDA (pair int (list \
+     int))(list int){DUP; CAR; DIP {CDR}; CONS};REDUCE;LAMBDA (pair int (list \
      int))(list int){DUP; CAR; DIP{CDR}; CONS};UNIT; SWAP; PAIR}"
     [ Prim
         ( (),
@@ -588,7 +588,7 @@ let test_list_append_parsing () =
                   Prim ((), "SWAP", [], []);
                   Prim
                     ( (),
-                      "LAMDA",
+                      "LAMBDA",
                       [ Prim
                           ( (),
                             "pair",
@@ -611,7 +611,7 @@ let test_list_append_parsing () =
                   Prim ((), "REDUCE", [], []);
                   Prim
                     ( (),
-                      "LAMDA",
+                      "LAMBDA",
                       [ Prim
                           ( (),
                             "pair",

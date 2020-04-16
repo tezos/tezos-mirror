@@ -731,7 +731,7 @@ and do_check ?(toplevel = false) errors = function
       else
         (* In a sequence or in the arguments of a primitive, we
            require all items to be aligned, but we relax the rule to
-           allow consecutive items to be writtem on the same line. *)
+           allow consecutive items to be written on the same line. *)
         let rec in_line_or_aligned prev_start_line errors = function
           | [] ->
               errors
