@@ -45,6 +45,9 @@ struct
           (Format.pp_print_list Error.pp)
           (List.rev errors)
 
+  let pp_print_error_first fmt trace =
+    Format.fprintf fmt "%a" Error.pp @@ List.hd trace
+
   let classify_errors trace =
     List.fold_left
       (fun r e ->

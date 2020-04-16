@@ -155,6 +155,9 @@ module type MONAD = sig
      might rename it to [pp_print_trace]. *)
   val pp_print_error : Format.formatter -> trace -> unit
 
+  (** Pretty prints a trace as the message of its first error *)
+  val pp_print_error_first : Format.formatter -> trace -> unit
+
   val trace_encoding : trace Data_encoding.t
 
   (* NOTE: Right now we leave this [classify_errors] named as is. Later on we

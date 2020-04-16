@@ -50,5 +50,5 @@ let prevalidator_reinstantiation_failure =
     ~name:"prevalidator_reinstantiation_failure"
     ~msg:"failed to reinstantiate prevalidator error {trace}"
     ~level:Error
-    ~pp1:Event.pp_first_error_of_trace
+    ~pp1:pp_print_error_first
     ("trace", trace_encoding)
