@@ -132,7 +132,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
               ctxt#error
                 "The operation %a is outdated and may never be included in \
                  the chain.@,\
-                 We recommand to use an external block explorer."
+                 We recommend to use an external block explorer."
                 Operation_hash.pp
                 operation_hash
               >>= fun () -> Lwt.fail (Outdated operation_hash)

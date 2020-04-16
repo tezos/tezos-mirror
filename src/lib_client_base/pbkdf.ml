@@ -12,7 +12,7 @@ let xorbuf a b =
 
 let cdiv x y =
   (* This is lifted from Nocrypto.Uncommon.(//)
-     (formerly known as [cdiv]). It is part of the documented, publically
+     (formerly known as [cdiv]). It is part of the documented, publicly
      exposed _internal_ utility library not for public consumption, hence
      the API break that prompted this copy-pasted function. *)
   if y < 1 then raise Division_by_zero
