@@ -1,7 +1,10 @@
 from os import path
+import re
 import pytest
 from client import client_output
 from tools.paths import CONTRACT_PATH, ACCOUNT_PATH
+from tools.utils import assert_run_failure
+
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 TRANSFER_ARGS = ['--burn-cap', '0.257']
@@ -159,3 +162,63 @@ class TestRawContext:
         keys = session['keys']
         client.transfer(10, keys[3], keys[4], TRANSFER_ARGS)
         client.bake('bootstrap1', BAKE_ARGS)
+
+
+class TestRememberContract:
+    @pytest.mark.parametrize(
+        "contract_name,non_originated_contract_address", [
+            ("test",
+             "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
+            ("test-2",
+             "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
+        ])
+    def test_non_originated_contract_no_forcing_not_saved_before(
+            self,
+            client,
+            contract_name,
+            non_originated_contract_address,
+    ):
+        client.remember_contract(contract_name,
+                                 non_originated_contract_address)
+
+    # As it is always the same client, the contracts have been saved
+    # before
+    @pytest.mark.parametrize(
+        "contract_name,non_originated_contract_address", [
+            ("test",
+             "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
+            ("test-2",
+             "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
+        ])
+    def test_non_originated_contract_with_forcing_and_saved_before(
+            self,
+            client,
+            contract_name,
+            non_originated_contract_address,
+    ):
+        client.remember_contract(contract_name,
+                                 non_originated_contract_address,
+                                 force=True)
+
+    # As it is always the same client, the contracts have been saved
+    # before
+    @pytest.mark.parametrize(
+        "contract_name,non_originated_contract_address", [
+            ("test",
+             "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
+            ("test-2",
+             "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
+        ])
+    def test_non_originated_contract_no_forcing_and_saved_before(
+            self,
+            client,
+            contract_name,
+            non_originated_contract_address,
+    ):
+        expected_error = f"The contract alias {contract_name} already exists"
+
+        def cmd():
+            client.remember_contract(contract_name,
+                                     non_originated_contract_address,
+                                     force=False)
+        assert_run_failure(cmd, re.compile(expected_error))
