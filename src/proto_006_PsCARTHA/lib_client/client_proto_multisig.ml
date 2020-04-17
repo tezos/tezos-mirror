@@ -192,16 +192,16 @@ let () =
     ~description:
       "When trying to deserialise an action from a sequence of bytes, we got \
        an action for another multisig contract"
-    ~pp:(fun ppf (recieved, expected) ->
+    ~pp:(fun ppf (received, expected) ->
       Format.fprintf
         ppf
-        "Bad deserialized contract, recieved %a expected %a."
+        "Bad deserialized contract, received %a expected %a."
         Contract.pp
-        recieved
+        received
         Contract.pp
         expected)
     Data_encoding.(
-      obj1 (req "recieved_expected" (tup2 Contract.encoding Contract.encoding)))
+      obj1 (req "received_expected" (tup2 Contract.encoding Contract.encoding)))
     (function Bad_deserialized_contract b -> Some b | _ -> None)
     (fun b -> Bad_deserialized_contract b) ;
   register_error_kind
@@ -211,13 +211,13 @@ let () =
     ~description:
       "The byte sequence references a multisig counter that does not match \
        the one currently stored in the given multisig contract"
-    ~pp:(fun ppf (recieved, expected) ->
+    ~pp:(fun ppf (received, expected) ->
       Format.fprintf
         ppf
-        "Bad deserialized counter, recieved %d expected %d."
-        recieved
+        "Bad deserialized counter, received %d expected %d."
+        received
         expected)
-    Data_encoding.(obj1 (req "recieved_expected" (tup2 int31 int31)))
+    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
     (function
       | Bad_deserialized_counter (c1, c2) ->
           Some (Z.to_int c1, Z.to_int c2)
@@ -237,7 +237,7 @@ let () =
         "Threshold too high: %d expected at most %d."
         threshold
         nkeys)
-    Data_encoding.(obj1 (req "recieved_expected" (tup2 int31 int31)))
+    Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
     (function Threshold_too_high (c1, c2) -> Some (c1, c2) | _ -> None)
     (fun (c1, c2) -> Threshold_too_high (c1, c2)) ;
   register_error_kind
@@ -281,7 +281,7 @@ let multisig_script_string =
   \        UNPAIR ;\n\
   \        # pair the payload with the current contract address, to ensure \
    signatures\n\
-  \        # can't be replayed accross different contracts if a key is reused.\n\
+  \        # can't be replayed across different contracts if a key is reused.\n\
   \        DUP ; SELF ; ADDRESS ; CHAIN_ID ; PAIR ; PAIR ;\n\
   \        PACK ; # form the binary payload that we expect to be signed\n\
   \        DIP { UNPAIR @counter ; DIP { SWAP } } ; SWAP\n\
@@ -658,7 +658,7 @@ let multisig_create_param ~counter ~action ~optional_signatures () :
        (pair ~loc (int ~loc counter) (action_to_expr ~loc action))
        (Seq (loc, l))
 
-let mutlisig_param_string ~counter ~action ~optional_signatures () =
+let multisig_param_string ~counter ~action ~optional_signatures () =
   multisig_create_param ~counter ~action ~optional_signatures ()
   >>=? fun expr ->
   return @@ Format.asprintf "%a" Michelson_v1_printer.print_expr expr
@@ -794,7 +794,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
   >>=? fun {bytes; threshold; keys; counter = stored_counter} ->
   check_multisig_signatures ~bytes ~threshold ~keys signatures
   >>=? fun optional_signatures ->
-  mutlisig_param_string ~counter:stored_counter ~action ~optional_signatures ()
+  multisig_param_string ~counter:stored_counter ~action ~optional_signatures ()
   >>=? fun arg ->
   Client_proto_context.transfer
     cctxt

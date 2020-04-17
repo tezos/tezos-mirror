@@ -717,7 +717,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               | None -> return_unit | Some (_res, _contracts) -> return_unit ));
       command
         ~group
-        ~desc:"Withdrow the delegate of a multisig contract."
+        ~desc:"Withdraw the delegate of a multisig contract."
         transfer_options
         ( prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
         @@ Client_proto_contracts.ContractAlias.destination_param

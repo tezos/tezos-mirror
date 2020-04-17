@@ -273,7 +273,7 @@ let commands version () =
               ~contract);
     command
       ~group
-      ~desc:"Get the list of unreachable pathsin a contract's parameter type."
+      ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       ( prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
