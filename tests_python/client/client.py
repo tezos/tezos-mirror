@@ -168,6 +168,13 @@ class Client:
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 
+    def remember_contract(self, alias: str, contract_address: str,
+                          force: bool = False):
+        params = ["remember", "contract", alias, contract_address]
+        if force:
+            params.append("--force")
+        return self.run(params)
+
     def remember(self, alias: str, contract: str) -> str:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
