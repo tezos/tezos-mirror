@@ -191,13 +191,13 @@ module type T = sig
     'b tzresult Lwt.t
 
   (** Exports the canceler to allow cancellation of other tasks when this
-      worker is shutdowned or when it dies. *)
+      worker is shut down or when it dies. *)
   val canceler : _ t -> Lwt_canceler.t
 
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
-  (** Recod an event in the backlog. *)
+  (** Record an event in the backlog. *)
   val record_event : _ t -> Event.t -> unit
 
   (** Record an event and make sure it is logged. *)
