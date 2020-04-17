@@ -282,7 +282,7 @@ let () =
     ~id:"michelson_v1.duplicate_set_values_in_literal"
     ~title:"Sets literals cannot contain duplicate elements"
     ~description:
-      "Set literals cannot contain duplicate elements, but a duplicae was \
+      "Set literals cannot contain duplicate elements, but a duplicate was \
        found while parsing."
     (obj2
        (req "location" Script.location_encoding)
@@ -407,7 +407,7 @@ let () =
     `Permanent
     ~id:"michelson_v1.unexpected_annotation"
     ~title:"An annotation was encountered where no annotation is expected"
-    ~description:"A node in the syntax tree was impropperly annotated"
+    ~description:"A node in the syntax tree was improperly annotated"
     (located empty)
     (function Unexpected_annotation loc -> Some (loc, ()) | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc) ;
@@ -564,7 +564,7 @@ let () =
     ~id:"michelson_v1.invalid_map_block_fail"
     ~title:"FAIL instruction occurred as body of map block"
     ~description:
-      "FAIL cannot be the only instruction in the body. The propper type of \
+      "FAIL cannot be the only instruction in the body. The proper type of \
        the return list cannot be inferred."
     (obj1 (req "loc" Script.location_encoding))
     (function Invalid_map_block_fail loc -> Some loc | _ -> None)

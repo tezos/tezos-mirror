@@ -204,7 +204,7 @@ type annot_opt =
 
 let parse_annots loc ?(allow_special_var = false)
     ?(allow_special_field = false) l =
-  (* allow emtpty annotations as wildcards but otherwise only accept
+  (* allow empty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard ~specials wrap s acc =
     let mem_char c cs = List.exists (Char.equal c) cs in

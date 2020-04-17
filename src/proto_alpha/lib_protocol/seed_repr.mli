@@ -27,7 +27,7 @@
 
     This is not expected to be a good cryptographic random number
     generator. In particular this is supposed to be used in situations
-    where the seed is a globaly known information.
+    where the seed is a globally known information.
 
     The only expected property is: It should be difficult to find a
     seed such that the generated sequence is a given one. *)
@@ -62,7 +62,7 @@ val empty : seed
 (** Returns a new seed by hashing the one passed with a constant. *)
 val deterministic_seed : seed -> seed
 
-(** [intial_seeds n] generates the first [n] seeds for which there are no nonces.
+(** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
     The first seed is a constant value. The kth seed is the hash of seed (k-1)
     concatenated with a constant. *)
 val initial_seeds : int -> seed list

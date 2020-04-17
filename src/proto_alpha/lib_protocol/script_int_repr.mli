@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The types for arbitraty precision integers in Michelson.
+(** The types for arbitrary precision integers in Michelson.
     The type variable ['t] is always [n] or [z],
     [n num] and [z num] are incompatible.
 

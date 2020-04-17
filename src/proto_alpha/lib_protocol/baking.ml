@@ -195,7 +195,7 @@ let () =
 let () =
   let description =
     "The number of endorsements must be non-negative and at most the \
-     endosers_per_block constant."
+     endorsers_per_block constant."
   in
   register_error_kind
     `Permanent

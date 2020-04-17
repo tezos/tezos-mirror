@@ -133,7 +133,7 @@ let consume block_gas operation_gas cost =
 
 let check_enough block_gas operation_gas cost =
   consume block_gas operation_gas cost
-  >|? fun (_block_remainig, _remaining) -> ()
+  >|? fun (_block_remaining, _remaining) -> ()
 
 let alloc_cost n =
   {

@@ -125,7 +125,7 @@ val freeze_rewards :
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
     unfreeze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
-    provided unrevealed seeds (tipically seed from cycle 'n - 1').
+    provided unrevealed seeds (typically seed from cycle 'n - 1').
     Returns a list of account with the amount that was unfrozen for each
     and the list of deactivated delegates. *)
 val cycle_end :

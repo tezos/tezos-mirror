@@ -151,7 +151,7 @@ let () =
     ~id:"operation.wrong_voting_period"
     ~title:"Wrong voting period"
     ~description:
-      "Trying to onclude a proposal or ballot meant for another voting period"
+      "Trying to include a proposal or ballot meant for another voting period"
     ~pp:(fun ppf (e, p) ->
       Format.fprintf
         ppf
@@ -264,7 +264,7 @@ let () =
       Format.fprintf
         ppf
         "A valid double-endorsement operation cannot  be applied: the \
-         associated delegate  has previously been denunciated in this cycle.")
+         associated delegate  has previously been denounced in this cycle.")
     Data_encoding.empty
     (function Unrequired_double_endorsement_evidence -> Some () | _ -> None)
     (fun () -> Unrequired_double_endorsement_evidence) ;
@@ -376,7 +376,7 @@ let () =
       Format.fprintf
         ppf
         "A valid double-baking operation cannot  be applied: the associated \
-         delegate  has previously been denunciated in this cycle.")
+         delegate  has previously been denounced in this cycle.")
     Data_encoding.empty
     (function Unrequired_double_baking_evidence -> Some () | _ -> None)
     (fun () -> Unrequired_double_baking_evidence) ;
@@ -456,7 +456,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"gas_exhausted.init_deserialize"
-    ~title:"Not enough gas for initial deserialization of script expresions"
+    ~title:"Not enough gas for initial deserialization of script expressions"
     ~description:
       "Gas limit was not high enough to deserialize the transaction \
        parameters or origination script code or initial storage, making the \
@@ -466,7 +466,7 @@ let () =
     (fun () -> Gas_quota_exceeded_init_deserialize) ;
   register_error_kind
     `Permanent
-    ~id:"operation.not_enought_endorsements_for_priority"
+    ~id:"operation.not_enough_endorsements_for_priority"
     ~title:"Not enough endorsements for priority"
     ~description:
       "The block being validated does not include the required minimum number \

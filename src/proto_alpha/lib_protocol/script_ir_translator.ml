@@ -2120,7 +2120,7 @@ let rec parse_data :
   (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
       Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
       >>=? fun ctxt -> return (Script_timestamp.of_zint v, ctxt)
-  | (Timestamp_t _, String (_, s)) (* As unparsed with [Redable]. *) -> (
+  | (Timestamp_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
       Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp)
       >>=? fun ctxt ->
       match Script_timestamp.of_string s with
@@ -2228,7 +2228,7 @@ let rec parse_data :
         (fail
            (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
   (* Addresses *)
-  | (Address_t _, Bytes (loc, bytes)) (* As unparsed with [O[ptimized]. *) -> (
+  | (Address_t _, Bytes (loc, bytes)) (* As unparsed with [Optimized]. *) -> (
       Lwt.return (Gas.consume ctxt Typecheck_costs.contract)
       >>=? fun ctxt ->
       match
@@ -4041,12 +4041,11 @@ and parse_instr :
         (* For existing contracts, this instruction is still allowed *)
         Lwt.return @@ parse_two_var_annot loc annot
         >>=? fun (op_annot, addr_annot) ->
-        let cannonical_code = fst @@ Micheline.extract_locations code in
-        Lwt.return @@ parse_toplevel ~legacy cannonical_code
+        let canonical_code = fst @@ Micheline.extract_locations code in
+        Lwt.return @@ parse_toplevel ~legacy canonical_code
         >>=? fun (arg_type, storage_type, code_field, root_name) ->
         trace
-          (Ill_formed_type
-             (Some "parameter", cannonical_code, location arg_type))
+          (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
           (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
         >>=? fun (Ex_ty arg_type, ctxt) ->
         ( if legacy then Error_monad.return ()
@@ -4054,7 +4053,7 @@ and parse_instr :
         >>=? fun () ->
         trace
           (Ill_formed_type
-             (Some "storage", cannonical_code, location storage_type))
+             (Some "storage", canonical_code, location storage_type))
           (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
         >>=? fun (Ex_ty storage_type, ctxt) ->
         let arg_annot =
@@ -4080,7 +4079,7 @@ and parse_instr :
               None )
         in
         trace
-          (Ill_typed_contract (cannonical_code, []))
+          (Ill_typed_contract (canonical_code, []))
           (parse_returning
              (Toplevel
                 {
@@ -4126,19 +4125,18 @@ and parse_instr :
         _ ) ) ->
       Lwt.return @@ parse_two_var_annot loc annot
       >>=? fun (op_annot, addr_annot) ->
-      let cannonical_code = fst @@ Micheline.extract_locations code in
-      Lwt.return @@ parse_toplevel ~legacy cannonical_code
+      let canonical_code = fst @@ Micheline.extract_locations code in
+      Lwt.return @@ parse_toplevel ~legacy canonical_code
       >>=? fun (arg_type, storage_type, code_field, root_name) ->
       trace
-        (Ill_formed_type (Some "parameter", cannonical_code, location arg_type))
+        (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
       >>=? fun (Ex_ty arg_type, ctxt) ->
       ( if legacy then Error_monad.return ()
       else Lwt.return (well_formed_entrypoints ~root_name arg_type) )
       >>=? fun () ->
       trace
-        (Ill_formed_type
-           (Some "storage", cannonical_code, location storage_type))
+        (Ill_formed_type (Some "storage", canonical_code, location storage_type))
         (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
       >>=? fun (Ex_ty storage_type, ctxt) ->
       let arg_annot =
@@ -4164,7 +4162,7 @@ and parse_instr :
             None )
       in
       trace
-        (Ill_typed_contract (cannonical_code, []))
+        (Ill_typed_contract (canonical_code, []))
         (parse_returning
            (Toplevel
               {
@@ -5464,7 +5462,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
         >>=? fun (ctxt, duplicate) ->
         return (ctxt, [Contract.Copy {src = id; dst = duplicate}], duplicate)
       else
-        (* The first occurence encountered of a big_map reuses the
+        (* The first occurrence encountered of a big_map reuses the
              ID. This way, the payer is only charged for the diff.
              For this to work, this diff has to be put at the end of
              the global diff, otherwise the duplicates will use the

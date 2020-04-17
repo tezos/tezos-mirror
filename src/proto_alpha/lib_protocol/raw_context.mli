@@ -200,7 +200,7 @@ module type T = sig
 
   (** When the value is [Some v], allocates the data and initializes
       it with [v] ; just updates it if the bucket exists. When the
-      valus is [None], delete the storage bucket when the value ; does
+      value is [None], delete the storage bucket when the value ; does
       nothing if the bucket does not exists. *)
   val set_option : context -> key -> value option -> context Lwt.t
 
@@ -281,7 +281,7 @@ val init_endorsements :
   (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
   context
 
-(** Marks an endorsment in the map as used. *)
+(** Marks an endorsement in the map as used. *)
 val record_endorsement : context -> Signature.Public_key_hash.t -> context
 
 (** Provide a fresh identifier for a temporary big map (negative index). *)

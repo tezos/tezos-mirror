@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Wraps an alcotest so that it prints correcly errors from the Error_monad. *)
+(* Wraps an alcotest so that it prints correctly errors from the Error_monad. *)
 let tztest name speed f =
   Alcotest_lwt.test_case name speed (fun _sw () ->
       f ()

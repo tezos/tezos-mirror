@@ -41,7 +41,7 @@ open Test_tez
        destination contract.
 
     2- Check the equivalent of the balance of the source/destination
-       contract before and after transfer is valided.
+       contract before and after transfer is validated.
 
    This function returns a pair:
    - A block that added a valid operation
@@ -205,7 +205,7 @@ let transfer_zero_implicit () =
           false)
 
 (********************)
-(** Transfer to originted contract *)
+(** Transfer to originated contract *)
 
 (********************)
 
@@ -296,7 +296,7 @@ let missing_transaction () =
     - implicit to implicit
     - implicit to originated
     - originated to implicit
-    - originted to originted *)
+    - originated to originated *)
 
 (********************)
 
@@ -704,7 +704,7 @@ let tests =
     Test.tztest "transfers to itself" `Quick transfers_to_self;
     (* missing operation *)
     Test.tztest "missing transaction" `Quick missing_transaction;
-    (* transfer from/to implicit/originted contracts*)
+    (* transfer from/to implicit/originated contracts*)
     Test.tztest
       "transfer from an implicit to implicit contract "
       `Quick

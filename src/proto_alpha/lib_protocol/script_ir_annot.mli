@@ -90,7 +90,7 @@ val unparse_var_annot : var_annot option -> string list
 
 val unparse_field_annot : field_annot option -> string list
 
-(** Convertions functions between different annotation kinds *)
+(** Conversion functions between different annotation kinds *)
 
 val field_to_var_annot : field_annot option -> var_annot option
 

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Endorsing a block adds an extra layer of confidence to the Tezos's
+(** Endorsing a block adds an extra layer of confidence to the Tezos'
     PoS algorithm. The block endorsing operation must be included in
     the following block. Each endorser possess a number of slots
     corresponding to their priority. After [preserved_cycles], a reward
@@ -61,7 +61,7 @@ let get_expected_deposit ctxt ~baker ~endorsing_power =
   endorsement_deposit +? baking_deposit >>?= fun deposit -> return deposit
 
 (* [baker] is true if the [pkh] has also baked the current block, in
-   which case correspoding deposit and reward should be ajusted *)
+   which case corresponding deposit and reward should be adjusted *)
 let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
     ~endorsing_power ctxt pkh initial_balance =
   let contract = Contract.implicit_contract pkh in
@@ -616,7 +616,7 @@ let test_fitness_gap () =
   >>=? fun res ->
   (* in Emmy+, the fitness increases by 1, so the difference between
      the fitness at level 1 and at level 0 is 1, independently if the
-     number fo endorements (here 1) *)
+     number fo endorsements (here 1) *)
   Assert.equal_int ~loc:__LOC__ res 1 >>=? fun () -> return_unit
 
 let tests =
