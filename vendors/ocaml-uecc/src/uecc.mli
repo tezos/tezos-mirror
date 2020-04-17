@@ -82,7 +82,7 @@ val write_dh : ('a, secret) key -> ('a, public) key -> Bigstring.t -> int
 val sign : (_, secret) key -> Bigstring.t -> Bigstring.t option
 (** [sign sk msg] is [Some signature] where [signature] is a valid
     signature of [msg] with secret key [sk], or [None] if an error
-    occured. *)
+    occurred. *)
 
 val write_sign :
   (_, secret) key -> Bigstring.t -> msg:Bigstring.t -> int
