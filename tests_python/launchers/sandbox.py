@@ -225,7 +225,7 @@ class Sandbox:
             account (str): account to bake for
             proto (str): name of protocol, used to determine the binary to
                          use. E.g. 'alpha` for `tezos-baker-alpha`.
-            params (list): additioonal parameters
+            params (list): additional parameters
             branch (str): see branch parameter for `add_node()`
         """
         assert node_id in self.nodes, f'No node running with id={node_id}'
@@ -265,7 +265,7 @@ class Sandbox:
             account (str): account to endorse for
             proto (str): name of protocol, used to determine the binary to
                          use. E.g. 'alpha` for `tezos-endorser-alpha`.
-            params (list): additiosonal parameters
+            params (list): additional parameters
             branch (str): see branch parameter for `add_node()`
         """
         assert node_id in self.nodes, f'No node running with id={node_id}'

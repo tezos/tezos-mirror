@@ -141,7 +141,7 @@ def main():
                         help='repository where executables will be copied',
                         required=True)
     parser.add_argument('branches', metavar='BRANCH', type=str, nargs='*',
-                        help='list of brnaches')
+                        help='list of branches')
     args = parser.parse_args()
     prepare_binaries(args.clone_dir, args.build_dir, args.bin_dir,
                      args.branches)

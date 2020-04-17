@@ -175,9 +175,9 @@ class TestRPCs:
     @pytest.mark.skip
     def test_workers_chain_validator_peer_validator(self, sandbox):
         peer_id = sandbox.client(2).rpc('get', '/network/self')
-        sandbox.clientœ(1).rpc('get',
-                               f'/workers/chain_validators/{CHAIN_ID}'
-                               f'/peers_validators/{peer_id}')
+        sandbox.client(1).rpc('get',
+                              f'/workers/chain_validators/{CHAIN_ID}'
+                              f'/peers_validators/{peer_id}')
 
     def test_workers_prevalidators(self, sandbox):
         sandbox.client(1).rpc('get', f'/workers/prevalidators')

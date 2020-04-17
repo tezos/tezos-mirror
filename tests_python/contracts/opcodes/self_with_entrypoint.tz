@@ -12,7 +12,7 @@ code {
 
        # Verify the types of the different entrypoints.  CAST is noop
        # if its argument is convertible with the type of the top of
-       # the stack. is conver
+       # the stack.
        SELF %A; CAST (contract nat); DROP;
        SELF %B; CAST (contract bool); DROP;
        SELF %maybe_C; CAST (contract (or (unit) (string))); DROP;

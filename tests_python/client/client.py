@@ -678,7 +678,7 @@ class Client:
     def check_node_listening(self,
                              timeout: float = 1,
                              attempts: int = 20) -> bool:
-        """ Checks whether the node is reponsive, by polling it
+        """ Checks whether the node is responsive, by polling it
         using the `version` rpc.
 
         Args:

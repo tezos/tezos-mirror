@@ -60,7 +60,7 @@ def pytest_addoption(parser):
 
 
 DEAD_DAEMONS_WARN = '''
-It seems some daemons terminated unexpectingly, or didn't launch properly.
+It seems some daemons terminated unexpectedly, or didn't launch properly.
 You can investigate daemon logs by running this test using the
 `--log-dir=LOG_DIR` option.'''
 
