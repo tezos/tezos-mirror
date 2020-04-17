@@ -138,7 +138,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                          conflicting_endorsements_tag
                          (existing_endorsement, new_endorsement))
               >>= fun () ->
-              (* A denunciation may have already occured *)
+              (* A denunciation may have already occurred *)
               Shell_services.Injection.operation cctxt ~chain bytes
               >>=? fun op_hash ->
               lwt_log_notice
@@ -239,7 +239,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           fun f ->
             f "Double baking detected" -% t event "double_baking_detected")
       >>= fun () ->
-      (* A denunciation may have already occured *)
+      (* A denunciation may have already occurred *)
       Shell_services.Injection.operation cctxt ~chain bytes
       >>=? fun op_hash ->
       lwt_log_notice

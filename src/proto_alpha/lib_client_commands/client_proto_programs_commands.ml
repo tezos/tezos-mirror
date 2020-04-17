@@ -415,7 +415,7 @@ let commands () =
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successfull."
+              cctxt#message "Signature check successful."
               >>= fun () -> return_unit);
     command
       ~group
@@ -502,7 +502,7 @@ let commands () =
     command
       ~group
       ~desc:
-        "Ask the node to list the unreachable pathsin a script's parameter \
+        "Ask the node to list the unreachable paths in a script's parameter \
          type."
       (args2 emacs_mode_switch no_print_source_flag)
       ( prefixes ["get"; "script"; "unreachable"; "paths"; "for"]

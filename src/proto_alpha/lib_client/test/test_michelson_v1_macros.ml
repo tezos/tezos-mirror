@@ -522,7 +522,7 @@ let test_map_cdadr () =
 (* Unexpand tests *)
 (****************************************************************************)
 
-(* unpexpanded : original expression with macros *)
+(* unexpanded : original expression with macros *)
 
 let assert_unexpansion original ex =
   let ({Michelson_v1_parser.expanded; _}, errors) =

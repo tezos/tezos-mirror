@@ -264,7 +264,7 @@ let get_manager_operation_gas_and_fee op =
     (Tez.zero, Z.zero)
     l
 
-(* Sort operation consisdering potential gas and storage usage.
+(* Sort operation considering potential gas and storage usage.
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
 let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte
@@ -786,7 +786,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       (List.nth operations anonymous_index)
       (List.nth quota anonymous_index)
   in
-  (* Size/Gas check already occured in classify operations *)
+  (* Size/Gas check already occurred in classify operations *)
   let managers = List.nth operations managers_index in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
@@ -1488,7 +1488,7 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
               | Ok () ->
                   (* If some nonces are to be revealed it means:
                    - We entered a new cycle and we can clear old nonces ;
-                   - A revelation was not included yet in the cycle beggining.
+                   - A revelation was not included yet in the cycle beginning.
                    So, it is safe to only filter outdated_nonces there *)
                   Client_baking_nonces.filter_outdated_nonces
                     cctxt

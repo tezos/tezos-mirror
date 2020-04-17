@@ -25,7 +25,7 @@
 
 open Protocol
 
-(** A null proof-of-work nonce. This should only be used to non-sensical blocks
+(** A null proof-of-work nonce. This should only be used to nonsensical blocks
     of the correct size and shape. *)
 val empty_proof_of_work_nonce : Bytes.t
 
