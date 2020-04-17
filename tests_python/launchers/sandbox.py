@@ -131,7 +131,7 @@ class Sandbox:
             private (bool): enable private mode, default=True
             config_client (bool): initialize client with sandbox identities,
                                   default=True
-            use_tls (list): couple of filenames containing
+            use_tls (Tuple[str, str]): couple of filenames containing
                            (tezos.crt, tezos.k), default=None
             snapshot (str): import snapshot  before initializing node
             branch (str): sub-dir where to lookup the node and client

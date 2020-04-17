@@ -21,7 +21,7 @@ class ClientRegression(client.Client):
                  host: str = '127.0.0.1',
                  base_dir: str = None,
                  rpc_port: int = 8732,
-                 use_tls: int = False,
+                 use_tls: bool = False,
                  disable_disclaimer: bool = True):
         self.regtest = None
         super().__init__(client_path,

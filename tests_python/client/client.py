@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, List
+from typing import Any, List, Optional
 
 from . import client_output
 
@@ -45,9 +45,9 @@ class Client:
                  client_path: str,
                  admin_client_path: str,
                  host: str = '127.0.0.1',
-                 base_dir: str = None,
+                 base_dir: Optional[str] = None,
                  rpc_port: int = 8732,
-                 use_tls: int = False,
+                 use_tls: bool = False,
                  disable_disclaimer: bool = True):
         """
         Args:

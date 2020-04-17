@@ -6,6 +6,7 @@ in the test function, and the yielded values is then accessible with this
 parameter.
 """
 import os
+from typing import Optional
 import pytest
 from pytest_regtest import register_converter_pre, deregister_converter_pre, \
     _std_conversion
@@ -93,9 +94,9 @@ def client_regtest_bis(sandbox):
     def reg_client_factory(client_path: str,
                            admin_client_path: str,
                            host: str = '127.0.0.1',
-                           base_dir: str = None,
+                           base_dir: Optional[str] = None,
                            rpc_port: int = 8732,
-                           use_tls: int = False,
+                           use_tls: bool = False,
                            disable_disclaimer: bool = True):
         client = ClientRegression(client_path,
                                   admin_client_path,
