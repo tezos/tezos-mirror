@@ -87,7 +87,7 @@ module type S = sig
   val add :
     (value -> value -> value) -> key:key -> value:value -> ?mask:mask -> t -> t
 
-  (** [remove key t] Remove the entire subtree speficied by the mask associated with
+  (** [remove key t] Remove the entire subtree specified by the mask associated with
       key in the tree. Otherwise remove only the key *)
   val remove : key -> t -> t
 
@@ -97,7 +97,7 @@ module type S = sig
 
   val remove_prefix : key -> mask -> t -> t
 
-  (** [mem key t] return true if the entire subtree speficied by the mask associated with
+  (** [mem key t] return true if the entire subtree specified by the mask associated with
       key is in the tree *)
   val mem : key -> t -> bool
 

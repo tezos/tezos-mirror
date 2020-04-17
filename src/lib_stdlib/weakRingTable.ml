@@ -72,7 +72,7 @@ module MakeGeneral (M : Hashtbl.SeededHashedType) = struct
     type t = nativeint
 
     (* NOTE: the [nativeint] fed into this hash functions are the result of
-       [Nativeint.of_int @@ M.hash v] (for arbistrary [v]s). We assume [M.hash]
+       [Nativeint.of_int @@ M.hash v] (for arbitrary [v]s). We assume [M.hash]
        already has the expected properties of a good hash, and we assert that
        [Nativeint.of_int] does not degrade those properties. *)
     let hash a = Nativeint.to_int a
