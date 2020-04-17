@@ -522,7 +522,7 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
     | (Create_contract_2 _, _) ->
         Interp_costs.create_contract
     | (Set_delegate, _) ->
-        Interp_costs.create_account
+        Interp_costs.set_delegate
     | (Balance, _) ->
         Interp_costs.balance
     | (Level, _) ->

@@ -307,7 +307,7 @@ module Cost_of = struct
 
     let implicit_account = step_cost 10
 
-    let set_delegate = step_cost 10 +@ write_bytes_cost (Z.of_int 32)
+    let set_delegate = step_cost 10
 
     let balance = atomic_step_cost 10
 
