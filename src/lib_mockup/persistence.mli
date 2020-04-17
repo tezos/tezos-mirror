@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val get_registered_mockup :
+  Protocol_hash.t option -> Registration.mockup_environment tzresult Lwt.t
+
 (** Returns a mockup environment for the default protocol (which is the first
     in the list of registered protocol, cf [Registration] module). *)
 val default_mockup_context :

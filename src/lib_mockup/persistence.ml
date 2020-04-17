@@ -56,21 +56,31 @@ let persisted_mockup_environment_encoding :
        (req "protocol_hash" Protocol_hash.encoding)
        (req "context" rpc_context_encoding))
 
-let get_mockup_by_hash :
-    Protocol_hash.t -> Registration.mockup_environment tzresult Lwt.t =
- fun protocol_hash ->
+let get_registered_mockup :
+    Protocol_hash.t option -> Registration.mockup_environment tzresult Lwt.t =
+ fun protocol_hash_opt ->
   let available = Registration.get_registered_contexts () in
-  let mockup_opt =
-    List.find_opt
-      (fun (module Mockup : Tezos_mockup_registration.Registration.Mockup_sig) ->
-        Protocol_hash.equal protocol_hash Mockup.protocol_hash)
-      available
-  in
-  match mockup_opt with
-  | Some mockup ->
-      return mockup
-  | None ->
-      failwith "requested protocol not found in available mockup environments"
+  match available with
+  | [] ->
+      failwith "get_registered_mockup: no registered mockup environment"
+  | fst_mockup :: _ -> (
+    match protocol_hash_opt with
+    | None ->
+        return fst_mockup
+    | Some protocol_hash -> (
+        let mockup_opt =
+          List.find_opt
+            (fun (module Mockup : Registration.Mockup_sig) ->
+              Protocol_hash.equal protocol_hash Mockup.protocol_hash)
+            available
+        in
+        match mockup_opt with
+        | Some mockup ->
+            return mockup
+        | None ->
+            failwith
+              "requested protocol not found in available mockup environments" )
+    )
 
 let default_mockup_context :
     Tezos_client_base.Client_context.full ->
@@ -78,17 +88,15 @@ let default_mockup_context :
     tzresult
     Lwt.t =
  fun cctxt ->
-  match Registration.get_registered_contexts () with
-  | [] ->
-      failwith "default_mockup_context: no registered mockup environment"
-  | mockup :: _ ->
-      let (module Mockup) = mockup in
-      Mockup.init
-        ~cctxt
-        ~parameters:Mockup.default_parameters
-        ~constants_overrides_json:None
-        ~bootstrap_accounts_json:None
-      >>=? fun rpc_context -> return (mockup, rpc_context)
+  get_registered_mockup None
+  >>=? fun mockup ->
+  let (module Mockup) = mockup in
+  Mockup.init
+    ~cctxt
+    ~parameters:Mockup.default_parameters
+    ~constants_overrides_json:None
+    ~bootstrap_accounts_json:None
+  >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let init_mockup_context_by_protocol_hash :
     cctxt:Tezos_client_base.Client_context.full ->
@@ -99,7 +107,7 @@ let init_mockup_context_by_protocol_hash :
     tzresult
     Lwt.t =
  fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
-  get_mockup_by_hash protocol_hash
+  get_registered_mockup (Some protocol_hash)
   >>=? fun mockup ->
   let (module Mockup) = mockup in
   Mockup.init
@@ -110,7 +118,7 @@ let init_mockup_context_by_protocol_hash :
   >>=? fun rpc_context -> return (mockup, rpc_context)
 
 let mockup_context_from_persisted {protocol_hash; rpc_context} =
-  get_mockup_by_hash protocol_hash
+  get_registered_mockup (Some protocol_hash)
   >>=? fun mockup -> return (mockup, rpc_context)
 
 let get_mockup_context_from_disk :

@@ -30,9 +30,19 @@
 module type Mockup_sig = sig
   type parameters
 
+  type protocol_constants
+
   val parameters_encoding : parameters Data_encoding.t
 
+  val protocol_constants_encoding : protocol_constants Data_encoding.t
+
+  (* The content equivalent to the default value of --bootstrap-acounts *)
+  val default_bootstrap_accounts :
+    Tezos_client_base.Client_context.full -> string tzresult Lwt.t
+
   val default_parameters : parameters
+
+  val default_protocol_constants : protocol_constants
 
   val protocol_hash : Protocol_hash.t
 

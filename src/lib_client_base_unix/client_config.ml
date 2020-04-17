@@ -418,9 +418,31 @@ let read_config_file config_file =
         (fun ppf exn -> Json_encoding.print_error ppf exn)
         exn )
 
+let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
+  let base_dir = cctxt#get_base_dir in
+  match Tezos_mockup.Persistence.classify_base_dir base_dir with
+  | Base_dir_does_not_exist
+  | Base_dir_is_file
+  | Base_dir_is_nonempty
+  | Base_dir_is_empty ->
+      failwith
+        "base directory at %s should be a mockup directory for this operation \
+         to be allowed (it may contain sensitive data otherwise). What you \
+         likely want is calling `tezos-client --mode mockup --base-dir \
+         /some/dir create mockup` where `/some/dir` is **fresh** and \
+         **empty** and redo this operation, specifying `--base-dir /some/dir` \
+         this time."
+        base_dir
+  | Base_dir_is_mockup ->
+      Error_monad.return_unit
+
 let default_config_file_name = "config"
 
-let commands config_file cfg =
+let mockup_bootstrap_accounts = "bootstrap-accounts"
+
+let mockup_protocol_constants = "protocol-constants"
+
+let commands config_file cfg (protocol_hash_opt : Protocol_hash.t option) =
   let open Clic in
   let group =
     {
@@ -450,6 +472,37 @@ let commands config_file cfg =
         else
           read_config_file config_file
           >>=? fun cfg -> cctxt#message "%a@," pp_cfg cfg >>= return);
+    command
+      ~group
+      ~desc:"Show mockup config files."
+      no_options
+      (fixed ["config"; "show"; "mockup"])
+      (fun () (cctxt : #Client_context.full) ->
+        fail_on_non_mockup_dir cctxt
+        >>=? fun _ ->
+        Tezos_mockup.Persistence.get_registered_mockup protocol_hash_opt
+        >>=? fun mockup ->
+        let (module Mockup) = mockup in
+        let json_pp encoding ppf value =
+          Format.fprintf
+            ppf
+            "%a"
+            Data_encoding.Json.pp
+            (Data_encoding.Json.construct encoding value)
+        in
+        Mockup.default_bootstrap_accounts cctxt
+        >>=? fun bootstrap_accounts_string ->
+        cctxt#message
+          "Default value of --%s:\n%s"
+          mockup_bootstrap_accounts
+          bootstrap_accounts_string
+        >>= fun () ->
+        cctxt#message
+          "Default value of --%s:\n%a"
+          mockup_protocol_constants
+          (json_pp Mockup.protocol_constants_encoding)
+          Mockup.default_protocol_constants
+        >>= return);
     command
       ~group
       ~desc:"Reset the config file to the factory defaults."
@@ -659,23 +712,24 @@ let parse_config_args (ctx : #Client_context.full) argv =
     exit 1 ) ;
   Lwt_utils_unix.create_dir config_dir
   >>= fun () ->
+  let parsed_args =
+    {
+      chain;
+      block;
+      confirmations;
+      print_timings = timings;
+      log_requests;
+      password_filename;
+      protocol;
+      client_mode;
+    }
+  in
   return
     ( {
         default_parsed_config_args with
         parsed_config_file = Some cfg;
-        parsed_args =
-          Some
-            {
-              chain;
-              block;
-              confirmations;
-              print_timings = timings;
-              log_requests;
-              password_filename;
-              protocol;
-              client_mode;
-            };
-        config_commands = commands config_file cfg;
+        parsed_args = Some parsed_args;
+        config_commands = commands config_file cfg parsed_args.protocol;
       },
       remaining )
 

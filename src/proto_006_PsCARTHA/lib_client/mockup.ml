@@ -140,6 +140,87 @@ let default_mockup_parameters : mockup_protocol_parameters =
     constants = parameters.constants;
   }
 
+let default_mockup_protocol_constants : protocol_constants_overrides =
+  let default = default_mockup_parameters in
+  {
+    hard_gas_limit_per_operation =
+      Some default.constants.hard_gas_limit_per_operation;
+    hard_gas_limit_per_block = Some default.constants.hard_gas_limit_per_block;
+    hard_storage_limit_per_operation =
+      Some default.constants.hard_storage_limit_per_operation;
+    cost_per_byte = Some default.constants.cost_per_byte;
+  }
+
+(* Use the wallet to convert a bootstrap account's public key
+  into a parsed_account_repr secret key Uri *)
+let bootstrap_account_to_parsed_account_repr cctxt
+    (bootstrap_account : Protocol.Parameters_repr.bootstrap_account) =
+  Client_keys.get_key cctxt bootstrap_account.public_key_hash
+  >>=? fun (name, _, sk_uri) ->
+  return {name; sk_uri; amount = bootstrap_account.amount}
+
+let parsed_account_repr_encoding =
+  let open Data_encoding in
+  conv
+    (fun p -> (p.name, p.sk_uri, p.amount))
+    (fun (name, sk_uri, amount) -> {name; sk_uri; amount})
+    (obj3
+       (req "name" string)
+       (req "sk_uri" Client_keys.Secret_key.encoding)
+       (req "amount" Protocol.Tez_repr.encoding))
+
+let mockup_default_bootstrap_accounts
+    (cctxt : Tezos_client_base.Client_context.full) : string tzresult Lwt.t =
+  let rpc_context = new Protocol_client_context.wrap_full cctxt in
+  let wallet = (cctxt :> Client_context.wallet) in
+  let parsed_account_reprs = ref [] in
+  let errors = ref [] in
+  Client_keys.list_keys wallet
+  >>=? fun all_keys ->
+  Lwt_list.iter_s
+    (function
+      | (name, pkh, _pk_opt, Some sk_uri) -> (
+          let contract =
+            Protocol.Alpha_context.Contract.implicit_contract pkh
+          in
+          Client_proto_context.get_balance
+            rpc_context
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+          >>= fun tz_balance ->
+          match tz_balance with
+          | Ok balance -> (
+              let tez_repr =
+                Protocol.Tez_repr.of_mutez
+                @@ Protocol.Alpha_context.Tez.to_mutez balance
+              in
+              match tez_repr with
+              | None ->
+                  (* we're reading the wallet, it's content MUST be valid *)
+                  assert false
+              | Some amount ->
+                  parsed_account_reprs :=
+                    {name; sk_uri; amount} :: !parsed_account_reprs ;
+                  Lwt.return_unit )
+          | Error err ->
+              errors := err :: !errors ;
+              Lwt.return_unit )
+      | _ ->
+          Lwt.return_unit)
+    all_keys
+  >>= fun () ->
+  match !errors with
+  | [] ->
+      let json =
+        Data_encoding.Json.construct
+          (Data_encoding.list parsed_account_repr_encoding)
+          !parsed_account_reprs
+      in
+      return @@ Data_encoding.Json.to_string json
+  | errs ->
+      Lwt.return_error @@ List.concat errs
+
 let protocol_constants_no_overrides =
   {
     hard_gas_limit_per_operation = None;
@@ -194,18 +275,6 @@ let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
           o.hard_storage_limit_per_operation;
       cost_per_byte = Option.unopt ~default:c.cost_per_byte o.cost_per_byte;
     }
-
-let parsed_account_repr_encoding =
-  let open Data_encoding in
-  conv
-    (fun p -> (p.name, p.sk_uri, p.amount))
-    (fun (name, sk_uri, amount) -> {name; sk_uri; amount})
-    (obj3
-       (req "name" string)
-       (req "sk_uri" Client_keys.Secret_key.encoding)
-       (req "amount" Protocol.Tez_repr.encoding))
-
-let parsed_accounts_reprs = Data_encoding.list parsed_account_repr_encoding
 
 let to_bootstrap_account repr =
   Tezos_client_base.Client_keys.neuterize repr.sk_uri
@@ -326,7 +395,11 @@ let mem_init :
   | None ->
       return None
   | Some json -> (
-    match Data_encoding.Json.destruct parsed_accounts_reprs json with
+    match
+      Data_encoding.Json.destruct
+        (Data_encoding.list parsed_account_repr_encoding)
+        json
+    with
     | accounts ->
         cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
         >>= fun () ->
@@ -372,9 +445,17 @@ let () =
   let module M : Mockup_sig = struct
     type parameters = mockup_protocol_parameters
 
+    type protocol_constants = protocol_constants_overrides
+
     let parameters_encoding = mockup_protocol_parameters_encoding
 
+    let protocol_constants_encoding = protocol_constants_overrides_encoding
+
+    let default_bootstrap_accounts = mockup_default_bootstrap_accounts
+
     let default_parameters = default_mockup_parameters
+
+    let default_protocol_constants = default_mockup_protocol_constants
 
     let protocol_hash = Protocol.hash
 
