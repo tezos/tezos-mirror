@@ -35,7 +35,7 @@ val update : t -> int -> int64 -> unit
     [off]. *)
 
 val finalize : t -> unit
-(** Finalizes the update of the fanout. This is mendatory before any [search]
+(** Finalizes the update of the fanout. This is mandatory before any [search]
     query. *)
 
 val exported_size : t -> int
