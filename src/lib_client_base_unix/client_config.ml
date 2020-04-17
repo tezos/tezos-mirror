@@ -522,6 +522,52 @@ let default_parsed_config_args =
     password_filename = None;
   }
 
+(* Check that the base directory is actually in the right configuration for
+ * the mode used by the client.
+ *
+ * Depending on the criticality of the compatibility issue, this function fails
+ * (when all/most commands will fail) or emits a warning (some commands may
+ * fail).
+ *)
+let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
+  let open Tezos_mockup.Persistence in
+  let base_dir_class = classify_base_dir base_dir in
+  match client_mode with
+  | Mode_client -> (
+    match base_dir_class with
+    | Base_dir_is_mockup ->
+        failwith
+          "Base directory %s is in mockup mode while operation is in client \
+           mode"
+          base_dir
+    (* You might be creating a mockup directory here *)
+    | Base_dir_is_empty ->
+        return_unit
+    | Base_dir_is_file | Base_dir_does_not_exist ->
+        (* This case is checked in by the caller so that it should not happen *)
+        failwith
+          "Error for base-dir %s should not have happened (this is due to %a)"
+          base_dir
+          pp_base_dir_class
+          base_dir_class
+    | _ ->
+        return_unit )
+  | Mode_mockup -> (
+    match base_dir_class with
+    | Base_dir_is_empty
+    | Base_dir_does_not_exist
+    | Base_dir_is_nonempty
+    | Base_dir_is_file ->
+        ctx#warning
+          "@[<hv>Base dir %s has state `%a`.@ Some commands (e.g., transfer) \
+           might not work correctly.@]"
+          base_dir
+          pp_base_dir_class
+          base_dir_class
+        >>= fun () -> return_unit
+    | Base_dir_is_mockup ->
+        return_unit )
+
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
   >>=? fun ( ( base_dir,
@@ -558,6 +604,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
         (* In mockup mode base dir may be created automatically. *)
         return dir ) )
   >>=? fun base_dir ->
+  check_base_dir_for_mode ctx client_mode base_dir
+  >>=? fun () ->
   ( match config_file with
   | None ->
       return @@ (base_dir // default_config_file_name)
