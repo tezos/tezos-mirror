@@ -138,7 +138,7 @@ let overwrite_mockup ~protocol_hash ~rpc_context ~base_dir =
   let mockup_dir = Filename.concat base_dir mockup_dirname in
   let context_file = Filename.concat mockup_dir context_file in
   if not (Sys.file_exists context_file) then
-    failwith "create_mockup: file %s does not exist" context_file
+    failwith "overwrite_mockup: file %s does not exist" context_file
   else
     let json =
       Data_encoding.Json.construct
