@@ -154,6 +154,23 @@ type base_dir_class =
   | Base_dir_is_nonempty
   | Base_dir_is_empty
 
+let pp_base_dir_class ppf bclass =
+  Format.fprintf
+    ppf
+    "base_dir_%s"
+    ((function
+       | Base_dir_does_not_exist ->
+           "does_not_exist"
+       | Base_dir_is_file ->
+           "is_file"
+       | Base_dir_is_mockup ->
+           "is_mockup"
+       | Base_dir_is_empty ->
+           "is_empty"
+       | Base_dir_is_nonempty ->
+           "is_non_empty")
+       bclass)
+
 let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
 
 let classify_base_dir base_dir =

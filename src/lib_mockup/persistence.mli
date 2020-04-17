@@ -71,6 +71,8 @@ type base_dir_class =
   | Base_dir_is_nonempty
   | Base_dir_is_empty
 
+val pp_base_dir_class : Format.formatter -> base_dir_class -> unit
+
 (** Test whether base directory is a valid target for loading or creating
     a mockup environment. *)
 val classify_base_dir : string -> base_dir_class
