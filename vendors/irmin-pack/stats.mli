@@ -7,7 +7,7 @@ type t = {
 (** The type for stats for a store S.
 
     - [finds] is the number of calls to [S.find];
-    - [cache_misses] is the number of times a cache miss occured during calls to
+    - [cache_misses] is the number of times a cache miss occurred during calls to
       [S.find];
     - [appended_hashes] is the number of times a hash was appended, during calls
       to [add];
