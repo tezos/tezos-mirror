@@ -62,7 +62,7 @@ Multinetwork
   and user-activated protocol overrides. In the past, those upgrades and overrides
   required you to upgrade the node; now, you can just edit the configuration file
   instead. You can also disable built-in upgrades by specifying the configuration
-  explicitely.
+  explicitly.
 
 - The `network` configuration field also allows to specify the parameters
   of the genesis protocol, such as the activation key of `proto_genesis`.
