@@ -29,7 +29,7 @@ include module type of struct
   include Resto_directory.Make (RPC_encoding)
 end
 
-(** Registring handler in service tree. *)
+(** Registering handler in service tree. *)
 val register :
   'prefix directory ->
   ([< Resto.meth], 'prefix, 'p, 'q, 'i, 'o) RPC_service.t ->
@@ -54,7 +54,7 @@ val lwt_register :
   ('p -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
-(** Registring handler in service tree. Curryfied variant.  *)
+(** Registering handler in service tree. Curryfied variant.  *)
 
 val register0 :
   unit directory ->
