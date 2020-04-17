@@ -345,5 +345,5 @@ let commands () =
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successfull."
+              cctxt#message "Signature check successful."
               >>= fun () -> return_unit) ]
