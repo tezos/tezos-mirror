@@ -207,11 +207,11 @@ module On_chain = struct
       match should with
       | `Fail -> return (`Expected `Failure)
       | `Script_failwith_re re ->
-          let intersting_part =
+          let interesting_part =
             List.drop_while res#err ~f:(fun line ->
                 String.is_prefix line ~prefix:"script reached FAILWITH")
             |> String.concat ~sep:" " in
-          if Re.execp re intersting_part then return (`Expected `Failure)
+          if Re.execp re interesting_part then return (`Expected `Failure)
           else return (`Failed `With_error_does_not_match)
       | `Command_stderr_re re ->
           if Re.execp re (String.concat ~sep:"\n" res#err) then

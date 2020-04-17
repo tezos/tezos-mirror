@@ -851,6 +851,6 @@ module Pauser = struct
           finish () >>= fun () -> Asynchronous_result.die 4 in
     protect f ~name:"Main-function"
     >>= fun () ->
-    Dbg.e EF.(wf "Finiching Interactive_test.run_test") ;
+    Dbg.e EF.(wf "Finishing Interactive_test.run_test") ;
     return ()
 end

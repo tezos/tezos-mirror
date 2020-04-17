@@ -251,7 +251,7 @@ module System_dependencies = struct
               (List.length non_warning_errors) )
 end
 
-module Shell_environement = struct
+module Shell_environment = struct
   type t = {aliases: (string * string * string) list}
 
   let make ~aliases = {aliases}

@@ -250,7 +250,7 @@ let run state ~protocol ~size ~base_port ~clear_root ~no_daemons_for ?hard_fork
     return () )
   >>= fun () ->
   let clients = List.map keys_and_daemons ~f:(fun (_, c, _, _) -> c) in
-  Helpers.Shell_environement.(
+  Helpers.Shell_environment.(
     let path = Paths.root state // "shell.env" in
     let env = build state ~clients in
     write state env ~path >>= fun () -> return (help_command state env ~path))

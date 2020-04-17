@@ -65,7 +65,7 @@ let output_path t process which =
      | `Meta -> "meta.log"
      | `Script -> "script.sh" )
 
-let ef_procesess state processes =
+let ef_processes state processes =
   EF.(
     desc_list (af "Processes")
       (List.map processes ~f:(fun {process; lwt} ->

@@ -34,7 +34,7 @@ val output_path :
 (** Return the path (within {!Paths}'s root-path) where the process
     writes its output or metadata. *)
 
-val ef_procesess :
+val ef_processes :
   < paths: Paths.t ; .. > -> State.process_state list -> Easy_format.t
 
 val ef : ?all:bool -> < runner: State.t ; .. > -> Easy_format.t

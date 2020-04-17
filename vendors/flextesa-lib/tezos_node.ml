@@ -55,7 +55,7 @@ let exec_path config t = make_path ~config "exec" t
 
 module Config_file = struct
   (*
-     This module pruposedly avoids using the node's modules because we
+     This module purposely avoids using the node's modules because we
      want the sandbox to be able to configure ≥ 1 versions of the
      node.
 
