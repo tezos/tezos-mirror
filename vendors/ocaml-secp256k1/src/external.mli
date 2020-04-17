@@ -73,7 +73,7 @@ module Key : sig
   val equal : 'a t -> 'a t -> bool
   val copy : 'a t -> 'a t
 
-  (** {2 Aritmetic operations } *)
+  (** {2 Arithmetic operations } *)
 
   val negate : Context.t -> 'a t -> 'a t
   val add_tweak : Context.t -> 'a t -> Bigstring.t -> 'a t
