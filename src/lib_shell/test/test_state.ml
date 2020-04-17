@@ -296,7 +296,7 @@ let test_set_checkpoint_then_purge_full (s : state) =
   State.Block.read_opt s.chain ha1
   >|= (function Some _header -> assert true | None -> assert false)
   >>= fun () ->
-  (* and is accesible in Store.Block.Header *)
+  (* and is accessible in Store.Block.Header *)
   Store.Block.Pruned_contents.known (block_store, ha1)
   >|= (fun b -> assert b)
   >>= fun () -> return_unit

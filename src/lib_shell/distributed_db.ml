@@ -356,7 +356,7 @@ module P2p_reader = struct
         in
         let known_invalid =
           known_invalid || (disable_mempool && mempool <> Mempool.empty)
-          (* A non-empty mempool was received while mempool is desactivated,
+          (* A non-empty mempool was received while mempool is deactivated,
                so the message is ignored.
                This should probably warrant a reduction of the sender's score. *)
         in

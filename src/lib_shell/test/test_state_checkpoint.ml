@@ -364,7 +364,7 @@ let test_future_checkpoint s =
    - iv = invalid
   - (0): level of this block in the chain
 
-  Two exammples:
+  Two examples:
     * Genesis (0)- A1 (1) - A2(2) - A3(3) - A4(4) - A5(5) (invalid)
                             \
                             B1(3) - B2(4) - B3 (5)(cp) - B4(6) - B5(7)

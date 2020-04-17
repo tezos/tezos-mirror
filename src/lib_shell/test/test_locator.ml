@@ -215,7 +215,7 @@ let print_chain chain bh =
   in
   loop bh 0
 
-(* returns the predecessors at ditance n, traversing all n intermediate blocks *)
+(* returns the predecessors at distance n, traversing all n intermediate blocks *)
 let linear_predecessor_n (chain : State.Chain.t) (bh : Block_hash.t)
     (distance : int) : Block_hash.t option Lwt.t =
   (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)

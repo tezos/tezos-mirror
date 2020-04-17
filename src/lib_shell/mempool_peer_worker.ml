@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (** Validating batches of operations with some peer-based
- * compartimentatilsation. *)
+ * compartmentalisation. *)
 
 type limits = {
   max_promises_per_request : int;
@@ -305,7 +305,7 @@ module Make (Static : STATIC) (Mempool_worker : Mempool_worker.T) :
 
     let step mempool_worker pipeline =
       (* Going through each buffer one by one. *)
-      (* op_hash: Opertation_hash.t
+      (* op_hash: Operation_hash.t
        * op: Operation.t
        * mop: Mempool_worker.operation *)
       if head_is_resolved pipeline.applying then (

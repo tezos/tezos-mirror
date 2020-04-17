@@ -363,7 +363,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
   Lwt_canceler.on_cancel pipeline.canceler (fun () ->
       Lwt_pipe.close fetched_blocks ;
       Lwt_pipe.close fetched_headers ;
-      (* TODO proper cleanup of ressources... *)
+      (* TODO proper cleanup of resources... *)
       Lwt.return_unit) ;
   let (head, _) = (pipeline.locator : Block_locator.t :> _ * _) in
   let hash = Block_header.hash head in

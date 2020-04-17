@@ -42,7 +42,7 @@ let read_args () =
   let args = ref default_args in
   let specific =
     [ ("--blocks", Arg.Int (set_blocks args), "number of blocks");
-      ("--accounts", Arg.Int (set_accounts args), "number of acount") ]
+      ("--accounts", Arg.Int (set_accounts args), "number of accounts") ]
   in
   let usage = "Usage: [--blocks n] [--accounts n] " in
   Arg.parse specific (fun _ -> ()) usage ;

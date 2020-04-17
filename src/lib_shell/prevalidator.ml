@@ -992,8 +992,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let table = Worker.create_table Queue
 
   (* NOTE: we register a single worker for each instantiation of this Make
-   * functor (and thus a single worker for the single instantiaion of Worker).
-   * Whislt this is somewhat abusing the intended purpose of worker, it is part
+   * functor (and thus a single worker for the single instantiation of Worker).
+   * Whilst this is somewhat abusing the intended purpose of worker, it is part
    * of a transition plan to a one-worker-per-peer architecture. *)
   let worker_promise =
     Worker.launch
@@ -1058,7 +1058,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
             let chain_id = chain_id
           end)
       in
-      (* Checking initialization errors before giving a reference to dnagerous
+      (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
       Prevalidator.initialization_errors
       >>=? fun () ->

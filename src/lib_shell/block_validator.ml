@@ -232,8 +232,8 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
                         hash
                         header
                         err)
-                  >>=? fun commited ->
-                  assert commited ;
+                  >>=? fun committed ->
+                  assert committed ;
                   return error )
                 else (
                   debug

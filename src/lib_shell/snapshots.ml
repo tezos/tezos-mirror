@@ -531,7 +531,7 @@ let export ?(export_rolling = false) ~context_root ~store_root ~genesis
             lwt_emit
               (Export_info (export_mode, block_hash, block_header.shell.level))
             >>= fun () ->
-            (* Get block precessor's block header *)
+            (* Get block predecessor's block header *)
             Store.Block.Predecessors.read (block_store, block_hash) 0
             >>=? fun pred_block_hash ->
             State.Block.Header.read (block_store, pred_block_hash)
@@ -573,7 +573,7 @@ let check_operations_consistency block_header operations operation_hashes =
         oph)
     operations
     operation_hashes ;
-  (* Check header hashes based on merkel tree *)
+  (* Check header hashes based on Merkle tree *)
   let hashes =
     List.map
       (fun (_, opl) -> List.map Operation.hash opl)

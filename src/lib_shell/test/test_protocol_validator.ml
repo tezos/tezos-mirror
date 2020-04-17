@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Unit tests for protocol_validator. Currently only tests that
-   events arex emitted. *)
+   events are emitted. *)
 
 open Shell_test_helpers
 

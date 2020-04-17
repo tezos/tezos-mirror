@@ -144,7 +144,7 @@ end
 module Logger =
   Worker_logger.Make (Event) (Request_view)
     (struct
-      let worker_name = "node_mempol_worker"
+      let worker_name = "node_mempool_worker"
     end)
 
 module Make (Static : STATIC) (Proto : Registered_protocol.T) :
