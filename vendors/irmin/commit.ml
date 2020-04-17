@@ -366,7 +366,7 @@ module History (S : S.COMMIT_STORE) = struct
     set_mark t commit new_mark;
     new_mark
 
-  (* update the ancestors which have already been visisted. *)
+  (* update the ancestors which have already been visited. *)
   let update_ancestors_marks t mark commit =
     let todo = Queue.create () in
     Queue.add commit todo;

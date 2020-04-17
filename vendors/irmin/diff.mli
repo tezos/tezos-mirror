@@ -15,7 +15,7 @@
  *)
 
 type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-(** The type for representing differences betwen values. *)
+(** The type for representing differences between values. *)
 
 (** {1 Value Types} *)
 

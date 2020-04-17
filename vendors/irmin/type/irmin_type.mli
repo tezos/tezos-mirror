@@ -395,7 +395,7 @@ type 'a size_of = ?headers:bool -> 'a -> int option
 val pre_hash : 'a t -> 'a bin_seq
 (** [pre_hash t x] is the string representation of [x], of type [t], which will
     be used to compute the digest of the value. By default it's
-    [to_bin_string t x] but it can be overriden by {!v}, {!like} and {!map}
+    [to_bin_string t x] but it can be overridden by {!v}, {!like} and {!map}
     operators. *)
 
 val encode_bin : 'a t -> 'a encode_bin

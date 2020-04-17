@@ -77,7 +77,7 @@ module type S = sig
     (vertex * Graph.Graphviz.DotAttributes.edge list * vertex) list ->
     string ->
     unit
-  (** [output ppf vertex edges name] create aand dumps the graph contents on
+  (** [output ppf vertex edges name] create and dumps the graph contents on
       [ppf]. The graph is defined by its [vertex] and [edges]. [name] is the
       name of the output graph.*)
 
@@ -85,7 +85,7 @@ module type S = sig
   (** Compute the minimum vertex. *)
 
   val max : t -> vertex list
-  (** Compute the maximun vertex. *)
+  (** Compute the maximum vertex. *)
 
   type dump = vertex list * (vertex * vertex) list
   (** Expose the graph internals. *)

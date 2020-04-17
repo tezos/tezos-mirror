@@ -330,7 +330,7 @@ module Make (P : S.PRIVATE) = struct
           >|= fun () -> Ok ())
         (function
           | Import_error e -> Lwt.return_error (`Msg e)
-          | e -> Fmt.kstrf Lwt.fail_invalid_arg "impot error: %a" Fmt.exn e)
+          | e -> Fmt.kstrf Lwt.fail_invalid_arg "import error: %a" Fmt.exn e)
   end
 
   type t = {

@@ -150,7 +150,7 @@ module type CONTENT_ADDRESSABLE_STORE = sig
 
   val unsafe_add : [> `Write ] t -> key -> value -> unit Lwt.t
   (** Same as {!add} but allows to specify the key directly. The backend might
-      choose to discared that key and/or can be corrupt if the key scheme is not
+      choose to discard that key and/or can be corrupt if the key scheme is not
       consistent. *)
 end
 
@@ -170,7 +170,7 @@ end
 module type APPEND_ONLY_STORE = sig
   (** {1 Append-only stores}
 
-      Append-onlye stores are store where it is possible to read and add new
+      Append-only stores are store where it is possible to read and add new
       values. *)
 
   type 'a t
@@ -345,7 +345,7 @@ module type NODE_GRAPH = sig
 
   val remove : [ `Read | `Write ] t -> node -> path -> node Lwt.t
   (** [remove t n path] is the node [x] such that [find t x] is [None] and it
-      behhaves then same as [n] for other operations. *)
+      behaves then same as [n] for other operations. *)
 
   val closure :
     [> `Read ] t -> min:node list -> max:node list -> node list Lwt.t
@@ -1119,7 +1119,7 @@ module type STORE = sig
       using the hash of the current commit. Temporary stores are similar to
       Git's detached heads. In a temporary store, all the operations are
       performed relative to the current head and update operations can modify
-      the current head: the current stores's head will automatically become the
+      the current head: the current stores' head will automatically become the
       new head obtained after performing the update. *)
 
   val repo : t -> repo
@@ -1169,13 +1169,13 @@ module type STORE = sig
     val fast_forward :
       t -> ?max_depth:int -> ?n:int -> commit -> (unit, ff_error) result Lwt.t
     (** [fast_forward t h] is similar to {!update} but the [t]'s head is updated
-        to [h] only if [h] is stricly in the future of [t]'s current head.
+        to [h] only if [h] is strictly in the future of [t]'s current head.
         [max_depth] or [n] are used to limit the search space of the lowest
         common ancestors (see {!lcas}).
 
         The result is:
 
-        - [Ok ()] if the operation is succesfull;
+        - [Ok ()] if the operation is successful;
         - [Error `No_change] if [h] is already [t]'s head;
         - [Error `Rejected] if [h] is not in the strict future of [t]'s head.
         - [Error e] if the history exploration has been cut before getting
@@ -1316,7 +1316,7 @@ module type STORE = sig
   val hash : t -> key -> hash option Lwt.t
   (** [hash t k] *)
 
-  (** {1 Udpates} *)
+  (** {1 Updates} *)
 
   type write_error =
     [ Merge.conflict | `Too_many_retries of int | `Test_was of tree option ]
@@ -1324,7 +1324,7 @@ module type STORE = sig
 
       - Merge conflict.
       - Concurrent transactions are competing to get the current operation
-        committed and too many attemps have been tried (livelock).
+        committed and too many attempts have been tried (livelock).
       - A "test and set" operation has failed and the current value is [v]
         instead of the one we were waiting for. *)
 
@@ -1715,7 +1715,7 @@ module type STORE = sig
     (** Base functions for branches. *)
   end
 
-  (** [Key] provides base functions for the stores's paths. *)
+  (** [Key] provides base functions for the stores' paths. *)
   module Key : PATH with type t = key and type step = step
 
   module Metadata : METADATA with type t = metadata

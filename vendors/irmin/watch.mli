@@ -33,7 +33,7 @@ module type S = sig
   (** The type for watch state. *)
 
   val stats : t -> int * int
-  (** [stats t] is a tuple [(k,a)] represeting watch stats. [k] is the number of
+  (** [stats t] is a tuple [(k,a)] representing watch stats. [k] is the number of
       single key watchers for the store [t] and [a] the number of global
       watchers for [t]. *)
 

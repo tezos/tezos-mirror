@@ -52,7 +52,7 @@ module Diff = Diff
 (** Differences between values. *)
 
 type 'a diff = 'a Diff.t
-(** The type for representing differences betwen values. *)
+(** The type for representing differences between values. *)
 
 (** {1 Low-level Stores} *)
 
@@ -193,7 +193,7 @@ module Branch : sig
   (** [STORE] specifies the signature for branch stores.
 
       A {i branch store} is a mutable and reactive key / value store, where keys
-      are branch names created by users and values are keys are head commmits. *)
+      are branch names created by users and values are keys are head commits. *)
 end
 
 type remote = S.remote = ..
