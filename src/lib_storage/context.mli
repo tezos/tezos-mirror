@@ -80,7 +80,7 @@ val remove_rec : context -> key -> t Lwt.t
 val copy : context -> from:key -> to_:key -> context option Lwt.t
 
 (** [fold] iterates over elements under a path (not recursive). Iteration order
-    is undeterministic. *)
+    is nondeterministic. *)
 val fold :
   context ->
   key ->

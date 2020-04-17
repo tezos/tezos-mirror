@@ -273,12 +273,12 @@ let checkout_exn index key =
   checkout index key
   >>= function None -> Lwt.fail Not_found | Some p -> Lwt.return p
 
-(* unshalow possible 1-st level objects from previous partial
+(* unshallow possible 1-st level objects from previous partial
    checkouts ; might be better to pass directly the list of shallow
    objects. *)
 let unshallow context =
   Store.Tree.list context.tree []
-  >>= fun childs ->
+  >>= fun children ->
   P.Repo.batch context.index.repo (fun x y _ ->
       Lwt_list.iter_s
         (fun (s, k) ->
@@ -290,7 +290,7 @@ let unshallow context =
               >>= fun tree ->
               Store.save_tree ~clear:true context.index.repo x y tree
               >|= fun _ -> ())
-        childs)
+        children)
 
 let raw_commit ~time ?(message = "") context =
   let info =
@@ -934,7 +934,7 @@ let upgrade_0_0_3 ~context_dir =
   match (is_lmdb, is_irmin) with
   | (true, true) ->
       Format.printf
-        "Your directory containts both the LMDB and Irmin2 chain's data. From \
+        "Your directory contains both the LMDB and Irmin2 chain's data. From \
          now, the node only uses Irmin2. LMDB data can be safely removed. To \
          do so, delete the following files: %s/data.mdb and %s/lock.mdb@."
         context_dir
