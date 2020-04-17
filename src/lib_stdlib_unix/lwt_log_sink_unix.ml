@@ -252,7 +252,7 @@ let find_log_rules default =
         "@[<v 2>@{<warning>@{<title>Warning@}@} Both environment variables \
          TEZOS_LOG and LWT_LOG defined, using TEZOS_LOG.@]@\n\
          @." ;
-      ("environment varible TEZOS_LOG", Some rules)
+      ("environment variable TEZOS_LOG", Some rules)
 
 let initialize ?(cfg = default_cfg) () =
   Lwt_log_core.add_rule "*" (Internal_event.Level.to_lwt_log cfg.default_level) ;

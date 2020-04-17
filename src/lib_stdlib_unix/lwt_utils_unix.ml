@@ -220,8 +220,8 @@ module Socket = struct
     | Unix of string
     | Tcp of string * string * Unix.getaddrinfo_option list
 
-  let handle_litteral_ipv6 host =
-    (* To strip '[' and ']' when a litteral IPv6 is provided *)
+  let handle_literal_ipv6 host =
+    (* To strip '[' and ']' when a literal IPv6 is provided *)
     match Ipaddr.of_string host with
     | Error (`Msg _) ->
         host
@@ -234,7 +234,7 @@ module Socket = struct
         let sock = Lwt_unix.socket PF_UNIX SOCK_STREAM 0 in
         Lwt_unix.connect sock addr >>= fun () -> return sock
     | Tcp (host, service, opts) -> (
-        let host = handle_litteral_ipv6 host in
+        let host = handle_literal_ipv6 host in
         Lwt_unix.getaddrinfo host service opts
         >>= function
         | [] ->
@@ -285,7 +285,7 @@ module Socket = struct
         return [sock]
     | Tcp (host, service, opts) -> (
         Lwt_unix.getaddrinfo
-          (handle_litteral_ipv6 host)
+          (handle_literal_ipv6 host)
           service
           (AI_PASSIVE :: opts)
         >>= function
