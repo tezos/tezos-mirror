@@ -190,7 +190,7 @@ module Contract = struct
       end)
       (Z)
 
-  (* Consume gas for serilization and deserialization of expr in this
+  (* Consume gas for serialization and deserialization of expr in this
      module *)
   module Make_carbonated_map_expr (N : Storage_sigs.NAME) = struct
     module I =

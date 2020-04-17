@@ -934,7 +934,7 @@ let test_supermajority_in_testing_vote supermajority () =
   (* beginning of testing_vote period, denoted by _p2;
      take a snapshot of the active delegates and their rolls from listings *)
   get_delegates_and_rolls_from_listings b
-  >>=? fun (delegates_p2, _olls_p2) ->
+  >>=? fun (delegates_p2, _rolls_p2) ->
   (* supermajority means [num_yays / (num_yays + num_nays) >= s_num / s_den],
      which is equivalent with [num_yays >= num_nays * s_num / (s_den - s_num)] *)
   let num_delegates = List.length delegates_p2 in

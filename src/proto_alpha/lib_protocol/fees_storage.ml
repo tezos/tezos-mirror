@@ -99,7 +99,7 @@ let burn_storage_fees c ~storage_limit ~payer =
     >>=? fun to_burn ->
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
-      (* If the payer was was deleted by transfering all its balance, and no space was used,
+      (* If the payer was was deleted by transferring all its balance, and no space was used,
          burning zero would fail *)
       return c
     else

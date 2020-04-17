@@ -110,7 +110,7 @@ val check_signature :
   Block_header.t -> Chain_id.t -> public_key -> unit tzresult Lwt.t
 
 (** Checks if the header that would be built from the given components
-    is valid for the given diffculty. The signature is not passed as it
+    is valid for the given difficulty. The signature is not passed as it
     is does not impact the proof-of-work stamp. The stamp is checked on
     the hash of a block header whose signature has been zeroed-out. *)
 val check_header_proof_of_work_stamp :

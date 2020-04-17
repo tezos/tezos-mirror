@@ -1505,7 +1505,7 @@ let unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
-(* self-delegation on revelead but not registered contract *)
+(* self-delegation on revealed but not registered contract *)
 let unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   Context.init 1
   >>=? fun (b, bootstrap_contracts) ->
@@ -1727,7 +1727,7 @@ let tests_delegate_registration =
          ~fee:Tez.max_tez);
     (* self delegation on registered contract *)
     Test.tztest
-      "registered and revelead self-delegation"
+      "registered and revealed self-delegation"
       `Quick
       registered_self_delegate_key_init_delegation;
     (*** unregistered delegate key: failed self-delegation ***)

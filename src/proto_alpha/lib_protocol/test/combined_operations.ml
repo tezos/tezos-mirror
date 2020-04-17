@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Multiple operations can be grouped in one ensuring their
-    derministic application.
+    deterministic application.
 
     If an invalid operation is present in this group of operation, the
     previous applied operations are backtracked leaving the context
@@ -160,7 +160,7 @@ let expect_balance_too_low = function
         "Contract should not have a sufficient balance : operation expected \
          to fail."
 
-(** Groups three operations, the midlle one failing.
+(** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant without fees. *)
 let failing_operation_in_the_middle () =
@@ -216,7 +216,7 @@ let failing_operation_in_the_middle () =
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance
   >>=? fun () -> return_unit
 
-(** Groups three operations, the midlle one failing.
+(** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
     Variant with fees, that should be spent even in case of failure. *)
 let failing_operation_in_the_middle_with_fees () =

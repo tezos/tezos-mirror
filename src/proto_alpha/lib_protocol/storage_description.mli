@@ -35,7 +35,7 @@ val pp : Format.formatter -> 'key t -> unit
 val build_directory : 'key t -> 'key RPC_directory.t
 
 (** Create a empty context description,
-    keys will be registred by side effects. *)
+    keys will be registered by side effects. *)
 val create : unit -> 'key t
 
 (** Register a single key accessor at a given path. *)
@@ -46,7 +46,7 @@ val register_value :
   unit
 
 (** Return a description for a prefixed fragment of the given context.
-    All keys registred in the subcontext will be shared by the external
+    All keys registered in the subcontext will be shared by the external
     context *)
 val register_named_subcontext : 'key t -> string list -> 'key t
 
@@ -63,8 +63,8 @@ type (_, _, _) args =
       -> ('key, 'a * 'b, 'sub_key) args
 
 (** Return a description for a indexed sub-context.
-    All keys registred in the subcontext will be shared by the external
-    context. One should provide a function to list all the registred
+    All keys registered in the subcontext will be shared by the external
+    context. One should provide a function to list all the registered
     index in the context. *)
 val register_indexed_subcontext :
   'key t ->

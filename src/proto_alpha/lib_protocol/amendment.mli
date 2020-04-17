@@ -37,7 +37,7 @@
      and the proposal has a supermajority in favor, we proceed to a testing
      period. Otherwise we go back to a proposal period.
      In any case, if there is enough participation the quorum is updated.
-   - Testing period: a test chain is forked for the lengh of the period.
+   - Testing period: a test chain is forked for the length of the period.
      At the end of a testing period we move to a promotion_vote period.
    - Promotion_vote period: delegates can cast votes to promote or not the
      tested proposal using the ballot operation.

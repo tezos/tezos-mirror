@@ -373,7 +373,7 @@ let update_script_big_map c = function
                  these ones are only used to make sure they are
                  compatible during transmissions between contracts,
                  and only need to be compatible, annotations
-                 nonwhistanding. *)
+                 notwithstanding. *)
               let key_type =
                 Micheline.strip_locations
                   (Script_repr.strip_annotations (Micheline.root key_type))

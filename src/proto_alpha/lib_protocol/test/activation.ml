@@ -32,7 +32,7 @@
     - an amount.
 
     The commitments and the secrets are generated from
-    /scripts/create_genesis/create_genenis.py and should be coherent.
+    /scripts/create_genesis/create_genesis.py and should be coherent.
 *)
 
 open Protocol
@@ -521,7 +521,7 @@ let invalid_double_activation () =
           false)
 
 (** Transfer from an unactivated commitment account *)
-let invalid_transfer_from_unactived_account () =
+let invalid_transfer_from_unactivated_account () =
   activation_init ()
   >>=? fun (blk, contracts, secrets) ->
   let ({account; _} as _first_one) = List.hd secrets in
@@ -565,4 +565,4 @@ let tests =
     Test.tztest
       "invalid transfer from unactivated account"
       `Quick
-      invalid_transfer_from_unactived_account ]
+      invalid_transfer_from_unactivated_account ]

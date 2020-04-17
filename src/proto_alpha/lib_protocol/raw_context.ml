@@ -168,7 +168,7 @@ let () =
     ~id:"undefined_operation_nonce"
     ~title:"Ill timed access to the origination nonce"
     ~description:
-      "An origination was attemped out of the scope of a manager operation"
+      "An origination was attempted out of the scope of a manager operation"
     empty
     (function Undefined_operation_nonce -> Some () | _ -> None)
     (fun () -> Undefined_operation_nonce)

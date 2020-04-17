@@ -45,9 +45,9 @@ let () =
     `Permanent
     ~id:"timestamp_sub"
     ~title:"Timestamp sub"
-    ~description:"Substracting timestamps resulted in negative period."
+    ~description:"Subtracting timestamps resulted in negative period."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "Substracting timestamps resulted in negative period.")
+      Format.fprintf ppf "Subtracting timestamps resulted in negative period.")
     Data_encoding.empty
     (function Timestamp_sub -> Some () | _ -> None)
     (fun () -> Timestamp_sub)
