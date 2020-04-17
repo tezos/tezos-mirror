@@ -71,7 +71,7 @@ let deterministic_nonce_hash =
 let supports_deterministic_nonces =
   RPC_service.get_service
     ~description:
-      "Obtain whether the signing service suppports the determinstic nonces \
+      "Obtain whether the signing service supports the deterministic nonces \
        functionality"
     ~query:RPC_query.empty
     ~output:Data_encoding.(obj1 (req "supports_deterministic_nonces" bool))
