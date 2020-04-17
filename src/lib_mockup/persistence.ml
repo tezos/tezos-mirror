@@ -28,6 +28,10 @@ type persisted_mockup_environment = {
   rpc_context : Tezos_protocol_environment.rpc_context;
 }
 
+let mockup_dirname = "mockup"
+
+let context_file = "context.json"
+
 let rpc_context_encoding :
     Tezos_protocol_environment.rpc_context Data_encoding.t =
   let open Data_encoding in
@@ -101,10 +105,6 @@ let init_mockup_context_by_protocol_hash :
     ~constants_overrides_file
     ~bootstrap_accounts_file
   >>=? fun rpc_context -> return (mockup, rpc_context)
-
-let mockup_dirname = "mockup"
-
-let context_file = "context.json"
 
 let mockup_context_from_persisted {protocol_hash; rpc_context} =
   get_mockup_by_hash protocol_hash
