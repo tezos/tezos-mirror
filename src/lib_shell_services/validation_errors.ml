@@ -163,7 +163,7 @@ let () =
     ~id:"node.state.block.inconsistent_context_hash"
     ~title:"Inconsistent commit hash"
     ~description:
-      "When commiting the context of a block, the announced context hash was \
+      "When committing the context of a block, the announced context hash was \
        not the one computed at commit time."
     ~pp:(fun ppf (got, exp) ->
       Format.fprintf

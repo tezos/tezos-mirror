@@ -338,7 +338,7 @@ let validation_process_error_encoding =
       case
         (Tag 2)
         ~title:"Protocol_dynlink_failure"
-        (obj1 (req "pretocol_dynlink_failure" string))
+        (obj1 (req "protocol_dynlink_failure" string))
         (function Protocol_dynlink_failure msg -> Some msg | _ -> None)
         (fun msg -> Protocol_dynlink_failure msg) ]
 
@@ -487,11 +487,11 @@ let () =
     `Temporary
     ~id:"validator.validation_process_failed"
     ~title:"Validation process failed"
-    ~description:"Failed to validate block using exteranl validation process."
+    ~description:"Failed to validate block using external validation process."
     ~pp:(fun ppf error ->
       Format.fprintf
         ppf
-        "Failed to validate block using exteranl validation process. %a"
+        "Failed to validate block using external validation process. %a"
         pp_validation_process_error
         error)
     Data_encoding.(obj1 (req "error" validation_process_error_encoding))
