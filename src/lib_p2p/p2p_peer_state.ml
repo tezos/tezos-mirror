@@ -58,7 +58,7 @@ module Info = struct
     mutable last_established_connection :
       (P2p_connection.Id.t * Time.System.t) option;
     mutable last_disconnection : (P2p_connection.Id.t * Time.System.t) option;
-    events : Pool_event.t Ring.t;
+    events : Pool_event.t Ringo.Ring.t;
     watchers : Pool_event.t Lwt_watcher.input;
   }
 
@@ -81,7 +81,7 @@ module Info = struct
       last_rejected_connection = None;
       last_established_connection = None;
       last_disconnection = None;
-      events = Ring.create log_size;
+      events = Ringo.Ring.create log_size;
       watchers = Lwt_watcher.create_input ();
     }
 
@@ -102,7 +102,7 @@ module Info = struct
           created,
           trusted,
           peer_metadata,
-          Ring.elements events,
+          Ringo.Ring.elements events,
           last_failed_connection,
           last_rejected_connection,
           last_established_connection,
@@ -117,8 +117,8 @@ module Info = struct
              last_established_connection,
              last_disconnection ) ->
         let info = create ~trusted ~peer_metadata peer_id in
-        let events = Ring.create log_size in
-        Ring.add_list info.events event_list ;
+        let events = Ringo.Ring.create log_size in
+        Ringo.Ring.add_list info.events event_list ;
         {
           state = Disconnected;
           trusted;
@@ -185,7 +185,7 @@ module Info = struct
 
   let log {events; watchers; _} ?(timestamp = Systime_os.now ()) point kind =
     let event = {Pool_event.kind; timestamp; point} in
-    Ring.add events event ;
+    Ringo.Ring.add events event ;
     Lwt_watcher.notify watchers event
 
   let log_incoming_rejection ?timestamp peer_info point =
@@ -207,7 +207,7 @@ module Info = struct
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
 
-  let fold {events; _} ~init ~f = Ring.fold events ~init ~f
+  let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
 end
 
 let get {Info.state; _} = state

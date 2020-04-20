@@ -23,25 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PeerLRUCache : Ring.TABLE with type v = P2p_peer.Id.t = struct
-  module Cache = Lru_cache.Make (P2p_peer.Id.Table)
-
-  type t = unit Cache.t
-
-  type v = Cache.key
-
-  let create capacity = Cache.create ~capacity
-
-  let add cache peer_id = Cache.push cache peer_id ()
-
-  let mem cache peer_id = Cache.is_cached cache peer_id
-
-  let remove cache peer_id = Cache.remove cache peer_id
-
-  let clear cache = Cache.clear cache
-
-  let elements cache = Cache.bindings cache |> List.map fst
-end
+module PeerLRUCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
+  ( val Ringo.set_maker ~replacement:LRU ~overflow:Strong ~accounting:Sloppy
+      : Ringo.SET_MAKER )
+    (P2p_peer.Id)
 
 module PatriciaTree (V : HashPtree.Value) = struct
   module M = HashPtree.Make_BE_int2_64 (V)

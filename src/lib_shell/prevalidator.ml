@@ -59,11 +59,11 @@ module type T = sig
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
     mutable live_operations : Operation_hash.Set.t;
-    refused : Operation_hash.t Ring.t;
+    refused : Operation_hash.t Ringo.Ring.t;
     mutable refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_refused : Operation_hash.t Ring.t;
+    branch_refused : Operation_hash.t Ringo.Ring.t;
     mutable branch_refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_delayed : Operation_hash.t Ring.t;
+    branch_delayed : Operation_hash.t Ringo.Ring.t;
     mutable branch_delays : (Operation.t * error list) Operation_hash.Map.t;
     mutable fetching : Operation_hash.Set.t;
     mutable pending : Operation.t Operation_hash.Map.t;
@@ -141,11 +141,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     (* just a cache *)
     mutable live_operations : Operation_hash.Set.t;
     (* just a cache *)
-    refused : Operation_hash.t Ring.t;
+    refused : Operation_hash.t Ringo.Ring.t;
     mutable refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_refused : Operation_hash.t Ring.t;
+    branch_refused : Operation_hash.t Ringo.Ring.t;
     mutable branch_refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_delayed : Operation_hash.t Ring.t;
+    branch_delayed : Operation_hash.t Ringo.Ring.t;
     mutable branch_delays : (Operation.t * error list) Operation_hash.Map.t;
     mutable fetching : Operation_hash.Set.t;
     mutable pending : Operation.t Operation_hash.Map.t;
@@ -382,7 +382,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let handle_branch_refused pv op oph errors =
     notify_operation pv `Branch_refused op ;
-    Option.iter (Ring.add_and_return_erased pv.branch_refused oph) ~f:(fun e ->
+    Option.iter
+      (Ringo.Ring.add_and_return_erased pv.branch_refused oph)
+      ~f:(fun e ->
         pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
@@ -395,7 +397,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Operation_hash.Map.iter
           (fun h op ->
             Option.iter
-              (Ring.add_and_return_erased pv.branch_delayed h)
+              (Ringo.Ring.add_and_return_erased pv.branch_delayed h)
               ~f:(fun e ->
                 pv.branch_delays <-
                   Operation_hash.Map.remove e pv.branch_delays ;
@@ -428,7 +430,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                     }
                 in
                 Option.iter
-                  (Ring.add_and_return_erased pv.refused hash)
+                  (Ringo.Ring.add_and_return_erased pv.refused hash)
                   ~f:(fun e ->
                     pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
                 pv.refusals <-
@@ -487,7 +489,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                         else acc_mempool
                       in
                       Option.iter
-                        (Ring.add_and_return_erased pv.branch_delayed op.hash)
+                        (Ringo.Ring.add_and_return_erased
+                           pv.branch_delayed
+                           op.hash)
                         ~f:(fun e ->
                           pv.branch_delays <-
                             Operation_hash.Map.remove e pv.branch_delays ;
@@ -876,9 +880,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       pv.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.pending <- pending ;
       pv.in_mempool <- Operation_hash.Set.empty ;
-      Ring.clear pv.branch_delayed ;
+      Ringo.Ring.clear pv.branch_delayed ;
       pv.branch_delays <- Operation_hash.Map.empty ;
-      Ring.clear pv.branch_refused ;
+      Ringo.Ring.clear pv.branch_refused ;
       pv.branch_refusals <- Operation_hash.Map.empty ;
       pv.applied <- [] ;
       pv.applied_count <- 0 ;
@@ -955,16 +959,16 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           live_blocks;
           live_operations;
           mempool = {known_valid = []; pending = Operation_hash.Set.empty};
-          refused = Ring.create limits.max_refused_operations;
+          refused = Ringo.Ring.create limits.max_refused_operations;
           refusals = Operation_hash.Map.empty;
           fetching;
           pending = Operation_hash.Map.empty;
           in_mempool = Operation_hash.Set.empty;
           applied = [];
           applied_count = 0;
-          branch_refused = Ring.create limits.max_refused_operations;
+          branch_refused = Ringo.Ring.create limits.max_refused_operations;
           branch_refusals = Operation_hash.Map.empty;
-          branch_delayed = Ring.create limits.max_refused_operations;
+          branch_delayed = Ringo.Ring.create limits.max_refused_operations;
           branch_delays = Operation_hash.Map.empty;
           validation_state;
           operation_stream = Lwt_watcher.create_input ();

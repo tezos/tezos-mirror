@@ -175,6 +175,12 @@ struct
       ()
 end
 
+module Weak_FIFO_Cache_Maker : Ringo.MAP_MAKER = ( val Ringo.map_maker
+                                                         ~replacement:FIFO
+                                                         ~overflow:Weak
+                                                         ~accounting:Sloppy
+                                                     : Ringo.MAP_MAKER )
+
 module MakeIterator (H : sig
   type t
 
@@ -255,22 +261,21 @@ struct
   end
 
   module WeakRingTable = struct
-    include WeakRingTable.Make (struct
-      type t = H.t
+    let h_encoding = H.encoding
 
-      let hash = H.hash
-
-      let equal = H.equal
-    end)
+    include Weak_FIFO_Cache_Maker (H)
 
     let encoding arg_encoding =
-      Data_encoding.conv
-        (fun h -> fold (fun k v l -> (k, v) :: l) h [])
-        (fun l ->
-          let h = create (List.length l) in
-          List.iter (fun (k, v) -> add h k v) l ;
+      let open Data_encoding in
+      conv
+        (fun h -> (capacity h, fold (fun k v l -> (k, v) :: l) h []))
+        (fun (capacity, l) ->
+          let h = create capacity in
+          List.iter (fun (k, v) -> replace h k v) l ;
           h)
-        Data_encoding.(list (tup2 H.encoding arg_encoding))
+      @@ obj2
+           (req "capacity" int31)
+           (req "content" @@ list (tup2 h_encoding arg_encoding))
   end
 end
 

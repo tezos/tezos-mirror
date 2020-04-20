@@ -290,7 +290,7 @@ struct
     mutable (* only for init *) worker : unit Lwt.t;
     mutable (* only for init *) state : Types.state option;
     buffer : 'kind buffer;
-    event_log : (Internal_event.level * Event.t Ring.t) list;
+    event_log : (Internal_event.level * Event.t Ringo.Ring.t) list;
     canceler : Lwt_canceler.t;
     name : Name.t;
     id : int;
@@ -507,7 +507,7 @@ struct
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
     >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
-      Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
+      Ringo.Ring.add (List.assoc (Event.level evt) w.event_log) evt ;
     Lwt.return_unit
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)
@@ -558,7 +558,7 @@ struct
       >>= fun () ->
       w.state <- None ;
       Lwt.ignore_result
-        ( List.iter (fun (_, ring) -> Ring.clear ring) w.event_log ;
+        ( List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
           Lwt.return_unit ) ;
       Lwt.return_unit
     in
@@ -684,7 +684,7 @@ struct
         let levels =
           Internal_event.[Debug; Info; Notice; Warning; Error; Fatal]
         in
-        List.map (fun l -> (l, Ring.create limits.backlog_size)) levels
+        List.map (fun l -> (l, Ringo.Ring.create limits.backlog_size)) levels
       in
       let w =
         {
@@ -752,7 +752,9 @@ struct
   let pending_requests q = Queue.pending_requests q
 
   let last_events w =
-    List.map (fun (level, ring) -> (level, Ring.elements ring)) w.event_log
+    List.map
+      (fun (level, ring) -> (level, Ringo.Ring.elements ring))
+      w.event_log
 
   let status {status; _} = status
 

@@ -63,7 +63,7 @@ module Info = struct
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option;
     mutable greylisting_delay : Time.System.Span.t;
     mutable greylisting_end : Time.System.t;
-    events : Pool_event.t Ring.t;
+    events : Pool_event.t Ringo.Ring.t;
     watchers : Pool_event.t Lwt_watcher.input;
   }
 
@@ -133,7 +133,7 @@ module Info = struct
       last_established_connection = None;
       last_disconnection = None;
       known_public = false;
-      events = Ring.create log_size;
+      events = Ringo.Ring.create log_size;
       greylisting_delay = Ptime.Span.of_int_s 1;
       greylisting_end = Time.System.epoch;
       watchers = Lwt_watcher.create_input ();
@@ -184,13 +184,13 @@ module Info = struct
   let log {events; watchers; _} ?timestamp kind =
     let time = Option.unopt ~default:(Systime_os.now ()) timestamp in
     let event = Time.System.stamp ~time kind in
-    Ring.add events event ;
+    Ringo.Ring.add events event ;
     Lwt_watcher.notify watchers event
 
   let log_incoming_rejection ?timestamp point_info peer_id =
     log point_info ?timestamp (Rejecting_request peer_id)
 
-  let fold {events; _} ~init ~f = Ring.fold events ~init ~f
+  let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
 end

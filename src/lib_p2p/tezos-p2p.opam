@@ -15,6 +15,7 @@ depends: [
   "lwt"
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { = "0.2" }
+  "ringo" { = "0.4" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

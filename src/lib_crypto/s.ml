@@ -173,7 +173,7 @@ module type INDEXES = sig
   end
 
   module WeakRingTable : sig
-    include WeakRingTable.S with type key = t
+    include Ringo.CACHE_MAP with type key = t
 
     val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
   end

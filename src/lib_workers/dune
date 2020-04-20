@@ -2,7 +2,8 @@
  (name tezos_workers)
  (public_name tezos-workers)
  (libraries tezos-base
-            tezos-stdlib-unix)
+            tezos-stdlib-unix
+            ringo)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
                    -open Tezos_stdlib_unix

@@ -13,6 +13,7 @@
             hacl-star
             secp256k1-internal
             uecc
+            ringo
             zarith))
 
 (alias
