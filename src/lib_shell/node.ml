@@ -57,7 +57,7 @@ module Initialization_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {status; _} =
+    let pp ?short:_ ppf {status; _} =
       Format.fprintf
         ppf
         "%s initialization: %s"

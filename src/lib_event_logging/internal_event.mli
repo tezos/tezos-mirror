@@ -104,7 +104,7 @@ module type EVENT_DEFINITION = sig
   (** A display-friendly text which describes what the event means. *)
   val doc : string
 
-  val pp : Format.formatter -> t -> unit
+  val pp : ?short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 

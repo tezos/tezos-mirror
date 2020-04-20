@@ -181,7 +181,8 @@ module Definition = struct
              (function Reconstruct_success -> Some () | _ -> None)
              (fun () -> Reconstruct_success) ]
 
-  let pp ppf (status : t) = Format.fprintf ppf "%a" status_pp status.data
+  let pp ?short:_ ppf (status : t) =
+    Format.fprintf ppf "%a" status_pp status.data
 
   let doc = "Snapshots status."
 

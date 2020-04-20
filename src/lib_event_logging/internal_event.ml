@@ -138,7 +138,7 @@ module type EVENT_DEFINITION = sig
 
   val doc : string
 
-  val pp : Format.formatter -> t -> unit
+  val pp : ?short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
@@ -720,7 +720,7 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt () = pp_log_message parsed_msg fmt []
+      let pp ?short fmt () = pp_log_message ?short parsed_msg fmt []
 
       let encoding = with_version ~name Data_encoding.unit
 
@@ -740,8 +740,12 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt f1 =
-        pp_log_message parsed_msg fmt [Parameter (f1_name, f1_enc, f1, pp1)]
+      let pp ?short fmt f1 =
+        pp_log_message
+          ?short
+          parsed_msg
+          fmt
+          [Parameter (f1_name, f1_enc, f1, pp1)]
 
       let encoding = with_version ~name f1_enc
 
@@ -762,8 +766,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2) =
+      let pp ?short fmt (f1, f2) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -793,8 +798,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3) =
+      let pp ?short fmt (f1, f2, f3) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -828,8 +834,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4) =
+      let pp ?short fmt (f1, f2, f3, f4) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -868,8 +875,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5) =
+      let pp ?short fmt (f1, f2, f3, f4, f5) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -911,8 +919,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6) =
+      let pp ?short fmt (f1, f2, f3, f4, f5, f6) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -959,8 +968,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6, f7) =
+      let pp ?short fmt (f1, f2, f3, f4, f5, f6, f7) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -1010,8 +1020,9 @@ module Simple = struct
 
       let name = name
 
-      let pp fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
+      let pp ?short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
         pp_log_message
+          ?short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -1153,7 +1164,7 @@ module Legacy_logging = struct
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ppf {message; _} =
+      let pp ?short:_ ppf {message; _} =
         let open Format in
         fprintf ppf "%s" message
 
@@ -1296,7 +1307,7 @@ module Error_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp f x =
+    let pp ?short:_ f x =
       Format.fprintf
         f
         "%s:@ %s"
@@ -1349,7 +1360,7 @@ module Debug_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {message; attachment} =
+    let pp ?short:_ ppf {message; attachment} =
       let open Format in
       fprintf ppf "%s:@ %s@ %a" name message Data_encoding.Json.pp attachment
 
@@ -1403,7 +1414,7 @@ module Lwt_worker_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ppf {name; event} =
+    let pp ?short:_ ppf {name; event} =
       let open Format in
       fprintf
         ppf
@@ -1452,7 +1463,11 @@ module Lwt_log_sink = struct
               ~default:default_section
           in
           let level = M.level ev in
-          Format.kasprintf (Lwt_log_core.log ~section ~level) "%a" M.pp ev
+          Format.kasprintf
+            (Lwt_log_core.log ~section ~level)
+            "%a"
+            (M.pp ~short:false)
+            ev
           >>= fun () -> return_unit)
 
     let close _ =

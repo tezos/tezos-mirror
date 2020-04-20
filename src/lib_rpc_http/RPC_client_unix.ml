@@ -39,7 +39,7 @@ module Attempt_logging = Internal_event.Make (struct
         (fun (attempt, delay, text) -> {attempt; delay; text})
         (obj3 (req "attempt" int8) (req "delay" float) (req "text" string)))
 
-  let pp f {attempt; delay; text} =
+  let pp ?short:_ f {attempt; delay; text} =
     Format.fprintf
       f
       "Attempt number %d/10, will retry after %g seconds.\n\
