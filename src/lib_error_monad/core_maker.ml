@@ -213,61 +213,97 @@ end = struct
         }
       :: !error_kinds
 
-  let raw_register_error_kind category ~id:name ~title ~description ?pp
-      encoding from_error to_error =
-    let name = Prefix.id ^ name in
+  let prepare_registration new_id =
+    !set_error_encoding_cache_dirty () ;
+    let name = Prefix.id ^ new_id in
     if List.exists (fun (Error_kind {id; _}) -> name = id) !error_kinds then
       invalid_arg
         (Printf.sprintf "register_error_kind: duplicate error name: %s" name) ;
+    name
+
+  let register_wrapped_error_kind (module WEM : Wrapped_error_monad) ~id ~title
+      ~description =
+    let name = prepare_registration id in
     let encoding_case =
-      let open Data_encoding in
-      match category with
-      | Wrapped (module WEM) ->
-          let unwrap err =
-            match WEM.unwrap err with
-            | Some (WEM.Unclassified _) ->
-                None
-            | Some (WEM.Unregistered_error _) ->
-                Format.eprintf "What %s@." name ;
-                None
-            | res ->
-                res
-          in
-          let wrap err =
-            match err with
-            | WEM.Unclassified _ ->
-                failwith "ignore wrapped error when serializing"
-            | WEM.Unregistered_error _ ->
-                failwith "ignore wrapped error when deserializing"
-            | res ->
-                WEM.wrap res
-          in
-          case Json_only ~title:name WEM.error_encoding unwrap wrap
-      | Main category ->
-          let with_id_and_kind_encoding =
-            merge_objs
-              (obj2
-                 (req "kind" (constant (string_of_category category)))
-                 (req "id" (constant name)))
-              encoding
-          in
-          case
-            Json_only
-            ~title
-            ~description
-            (conv
-               (fun x -> (((), ()), x))
-               (fun (((), ()), x) -> x)
-               with_id_and_kind_encoding)
-            from_error
-            to_error
+      let unwrap err =
+        match WEM.unwrap err with
+        | Some (WEM.Unclassified _) ->
+            None
+        | Some (WEM.Unregistered_error _) ->
+            Format.eprintf "What %s@." name ;
+            None
+        | res ->
+            res
+      in
+      let wrap err =
+        match err with
+        | WEM.Unclassified _ ->
+            failwith "ignore wrapped error when serializing"
+        | WEM.Unregistered_error _ ->
+            failwith "ignore wrapped error when deserializing"
+        | res ->
+            WEM.wrap res
+      in
+      case Json_only ~title:name WEM.error_encoding unwrap wrap
     in
-    !set_error_encoding_cache_dirty () ;
     error_kinds :=
       Error_kind
         {
           id = name;
-          category;
+          category = Wrapped (module WEM);
+          title;
+          description;
+          from_error = WEM.unwrap;
+          encoding_case;
+          pp = WEM.pp;
+        }
+      :: !error_kinds
+
+  let add_kind_and_id ~category ~name ~title ~description encoding from_error
+      to_error =
+    if not (Data_encoding.is_obj encoding) then
+      invalid_arg
+        (Printf.sprintf
+           "Specified encoding for \"%s%s\" is not an object, but error \
+            encodings must be objects."
+           Prefix.id
+           name) ;
+    let with_id_and_kind_encoding =
+      merge_objs
+        (obj2
+           (req "kind" (constant (string_of_category category)))
+           (req "id" (constant name)))
+        encoding
+    in
+    case
+      Json_only
+      ~title
+      ~description
+      (conv
+         (fun x -> (((), ()), x))
+         (fun (((), ()), x) -> x)
+         with_id_and_kind_encoding)
+      from_error
+      to_error
+
+  let register_error_kind category ~id ~title ~description ?pp encoding
+      from_error to_error =
+    let name = prepare_registration id in
+    let encoding_case =
+      add_kind_and_id
+        ~category
+        ~name
+        ~title
+        ~description
+        encoding
+        from_error
+        to_error
+    in
+    error_kinds :=
+      Error_kind
+        {
+          id = name;
+          category = Main category;
           title;
           description;
           from_error;
@@ -276,47 +312,16 @@ end = struct
         }
       :: !error_kinds
 
-  let register_wrapped_error_kind (module WEM : Wrapped_error_monad) ~id ~title
-      ~description =
-    raw_register_error_kind
-      (Wrapped (module WEM))
-      ~id
-      ~title
-      ~description
-      ~pp:WEM.pp
-      WEM.error_encoding
-      WEM.unwrap
-      WEM.wrap
-
-  let register_error_kind category ~id ~title ~description ?pp encoding
-      from_error to_error =
-    if not (Data_encoding.is_obj encoding) then
-      invalid_arg
-        (Printf.sprintf
-           "Specified encoding for \"%s%s\" is not an object, but error \
-            encodings must be objects."
-           Prefix.id
-           id) ;
-    raw_register_error_kind
-      (Main category)
-      ~id
-      ~title
-      ~description
-      ?pp
-      encoding
-      from_error
-      to_error
-
   let error_encoding () =
     match !error_encoding_cache with
     | None ->
-        let cases =
-          List.map
-            (fun (Error_kind {encoding_case; _}) -> encoding_case)
-            !error_kinds
-        in
-        let union_encoding = Data_encoding.union cases in
         let encoding =
+          let cases =
+            List.map
+              (fun (Error_kind {encoding_case; _}) -> encoding_case)
+              !error_kinds
+          in
+          let union_encoding = Data_encoding.union cases in
           let open Data_encoding in
           dynamic_size
           @@ splitted
