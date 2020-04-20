@@ -65,6 +65,12 @@ end
 module Group : sig
   type t
 
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+
+  include S.RAW_DATA with type t := t
+
   include S.B58_DATA with type t := t
 
   include S.ENCODER with type t := t
@@ -90,6 +96,4 @@ module Group : sig
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
-
-  val ( = ) : t -> t -> bool
 end

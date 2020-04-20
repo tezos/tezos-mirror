@@ -68,6 +68,12 @@ module Group : sig
 
   type t
 
+  val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
+
+  include S.RAW_DATA with type t := t
+
   include S.B58_DATA with type t := t
 
   include S.ENCODER with type t := t
@@ -89,8 +95,6 @@ module Group : sig
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
-
-  val ( = ) : t -> t -> bool
 end = struct
   let order =
     Z.of_string_base
@@ -274,8 +278,6 @@ end = struct
     Sp.Group.Jacobian.neg neg_y y ;
     x + neg_y
 
-  let ( = ) x y = Sp.Group.Jacobian.is_infinity (x - y)
-
   let mul s g =
     let r = Sp.Group.Jacobian.of_fields () in
     Sp.Group.Jacobian.mul r (group_of_jacobian g) s ;
@@ -335,4 +337,33 @@ end = struct
   end
 
   include Encoding
+
+  let to_bytes pk = to_bits pk |> Bytes.of_string
+
+  let of_bytes_opt s =
+    try Some (Bytes.to_string s |> of_bits_exn) with _ -> None
+
+  let to_string = to_bits
+
+  let of_string_opt s = try Some (of_bits_exn s) with _ -> None
+
+  let size = 37
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare a b = String.compare (to_string a) (to_string b)
+  end)
+
+  include Helpers.MakeRaw (struct
+    type nonrec t = t
+
+    let name = name
+
+    let of_bytes_opt = of_bytes_opt
+
+    let of_string_opt = of_string_opt
+
+    let to_string = to_string
+  end)
 end
