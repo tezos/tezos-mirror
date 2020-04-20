@@ -433,26 +433,6 @@ module Script : sig
 
   val unit_parameter : lazy_expr
 
-  module Legacy_support : sig
-    val manager_script_code : lazy_expr
-
-    val add_do :
-      manager_pkh:Signature.Public_key_hash.t ->
-      script_code:lazy_expr ->
-      script_storage:lazy_expr ->
-      (lazy_expr * lazy_expr) tzresult Lwt.t
-
-    val add_set_delegate :
-      manager_pkh:Signature.Public_key_hash.t ->
-      script_code:lazy_expr ->
-      script_storage:lazy_expr ->
-      (lazy_expr * lazy_expr) tzresult Lwt.t
-
-    val has_default_entrypoint : lazy_expr -> bool
-
-    val add_root_entrypoint : script_code:lazy_expr -> lazy_expr tzresult Lwt.t
-  end
-
   val micheline_nodes : node -> int
 
   val strip_locations_cost : node -> Gas.cost
