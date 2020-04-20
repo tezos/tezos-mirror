@@ -26,7 +26,6 @@
         "Script_timestamp_repr",
         "Michelson_v1_primitives",
         "Script_repr",
-        "Legacy_script_support_repr",
         "Contract_repr",
         "Roll_repr",
         "Vote_repr",

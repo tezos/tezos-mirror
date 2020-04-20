@@ -102,8 +102,6 @@ module Script = struct
       ( Script_repr.force_bytes lexpr
       >>? fun (b, cost) ->
       Raw_context.consume_gas ctxt cost >|? fun ctxt -> (b, ctxt) )
-
-  module Legacy_support = Legacy_script_support_repr
 end
 
 module Fees = Fees_storage
