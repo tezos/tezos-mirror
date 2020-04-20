@@ -56,7 +56,7 @@ type block_error =
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
 
-let block_error_encoding =
+let block_error_encoding error_encoding =
   let open Data_encoding in
   union
     [ case
@@ -221,7 +221,16 @@ let block_error_encoding =
         ~title:"Cannot_parse_block_header"
         (obj1 (req "error" (constant "cannot_parse_bock_header")))
         (function Cannot_parse_block_header -> Some () | _ -> None)
-        (fun () -> Cannot_parse_block_header) ]
+        (fun () -> Cannot_parse_block_header);
+      case
+        (Tag 14)
+        ~title:"Economic_protocol_error"
+        (obj2
+           (req "error" (constant "economic_protocol_error"))
+           (req "trace" (list error_encoding)))
+        (function
+          | Economic_protocol_error trace -> Some ((), trace) | _ -> None)
+        (fun ((), trace) -> Economic_protocol_error trace) ]
 
 let pp_block_error ppf = function
   | Cannot_parse_operation oph ->
@@ -367,7 +376,7 @@ type error +=
   | Validation_process_failed of validation_process_error
 
 let () =
-  Error_monad.register_error_kind
+  Error_monad.register_recursive_error_kind
     `Permanent
     ~id:"validator.invalid_block"
     ~title:"Invalid block"
@@ -380,10 +389,11 @@ let () =
         block
         pp_block_error
         error)
-    Data_encoding.(
-      merge_objs
-        (obj1 (req "invalid_block" Block_hash.encoding))
-        block_error_encoding)
+    (fun error_encoding ->
+      Data_encoding.(
+        merge_objs
+          (obj1 (req "invalid_block" Block_hash.encoding))
+          (block_error_encoding error_encoding)))
     (function
       | Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
