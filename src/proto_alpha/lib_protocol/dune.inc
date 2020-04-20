@@ -43,7 +43,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
-   legacy_script_support_repr.mli legacy_script_support_repr.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -124,7 +123,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
-   legacy_script_support_repr.mli legacy_script_support_repr.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -205,7 +203,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
-   legacy_script_support_repr.mli legacy_script_support_repr.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
@@ -306,7 +303,6 @@ include Tezos_raw_protocol_alpha.Main
    Script_timestamp_repr
    Michelson_v1_primitives
    Script_repr
-   Legacy_script_support_repr
    Contract_repr
    Roll_repr
    Vote_repr
@@ -423,7 +419,6 @@ include Tezos_raw_protocol_alpha.Main
    script_timestamp_repr.mli script_timestamp_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
-   legacy_script_support_repr.mli legacy_script_support_repr.ml
    contract_repr.mli contract_repr.ml
    roll_repr.mli roll_repr.ml
    vote_repr.mli vote_repr.ml
