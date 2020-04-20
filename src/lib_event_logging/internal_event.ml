@@ -657,7 +657,7 @@ module Simple = struct
     in
     find_variable_begin [] 0 0 |> List.rev
 
-  let pp_log_message (msg : msg_atom list) fmt fields =
+  let pp_log_message ?(short = false) (msg : msg_atom list) fmt fields =
     (* Add a boolean reference to each field telling whether the field was used. *)
     let fields = List.map (fun field -> (field, ref false)) fields in
     Format.fprintf fmt "@[<hov 2>" ;
@@ -702,7 +702,7 @@ module Simple = struct
             Format.fprintf fmt "@ (%s = %s" name value )
           else Format.fprintf fmt ",@ %s = %s" name value
     in
-    List.iter print_field fields ;
+    if not short then List.iter print_field fields ;
     if !first_field then Format.fprintf fmt "@]" else Format.fprintf fmt ")@]"
 
   let with_version ~name encoding =
