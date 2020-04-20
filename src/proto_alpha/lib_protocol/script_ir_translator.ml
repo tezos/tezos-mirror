@@ -687,7 +687,16 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
         None
     | Some ty ->
         Some (Option_key (ty, tname)) )
-  | _ ->
+  | Signature_t _
+  | Key_t _
+  | Lambda_t _
+  | List_t _
+  | Set_t _
+  | Map_t _
+  | Big_map_t _
+  | Contract_t _
+  | Operation_t _
+  | Chain_id_t _ ->
       None
 
 let add_field_annot a var = function
@@ -1348,15 +1357,17 @@ let rec parse_comparable_ty :
       >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
   | Prim
       ( loc,
-        ( ( T_int
+        ( ( T_unit
           | T_never
+          | T_int
           | T_nat
           | T_string
+          | T_bytes
           | T_mutez
           | T_bool
-          | T_key
-          | T_address
-          | T_timestamp ) as prim ),
+          | T_key_hash
+          | T_timestamp
+          | T_address ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1400,7 +1411,7 @@ let rec parse_comparable_ty :
       error (Invalid_arity (loc, T_option, 1, List.length l))
   | Prim
       ( loc,
-        (T_set | T_map | T_list | T_lambda | T_signature | T_contract),
+        (T_set | T_map | T_list | T_lambda | T_signature | T_contract | T_key),
         _,
         _ ) ->
       error (Comparable_type_expected (loc, Micheline.strip_locations ty))
@@ -1410,15 +1421,17 @@ let rec parse_comparable_ty :
            expr
            []
            Type_namespace
-           [ T_int;
+           [ T_unit;
              T_never;
+             T_int;
              T_nat;
              T_string;
+             T_bytes;
              T_mutez;
              T_bool;
-             T_key;
              T_key_hash;
-             T_timestamp ]
+             T_timestamp;
+             T_address ]
 
 and parse_packable_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
