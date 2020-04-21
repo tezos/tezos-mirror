@@ -22,7 +22,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {version : Version.t; commit_info : commit_info option}
+type t = {
+  version : Version.t;
+  network_version : Network_version.t;
+  commit_info : commit_info option;
+}
 
 and commit_info = {commit_hash : string; commit_date : string}
 
@@ -72,8 +76,11 @@ let current_version_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {version; commit_info} -> (version, commit_info))
-    (fun (version, commit_info) -> {version; commit_info})
-    (obj2
+    (fun {version; network_version; commit_info} ->
+      (version, network_version, commit_info))
+    (fun (version, network_version, commit_info) ->
+      {version; network_version; commit_info})
+    (obj3
        (req "version" current_version_encoding)
+       (req "network_version" Network_version.encoding)
        (req "commit_info" (option commit_info_encoding)))

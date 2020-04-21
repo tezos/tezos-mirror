@@ -527,7 +527,7 @@ let build_rpc_directory node =
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:
          node.user_activated_protocol_overrides) ;
-  merge (Version_directory.rpc_directory ()) ;
+  merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   RPC_directory.register_describe_directory_service

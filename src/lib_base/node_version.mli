@@ -26,10 +26,15 @@
 
  This module provides several information regarding the node's version:
  - version: current version number
+ - network_version: current version of the network
  - commit_info (optional): hash and date of the head commit
 *)
 
-type t = {version : Version.t; commit_info : commit_info option}
+type t = {
+  version : Version.t;
+  network_version : Network_version.t;
+  commit_info : commit_info option;
+}
 
 and commit_info = {commit_hash : string; commit_date : string}
 
