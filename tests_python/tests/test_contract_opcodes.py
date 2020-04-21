@@ -617,11 +617,12 @@ class TestContractOpcodes:
                                    storage,
                                    expected):
         client = client_regtest
-        if contract.endswith('.tz'):
-            contract = path.join(OPCODES_CONTRACT_PATH, contract)
-            run_script_res = client.run_script(contract, param,
-                                               storage, None, True)
-            assert run_script_res.storage == expected
+        assert contract.endswith('.tz'), \
+            "test contract should have .tz extension"
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        run_script_res = client.run_script(contract, param,
+                                           storage, None, True)
+        assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
         "contract,param,storage,expected,big_map_diff",

@@ -82,6 +82,13 @@ class RunScriptResult:
             raise InvalidClientOutput(client_output)
         self.storage = match.groups()[0]
 
+        # read operation output
+        self.internal_operations = None
+        pattern = r"(?s)emitted operations\n\s*(.*)\n  big_map diff"
+        match = re.search(pattern, client_output)
+        if match is not None:
+            self.internal_operations = match.group(1)
+
         # read map diff output
         self.big_map_diff = []  # type: List
         pattern_str = r"big_map diff\n"

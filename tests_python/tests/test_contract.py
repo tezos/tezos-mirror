@@ -2,7 +2,7 @@ import os
 import re
 import pytest
 from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
-    all_contracts, all_deprecated_contracts
+    all_contracts
 from tools import utils
 from tools.constants import IDENTITIES
 
@@ -227,25 +227,9 @@ class TestContracts:
 
     @pytest.mark.parametrize("contract", all_contracts())
     def test_typecheck(self, client, contract):
-        if contract.endswith('.tz'):
-            client.typecheck(os.path.join(CONTRACT_PATH, contract))
-
-    # TODO add more tests here
-    @pytest.mark.parametrize("contract,param,storage,expected",
-                             [('opcodes/ret_int.tz', 'None', 'Unit',
-                               '(Some 300)')])
-    def test_run(self, client, contract, param, storage, expected):
-        if contract.endswith('.tz'):
-            contract = os.path.join(CONTRACT_PATH, contract)
-            run_script_res = client.run_script(contract, param, storage)
-            assert run_script_res.storage == expected
-
-    @pytest.mark.parametrize("contract", all_deprecated_contracts())
-    def test_deprecated_typecheck(self, client, contract):
-        def cmd():
-            client.typecheck(os.path.join(CONTRACT_PATH, contract))
-
-        utils.assert_run_failure(cmd, r'Use of deprecated instruction')
+        assert contract.endswith('.tz'), \
+            "test contract should have .tz extension"
+        client.typecheck(os.path.join(CONTRACT_PATH, contract))
 
     @pytest.mark.parametrize("contract,error_pattern", [
         # operations cannot be PACKed

@@ -85,10 +85,11 @@ class TestContractMacros:
         ])
     def test_contract_input_output(self, client, contract, param, storage,
                                    expected):
-        if contract.endswith('.tz'):
-            contract = path.join(MACROS_CONTRACT_PATH, contract)
-            run_script_res = client.run_script(contract, param, storage)
-            assert run_script_res.storage == expected
+        assert contract.endswith('.tz'), \
+            "test contract should have .tz extension"
+        contract = path.join(MACROS_CONTRACT_PATH, contract)
+        run_script_res = client.run_script(contract, param, storage)
+        assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
         "contract,param,storage",
