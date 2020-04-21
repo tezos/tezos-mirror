@@ -75,6 +75,10 @@ build:
     - dune build @runtest_dune_template
     - make all build-test
     - opam clean
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - _build
   artifacts:
     name: "$CI_COMMIT_REF_NAME"
     paths:
