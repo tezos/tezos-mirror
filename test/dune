@@ -1,24 +1,30 @@
 (executable
  (name ezResto_test)
  (modules ezDirectory ezResto_test ezServices)
- (flags (:standard -safe-string))
+ (flags
+  (:standard -safe-string))
  (libraries ezresto-directory lwt lwt.unix))
 
 (alias
  (name runtest_ezresto)
- (action (run %{exe:ezResto_test.exe})))
+ (action
+  (run %{exe:ezResto_test.exe})))
 
 (executable
  (name resto_test)
  (modules directory resto_test services)
- (flags (:standard -safe-string))
- (libraries resto-directory resto-json json-data-encoding json-data-encoding-bson lwt lwt.unix))
+ (flags
+  (:standard -safe-string))
+ (libraries resto-directory resto-json json-data-encoding
+   json-data-encoding-bson lwt lwt.unix))
 
 (alias
  (name runtest_resto)
- (action (run %{exe:resto_test.exe})))
+ (action
+  (run %{exe:resto_test.exe})))
 
 (alias
  (name runtest)
- (deps (alias runtest_resto)
-       (alias runtest_ezresto)))
+ (deps
+  (alias runtest_resto)
+  (alias runtest_ezresto)))
