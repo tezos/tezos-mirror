@@ -82,6 +82,7 @@ build:
     expire_in: 1 day
   tags:
     - gitlab-org
+    - nomadic-labs
 
 ############################################################
 ## Stage: test (only MR)                                  ##
