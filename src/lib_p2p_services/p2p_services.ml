@@ -62,9 +62,11 @@ module S = struct
       ~output:P2p_peer.Id.encoding
       RPC_path.(root / "network" / "self")
 
+  (* DEPRECATED: use [version] from "lib_shell_services/version_services"
+     instead. *)
   let version =
     RPC_service.get_service
-      ~description:"Supported network layer version."
+      ~description:"DEPRECATED: use `version` instead."
       ~query:RPC_query.empty
       ~output:Network_version.encoding
       RPC_path.(root / "network" / "version")
