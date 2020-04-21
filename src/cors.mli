@@ -23,11 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** CORS (cross-origin resource sharing) controls the ways in which resources
+    from different domains are allowed to be obtained.
+
+    See the specifications at https://fetch.spec.whatwg.org/#http-cors-protocol
+*)
+
 type t = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
+  allowed_headers : string list (** https://fetch.spec.whatwg.org/#http-access-control-allow-headers *) ;
+  allowed_origins : string list (** https://fetch.spec.whatwg.org/#http-access-control-allow-origin *) ;
 }
 
+(** [default] is a [t] with no allowed headers and no allowed origins. *)
 val default: t
 
 val add_allow_origin:
@@ -36,4 +43,6 @@ val add_allow_origin:
 val add_headers:
   Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 
+(** [check_host header t] is [true] if one of [t]'s members matches the
+    [header]'s [Host] field. *)
 val check_host: Cohttp.Header.t -> t -> bool

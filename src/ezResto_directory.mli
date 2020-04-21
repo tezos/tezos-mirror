@@ -10,6 +10,9 @@
 
 open EzResto
 
+(** Directories are sets of services. They are used to spin up servers (see
+    [Server]) that reply to requests for all their registered services. *)
+
 module Answer : sig
 
   (** Return type for service handler *)
@@ -46,14 +49,26 @@ type conflict =
 
 exception Conflict of step list * conflict
 
-(** Dispatch tree *)
+(** A set of services on which requests can be dispatched. *)
 type directory
 
 (** Empty tree *)
 val empty: directory
 
+(** [prefix p d] is a directory of services which includes a service registered
+    on the path [p / q] for each service registered on the path [q] in [d].
+
+    @raise [Invalid_argument] if [p] is a dynamic path. *)
 val prefix: 'a Path.t -> directory -> directory
+
+(** [merge d1 d2] is a directory which includes all the services of [d1] and
+    [d2].
+
+    @raise [Conflict] if one or more service from [d1] conflicts with one or
+    more service from [d2]. *)
 val merge: directory -> directory -> directory
+
+(** Registered services (with existential types for parameters and such). *)
 
 type 'input input =
   | No_input : unit input
@@ -72,15 +87,25 @@ type registered_service =
         handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
       } -> registered_service
 
+(** Resolve a service. *)
+
 type lookup_error =
   [ `Not_found (* 404 *)
   | `Method_not_allowed of meth list (* 405 *)
   | `Cannot_parse_path of string list * Arg.descr * string (* 400 *)
   ]
 
-(** Resolve a service. *)
+(** [lookup d m p] is [Ok (Service _)] if there is a service [s] registered in
+    [d] and both the method of [s] is [m] and the path of [s] matches [p]. It is
+    [Error _] otherwise.
+
+    If it is [Ok (Service _)] then the returned value corresponds to the
+    registered service. *)
 val lookup: directory -> meth -> string list -> (registered_service, [> lookup_error ]) result Lwt.t
 
+(** [allowed_methods d p] is the set of methods [m] such that [lookup d m p] is
+    [Ok _]. In other words, it is the set of methods [m] such that a service has
+    been registered in [d] for a path that matches [p]. *)
 val allowed_methods:
   directory -> string list ->
   (meth list, [> lookup_error ]) result Lwt.t
@@ -91,14 +116,20 @@ val transparent_lookup:
   'params -> 'query -> 'input -> [> ('output, 'error) Answer.t ] Lwt.t
 
 
-(** Registring handler in service tree. *)
+(** Registering a handler to a service in a directory. *)
+
+(** [register d s h] is a directory that contains all the services registered
+    in [d] plus the service [s]. Requests to the service [s] are handled by the
+    handler [h]. *)
 val register:
   directory ->
   ('meth, 'params, 'query, 'input, 'output, 'error) EzResto.service ->
   ('params -> 'query -> 'input -> ('output, 'error) Answer.t Lwt.t) ->
   directory
 
-(** Registring handler in service tree. Curryfied variant.  *)
+(** Below are variants of the [register] function curryfied for specific arity
+    of services. *)
+
 val register0:
   directory ->
   ('meth, unit, 'q, 'i, 'o, 'e) EzResto.service ->

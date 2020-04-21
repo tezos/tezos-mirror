@@ -17,13 +17,27 @@ module MethMap : Map.S with type key = meth
 module StringMap : Map.S with type 'a t = 'a Map.Make(String).t
                           and type key = string
 
+(** [eq] is an equality witness type. It is returned by some non-trivial
+    equality-testing functions in the rest of this module. In general, it is
+    intended to be used as follows:
+
+    [match are_equal foo bar with
+     | None -> (* values are not equal *) ..
+     | Some Eq -> (* values are equal *) ..] *)
 type (_, _) eq = Eq : ('a, 'a) eq
 
 (** Typed path argument. *)
 module Arg : sig
 
+  (** An argument to a service. *)
   type 'a t
   type 'a arg = 'a t
+
+  (** [make ?descr ~name ~destruct ~construct ()] is an argument. The values of
+      [descr] and [name] are used for documentation purpose only. The values of
+      [destruct] and [construct] are used for conversion from/to [string]s. Note
+      that it is expected that [destruct] and [construct] roundtrip (modulo the
+      [result] error wrapping). *)
   val make:
     ?descr:string ->
     name:string ->
@@ -31,10 +45,13 @@ module Arg : sig
     construct:('a -> string) ->
     unit -> 'a arg
 
+  (** [descr] is a type for the documentation of a [t]. *)
   type descr = {
     name: string ;
     descr: string option ;
   }
+
+  (** [descr t] is the documentation of [t]. *)
   val descr: 'a arg -> descr
 
   (** [bool] is an argument for boolean values. The strings ["yes"], ["y"],
@@ -66,8 +83,25 @@ module Arg : sig
   (** [string] is an argument for string values. No parsing is done. *)
   val string: string arg
 
+  (** [like a ?descr name] is a new argument which carries the same type
+      parameter and uses the same constructor/destructor functions as [a], but
+      has a different name and description. It is intended to be used to give
+      different meaning to isomorphic arguments. E.g.,
+
+      [let date =
+         make ~descr:"A date in YYYY-MM-DD format" ~name:"date"
+              ~destruct:(fun s -> ..) ~construct:(fun d -> ..)
+              () in
+       let birth_date =
+         like date
+              ~descr:"A date of birth in the YYYY-MM-DD format" "birth-date" in
+       ..]
+    *)
   val like: 'a arg -> ?descr:string -> string -> 'a arg
 
+  (** [eq a b] is [Some Eq] if [a] and [b] are the same and [None] otherwise.
+
+      Note that [eq a (like a ..)] is always [None]. *)
   val eq: 'a arg -> 'b arg -> ('a, 'b) eq option
 
 end
@@ -76,28 +110,62 @@ end
 (** Parametrized path to services. *)
 module Path : sig
 
+  (** The type of a path. Here "path" is to be taken in the sense of a
+      slash-separated sequence of segments of a URI/URL. *)
   type ('prefix, 'params) t
   type ('prefix, 'params) path = ('prefix, 'params) t
   type 'prefix context = ('prefix, 'prefix) path
 
+  (** [root] is the basis to build paths upon. It is the "[Nil]" of path
+      construction. *)
   val root: unit context
   val open_root: 'a context
 
+  (** [add_suffix p s] is a path in which [s] has been appended to the sequence
+      of segments described by [p]. *)
   val add_suffix:
     ('prefix, 'params) path -> string -> ('prefix, 'params) path
+
+  (** [(/)] is an infix operator for [add_suffix]. *)
   val (/):
     ('prefix, 'params) path -> string -> ('prefix, 'params) path
 
+  (** [add_arg p a] is a path in which a segment representing a value of type
+      [a] has been appended to the sequence of segments described by [p].
+
+      This is intended for use by services. Specifically, a service that is
+      parameterized over a value of type [ty] is attached to a path that includes
+      an argument for a value of type [ty]. When the service is called, Resto
+      decodes the argument and passes its value to the service. *)
   val add_arg:
     ('prefix, 'params) path -> 'a Arg.t -> ('prefix, 'params * 'a) path
+
+  (** [(/:)] is an infix operator for [add_arg]. *)
   val (/:):
     ('prefix, 'params) path -> 'a Arg.t -> ('prefix, 'params * 'a) path
 
+  (** [add_final_args p a] is a path in which an arbitrary sequence of segments
+      representing values of type [a] has been appended to the sequence of
+      segments described by [p].
+
+      A similar use to the [add_arg] is intended, but for a list of values
+      rather than a single value.
+
+      Note that, as the name suggests, [add_final_args] is final: you cannot add
+      further suffixes or arguments to the resulting path. Attempting to do so
+      raises [Invalid_arg]. Similarly, using the resulting path as a [prefix]
+      (see below) raises the same exception. This is because paths built with
+      [add_final_args] consume all the suffix as an unterminated list of
+      arguments, there cannot be further suffixes or arguments. *)
   val add_final_args:
     ('prefix, 'params) path -> 'a Arg.t -> ('prefix, 'params * 'a list) path
+
+  (** [( /:* )] is an infix operator for [add_final_args]. *)
   val (/:*):
     ('prefix, 'params) path -> 'a Arg.t -> ('prefix, 'params * 'a list) path
 
+  (** [prefix p q] is a path in which the sequence of segments of [p] is
+      followed by the sequence of segments of [q]. *)
   val prefix:
     ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
 
@@ -268,6 +336,11 @@ end
 
 (**/**)
 
+(** An [ENCODING] is a generic interface for modules that provide conversion
+    from values to a different representation and back. This is used to abstract
+    resto over specific representations of values.
+
+    See {Resto_json} for example of possible instantiation. *)
 module type ENCODING = sig
   type 'a t
   type schema

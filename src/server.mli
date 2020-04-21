@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Typed RPC services: server implementation. *)
+(** Serving a directory of registered services. *)
 
 module type LOGGING = sig
 
