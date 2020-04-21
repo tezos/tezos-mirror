@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let error_encoding_name = "error"
-
 let json_pp id description encoding ppf data =
   Format.pp_print_string ppf @@ Data_encoding.Json.to_string
   @@
@@ -44,6 +42,9 @@ module Make (Prefix : Sig.PREFIX) : sig
   include Sig.WITH_WRAPPED with type error := error
 end = struct
   type error = ..
+
+  let error_encoding_name =
+    if Prefix.id = "" then "error" else Prefix.id ^ "error"
 
   module type Wrapped_error_monad = sig
     type unwrapped = ..

@@ -39,6 +39,10 @@ let string_of_category = function
       "branch"
 
 module type PREFIX = sig
+  (** The identifier for parts of the code that need their own error monad. It
+      is expected (but not enforced) that the identifier:
+      is printable and easy to read once printed, and
+      ends with a separator (typically a dot or a dash). *)
   val id : string
 end
 
