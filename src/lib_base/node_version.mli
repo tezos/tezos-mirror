@@ -26,10 +26,11 @@
 
  This module provides several information regarding the node's version:
  - version: current version number
- - commit_hash: hash of the head commit
- - commit_date: date of the head commit
+ - commit_info (optional): hash and date of the head commit
 *)
 
-type t = {version : Version.t; commit_hash : string; commit_date : string}
+type t = {version : Version.t; commit_info : commit_info option}
+
+and commit_info = {commit_hash : string; commit_date : string}
 
 val encoding : t Data_encoding.t

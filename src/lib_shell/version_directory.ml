@@ -27,6 +27,8 @@ let rpc_directory () =
   let version = Version.current in
   let commit_hash = Current_git_info.commit_hash in
   let commit_date = Current_git_info.committer_date in
+  let commit_info =
+    Some ({commit_hash; commit_date} : Node_version.commit_info)
+  in
   RPC_directory.gen_register dir Version_services.S.version (fun () () () ->
-      RPC_answer.return
-      @@ ({version; commit_hash; commit_date} : Node_version.t))
+      RPC_answer.return @@ ({version; commit_info} : Node_version.t))

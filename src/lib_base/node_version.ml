@@ -22,7 +22,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {version : Version.t; commit_hash : string; commit_date : string}
+type t = {version : Version.t; commit_info : commit_info option}
+
+and commit_info = {commit_hash : string; commit_date : string}
+
+let commit_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {commit_hash; commit_date} -> (commit_hash, commit_date))
+    (fun (commit_hash, commit_date) -> {commit_hash; commit_date})
+    (obj2 (req "commit_hash" string) (req "commit_date" string))
 
 (* Locally defined encoding for Version.additional_info *)
 let additional_info_encoding =
@@ -63,11 +72,8 @@ let current_version_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {version; commit_hash; commit_date} ->
-      (version, commit_hash, commit_date))
-    (fun (version, commit_hash, commit_date) ->
-      {version; commit_hash; commit_date})
-    (obj3
+    (fun {version; commit_info} -> (version, commit_info))
+    (fun (version, commit_info) -> {version; commit_info})
+    (obj2
        (req "version" current_version_encoding)
-       (req "commit_hash" string)
-       (req "commit_date" string))
+       (req "commit_info" (option commit_info_encoding)))
