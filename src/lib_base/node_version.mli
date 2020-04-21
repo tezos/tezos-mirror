@@ -22,6 +22,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = {commit_hash : string; commit_date : string}
+(** Node version information.
 
-val version_encoding : version Data_encoding.t
+ This module provides several information regarding the node's version:
+ - version: current version number
+ - commit_hash: hash of the head commit
+ - commit_date: date of the head commit
+*)
+
+type t = {version : Version.t; commit_hash : string; commit_date : string}
+
+val encoding : t Data_encoding.t

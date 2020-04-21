@@ -24,7 +24,9 @@
 
 let rpc_directory () =
   let dir = RPC_directory.empty in
-  let commit_hash = Tezos_version.Current_git_info.commit_hash in
-  let commit_date = Tezos_version.Current_git_info.committer_date in
+  let version = Version.current in
+  let commit_hash = Current_git_info.commit_hash in
+  let commit_date = Current_git_info.committer_date in
   RPC_directory.gen_register dir Version_services.S.version (fun () () () ->
-      RPC_answer.return @@ ({commit_hash; commit_date} : Node_version.version))
+      RPC_answer.return
+      @@ ({version; commit_hash; commit_date} : Node_version.t))

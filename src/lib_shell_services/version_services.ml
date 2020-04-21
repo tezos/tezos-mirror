@@ -27,7 +27,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Get information on the node version"
       ~query:RPC_query.empty
-      ~output:Node_version.version_encoding
+      ~output:Node_version.encoding
       RPC_path.(root / "version")
 end
 
