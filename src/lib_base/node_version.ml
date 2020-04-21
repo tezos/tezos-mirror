@@ -22,11 +22,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = {commit_hash : string; commit_date : string}
+type t = {version : Version.t; commit_hash : string; commit_date : string}
 
-let version_encoding =
+(* Locally defined encoding for Version.additional_info *)
+let additional_info_encoding =
+  let open Data_encoding in
+  let open Version in
+  union
+    [ case
+        (Tag 0)
+        ~title:"Dev"
+        (constant "dev")
+        (function Dev -> Some () | _ -> None)
+        (fun () -> Dev);
+      case
+        (Tag 1)
+        ~title:"RC"
+        (obj1 (req "rc" int31))
+        (function RC n -> Some n | _ -> None)
+        (fun n -> RC n);
+      case
+        (Tag 2)
+        ~title:"Release"
+        (constant "release")
+        (function Release -> Some () | _ -> None)
+        (fun () -> Release) ]
+
+(* Locally defined encoding for Version.t *)
+let current_version_encoding =
   let open Data_encoding in
   conv
-    (fun {commit_hash; commit_date} -> (commit_hash, commit_date))
-    (fun (commit_hash, commit_date) -> {commit_hash; commit_date})
-    (obj2 (req "commit_hash" string) (req "commit_date" string))
+    (fun ({major; minor; additional_info} : Version.t) ->
+      (major, minor, additional_info))
+    (fun (major, minor, additional_info) -> {major; minor; additional_info})
+    (obj3
+       (req "major" int31)
+       (req "minor" int31)
+       (req "additional_info" additional_info_encoding))
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {version; commit_hash; commit_date} ->
+      (version, commit_hash, commit_date))
+    (fun (version, commit_hash, commit_date) ->
+      {version; commit_hash; commit_date})
+    (obj3
+       (req "version" current_version_encoding)
+       (req "commit_hash" string)
+       (req "commit_date" string))

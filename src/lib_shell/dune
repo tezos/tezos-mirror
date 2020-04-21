@@ -25,7 +25,8 @@
                    -open Tezos_protocol_updater
                    -open Tezos_requester
                    -open Tezos_workers
-                   -open Tezos_validation)))
+                   -open Tezos_validation
+		   -open Tezos_version)))
 
 (alias
  (name runtest_lint)

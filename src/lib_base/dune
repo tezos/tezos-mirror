@@ -9,6 +9,7 @@
                    -open Tezos_clic
                    -open Tezos_micheline
                    -open Tezos_event_logging
+		   -open Tezos_version
                    ))
  (libraries tezos-stdlib
             tezos-crypto
@@ -18,6 +19,7 @@
             tezos-rpc
             tezos-clic
             tezos-micheline
+	    tezos-version
             ptime
             ezjsonm
             lwt
