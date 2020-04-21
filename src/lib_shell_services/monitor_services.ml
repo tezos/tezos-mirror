@@ -144,9 +144,10 @@ module S = struct
       ~output:Protocol_hash.encoding
       RPC_path.(path / "protocols")
 
+  (* DEPRECATED: use [version] from "version_services" instead. *)
   let commit_hash =
     RPC_service.get_service
-      ~description:"Get information on the build of the node."
+      ~description:"DEPRECATED: use `version` instead."
       ~query:RPC_query.empty
       ~output:string
       RPC_path.(path / "commit_hash")
