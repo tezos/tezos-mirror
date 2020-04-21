@@ -17,5 +17,5 @@ depends: [
   "ezresto" {= version }
   "resto-directory" {= version }
   "resto" {= version }
-  "lwt" { >= "3.0.0" & < "5.0.0" }
+  "lwt" { >= "3.0.0" & < "6.0.0" }
 ]
