@@ -180,6 +180,12 @@ val unparse_data :
   'a ->
   (Script.node * context) tzresult Lwt.t
 
+val unparse_code :
+  context ->
+  unparsing_mode ->
+  Script.node ->
+  (Script.node * context) tzresult Lwt.t
+
 val parse_instr :
   ?type_logger:type_logger ->
   tc_context ->
