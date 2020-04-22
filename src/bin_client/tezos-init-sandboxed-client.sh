@@ -4,11 +4,10 @@ set -e
 
 client_dirs=()
 
-host=localhost
-
 init_sandboxed_client() {
 
     id="$1"
+    host="${2:-localhost}"
     shift 1
 
     rpc=$((18730 + id))
@@ -144,7 +143,7 @@ main () {
         exit 1
     fi
 
-    init_sandboxed_client "$1"
+    init_sandboxed_client "$1" "$2"
 
     add_sandboxed_bootstrap_identities | sed -e 's/^/## /' 1>&2
 
@@ -165,13 +164,13 @@ main () {
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
 
         if [ -n "$USE_TLS" ]; then
-            baker="$local_baker -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-            endorser="$local_endorser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-            accuser="$local_accuser -S -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            baker="$local_baker -S -base-dir $client_dir -addr $host -port $rpc"
+            endorser="$local_endorser -S -base-dir $client_dir -addr $host -port $rpc"
+            accuser="$local_accuser -S -base-dir $client_dir -addr $host -port $rpc"
         else
-            baker="$local_baker -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-            endorser="$local_endorser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-            accuser="$local_accuser -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+            baker="$local_baker -base-dir $client_dir -addr $host -port $rpc"
+            endorser="$local_endorser -base-dir $client_dir -addr $host -port $rpc"
+            accuser="$local_accuser -base-dir $client_dir -addr $host -port $rpc"
         fi
 
         echo '#!/bin/sh' > $client_dir/bin/tezos-baker-$protocol
