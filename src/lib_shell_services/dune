@@ -3,11 +3,13 @@
  (public_name tezos-shell-services)
  (libraries tezos-base
             tezos-workers
-	    tezos-p2p-services)
+	    tezos-p2p-services
+	    tezos-version)
  (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
                    -open Tezos_workers
-		   -open Tezos_p2p_services)))
+		   -open Tezos_p2p_services
+		   -open Tezos_version)))
 
 (alias
  (name runtest_lint)
