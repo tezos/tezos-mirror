@@ -1,12 +1,19 @@
 (**************************************************************************)
 (*  resto                                                                 *)
 (*  Copyright (C) 2016, OCamlPro.                                         *)
+(*  Copyright (C) 2020, Nomadic Labs.                                     *)
 (*                                                                        *)
 (*    All rights reserved.  This file is distributed under the terms      *)
 (*    of the GNU Lesser General Public License version 2.1, with the      *)
 (*    special exception on linking described in the file LICENSE.         *)
 (*                                                                        *)
 (**************************************************************************)
+
+let bool_of_string s =
+  match String.lowercase_ascii s with
+  | "false" | "f" | "no" | "n" -> Ok false
+  | "true" | "t" | "yes" | "y" -> Ok true
+  | _ -> Error (Printf.sprintf "Cannot parse boolean value: %S." s)
 
 type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
 
@@ -183,10 +190,6 @@ module Arg = struct
     let construct () = "" in
     make ~name:"unit" ~destruct ~construct ()
   let bool : bool arg =
-    let bool_of_string s =
-      match String.lowercase_ascii s with
-      | "false" | "no" -> Ok false
-      | _ -> Ok true in
     let string_of_bool = function
       | true -> "yes"
       | false -> "no" in
@@ -400,12 +403,11 @@ module Query = struct
                 | Ok v -> StringMap.add name (Parsed (Opt f, Some (Some v))) fields
               end
             | (Parsed (Flag f, None)) -> begin
-                let v =
-                  match String.lowercase_ascii value with
-                  | "no" | "false" -> false
-                  | _ -> true
-                in
-                StringMap.add name (Parsed (Flag f, Some v)) fields
+                match bool_of_string value with
+                | Ok v -> StringMap.add name (Parsed (Flag f, Some v)) fields
+                | Error error ->
+                    fail "Failed to parse argument '%s' (%S): %s"
+                      name value error
               end
             | (Parsed (Multi f, previous)) -> begin
                 match f.ty.destruct value with
