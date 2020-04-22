@@ -49,12 +49,9 @@ val del : t -> key -> t Lwt.t
 
 val remove_rec : t -> key -> t Lwt.t
 
-val fold :
-  t ->
-  key ->
-  init:'a ->
-  f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-  'a Lwt.t
+type key_or_dir = [`Key of key | `Dir of key]
+
+val fold : t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 val keys : t -> key -> key list Lwt.t
 

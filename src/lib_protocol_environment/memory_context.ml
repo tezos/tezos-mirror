@@ -133,6 +133,8 @@ module M = struct
               to_
               s )
 
+  type key_or_dir = [`Key of key | `Dir of key]
+
   let fold m k ~init ~f =
     match raw_get m k with
     | None ->

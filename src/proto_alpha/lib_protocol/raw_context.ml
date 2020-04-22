@@ -640,7 +640,7 @@ module type T = sig
     context ->
     key ->
     init:'a ->
-    f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
+    f:(Context.key_or_dir -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
   val keys : context -> key -> key list Lwt.t

@@ -80,14 +80,12 @@ val remove_rec : context -> key -> t Lwt.t
 (** [copy] returns None if the [from] key is not bound *)
 val copy : context -> from:key -> to_:key -> context option Lwt.t
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 (** [fold] iterates over elements under a path (not recursive). Iteration order
     is nondeterministic. *)
 val fold :
-  context ->
-  key ->
-  init:'a ->
-  f:([`Key of key | `Dir of key] -> 'a -> 'a Lwt.t) ->
-  'a Lwt.t
+  context -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Accessing and Updating Versions} *)
 

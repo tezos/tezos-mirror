@@ -359,6 +359,8 @@ let copy ctxt ~from ~to_ =
       Store.Tree.add_tree ctxt.tree (data_key to_) sub_tree
       >>= fun tree -> Lwt.return_some {ctxt with tree}
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 let fold ctxt key ~init ~f =
   Store.Tree.list ctxt.tree (data_key key)
   >>= fun keys ->

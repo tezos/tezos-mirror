@@ -281,6 +281,8 @@ let next_key_after_subdirs = function
       List.sub path (List.length path - 1)
       @ [List.last_exn path ^ zero_char_str]
 
+type key_or_dir = [`Key of key | `Dir of key]
+
 let fold t k ~init ~f =
   let base_len = List.length k in
   let rec inner ht cursor acc =
