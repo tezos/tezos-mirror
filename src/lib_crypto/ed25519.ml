@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -54,25 +55,25 @@ module Public_key = struct
 
   let title = "Ed25519 public key"
 
+  let size _ = Sign.pkbytes
+
   let to_bytes pk = Bytes.copy (Sign.unsafe_to_bytes pk)
+
+  let to_string s = Bytes.to_string (Sign.unsafe_to_bytes s)
 
   let of_bytes_opt buf =
     if Bytes.length buf = Sign.pkbytes then
       Some (Sign.unsafe_pk_of_bytes (Bytes.copy buf))
     else None
 
-  let to_string s = Bytes.to_string (Sign.unsafe_to_bytes s)
-
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
-
-  let size = Sign.pkbytes
 
   type Base58.data += Data of t
 
   let b58check_encoding =
     Base58.register_encoding
       ~prefix:Base58.Prefix.ed25519_public_key
-      ~length:size
+      ~length:(size ())
       ~to_raw:to_string
       ~of_raw:of_string_opt
       ~wrap:(fun x -> Data x)
@@ -117,7 +118,7 @@ module Public_key = struct
 
     let raw_encoding =
       let open Data_encoding in
-      conv to_bytes of_bytes_exn (Fixed.bytes size)
+      conv to_bytes of_bytes_exn (Fixed.bytes (size ()))
 
     let of_b58check = of_b58check
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -279,6 +280,18 @@ module Public_key = struct
   let name = "Signature.Public_key"
 
   let title = "A Ed25519, Secp256k1, or P256 public key"
+
+  let size pk =
+    let s =
+      match pk with
+      | Ed25519 pk ->
+          Ed25519.Public_key.size pk
+      | Secp256k1 pk ->
+          Secp256k1.Public_key.size pk
+      | P256 pk ->
+          P256.Public_key.size pk
+    in
+    s + 1
 
   let hash pk =
     match pk with
