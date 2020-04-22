@@ -135,7 +135,7 @@ Crowbar
 
 `Crowbar <https://github.com/stedolan/crowbar>`_ is a library for
 property-based testing in OCaml. It also interfaces with `afl
-<http://lcamtuf.coredump.cx/afl/>`_ to enable fuzzing.
+<https://lcamtuf.coredump.cx/afl/>`_ to enable fuzzing.
 
 Typical use cases:
  - Verifying input-output invariants for functions with

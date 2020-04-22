@@ -1,3 +1,5 @@
+.. _multinetwork:
+
 Multinetwork Node
 =================
 

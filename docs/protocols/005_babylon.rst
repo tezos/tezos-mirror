@@ -477,7 +477,7 @@ false     false       none
 
 For a complete Michelson pseudo-code showing these transformations, together
 with examples of these transformations applied to the `id.tz script <https://gitlab.com/tezos/tezos/blob/794bc16664cbed4057ffbc51631151023af835c0/src/bin_client/test/contracts/attic/id.tz>`_,
-please refer to this `Mi-cho-coq merge request <https://gitlab.com/nomadic-labs/mi-cho-coq/merge_requests/29>`_.
+please refer to this `Mi-cho-coq merge request <https://gitlab.com/nomadic-labs/mi-cho-coq/-/merge_requests/29>`_.
 
 For both ``add_do`` and ``add_set_delegate`` templates, the original script's
 storage gets wrapped in a ``pair``, with the manager of the contract being written

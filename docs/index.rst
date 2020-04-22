@@ -43,7 +43,7 @@ The Community
     - https://teztracker.everstake.one
     - https://tzkt.io (Baking focused Explorer)
     - https://arronax.io
-    - https://mininax.cryptonomic.tech/mainnet
+    - https://mininax.io
     - https://baking-bad.org (Reward Tracker)
     - https://better-call.dev (Smart-contract Explorer)
 
