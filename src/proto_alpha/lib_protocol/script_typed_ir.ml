@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,12 +48,15 @@ type _ comparable_ty =
   | Never_key : type_annot option -> never comparable_ty
   | Int_key : type_annot option -> z num comparable_ty
   | Nat_key : type_annot option -> n num comparable_ty
+  | Signature_key : type_annot option -> signature comparable_ty
   | String_key : type_annot option -> string comparable_ty
   | Bytes_key : type_annot option -> bytes comparable_ty
   | Mutez_key : type_annot option -> Tez.t comparable_ty
   | Bool_key : type_annot option -> bool comparable_ty
   | Key_hash_key : type_annot option -> public_key_hash comparable_ty
+  | Key_key : type_annot option -> public_key comparable_ty
   | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
+  | Chain_id_key : type_annot option -> Chain_id.t comparable_ty
   | Address_key : type_annot option -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)

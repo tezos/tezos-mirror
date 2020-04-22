@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,6 +56,8 @@ module Cost_of = struct
         int_bytes v
     | (Nat_key _, _) ->
         int_bytes v
+    | (Signature_key _, _) ->
+        Signature.size
     | (String_key _, _) ->
         String.length v
     | (Bytes_key _, _) ->
@@ -63,12 +66,16 @@ module Cost_of = struct
         1
     | (Key_hash_key _, _) ->
         Signature.Public_key_hash.size
+    | (Key_key _, k) ->
+        Signature.Public_key.size k
     | (Timestamp_key _, _) ->
         timestamp_bytes v
     | (Address_key _, _) ->
         Signature.Public_key_hash.size
     | (Mutez_key _, _) ->
         8
+    | (Chain_id_key _, _) ->
+        Chain_id.size
     | (Pair_key ((l, _), (r, _), _), (lval, rval)) ->
         size_of_comparable l lval + size_of_comparable r rval
     | (Union_key ((t, _), _, _), L x) ->
@@ -261,6 +268,8 @@ module Cost_of = struct
 
     let compare_union_tag = atomic_step_cost 40
 
+    let compare_signature _ _ = atomic_step_cost 92
+
     let compare_string s1 s2 =
       let bytes1 = String.length s1 in
       let bytes2 = String.length s2 in
@@ -279,12 +288,16 @@ module Cost_of = struct
 
     let compare_key_hash _ _ = atomic_step_cost 92
 
+    let compare_key _ _ = atomic_step_cost 92
+
     let compare_timestamp t1 t2 =
       let bytes1 = timestamp_bytes t1 in
       let bytes2 = timestamp_bytes t2 in
       atomic_step_cost (51 + (Compare.Int.min bytes1 bytes2 / 82))
 
     let compare_address _ _ = atomic_step_cost 92
+
+    let compare_chain_id _ _ = atomic_step_cost 30
 
     let compare_res = atomic_step_cost 30
 
@@ -330,6 +343,8 @@ module Cost_of = struct
 
     let hash_key = atomic_step_cost 30
 
+    let key = atomic_step_cost 30
+
     let hash_blake2b b = atomic_step_cost (102 + (Bytes.length b / 5))
 
     let hash_sha256 b = atomic_step_cost (409 + Bytes.length b)
@@ -367,6 +382,8 @@ module Cost_of = struct
           compare_bool
       | String_key _ ->
           compare_string x y
+      | Signature_key _ ->
+          compare_signature x y
       | Bytes_key _ ->
           compare_bytes x y
       | Mutez_key _ ->
@@ -377,10 +394,14 @@ module Cost_of = struct
           compare_zint x y
       | Key_hash_key _ ->
           compare_key_hash x y
+      | Key_key _ ->
+          compare_key x y
       | Timestamp_key _ ->
           compare_timestamp x y
       | Address_key _ ->
           compare_address x y
+      | Chain_id_key _ ->
+          compare_chain_id x y
       | Pair_key ((tl, _), (tr, _), _) ->
           (* Reasonable over-approximation of the cost of lexicographic comparison. *)
           let (xl, xr) = x and (yl, yr) = y in

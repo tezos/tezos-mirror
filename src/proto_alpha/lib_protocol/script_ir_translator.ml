@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -75,12 +76,15 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
   | Never_key _
   | Int_key _
   | Nat_key _
+  | Signature_key _
   | String_key _
   | Bytes_key _
   | Mutez_key _
   | Bool_key _
   | Key_hash_key _
+  | Key_key _
   | Timestamp_key _
+  | Chain_id_key _
   | Address_key _ ->
       1
   | Pair_key ((t1, _), (t2, _), _) ->
@@ -410,6 +414,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       fun () () -> 0
   | Never_key _ -> (
       function _ -> . )
+  | Signature_key _ ->
+      wrap_compare Signature.compare
   | String_key _ ->
       wrap_compare Compare.String.compare
   | Bool_key _ ->
@@ -418,6 +424,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       wrap_compare Tez.compare
   | Key_hash_key _ ->
       wrap_compare Signature.Public_key_hash.compare
+  | Key_key _ ->
+      wrap_compare Signature.Public_key.compare
   | Int_key _ ->
       wrap_compare Script_int.compare
   | Nat_key _ ->
@@ -431,6 +439,8 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
   | Bytes_key _ ->
       wrap_compare Compare.Bytes.compare
+  | Chain_id_key _ ->
+      wrap_compare Chain_id.compare
   | Pair_key ((tl, _), (tr, _), _) ->
       fun (lx, rx) (ly, ry) ->
         let lres = compare_comparable tl lx ly in
@@ -613,6 +623,8 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Int_t tname
   | Nat_key tname ->
       Nat_t tname
+  | Signature_key tname ->
+      Signature_t tname
   | String_key tname ->
       String_t tname
   | Bytes_key tname ->
@@ -623,10 +635,14 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Bool_t tname
   | Key_hash_key tname ->
       Key_hash_t tname
+  | Key_key tname ->
+      Key_t tname
   | Timestamp_key tname ->
       Timestamp_t tname
   | Address_key tname ->
       Address_t tname
+  | Chain_id_key tname ->
+      Chain_id_t tname
   | Pair_key ((l, al), (r, ar), tname) ->
       Pair_t
         ( (ty_of_comparable_ty l, al, None),
@@ -647,6 +663,8 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       Some (Int_key tname)
   | Nat_t tname ->
       Some (Nat_key tname)
+  | Signature_t tname ->
+      Some (Signature_key tname)
   | String_t tname ->
       Some (String_key tname)
   | Bytes_t tname ->
@@ -657,10 +675,14 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
       Some (Bool_key tname)
   | Key_hash_t tname ->
       Some (Key_hash_key tname)
+  | Key_t tname ->
+      Some (Key_key tname)
   | Timestamp_t tname ->
       Some (Timestamp_key tname)
   | Address_t tname ->
       Some (Address_key tname)
+  | Chain_id_t tname ->
+      Some (Chain_id_key tname)
   | Pair_t ((l, al, _), (r, ar, _), pname) -> (
     match comparable_ty_of_ty_no_gas l with
     | None ->
@@ -687,16 +709,13 @@ let rec comparable_ty_of_ty_no_gas : type a. a ty -> a comparable_ty option =
         None
     | Some ty ->
         Some (Option_key (ty, tname)) )
-  | Signature_t _
-  | Key_t _
   | Lambda_t _
   | List_t _
   | Set_t _
   | Map_t _
   | Big_map_t _
   | Contract_t _
-  | Operation_t _
-  | Chain_id_t _ ->
+  | Operation_t _ ->
       None
 
 let add_field_annot a var = function
@@ -719,6 +738,8 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_int, [], unparse_type_annot tname)
   | Nat_key tname ->
       Prim (-1, T_nat, [], unparse_type_annot tname)
+  | Signature_key tname ->
+      Prim (-1, T_signature, [], unparse_type_annot tname)
   | String_key tname ->
       Prim (-1, T_string, [], unparse_type_annot tname)
   | Bytes_key tname ->
@@ -729,10 +750,14 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_bool, [], unparse_type_annot tname)
   | Key_hash_key tname ->
       Prim (-1, T_key_hash, [], unparse_type_annot tname)
+  | Key_key tname ->
+      Prim (-1, T_key, [], unparse_type_annot tname)
   | Timestamp_key tname ->
       Prim (-1, T_timestamp, [], unparse_type_annot tname)
   | Address_key tname ->
       Prim (-1, T_address, [], unparse_type_annot tname)
+  | Chain_id_key tname ->
+      Prim (-1, T_chain_id, [], unparse_type_annot tname)
   | Pair_key ((l, al), (r, ar), pname) ->
       let tl = add_field_annot al None (unparse_comparable_ty l) in
       let tr = add_field_annot ar None (unparse_comparable_ty r) in
@@ -761,6 +786,8 @@ let rec unparse_ty_no_lwt :
       return ctxt (T_int, [], unparse_type_annot tname)
   | Nat_t tname ->
       return ctxt (T_nat, [], unparse_type_annot tname)
+  | Signature_t tname ->
+      return ctxt (T_signature, [], unparse_type_annot tname)
   | String_t tname ->
       return ctxt (T_string, [], unparse_type_annot tname)
   | Bytes_t tname ->
@@ -777,8 +804,6 @@ let rec unparse_ty_no_lwt :
       return ctxt (T_timestamp, [], unparse_type_annot tname)
   | Address_t tname ->
       return ctxt (T_address, [], unparse_type_annot tname)
-  | Signature_t tname ->
-      return ctxt (T_signature, [], unparse_type_annot tname)
   | Operation_t tname ->
       return ctxt (T_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
@@ -941,6 +966,9 @@ let rec merge_comparable_types :
   | (Nat_key annot_a, Nat_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Nat_key annot, ctxt)
+  | (Signature_key annot_a, Signature_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Signature_key annot, ctxt)
   | (String_key annot_a, String_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, String_key annot, ctxt)
@@ -956,9 +984,15 @@ let rec merge_comparable_types :
   | (Key_hash_key annot_a, Key_hash_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Key_hash_key annot, ctxt)
+  | (Key_key annot_a, Key_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Key_key annot, ctxt)
   | (Timestamp_key annot_a, Timestamp_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Timestamp_key annot, ctxt)
+  | (Chain_id_key annot_a, Chain_id_key annot_b) ->
+      merge_type_annot ~legacy annot_a annot_b
+      >|? fun annot -> (Eq, Chain_id_key annot, ctxt)
   | (Address_key annot_a, Address_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Address_key annot, ctxt)
@@ -1334,6 +1368,9 @@ let rec parse_comparable_ty :
   | Prim (loc, T_nat, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Nat_key tname), ctxt)
+  | Prim (loc, T_signature, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Signature_key tname), ctxt)
   | Prim (loc, T_string, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (String_key tname), ctxt)
@@ -1349,9 +1386,15 @@ let rec parse_comparable_ty :
   | Prim (loc, T_key_hash, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Key_hash_key tname), ctxt)
+  | Prim (loc, T_key, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Key_key tname), ctxt)
   | Prim (loc, T_timestamp, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Timestamp_key tname), ctxt)
+  | Prim (loc, T_chain_id, [], annot) ->
+      parse_type_annot loc annot
+      >|? fun tname -> (Ex_comparable_ty (Chain_id_key tname), ctxt)
   | Prim (loc, T_address, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
@@ -1367,7 +1410,10 @@ let rec parse_comparable_ty :
           | T_bool
           | T_key_hash
           | T_timestamp
-          | T_address ) as prim ),
+          | T_address
+          | T_chain_id
+          | T_signature
+          | T_key ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1409,11 +1455,7 @@ let rec parse_comparable_ty :
       (Ex_comparable_ty (Option_key (t, tname)), ctxt)
   | Prim (loc, T_option, l, _) ->
       error (Invalid_arity (loc, T_option, 1, List.length l))
-  | Prim
-      ( loc,
-        (T_set | T_map | T_list | T_lambda | T_signature | T_contract | T_key),
-        _,
-        _ ) ->
+  | Prim (loc, (T_set | T_map | T_list | T_lambda | T_contract), _, _) ->
       error (Comparable_type_expected (loc, Micheline.strip_locations ty))
   | expr ->
       error
@@ -1431,7 +1473,13 @@ let rec parse_comparable_ty :
              T_bool;
              T_key_hash;
              T_timestamp;
-             T_address ]
+             T_address;
+             T_pair;
+             T_or;
+             T_option;
+             T_chain_id;
+             T_signature;
+             T_key ]
 
 and parse_packable_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =

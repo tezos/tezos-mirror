@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -165,6 +166,8 @@ module Cost_of : sig
     val check_signature : public_key -> bytes -> Gas.cost
 
     val hash_key : Gas.cost
+
+    val key : Gas.cost
 
     val hash_blake2b : bytes -> Gas.cost
 
