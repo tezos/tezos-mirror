@@ -1,7 +1,7 @@
 TYPECHECK=mypy
 LINT=pylint
 LINT2=pycodestyle
-PACKAGES=daemons launchers client tools scripts tests examples tests/multibranch
+PACKAGES=daemons launchers client tools scripts tests examples tests/multibranch codec
 LOG_DIR=tmp
 
 fast:
