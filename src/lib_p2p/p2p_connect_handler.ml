@@ -23,9 +23,112 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.connect_handler"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "connect_handler"]
+
+  let disconnected =
+    declare_2
+      ~section
+      ~name:"disconnected"
+      ~msg:"Disconnected: {peer} ({point})"
+      ~level:Debug
+      ("peer", P2p_peer.Id.encoding)
+      ("point", P2p_connection.Id.encoding)
+
+  let peer_rejected =
+    declare_0
+      ~section
+      ~name:"peer_rejected"
+      ~msg:"[private node] incoming connection from untrusted peer rejected!"
+      ~level:Notice
+      ()
+
+  let authenticate =
+    declare_3
+      ~section
+      ~name:"authenticate"
+      ~msg:"authenticate: {point} {type} -> {state}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("type", Data_encoding.(option string))
+      ("state", Data_encoding.(option string))
+
+  let authenticate_status =
+    declare_3
+      ~section
+      ~name:"authenticate_status"
+      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~level:Debug
+      ("type", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+
+  let authenticate_error =
+    declare_2
+      ~section
+      ~name:"authentication_error"
+      ~msg:"authenticate: {point} {errors}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let connection_rejected_by_peers =
+    declare_3
+      ~section
+      ~name:"connection_rejected_by_peers"
+      ~msg:
+        "Connection to {point} rejected by peer. Reason {reason}. Peer list \
+         received: {points}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("reason", P2p_rejection.encoding)
+      ("points", Data_encoding.list P2p_point.Id.encoding)
+
+  let connection_error =
+    declare_2
+      ~section
+      ~name:"connection_error"
+      ~msg:"Connection to {point} rejected by peer : {errors}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let connect_status =
+    declare_2
+      ~section
+      ~name:"connect_status"
+      ~msg:"connect: {point} {state}"
+      ~level:Debug
+      ("state", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+
+  let connect_error =
+    declare_3
+      ~section
+      ~name:"connect_error"
+      ~msg:"connect: {point} {state} : {errors}"
+      ~level:Debug
+      ("state", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("errors", Error_monad.trace_encoding)
+
+  let authenticate_reject_protocol_mismatch =
+    declare_8
+      ~section
+      ~name:"authenticate_reject_protocol_mismatch"
+      ~msg:"No common protocol with {peer}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+      ("local_chain", Distributed_db_version.Name.encoding)
+      ("remote_chain", Distributed_db_version.Name.encoding)
+      ("local_db_versions", Data_encoding.list Distributed_db_version.encoding)
+      ("remote_db_version", Distributed_db_version.encoding)
+      ("local_p2p_version", Data_encoding.list P2p_version.encoding)
+      ("remote_p2p_version", P2p_version.encoding)
+end
 
 type config = {
   incoming_app_message_queue_size : int option;
@@ -117,12 +220,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
   P2p_trigger.broadcast_new_connection t.triggers ;
   Lwt_canceler.on_cancel canceler (fun () ->
-      lwt_debug
-        "Disconnect: %a (%a)"
-        P2p_peer.Id.pp
-        peer_id
-        P2p_connection.Id.pp
-        id_point
+      Events.(emit disconnected) (peer_id, id_point)
       >>= fun () ->
       Option.iter
         ~f:(P2p_point_state.set_disconnected t.config.greylisting_config)
@@ -155,7 +253,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
     && not (P2p_peer_state.Info.trusted peer_info)
   in
   if unexpected then (
-    warn "[private node] incoming connection from untrusted peer rejected!" ;
+    Lwt.async (fun () -> Events.(emit peer_rejected) ()) ;
     error P2p_errors.Private_mode )
   else
     (* checking if point is acceptable *)
@@ -189,11 +287,8 @@ let may_register_my_id_point pool = function
 
 let raw_authenticate t ?point_info canceler fd point =
   let incoming = point_info = None in
-  lwt_debug
-    "authenticate: %a%s"
-    P2p_point.Id.pp
-    point
-    (if incoming then " incoming" else "")
+  let incoming_opt = if incoming then Some "incoming" else None in
+  Events.(emit authenticate) (point, incoming_opt, None)
   >>= fun () ->
   protect
     ~canceler
@@ -212,11 +307,7 @@ let raw_authenticate t ?point_info canceler fd point =
       ( match err with
       | [Canceled] ->
           (* Currently only on time out *)
-          lwt_debug
-            "authenticate: %a%s -> canceled"
-            P2p_point.Id.pp
-            point
-            (if incoming then " incoming" else "")
+          Events.(emit authenticate) (point, incoming_opt, Some "canceled")
       | err ->
           (* Authentication incorrect! Temp ban the offending points/peers *)
           List.iter
@@ -232,13 +323,9 @@ let raw_authenticate t ?point_info canceler fd point =
               | _ ->
                   ())
             err ;
-          lwt_debug
-            "@[authenticate: %a%s -> failed@ %a@]"
-            P2p_point.Id.pp
-            point
-            (if incoming then " incoming" else "")
-            pp_print_error
-            err )
+          Events.(emit authenticate) (point, incoming_opt, Some "failed") )
+      >>= fun () ->
+      Events.(emit authenticate_error) (point, err)
       >>= fun () ->
       may_register_my_id_point t.pool err ;
       t.log (Authentication_failed point) ;
@@ -250,12 +337,7 @@ let raw_authenticate t ?point_info canceler fd point =
       Lwt.return_error err)
   >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
-  lwt_debug
-    "authenticate: %a -> auth %a"
-    P2p_point.Id.pp
-    point
-    P2p_peer.Id.pp
-    info.peer_id
+  Events.(emit authenticate_status) ("auth", point, info.peer_id)
   >>= fun () ->
   fail_when
     (P2p_pool.Peers.banned t.pool info.peer_id)
@@ -322,14 +404,7 @@ let raw_authenticate t ?point_info canceler fd point =
       :: _) -> (
       (* non-acceptable point, kicking it. *)
       t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
-      lwt_debug
-        "@[<v 2>authenticate: %a -> kick %a motive: %a@]"
-        P2p_point.Id.pp
-        point
-        P2p_peer.Id.pp
-        info.peer_id
-        P2p_rejection.pp
-        motive
+      Events.(emit authenticate_status ("kick", point, info.peer_id))
       >>= fun () ->
       P2p_pool.list_known_points ~ignore_private:true t.pool
       >>= fun point_list ->
@@ -346,27 +421,15 @@ let raw_authenticate t ?point_info canceler fd point =
       | Unknown_chain_name
       | Deprecated_distributed_db_version
       | Deprecated_p2p_version ->
-          lwt_debug
-            "@[<v 2>No common protocol with %a@,\
-             (chains: local %a - remote %a)@,\
-             @[<h>(db_versions: local [%a] - remote %a)@]@,\
-             @[<h>(p2p_versions: local [%a] - remote %a)@]@]@."
-            P2p_peer.Id.pp
-            info.peer_id
-            Distributed_db_version.Name.pp
-            t.message_config.chain_name
-            Distributed_db_version.Name.pp
-            info.announced_version.chain_name
-            (Format.pp_print_list
-               ~pp_sep:Format.pp_print_space
-               Distributed_db_version.pp)
-            t.message_config.distributed_db_versions
-            Distributed_db_version.pp
-            info.announced_version.distributed_db_version
-            (Format.pp_print_list ~pp_sep:Format.pp_print_space P2p_version.pp)
-            t.custom_p2p_versions
-            P2p_version.pp
-            info.announced_version.p2p_version
+          Events.(emit authenticate_reject_protocol_mismatch)
+            ( point,
+              info.peer_id,
+              t.message_config.chain_name,
+              info.announced_version.chain_name,
+              t.message_config.distributed_db_versions,
+              info.announced_version.distributed_db_version,
+              t.custom_p2p_versions,
+              info.announced_version.p2p_version )
           >>= fun () ->
           fail
             (P2p_errors.Rejected_no_common_protocol
@@ -374,26 +437,16 @@ let raw_authenticate t ?point_info canceler fd point =
       | _ ->
           fail (P2p_errors.Rejected {peer = info.peer_id; motive}) )
   | Error errs as err ->
-      lwt_debug
-        "@[<v 2>authenticate: %a -> reject %a: %a@]"
-        P2p_point.Id.pp
-        point
-        P2p_peer.Id.pp
-        info.peer_id
-        Error_monad.pp_print_error
-        errs
+      Events.(emit authenticate_status) ("reject", point, info.peer_id)
+      >>= fun () ->
+      Events.(emit authenticate_error) (point, errs)
       >>= fun () -> Lwt.return err
   | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
       Option.iter connection_point_info ~f:(fun point_info ->
           P2p_point_state.set_accepted point_info info.peer_id canceler) ;
       P2p_peer_state.set_accepted peer_info info.id_point canceler ;
-      lwt_debug
-        "authenticate: %a -> accept %a"
-        P2p_point.Id.pp
-        point
-        P2p_peer.Id.pp
-        info.peer_id
+      Events.(emit authenticate_status) ("accept", point, info.peer_id)
       >>= fun () ->
       protect
         ~canceler
@@ -406,12 +459,7 @@ let raw_authenticate t ?point_info canceler fd point =
             auth_fd
             t.encoding
           >>=? fun conn ->
-          lwt_debug
-            "authenticate: %a -> Connected %a"
-            P2p_point.Id.pp
-            point
-            P2p_peer.Id.pp
-            info.peer_id
+          Events.(emit authenticate_status) ("connected", point, info.peer_id)
           >>= fun () -> return conn)
         ~on_error:(fun err ->
           if incoming then
@@ -421,15 +469,7 @@ let raw_authenticate t ?point_info canceler fd point =
           | P2p_errors.Rejected_by_nack
               {alternative_points = Some points; motive}
             :: _ ->
-              lwt_debug
-                "@[<v 2> Connection to %a rejected by peer. @[Motive : %a@]. \
-                 @[Peer list received :%a@]@]"
-                P2p_point.Id.pp
-                point
-                P2p_rejection.pp
-                motive
-                P2p_point.Id.pp_list
-                points
+              Events.(emit connection_rejected_by_peers) (point, motive, points)
               >>= fun () ->
               P2p_pool.register_list_of_new_points
                 ~medium:"Nack"
@@ -438,21 +478,10 @@ let raw_authenticate t ?point_info canceler fd point =
                 points ;
               Lwt.return_unit
           | _ ->
-              lwt_debug
-                "@[<v 2> Connection to %a rejected by peer. Stack trace: \
-                 @[%a@]@]"
-                P2p_point.Id.pp
-                point
-                Error_monad.pp_print_error
-                err
+              Events.(emit connection_error) (point, err)
               >>= fun () -> Lwt.return_unit )
           >>= fun () ->
-          lwt_debug
-            "authenticate: %a -> rejected %a"
-            P2p_point.Id.pp
-            point
-            P2p_peer.Id.pp
-            info.peer_id
+          Events.(emit authenticate_status) ("rejected", point, info.peer_id)
           >>= fun () ->
           Option.iter
             connection_point_info
@@ -547,7 +576,7 @@ let connect ?timeout t point =
       let uaddr =
         Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port)
       in
-      lwt_debug "connect: %a" P2p_point.Id.pp point
+      Events.(emit connect_status) ("start", point)
       >>= fun () ->
       protect
         ~canceler
@@ -555,12 +584,7 @@ let connect ?timeout t point =
           t.log (Outgoing_connection point) ;
           P2p_fd.connect fd uaddr >>= fun () -> return_unit)
         ~on_error:(fun err ->
-          lwt_debug
-            "@[<v 2>connect: %a -> disconnect@[(%a)@]@]"
-            P2p_point.Id.pp
-            point
-            (Format.pp_print_list Error_monad.pp)
-            err
+          Events.(emit connect_error) ("disconnect", point, err)
           >>= fun () ->
           P2p_point_state.set_disconnected
             t.config.greylisting_config
@@ -573,7 +597,7 @@ let connect ?timeout t point =
           | err ->
               Lwt.return_error err)
       >>=? fun () ->
-      lwt_debug "connect: %a -> authenticate" P2p_point.Id.pp point
+      Events.(emit connect_status) ("authenticate", point)
       >>= fun () -> authenticate t ~point_info canceler fd point)
 
 let stat t = P2p_io_scheduler.global_stat t.io_sched
