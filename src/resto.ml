@@ -13,7 +13,7 @@ let bool_of_string s =
   match String.lowercase_ascii s with
   | "false" | "f" | "no" | "n" -> Ok false
   | "true" | "t" | "yes" | "y" -> Ok true
-  | _ -> Error (Printf.sprintf "Cannot parse boolean value: %S." s)
+  | _ -> Error "Cannot parse boolean value"
 
 type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
 
@@ -197,26 +197,22 @@ module Arg = struct
   let int =
     let int_of_string s =
       try Ok (int_of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse integer value: %S." s) in
+      with Failure _ -> Error "Cannot parse integer value" in
     make ~name:"int" ~destruct:int_of_string ~construct:string_of_int ()
   let float =
     let float_of_string s =
       try Ok (float_of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse float value: %S." s) in
+      with Failure _ -> Error "Cannot parse float value" in
     make ~name:"float" ~destruct:float_of_string ~construct:string_of_float ()
   let int32 =
     let int32_of_string s =
       try Ok (Int32.of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse int32 value: %S." s) in
+      with Failure _ -> Error "Cannot parse int32 value" in
     make ~name:"int32" ~destruct:int32_of_string ~construct:Int32.to_string ()
   let int64 =
     let int64_of_string s =
       try Ok (Int64.of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
+      with Failure _ -> Error "Cannot parse int64 value" in
     make ~name:"int64" ~destruct:int64_of_string ~construct:Int64.to_string ()
   let string =
     make ~name:"string" ~destruct:(fun x -> Ok x) ~construct:(fun x -> x) ()
