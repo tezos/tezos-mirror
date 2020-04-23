@@ -14,6 +14,7 @@
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_alpha_parameters
                    -open Tezos_rpc)))
 
 (alias
