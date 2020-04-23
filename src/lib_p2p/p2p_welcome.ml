@@ -23,9 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.welcome"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "welcome"]
+
+  let incoming_error =
+    declare_2
+      ~section
+      ~name:"incoming_error"
+      ~msg:"Incoming connection failed with {error}. Ignoring"
+      ~level:Debug
+      ("error", Error_monad.trace_encoding)
+      ("type", Data_encoding.string)
+
+  let unexpected_error =
+    declare_1
+      ~section
+      ~name:"unexpected_error_welcome"
+      ~msg:"Unexpected error."
+      ~level:Error
+      ("error", Error_monad.trace_encoding)
+
+  let incoming_connection_error =
+    declare_1
+      ~section
+      ~name:"incoming_connection_error"
+      ~msg:"Cannot accept incoming connections."
+      ~level:Error
+      ("exception", Error_monad.error_encoding)
+end
 
 type connect_handler =
   | Connect_handler :
@@ -67,11 +94,7 @@ let rec worker_loop st =
               _,
               _ ))
         :: _ as err ) ->
-      lwt_log_error
-        "@[<v 2>Incoming connection failed with %a in the\n\
-        \      Welcome worker. Resuming in 5s.@]"
-        pp_print_error
-        err
+      Events.(emit incoming_error) (err, "system")
       >>= fun () ->
       (* These are temporary system errors, giving some time for the system to
          recover *)
@@ -104,18 +127,11 @@ let rec worker_loop st =
               _ ))
         :: _ as err ) ->
       (* These are socket-specific errors, ignoring. *)
-      lwt_log_error
-        "@[<v 2>Incoming connection failed with %a in the Welcome worker@]"
-        pp_print_error
-        err
-      >>= fun () -> worker_loop st
+      Events.(emit incoming_error) (err, "socket") >>= fun () -> worker_loop st
   | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error
-        "@[<v 2>Unexpected error in the Welcome worker@ %a@]"
-        pp_print_error
-        err
+      Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -145,10 +161,7 @@ let create ?addr ~backlog connect_handler port =
       in
       Lwt.return st)
     (fun exn ->
-      lwt_log_error
-        "@[<v 2>Cannot accept incoming connections@ %a@]"
-        pp_exn
-        exn
+      Events.(emit incoming_connection_error) (Error_monad.Exn exn)
       >>= fun () -> Lwt.fail exn)
 
 let activate st =
