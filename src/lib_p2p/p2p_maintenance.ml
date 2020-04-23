@@ -24,9 +24,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.maintenance"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "maintenance"]
+
+  let maintenance_ended =
+    declare_0
+      ~section
+      ~name:"maintenance_ended"
+      ~msg:"Maintenance step ended"
+      ~level:Debug
+      ()
+
+  let too_few_connections =
+    declare_1
+      ~section
+      ~name:"too_few_connections_maintenance"
+      ~msg:"Too few connections ({connections})"
+      ~level:Notice
+      ("connections", Data_encoding.int16)
+
+  let too_many_connections =
+    declare_1
+      ~section
+      ~name:"too_many_connections_maintenance"
+      ~msg:"Too many connections (will kill {connections})"
+      ~level:Notice
+      ("connections", Data_encoding.int16)
+end
 
 let time_between_looking_for_peers = 5.0 (* TODO put this in config *)
 
@@ -250,11 +276,11 @@ let rec do_maintain t =
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
-    lwt_debug "Maintenance step ended" >>= fun () -> return_unit )
+    Events.(emit maintenance_ended) () >>= fun () -> return_unit )
 
 and too_few_connections t n_connected =
   (* try and contact new peers *)
-  lwt_log_notice "Too few connections (%d)" n_connected
+  Events.(emit too_few_connections) n_connected
   >>= fun () ->
   let min_to_contact = t.bounds.min_target - n_connected in
   let max_to_contact = t.bounds.max_target - n_connected in
@@ -266,7 +292,7 @@ and too_few_connections t n_connected =
 and too_many_connections t n_connected =
   (* kill random connections *)
   let n = n_connected - t.bounds.max_target in
-  lwt_log_notice "Too many connections, will kill %d" n
+  Events.(emit too_many_connections) n
   >>= fun () ->
   let connections = random_connections t.pool n in
   Lwt_list.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
