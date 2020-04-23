@@ -23,26 +23,118 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** {1} Function evaluation in a detached process
+
+    This library uses a process detached in a separated unix thread to
+   execute a given function, with bidirectional communication channels
+   and transmission of the function result at the end of the
+   execution.
+
+    The communication channels does not require a data encoding, but
+   the data encoding can be given. In absence of data encoding the
+   Marshal mecanism will be used. Be aware that extensible types, like
+   error or exception cannot be safely exchanged between processes.
+
+    Flags for Marshal serialisation can be passed at the creation of
+   the detached process.
+
+  *)
 open Error_monad
 
 exception Exited of int
 
+(** Endpoint of a bidirectionnal channel.  *)
 module Channel : sig
-  type ('a, 'b) t
+  (** A bidirectionnal channel endpoint.   *)
+  type ('sent, 'received) t
 
-  val push : ('a, 'b) t -> 'a -> unit tzresult Lwt.t
+  (** Asynchronously sending a value *)
+  val push : ('sent, 'received) t -> 'sent -> unit tzresult Lwt.t
 
-  val pop : ('a, 'b) t -> 'b tzresult Lwt.t
+  (** Waiting for a value. *)
+  val pop : ('sent, 'received) t -> 'received tzresult Lwt.t
 end
 
-type ('a, 'b) t = {
-  termination : unit tzresult Lwt.t;
-  channel : ('b, 'a) Channel.t;
-}
+(** Detached process. *)
+type ('sent, 'received, 'result) t
 
+(** Executing a function in a detached process.
+    [prefix] will be used in detached process logs.
+    On canceling of [canceler], the detached process will be killed by
+    SIGKILL.
+
+    [input_encoding] and [output_encoding], if provided,  will be used
+    to exchange values between the main thread and the detached thread
+    [input_encoding] is for values received by the detached thread.
+    [output_encoding] is for values sent by the detached thread.
+
+    In absence of data encoding the Marshal mecanism will be  used.
+    Be aware that extensible types, like error or exception cannot be
+    safely exchanged between processes.
+
+    [value_encoding] is for the encoding of the result of the detached
+    function.
+    The Error_monad encapsulation part of the value computed by the
+    detached function will be safely encoded, even without encoding
+    for the ['result] type. Ie if the detached function end with an
+    error, the error will safely be serialized-deserialised.
+
+   If no encoding is given, the values will be serialized using hte
+     Marshal module, with the given [flags] (if any is provided).
+
+  *)
 val detach :
   ?prefix:string ->
-  (('a, 'b) Channel.t -> unit tzresult Lwt.t) ->
-  ('a, 'b) t Lwt.t
+  ?canceler:Lwt_canceler.t ->
+  ?input_encoding:'received Data_encoding.encoding ->
+  ?output_encoding:'sent Data_encoding.encoding ->
+  ?value_encoding:'result Data_encoding.encoding ->
+  ?flags:Marshal.extern_flags list ->
+  (('sent, 'received) Channel.t -> 'result tzresult Lwt.t) ->
+  ('sent, 'received, 'result) t tzresult Lwt.t
 
-val wait_all : ('a, 'b) t list -> unit tzresult Lwt.t
+(** Sending a data to the detached process   *)
+val send : ('a, 'received, 'c) t -> 'received -> unit tzresult Lwt.t
+
+(** Receiving a data from the detached process.
+    This call is blocking.
+   *)
+val receive : ('sent, 'b, 'c) t -> 'sent tzresult Lwt.t
+
+(** Receiving the result of the detached function.
+    This call is blocking.
+   *)
+val wait_result : ('a, 'b, 'result) t -> 'result tzresult Lwt.t
+
+(** {2} Working with list of detached process  *)
+
+(** Gathering a list of error happening in parallel.
+    First value is the number of the detached process,
+    Second value is its prefix,
+    Third value is the error returned by the process.
+ *)
+type error += Par of (int * string * error) list
+
+(** Waiting for all the detached function to finish, unless one
+    of the function return an error.
+
+    If all detached functions succesfully compute a value, return the list of
+    values.
+
+    If at least one function end with en error, cancel all the
+    unfinished process, and return a [Par] error gathering the list of
+    errors for unsuccesful process.
+
+  *)
+val wait_all_results : ('a, 'b, 'c) t list -> 'c list tzresult Lwt.t
+
+(** Waiting for all the detached function to finish, unless one
+    of the function return an error.
+
+    If all detached functions succesfully compute a value, return unit.
+
+    If at least one function end with en error, cancel all the
+    unfinished process, and fail with a message containing all the errors.
+
+  *)
+val wait_all : ('a, 'b, 'c) t list -> unit tzresult Lwt.t

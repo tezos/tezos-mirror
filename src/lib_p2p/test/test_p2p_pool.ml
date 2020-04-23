@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -87,6 +87,7 @@ let conn_meta_config : metadata P2p_params.conn_meta_config =
     private_node = (fun _ -> false);
   }
 
+(** Syncing inside the detached process *)
 let sync iteration ch =
   incr iteration ;
   lwt_debug "Sync iteration %i" !iteration
@@ -94,12 +95,11 @@ let sync iteration ch =
   Process.Channel.push ch ()
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
-(** Syncing everyone until one node fails to sync  *)
+(** Syncing from the main process everyone until one node fails to sync  *)
 let rec sync_nodes nodes =
-  iter_p (fun {Process.channel; _} -> Process.Channel.pop channel) nodes
+  Error_monad.iter_p (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun {Process.channel; _} -> Process.Channel.push channel ()) nodes
-  >>=? fun () -> sync_nodes nodes
+  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes
@@ -109,9 +109,10 @@ let sync_nodes nodes =
   | Error _ as err ->
       Lwt.return err
 
+(**Detach a process with a p2p_pool and a welcome worker.  *)
 let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
     ?max_connections ?max_incoming_connections ?p2p_versions
-    ?(msg_config = msg_config) f trusted_points all_points addr port =
+    ?(msg_config = msg_config) canceler f trusted_points all_points addr port =
   let trusted_points =
     List.filter
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
@@ -152,12 +153,11 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         max_known_peer_ids = None;
       }
   in
-  (* swap_linger = Time.System.Span.of_seconds_exn 0. ; *)
   Process.detach
     ~prefix:
       (Format.asprintf "%s%a: " prefix P2p_peer.Id.pp_short identity.peer_id)
+    ~canceler
     (fun channel ->
-      let canceler = Lwt_canceler.create () in
       let timer ti =
         Lwt_unix.sleep ti >>= fun () -> lwt_debug "Process timeout"
       in
@@ -222,9 +222,19 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           P2p_io_scheduler.shutdown sched
           >>= fun () -> lwt_log_info "Bye.@." >>= fun () -> return_unit))
 
+(**Detach one process per id in [points], each with a p2p_pool and a
+   welcome worker.
+
+   Most arguments are the same as for [detach_node] but they are
+  function that specify the value of the argument for a given position
+  in the list of points, allowing to specify the characteristics of
+  each detached node.
+
+  *)
 let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
     ?max_incoming_connections ?p2p_versions ?msg_config run_node
     ?(trusted = fun _ points -> points) points =
+  let canceler = Lwt_canceler.create () in
   Lwt_list.mapi_p
     (fun n _ ->
       let prefix = Option.map (fun f -> f n) prefix in
@@ -244,6 +254,7 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
         ?max_connections
         ?max_incoming_connections
         ?msg_config
+        canceler
         (run_node n)
         (trusted n points)
         other_points
@@ -251,6 +262,8 @@ let detach_nodes ?prefix ?timeout ?min_connections ?max_connections
         port)
     points
   >>= fun nodes ->
+  Lwt.return @@ Error_monad.map2 (fun p _p -> p) nodes nodes
+  >>=? fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
 

@@ -165,7 +165,9 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
   >>= fun () ->
   listen ?port addr
   >>= fun (main_socket, port) ->
-  Process.detach ~prefix:"server: " (fun _ ->
+  Process.detach
+    ~prefix:"server: "
+    (fun (_ : (unit, unit) Process.Channel.t) ->
       server
         ?display_client_stat
         ?max_download_speed
@@ -173,7 +175,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         ?read_queue_size
         main_socket
         n)
-  >>= fun server_node ->
+  >>=? fun server_node ->
   let client n =
     let prefix = Printf.sprintf "client(%d): " n in
     Process.detach ~prefix (fun _ ->
@@ -187,8 +189,8 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  Lwt_list.map_p client (1 -- n)
-  >>= fun client_nodes -> Process.wait_all (server_node :: client_nodes)
+  Error_monad.map_p client (1 -- n)
+  >>=? fun client_nodes -> Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 

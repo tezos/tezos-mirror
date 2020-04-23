@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -84,10 +84,9 @@ let sync ch =
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
 let rec sync_nodes nodes =
-  iter_p (fun {Process.channel; _} -> Process.Channel.pop channel) nodes
+  iter_p (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun {Process.channel; _} -> Process.Channel.push channel ()) nodes
-  >>=? fun () -> sync_nodes nodes
+  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes
@@ -104,7 +103,7 @@ let run_nodes client server =
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       server channel sched main_socket
       >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>= fun server_node ->
+  >>=? fun server_node ->
   Process.detach ~prefix:"client: " (fun channel ->
       Lwt_utils_unix.safe_close main_socket
       >>= (function
@@ -117,7 +116,7 @@ let run_nodes client server =
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
       client channel sched !addr port
       >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>= fun client_node ->
+  >>=? fun client_node ->
   let nodes = [server_node; client_node] in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
