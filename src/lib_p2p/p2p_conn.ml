@@ -24,9 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.conn"
-end)
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "conn"]
+
+  let unexpected_error =
+    declare_1
+      ~section
+      ~name:"unexpected_error_answerer"
+      ~msg:"Answerer unexpected error: {errors}"
+      ~level:Error
+      ("errors", Error_monad.trace_encoding)
+
+  let bytes_popped_from_queue =
+    declare_2
+      ~section
+      ~name:"bytes_popped_from_queue"
+      ~msg:"{bytes} bytes message popped from queue {peer}\027[0m"
+      ~level:Debug
+      ("bytes", Data_encoding.int8)
+      ("peer", P2p_peer.Id.encoding)
+end
 
 type ('msg, 'peer, 'conn) t = {
   canceler : Lwt_canceler.t;
@@ -88,10 +107,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
-      lwt_log_error
-        "@[Answerer unexpected error:@ %a@]"
-        Error_monad.pp_print_error
-        err
+      Events.(emit unexpected_error) err
       >>= fun () ->
       Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
 
@@ -163,11 +179,8 @@ let read t =
     (fun () ->
       Lwt_pipe.pop t.messages
       >>= fun (s, msg) ->
-      lwt_debug
-        "%d bytes message popped from queue %a\027[0m"
-        s
-        P2p_peer.Id.pp
-        (P2p_socket.info t.conn).peer_id
+      Events.(emit bytes_popped_from_queue)
+        (s, (P2p_socket.info t.conn).peer_id)
       >>= fun () -> return msg)
     pipe_exn_handler
 
