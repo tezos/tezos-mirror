@@ -13,6 +13,8 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-alpha"
   "tezos-protocol-alpha-parameters"
+  "tezos-client-alpha"
+  "alcotest-lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

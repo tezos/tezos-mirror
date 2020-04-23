@@ -1,12 +1,14 @@
 (library
  (name tezos_alpha_test_helpers)
  (public_name tezos-alpha-test-helpers)
- (libraries tezos-base
+ (libraries alcotest-lwt
+            tezos-base
             tezos-stdlib-unix
             tezos-shell-services
             tezos-protocol-environment
             tezos-protocol-alpha
-            tezos-protocol-alpha-parameters)
+            tezos-protocol-alpha-parameters
+            tezos-client-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_stdlib_unix

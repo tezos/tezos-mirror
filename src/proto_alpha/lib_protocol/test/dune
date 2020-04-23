@@ -6,13 +6,14 @@
             alcotest-lwt
             tezos-alpha-test-helpers
             tezos-stdlib-unix
-	    tezos-client-base
-            tezos-protocol-alpha-parameters)
+            tezos-client-base
+            tezos-protocol-alpha-parameters
+            tezos-test-services)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_protocol_alpha
                    -open Tezos_alpha_test_helpers
-                   )))
+                   -open Tezos_test_services)))
 
 (alias
  (name buildtest)

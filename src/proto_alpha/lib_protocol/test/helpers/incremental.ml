@@ -56,6 +56,8 @@ let rpc_context st =
 let rpc_ctxt =
   new Environment.proto_rpc_context_of_directory rpc_context rpc_services
 
+let alpha_ctxt st = st.state.ctxt
+
 let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ?(policy = Block.By_priority priority) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor

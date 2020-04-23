@@ -55,3 +55,5 @@ val add_operation :
 val finalize_block : incremental -> Block.t tzresult Lwt.t
 
 val rpc_ctxt : incremental Environment.RPC_context.simple
+
+val alpha_ctxt : incremental -> Alpha_context.context

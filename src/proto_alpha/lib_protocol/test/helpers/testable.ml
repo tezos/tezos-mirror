@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest.run
-    "protocol_alpha"
-    [ ("transfer", Transfer.tests);
-      ("origination", Origination.tests);
-      ("activation", Activation.tests);
-      ("endorsement", Endorsement.tests);
-      ("double endorsement", Double_endorsement.tests);
-      ("double baking", Double_baking.tests);
-      ("seed", Seed.tests);
-      ("baking", Baking.tests);
-      ("delegation", Delegation.tests);
-      ("rolls", Rolls.tests);
-      ("combined", Combined_operations.tests);
-      ("qty", Qty.tests);
-      ("voting", Voting.tests);
-      ("interpretation", Interpretation.tests) ]
+let contract : Protocol.Alpha_context.Contract.t Alcotest.testable =
+  let open Protocol in
+  let open Alpha_context in
+  Alcotest.testable Contract.pp Contract.( = )
+
+let script_expr : Protocol.Alpha_context.Script.expr Alcotest.testable =
+  let open Tezos_client_alpha in
+  Alcotest.testable Michelson_v1_printer.print_expr ( = )
+
+let trace : trace Alcotest.testable = Alcotest.testable pp_print_error ( = )
+
+let protocol_error :
+    Tezos_protocol_environment_alpha.Environment.Error_monad.error
+    Alcotest.testable =
+  let open Tezos_protocol_environment_alpha.Environment.Error_monad in
+  Alcotest.testable pp ( = )
