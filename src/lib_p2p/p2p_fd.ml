@@ -25,6 +25,86 @@
 
 (* logging facility to monitor sockets *)
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "fd"]
+
+  let create_fd =
+    declare_1
+      ~section
+      ~name:"create_fd"
+      ~msg:"cnx:{connection_id}:create fd"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+
+  let close_fd =
+    declare_3
+      ~section
+      ~name:"close_fd"
+      ~msg:"cnx:{connection_id}:close fd ( stats : {nread}/{nwrit}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("nread", Data_encoding.int16)
+      ("nwrit", Data_encoding.int16)
+
+  let try_read =
+    declare_2
+      ~section
+      ~name:"try_read"
+      ~msg:"cnx:{connection_id}:try read {length}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("length", Data_encoding.int16)
+
+  let try_write =
+    declare_2
+      ~section
+      ~name:"try_write"
+      ~msg:"cnx:{connection_id}:try write {length}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("length", Data_encoding.int16)
+
+  let read_fd =
+    declare_3
+      ~section
+      ~name:"read_fd"
+      ~msg:"cnx:{connection_id}:read {nread} ({nread_expected})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("nread", Data_encoding.int16)
+      ("nread_expected", Data_encoding.int16)
+
+  let written_fd =
+    declare_3
+      ~section
+      ~name:"written_fd"
+      ~msg:"cnx:{connection_id}:written {length} ({nwrit_expected})"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("length", Data_encoding.int16)
+      ("nwrit_expected", Data_encoding.int16)
+
+  let connect_fd =
+    declare_2
+      ~section
+      ~name:"connect"
+      ~msg:"cnx:{connection_id}:connect {socket}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("socket", Data_encoding.string)
+
+  let accept_fd =
+    declare_2
+      ~section
+      ~name:"accept"
+      ~msg:"cnx:{connection_id}:accept {socket}"
+      ~level:Debug
+      ("connection_id", Data_encoding.int16)
+      ("socket", Data_encoding.string)
+end
+
 let is_not_windows = Sys.os_type <> "Win32"
 
 let () =
@@ -34,11 +114,6 @@ let () =
      stand alone library.  *)
   if is_not_windows then Sys.(set_signal sigpipe Signal_ignore)
 
-(* Logging facility for the P2P layer *)
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "p2p.fd"
-end)
-
 type t = {
   fd : Lwt_unix.file_descr;
   id : int;
@@ -46,17 +121,14 @@ type t = {
   mutable nwrit : int;
 }
 
-(* we use a prefix ' cnx:' that allows easy grepping in the log to lookup
-   everything related to a particular connection. *)
-let log t fmt = Format.kasprintf (fun s -> Log.debug "cnx:%d:%s" t.id s) fmt
-
 let create =
   let counter = ref 0 in
   function
   | fd ->
       incr counter ;
       let t = {fd; id = !counter; nread = 0; nwrit = 0} in
-      log t "create: fd %d" t.id ; t
+      Lwt.async (fun () -> Events.(emit create_fd) t.id) ;
+      t
 
 let string_of_sockaddr addr =
   match addr with
@@ -70,36 +142,36 @@ let id t = t.id
 let socket proto kind arg = create (Lwt_unix.socket proto kind arg)
 
 let close t =
-  log t "close: stats %d/%d" t.nread t.nwrit ;
-  Lwt_utils_unix.safe_close t.fd
+  Events.(emit close_fd) (t.id, t.nread, t.nwrit)
+  >>= fun () -> Lwt_utils_unix.safe_close t.fd
 
 let read t buf pos len =
-  log t "try-read: %d" len ;
+  Events.(emit try_read) (t.id, len)
+  >>= fun () ->
   Lwt_unix.read t.fd buf pos len
   >>= fun nread ->
   t.nread <- t.nread + nread ;
-  log t "read: %d (%d)" nread t.nread ;
-  Lwt.return nread
+  Events.(emit read_fd) (t.id, nread, t.nread) >>= fun () -> Lwt.return nread
 
 let write t buf =
   let len = Bytes.length buf in
-  log t "try-write: %d" len ;
+  Events.(emit try_write) (t.id, len)
+  >>= fun () ->
   Lwt_utils_unix.write_bytes t.fd buf
   >>= fun () ->
   t.nwrit <- t.nwrit + len ;
-  log t "written: %d (%d)" len t.nwrit ;
-  Lwt.return_unit
+  Events.(emit written_fd) (t.id, len, t.nwrit) >>= fun () -> Lwt.return_unit
 
 let connect t saddr =
-  log t "connect: %s" (string_of_sockaddr saddr) ;
-  Lwt_unix.connect t.fd saddr
+  Events.(emit connect_fd) (t.id, string_of_sockaddr saddr)
+  >>= fun () -> Lwt_unix.connect t.fd saddr
 
 let accept sock =
   Lwt_unix.accept sock
   >>= fun (fd, saddr) ->
   let t = create fd in
-  log t "accept: %s" (string_of_sockaddr saddr) ;
-  Lwt.return (t, saddr)
+  Events.(emit accept_fd) (t.id, string_of_sockaddr saddr)
+  >>= fun () -> Lwt.return (t, saddr)
 
 module Table = Hashtbl.Make (struct
   type nonrec t = t
