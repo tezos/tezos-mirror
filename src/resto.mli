@@ -37,11 +37,33 @@ module Arg : sig
   }
   val descr: 'a arg -> descr
 
+  (** [bool] is an argument for boolean values. The strings ["yes"], ["y"],
+      ["true"], and ["t"], as well as all capitalisation variation thereof, all
+      parsed to [true]. The strings ["no"], ["n"], ["false"], and ["f"], as well
+      as all capitalisation variation thereof, all parsed to [false]. All other
+      strings fail to parse. *)
   val bool: bool arg
+
+  (** [int] is an argument for integer values. The parsing is identical to that
+      of {!Stdlib.int_of_string} -- refer to that function's documentation. *)
   val int: int arg
+
+  (** [int32] is an argument for 32-bit integer values. The parsing is identical
+      to that of {!Int32.of_string} -- refer to that function's
+      documentation. *)
   val int32: int32 arg
+
+  (** [int64] is an argument for 64-bit integer values. The parsing is identical
+      to that of {!Int64.of_string} -- refer to that function's
+      documentation. *)
   val int64: int64 arg
+
+  (** [float] is an argument for floating-point decimal values. The parsing is
+      identical to that of {!Float.of_string} -- refer to that function's
+      documentation. *)
   val float: float arg
+
+  (** [string] is an argument for string values. No parsing is done. *)
   val string: string arg
 
   val like: 'a arg -> ?descr:string -> string -> 'a arg
