@@ -10,8 +10,8 @@ depends: [
   "dune" { >= "1.11" }
   "tezos-error-monad"
   "data-encoding" { = "0.2" }
-  "resto" { = "0.4" }
-  "resto-directory" { = "0.4" }
+  "resto" { = "0.5" }
+  "resto-directory" { = "0.5" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
