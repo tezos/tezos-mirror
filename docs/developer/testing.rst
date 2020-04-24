@@ -361,23 +361,6 @@ project directory:
 
     make build-dev-deps
 
-Then set up the ``BISECT_FILE`` environment variable:
-
-::
-
-    export BISECT_FILE=${PWD}/_coverage_output/bisect
-
-It tells ``bisect_ppx`` to generate coverage data in
-``${PWD}/_coverage_output/bisect*.out`` files. Then,
-
-::
-
-    make coverage-setup
-
-creates the required coverage data directory ``_coverage_output``. It also
-checks if the ``BISECT_FILE`` environment variable is set up properly (and
-remind the user how to do so if not).
-
 The OCaml code should be instrumented in order to generate coverage data. This
 has to be specified in ``dune`` files (or ``dune.inc`` for protocols)
 on a per-package basis by adding the following line in the ``library``
@@ -385,8 +368,10 @@ or ``executable`` stanza.
 
 ::
 
-    (preprocess (pps bisect_ppx))
+    (preprocess (pps bisect_ppx -- --bisect-file /path/to/tezos.git/_coverage_output))))
 
+At the same time, it tells ``bisect_ppx`` to generate coverage data in the
+``_coverage_output`` directory.
 The convenience script ``./scripts/instrument_dune_bisect.sh`` does
 this automatically. For instance,
 
@@ -395,8 +380,19 @@ this automatically. For instance,
     ./scripts/instrument_dune_bisect.sh src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
 
 enables code coverage analysis for ``lib_p2p`` and ``proto_alpha``.
+To instrument all the code in ``src/``, use:
 
-Finally, compile the code using ``make``, run any number of tests, and
+::
+
+    ./scripts/instrument_dune_bisect.sh src/ --except "src/proto_0*"
+
+Previous protocols (``proto_0*``) have to be excluded because they contain
+code that is not well instrumented by bisect_ppx2 and cannot be changed.
+
+Then, compile the code using ``make``, ignoring warnings such as
+``.merlin generated is inaccurate.`` which
+`are expected <https://discuss.ocaml.org/t/ann-dune-1-10-0/3896/3>`_.
+Finally run any number of tests, and
 generate the HTML report from the coverage files using
 
 ::
@@ -419,3 +415,9 @@ Reset the updated ``dune`` files using ``git``. For instance:
 ::
 
     git checkout -- src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
+
+Or
+
+::
+
+    ./scripts/instrument_dune_bisect.sh --remove src/
