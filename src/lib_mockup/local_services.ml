@@ -53,7 +53,7 @@ let () =
     ~description:"Cannot parse operation"
     ~pp:(fun ppf () -> Format.pp_print_string ppf "Cannot parse operation.")
     Data_encoding.unit
-    (function Injection_not_possible -> Some () | _ -> None)
+    (function Cannot_parse_op -> Some () | _ -> None)
     (fun () -> Canceled)
 
 (* Since we bypass the node but still use the RPC mechanism for procedure
