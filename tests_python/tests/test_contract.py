@@ -842,6 +842,73 @@ class TestComparables:
         utils.assert_typecheck_data_failure(
             client, '{Pair 1 "bar"; Pair 0 "foo"}', '(set (pair nat string))')
 
+    def test_comparable_chain_id(self, client):
+        client.typecheck_data('{}', '(set chain_id)')
+        chain1 = client.rpc('get', 'chains/main/chain_id')
+        chain2 = 'NetXZVhNXbDTx5M'
+        utils.assert_typecheck_data_failure(client,
+                                            '{"' + f'{chain1}' + '"; "' +
+                                            f'{chain2}' + '"}',
+                                            '(set chain_id)')
+        client.typecheck_data(
+            '{"' + f'{chain2}' + '"; "' + f'{chain1}' + '"}', '(set chain_id)')
+
+    def test_comparable_signature(self, client):
+        client.typecheck_data('{}', '(set signature)')
+        packed = client.pack('Unit', 'unit')
+        sig1 = client.sign(packed, "bootstrap1")
+        sig2 = client.sign(packed, "bootstrap2")
+        utils.assert_typecheck_data_failure(client, '{"' + f'{sig1}' + '"; "' +
+                                            f'{sig2}' + '"}',
+                                            '(set signature)')
+        client.typecheck_data(
+            '{"' + f'{sig2}' + '"; "' + f'{sig1}' + '"}', '(set signature)')
+
+    def test_comparable_key(self, client):
+        pubkey1 = IDENTITIES['bootstrap1']['public']
+        pubkey2 = IDENTITIES['bootstrap2']['public']
+        client.typecheck_data('{}', '(set key)')
+        utils.assert_typecheck_data_failure(client,
+                                            '{"' + f'{pubkey1}' + '"; "' +
+                                            f'{pubkey2}' + '"}', '(set key)')
+        client.typecheck_data(
+            '{"' + f'{pubkey2}' + '"; "' + f'{pubkey1}' + '"}', '(set key)')
+
+    def test_comparable_key_different_schemes(self, client):
+        client.gen_key('sk1', ['--sig', 'ed25519'])
+        key1 = client.show_address('sk1').public_key
+
+        client.gen_key('sk2', ['--sig', 'secp256k1'])
+        key2 = client.show_address('sk2').public_key
+
+        client.gen_key('sk3', ['--sig', 'p256'])
+        key3 = client.show_address('sk3').public_key
+
+        # Three public keys of the three different signature schemes, ordered
+        client.typecheck_data('{"' + key1 + '"; "' + key2 + '"; "' + key3 +
+                              '"}', '(set key)')
+
+        # Test all orderings that do not respect the comparable order
+        utils.assert_typecheck_data_failure(client, '{"' +
+                                            key1 + '"; "' + key3 + '"; "' +
+                                            key2 + '"}', '(set key)')
+
+        utils.assert_typecheck_data_failure(client, '{"' +
+                                            key2 + '"; "' + key1 + '"; "' +
+                                            key3 + '"}', '(set key)')
+
+        utils.assert_typecheck_data_failure(client, '{"' +
+                                            key2 + '"; "' + key3 + '"; "' +
+                                            key1 + '"}', '(set key)')
+
+        utils.assert_typecheck_data_failure(client, '{"' +
+                                            key3 + '"; "' + key1 + '"; "' +
+                                            key2 + '"}', '(set key)')
+
+        utils.assert_typecheck_data_failure(client, '{"' +
+                                            key3 + '"; "' + key2 + '"; "' +
+                                            key1 + '"}', '(set key)')
+
 
 @pytest.mark.contract
 class TestTypecheckingErrors:
