@@ -362,6 +362,12 @@ integration:contract_baker:
     - pytest tests_python/tests/test_contract_baker.py -s --log-dir=tmp
   stage: test
 
+integration:contract_caching:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_contract_caching.py -s --log-dir=tmp
+  stage: test
+
 integration:contract_macros:
   <<: *integration_python_definition
   script:
