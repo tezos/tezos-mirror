@@ -15,6 +15,7 @@ It contains the following python packages.
 
 - ``daemons`` defines classes to run Tezos node and daemons,
 - ``client`` mainly defines the ``Client`` class, that provides a programmatic interface to a client,
+- ``codec`` defines a `Codec`` class, that provides a interface for `tezos-codec` binary,
 - ``launcher`` defines classes used to launch a nodes and daemons with specific settings,
 - ``tools`` contains utility functions and constants shared by the tests,
 - ``examples`` contains example of tests and scripts that run scenarios of interactions between tezos nodes and clients,
@@ -23,7 +24,7 @@ It contains the following python packages.
 
 They are organized in three layers.
 
-1. ``daemons`` and ``client``,
+1. ``daemons``, ``client`` and ``codec``,
 2. ``launchers``,
 3. ``tests``, ``examples``, ``tools``.
 
