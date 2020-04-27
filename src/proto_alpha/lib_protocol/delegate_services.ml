@@ -414,6 +414,43 @@ module Baking_rights = struct
     in
     loop contract_list [] 0
 
+  let baking_priorities_of_delegates ctxt ~all ~max_prio delegates
+      (level, pred_timestamp) =
+    Baking.baking_priorities ctxt level
+    >>=? fun contract_list ->
+    let rec loop l acc priority delegates =
+      match delegates with
+      | [] ->
+          return (List.rev acc)
+      | _ :: _ -> (
+          if Compare.Int.(priority > max_prio) then return (List.rev acc)
+          else
+            let (Misc.LCons (pk, next)) = l in
+            next ()
+            >>=? fun l ->
+            match
+              List.partition
+                (fun (pk', _) -> Signature.Public_key.equal pk pk')
+                delegates
+            with
+            | ([], _) ->
+                loop l acc (priority + 1) delegates
+            | ((_, delegate) :: _, delegates') ->
+                ( match pred_timestamp with
+                | None ->
+                    ok_none
+                | Some pred_timestamp ->
+                    Baking.minimal_time ctxt priority pred_timestamp
+                    >|? fun t -> Some t )
+                >>?= fun timestamp ->
+                let acc =
+                  {level = level.level; delegate; priority; timestamp} :: acc
+                in
+                let delegates'' = if all then delegates else delegates' in
+                loop l acc (priority + 1) delegates'' )
+    in
+    loop contract_list [] 0 delegates
+
   let remove_duplicated_delegates rights =
     List.rev @@ fst
     @@ List.fold_left
@@ -439,22 +476,36 @@ module Baking_rights = struct
         let max_priority =
           match q.max_priority with None -> 64 | Some max -> max
         in
-        map_s (baking_priorities ctxt max_priority) levels
-        >|=? fun rights ->
-        let rights =
-          if q.all then rights else List.map remove_duplicated_delegates rights
-        in
-        let rights = List.concat rights in
         match q.delegates with
         | [] ->
-            rights
-        | _ :: _ as delegates ->
-            let is_requested p =
-              List.exists
-                (Signature.Public_key_hash.equal p.delegate)
-                delegates
+            map_s (baking_priorities ctxt max_priority) levels
+            >|=? fun rights ->
+            let rights =
+              if q.all then rights
+              else List.map remove_duplicated_delegates rights
             in
-            List.filter is_requested rights)
+            List.concat rights
+        | _ :: _ as delegates ->
+            Lwt_list.filter_map_s
+              (fun delegate ->
+                Contract.get_manager_key ctxt delegate
+                >>= function
+                | Ok pk ->
+                    Lwt.return (Some (pk, delegate))
+                | Error _ ->
+                    Lwt.return_none)
+              delegates
+            >>= fun delegates ->
+            map_s
+              (fun level ->
+                baking_priorities_of_delegates
+                  ctxt
+                  q.all
+                  max_priority
+                  delegates
+                  level)
+              levels
+            >|=? List.concat)
 
   let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) ?(all = false)
       ?max_priority block =
