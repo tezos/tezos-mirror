@@ -339,9 +339,7 @@ let big_map_diff_item_encoding =
         (fun ((), big_map, key_type, value_type) ->
           Alloc {big_map; key_type; value_type}) ]
 
-let big_map_diff_encoding =
-  let open Data_encoding in
-  def "contract.big_map_diff" @@ list big_map_diff_item_encoding
+let big_map_diff_encoding = Data_encoding.list big_map_diff_item_encoding
 
 let big_map_key_cost = 65
 
