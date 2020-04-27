@@ -179,6 +179,7 @@ let setup_mockup_rpc_client_config
         Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
           ~cctxt
           ~protocol_hash
+          ~chain_id:None
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
@@ -213,8 +214,9 @@ let setup_mockup_rpc_client_config
               Protocol_hash.pp_short
               desired_protocol )
       >>=? fun () -> return (res, mem_only) )
-  >>=? fun ((mockup_env, rpc_context), mem_only) ->
-  return (new unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context)
+  >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
+  return
+    (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)
 
 let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     (parsed_args : Client_config.cli_args option) base_dir rpc_config =

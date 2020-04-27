@@ -94,11 +94,12 @@ let rpc_error_encoding =
         (fun () -> Rpc_streams_not_handled) ]
 
 class local_ctxt (base_dir : string) (mem_only : bool)
-  (mockup_env : Registration.mockup_environment)
+  (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
   (rpc_context : Tezos_protocol_environment.rpc_context) : RPC_context.json =
   let write_context rpc_context =
     let (module Mockup_environment) = mockup_env in
     Persistence.overwrite_mockup
+      ~chain_id
       ~protocol_hash:Mockup_environment.protocol_hash
       ~rpc_context
       ~base_dir
@@ -119,6 +120,7 @@ class local_ctxt (base_dir : string) (mem_only : bool)
       let (module Mockup_environment) = mockup_env in
       Local_services.build_shell_directory
         mockup_env
+        chain_id
         rpc_context
         mem_only
         write_context

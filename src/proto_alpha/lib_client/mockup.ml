@@ -38,6 +38,7 @@ type protocol_constants_overrides = {
   hard_gas_limit_per_block : Z.t option;
   hard_storage_limit_per_operation : Z.t option;
   cost_per_byte : Protocol.Tez_repr.t option;
+  chain_id : Chain_id.t option;
 }
 
 type parsed_account_repr = {
@@ -110,22 +111,26 @@ let protocol_constants_overrides_encoding =
       ( p.hard_gas_limit_per_operation,
         p.hard_gas_limit_per_block,
         p.hard_storage_limit_per_operation,
-        p.cost_per_byte ))
+        p.cost_per_byte,
+        p.chain_id ))
     (fun ( hard_gas_limit_per_operation,
            hard_gas_limit_per_block,
            hard_storage_limit_per_operation,
-           cost_per_byte ) ->
+           cost_per_byte,
+           chain_id ) ->
       {
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         hard_storage_limit_per_operation;
         cost_per_byte;
+        chain_id;
       })
-    (obj4
+    (obj5
        (opt "hard_gas_limit_per_operation" z)
        (opt "hard_gas_limit_per_block" z)
        (opt "hard_storage_limit_per_operation" z)
-       (opt "cost_per_byte" Protocol.Tez_repr.encoding))
+       (opt "cost_per_byte" Protocol.Tez_repr.encoding)
+       (opt "chain_id" Chain_id.encoding))
 
 let default_mockup_parameters : mockup_protocol_parameters =
   let parameters =
@@ -148,6 +153,7 @@ let default_mockup_protocol_constants : protocol_constants_overrides =
     hard_storage_limit_per_operation =
       Some default.constants.hard_storage_limit_per_operation;
     cost_per_byte = Some default.constants.cost_per_byte;
+    chain_id = Some Tezos_mockup_registration.Mockup_args.Chain_id.dummy;
   }
 
 (* Use the wallet to convert a bootstrap account's public key
@@ -226,6 +232,7 @@ let protocol_constants_no_overrides =
     hard_gas_limit_per_block = None;
     hard_storage_limit_per_operation = None;
     cost_per_byte = None;
+    chain_id = None;
   }
 
 let apply_protocol_overrides (cctxt : Tezos_client_base.Client_context.full)
@@ -356,10 +363,15 @@ let initial_context (header : Block_header.shell_header)
 let mem_init :
     cctxt:Tezos_client_base.Client_context.full ->
     parameters:mockup_protocol_parameters ->
+    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t =
- fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
+    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
+ fun ~cctxt
+     ~parameters
+     ~chain_id
+     ~constants_overrides_json
+     ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
@@ -428,12 +440,18 @@ let mem_init :
       constants = protocol_custom;
     }
   >>=? fun context ->
+  let chain_id =
+    Tezos_mockup_registration.Mockup_args.Chain_id.choose
+      ~from_command_line:chain_id
+      ~from_config_file:protocol_overrides.chain_id
+  in
   return
-    {
-      Tezos_protocol_environment.block_hash = hash;
-      block_header = shell;
-      context;
-    }
+    ( chain_id,
+      {
+        Tezos_protocol_environment.block_hash = hash;
+        block_header = shell;
+        context;
+      } )
 
 (* ------------------------------------------------------------------------- *)
 (* Register mockup *)
@@ -464,4 +482,4 @@ let () =
 
     let init = mem_init
   end in
-  register_mockup_context (module M)
+  register_mockup_environment (module M)

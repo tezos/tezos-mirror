@@ -27,6 +27,8 @@
     prepared protocol-side and registered here to become available to the
     mockup facility. *)
 
+type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+
 module type Mockup_sig = sig
   type parameters
 
@@ -61,13 +63,14 @@ module type Mockup_sig = sig
   val init :
     cctxt:Tezos_client_base.Client_context.full ->
     parameters:parameters ->
+    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t
+    mockup_context tzresult Lwt.t
 end
 
 type mockup_environment = (module Mockup_sig)
 
-val register_mockup_context : mockup_environment -> unit
+val register_mockup_environment : mockup_environment -> unit
 
-val get_registered_contexts : unit -> mockup_environment list
+val get_registered_environments : unit -> mockup_environment list

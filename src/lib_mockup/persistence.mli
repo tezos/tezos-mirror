@@ -30,26 +30,24 @@ val get_registered_mockup :
     in the list of registered protocol, cf [Registration] module). *)
 val default_mockup_context :
   Tezos_client_base.Client_context.full ->
-  (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-  tzresult
+  (Registration.mockup_environment * Registration.mockup_context) tzresult
   Lwt.t
 
 (**  Returns a mockup environment for the specified protocol hash. *)
 val init_mockup_context_by_protocol_hash :
   cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
+  chain_id:Chain_id.t option ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->
-  (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-  tzresult
+  (Registration.mockup_environment * Registration.mockup_context) tzresult
   Lwt.t
 
 (** Load a mockup environment and initializes a protocol RPC context from
     a mockup base directory. *)
 val get_mockup_context_from_disk :
   base_dir:string ->
-  (Registration.mockup_environment * Tezos_protocol_environment.rpc_context)
-  tzresult
+  (Registration.mockup_environment * Registration.mockup_context) tzresult
   Lwt.t
 
 (** Initializes an on-disk mockup environment in [base_dir] for the specified
@@ -57,6 +55,7 @@ val get_mockup_context_from_disk :
 val create_mockup :
   cctxt:Tezos_client_base.Client_context.full ->
   protocol_hash:Protocol_hash.t ->
+  chain_id:Chain_id.t option ->
   constants_overrides_json:Data_encoding.json option ->
   bootstrap_accounts_json:Data_encoding.json option ->
   unit tzresult Lwt.t
@@ -64,9 +63,12 @@ val create_mockup :
 (** Overwrites an on-disk mockup environment. *)
 val overwrite_mockup :
   protocol_hash:Protocol_hash.t ->
+  chain_id:Chain_id.t ->
   rpc_context:Tezos_protocol_environment.rpc_context ->
   base_dir:string ->
   unit tzresult Lwt.t
+
+(** {2 Base diretory states} *)
 
 type base_dir_class =
   | Base_dir_does_not_exist

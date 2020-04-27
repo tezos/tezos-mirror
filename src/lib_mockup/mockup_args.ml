@@ -23,27 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
+module Chain_id = struct
+  let of_string s = Chain_id.hash_string ~key:"mockup" [s]
 
-let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
+  let dummy = of_string "chain"
 
-let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_environments () in
-  List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
-      let module Mockup = (val mockup) in
-      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
-    available ;
-  return ()
-
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"List available protocols available for mockup construction."
-    no_options
-    (prefixes ["list"; "mockup"; "protocols"] @@ stop)
-    list_mockup_command_handler
-
-let commands () = [list_mockup_command]
+  let choose ~from_command_line ~from_config_file =
+    match (from_command_line, from_config_file) with
+    | (None, None) ->
+        dummy
+    | (Some cid, (None | Some _)) | (None, Some cid) ->
+        cid
+end

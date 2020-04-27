@@ -23,27 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
+module Chain_id : sig
+  (** [of_string s] converts any string to its valid [chain_id] representation.
+   **
+   ** This function is useful to get valid, but dummy, chain identifiers out of
+   ** command lines in the context of a mockup client.
+   *)
+  val of_string : string -> Chain_id.t
 
-let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
+  (** [dummy] is a valid dummy chain identifier.
+   **
+   ** Do not use it outside of the context of a mockup client.
+   *)
+  val dummy : Chain_id.t
 
-let list_mockup_command_handler _ _ =
-  let available = Registration.get_registered_environments () in
-  List.iter
-    (fun (mockup : (module Registration.Mockup_sig)) ->
-      let module Mockup = (val mockup) in
-      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
-    available ;
-  return ()
-
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
-  let open Clic in
-  command
-    ~group
-    ~desc:"List available protocols available for mockup construction."
-    no_options
-    (prefixes ["list"; "mockup"; "protocols"] @@ stop)
-    list_mockup_command_handler
-
-let commands () = [list_mockup_command]
+  (** [choose ~from_command_line ~from_config_file]
+   ** chooses a valid chain_id from two options.
+   **
+   ** The value from the command line, if any, has highest precedence, over the
+   ** one from the config file.
+   ** When both values are [None], it uses the {!dummy}.
+   *)
+  val choose :
+    from_command_line:Chain_id.t option ->
+    from_config_file:Chain_id.t option ->
+    Chain_id.t
+end

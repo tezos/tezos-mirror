@@ -49,16 +49,29 @@ let load_json_file (cctxt : Protocol_client_context.full) json_file =
       >>=? fun json_string ->
       return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
 
+let chain_id_seed_arg =
+  Clic.arg
+    ~doc:"chain id seed to generate a valid mockup chain id"
+    ~long:"chain-id-seed"
+    ~placeholder:"string"
+    (Clic.parameter (fun _ x -> return x))
+
 let create_mockup_command_handler
-    (constants_overrides_file, bootstrap_accounts_file)
+    (chain_id_seed_arg, constants_overrides_file, bootstrap_accounts_file)
     (cctxt : Protocol_client_context.full) =
   load_json_file cctxt constants_overrides_file
   >>=? fun constants_overrides_json ->
   load_json_file cctxt bootstrap_accounts_file
   >>=? fun bootstrap_accounts_json ->
+  let chain_id =
+    Option.map
+      Tezos_mockup_registration.Mockup_args.Chain_id.of_string
+      chain_id_seed_arg
+  in
   Tezos_mockup.Persistence.create_mockup
     ~cctxt:(cctxt :> Tezos_client_base.Client_context.full)
     ~protocol_hash:Protocol.hash
+    ~chain_id
     ~constants_overrides_json
     ~bootstrap_accounts_json
   >>=? fun () ->
@@ -69,7 +82,7 @@ let create_mockup_command : Protocol_client_context.full Clic.command =
   command
     ~group:Tezos_mockup_commands.Mockup_commands.group
     ~desc:"Create a mockup environment."
-    (args2 protocol_constants_arg bootstrap_accounts_arg)
+    (args3 chain_id_seed_arg protocol_constants_arg bootstrap_accounts_arg)
     (prefixes ["create"; "mockup"] @@ stop)
     create_mockup_command_handler
 

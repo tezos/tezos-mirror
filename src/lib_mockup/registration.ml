@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Type of a mockup environment *)
+
+(** Modules of this type should be prepared protocol-side and registered here to
+    become available to the mockup facility.  *)
+
+type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+
 module type Mockup_sig = sig
   type parameters
 
@@ -32,6 +39,7 @@ module type Mockup_sig = sig
 
   val protocol_constants_encoding : protocol_constants Data_encoding.t
 
+  (** Content equivalent to the default value of --bootstrap-acounts *)
   val default_bootstrap_accounts :
     Tezos_client_base.Client_context.full -> string tzresult Lwt.t
 
@@ -56,15 +64,16 @@ module type Mockup_sig = sig
   val init :
     cctxt:Tezos_client_base.Client_context.full ->
     parameters:parameters ->
+    chain_id:Chain_id.t option ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t
+    mockup_context tzresult Lwt.t
 end
 
 type mockup_environment = (module Mockup_sig)
 
 let registered : mockup_environment list ref = ref []
 
-let register_mockup_context m = registered := m :: !registered
+let register_mockup_environment m = registered := m :: !registered
 
-let get_registered_contexts () = !registered
+let get_registered_environments () = !registered

@@ -185,7 +185,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     method confirmations = confirmations
   end
 
-class unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context :
+class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
   Client_context.full =
   object
     inherit unix_logger ~base_dir
@@ -196,11 +196,11 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~rpc_context :
 
     inherit
       Tezos_mockup.RPC_client.local_ctxt
-        base_dir mem_only mockup_env rpc_context
+        base_dir mem_only mockup_env chain_id rpc_context
 
     inherit unix_ui
 
-    method chain = `Main
+    method chain = `Hash chain_id
 
     method block = `Head 0
 

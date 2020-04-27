@@ -1,7 +1,7 @@
 (library
  (name tezos_mockup_registration)
  (public_name tezos-mockup-registration)
- (modules registration)
+ (modules registration mockup_args)
  (libraries
    tezos-base
    tezos-client-base
