@@ -136,10 +136,10 @@ module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
       ~chain ~context_path delegates =
-    Config_services.user_activated_upgrades cctxt
-    >>=? fun user_activated_upgrades ->
     await_bootstrapped_node cctxt
     >>=? fun _ ->
+    Config_services.user_activated_upgrades cctxt
+    >>=? fun user_activated_upgrades ->
     ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
     else return_unit )
     >>=? fun () ->
