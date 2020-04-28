@@ -19,9 +19,7 @@ class TestAnnotations:
         client.typecheck_data('Pair 0 0', 'pair (nat %x) (int %y)')
 
     def test_field_annotation_in_type_numeral(self, client):
-        assert_typecheck_data_failure(
-            client, 'Pair 0 0', 'pair (nat %1) (int %2)',
-            'unexpected annotation')
+        client.typecheck_data('Pair 0 0', 'pair (nat %1) (int %2)')
 
     def test_field_annotation_in_type_invalid_character(self, client):
         assert_typecheck_data_failure(
@@ -33,9 +31,8 @@ class TestAnnotations:
             '{ CAR %x }', 'lambda (pair (nat %x) (int %y)) nat')
 
     def test_field_annotation_in_instruction_numeral(self, client):
-        assert_typecheck_data_failure(
-            client, '{ CAR %1 }', 'lambda (pair (nat %1) (int %2)) nat',
-            'unexpected annotation')
+        client.typecheck_data(
+            '{ CAR %1 }', 'lambda (pair (nat %1) (int %2)) nat')
 
     def test_field_annotation_in_instruction_invalid_character(self, client):
         assert_typecheck_data_failure(
@@ -47,9 +44,8 @@ class TestAnnotations:
                          file=False)
 
     def test_field_annotation_in_root_numeral(self, client):
-        assert_typecheck_failure(
-            client, 'parameter %1 unit; storage unit; code {FAILWITH}',
-            'unexpected annotation', file=False)
+        client.typecheck('parameter %1 unit; storage unit; code {FAILWITH}',
+                         file=False)
 
     def test_field_annotation_in_root_invalid_character(self, client):
         assert_typecheck_failure(
@@ -61,9 +57,8 @@ class TestAnnotations:
                          file=False)
 
     def test_field_annotation_in_root_type_numeral(self, client):
-        assert_typecheck_failure(
-            client, 'parameter (unit %1); storage unit; code {FAILWITH}',
-            'unexpected annotation', file=False)
+        client.typecheck('parameter (unit %1); storage unit; code {FAILWITH}',
+                         file=False)
 
     def test_field_annotation_in_root_type_invalid_character(self, client):
         assert_typecheck_failure(
