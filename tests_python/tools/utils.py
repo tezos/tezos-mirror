@@ -1,19 +1,20 @@
 """ Utility functions to check time-dependent assertions in the tests.
 Assertions are retried to avoid using arbitrary time constants in test.
 """
-from typing import Any, List
-import hashlib
 import contextlib
+import hashlib
 import json
 import os
 import re
 import subprocess
 import time
+from typing import Any, List
 
 import base58check
 import ed25519
 import pyblake2
 import requests
+
 from client.client import Client
 from client.client_output import (BakeForResult, RunScriptResult,
                                   InvalidClientOutput)
@@ -429,6 +430,15 @@ def assert_typecheck_data_failure(
         err: str = 'ill-typed data') -> None:
     with assert_run_failure(err):
         client.typecheck_data(data, typ)
+
+
+def assert_typecheck_failure(
+        client: Client,
+        script: str,
+        err: str = 'ill-typed script',
+        file: bool = True) -> None:
+    with assert_run_failure(err):
+        client.typecheck(script, file=file)
 
 
 def client_output_converter(pre):
