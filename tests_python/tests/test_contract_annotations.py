@@ -1,5 +1,5 @@
 import pytest
-from tools.utils import assert_typecheck_data_failure
+from tools.utils import assert_typecheck_data_failure, assert_typecheck_failure
 from client.client import Client
 
 
@@ -18,13 +18,15 @@ class TestAnnotations:
     def test_field_annotation_in_type_alphabetic(self, client):
         client.typecheck_data('Pair 0 0', 'pair (nat %x) (int %y)')
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_type_numeral(self, client):
-        client.typecheck_data('Pair 0 0', 'pair (nat %1) (int %2)')
+        assert_typecheck_data_failure(
+            client, 'Pair 0 0', 'pair (nat %1) (int %2)',
+            'unexpected annotation')
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_type_invalid_character(self, client):
-        client.typecheck_data('Pair 0 0', 'pair (nat %.) (int %.)')
+        assert_typecheck_data_failure(
+            client, 'Pair 0 0', 'pair (nat %.) (int %.)',
+            'unexpected annotation')
 
     def test_field_annotation_in_instruction_alphabetic(self, client):
         client.typecheck_data(
@@ -44,26 +46,26 @@ class TestAnnotations:
         client.typecheck('parameter %r unit; storage unit; code {FAILWITH}',
                          file=False)
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_root_numeral(self, client):
-        client.typecheck('parameter %1 unit; storage unit; code {FAILWITH}',
-                         file=False)
+        assert_typecheck_failure(
+            client, 'parameter %1 unit; storage unit; code {FAILWITH}',
+            'unexpected annotation', file=False)
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_root_invalid_character(self, client):
-        client.typecheck('parameter %. unit; storage unit; code {FAILWITH}',
-                         file=False)
+        assert_typecheck_failure(
+            client, 'parameter %. unit; storage unit; code {FAILWITH}',
+            'unexpected annotation', file=False)
 
     def test_field_annotation_in_root_type_alphabetic(self, client):
         client.typecheck('parameter (unit %r); storage unit; code {FAILWITH}',
                          file=False)
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_root_type_numeral(self, client):
-        client.typecheck('parameter (unit %1); storage unit; code {FAILWITH}',
-                         file=False)
+        assert_typecheck_failure(
+            client, 'parameter (unit %1); storage unit; code {FAILWITH}',
+            'unexpected annotation', file=False)
 
-    # This is not expected, see https://gitlab.com/tezos/tezos/-/issues/716
     def test_field_annotation_in_root_type_invalid_character(self, client):
-        client.typecheck('parameter (unit %.); storage unit; code {FAILWITH}',
-                         file=False)
+        assert_typecheck_failure(
+            client, 'parameter (unit %.); storage unit; code {FAILWITH}',
+            'unexpected annotation', file=False)
