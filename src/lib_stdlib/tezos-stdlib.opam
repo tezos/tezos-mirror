@@ -11,6 +11,7 @@ depends: [
   "hex"
   "lwt"
   "zarith"
+  "ppx_inline_test"
   "bigstring" { with-test }
   "lwt_log" { with-test }
   "alcotest" { with-test & = "0.8.5" }
