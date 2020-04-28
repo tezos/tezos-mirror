@@ -272,80 +272,10 @@ Flextesa and Alcotest tests are run with ``make test`` in the project root.
 
 The Python tests are run with ``make all`` in the directory ``tests_python``.
 
-Executing tests through the GitLab CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-All tests are executed on all branches for each commit.  For
-instances, to see the latest runs of the CI on the master branch,
-visit `this page
-<https://gitlab.com/tezos/tezos/-/commits/master>_`. Each commit is
-annotated with a green checkmark icon if the CI passed, and a red
-cross icon if not. You can click the icon for more details.
-
-Note that the CI does not simply execute ``make test`` and ``make
-all`` in the directory ``tests_python``.  Instead, it runs the tests
-as a set of independent jobs, to better exploit GitLab runner
-parallelism: one job per ``pytest`` test file and one job for each
-OCaml package containing tests.
-
-When adding a new test that should be run in the CI (which should be
-the case for most automatic tests), you need to make sure that it is
-properly specified in the :src:`.gitlab-ci.yml` file. The procedure
-for doing this depends on the type of test you've added:
-
-Python integration and regression tests
-  Run ``./scripts/update_integration_test.sh`` in Tezos home. This
-  will include your new test in :src:`.gitlab-ci.yml`.
-
-Tests executed through Dune (Alcotest, Flextesa)
-  Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
-  include your new test in :src:`.gitlab-ci.yml`.
-
-Other
-  For other types of tests, you need to manually modify the
-  :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
-  Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI linter <https://gitlab.com/ci/lint>`_, and ``gitlab-runner``,
-  introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
-
-.. _executing_gitlab_ci_locally:
-
-Executing the GitLab CI locally
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-GitLab offers the ability to run jobs defined in the :src:`.gitlab-ci.yml` file on your own machine.
-This is helpful to debug the CI pipeline.
-For this, you need to setup ``gitlab-runner`` on your machine.
-To avoid using outdated versions of the binary, it is recommended to install a
-`release from the development repository <https://gitlab.com/gitlab-org/gitlab-runner/-/releases>`_.
-
-``gitlab-runner`` works with the concept of `executor`. We recommend to use the
-``docker`` executor to sandbox the environment the job will be executed in. This
-supposes that you have docker installed on your machine.
-
-For example, if you want to run the job ``check_python_linting`` which checks the Python syntax, you can use:
-
-.. code-block:: bash
-
-    gitlab-runner exec docker check_python_linting
-
-Note that the first time you execute a job, it may take a long time because it
-requires downloading the docker image, and ``gitlab-runner`` is not verbose on this
-subject. It may be the case if the opam repository Tezos uses has been changed, requiring
-the refresh of the locally cached docker image.
-
-Local changes must be committed (but not necessarily pushed remotely)
-before executing the job locally. Indeed, ``gitlab-runner`` will clone
-the head of the current local branch to execute the job.
-
-Another limitation is that only single jobs can be executed using
-`gitlab-runner`. For instance, there is no direct way of executing all
-jobs in the stage `test`.
-
 .. _measuring-test-coverage:
 
 Measuring test coverage
------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 We measure `test coverage <https://en.wikipedia.org/wiki/Code_coverage>`_
 with `bisect_ppx <https://github.com/aantron/bisect_ppx/>`_. This tool
@@ -353,8 +283,8 @@ is used to see which lines in the code source are actually executed when
 running one or several tests. Importantly, it tells us which parts of the
 code aren't tested.
 
-We describe here how ``bisect_ppx`` can be used locally (code coverage isn't
-integrated in the CI yet).
+We describe here how ``bisect_ppx`` can be used locally. See below for usage
+with CI.
 
 To install ``bisect_ppx``. Run the following command from the root of the
 project directory:
@@ -428,12 +358,123 @@ Or
 Known issues
 ~~~~~~~~~~~~
 
-The instrumentation by ``bisect_ppx`` of OCaml code containing `partial
-applications with missing optional arguments generate code that fails
-typechecking <https://github.com/aantron/bisect_ppx/issues/319>`_. For those
-pretty rare cases, either: change the order of arguments (`fun ?x y z` rather
-than `fun y ?x z`), add an explicit parameter at call site (`f y ?x:None`
-rather than `f y`), or add a wrapper function (`fun z -> f y z`).
+1. The instrumentation by ``bisect_ppx`` of OCaml code containing `partial
+   applications with missing optional arguments generate code that fails
+   typechecking <https://github.com/aantron/bisect_ppx/issues/319>`_. For those
+   pretty rare cases, either: change the order of arguments (``fun ?x y z``
+   rather than ``fun y ?x z``), add an explicit parameter at call site
+   (``f y ?x:None`` rather than ``f y``), or add a wrapper function
+   (``fun z -> f y z``). A more drastic solution is to exclude the problematic
+   packages from instrumentation. In the CI script ``.gitlab-ci.yml``, packages
+   to be excluded are defined in ``COVERAGE_EXCLUDE``.
+
+2. Report generation may fail spuriously.
+
+   ::
+
+       $ make coverage-report
+       4409 Info: found coverage files in '_coverage_output/'
+       4410  *** invalid file: '_coverage_output/819770417.coverage' error: "unexpected end of file while reading magic number"
+
+   In that case, either delete the problematic files or re-launch the tests and re-generate the report.
+
+Executing tests through the GitLab CI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All tests are executed on all branches for each commit.  For
+instances, to see the latest runs of the CI on the master branch,
+visit `this page
+<https://gitlab.com/tezos/tezos/-/commits/master>`_. Each commit is
+annotated with a green checkmark icon if the CI passed, and a red
+cross icon if not. You can click the icon for more details.
+
+By default, the CI runs the tests as a set of independent jobs in the
+``test`` stage. This is to better exploit GitLab runner parallelism: one job
+per ``pytest`` test file and one job for each OCaml package containing tests.
+This produces a report that is well-integrated with the CI user interface.
+
+When adding a new test that should be run in the CI (which should be
+the case for most automatic tests), you need to make sure that it is
+properly specified in the :src:`.gitlab-ci.yml` file. The procedure
+for doing this depends on the type of test you've added:
+
+Python integration and regression tests
+  Run ``./scripts/update_integration_test.sh`` in Tezos home. This
+  will include your new test in :src:`.gitlab-ci.yml`.
+
+Tests executed through Dune (Alcotest, Flextesa)
+  Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
+  include your new test in :src:`.gitlab-ci.yml`.
+
+Other
+  For other types of tests, you need to manually modify the
+  :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
+  Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
+  this task is the `CI linter <https://gitlab.com/ci/lint>`_, and ``gitlab-runner``,
+  introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
+
+A second way to run the tests is to trigger manually the job
+``test_coverage`` in stage ``test_coverage``, from the Gitlab CI web interface.
+This job simply runs ``dune build @runtest`` in the project directory,
+followed by ``make all`` in the directory ``tests_python``. This is slower
+than the previous method, and it is not run by default.
+
+The role of having this extra testing stage is twofold.
+
+- It can be launched locally in a container environment (see next section),
+- it can be used to generate a code coverage report, from the CI.
+
+The report artefact can be downloaded or browsed from the CI page upon completion
+of ``test_coverage``. It can also be published on a publicly available webpage
+linked to the gitlab repository. This is done by triggering manually
+the ``pages`` job in the ``publish_coverage`` stage, from the Gitlab CI
+web interface.
+
+Up to a few minutes after the ``pages`` job is completed, the report is
+published at the URL indicated in the log of the ``pages`` job. The actual URL
+depends on the names of the GitLab account and project which triggered
+the pipeline, as well as on the pipeline number. Examples:
+``https://nomadic-labs.gitlab.io/tezos/105822404/``,
+``https://tezos.gitlab.io/tezos/1234822404/``.
+
+.. _executing_gitlab_ci_locally:
+
+Executing the GitLab CI locally
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GitLab offers the ability to run jobs defined in the :src:`.gitlab-ci.yml` file on your own machine.
+This is helpful to debug the CI pipeline.
+For this, you need to setup ``gitlab-runner`` on your machine.
+To avoid using outdated versions of the binary, it is recommended to install a
+`release from the development repository <https://gitlab.com/gitlab-org/gitlab-runner/-/releases>`_.
+
+``gitlab-runner`` works with the concept of `executor`. We recommend to use the
+``docker`` executor to sandbox the environment the job will be executed in. This
+supposes that you have docker installed on your machine.
+
+For example, if you want to run the job ``check_python_linting`` which checks the Python syntax, you can use:
+
+.. code-block:: bash
+
+    gitlab-runner exec docker check_python_linting
+
+Note that the first time you execute a job, it may take a long time because it
+requires downloading the docker image, and ``gitlab-runner`` is not verbose on this
+subject. It may be the case if the opam repository Tezos uses has been changed, requiring
+the refresh of the locally cached docker image.
+
+Local changes must be committed (but not necessarily pushed remotely)
+before executing the job locally. Indeed, ``gitlab-runner`` will clone
+the head of the current local branch to execute the job.
+
+Another limitation is that only single jobs can be executed using
+``gitlab-runner``. For instance, there is no direct way of executing all
+jobs in the stage ``test``. However, you can run the ``test_coverage`` job
+which runs most tests (alcotest and python tests) in a single job.
+
+.. code-block:: bash
+
+    gitlab-runner exec docker test_coverage
 
 Conventions
 -----------
