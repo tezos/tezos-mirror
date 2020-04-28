@@ -59,7 +59,8 @@ let rec accept_n main_socket n =
     >>=? fun acc -> accept main_socket >>=? fun conn -> return (conn :: acc)
 
 let connect addr port =
-  let fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  P2p_fd.socket PF_INET6 SOCK_STREAM 0
+  >>= fun fd ->
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   P2p_fd.connect fd uaddr >>= fun () -> return fd
 

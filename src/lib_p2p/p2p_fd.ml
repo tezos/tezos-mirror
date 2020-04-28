@@ -127,8 +127,7 @@ let create =
   | fd ->
       incr counter ;
       let t = {fd; id = !counter; nread = 0; nwrit = 0} in
-      Lwt.async (fun () -> Events.(emit create_fd) t.id) ;
-      t
+      Events.(emit create_fd) t.id >>= fun () -> Lwt.return t
 
 let string_of_sockaddr addr =
   match addr with
@@ -169,7 +168,8 @@ let connect t saddr =
 let accept sock =
   Lwt_unix.accept sock
   >>= fun (fd, saddr) ->
-  let t = create fd in
+  create fd
+  >>= fun t ->
   Events.(emit accept_fd) (t.id, string_of_sockaddr saddr)
   >>= fun () -> Lwt.return (t, saddr)
 

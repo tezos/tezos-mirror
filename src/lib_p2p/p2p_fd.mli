@@ -39,7 +39,7 @@ val close : t -> unit Lwt.t
 
 val write : t -> Bytes.t -> unit Lwt.t
 
-val socket : Lwt_unix.socket_domain -> Lwt_unix.socket_type -> int -> t
+val socket : Lwt_unix.socket_domain -> Lwt_unix.socket_type -> int -> t Lwt.t
 
 val connect : t -> Lwt_unix.sockaddr -> unit Lwt.t
 
