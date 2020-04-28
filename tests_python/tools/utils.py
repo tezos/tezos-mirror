@@ -434,6 +434,15 @@ def assert_typecheck_data_failure(
         client.typecheck_data(data, typ)
 
 
+def assert_typecheck_failure(
+        client: Client,
+        script: str,
+        err: str = 'ill-typed script',
+        file: bool = True) -> None:
+    with assert_run_failure(err):
+        client.typecheck(script, file=file)
+
+
 def client_output_converter(pre):
     """Remove variable substrings from client output for regression testing.
 
