@@ -2524,7 +2524,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``@%|@%%|%@|[@:%][_a-zA-Z][_0-9a-zA-Z\.%@]*``.
+expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
 :ref:`special annotations <SpecialAnnotations>` and are not allowed everywhere.
 
