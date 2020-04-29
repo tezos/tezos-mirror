@@ -31,7 +31,7 @@ type rpc_error =
   | Rpc_unauthorized
   | Rpc_unexpected_type_of_failure
 
-type error += Not_implemented_in_local_RPC_mode
+type error += Not_implemented_in_local_RPC_mode of Uri.t
 
 type error += Local_RPC_error of rpc_error
 
@@ -113,8 +113,8 @@ class local_ctxt (base_dir : string) (mem_only : bool)
       (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
       Lwt.t =
    fun meth ?body uri ->
-    ignore (meth, body, uri) ;
-    Error_monad.fail Not_implemented_in_local_RPC_mode
+    ignore (meth, body) ;
+    Error_monad.fail (Not_implemented_in_local_RPC_mode uri)
   in
   object
     method base = Uri.empty
@@ -203,7 +203,8 @@ let () =
     ~id:"local_rpc_client.not_implemented_in_local_mode"
     ~title:"Local mockup RPC request not implemented"
     ~description:"A specific RPC is not implemented in mockup mode"
-    ~pp:(fun ppf () -> Format.fprintf ppf "RPC not implemented in mockup mode")
-    Data_encoding.empty
-    (function Not_implemented_in_local_RPC_mode -> Some () | _ -> None)
-    (fun () -> Not_implemented_in_local_RPC_mode)
+    ~pp:(fun ppf (uri : Uri.t) ->
+      Format.fprintf ppf "RPC not implemented in mockup mode: %a" Uri.pp uri)
+    Data_encoding.(obj1 (req "uri" RPC_encoding.uri_encoding))
+    (function Not_implemented_in_local_RPC_mode uri -> Some uri | _ -> None)
+    (fun uri -> Not_implemented_in_local_RPC_mode uri)
