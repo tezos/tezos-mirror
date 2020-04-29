@@ -26,7 +26,17 @@ def _run_and_print(cmd):
 
 
 class Node:
-    """Forks a tezos node and manages its persistent state.
+    """Wrapper for the tezos-node command.
+
+    This class manages the persistent state of a tezos-node
+    (the node directory) and provides an API which wraps the node commands.
+
+    Most commands are intended to be used synchronously, for instance:
+    - tezos-node identity generate
+    - tezos-node upgrade storage
+
+    tezos-node run is intended to be used asynchronously and forks a
+    subprocess.
 
     Typical use.
 
@@ -196,20 +206,29 @@ class Node:
         if self._temp_dir:
             shutil.rmtree(self.node_dir)
 
-    def terminate(self):
-        assert self._process
-        return self._process.terminate()
+    def terminate(self) -> None:
+        """Send SIGTERM to node, do nothing if node hasn't been run yet"""
+        if self._process is not None:
+            self._process.terminate()
 
-    def kill(self):
-        assert self._process
-        return self._process.terminate()
+    def kill(self) -> None:
+        """Send SIGKILL to node, do nothing if node hasn't been run yet"""
+        if self._process is not None:
+            self._process.kill()
 
-    def terminate_or_kill(self):
+    def terminate_or_kill(self) -> None:
+        """Try to terminate node gently (SIGTERM) and kill it (SIGKILL)
+
+        if the node is still running after TERM_TIMEOUT. Do nothing
+        if node hasn't been run yet.
+        """
+        if self._process is None:
+            return
         self._process.terminate()
         try:
-            return self._process.wait(timeout=TERM_TIMEOUT)
+            self._process.wait(timeout=TERM_TIMEOUT)
         except subprocess.TimeoutExpired:
-            return self._process.kill()
+            self._process.kill()
 
     def poll(self):
         assert self._process

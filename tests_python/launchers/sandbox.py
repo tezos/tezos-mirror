@@ -19,24 +19,25 @@ TMP_DIR_PREFIX = 'tezos-sandbox.'
 
 
 class Sandbox:
-    """A sandbox acts as a node/daemons factory with nodes running in
+    """A Sandbox manages a set of clients, nodes and daemons running in
     sandbox mode.
 
-    Nodes and daemons are identified by an integer 0 <= node_id < num_peers,
-    which is mapped to a port rpc + node_id, p2p + node_id.
+    Wrapper objects (Client, Node, Baker...) allow interacting with the
+    corresponding processes. In the sandbox, they are identified by an
+    integer 0 <= node_id < num_peers, which corresponds to ports
+    ``rpc + node_id``, ``p2p + node_id``.
 
-    Nodes and daemons can be dynamically added or removed. Daemons are
-    protocol specific. There can be more than one daemons for a given node,
+    Clients, nodes and daemons can be dynamically added or removed. Daemons are
+    protocol specific. There can be more than one daemon for a given node,
     as long as they correspond to different protocol.
 
     Whenever a node has been added with `add_node()`, we can access to a
     corresponding client object `client()` to interact with this node.
 
-    When the sandbox resources are cleaned (from a call `__exit__()`),
-    the sandbox checks all nodes/daemons started are still alive
-    to alert to user of unexpected failure. If you want to definitively
-    terminate a node within a sandbox, use `sandbox.rm_node()` instead
-    of `node.terminate()`.
+    Sandbox is a python context manager. In particular, the allocated resources
+    are cleaned when `__exit__()` is called. It cleans all temporary
+    directories, allocated for the sandbox, or the Tezos binaries. And
+    it terminates all running processes managed by this sandbox.
     """
 
     def _wrap_path(self, binary: str, branch: str, proto="") -> str:
@@ -108,6 +109,110 @@ class Sandbox:
             file.write(json.dumps({'genesis_pubkey': self._genesis_pk}))
         return self
 
+    def register_node(self, node_id: int,
+                      peers: List[int] = None,
+                      params: List[str] = None,
+                      log_levels: Dict[str, str] = None,
+                      private: bool = True,
+                      use_tls: Tuple[str, str] = None,
+                      branch: str = ""):
+        """Instantiate a Node object and add to sandbox manager
+
+        See add_node for args documentation.
+
+        This node isn't run yet, but is "prepared" with the following
+        parameters.
+
+        tezos-node run
+           --data-dir TMP_DIR
+           --no-bootstrap-peers
+           --sandbox=SANDBOX_FILE
+           --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
+           --private-mode # if private is True
+        """
+        assert node_id not in self.nodes, f'Already a node for id={node_id}'
+        rpc_node = self.rpc + node_id
+        p2p_node = self.p2p + node_id
+        assert 0 <= node_id < self.num_peers, f'{node_id} outside bounds'
+        if peers is None:
+            peers = list(range(self.num_peers))
+        assert all(0 <= peer < self.num_peers for peer in peers)
+
+        log_file = None
+        if self.log_dir:
+            log_file = f'{self.log_dir}/node{node_id}_{self.counter}.txt'
+            self.logs.append(log_file)
+            self.counter += 1
+
+        params = [] if params is None else params
+        if private:
+            params = params + ['--private-mode']
+        params = params + ['--network=sandbox']
+        peers_rpc = [self.p2p + p for p in peers]
+        node_bin = self._wrap_path(NODE, branch)
+        node = Node(node_bin, self.sandbox_file,
+                    p2p_port=p2p_node, rpc_port=rpc_node,
+                    peers=peers_rpc, log_file=log_file, params=params,
+                    log_levels=log_levels, use_tls=use_tls)
+
+        self.nodes[node_id] = node
+        return node
+
+    def register_client(self,
+                        node_id: int,
+                        rpc_port: int,
+                        use_tls: Tuple[str, str] = None,
+                        branch: str = "",
+                        client_factory: Callable = Client):
+        """Instantiate a Client and add it to the sandbox manager"""
+        error_msg = f'Already a client for id={node_id}'
+        assert node_id not in self.clients, error_msg
+        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
+        local_client = self._wrap_path(CLIENT, branch)
+        client = client_factory(local_client, local_admin_client,
+                                rpc_port=rpc_port, use_tls=bool(use_tls))
+        self.clients[node_id] = client
+        return client
+
+    def init_node(self, node, snapshot, reconstruct):
+        """Generate node id and import snapshot """
+        if snapshot is None:
+            node.init_id()
+            node.init_config()
+        else:
+            assert_msg = ("The attribute sandbox_file can not be None. "
+                          "Please verify you wrapped the call to this method "
+                          " inside a with statement")
+            assert self.sandbox_file is not None, assert_msg
+            node.init_id()
+            node.init_config()
+            sandboxed_import = [f'--sandbox', self.sandbox_file]
+            if reconstruct:
+                node.snapshot_import(snapshot,
+                                     ['--reconstruct', '--network=sandbox'] +
+                                     sandboxed_import)
+            else:
+                node.snapshot_import(snapshot,
+                                     ['--network=sandbox'] + sandboxed_import)
+
+    def init_client(self,
+                    client,
+                    node: Node = None,
+                    config_client: bool = True):
+        """Initialize client with bootstrap keys. If node object is provided,
+           check whether the node is running and responsive """
+
+        if node is not None and not client.check_node_listening():
+            node_id = node.rpc_port - self.rpc
+            assert node.poll() is None, "# Node {node_id} isn't running"
+            node.kill()
+            assert False, f"# Node {node_id} isn't responding to RPC"
+
+        client.run(['-w', 'none', 'config', 'update'])
+        if config_client:
+            for name, iden in self.identities.items():
+                client.import_secret_key(name, iden['secret'])
+
     def add_node(self,
                  node_id: int,
                  peers: List[int] = None,
@@ -140,7 +245,8 @@ class Sandbox:
             client_factory (Callable): the constructor of clients. Defaults to
                                        Client. Allows e.g. regression testing.
 
-        This launches a node with default sandbox parameters
+        This registers a node and a client for the given id. It initializes
+        both the client and the node, and run the node.
 
         tezos-node run
            --data-dir TMP_DIR
@@ -148,68 +254,24 @@ class Sandbox:
            --sandbox=SANDBOX_FILE
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
            --private-mode # if private is True
+
+        Whenever a node has been added with `add_node()`, we can access a
+        corresponding client object `client()` to interact with this node.
         """
-        assert node_id not in self.nodes, f'Already a node for id={node_id}'
-        rpc_node = self.rpc + node_id
-        p2p_node = self.p2p + node_id
-        assert 0 <= node_id < self.num_peers, f'{node_id} outside bounds'
-        if peers is None:
-            peers = list(range(self.num_peers))
-        assert all(0 <= peer < self.num_peers for peer in peers)
+        node = self.register_node(node_id, peers, params, log_levels,
+                                  private, use_tls, branch)
 
-        log_file = None
-        if self.log_dir:
-            log_file = f'{self.log_dir}/node{node_id}_{self.counter}.txt'
-            self.logs.append(log_file)
-            self.counter += 1
+        self.init_node(node, snapshot, reconstruct)
 
-        params = [] if params is None else params
-        if private:
-            params = params + ['--private-mode']
-        params = params + ['--network=sandbox']
-        peers_rpc = [self.p2p + p for p in peers]
-        node_bin = self._wrap_path(NODE, branch)
-        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
-        local_client = self._wrap_path(CLIENT, branch)
-        node = Node(node_bin, self.sandbox_file,
-                    p2p_port=p2p_node, rpc_port=rpc_node,
-                    peers=peers_rpc, log_file=log_file, params=params,
-                    log_levels=log_levels, use_tls=use_tls)
-        if snapshot is None:
-            node.init_id()
-            node.init_config()
-        else:
-            assert os.path.isfile(snapshot)
-            assert_msg = "The attribute sandbox_file can not be None. " \
-                "Please verify you wrapped the call to this method inside a " \
-                "with statement"
-            assert self.sandbox_file is not None, assert_msg
-            node.init_id()
-            node.init_config()
-            sandboxed_import = [f'--sandbox', self.sandbox_file]
-            if reconstruct:
-                node.snapshot_import(snapshot,
-                                     ['--reconstruct', '--network=sandbox'] +
-                                     sandboxed_import)
-            else:
-                node.snapshot_import(snapshot,
-                                     ['--network=sandbox'] + sandboxed_import)
         node.run()
-        client = client_factory(local_client, local_admin_client,
-                                rpc_port=rpc_node, use_tls=bool(use_tls))
 
-        if not client.check_node_listening():
-            assert node.poll() is None, '# Node {node_id} failed at startup'
-            node.kill()
-            assert False, f"# Node {node_id} isn't responding to RPC"
+        rpc_port = node.rpc_port
+        client = self.register_client(node_id,
+                                      rpc_port, use_tls,
+                                      branch,
+                                      client_factory)
 
-        # don't wait for confirmation
-        client.run(['-w', 'none', 'config', 'update'])
-        if config_client:
-            for name, iden in self.identities.items():
-                client.import_secret_key(name, iden['secret'])
-        self.nodes[node_id] = node
-        self.clients[node_id] = client
+        self.init_client(client, node, config_client)
 
     def add_baker(self,
                   node_id: int,
@@ -308,11 +370,20 @@ class Sandbox:
         del self.endorsers[proto][node_id]
         endorser.terminate_or_kill()
 
+    def rm_client(self, client_id: int) -> None:
+        """Delete client for given client_id"""
+        error_msg = f"Client {client_id} wasn't registered"
+        assert client_id in self.clients, error_msg
+        self.clients[client_id].cleanup()
+        del self.clients[client_id]
+
     def rm_node(self, node_id: int) -> None:
-        """Kill node for given node_id"""
+        """Kill/cleanup node for given node_id. Also delete corresponding
+           client if was created."""
         node = self.nodes[node_id]
         del self.nodes[node_id]
-        del self.clients[node_id]
+        if node_id in self.clients:
+            self.rm_client(node_id)
         node.terminate_or_kill()
         node.cleanup()
 
@@ -358,8 +429,11 @@ class Sandbox:
     def are_daemons_alive(self) -> bool:
         """ Returns True iff all started daemons/nodes are still alive.
 
-        Daemons/nodes must be removed explicitely to prevent this to
-        return false.
+        This is useful to check that background processes didn't die
+        accidentally. It assumes that all background processes are running.
+        If this is known not to be the case (for instance a node has been
+        added, but is not running), it must be removed with
+        ``sandbox.rm_node()``.
         """
         daemons_alive = True
         for node_id, node in self.nodes.items():
