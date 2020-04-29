@@ -7,26 +7,25 @@ By default the ``tezos-client`` described in the
 :ref:`sandboxed node<sandboxed-mode>` needs a node running.
 This page describes the *mockup* mode, a mode that works without
 connecting to a node. For the moment, its features are more
-limited than the default mode. In this page, we describe the mockup mode.
+limited than the default mode.
 
-In mockup mode, the client uses some dummy values for initial
-parameters that are usually gathered from a node, such as the head
-of the chain or the network identifier. Then the mockup client
-simulates activation from genesis and run implementations of the RPCs
-itself.
+In mockup mode, the client uses some dummy values for initial parameters that
+are usually gathered from a node, such as the head of the chain or the network
+identifier. Then the mockup client simulates activation from genesis and runs
+local implementations of the RPCs itself.
 
 The mockup mode can either use a volatile, in-memory environment or work
 on a persistent state when ``--base-dir`` is specified at creation.
 
 In the current state the mockup mode can:
 
-* typecheck, serialize, sign and evaluate a contract; without a node.
+* typecheck, serialize, sign and evaluate a contract -- without a node.
   These features do not require a persistent state.
 * perform transactions, originations, contract calls in a purely local fashion;
   mimicking the sandboxed mode but without a node. These features
   require a persistent state.
 
-For beginners, we recommend always using the persistent state, for simplicity.
+We recommend that beginners *always* use the persistent state, for simplicity.
 
 Run a mockup client with persistent state
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -46,23 +45,23 @@ be the following (ignore the Warning if there is any):
     ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
 
-To create the mockup client, issue the following command:
+To create the mockup client state, issue the following command:
 
 ::
 
     tezos-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
       --base-dir /tmp/mockup create mockup for protocol
 
-Now that this command has been issued, next calls we show below **all** use
+Now that this command has been issued, the next calls below **all** use
 ``--mode mockup`` and ``--base-dir /tmp/mockup`` arguments. This is
-akin to doing a mockup *session*. To avoid mistakes, we advice to
+akin to doing a mockup *session*. To avoid mistakes, we advise to
 do the following in the local shell running the session:
 
 ::
 
     $ alias mockup-client='tezos-client --mode mockup --base-dir /tmp/mockup'
 
-You can know use usual commands, such as:
+You can now use standard commands, such as:
 
 ::
 
@@ -113,8 +112,8 @@ You can know use usual commands, such as:
 Run a mockup client without persistent state
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Without the persistent state, the mockup mode is capable of
-typechecking scripts:::
+Without persistent state, the mockup mode is still able to
+typecheck scripts:::
 
     ./tezos-client --mode mockup typecheck script ./tests_python/contracts/mini_scenarios/hardlimit.tz
 
@@ -143,6 +142,13 @@ corresponding to the default values:
     Written default --bootstrap-accounts file: /tmp/mockup/bootstrap-accounts.json
     Written default --protocol-constants file: /tmp/mockup/protocol-constants.json
 
-Then edit the files ``bootstrap-accounts.json`` and ``protocol-constants.json``,
-and specify them to ``mockup-client`` using flags ``--bootstrap-acounts`` and
-``--protocol-constants``.
+You can now edit the files ``bootstrap-accounts.json`` and
+``protocol-constants.json`` to your liking then create a tuned mockup state.
+
+::
+
+   $ mv /tmp/mockup /tmp/mockup.old && \
+     mockup-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+     create mockup for protocol \
+     --protocol-constants protocol-constants.json \
+     --bootstrap-accounts bootstrap-accounts.json
