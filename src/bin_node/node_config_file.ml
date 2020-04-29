@@ -135,6 +135,17 @@ let blockchain_network_sandbox =
         Protocol_hash.of_b58check_exn
           "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
     }
+    ~genesis_parameters:
+      (* Genesis public key corresponds to the following private key:
+         unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6 *)
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" ) ];
+      }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
 
