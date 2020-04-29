@@ -11,6 +11,7 @@ depends: [
   "tezos-base"
   "tezos-workers"
   "tezos-p2p-services"
+  "tezos-version"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
