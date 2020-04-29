@@ -44,7 +44,8 @@ class Baker(subprocess.Popen):
         cmd_string = utils.format_command(cmd)
         print(cmd_string)
         stdout, stderr = utils.prepare_log(cmd, log_file)
-        subprocess.Popen.__init__(self, cmd, stdout=stdout, stderr=stderr)
+        subprocess.Popen.__init__(self, cmd, stdout=stdout,
+                                  stderr=stderr)  # type: ignore
 
     def terminate_or_kill(self):
         self.terminate()

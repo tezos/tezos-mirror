@@ -128,6 +128,8 @@ class Client:
                               bufsize=1,
                               universal_newlines=True,
                               env=new_env) as process:
+            assert process.stdout is not None
+            assert process.stderr is not None
             for line in process.stdout:
                 print(line, end='')
                 stdout += line
