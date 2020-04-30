@@ -3,9 +3,13 @@ from os import path
 import pytest
 
 from tools.client_regression import ClientRegression
+from tools.constants import IDENTITIES
 from tools.paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 from tools.utils import (assert_run_failure, assert_run_script_failwith,
                          assert_run_script_success)
+
+
+PUBLIC_KEY = IDENTITIES['bootstrap1']['public']
 
 
 @pytest.mark.slow
@@ -635,6 +639,9 @@ class TestContractOpcodes:
 
             # Test UNPAIR
             ('unpair.tz', 'Unit', 'Unit', 'Unit'),
+
+            # Test VOTING_POWER
+            ('voting_power.tz', '0', f'"{PUBLIC_KEY}"', '500')
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
