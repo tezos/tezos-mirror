@@ -104,10 +104,12 @@ module type EVENT_DEFINITION = sig
   (** A display-friendly text which describes what the event means. *)
   val doc : string
 
-  (** Pretty printer for log messages. When pretty-printed with [~short: true],
-      simple events omit the parameters which are normally written in
-      parentheses at the end of the message, i.e. parameters which are not
-      inlined. *)
+  (* Pretty printer for log messages.
+     Some sinks output a short message; some output a more detailed message; and
+     some may output both. This function is called with [~short: true] when they
+     want short messages, and [~short: false] when they want detailed ones.
+     Short messages should contain information which is not available in the
+     event encoding, or that looks nice when inlined in the message. *)
   val pp : ?short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
