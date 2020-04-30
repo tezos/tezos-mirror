@@ -87,13 +87,13 @@ let sandbox () =
        @."
 
 let check_network ctxt =
-  Shell_services.P2p.version ctxt
+  Version_services.version ctxt
   >>= function
   | Error _ ->
       Lwt.return_none
-  | Ok version ->
+  | Ok {network_version; _} ->
       let has_prefix prefix =
-        String.has_prefix ~prefix (version.chain_name :> string)
+        String.has_prefix ~prefix (network_version.chain_name :> string)
       in
       if has_prefix "SANDBOXED" then (
         sandbox () ;
