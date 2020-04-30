@@ -1,15 +1,45 @@
-build-and-test:
+---
+
+.build_template:
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
-  script:
+  before_script:
+    - sudo apk add --update gmp-dev m4 perl
     - opam repository set-url default https://opam.ocaml.org
     - opam update
     - opam pin --no-action data-encoding .
+    - opam depext data-encoding
+    - opam install --deps-only data-encoding
+
+build:
+  extends: .build_template
+  stage: build
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - _build
+  script:
+    - dune build
+
+test:
+  extends: .build_template
+  stage: test
+  script:
     - opam depext ocamlformat.0.11.0
     - opam install ocamlformat.0.11.0
     - dune build @fmt
-    - opam depext data-encoding
-    - opam install --deps-only data-encoding
-    - dune build
     - opam depext --dry-run crowbar alcotest
     - opam install --deps-only --with-test .
     - dune runtest
+
+pages:
+  extends: .build_template
+  stage: deploy
+  artifacts:
+    paths:
+      - public/
+  only:
+    - master
+  script:
+    - opam install odoc
+    - dune build @doc
+    - mv _build/default/_doc/_html public/
