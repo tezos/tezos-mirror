@@ -2,10 +2,9 @@
 
 stages:
   - test
-  - build
+  - deploy
 
-build-and-test:
-  stage: build
+.build_template: &build_definition
   image: ocaml/opam2:alpine-3.10-ocaml-4.08
   script:
     - sudo apk --no-cache add m4
@@ -21,8 +20,12 @@ build-and-test:
       resto-cohttp resto-cohttp-server resto-directory resto-json resto
     - opam install --deps-only .
     - dune build
+    - opam install odoc
+    - dune build @doc
+    - mv _build/default/_doc/_html public/
     - dune runtest
     - opam install .
+
 
 test-fmt:
   stage: test
@@ -31,3 +34,20 @@ test-fmt:
     - sudo apk --no-cache add m4
     - opam install ocamlformat.0.10
     - ocamlformat --check src/*.ml src/*.mli test/*.ml
+
+pages:
+  <<: *build_definition
+  stage: deploy
+  artifacts:
+    paths:
+    - public/
+  only:
+  - master
+
+test:
+  <<: *build_definition
+  stage: test
+  only:
+  - branches
+  except:
+  - master
