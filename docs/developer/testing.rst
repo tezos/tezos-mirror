@@ -421,3 +421,14 @@ Or
 ::
 
     ./scripts/instrument_dune_bisect.sh --remove src/
+
+
+Known issues
+~~~~~~~~~~~~
+
+The instrumentation by ``bisect_ppx`` of OCaml code containing `partial
+applications with missing optional arguments generate code that fails
+typechecking <https://github.com/aantron/bisect_ppx/issues/319>`_. For those
+pretty rare cases, either: change the order of arguments (`fun ?x y z` rather
+than `fun y ?x z`), add an explicit parameter at call site (`f y ?x:None`
+rather than `f y`), or add a wrapper function (`fun z -> f y z`).
