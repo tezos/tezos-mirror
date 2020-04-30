@@ -32,8 +32,6 @@ stages:
     - mainnet-snapshots
   before_script:
     - . ./scripts/version.sh
-  tags:
-    - gitlab-org
 
 check_opam_deps:
   <<: *build_definition
@@ -84,9 +82,6 @@ build:
     paths:
       - _build
     expire_in: 1 day
-  tags:
-    - gitlab-org
-    - nomadic-labs
 
 ############################################################
 ## Stage: test (only MR)                                  ##
@@ -235,8 +230,6 @@ unit:protocol_compiles:
     - build
   before_script:
     - make
-  tags:
-    - gitlab-org
 
 integration:proto:sandbox:
   <<: *integration_definition
@@ -312,8 +305,6 @@ integration:sandboxes:daemons-upgrade:
     - mkdir tmp
   after_script:
     - tail -n +1 tmp/*
-  tags:
-    - gitlab-org
 
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
@@ -529,8 +520,6 @@ documentation:linkcheck:
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
-  tags:
-    - gitlab-org
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
@@ -1210,5 +1199,3 @@ publish:doc:
         git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
         git push origin master ;
       fi
-  tags:
-    - gitlab-org
