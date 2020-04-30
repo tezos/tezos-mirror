@@ -99,6 +99,8 @@ let info_of_peer_info pool i =
 let build_rpc_directory net =
   let dir = RPC_directory.empty in
   (* Network : Global *)
+  (* DEPRECATED: use [version] from "lib_shell_services/version_services"
+     instead. *)
   let dir =
     RPC_directory.register0 dir P2p_services.S.version (fun () () ->
         return (P2p.announced_version net))
