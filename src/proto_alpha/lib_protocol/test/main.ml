@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "protocol_alpha"
     [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
@@ -40,3 +40,4 @@ let () =
       ("qty", Qty.tests);
       ("voting", Voting.tests);
       ("interpretation", Interpretation.tests) ]
+  |> Lwt_main.run

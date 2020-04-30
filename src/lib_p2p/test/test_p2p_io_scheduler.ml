@@ -255,7 +255,7 @@ let wrap n f =
           Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p.io-scheduler",
@@ -271,3 +271,4 @@ let () =
                 !port
                 !delay
                 !clients) ] ) ]
+  |> Lwt_main.run

@@ -156,4 +156,6 @@ let tests =
   [ Alcotest_lwt.test_case "random_roundtrip" `Quick test_random;
     Alcotest_lwt.test_case "vectors_decrypt" `Quick test_vectors ]
 
-let () = Alcotest.run "tezos-signer-backends" [("encrypted", tests)]
+let () =
+  Alcotest_lwt.run "tezos-signer-backends" [("encrypted", tests)]
+  |> Lwt_main.run

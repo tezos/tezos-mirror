@@ -16,7 +16,7 @@ depends: [
   "tezos-mockup-registration"
   "tezos-signer-backends"
   "tezos-protocol-alpha-parameters"
-  "alcotest-lwt" { with-test & = "0.8.5" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

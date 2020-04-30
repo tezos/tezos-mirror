@@ -687,7 +687,8 @@ let wrap (n, f) =
       >>= function Ok () -> Lwt.return_unit | Error err -> Lwt.fail_with err)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-lib-micheline"
     [("micheline", List.map wrap tests)]
+  |> Lwt_main.run

@@ -12,7 +12,7 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "lwt-watcher"
-  "alcotest-lwt" { with-test & = "0.8.5" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
   "tezos-test-services" { with-test }
 ]
 build: [

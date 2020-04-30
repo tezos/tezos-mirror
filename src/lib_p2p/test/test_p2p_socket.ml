@@ -609,7 +609,7 @@ let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p-connection.",
@@ -623,6 +623,7 @@ let main () =
           wrap "close-on-write" Close_on_write.run;
           wrap "garbled-data" Garbled_data.run;
           Crypto_test.wrap () ] ) ]
+  |> Lwt_main.run
 
 let () =
   Sys.catch_break true ;

@@ -389,4 +389,6 @@ let tests =
   try if Sys.argv.(1) = "--no-bench" then tests else tests @ bench
   with _ -> tests @ bench
 
-let () = Alcotest.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
+let () =
+  Alcotest_lwt.run ~argv:[|""|] "tezos-shell" [("locator", tests)]
+  |> Lwt_main.run

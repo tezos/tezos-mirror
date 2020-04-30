@@ -82,10 +82,11 @@ let () =
     Alcotest_lwt.test_case n `Quick (fun _ () ->
         Lazy.force init_logs >>= fun () -> f ())
   in
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p.peerset",
         List.map
           wrap
           [("empty", test_empty); ("ban", test_ban); ("gc", test_gc)] ) ]
+  |> Lwt_main.run

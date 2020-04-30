@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "protocol_006_PsCARTHA"
     [ ("transfer", Transfer.tests);
       ("origination", Origination.tests);
@@ -39,3 +39,4 @@ let () =
       ("combined", Combined_operations.tests);
       ("qty", Qty.tests);
       ("voting", Voting.tests) ]
+  |> Lwt_main.run

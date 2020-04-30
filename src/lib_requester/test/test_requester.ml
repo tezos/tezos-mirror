@@ -639,10 +639,13 @@ let test_full_requester_shutdown _ () =
   Test_Requester.shutdown req
 
 let () =
-  Alcotest.run
+  Alcotest_lwt.run
     "tezos-requester"
     [ ( "all",
-        [ Alcotest.test_case "test create: simple" `Quick test_full_requester;
+        [ Alcotest_lwt.test_case_sync
+            "test create: simple"
+            `Quick
+            test_full_requester;
           Alcotest_lwt.test_case
             "test create: test known"
             `Quick
@@ -735,7 +738,7 @@ let () =
             "test notify: disk duplicate"
             `Quick
             test_full_requester_test_notify_disk_duplicate;
-          Alcotest.test_case
+          Alcotest_lwt.test_case_sync
             "test pending_requests"
             `Quick
             test_full_requester_test_pending_requests;
@@ -747,3 +750,4 @@ let () =
             "test shutdown"
             `Quick
             test_full_requester_shutdown ] ) ]
+  |> Lwt_main.run

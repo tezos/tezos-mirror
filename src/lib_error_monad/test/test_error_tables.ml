@@ -185,4 +185,5 @@ let tests =
     Alcotest_lwt.test_case "self_clean" `Quick test_length;
     Alcotest_lwt.test_case "order" `Quick test_order ]
 
-let () = Alcotest.run "error_tables" [("error_tables", tests)]
+let () =
+  Alcotest_lwt.run "error_tables" [("error_tables", tests)] |> Lwt_main.run

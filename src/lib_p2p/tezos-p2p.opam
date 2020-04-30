@@ -11,7 +11,7 @@ depends: [
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-p2p-services"
-  "alcotest-lwt" { with-test & = "0.8.5" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
   "lwt" { < "4.3" }
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { = "0.2" }

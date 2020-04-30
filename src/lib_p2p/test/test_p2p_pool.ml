@@ -968,7 +968,7 @@ let main () =
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in
   let points = List.map (fun port -> (!addr, port)) ports in
-  Alcotest.run
+  Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p-connection-pool",
@@ -981,6 +981,7 @@ let main () =
               Overcrowded.run_mixed_versions points);
           wrap "no-common-network-protocol" (fun _ ->
               No_common_network.run points) ] ) ]
+  |> Lwt_main.run
 
 let () =
   Sys.catch_break true ;

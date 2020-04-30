@@ -13,7 +13,7 @@ depends: [
   "tezos-protocol-004-Pt24m4xi"
   "tezos-shell-services"
   "tezos-signer-backends"
-  "alcotest-lwt" { with-test & = "0.8.5" }
+  "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [
   [ "dune" "build" "-p" name "-j" jobs ]
