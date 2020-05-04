@@ -314,7 +314,9 @@ val case :
   ('a -> 't) ->
   't case
 
-val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
+type tag_size = [`Uint8 | `Uint16]
+
+val union : ?tag_size:tag_size -> 't case list -> 't encoding
 
 val def :
   string -> ?title:string -> ?description:string -> 't encoding -> 't encoding

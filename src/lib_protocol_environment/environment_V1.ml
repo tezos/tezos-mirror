@@ -281,6 +281,8 @@ struct
 
     let case = case
 
+    type tag_size = [`Uint8 | `Uint16]
+
     let union = union
 
     let def = def
