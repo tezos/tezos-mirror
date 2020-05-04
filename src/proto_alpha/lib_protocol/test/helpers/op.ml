@@ -108,7 +108,7 @@ let combine_operations ?public_key ?counter ~source ctxt
                    fee = Tez.zero;
                    counter;
                    operation = Reveal public_key;
-                   gas_limit = Z.of_int (128 * 10000);
+                   gas_limit = Z.of_int (1000 * 10000);
                    storage_limit = Z.zero;
                  }
              in
@@ -175,7 +175,7 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
             fee = Tez.zero;
             counter;
             operation = Reveal public_key;
-            gas_limit = Z.of_int (128 * 10000);
+            gas_limit = Z.of_int (1000 * 10000);
             storage_limit = Z.zero;
           }
       in
@@ -209,7 +209,7 @@ let revelation ctxt public_key =
               fee = Tez.zero;
               counter;
               operation = Reveal public_key;
-              gas_limit = Z.of_int (128 * 10000);
+              gas_limit = Z.of_int (1000 * 10000);
               storage_limit = Z.zero;
             }))
   in
