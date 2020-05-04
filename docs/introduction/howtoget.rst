@@ -67,6 +67,7 @@ the client. Every command to the ``tezos-client`` can be equivalently
 executed using ``./carthagenet.sh client``. Similarly, ``tezos-admin-client``
 can be executed using ``./carthagenet.sh admin-client``.
 
+.. _build_from_sources:
 
 Build from sources
 ------------------
