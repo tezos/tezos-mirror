@@ -1739,6 +1739,14 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
+- ``VOTING_POWER``: Return the voting power of a given contract. This voting power
+   coincides with the weight of the contract in the voting listings (i.e., the rolls
+   count) which is calculated at the beginning of every voting period.
+
+::
+
+    :: key_hash : 'S   ->   nat : 'S
+
 Special operations
 ~~~~~~~~~~~~~~~~~~
 
@@ -3176,6 +3184,7 @@ Full grammar
       | CREATE_ACCOUNT
       | CREATE_CONTRACT { <instruction> ... }
       | IMPLICIT_ACCOUNT
+      | VOTING_POWER
       | NOW
       | LEVEL
       | AMOUNT
