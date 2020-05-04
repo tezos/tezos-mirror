@@ -57,21 +57,23 @@ type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
 
-let allocation_weight = Z.of_int 2
-
-let step_weight = Z.of_int 1
-
-let read_base_weight = Z.of_int 100
-
-let write_base_weight = Z.of_int 160
-
-let byte_read_weight = Z.of_int 10
-
-let byte_written_weight = Z.of_int 15
-
 let rescaling_bits = 7
 
 let scale (z : Z.t) = Z.shift_left z rescaling_bits
+
+let allocation_weight = scale (Z.of_int 2)
+
+let atomic_step_weight = Z.of_int 1
+
+let step_weight = scale (Z.of_int 1)
+
+let read_base_weight = scale (Z.of_int 100)
+
+let write_base_weight = scale (Z.of_int 160)
+
+let byte_read_weight = scale (Z.of_int 10)
+
+let byte_written_weight = scale (Z.of_int 15)
 
 let cost_to_gas (cost : cost) : Z.t = cost
 
@@ -94,27 +96,23 @@ let check_enough block_gas operation_gas cost =
   consume block_gas operation_gas cost
   >|? fun (_block_remaining, _remaining) -> ()
 
-let alloc_cost n = Z.mul allocation_weight (scale (Z.of_int (n + 1)))
+let alloc_cost n = Z.mul allocation_weight (Z.of_int (n + 1))
 
 let alloc_bytes_cost n = alloc_cost ((n + 7) / 8)
 
 let alloc_bits_cost n = alloc_cost ((n + 63) / 64)
 
-let atomic_step_cost n = Z.mul step_weight (Z.of_int (2 * n))
+let atomic_step_cost n = Z.mul atomic_step_weight (Z.of_int (2 * n))
 
-let step_cost n = Z.mul step_weight (scale (Z.of_int n))
+let step_cost n = Z.mul step_weight (Z.of_int n)
 
 let free = Z.zero
 
 let read_bytes_cost n =
-  Z.add
-    (Z.mul read_base_weight (scale Z.one))
-    (Z.mul byte_read_weight (scale n))
+  Z.add (Z.mul read_base_weight Z.one) (Z.mul byte_read_weight n)
 
 let write_bytes_cost n =
-  Z.add
-    (Z.mul write_base_weight (scale Z.one))
-    (Z.mul byte_written_weight (scale n))
+  Z.add (Z.mul write_base_weight Z.one) (Z.mul byte_written_weight n)
 
 let ( +@ ) x y = Z.add x y
 
