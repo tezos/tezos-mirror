@@ -286,7 +286,9 @@ let max_priority_arg =
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
-let default_minimal_nanotez_per_gas_unit = Q.(100 // 128)
+let default_minimal_nanotez_per_gas_unit =
+  let scaling = 1000 in
+  Q.(100 // scaling)
 
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 

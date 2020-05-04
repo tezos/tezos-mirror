@@ -57,7 +57,7 @@ type error += Block_quota_exceeded (* `Temporary *)
 
 type error += Operation_quota_exceeded (* `Temporary *)
 
-let scaling_factor = 128
+let scaling_factor = 1000
 
 let allocation_weight = Z.of_int (scaling_factor * 2)
 
