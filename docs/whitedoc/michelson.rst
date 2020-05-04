@@ -1596,7 +1596,7 @@ for under/overflows.
     > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
         iff y <> 0
 
--  ``COMPARE``
+-  ``COMPARE``: Mutez comparison
 
 ::
 
@@ -1756,6 +1756,19 @@ Special operations
 
     :: 'S   ->   chain_id : 'S
 
+-  ``COMPARE``: Chain identifier comparison
+
+::
+
+    :: chain_id : chain_id : 'S   ->   int : 'S
+
+    > COMPARE / x : y : S  =>  -1 : S
+        iff x < y
+    > COMPARE / x : y : S  =>  0 : S
+        iff x = y
+    > COMPARE / x : y : S  =>  1 : S
+        iff x > y
+
 - ``LEVEL``: Push the current block level.
 
 ::
@@ -1787,7 +1800,7 @@ the wild and untyped outside world.
 
 ::
 
-   :: bytes : bytes : 'S   -> bytes : 'S
+    :: bytes : bytes : 'S   -> bytes : 'S
 
     > CONCAT / s : t : S  =>  (s ^ t) : S
 
@@ -1866,11 +1879,13 @@ Cryptographic primitives
 
     :: key : signature : bytes : 'S   ->   bool : 'S
 
--  ``COMPARE``:
+-  ``COMPARE``: Key hash, key and signature comparison
 
 ::
 
     :: key_hash : key_hash : 'S   ->   int : 'S
+    :: key : key : 'S   ->   int : 'S
+    :: signature : signature : 'S   ->   int : 'S
 
     > COMPARE / x : y : S  =>  -1 : S
         iff x < y
@@ -1878,6 +1893,7 @@ Cryptographic primitives
         iff x = y
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
+
 
 Deprecated instructions
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3176,9 +3192,6 @@ Full grammar
       | CHAIN_ID
     <type> ::=
       | <comparable type>
-      | key
-      | unit
-      | signature
       | option <type>
       | list <type>
       | set <comparable type>
@@ -3189,7 +3202,6 @@ Full grammar
       | lambda <type> <type>
       | map <comparable type> <type>
       | big_map <comparable type> <type>
-      | chain_id
     <comparable type> ::=
       | unit
       | never
@@ -3197,9 +3209,12 @@ Full grammar
       | int
       | nat
       | string
+      | chain_id
       | bytes
       | mutez
       | key_hash
+      | key
+      | signature
       | timestamp
       | address
       | option <comparable type>
