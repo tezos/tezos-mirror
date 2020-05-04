@@ -25,14 +25,7 @@
 
 type t = Unaccounted | Limited of {remaining : Z.t}
 
-type cost = {
-  allocations : Z.t;
-  steps : Z.t;
-  reads : Z.t;
-  writes : Z.t;
-  bytes_read : Z.t;
-  bytes_written : Z.t;
-}
+type cost = Z.t
 
 let encoding =
   let open Data_encoding in
@@ -56,38 +49,9 @@ let pp ppf = function
   | Limited {remaining} ->
       Format.fprintf ppf "%a units remaining" Z.pp remaining
 
-let cost_encoding =
-  let open Data_encoding in
-  conv
-    (fun {allocations; steps; reads; writes; bytes_read; bytes_written} ->
-      (allocations, steps, reads, writes, bytes_read, bytes_written))
-    (fun (allocations, steps, reads, writes, bytes_read, bytes_written) ->
-      {allocations; steps; reads; writes; bytes_read; bytes_written})
-    (obj6
-       (req "allocations" z)
-       (req "steps" z)
-       (req "reads" z)
-       (req "writes" z)
-       (req "bytes_read" z)
-       (req "bytes_written" z))
+let cost_encoding = Data_encoding.z
 
-let pp_cost ppf {allocations; steps; reads; writes; bytes_read; bytes_written}
-    =
-  Format.fprintf
-    ppf
-    "(steps: %a, allocs: %a, reads: %a (%a bytes), writes: %a (%a bytes))"
-    Z.pp
-    steps
-    Z.pp
-    allocations
-    Z.pp
-    reads
-    Z.pp
-    bytes_read
-    Z.pp
-    writes
-    Z.pp
-    bytes_written
+let pp_cost = Z.pp
 
 type error += Block_quota_exceeded (* `Temporary *)
 
@@ -109,18 +73,7 @@ let rescaling_bits = 7
 
 let scale (z : Z.t) = Z.shift_left z rescaling_bits
 
-let cost_to_gas (cost : cost) : Z.t =
-  Z.add
-    (Z.add
-       (Z.mul cost.allocations allocation_weight)
-       (Z.mul cost.steps step_weight))
-    (Z.add
-       (Z.add
-          (Z.mul cost.reads read_base_weight)
-          (Z.mul cost.writes write_base_weight))
-       (Z.add
-          (Z.mul cost.bytes_read byte_read_weight)
-          (Z.mul cost.bytes_written byte_written_weight)))
+let cost_to_gas (cost : cost) : Z.t = cost
 
 let consume block_gas operation_gas cost =
   match operation_gas with
@@ -141,89 +94,31 @@ let check_enough block_gas operation_gas cost =
   consume block_gas operation_gas cost
   >|? fun (_block_remaining, _remaining) -> ()
 
-let alloc_cost n =
-  {
-    allocations = scale (Z.of_int (n + 1));
-    steps = Z.zero;
-    reads = Z.zero;
-    writes = Z.zero;
-    bytes_read = Z.zero;
-    bytes_written = Z.zero;
-  }
+let alloc_cost n = Z.mul allocation_weight (scale (Z.of_int (n + 1)))
 
 let alloc_bytes_cost n = alloc_cost ((n + 7) / 8)
 
 let alloc_bits_cost n = alloc_cost ((n + 63) / 64)
 
-let atomic_step_cost n =
-  {
-    allocations = Z.zero;
-    steps = Z.of_int (2 * n);
-    reads = Z.zero;
-    writes = Z.zero;
-    bytes_read = Z.zero;
-    bytes_written = Z.zero;
-  }
+let atomic_step_cost n = Z.mul step_weight (Z.of_int (2 * n))
 
-let step_cost n =
-  {
-    allocations = Z.zero;
-    steps = scale (Z.of_int n);
-    reads = Z.zero;
-    writes = Z.zero;
-    bytes_read = Z.zero;
-    bytes_written = Z.zero;
-  }
+let step_cost n = Z.mul step_weight (scale (Z.of_int n))
 
-let free =
-  {
-    allocations = Z.zero;
-    steps = Z.zero;
-    reads = Z.zero;
-    writes = Z.zero;
-    bytes_read = Z.zero;
-    bytes_written = Z.zero;
-  }
+let free = Z.zero
 
 let read_bytes_cost n =
-  {
-    allocations = Z.zero;
-    steps = Z.zero;
-    reads = scale Z.one;
-    writes = Z.zero;
-    bytes_read = scale n;
-    bytes_written = Z.zero;
-  }
+  Z.add
+    (Z.mul read_base_weight (scale Z.one))
+    (Z.mul byte_read_weight (scale n))
 
 let write_bytes_cost n =
-  {
-    allocations = Z.zero;
-    steps = Z.zero;
-    reads = Z.zero;
-    writes = scale Z.one;
-    bytes_read = Z.zero;
-    bytes_written = scale n;
-  }
+  Z.add
+    (Z.mul write_base_weight (scale Z.one))
+    (Z.mul byte_written_weight (scale n))
 
-let ( +@ ) x y =
-  {
-    allocations = Z.add x.allocations y.allocations;
-    steps = Z.add x.steps y.steps;
-    reads = Z.add x.reads y.reads;
-    writes = Z.add x.writes y.writes;
-    bytes_read = Z.add x.bytes_read y.bytes_read;
-    bytes_written = Z.add x.bytes_written y.bytes_written;
-  }
+let ( +@ ) x y = Z.add x y
 
-let ( *@ ) x y =
-  {
-    allocations = Z.mul (Z.of_int x) y.allocations;
-    steps = Z.mul (Z.of_int x) y.steps;
-    reads = Z.mul (Z.of_int x) y.reads;
-    writes = Z.mul (Z.of_int x) y.writes;
-    bytes_read = Z.mul (Z.of_int x) y.bytes_read;
-    bytes_written = Z.mul (Z.of_int x) y.bytes_written;
-  }
+let ( *@ ) x y = Z.mul (Z.of_int x) y
 
 let alloc_mbytes_cost n = alloc_cost 12 +@ alloc_bytes_cost n
 
