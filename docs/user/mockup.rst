@@ -50,7 +50,7 @@ To create the mockup client state, issue the following command:
 ::
 
     tezos-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
-      --base-dir /tmp/mockup create mockup for protocol
+      --base-dir /tmp/mockup create mockup
 
 Now that this command has been issued, the next calls below **all** use
 ``--mode mockup`` and ``--base-dir /tmp/mockup`` arguments. This is
