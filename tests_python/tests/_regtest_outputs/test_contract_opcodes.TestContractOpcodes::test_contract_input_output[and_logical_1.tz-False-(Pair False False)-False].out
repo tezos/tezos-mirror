@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 133070976 units remaining)
+  - location: 8 (remaining gas: 1039617000 units remaining)
     [ (Pair (Pair False False) False)  	 ]
-  - location: 9 (remaining gas: 133070916 units remaining)
+  - location: 9 (remaining gas: 1039616940 units remaining)
     [ (Pair False False)  	@parameter ]
-  - location: 12 (remaining gas: 133070816 units remaining)
+  - location: 12 (remaining gas: 1039616840 units remaining)
     [ (Pair False False)  	@parameter
       (Pair False False)  	@parameter ]
-  - location: 13 (remaining gas: 133070756 units remaining)
+  - location: 13 (remaining gas: 1039616780 units remaining)
     [ False  	
       (Pair False False)  	@parameter ]
-  - location: 16 (remaining gas: 133070636 units remaining)
+  - location: 16 (remaining gas: 1039616660 units remaining)
     [ False  	 ]
-  - location: 15 (remaining gas: 133070616 units remaining)
+  - location: 15 (remaining gas: 1039616640 units remaining)
     [ False  	 ]
-  - location: 14 (remaining gas: 133070616 units remaining)
+  - location: 14 (remaining gas: 1039616640 units remaining)
     [ False  	
       False  	 ]
-  - location: -1 (remaining gas: 133070596 units remaining)
+  - location: -1 (remaining gas: 1039616620 units remaining)
     [ False  	
       False  	 ]
-  - location: 10 (remaining gas: 133070576 units remaining)
+  - location: 10 (remaining gas: 1039616600 units remaining)
     [ False  	
       False  	 ]
-  - location: 17 (remaining gas: 133070516 units remaining)
+  - location: 17 (remaining gas: 1039616540 units remaining)
     [ False  	@and ]
-  - location: 18 (remaining gas: 133070456 units remaining)
+  - location: 18 (remaining gas: 1039616480 units remaining)
     [ {}  	@noop
       False  	@and ]
-  - location: 20 (remaining gas: 133070396 units remaining)
+  - location: 20 (remaining gas: 1039616420 units remaining)
     [ (Pair {} False)  	 ]
-  - location: -1 (remaining gas: 133070376 units remaining)
+  - location: -1 (remaining gas: 1039616400 units remaining)
     [ (Pair {} False)  	 ]
 

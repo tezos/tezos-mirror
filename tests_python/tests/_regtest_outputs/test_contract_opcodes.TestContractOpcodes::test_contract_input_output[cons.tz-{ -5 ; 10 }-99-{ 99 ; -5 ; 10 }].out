@@ -7,34 +7,34 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 133071616 units remaining)
+  - location: 7 (remaining gas: 1039622000 units remaining)
     [ (Pair 99 { -5 ; 10 })  	 ]
-  - location: 10 (remaining gas: 133071516 units remaining)
+  - location: 10 (remaining gas: 1039621900 units remaining)
     [ (Pair 99 { -5 ; 10 })  	
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 11 (remaining gas: 133071456 units remaining)
+  - location: 11 (remaining gas: 1039621840 units remaining)
     [ 99  	@parameter
       (Pair 99 { -5 ; 10 })  	 ]
-  - location: 14 (remaining gas: 133071336 units remaining)
+  - location: 14 (remaining gas: 1039621720 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 13 (remaining gas: 133071316 units remaining)
+  - location: 13 (remaining gas: 1039621700 units remaining)
     [ { -5 ; 10 }  	@storage ]
-  - location: 12 (remaining gas: 133071316 units remaining)
+  - location: 12 (remaining gas: 1039621700 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: -1 (remaining gas: 133071296 units remaining)
+  - location: -1 (remaining gas: 1039621680 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 8 (remaining gas: 133071276 units remaining)
+  - location: 8 (remaining gas: 1039621660 units remaining)
     [ 99  	@parameter
       { -5 ; 10 }  	@storage ]
-  - location: 15 (remaining gas: 133071216 units remaining)
+  - location: 15 (remaining gas: 1039621600 units remaining)
     [ { 99 ; -5 ; 10 }  	 ]
-  - location: 16 (remaining gas: 133071156 units remaining)
+  - location: 16 (remaining gas: 1039621540 units remaining)
     [ {}  	
       { 99 ; -5 ; 10 }  	 ]
-  - location: 18 (remaining gas: 133071096 units remaining)
+  - location: 18 (remaining gas: 1039621480 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
-  - location: -1 (remaining gas: 133071076 units remaining)
+  - location: -1 (remaining gas: 1039621460 units remaining)
     [ (Pair {} { 99 ; -5 ; 10 })  	 ]
 
