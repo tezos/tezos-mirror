@@ -178,9 +178,8 @@ module Big_map = struct
     >>= fun c -> Lwt.return (Raw_context.reset_temporary_big_map c)
 
   let exists c id =
-    Lwt.return
-      (Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero))
-    >>=? fun c ->
+    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost Z.zero)
+    >>?= fun c ->
     Storage.Big_map.Key_type.get_option c id
     >>=? fun kt ->
     match kt with

@@ -499,10 +499,10 @@ let check_inited ctxt =
       else storage_error (Incompatible_protocol_version s)
 
 let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
-  Lwt.return (Raw_level_repr.of_int32 level)
-  >>=? fun level ->
-  Lwt.return (Fitness_repr.to_int64 fitness)
-  >>=? fun fitness ->
+  Raw_level_repr.of_int32 level
+  >>?= fun level ->
+  Fitness_repr.to_int64 fitness
+  >>?= fun fitness ->
   check_inited ctxt
   >>=? fun () ->
   get_constants ctxt
@@ -568,8 +568,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
   >>=? fun (previous_proto, ctxt) ->
   ( match previous_proto with
   | Genesis param ->
-      Lwt.return (Raw_level_repr.of_int32 level)
-      >>=? fun first_level ->
+      Raw_level_repr.of_int32 level
+      >>?= fun first_level ->
       set_first_level ctxt first_level
       >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
   | Carthage_006 ->

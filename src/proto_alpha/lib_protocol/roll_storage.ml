@@ -249,17 +249,16 @@ module Delegate = struct
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
     Storage.Roll.Delegate_change.get ctxt delegate
     >>=? fun change ->
-    Lwt.return
-      (record_trace Consume_roll_change Tez_repr.(change -? tokens_per_roll))
-    >>=? fun new_change ->
+    record_trace Consume_roll_change Tez_repr.(change -? tokens_per_roll)
+    >>?= fun new_change ->
     Storage.Roll.Delegate_change.set ctxt delegate new_change
 
   let recover_roll_change ctxt delegate =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
     Storage.Roll.Delegate_change.get ctxt delegate
     >>=? fun change ->
-    Lwt.return Tez_repr.(change +? tokens_per_roll)
-    >>=? fun new_change ->
+    Tez_repr.(change +? tokens_per_roll)
+    >>?= fun new_change ->
     Storage.Roll.Delegate_change.set ctxt delegate new_change
 
   let pop_roll_from_delegate ctxt delegate =
@@ -361,8 +360,8 @@ module Delegate = struct
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
     Storage.Roll.Delegate_change.get ctxt delegate
     >>=? fun change ->
-    Lwt.return Tez_repr.(amount +? change)
-    >>=? fun change ->
+    Tez_repr.(amount +? change)
+    >>?= fun change ->
     Storage.Roll.Delegate_change.set ctxt delegate change
     >>=? fun ctxt ->
     delegate_pubkey ctxt delegate
@@ -370,8 +369,8 @@ module Delegate = struct
     let rec loop ctxt change =
       if Tez_repr.(change < tokens_per_roll) then return ctxt
       else
-        Lwt.return Tez_repr.(change -? tokens_per_roll)
-        >>=? fun change ->
+        Tez_repr.(change -? tokens_per_roll)
+        >>?= fun change ->
         create_roll_in_delegate ctxt delegate delegate_pk
         >>=? fun ctxt -> loop ctxt change
     in
@@ -396,8 +395,8 @@ module Delegate = struct
       else
         pop_roll_from_delegate ctxt delegate
         >>=? fun (_, ctxt) ->
-        Lwt.return Tez_repr.(change +? tokens_per_roll)
-        >>=? fun change -> loop ctxt change
+        Tez_repr.(change +? tokens_per_roll)
+        >>?= fun change -> loop ctxt change
     in
     Storage.Roll.Delegate_change.get ctxt delegate
     >>=? fun change ->
@@ -416,8 +415,8 @@ module Delegate = struct
       | Some _ ->
           return (ctxt, change) )
     >>=? fun (ctxt, change) ->
-    Lwt.return Tez_repr.(change -? amount)
-    >>=? fun change -> Storage.Roll.Delegate_change.set ctxt delegate change
+    Tez_repr.(change -? amount)
+    >>?= fun change -> Storage.Roll.Delegate_change.set ctxt delegate change
 
   let set_inactive ctxt delegate =
     ensure_inited ctxt delegate
@@ -439,8 +438,8 @@ module Delegate = struct
       | Some _roll ->
           pop_roll_from_delegate ctxt delegate
           >>=? fun (_, ctxt) ->
-          Lwt.return Tez_repr.(change +? tokens_per_roll)
-          >>=? fun change -> loop ctxt change
+          Tez_repr.(change +? tokens_per_roll)
+          >>?= fun change -> loop ctxt change
     in
     loop ctxt change
     >>=? fun (ctxt, change) ->
@@ -493,8 +492,8 @@ module Delegate = struct
       let rec loop ctxt change =
         if Tez_repr.(change < tokens_per_roll) then return ctxt
         else
-          Lwt.return Tez_repr.(change -? tokens_per_roll)
-          >>=? fun change ->
+          Tez_repr.(change -? tokens_per_roll)
+          >>?= fun change ->
           create_roll_in_delegate ctxt delegate delegate_pk
           >>=? fun ctxt -> loop ctxt change
       in
@@ -529,16 +528,14 @@ let init ctxt = Storage.Roll.Next.init ctxt Roll_repr.first
 let init_first_cycles ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   (* Precompute rolls for cycle (0 --> preserved_cycles) *)
-  List.fold_left
+  fold_left_s
     (fun ctxt c ->
-      ctxt
-      >>=? fun ctxt ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0
       >>=? fun ctxt ->
       snapshot_rolls_for_cycle ctxt cycle
       >>=? fun ctxt -> freeze_rolls_for_cycle ctxt cycle)
-    (return ctxt)
+    ctxt
     (0 --> preserved)
   >>=? fun ctxt ->
   let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 1)) in
@@ -580,16 +577,15 @@ let update_tokens_per_roll ctxt new_tokens_per_roll =
       {constants with Constants_repr.tokens_per_roll = new_tokens_per_roll})
   >>= fun ctxt ->
   let decrease = Tez_repr.(new_tokens_per_roll < old_tokens_per_roll) in
-  Lwt.return
-    ( if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
-    else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll) )
-  >>=? fun abs_diff ->
+  ( if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
+  else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll) )
+  >>?= fun abs_diff ->
   Storage.Delegates.fold ctxt (Ok ctxt) (fun pkh ctxt_opt ->
-      Lwt.return ctxt_opt
-      >>=? fun ctxt ->
+      ctxt_opt
+      >>?= fun ctxt ->
       count_rolls ctxt pkh
       >>=? fun rolls ->
-      Lwt.return Tez_repr.(abs_diff *? Int64.of_int rolls)
-      >>=? fun amount ->
+      Tez_repr.(abs_diff *? Int64.of_int rolls)
+      >>?= fun amount ->
       if decrease then Delegate.add_amount ctxt pkh amount
       else Delegate.remove_amount ctxt pkh amount)

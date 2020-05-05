@@ -562,8 +562,8 @@ let rec step :
     (a * context) tzresult Lwt.t =
  fun logger ctxt step_constants ({instr; loc; _} as descr) stack ->
   let gas = cost_of_instr descr stack in
-  Lwt.return (Gas.consume ctxt gas)
-  >>=? fun ctxt ->
+  Gas.consume ctxt gas
+  >>?= fun ctxt ->
   let module Log = (val logger) in
   Log.log_entry ctxt descr stack ;
   let logged_return : a * context -> (a * context) tzresult Lwt.t =
@@ -759,23 +759,21 @@ let rec step :
       logged_return ((Script_int.(abs (of_int (MBytes.length s))), rest), ctxt)
   (* currency operations *)
   | (Add_tez, (x, (y, rest))) ->
-      Lwt.return Tez.(x +? y) >>=? fun res -> logged_return ((res, rest), ctxt)
+      Tez.(x +? y) >>?= fun res -> logged_return ((res, rest), ctxt)
   | (Sub_tez, (x, (y, rest))) ->
-      Lwt.return Tez.(x -? y) >>=? fun res -> logged_return ((res, rest), ctxt)
+      Tez.(x -? y) >>?= fun res -> logged_return ((res, rest), ctxt)
   | (Mul_teznat, (x, (y, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
         Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some y ->
-        Lwt.return Tez.(x *? y)
-        >>=? fun res -> logged_return ((res, rest), ctxt) )
+        Tez.(x *? y) >>?= fun res -> logged_return ((res, rest), ctxt) )
   | (Mul_nattez, (y, (x, rest))) -> (
     match Script_int.to_int64 y with
     | None ->
         Log.get_log () >>=? fun log -> fail (Overflow (loc, log))
     | Some y ->
-        Lwt.return Tez.(x *? y)
-        >>=? fun res -> logged_return ((res, rest), ctxt) )
+        Tez.(x *? y) >>?= fun res -> logged_return ((res, rest), ctxt) )
   (* boolean operations *)
   | (Or, (x, (y, rest))) ->
       logged_return ((x || y, rest), ctxt)
@@ -1011,8 +1009,8 @@ let rec step :
       Script_ir_translator.pack_data ctxt t value
       >>=? fun (bytes, ctxt) -> logged_return ((bytes, rest), ctxt)
   | (Unpack t, (bytes, rest)) ->
-      Lwt.return (Gas.check_enough ctxt (Script.serialized_cost bytes))
-      >>=? fun () ->
+      Gas.check_enough ctxt (Script.serialized_cost bytes)
+      >>?= fun () ->
       if
         Compare.Int.(MBytes.length bytes >= 1)
         && Compare.Int.(MBytes.get_uint8 bytes 0 = 0x05)
@@ -1020,19 +1018,18 @@ let rec step :
         let bytes = MBytes.sub bytes 1 (MBytes.length bytes - 1) in
         match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
         | None ->
-            Lwt.return (Gas.consume ctxt (Interp_costs.unpack_failed bytes))
-            >>=? fun ctxt -> logged_return ((None, rest), ctxt)
+            Gas.consume ctxt (Interp_costs.unpack_failed bytes)
+            >>?= fun ctxt -> logged_return ((None, rest), ctxt)
         | Some expr -> (
-            Lwt.return (Gas.consume ctxt (Script.deserialized_cost expr))
-            >>=? fun ctxt ->
+            Gas.consume ctxt (Script.deserialized_cost expr)
+            >>?= fun ctxt ->
             parse_data ctxt ~legacy:false t (Micheline.root expr)
             >>= function
             | Ok (value, ctxt) ->
                 logged_return ((Some value, rest), ctxt)
             | Error _ignored ->
-                Lwt.return
-                  (Gas.consume ctxt (Interp_costs.unpack_failed bytes))
-                >>=? fun ctxt -> logged_return ((None, rest), ctxt) )
+                Gas.consume ctxt (Interp_costs.unpack_failed bytes)
+                >>?= fun ctxt -> logged_return ((None, rest), ctxt) )
       else logged_return ((None, rest), ctxt)
   (* protocol *)
   | (Address, ((_, address), rest)) ->
@@ -1077,8 +1074,8 @@ let rec step :
             parameters = Script.lazy_expr (Micheline.strip_locations p);
           }
       in
-      Lwt.return (fresh_internal_nonce ctxt)
-      >>=? fun (ctxt, nonce) ->
+      fresh_internal_nonce ctxt
+      >>?= fun (ctxt, nonce) ->
       logged_return
         ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
@@ -1239,8 +1236,8 @@ let rec step :
           ctxt )
   | (Set_delegate, (delegate, rest)) ->
       let operation = Delegation delegate in
-      Lwt.return (fresh_internal_nonce ctxt)
-      >>=? fun (ctxt, nonce) ->
+      fresh_internal_nonce ctxt
+      >>?= fun (ctxt, nonce) ->
       logged_return
         ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
@@ -1336,11 +1333,10 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     Lwt.t =
   parse_script ctxt unparsed_script ~legacy:true
   >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt) ->
-  Lwt.return
-  @@ record_trace
-       (Bad_contract_parameter step_constants.self)
-       (find_entrypoint arg_type ~root_name entrypoint)
-  >>=? fun (box, _) ->
+  record_trace
+    (Bad_contract_parameter step_constants.self)
+    (find_entrypoint arg_type ~root_name entrypoint)
+  >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false arg_type (box arg))

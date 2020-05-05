@@ -90,13 +90,10 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   | Some cycles ->
       (* Store pending ramp ups. *)
       let constants = Raw_context.constants ctxt in
-      Lwt.return
-        Tez_repr.(constants.block_security_deposit /? Int64.of_int cycles)
-      >>=? fun block_step ->
-      Lwt.return
-        Tez_repr.(
-          constants.endorsement_security_deposit /? Int64.of_int cycles)
-      >>=? fun endorsement_step ->
+      Tez_repr.(constants.block_security_deposit /? Int64.of_int cycles)
+      >>?= fun block_step ->
+      Tez_repr.(constants.endorsement_security_deposit /? Int64.of_int cycles)
+      >>?= fun endorsement_step ->
       (* Start without security_deposit *)
       Raw_context.patch_constants ctxt (fun c ->
           {
@@ -107,10 +104,10 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
       >>= fun ctxt ->
       fold_left_s
         (fun ctxt cycle ->
-          Lwt.return Tez_repr.(block_step *? Int64.of_int cycle)
-          >>=? fun block_security_deposit ->
-          Lwt.return Tez_repr.(endorsement_step *? Int64.of_int cycle)
-          >>=? fun endorsement_security_deposit ->
+          Tez_repr.(block_step *? Int64.of_int cycle)
+          >>?= fun block_security_deposit ->
+          Tez_repr.(endorsement_step *? Int64.of_int cycle)
+          >>?= fun endorsement_security_deposit ->
           let cycle = Cycle_repr.of_int32_exn (Int32.of_int cycle) in
           Storage.Ramp_up.Security_deposits.init
             ctxt

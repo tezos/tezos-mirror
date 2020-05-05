@@ -549,10 +549,10 @@ let fresh_contract_from_current_nonce c =
   >|? fun (c, nonce) -> (c, Contract_repr.originated_contract nonce)
 
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
-  Lwt.return (Raw_context.origination_nonce ctxt_since)
-  >>=? fun since ->
-  Lwt.return (Raw_context.origination_nonce ctxt_until)
-  >>=? fun until ->
+  Raw_context.origination_nonce ctxt_since
+  >>?= fun since ->
+  Raw_context.origination_nonce ctxt_until
+  >>?= fun until ->
   filter_s
     (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
@@ -724,8 +724,8 @@ let credit c contract amount =
     | Some manager ->
         create_implicit c manager ~balance:amount )
   | Some balance ->
-      Lwt.return Tez_repr.(amount +? balance)
-      >>=? fun balance ->
+      Tez_repr.(amount +? balance)
+      >>?= fun balance ->
       Storage.Contract.Balance.set c contract balance
       >>=? fun c -> Roll_storage.Contract.add_amount c contract amount
 
