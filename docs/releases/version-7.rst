@@ -75,6 +75,12 @@ For more information, see: http://tezos.gitlab.io/user/multinetwork.html
 Node
 ~~~~
 
+- Added RPC `/version` which returns the version of the node, the version
+  of the P2P protocol, the version of the distributed DB, the commit hash
+  and the commit date. Other RPCs which returned version numbers
+  (`/network/version`, `/network/versions` and `/monitor/commit_hash`)
+  are deprecated: use `/version` instead.
+
 - RPCs which returned `treated` and `completed` fields now return durations
   (relative to the value of the `pushed` field) instead of timestamps.
 
@@ -140,6 +146,8 @@ Node
 
 - In private mode, do not try to discover the local network peers as they will not
   be trusted anyway.
+
+- Fixed a bug which caused the node to stop with a segmentation fault.
 
 Client
 ~~~~~~
