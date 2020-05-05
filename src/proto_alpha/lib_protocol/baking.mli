@@ -126,8 +126,7 @@ val check_fitness_gap : context -> Block_header.t -> unit tzresult Lwt.t
 
 val dawn_of_a_new_cycle : context -> Cycle.t option tzresult Lwt.t
 
-val earlier_predecessor_timestamp :
-  context -> Level.t -> Timestamp.t tzresult Lwt.t
+val earlier_predecessor_timestamp : context -> Level.t -> Timestamp.t tzresult
 
 (** Since Emmy+
 

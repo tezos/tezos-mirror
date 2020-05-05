@@ -281,7 +281,7 @@ let grace_period ctxt block pkh =
 let requested_levels ~default ctxt cycles levels =
   match (levels, cycles) with
   | ([], []) ->
-      return [default]
+      ok [default]
   | (levels, cycles) ->
       (* explicitly fail when requested levels or cycle are in the past...
          or too far in the future... *)
@@ -292,13 +292,13 @@ let requested_levels ~default ctxt cycles levels =
              ( List.map (Level.from_raw ctxt) levels
              :: List.map (Level.levels_in_cycle ctxt) cycles ))
       in
-      map_s
+      map
         (fun level ->
           let current_level = Level.current ctxt in
-          if Level.(level <= current_level) then return (level, None)
+          if Level.(level <= current_level) then ok (level, None)
           else
             Baking.earlier_predecessor_timestamp ctxt level
-            >|=? fun timestamp -> (level, Some timestamp))
+            >|? fun timestamp -> (level, Some timestamp))
         levels
 
 module Baking_rights = struct
@@ -413,7 +413,7 @@ module Baking_rights = struct
           ctxt
           q.cycles
           q.levels
-        >>=? fun levels ->
+        >>?= fun levels ->
         let max_priority =
           match q.max_priority with None -> 64 | Some max -> max
         in
@@ -522,7 +522,7 @@ module Endorsing_rights = struct
           ctxt
           q.cycles
           q.levels
-        >>=? fun levels ->
+        >>?= fun levels ->
         map_s (endorsement_slots ctxt) levels
         >|=? fun rights ->
         let rights = List.concat rights in
