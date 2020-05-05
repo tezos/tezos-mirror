@@ -231,7 +231,7 @@ let register () =
           unparse_script ctxt Readable script
           >>=? fun (script, ctxt) ->
           Script.force_decode_in_context ctxt script.storage
-          >>=? fun (storage, _ctxt) -> return_some storage) ;
+          >>?= fun (storage, _ctxt) -> return_some storage) ;
   register2 S.entrypoint_type (fun ctxt v entrypoint () () ->
       Contract.get_script_code ctxt v
       >>=? fun (_, expr) ->
@@ -243,7 +243,7 @@ let register () =
           let legacy = true in
           let open Script_ir_translator in
           Script.force_decode_in_context ctxt expr
-          >>=? fun (expr, _) ->
+          >>?= fun (expr, _) ->
           Lwt.return
             ( parse_toplevel ~legacy expr
             >>? fun (arg_type, _, _, root_name) ->
@@ -268,7 +268,7 @@ let register () =
           let legacy = true in
           let open Script_ir_translator in
           Script.force_decode_in_context ctxt expr
-          >>=? fun (expr, _) ->
+          >>?= fun (expr, _) ->
           Lwt.return
             ( parse_toplevel ~legacy expr
             >>? fun (arg_type, _, _, root_name) ->

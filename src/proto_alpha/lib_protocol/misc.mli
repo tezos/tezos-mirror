@@ -49,6 +49,8 @@ val remove_elem_from_list : int -> 'a list -> 'a list
 module Syntax : sig
   val ( >|=? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
 
+  val ( >>?= ) : 'a tzresult -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+
   val ok_unit : unit tzresult
 
   val ok_none : 'a option tzresult

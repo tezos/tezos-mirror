@@ -91,6 +91,8 @@ module Syntax = struct
   (* To be upstreamed in environment v1 *)
   let ( >|=? ) = ( >>|? )
 
+  let ( >>?= ) v f = match v with Error _ as e -> Lwt.return e | Ok v -> f v
+
   let ok_unit = Ok ()
 
   let ok_none = Ok None
