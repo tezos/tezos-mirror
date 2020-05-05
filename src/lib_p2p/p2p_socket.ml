@@ -77,6 +77,11 @@ module Crypto = struct
     P2p_io_scheduler.read_full ?canceler ~len:header_length fd header_buf
     >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
+    (* Ciphertexts have at least length 16. *)
+    fail_unless
+      (encrypted_length >= 16)
+      P2p_errors.Invalid_incoming_ciphertext_size
+    >>=? fun () ->
     let buf_length = encrypted_length + Crypto_box.boxzerobytes in
     let buf = Bytes.make buf_length '\x00' in
     P2p_io_scheduler.read_full
