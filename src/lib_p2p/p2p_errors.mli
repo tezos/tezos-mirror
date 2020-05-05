@@ -33,6 +33,8 @@ type error += Decipher_error
 
 type error += Invalid_message_size
 
+type error += Invalid_incoming_ciphertext_size
+
 type error += Encoding_error
 
 type error += Rejected_socket_connection
