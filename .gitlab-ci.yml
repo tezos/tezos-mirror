@@ -440,6 +440,12 @@ integration:mempool:
     - pytest tests_python/tests/test_mempool.py -s --log-dir=tmp
   stage: test
 
+integration:migration:
+  <<: *integration_python_definition
+  script:
+    - pytest tests_python/tests/test_migration.py -s --log-dir=tmp
+  stage: test
+
 integration:mockup:
   <<: *integration_python_definition
   script:

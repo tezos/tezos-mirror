@@ -1,6 +1,6 @@
-from typing import Dict, List, Tuple, Callable, Optional
 import os
 import time
+from typing import Callable, Dict, List, Tuple
 
 from client.client import Client
 from daemons.baker import Baker
@@ -103,7 +103,8 @@ class Sandbox:
                       log_levels: Dict[str, str] = None,
                       private: bool = True,
                       use_tls: Tuple[str, str] = None,
-                      branch: str = ""):
+                      branch: str = "",
+                      node_config: dict = None):
         """Instantiate a Node object and add to sandbox manager
 
         See add_node for args documentation.
@@ -134,13 +135,12 @@ class Sandbox:
         params = [] if params is None else params
         if private:
             params = params + ['--private-mode']
-        params = params + ['--network=sandbox']
         peers_rpc = [self.p2p + p for p in peers]
         node_bin = self._wrap_path(NODE, branch)
-        node = Node(node_bin, node_dir=node_dir, p2p_port=p2p_node,
-                    rpc_port=rpc_node, peers=peers_rpc, log_file=log_file,
-                    params=params, log_levels=log_levels, use_tls=use_tls,
-                    singleprocess=self.singleprocess)
+        node = Node(node_bin, config=node_config, node_dir=node_dir,
+                    p2p_port=p2p_node, rpc_port=rpc_node, peers=peers_rpc,
+                    log_file=log_file, params=params, log_levels=log_levels,
+                    use_tls=use_tls, singleprocess=self.singleprocess)
 
         self.nodes[node_id] = node
         return node
@@ -266,6 +266,7 @@ class Sandbox:
                  snapshot: str = None,
                  reconstruct: bool = False,
                  branch: str = "",
+                 node_config: dict = None,
                  client_factory: Callable = Client) -> None:
         """ Launches new node with given node_id and initializes client
 
@@ -301,7 +302,8 @@ class Sandbox:
         corresponding client object `client()` to interact with this node.
         """
         node = self.register_node(node_id, node_dir, peers, params,
-                                  log_levels, private, use_tls, branch)
+                                  log_levels, private, use_tls, branch,
+                                  node_config)
 
         self.init_node(node, snapshot, reconstruct)
 
@@ -567,9 +569,10 @@ class SandboxMultiBranch(Sandbox):
                  snapshot: str = None,
                  reconstruct: bool = False,
                  branch: str = "",
+                 node_config: dict = None,
                  client_factory: Callable = Client) -> None:
         assert not branch
         branch = self._branch_map[node_id]
         super().add_node(node_id, node_dir, peers, params, log_levels, private,
                          config_client, use_tls, snapshot, reconstruct,
-                         branch, client_factory)
+                         branch, node_config, client_factory)

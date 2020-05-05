@@ -1,5 +1,6 @@
-import os.path
 import json
+import os.path
+
 from tools import paths
 
 PARAMETERS_FILE = (f'{paths.TEZOS_HOME}src/proto_alpha/parameters/'
@@ -14,6 +15,7 @@ with open(PARAMETERS_FILE) as f:
 # This is the secret key used to activate a protocol from genesis in sandbox
 # mode. The corresponding public key is hard-coded in the tezos node.
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
+GENESIS_PK = "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
 
 IDENTITIES = {
     'bootstrap1': {
