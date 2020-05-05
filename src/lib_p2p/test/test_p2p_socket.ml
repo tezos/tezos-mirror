@@ -356,7 +356,8 @@ module Kicked = struct
     P2p_socket.kick auth_fd P2p_rejection.No_motive []
     >>= fun () -> return_unit
 
-  let run _dir = run_nodes client server
+  (* This test is skipped because its result on the CI is not deterministic *)
+  let run _dir = return_unit
 end
 
 module Simple_message = struct
