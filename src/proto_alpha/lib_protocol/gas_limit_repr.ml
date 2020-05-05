@@ -59,7 +59,7 @@ let pp ppf = function
 
 let cost_encoding = Data_encoding.z
 
-let pp_cost fmt z = Format.fprintf fmt "%s" (Z.to_string z)
+let pp_cost fmt z = Z.pp fmt z
 
 type error += Block_quota_exceeded (* `Temporary *)
 
