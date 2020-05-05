@@ -1545,3 +1545,8 @@ class Client:
         if trace_stack:
             cmd += ['--trace-stack']
         return client_output.RunScriptResult(self.run(cmd))
+
+    def find_baker_with_consensus_key(self, pkh: str) -> str:
+        cmd = ['find', 'baker', 'with', 'consensus', 'key', pkh]
+        res = client_output.FindBakerWithConsensusKeyResult(self.run(cmd))
+        return res.baker
