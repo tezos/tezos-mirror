@@ -142,11 +142,10 @@ let minimal_time c priority pred_timestamp =
           let p = Int32.pred p in
           cumsum_time_between_blocks acc durations p
   in
-  Lwt.return
-    (cumsum_time_between_blocks
-       pred_timestamp
-       (Constants.time_between_blocks c)
-       (Int32.succ priority))
+  cumsum_time_between_blocks
+    pred_timestamp
+    (Constants.time_between_blocks c)
+    (Int32.succ priority)
 
 let earlier_predecessor_timestamp ctxt level =
   let current = Level.current ctxt in
@@ -161,19 +160,19 @@ let earlier_predecessor_timestamp ctxt level =
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp
-  >>=? fun minimal_time ->
+  >>? fun minimal_time ->
   let timestamp = Alpha_context.Timestamp.current c in
-  Lwt.return
-    (record_trace
-       (Timestamp_too_early (minimal_time, timestamp))
-       Timestamp.(timestamp -? minimal_time))
+  record_trace
+    (Timestamp_too_early (minimal_time, timestamp))
+    Timestamp.(timestamp -? minimal_time)
 
 let check_baking_rights c {Block_header.priority; _} pred_timestamp =
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority
   >>=? fun delegate ->
-  check_timestamp c priority pred_timestamp
-  >|=? fun block_delay -> (delegate, block_delay)
+  Lwt.return
+    ( check_timestamp c priority pred_timestamp
+    >|? fun block_delay -> (delegate, block_delay) )
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -387,7 +386,7 @@ let minimum_allowed_endorsements ctxt ~block_delay =
 let minimal_valid_time ctxt ~priority ~endorsing_power =
   let predecessor_timestamp = Timestamp.current ctxt in
   minimal_time ctxt priority predecessor_timestamp
-  >>=? fun minimal_time ->
+  >>? fun minimal_time ->
   let minimal_required_endorsements = Constants.initial_endorsers ctxt in
   let delay_per_missing_endorsement =
     Constants.delay_per_missing_endorsement ctxt
@@ -395,8 +394,5 @@ let minimal_valid_time ctxt ~priority ~endorsing_power =
   let missing_endorsements =
     Compare.Int.max 0 (minimal_required_endorsements - endorsing_power)
   in
-  Lwt.return
-  @@ ( Period.mult
-         (Int32.of_int missing_endorsements)
-         delay_per_missing_endorsement
-     >|? fun delay -> Time.add minimal_time (Period.to_seconds delay) )
+  Period.mult (Int32.of_int missing_endorsements) delay_per_missing_endorsement
+  >|? fun delay -> Time.add minimal_time (Period.to_seconds delay)

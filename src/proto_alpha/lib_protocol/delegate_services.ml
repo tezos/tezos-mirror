@@ -380,11 +380,11 @@ module Baking_rights = struct
         let delegate = Signature.Public_key.hash pk in
         ( match pred_timestamp with
         | None ->
-            return_none
+            ok_none
         | Some pred_timestamp ->
             Baking.minimal_time ctxt priority pred_timestamp
-            >>=? fun t -> return_some t )
-        >>=? fun timestamp ->
+            >|? fun t -> Some t )
+        >>?= fun timestamp ->
         let acc =
           {level = level.level; delegate; priority; timestamp} :: acc
         in
@@ -646,7 +646,7 @@ module Minimal_valid_time = struct
   let register () =
     let open Services_registration in
     register0 S.minimal_valid_time (fun ctxt {priority; endorsing_power} () ->
-        minimal_valid_time ctxt ~priority ~endorsing_power)
+        Lwt.return @@ minimal_valid_time ctxt ~priority ~endorsing_power)
 
   let get ctxt block priority endorsing_power =
     RPC_context.make_call0

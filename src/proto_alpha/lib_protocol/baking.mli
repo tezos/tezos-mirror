@@ -48,7 +48,7 @@ type error += Invalid_stamp (* `Permanent *)
     after which a baker with priority [priority] is allowed to
     bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
     time cannot be computed. *)
-val minimal_time : context -> int -> Time.t -> Time.t tzresult Lwt.t
+val minimal_time : context -> int -> Time.t -> Time.t tzresult
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
@@ -160,4 +160,4 @@ val minimum_allowed_endorsements : context -> block_delay:Period.t -> int
     `endorsing_power` argument), it returns the minimum time at which
     the next block can be baked. *)
 val minimal_valid_time :
-  context -> priority:int -> endorsing_power:int -> Time.t tzresult Lwt.t
+  context -> priority:int -> endorsing_power:int -> Time.t tzresult
