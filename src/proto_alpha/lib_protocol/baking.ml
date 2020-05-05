@@ -156,9 +156,7 @@ let earlier_predecessor_timestamp ctxt level =
     failwith "Baking.earlier_block_timestamp: past block."
   else
     Lwt.return (Period.mult (Int32.pred gap) step)
-    >>=? fun delay ->
-    Lwt.return Timestamp.(current_timestamp +? delay)
-    >>=? fun result -> return result
+    >>=? fun delay -> Lwt.return Timestamp.(current_timestamp +? delay)
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp
@@ -174,7 +172,7 @@ let check_baking_rights c {Block_header.priority; _} pred_timestamp =
   Roll.baking_rights_owner c level ~priority
   >>=? fun delegate ->
   check_timestamp c priority pred_timestamp
-  >>=? fun block_delay -> return (delegate, block_delay)
+  >|=? fun block_delay -> (delegate, block_delay)
 
 type error += Incorrect_priority (* `Permanent *)
 
@@ -245,7 +243,7 @@ let endorsing_reward ctxt ~block_priority num_slots =
 let baking_priorities c level =
   let rec f priority =
     Roll.baking_rights_owner c level ~priority
-    >>=? fun delegate -> return (LCons (delegate, fun () -> f (succ priority)))
+    >|=? fun delegate -> LCons (delegate, fun () -> f (succ priority))
   in
   f 0
 
@@ -253,7 +251,7 @@ let endorsement_rights ctxt level =
   fold_left_s
     (fun acc slot ->
       Roll.endorsement_rights_owner ctxt level ~slot
-      >>=? fun pk ->
+      >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
         match Signature.Public_key_hash.Map.find_opt pkh acc with
@@ -262,7 +260,7 @@ let endorsement_rights ctxt level =
         | Some (pk, slots, used) ->
             (pk, slot :: slots, used)
       in
-      return (Signature.Public_key_hash.Map.add pkh right acc))
+      Signature.Public_key_hash.Map.add pkh right acc)
     Signature.Public_key_hash.Map.empty
     (0 --> (Constants.endorsers_per_block ctxt - 1))
 
@@ -396,12 +394,8 @@ let minimal_valid_time ctxt ~priority ~endorsing_power =
   let missing_endorsements =
     Compare.Int.max 0 (minimal_required_endorsements - endorsing_power)
   in
-  match
-    Period.mult
-      (Int32.of_int missing_endorsements)
-      delay_per_missing_endorsement
-  with
-  | Ok delay ->
-      return (Time.add minimal_time (Period.to_seconds delay))
-  | Error _ as err ->
-      Lwt.return err
+  Lwt.return
+  @@ ( Period.mult
+         (Int32.of_int missing_endorsements)
+         delay_per_missing_endorsement
+     >|? fun delay -> Time.add minimal_time (Period.to_seconds delay) )

@@ -166,12 +166,12 @@ let rec register_indexed_subcontext :
   | Pair (left, right) ->
       let compare_left = compare left in
       let equal_left x y = Compare.Int.(compare_left x y = 0) in
-      let list_left r = list r >>=? fun l -> return (destutter equal_left l) in
+      let list_left r = list r >|=? fun l -> destutter equal_left l in
       let list_right r =
         let (a, k) = unpack left r in
         list a
-        >>=? fun l ->
-        return (List.map snd (List.filter (fun (x, _) -> equal_left x k) l))
+        >|=? fun l ->
+        List.map snd (List.filter (fun (x, _) -> equal_left x k) l)
       in
       register_indexed_subcontext
         (register_indexed_subcontext desc ~list:list_left left)
@@ -275,7 +275,7 @@ let rec combine_object = function
           get =
             (fun k i ->
               handler.get k i
-              >>=? fun v1 -> handlers.get k i >>=? fun v2 -> return (v1, v2));
+              >>=? fun v1 -> handlers.get k i >|=? fun v2 -> (v1, v2));
         }
 
 type query = {depth : int}
@@ -298,7 +298,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
     rpc_dir :=
       RPC_directory.register !rpc_dir service (fun k q () ->
           get k (q.depth + 1)
-          >>=? function None -> raise Not_found | Some x -> return x)
+          >|=? function None -> raise Not_found | Some x -> x)
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
@@ -368,9 +368,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
             map_s
               (fun key ->
                 if Compare.Int.(i = 1) then return (key, None)
-                else
-                  handler.get (k, key) (i - 1)
-                  >>=? fun value -> return (key, value))
+                else handler.get (k, key) (i - 1) >|=? fun value -> (key, value))
               keys
             >>=? fun values -> return_some values
         in

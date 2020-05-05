@@ -133,12 +133,11 @@ let internal_nonce_already_recorded ctxt k =
 let set_current_fitness ctxt fitness = {ctxt with fitness}
 
 let add_fees ctxt fees =
-  Lwt.return Tez_repr.(ctxt.fees +? fees)
-  >>=? fun fees -> return {ctxt with fees}
+  Lwt.return Tez_repr.(ctxt.fees +? fees) >|=? fun fees -> {ctxt with fees}
 
 let add_rewards ctxt rewards =
   Lwt.return Tez_repr.(ctxt.rewards +? rewards)
-  >>=? fun rewards -> return {ctxt with rewards}
+  >|=? fun rewards -> {ctxt with rewards}
 
 let add_deposit ctxt delegate deposit =
   let previous =
@@ -149,11 +148,11 @@ let add_deposit ctxt delegate deposit =
         Tez_repr.zero
   in
   Lwt.return Tez_repr.(previous +? deposit)
-  >>=? fun deposit ->
+  >|=? fun deposit ->
   let deposits =
     Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits
   in
-  return {ctxt with deposits}
+  {ctxt with deposits}
 
 let get_deposits ctxt = ctxt.deposits
 
@@ -394,7 +393,7 @@ let () =
     (function Storage_error err -> Some err | _ -> None)
     (fun err -> Storage_error err)
 
-let storage_error err = fail (Storage_error err)
+let storage_error err = error (Storage_error err)
 
 (* Initialization *********************************************************)
 
@@ -414,7 +413,7 @@ let protocol_param_key = ["protocol_parameters"]
 
 let get_first_level ctxt =
   Context.get ctxt first_level_key
-  >>= function
+  >|= function
   | None ->
       storage_error (Missing_key (first_level_key, Get))
   | Some bytes -> (
@@ -422,13 +421,13 @@ let get_first_level ctxt =
     | None ->
         storage_error (Corrupted_data first_level_key)
     | Some level ->
-        return level )
+        ok level )
 
 let set_first_level ctxt level =
   let bytes =
     Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
   in
-  Context.set ctxt first_level_key bytes >>= fun ctxt -> return ctxt
+  Context.set ctxt first_level_key bytes >|= ok
 
 type error += Failed_to_parse_parameter of bytes
 
@@ -476,7 +475,7 @@ let get_proto_param ctxt =
         fail (Failed_to_parse_parameter bytes)
     | Some json -> (
         Context.del ctxt protocol_param_key
-        >>= fun ctxt ->
+        >|= fun ctxt ->
         match Data_encoding.Json.destruct Parameters_repr.encoding json with
         | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
             Format.kasprintf
@@ -487,7 +486,7 @@ let get_proto_param ctxt =
               Data_encoding.Json.pp
               json
         | param ->
-            return (param, ctxt) ) )
+            ok (param, ctxt) ) )
 
 let set_constants ctxt constants =
   let bytes =
@@ -499,7 +498,7 @@ let set_constants ctxt constants =
 
 let get_constants ctxt =
   Context.get ctxt constants_key
-  >>= function
+  >|= function
   | None ->
       failwith "Internal error: cannot read constants in context."
   | Some bytes -> (
@@ -509,21 +508,21 @@ let get_constants ctxt =
     | None ->
         failwith "Internal error: cannot parse constants in context."
     | Some constants ->
-        return constants )
+        ok constants )
 
 let patch_constants ctxt f =
   let constants = f ctxt.constants in
   set_constants ctxt.context constants
-  >>= fun context -> Lwt.return {ctxt with context; constants}
+  >|= fun context -> {ctxt with context; constants}
 
 let check_inited ctxt =
   Context.get ctxt version_key
-  >>= function
+  >|= function
   | None ->
       failwith "Internal error: un-initialized context."
   | Some bytes ->
       let s = Bytes.to_string bytes in
-      if Compare.String.(s = version_value) then return_unit
+      if Compare.String.(s = version_value) then ok_unit
       else storage_error (Incompatible_protocol_version s)
 
 let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
@@ -536,7 +535,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   get_constants ctxt
   >>=? fun constants ->
   get_first_level ctxt
-  >>=? fun first_level ->
+  >|=? fun first_level ->
   let level =
     Level_repr.from_raw
       ~first_level
@@ -546,31 +545,30 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level
   in
-  return
-    {
-      context = ctxt;
-      constants;
-      level;
-      predecessor_timestamp;
-      timestamp;
-      fitness;
-      first_level;
-      allowed_endorsements = Signature.Public_key_hash.Map.empty;
-      included_endorsements = 0;
-      fees = Tez_repr.zero;
-      rewards = Tez_repr.zero;
-      deposits = Signature.Public_key_hash.Map.empty;
-      operation_gas = Unaccounted;
-      storage_space_to_pay = None;
-      allocated_contracts = None;
-      block_gas = constants.Constants_repr.hard_gas_limit_per_block;
-      origination_nonce = None;
-      temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
-      internal_nonce = 0;
-      internal_nonces_used = Int_set.empty;
-      contract_code_cache = Contract_repr.Map.empty;
-      contract_storage_cache = Contract_repr.Map.empty;
-    }
+  {
+    context = ctxt;
+    constants;
+    level;
+    predecessor_timestamp;
+    timestamp;
+    fitness;
+    first_level;
+    allowed_endorsements = Signature.Public_key_hash.Map.empty;
+    included_endorsements = 0;
+    fees = Tez_repr.zero;
+    rewards = Tez_repr.zero;
+    deposits = Signature.Public_key_hash.Map.empty;
+    operation_gas = Unaccounted;
+    storage_space_to_pay = None;
+    allocated_contracts = None;
+    block_gas = constants.Constants_repr.hard_gas_limit_per_block;
+    origination_nonce = None;
+    temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
+    internal_nonce = 0;
+    internal_nonces_used = Int_set.empty;
+    contract_code_cache = Contract_repr.Map.empty;
+    contract_storage_cache = Contract_repr.Map.empty;
+  }
 
 type previous_protocol = Genesis of Parameters_repr.t | Carthage_006
 
@@ -586,13 +584,13 @@ let check_and_update_protocol_version ctxt =
               failwith "Internal error: previously initialized context."
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
-              >>=? fun (param, ctxt) -> return (Genesis param, ctxt)
+              >|=? fun (param, ctxt) -> (Genesis param, ctxt)
             else if Compare.String.(s = "carthage_006") then
               return (Carthage_006, ctxt)
-            else storage_error (Incompatible_protocol_version s))
+            else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.set ctxt version_key (Bytes.of_string version_value)
-  >>= fun ctxt -> return (previous_proto, ctxt)
+  >|= fun ctxt -> ok (previous_proto, ctxt)
 
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
   check_and_update_protocol_version ctxt
@@ -602,8 +600,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       Lwt.return (Raw_level_repr.of_int32 level)
       >>=? fun first_level ->
       set_first_level ctxt first_level
-      >>=? fun ctxt ->
-      set_constants ctxt param.constants >>= fun ctxt -> return ctxt
+      >>=? fun ctxt -> set_constants ctxt param.constants >|= ok
   | Carthage_006 ->
       get_constants ctxt
       >>=? fun constants ->
@@ -619,14 +616,14 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       set_constants ctxt constants >>= fun ctxt -> return ctxt )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
-  >>=? fun ctxt -> return (previous_proto, ctxt)
+  >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ({context = c; _} as s) h =
-  Updater.activate c h >>= fun c -> Lwt.return {s with context = c}
+  Updater.activate c h >|= fun c -> {s with context = c}
 
 let fork_test_chain ({context = c; _} as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration
-  >>= fun c -> Lwt.return {s with context = c}
+  >|= fun c -> {s with context = c}
 
 (* Generic context ********************************************************)
 
@@ -692,8 +689,7 @@ let dir_mem ctxt k = Context.dir_mem ctxt.context k
 
 let get ctxt k =
   Context.get ctxt.context k
-  >>= function
-  | None -> storage_error (Missing_key (k, Get)) | Some v -> return v
+  >|= function None -> storage_error (Missing_key (k, Get)) | Some v -> ok v
 
 let get_option ctxt k = Context.get ctxt.context k
 
@@ -702,38 +698,35 @@ let set ctxt k v =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, Set))
+      Lwt.return @@ storage_error (Missing_key (k, Set))
   | true ->
-      Context.set ctxt.context k v
-      >>= fun context -> return {ctxt with context}
+      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
 
 (* Verify that the k is not present before inserting *)
 let init ctxt k v =
   Context.mem ctxt.context k
   >>= function
   | true ->
-      storage_error (Existing_key k)
+      Lwt.return @@ storage_error (Existing_key k)
   | false ->
-      Context.set ctxt.context k v
-      >>= fun context -> return {ctxt with context}
+      Context.set ctxt.context k v >|= fun context -> ok {ctxt with context}
 
 (* Does not verify that the key is present or not *)
 let init_set ctxt k v =
-  Context.set ctxt.context k v
-  >>= fun context -> Lwt.return {ctxt with context}
+  Context.set ctxt.context k v >|= fun context -> {ctxt with context}
 
 (* Verify that the key is present before deleting *)
 let delete ctxt k =
   Context.mem ctxt.context k
   >>= function
   | false ->
-      storage_error (Missing_key (k, Del))
+      Lwt.return @@ storage_error (Missing_key (k, Del))
   | true ->
-      Context.del ctxt.context k >>= fun context -> return {ctxt with context}
+      Context.del ctxt.context k >|= fun context -> ok {ctxt with context}
 
 (* Do not verify before deleting *)
 let remove ctxt k =
-  Context.del ctxt.context k >>= fun context -> Lwt.return {ctxt with context}
+  Context.del ctxt.context k >|= fun context -> {ctxt with context}
 
 let set_option ctxt k = function
   | None ->
@@ -742,16 +735,15 @@ let set_option ctxt k = function
       init_set ctxt k v
 
 let remove_rec ctxt k =
-  Context.remove_rec ctxt.context k
-  >>= fun context -> Lwt.return {ctxt with context}
+  Context.remove_rec ctxt.context k >|= fun context -> {ctxt with context}
 
 let copy ctxt ~from ~to_ =
   Context.copy ctxt.context ~from ~to_
-  >>= function
+  >|= function
   | None ->
       storage_error (Missing_key (from, Copy))
   | Some context ->
-      return {ctxt with context}
+      ok {ctxt with context}
 
 let fold ctxt k ~init ~f = Context.fold ctxt.context k ~init ~f
 

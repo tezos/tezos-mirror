@@ -149,7 +149,7 @@ let run_until_deactivation () =
   Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b
   >>=? fun b ->
   check_activate_staking_balance ~loc:__LOC__ ~deactivated:true b (a1, m1)
-  >>=? fun () -> return (b, ((a1, m1), balance_start), (a2, m2))
+  >|=? fun () -> (b, ((a1, m1), balance_start), (a2, m2))
 
 let deactivation_then_bake () =
   run_until_deactivation ()

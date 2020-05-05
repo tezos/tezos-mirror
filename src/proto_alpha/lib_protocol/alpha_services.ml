@@ -89,13 +89,13 @@ module Nonce = struct
     register1 S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
         Nonce.get ctxt level
-        >>= function
+        >|= function
         | Ok (Revealed nonce) ->
-            return (Revealed nonce)
+            ok (Revealed nonce)
         | Ok (Unrevealed {nonce_hash; _}) ->
-            return (Missing nonce_hash)
+            ok (Missing nonce_hash)
         | Error _ ->
-            return Forgotten)
+            ok Forgotten)
 
   let get ctxt block level =
     RPC_context.make_call1 S.get ctxt block level () ()

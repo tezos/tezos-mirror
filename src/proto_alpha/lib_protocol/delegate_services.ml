@@ -262,29 +262,28 @@ let register () =
       Vote.get_voting_power_free ctxt pkh
       >>=? fun voting_power ->
       Delegate.Proof.all ctxt pkh
-      >>=? fun proof_levels ->
-      return
-        {
-          balance;
-          frozen_balance;
-          frozen_balance_by_cycle;
-          staking_balance;
-          delegated_contracts;
-          delegated_balance;
-          deactivated;
-          grace_period;
-          voting_power;
-          proof_levels;
-        }) ;
+      >|=? fun proof_levels ->
+      {
+        balance;
+        frozen_balance;
+        frozen_balance_by_cycle;
+        staking_balance;
+        delegated_contracts;
+        delegated_balance;
+        deactivated;
+        grace_period;
+        voting_power;
+        proof_levels;
+      }) ;
   register1 S.balance (fun ctxt pkh () () -> Delegate.full_balance ctxt pkh) ;
   register1 S.frozen_balance (fun ctxt pkh () () ->
       Delegate.frozen_balance ctxt pkh) ;
   register1 S.frozen_balance_by_cycle (fun ctxt pkh () () ->
-      Delegate.frozen_balance_by_cycle ctxt pkh >>= return) ;
+      Delegate.frozen_balance_by_cycle ctxt pkh >|= ok) ;
   register1 S.staking_balance (fun ctxt pkh () () ->
       Delegate.staking_balance ctxt pkh) ;
   register1 S.delegated_contracts (fun ctxt pkh () () ->
-      Delegate.delegated_contracts ctxt pkh >>= return) ;
+      Delegate.delegated_contracts ctxt pkh >|= ok) ;
   register1 S.delegated_balance (fun ctxt pkh () () ->
       Delegate.delegated_balance ctxt pkh) ;
   register1 S.deactivated (fun ctxt pkh () () -> Delegate.deactivated ctxt pkh) ;
@@ -349,7 +348,7 @@ let requested_levels ~default ctxt cycles levels =
           if Level.(level <= current_level) then return (level, None)
           else
             Baking.earlier_predecessor_timestamp ctxt level
-            >>=? fun timestamp -> return (level, Some timestamp))
+            >|=? fun timestamp -> (level, Some timestamp))
         levels
 
 module Baking_rights = struct
@@ -469,21 +468,21 @@ module Baking_rights = struct
           match q.max_priority with None -> 64 | Some max -> max
         in
         map_s (baking_priorities ctxt max_priority) levels
-        >>=? fun rights ->
+        >|=? fun rights ->
         let rights =
           if q.all then rights else List.map remove_duplicated_delegates rights
         in
         let rights = List.concat rights in
         match q.delegates with
         | [] ->
-            return rights
+            rights
         | _ :: _ as delegates ->
             let is_requested p =
               List.exists
                 (Signature.Public_key_hash.equal p.delegate)
                 delegates
             in
-            return (List.filter is_requested rights))
+            List.filter is_requested rights)
 
   let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) ?(all = false)
       ?max_priority block =
@@ -558,13 +557,12 @@ module Endorsing_rights = struct
 
   let endorsement_slots ctxt (level, estimated_time) =
     Baking.endorsement_rights ctxt level
-    >>=? fun rights ->
-    return
-      (Signature.Public_key_hash.Map.fold
-         (fun delegate (_, slots, _) acc ->
-           {level = level.level; delegate; slots; estimated_time} :: acc)
-         rights
-         [])
+    >|=? fun rights ->
+    Signature.Public_key_hash.Map.fold
+      (fun delegate (_, slots, _) acc ->
+        {level = level.level; delegate; slots; estimated_time} :: acc)
+      rights
+      []
 
   let register () =
     let open Services_registration in
@@ -576,18 +574,18 @@ module Endorsing_rights = struct
           q.levels
         >>=? fun levels ->
         map_s (endorsement_slots ctxt) levels
-        >>=? fun rights ->
+        >|=? fun rights ->
         let rights = List.concat rights in
         match q.delegates with
         | [] ->
-            return rights
+            rights
         | _ :: _ as delegates ->
             let is_requested p =
               List.exists
                 (Signature.Public_key_hash.equal p.delegate)
                 delegates
             in
-            return (List.filter is_requested rights))
+            List.filter is_requested rights)
 
   let get ctxt ?(levels = []) ?(cycles = []) ?(delegates = []) block =
     RPC_context.make_call0
@@ -607,7 +605,7 @@ module Endorsing_power = struct
           ctxt
           chain_id
           {shell = operation.shell; protocol_data = data}
-        >>=? fun (_, slots, _) -> return (List.length slots)
+        >|=? fun (_, slots, _) -> List.length slots
     | _ ->
         failwith "Operation is not an endorsement"
 
@@ -719,19 +717,17 @@ let register () =
 
 let endorsement_rights ctxt level =
   Endorsing_rights.endorsement_slots ctxt (level, None)
-  >>=? fun l ->
-  return (List.map (fun {Endorsing_rights.delegate; _} -> delegate) l)
+  >|=? fun l -> List.map (fun {Endorsing_rights.delegate; _} -> delegate) l
 
 let baking_rights ctxt max_priority =
   let max = match max_priority with None -> 64 | Some m -> m in
   let level = Level.current ctxt in
   Baking_rights.baking_priorities ctxt max (level, None)
-  >>=? fun l ->
-  return
-    ( level.level,
-      List.map
-        (fun {Baking_rights.delegate; timestamp; _} -> (delegate, timestamp))
-        l )
+  >|=? fun l ->
+  ( level.level,
+    List.map
+      (fun {Baking_rights.delegate; timestamp; _} -> (delegate, timestamp))
+      l )
 
 let endorsing_power ctxt operation =
   Endorsing_power.endorsing_power ctxt operation

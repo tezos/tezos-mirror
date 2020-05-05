@@ -42,7 +42,7 @@ type error += Failed_to_parse_parameter of bytes
 
 type error += Failed_to_decode_parameter of Data_encoding.json * string
 
-val storage_error : storage_error -> 'a tzresult Lwt.t
+val storage_error : storage_error -> 'a tzresult
 
 (** {1 Abstract Context} *)
 

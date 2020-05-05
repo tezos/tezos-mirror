@@ -370,7 +370,7 @@ let extract_field_annot :
           ok None
       | Some field_annot ->
           parse_field_annot loc [field_annot] )
-      >>? fun field_annot -> ok (Prim (loc, prim, args, annot), field_annot)
+      >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr ->
       ok (expr, None)
 

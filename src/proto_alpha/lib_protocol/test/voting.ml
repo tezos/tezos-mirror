@@ -125,7 +125,7 @@ let mk_contracts_from_pkh pkh_list =
 (* get the list of delegates and the list of their rolls from listings *)
 let get_delegates_and_rolls_from_listings b =
   Context.Vote.get_listings (B b)
-  >>=? fun l -> return (mk_contracts_from_pkh (List.map fst l), List.map snd l)
+  >|=? fun l -> (mk_contracts_from_pkh (List.map fst l), List.map snd l)
 
 (* compute the rolls of each delegate *)
 let get_rolls b delegates loc =
@@ -538,7 +538,7 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
     participation_ema =
   let expected_quorum = expected_qr_num participation_ema in
   fold_left_s (fun v acc -> return Int32.(add v acc)) 0l active_rolls
-  >>=? fun active_rolls_sum ->
+  >|=? fun active_rolls_sum ->
   let rec loop delegates rolls sum selected =
     match (delegates, rolls) with
     | ([], []) ->
@@ -553,7 +553,7 @@ let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
     | (_, _) ->
         []
   in
-  return (loop active_delegates active_rolls 0 [])
+  loop active_delegates active_rolls 0 []
 
 let get_expected_participation_ema rolls voter_rolls old_participation_ema =
   (* formula to compute the updated participation_ema *)
@@ -565,11 +565,11 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
   fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls
   >>=? fun rolls_sum ->
   fold_left_s (fun v acc -> return Int32.(add v acc)) 0l voter_rolls
-  >>=? fun voter_rolls_sum ->
+  >|=? fun voter_rolls_sum ->
   let participation =
     Int32.to_int voter_rolls_sum * percent_mul / Int32.to_int rolls_sum
   in
-  return (get_updated_participation_ema old_participation_ema participation)
+  get_updated_participation_ema old_participation_ema participation
 
 (* if not enough quorum -- get_updated_participation_ema < pr_ema_weight/den -- in testing vote,
    go back to proposal period *)

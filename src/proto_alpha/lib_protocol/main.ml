@@ -126,12 +126,12 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >>=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker, block_delay) ->
   let mode =
     Partial_application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_application ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_fitness
@@ -142,12 +142,12 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >>=? fun (ctxt, baker, block_delay) ->
+  >|=? fun (ctxt, baker, block_delay) ->
   let mode =
     Application
       {block_header; baker = Signature.Public_key.hash baker; block_delay}
   in
-  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_level:pred_level
@@ -160,22 +160,22 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   ( match protocol_data with
   | None ->
       Apply.begin_partial_construction ctxt
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       let mode = Partial_construction {predecessor} in
-      return (mode, ctxt)
+      (mode, ctxt)
   | Some proto_header ->
       Apply.begin_full_construction
         ctxt
         predecessor_timestamp
         proto_header.contents
-      >>=? fun (ctxt, protocol_data, baker, block_delay) ->
+      >|=? fun (ctxt, protocol_data, baker, block_delay) ->
       let mode =
         let baker = Signature.Public_key.hash baker in
         Full_construction {predecessor; baker; protocol_data; block_delay}
       in
-      return (mode, ctxt) )
-  >>=? fun (mode, ctxt) ->
-  return {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+      (mode, ctxt) )
+  >|=? fun (mode, ctxt) ->
+  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
@@ -209,9 +209,9 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
         baker
         (Alpha_context.Operation.hash operation)
         operation
-      >>=? fun (ctxt, result) ->
+      >|=? fun (ctxt, result) ->
       let op_count = op_count + 1 in
-      return ({data with ctxt; op_count}, Operation_metadata result)
+      ({data with ctxt; op_count}, Operation_metadata result)
 
 let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
   match mode with
@@ -227,20 +227,19 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
           Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
         (Alpha_context.get_deposits ctxt)
         (return ctxt)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              baker;
-              level;
-              voting_period_kind;
-              nonce_hash = None;
-              consumed_gas = Z.zero;
-              deactivated = [];
-              balance_updates = migration_balance_updates;
-            } )
+      ( ctxt,
+        Apply_results.
+          {
+            baker;
+            level;
+            voting_period_kind;
+            nonce_hash = None;
+            consumed_gas = Z.zero;
+            deactivated = [];
+            balance_updates = migration_balance_updates;
+          } )
   | Partial_application {block_header; baker; block_delay} ->
       let level = Alpha_context.Level.current ctxt in
       let included_endorsements = Alpha_context.included_endorsements ctxt in
@@ -251,20 +250,19 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
         included_endorsements
       >>=? fun () ->
       Alpha_context.Vote.get_current_period_kind ctxt
-      >>=? fun voting_period_kind ->
+      >|=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              baker;
-              level;
-              voting_period_kind;
-              nonce_hash = None;
-              consumed_gas = Z.zero;
-              deactivated = [];
-              balance_updates = migration_balance_updates;
-            } )
+      ( ctxt,
+        Apply_results.
+          {
+            baker;
+            level;
+            voting_period_kind;
+            nonce_hash = None;
+            consumed_gas = Z.zero;
+            deactivated = [];
+            balance_updates = migration_balance_updates;
+          } )
   | Application
       { baker;
         block_delay;
@@ -276,7 +274,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
         baker
         ~block_delay
         migration_balance_updates
-      >>=? fun (ctxt, receipt) ->
+      >|=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in
       let raw_level = Alpha_context.Raw_level.to_int32 level.level in
@@ -290,7 +288,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
           op_count
       in
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
-      return (ctxt, receipt)
+      (ctxt, receipt)
 
 let compare_operations op1 op2 =
   let open Alpha_context in
@@ -378,11 +376,11 @@ let init ctxt block_header =
       Optimized
       parsed_script.storage_type
       storage
-    >>=? fun (storage, ctxt) ->
+    >|=? fun (storage, ctxt) ->
     let storage =
       Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
     in
-    return (({script with storage}, lazy_storage_diff), ctxt)
+    (({script with storage}, lazy_storage_diff), ctxt)
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
-  >>=? fun ctxt -> return (Alpha_context.finalize ctxt)
+  >|=? fun ctxt -> Alpha_context.finalize ctxt

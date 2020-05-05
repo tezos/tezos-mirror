@@ -103,16 +103,8 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ()
   >>= fun state ->
   Lwt.return (Environment.wrap_error state)
-  >>=? fun state ->
-  return
-    {
-      predecessor;
-      state;
-      rev_operations = [];
-      rev_tickets = [];
-      header;
-      delegate;
-    }
+  >|=? fun state ->
+  {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
 
 let detect_script_failure :
     type kind. kind Apply_results.operation_metadata -> _ =
@@ -173,14 +165,13 @@ let add_operation ?expect_failure st op =
             failwith "Error expected while adding operation"
         | Error e ->
             f e ) )
-      >>=? fun () ->
-      return
-        {
-          st with
-          state;
-          rev_operations = op :: st.rev_operations;
-          rev_tickets = metadata :: st.rev_tickets;
-        }
+      >|=? fun () ->
+      {
+        st with
+        state;
+        rev_operations = op :: st.rev_operations;
+        rev_tickets = metadata :: st.rev_tickets;
+      }
   | (state, (No_operation_metadata as metadata)) ->
       return
         {
@@ -194,7 +185,7 @@ let finalize_block st =
   finalize_block st.state
   >>= fun x ->
   Lwt.return (Environment.wrap_error x)
-  >>=? fun (result, _) ->
+  >|=? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute
@@ -213,4 +204,4 @@ let finalize_block st =
     }
   in
   let hash = Block_header.hash header in
-  return {Block.hash; header; operations; context = result.context}
+  {Block.hash; header; operations; context = result.context}

@@ -569,9 +569,7 @@ let delete c contract =
       Storage.Contract.Storage.remove c contract
       >>=? fun (c, _, _) ->
       Storage.Contract.Paid_storage_space.remove c contract
-      >>= fun c ->
-      Storage.Contract.Used_storage_space.remove c contract
-      >>= fun c -> return c
+      >>= fun c -> Storage.Contract.Used_storage_space.remove c contract >|= ok
 
 let allocated c contract =
   Storage.Contract.Balance.get_option c contract
@@ -605,7 +603,7 @@ let list c = Storage.Contract.list c
 
 let fresh_contract_from_current_nonce c =
   Lwt.return (Raw_context.increment_origination_nonce c)
-  >>=? fun (c, nonce) -> return (c, Contract_repr.originated_contract nonce)
+  >|=? fun (c, nonce) -> (c, Contract_repr.originated_contract nonce)
 
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Lwt.return (Raw_context.origination_nonce ctxt_since)
@@ -687,10 +685,11 @@ let get_storage ctxt contract =
   | (ctxt, None) ->
       return (ctxt, None)
   | (ctxt, Some storage) ->
-      Lwt.return (Script_repr.force_decode storage)
-      >>=? fun (storage, cost) ->
-      Lwt.return (Raw_context.consume_gas ctxt cost)
-      >>=? fun ctxt -> return (ctxt, Some storage)
+      Lwt.return
+        ( Script_repr.force_decode storage
+        >>? fun (storage, cost) ->
+        Raw_context.consume_gas ctxt cost >|? fun ctxt -> (ctxt, Some storage)
+        )
 
 let get_storage_cached = Raw_context.get_cached_storage
 
@@ -737,7 +736,7 @@ let reveal_manager_key c manager public_key =
       let actual_hash = Signature.Public_key.hash public_key in
       if Signature.Public_key_hash.equal actual_hash v then
         let v = Manager_repr.Public_key public_key in
-        Storage.Contract.Manager.set c contract v >>=? fun c -> return c
+        Storage.Contract.Manager.set c contract v
       else fail (Inconsistent_hash (public_key, v, actual_hash))
 
 let get_balance c contract =
@@ -801,8 +800,9 @@ let credit c contract amount =
     >>=? fun () ->
     Storage.Contract.Code.mem c contract
     >>=? fun (c, target_has_code) ->
-    fail_unless target_has_code (Empty_transaction contract)
-    >>=? fun () -> return c )
+    Lwt.return
+      ( error_unless target_has_code (Empty_transaction contract)
+      >|? fun () -> c ) )
   >>=? fun c ->
   Storage.Contract.Balance.get_option c contract
   >>=? function
@@ -824,11 +824,11 @@ let init c =
 
 let used_storage_space c contract =
   Storage.Contract.Used_storage_space.get_option c contract
-  >>=? function None -> return Z.zero | Some fees -> return fees
+  >|=? function None -> Z.zero | Some fees -> fees
 
 let paid_storage_space c contract =
   Storage.Contract.Paid_storage_space.get_option c contract
-  >>=? function None -> return Z.zero | Some paid_space -> return paid_space
+  >|=? function None -> Z.zero | Some paid_space -> paid_space
 
 let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
     =
@@ -838,4 +838,4 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space
   else
     let to_pay = Z.sub new_storage_space already_paid_space in
     Storage.Contract.Paid_storage_space.set c contract new_storage_space
-    >>=? fun c -> return (to_pay, c)
+    >|=? fun c -> (to_pay, c)

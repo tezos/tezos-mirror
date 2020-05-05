@@ -76,7 +76,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
   >>=? fun () ->
   Assert.balance_was_credited ~loc (I b) dst bal_dst amount
-  >>=? fun () -> return (b, op)
+  >|=? fun () -> (b, op)
 
 (**
    [transfer_to_itself_and_check_balances b fee contract amount]
@@ -101,8 +101,7 @@ let transfer_to_itself_and_check_balances ~loc b ?(fee = Tez.zero) contract
   >>=? fun op ->
   Incremental.add_operation b op
   >>=? fun b ->
-  Assert.balance_was_debited ~loc (I b) contract bal fee
-  >>=? fun () -> return (b, op)
+  Assert.balance_was_debited ~loc (I b) contract bal fee >|=? fun () -> (b, op)
 
 (**
    [n_transactions n b fee source dest amount]
@@ -117,7 +116,7 @@ let n_transactions n b ?fee source dest amount =
   fold_left_s
     (fun b _ ->
       transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
-      >>=? fun (b, _) -> return b)
+      >|=? fun (b, _) -> b)
     b
     (1 -- n)
 
@@ -129,10 +128,10 @@ let ten_tez = Tez.of_int 10
 
 let register_two_contracts () =
   Context.init 2
-  >>=? fun (b, contracts) ->
+  >|=? fun (b, contracts) ->
   let contract_1 = List.nth contracts 0 in
   let contract_2 = List.nth contracts 1 in
-  return (b, contract_1, contract_2)
+  (b, contract_1, contract_2)
 
 (** compute half of the balance and divided by nth
     times *)

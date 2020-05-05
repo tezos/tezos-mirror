@@ -99,7 +99,7 @@ let check_approval_and_update_participation_ema ctxt =
     Int32.(div (add (mul 8l participation_ema) (mul 2l participation)) 10l)
   in
   Vote.set_participation_ema ctxt new_participation_ema
-  >>=? fun ctxt -> return (ctxt, outcome)
+  >|=? fun ctxt -> (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
     Note that [update_listings], that computes the vote weight of each delegate,
@@ -119,9 +119,7 @@ let start_new_voting_period ctxt =
           return ctxt
       | Some proposal ->
           Vote.init_current_proposal ctxt proposal
-          >>=? fun ctxt ->
-          Vote.set_current_period_kind ctxt Testing_vote
-          >>=? fun ctxt -> return ctxt )
+          >>=? fun ctxt -> Vote.set_current_period_kind ctxt Testing_vote )
   | Testing_vote ->
       check_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
@@ -136,15 +134,12 @@ let start_new_voting_period ctxt =
         Vote.get_current_proposal ctxt
         >>=? fun proposal ->
         fork_test_chain ctxt proposal expiration
-        >>= fun ctxt ->
-        Vote.set_current_period_kind ctxt Testing >>=? fun ctxt -> return ctxt
+        >>= fun ctxt -> Vote.set_current_period_kind ctxt Testing
       else
         Vote.clear_current_proposal ctxt
-        >>=? fun ctxt ->
-        Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
+        >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal
   | Testing ->
       Vote.set_current_period_kind ctxt Promotion_vote
-      >>=? fun ctxt -> return ctxt
   | Promotion_vote ->
       check_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
@@ -152,7 +147,7 @@ let start_new_voting_period ctxt =
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt -> Vote.set_current_period_kind ctxt Proposal )
-      >>=? fun ctxt -> Vote.clear_ballots ctxt >>= return
+      >>=? fun ctxt -> Vote.clear_ballots ctxt >|= ok
   | Adoption ->
       Vote.get_current_proposal ctxt
       >>=? fun proposal ->
@@ -279,7 +274,6 @@ let record_proposals ctxt delegate proposals =
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals
-        >>=? fun ctxt -> return ctxt
       else fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote | Adoption ->
       fail Unexpected_proposal

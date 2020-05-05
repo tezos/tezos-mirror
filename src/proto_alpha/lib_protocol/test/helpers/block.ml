@@ -66,14 +66,14 @@ let get_next_baker_by_priority priority block =
     ~all:true
     ~max_priority:(priority + 1)
     block
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
     List.find
       (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
         p = priority)
       bakers
   in
-  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_by_account pkh block =
   Alpha_services.Delegate.Baking_rights.get
@@ -81,18 +81,18 @@ let get_next_baker_by_account pkh block =
     ~delegates:[pkh]
     ~max_priority:256
     block
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
         timestamp;
         priority;
         _ } =
     List.hd bakers
   in
-  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
   Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
         timestamp;
         priority;
@@ -102,7 +102,7 @@ let get_next_baker_excluding excludes block =
         not (List.mem delegate excludes))
       bakers
   in
-  return (pkh, priority, Option.unopt_exn (Failure "") timestamp)
+  (pkh, priority, Option.unopt_exn (Failure "") timestamp)
 
 let dispatch_policy = function
   | By_priority p ->
@@ -125,7 +125,7 @@ let get_endorsing_power b =
             b
             op
             Chain_id.zero
-          >>=? fun endorsement_power -> return (acc + endorsement_power)
+          >|=? fun endorsement_power -> acc + endorsement_power
       | _ ->
           return acc)
     0
@@ -167,7 +167,7 @@ module Forge = struct
 
   let sign_header {baker; shell; contents} =
     Account.find baker
-    >>=? fun delegate ->
+    >|=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -179,7 +179,7 @@ module Forge = struct
         delegate.sk
         unsigned_bytes
     in
-    Block_header.{shell; protocol_data = {contents; signature}} |> return
+    Block_header.{shell; protocol_data = {contents; signature}}
 
   let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = []) pred
       =
@@ -202,7 +202,7 @@ module Forge = struct
                Some (fst (Proto_Nonce.generate ()))
            | {expected_commitment = false; _} ->
                None)
-    >>=? fun seed_nonce_hash ->
+    >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
       Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
@@ -216,7 +216,7 @@ module Forge = struct
         ~operations_hash
     in
     let contents = make_contents ~priority ~seed_nonce_hash () in
-    return {baker = pkh; shell; contents}
+    {baker = pkh; shell; contents}
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
@@ -243,7 +243,6 @@ let check_constants_consistency constants =
       failwith
         "Inconsistent constants : blocks per cycle must be superior than \
          blocks per roll snapshot")
-  >>=? return
 
 let initial_context ?(with_commitments = false) constants header
     initial_accounts =
@@ -270,7 +269,7 @@ let initial_context ?(with_commitments = false) constants header
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt header >|= Environment.wrap_error
-  >>=? fun {context; _} -> return context
+  >|=? fun {context; _} -> context
 
 let genesis_with_parameters parameters =
   let hash =
@@ -297,16 +296,13 @@ let genesis_with_parameters parameters =
     >>= fun ctxt -> set ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
   Main.init ctxt shell >|= Environment.wrap_error
-  >>=? fun {context; _} ->
-  let block =
-    {
-      hash;
-      header = {shell; protocol_data = {contents; signature = Signature.zero}};
-      operations = [];
-      context;
-    }
-  in
-  return block
+  >|=? fun {context; _} ->
+  {
+    hash;
+    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    operations = [];
+    context;
+  }
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
@@ -362,16 +358,13 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   in
   let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
   initial_context ?with_commitments constants shell initial_accounts
-  >>=? fun context ->
-  let block =
-    {
-      hash;
-      header = {shell; protocol_data = {contents; signature = Signature.zero}};
-      operations = [];
-      context;
-    }
-  in
-  return block
+  >|=? fun context ->
+  {
+    hash;
+    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    operations = [];
+    context;
+  }
 
 (********* Baking *************)
 
@@ -386,12 +379,12 @@ let apply header ?(operations = []) pred =
   >>=? fun vstate ->
   fold_left_s
     (fun vstate op ->
-      apply_operation vstate op >>=? fun (state, _result) -> return state)
+      apply_operation vstate op >|=? fun (state, _result) -> state)
     vstate
     operations
   >>=? fun vstate ->
   Main.finalize_block vstate
-  >>=? fun (validation, _result) -> return validation.context)
+  >|=? fun (validation, _result) -> validation.context)
   >|= Environment.wrap_error
   >|=? fun context ->
   let hash = Block_header.hash header in

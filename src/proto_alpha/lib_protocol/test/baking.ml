@@ -110,7 +110,7 @@ let test_rewards_retrieval () =
       map_p
         (fun endorser ->
           Op.endorsement ~delegate:endorser.delegate (B good_b) ()
-          >>=? fun operation -> return (Operation.pack operation))
+          >|=? fun operation -> Operation.pack operation)
         real_endorsers
       >>=? fun operations ->
       let policy = Block.By_priority priority in

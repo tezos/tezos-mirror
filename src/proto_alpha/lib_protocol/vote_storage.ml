@@ -26,15 +26,13 @@
 
 let recorded_proposal_count_for_delegate ctxt proposer =
   Storage.Vote.Proposals_count.get_option ctxt proposer
-  >>=? function None -> return 0 | Some count -> return count
+  >|=? function None -> 0 | Some count -> count
 
 let record_proposal ctxt proposal proposer =
   recorded_proposal_count_for_delegate ctxt proposer
   >>=? fun count ->
   Storage.Vote.Proposals_count.init_set ctxt proposer (count + 1)
-  >>= fun ctxt ->
-  Storage.Vote.Proposals.add ctxt (proposal, proposer)
-  >>= fun ctxt -> return ctxt
+  >>= fun ctxt -> Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold
@@ -46,7 +44,7 @@ let get_proposals ctxt =
       >>=? fun weight ->
       Lwt.return
         ( acc
-        >>? fun acc ->
+        >|? fun acc ->
         let previous =
           match Protocol_hash.Map.find_opt proposal acc with
           | None ->
@@ -54,7 +52,7 @@ let get_proposals ctxt =
           | Some x ->
               x
         in
-        ok (Protocol_hash.Map.add proposal (Int32.add weight previous) acc) ))
+        Protocol_hash.Map.add proposal (Int32.add weight previous) acc ))
 
 let clear_proposals ctxt =
   Storage.Vote.Proposals_count.clear ctxt
@@ -85,13 +83,12 @@ let get_ballots ctxt =
       in
       Lwt.return
         ( ballots
-        >>? fun ballots ->
-        ok
-          {
-            yay = allocate ballot.yays_per_roll ballots.yay;
-            nay = allocate ballot.nays_per_roll ballots.nay;
-            pass = allocate ballot.passes_per_roll ballots.pass;
-          } ))
+        >|? fun ballots ->
+        {
+          yay = allocate ballot.yays_per_roll ballots.yay;
+          nay = allocate ballot.nays_per_roll ballots.nay;
+          pass = allocate ballot.passes_per_roll ballots.pass;
+        } ))
     ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
 
 let get_ballot_list = Storage.Vote.Ballots.bindings
@@ -110,12 +107,12 @@ let update_listings ctxt =
       (* TODO use snapshots *)
       let delegate = Signature.Public_key.hash delegate in
       Storage.Vote.Listings.get_option ctxt delegate
-      >>=? (function None -> return 0l | Some count -> return count)
+      >|=? (function None -> 0l | Some count -> count)
       >>=? fun count ->
       Storage.Vote.Listings.init_set ctxt delegate (Int32.succ count)
-      >>= fun ctxt -> return (ctxt, Int32.succ total))
+      >|= fun ctxt -> ok (ctxt, Int32.succ total))
   >>=? fun (ctxt, total) ->
-  Storage.Vote.Listings_size.init_set ctxt total >>= fun ctxt -> return ctxt
+  Storage.Vote.Listings_size.init_set ctxt total >|= ok
 
 let listing_size = Storage.Vote.Listings_size.get
 
@@ -142,7 +139,7 @@ let get_voting_power ctxt owner =
   | Some power ->
       (* If some power is returned, consume read size_of(int32) = 4 bytes *)
       Lwt.return (consume_gas ctxt (read_bytes_cost (Z.of_int 4)))
-      >>=? fun ctxt -> return (ctxt, power)
+      >|=? fun ctxt -> (ctxt, power)
 
 let get_total_voting_power_free = listing_size
 
@@ -159,7 +156,7 @@ let get_total_voting_power ctxt =
     ( consume_gas ctxt (read_bytes_cost Z.zero)
     >>? fun ctxt ->
     consume_gas ctxt (read_bytes_cost (Z.of_int 4))
-    >>? fun ctxt -> ok (ctxt, total_power) )
+    >|? fun ctxt -> (ctxt, total_power) )
 
 let get_current_period_kind = Storage.Vote.Current_period_kind.get
 
@@ -167,12 +164,11 @@ let set_current_period_kind = Storage.Vote.Current_period_kind.set
 
 let get_current_quorum ctxt =
   Storage.Vote.Participation_ema.get ctxt
-  >>=? fun participation_ema ->
+  >|=? fun participation_ema ->
   let quorum_min = Constants_storage.quorum_min ctxt in
   let quorum_max = Constants_storage.quorum_max ctxt in
   let quorum_diff = Int32.sub quorum_max quorum_min in
-  return
-    Int32.(add quorum_min (div (mul participation_ema quorum_diff) 100_00l))
+  Int32.(add quorum_min (div (mul participation_ema quorum_diff) 100_00l))
 
 let get_participation_ema = Storage.Vote.Participation_ema.get
 
@@ -188,6 +184,4 @@ let init ctxt =
   (* participation EMA is in centile of a percentage *)
   let participation_ema = Constants_storage.quorum_max ctxt in
   Storage.Vote.Participation_ema.init ctxt participation_ema
-  >>=? fun ctxt ->
-  Storage.Vote.Current_period_kind.init ctxt Proposal
-  >>=? fun ctxt -> return ctxt
+  >>=? fun ctxt -> Storage.Vote.Current_period_kind.init ctxt Proposal

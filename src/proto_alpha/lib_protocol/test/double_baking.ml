@@ -44,14 +44,14 @@ let get_first_different_bakers ctxt =
   >>=? fun bakers ->
   let baker_1 = List.hd bakers in
   get_first_different_baker baker_1 (List.tl bakers)
-  >>=? fun baker_2 -> return (baker_1, baker_2)
+  >|=? fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
-  >>=? fun endorsers ->
+  >|=? fun endorsers ->
   let endorser_1 = (List.hd endorsers).delegate in
   let endorser_2 = (List.hd (List.tl endorsers)).delegate in
-  return (endorser_1, endorser_2)
+  (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker) *)
@@ -62,7 +62,7 @@ let block_fork ?policy contracts b =
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b
-  >>=? fun blk_a -> Block.bake ?policy b >>=? fun blk_b -> return (blk_a, blk_b)
+  >>=? fun blk_a -> Block.bake ?policy b >|=? fun blk_b -> (blk_a, blk_b)
 
 (****************************************************************)
 (*                        Tests                                 *)

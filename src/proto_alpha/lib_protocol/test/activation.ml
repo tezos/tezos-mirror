@@ -305,7 +305,7 @@ let secrets () =
 
 let activation_init () =
   Context.init ~with_commitments:true 1
-  >>=? fun (b, cs) -> secrets () |> fun ss -> return (b, cs, ss)
+  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
 
 let simple_init_with_commitments () =
   activation_init ()
@@ -352,7 +352,7 @@ let multi_activation_1 () =
         (B blk)
         (Contract.implicit_contract account)
         expected_amount
-      >>=? fun () -> return blk)
+      >|=? fun () -> blk)
     blk
     secrets
   >>=? fun _ -> return_unit
@@ -363,8 +363,7 @@ let multi_activation_2 () =
   >>=? fun (blk, _contracts, secrets) ->
   Error_monad.fold_left_s
     (fun ops {account; activation_code; _} ->
-      Op.activation (B blk) account activation_code
-      >>=? fun op -> return (op :: ops))
+      Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
     []
     secrets
   >>=? fun ops ->

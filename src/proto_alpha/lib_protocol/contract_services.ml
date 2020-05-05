@@ -163,7 +163,7 @@ end
 
 let register () =
   let open Services_registration in
-  register0 S.list (fun ctxt () () -> Contract.list ctxt >>= return) ;
+  register0 S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field s f =
     register1 s (fun ctxt contract () () ->
         Contract.exists ctxt contract
@@ -171,7 +171,7 @@ let register () =
   in
   let register_opt_field s f =
     register_field s (fun ctxt a1 ->
-        f ctxt a1 >>=? function None -> raise Not_found | Some v -> return v)
+        f ctxt a1 >|=? function None -> raise Not_found | Some v -> v)
   in
   let do_big_map_get ctxt id key =
     let open Script_ir_translator in
@@ -194,8 +194,7 @@ let register () =
             parse_data ctxt ~legacy:true value_type (Micheline.root value)
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
-            >>=? fun (value, _ctxt) -> return (Micheline.strip_locations value)
-        )
+            >|=? fun (value, _ctxt) -> Micheline.strip_locations value )
   in
   register_field S.balance Contract.get_balance ;
   register1 S.manager_key (fun ctxt contract () () ->
@@ -217,7 +216,7 @@ let register () =
       | Some mgr ->
           Contract.get_counter ctxt mgr) ;
   register_opt_field S.script (fun c v ->
-      Contract.get_script c v >>=? fun (_, v) -> return v) ;
+      Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_opt_field S.storage (fun ctxt contract ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
@@ -255,8 +254,7 @@ let register () =
           >>= function
           | Ok (_f, Ex_ty ty) ->
               unparse_ty ctxt ty
-              >>=? fun (ty_node, _) ->
-              return (Micheline.strip_locations ty_node)
+              >|=? fun (ty_node, _) -> Micheline.strip_locations ty_node
           | Error _ ->
               raise Not_found )) ;
   register1 S.list_entrypoints (fun ctxt v () () ->
@@ -277,14 +275,13 @@ let register () =
             parse_parameter_ty ctxt ~legacy arg_type
             >>? fun (Ex_ty arg_type, _) ->
             Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
-          >>=? fun (unreachable_entrypoint, map) ->
-          return
-            ( unreachable_entrypoint,
-              Entrypoints_map.fold
-                (fun entry (_, ty) acc ->
-                  (entry, Micheline.strip_locations ty) :: acc)
-                map
-                [] )) ;
+          >|=? fun (unreachable_entrypoint, map) ->
+          ( unreachable_entrypoint,
+            Entrypoints_map.fold
+              (fun entry (_, ty) acc ->
+                (entry, Micheline.strip_locations ty) :: acc)
+              map
+              [] )) ;
   register1 S.contract_big_map_get_opt (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
@@ -346,8 +343,8 @@ let register () =
           parse_script ctxt ~legacy:true script
           >>=? fun (Ex_script script, ctxt) ->
           unparse_script ctxt Readable script
-          >>=? fun (script, ctxt) -> return (Some script, ctxt) )
-      >>=? fun (script, _ctxt) -> return {balance; delegate; script; counter})
+          >|=? fun (script, ctxt) -> (Some script, ctxt) )
+      >|=? fun (script, _ctxt) -> {balance; delegate; script; counter})
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 

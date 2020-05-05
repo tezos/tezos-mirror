@@ -41,8 +41,7 @@ let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
     ~timestamp
     ~fitness
     context
-  >>=? fun (context, _balance_updates) ->
-  return {block_hash; block_header; context}
+  >|=? fun (context, _balance_updates) -> {block_hash; block_header; context}
 
 let rpc_services =
   ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
@@ -85,8 +84,7 @@ let get_rpc_services () =
   let p =
     RPC_directory.map
       (fun c ->
-        rpc_init c
-        >>= function Error _ -> assert false | Ok c -> Lwt.return c.context)
+        rpc_init c >|= function Error _ -> assert false | Ok c -> c.context)
       (Storage_description.build_directory Alpha_context.description)
   in
   RPC_directory.register_dynamic_directory

@@ -330,8 +330,7 @@ module Big_map = struct
     let incr ctxt =
       get ctxt
       >>=? fun i ->
-      set ctxt (Lazy_storage_kind.Big_map.Id.next i)
-      >>=? fun ctxt -> return (ctxt, i)
+      set ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt -> (ctxt, i)
 
     let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
   end

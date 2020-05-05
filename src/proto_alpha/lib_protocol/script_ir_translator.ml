@@ -940,7 +940,7 @@ let rec unparse_ty_no_lwt :
   let return ctxt (name, args, annot) =
     let result = Prim (-1, name, args, annot) in
     Gas.consume ctxt (Unparse_costs.prim_cost (List.length args) annot)
-    >>? fun ctxt -> ok (result, ctxt)
+    >|? fun ctxt -> (result, ctxt)
   in
   match ty with
   | Unit_t tname ->
@@ -1051,8 +1051,8 @@ let rec unparse_stack :
       unparse_ty ctxt ty
       >>=? fun (uty, ctxt) ->
       unparse_stack ctxt rest
-      >>=? fun (urest, ctxt) ->
-      return ((strip_locations uty, unparse_var_annot annot) :: urest, ctxt)
+      >|=? fun (urest, ctxt) ->
+      ((strip_locations uty, unparse_var_annot annot) :: urest, ctxt)
 
 let serialize_stack_for_error ctxt stack_ty =
   trace Cannot_serialize_error (unparse_stack ctxt stack_ty)
@@ -1520,13 +1520,10 @@ let merge_branches :
       trace_eval
         unmatched_branches
         ( Lwt.return (merge_stacks ~legacy loc ctxt 1 aftbt aftbf)
-        >>=? fun (Eq, merged_stack, ctxt) ->
-        return
-          ( Typed
-              (branch
-                 {dbt with aft = merged_stack}
-                 {dbf with aft = merged_stack}),
-            ctxt ) )
+        >|=? fun (Eq, merged_stack, ctxt) ->
+        ( Typed
+            (branch {dbt with aft = merged_stack} {dbf with aft = merged_stack}),
+          ctxt ) )
   | (Failed {descr = descrt}, Failed {descr = descrf}) ->
       let descr ret = branch (descrt ret) (descrf ret) in
       return (Failed {descr}, ctxt)
@@ -2288,9 +2285,11 @@ let rec parse_data :
   Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
   >>=? fun ctxt ->
   let error () =
-    Lwt.return (serialize_ty_for_error ctxt ty)
-    >|=? fun (ty, _ctxt) ->
-    Invalid_constant (location script_data, strip_locations script_data, ty)
+    Lwt.return
+      ( serialize_ty_for_error ctxt ty
+      >|? fun (ty, _ctxt) ->
+      Invalid_constant (location script_data, strip_locations script_data, ty)
+      )
   in
   let traced body = trace_eval error body in
   let parse_items ?type_logger loc ctxt expr key_type value_type items
@@ -2315,8 +2314,8 @@ let rec parse_data :
                 else return_unit
             | None ->
                 return_unit )
-            >>=? fun () ->
-            return (Some k, map_update k (Some (item_wrapper v)) map, ctxt)
+            >|=? fun () ->
+            (Some k, map_update k (Some (item_wrapper v)) map, ctxt)
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
@@ -2374,13 +2373,13 @@ let rec parse_data :
   (* Byte sequences *)
   | (Bytes_t _, Bytes (_, v)) ->
       Lwt.return (Gas.consume ctxt (Typecheck_costs.string (Bytes.length v)))
-      >>=? fun ctxt -> return (v, ctxt)
+      >|=? fun ctxt -> (v, ctxt)
   | (Bytes_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
   (* Integers *)
   | (Int_t _, Int (_, v)) ->
       Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
-      >>=? fun ctxt -> return (Script_int.of_zint v, ctxt)
+      >|=? fun ctxt -> (Script_int.of_zint v, ctxt)
   | (Nat_t _, Int (_, v)) ->
       Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
       >>=? fun ctxt ->
@@ -2412,7 +2411,7 @@ let rec parse_data :
   | (Timestamp_t _, Int (_, v))
   (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
       Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
-      >>=? fun ctxt -> return (Script_timestamp.of_zint v, ctxt)
+      >|=? fun ctxt -> (Script_timestamp.of_zint v, ctxt)
   | (Timestamp_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
       Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp)
       >>=? fun ctxt ->
@@ -2529,18 +2528,19 @@ let rec parse_data :
           Data_encoding.(tup2 Contract.encoding Variable.string)
           bytes
       with
-      | Some (c, entrypoint) ->
+      | Some (c, entrypoint) -> (
+          Lwt.return
+          @@
           if Compare.Int.(String.length entrypoint > 31) then
-            fail (Entrypoint_name_too_long entrypoint)
+            Error_monad.error (Entrypoint_name_too_long entrypoint)
           else
-            ( match entrypoint with
+            match entrypoint with
             | "" ->
-                return "default"
+                ok ((c, "default"), ctxt)
             | "default" ->
-                fail (Unexpected_annotation loc)
+                Error_monad.error (Unexpected_annotation loc)
             | name ->
-                return name )
-            >>=? fun entrypoint -> return ((c, entrypoint), ctxt)
+                ok ((c, name), ctxt) )
       | None ->
           error () >>=? fail )
   | (Address_t _, String (loc, s)) (* As unparsed with [Readable]. *) ->
@@ -2561,7 +2561,7 @@ let rec parse_data :
                 return addr_and_name ) )
       >>=? fun (addr, entrypoint) ->
       Lwt.return (Contract.of_b58check addr)
-      >>=? fun c -> return ((c, entrypoint), ctxt)
+      >|=? fun c -> ((c, entrypoint), ctxt)
   | (Address_t _, expr) ->
       traced
         (fail
@@ -2577,19 +2577,21 @@ let rec parse_data :
           bytes
       with
       | Some (c, entrypoint) ->
+          ( Lwt.return
+          @@
           if Compare.Int.(String.length entrypoint > 31) then
-            fail (Entrypoint_name_too_long entrypoint)
+            Error_monad.error (Entrypoint_name_too_long entrypoint)
           else
-            ( match entrypoint with
+            match entrypoint with
             | "" ->
-                return "default"
+                ok "default"
             | "default" ->
-                traced (fail (Unexpected_annotation loc))
+                Error_monad.error (Unexpected_annotation loc)
             | name ->
-                return name )
-            >>=? fun entrypoint ->
-            traced (parse_contract ~legacy ctxt loc ty c ~entrypoint)
-            >>=? fun (ctxt, _) -> return ((ty, (c, entrypoint)), ctxt)
+                ok name )
+          >>=? fun entrypoint ->
+          traced (parse_contract ~legacy ctxt loc ty c ~entrypoint)
+          >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt)
       | None ->
           error () >>=? fail )
   | (Contract_t (ty, _), String (loc, s)) (* As unparsed with [Readable]. *) ->
@@ -2612,7 +2614,7 @@ let rec parse_data :
       traced (Lwt.return (Contract.of_b58check addr))
       >>=? fun c ->
       parse_contract ~legacy ctxt loc ty c ~entrypoint
-      >>=? fun (ctxt, _) -> return ((ty, (c, entrypoint)), ctxt)
+      >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt)
   | (Contract_t _, expr) ->
       traced
         (fail
@@ -2627,7 +2629,7 @@ let rec parse_data :
       traced @@ parse_data ?type_logger ctxt ~legacy ta va
       >>=? fun (va, ctxt) ->
       parse_data ?type_logger ctxt ~legacy tb vb
-      >>=? fun (vb, ctxt) -> return ((va, vb), ctxt)
+      >|=? fun (vb, ctxt) -> ((va, vb), ctxt)
   | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
   | (Pair_t _, expr) ->
@@ -2639,7 +2641,7 @@ let rec parse_data :
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tl v
-      >>=? fun (v, ctxt) -> return (L v, ctxt)
+      >|=? fun (v, ctxt) -> (L v, ctxt)
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
@@ -2648,7 +2650,7 @@ let rec parse_data :
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tr v
-      >>=? fun (v, ctxt) -> return (R v, ctxt)
+      >|=? fun (v, ctxt) -> (R v, ctxt)
   | (Union_t _, Prim (loc, D_Right, l, _)) ->
       fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
   | (Union_t _, expr) ->
@@ -2675,14 +2677,14 @@ let rec parse_data :
       Lwt.return (Gas.consume ctxt Typecheck_costs.some)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy t v
-      >>=? fun (v, ctxt) -> return (Some v, ctxt)
+      >|=? fun (v, ctxt) -> (Some v, ctxt)
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
       (if legacy then return () else fail_unexpected_annot loc annot)
       >>=? fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.none)
-      >>=? fun ctxt -> return (None, ctxt)
+      >|=? fun ctxt -> (None, ctxt)
   | (Option_t _, Prim (loc, D_None, l, _)) ->
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
   | (Option_t _, expr) ->
@@ -2695,7 +2697,7 @@ let rec parse_data :
              Lwt.return (Gas.consume ctxt Typecheck_costs.list_element)
              >>=? fun ctxt ->
              parse_data ?type_logger ctxt ~legacy t v
-             >>=? fun (v, ctxt) -> return (list_cons v rest, ctxt))
+             >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
            items
            (list_empty, ctxt)
   | (List_t _, expr) ->
@@ -2724,7 +2726,7 @@ let rec parse_data :
                (Gas.consume
                   ctxt
                   (Michelson_v1_gas.Cost_of.Legacy.set_update v false set))
-             >>=? fun ctxt -> return (Some v, set_update v true set, ctxt))
+             >|=? fun ctxt -> (Some v, set_update v true set, ctxt))
            (None, empty_set t, ctxt)
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
@@ -2830,8 +2832,8 @@ and parse_returning :
           serialize_stack_for_error ctxt stack_ty
           >|=? fun (stack_ty, _ctxt) -> Bad_return (loc, stack_ty, ret))
         ( Lwt.return (merge_types ~legacy ctxt loc ty ret)
-        >>=? fun (Eq, _ret, ctxt) ->
-        return ((Lam (descr, script_instr) : (arg, ret) lambda), ctxt) )
+        >|=? fun (Eq, _ret, ctxt) ->
+        ((Lam (descr, script_instr) : (arg, ret) lambda), ctxt) )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
       Lwt.return (serialize_ty_for_error ctxt ret)
       >>=? fun (ret, ctxt) ->
@@ -2872,8 +2874,9 @@ and parse_instr :
     trace_eval (fun () ->
         serialize_stack_for_error ctxt stack_ty
         >|=? fun (stack_ty, _ctxt) -> Bad_stack (loc, name, m, stack_ty))
-    @@ trace (Bad_stack_item n)
     @@ Lwt.return
+    @@ record_trace
+         (Bad_stack_item n)
          ( merge_types ~legacy ctxt loc exp got
          >>? fun (Eq, ty, ctxt) -> ok ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
@@ -2890,11 +2893,12 @@ and parse_instr :
         unparse_stack ctxt aft
         >>=? fun (aft, _) -> log loc stack_ty aft ; return_unit
   in
-  let outer_return = return in
   let return :
       type bef.
       context -> bef judgement -> (bef judgement * context) tzresult Lwt.t =
    fun ctxt judgement ->
+    Lwt.return
+    @@
     match judgement with
     | Typed {instr; loc; aft; _} ->
         let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
@@ -2904,10 +2908,10 @@ and parse_instr :
             ~up_to:(number_of_generated_growing_types instr)
         in
         if Compare.Int.(type_size > maximum_type_size) then
-          fail (Type_too_large (loc, type_size, maximum_type_size))
-        else return (judgement, ctxt)
+          error (Type_too_large (loc, type_size, maximum_type_size))
+        else ok (judgement, ctxt)
     | Failed _ ->
-        return (judgement, ctxt)
+        ok (judgement, ctxt)
   in
   let typed ctxt loc instr aft =
     log_stack ctxt loc stack_ty aft
@@ -2931,13 +2935,12 @@ and parse_instr :
        fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) ->
-            outer_return @@ Dropn_proof_argument (Rest, rest, rest)
+            Error_monad.return @@ Dropn_proof_argument (Rest, rest, rest)
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) rest
-            >>=? fun (Dropn_proof_argument (n', stack_after_drops, aft')) ->
-            outer_return
-            @@ Dropn_proof_argument
-                 (Prefix n', stack_after_drops, Item_t (v, aft', annot))
+            >|=? fun (Dropn_proof_argument (n', stack_after_drops, aft')) ->
+            Dropn_proof_argument
+              (Prefix n', stack_after_drops, Item_t (v, aft', annot))
         | (_, _) ->
             serialize_stack_for_error ctxt whole_stack
             >>=? fun (whole_stack, _ctxt) ->
@@ -2963,12 +2966,11 @@ and parse_instr :
        fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, Item_t (v, rest, annot)) ->
-            outer_return @@ Dig_proof_argument (Rest, (v, annot), rest)
+            Error_monad.return @@ Dig_proof_argument (Rest, (v, annot), rest)
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) rest
-            >>=? fun (Dig_proof_argument (n', (x, xv), aft')) ->
-            outer_return
-            @@ Dig_proof_argument (Prefix n', (x, xv), Item_t (v, aft', annot))
+            >|=? fun (Dig_proof_argument (n', (x, xv), aft')) ->
+            Dig_proof_argument (Prefix n', (x, xv), Item_t (v, aft', annot))
         | (_, _) ->
             serialize_stack_for_error ctxt stack
             >>=? fun (whole_stack, _ctxt) ->
@@ -2997,13 +2999,12 @@ and parse_instr :
        fun n x stack_annot stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) ->
-            outer_return
+            Error_monad.return
             @@ Dug_proof_argument (Rest, (), Item_t (x, rest, stack_annot))
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) x stack_annot rest
-            >>=? fun (Dug_proof_argument (n', (), aft')) ->
-            outer_return
-            @@ Dug_proof_argument (Prefix n', (), Item_t (v, aft', annot))
+            >|=? fun (Dug_proof_argument (n', (), aft')) ->
+            Dug_proof_argument (Prefix n', (), Item_t (v, aft', annot))
         | (_, _) ->
             serialize_stack_for_error ctxt whole_stack
             >>=? fun (whole_stack, _ctxt) ->
@@ -3748,17 +3749,17 @@ and parse_instr :
         | (true, rest) -> (
             parse_instr ?type_logger inner_tc_context ctxt ~legacy code rest
             >>=? fun (judgement, ctxt) ->
+            Lwt.return
+            @@
             match judgement with
             | Typed descr ->
-                outer_return
-                @@ Dipn_proof_argument (Rest, (ctxt, descr), descr.aft)
+                ok @@ Dipn_proof_argument (Rest, (ctxt, descr), descr.aft)
             | Failed _ ->
-                fail (Fail_not_in_tail_position loc) )
+                error (Fail_not_in_tail_position loc) )
         | (false, Item_t (v, rest, annot)) ->
             make_proof_argument (n - 1) (add_dip v annot tc_context) rest
-            >>=? fun (Dipn_proof_argument (n', descr, aft')) ->
-            outer_return
-            @@ Dipn_proof_argument (Prefix n', descr, Item_t (v, aft', annot))
+            >|=? fun (Dipn_proof_argument (n', descr, aft')) ->
+            Dipn_proof_argument (Prefix n', descr, Item_t (v, aft', annot))
         | (_, _) ->
             serialize_stack_for_error ctxt stack
             >>=? fun (whole_stack, _ctxt) ->
@@ -4327,12 +4328,15 @@ and parse_instr :
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (Lwt.return @@ parse_parameter_ty ctxt ~legacy arg_type)
       >>=? fun (Ex_ty arg_type, ctxt) ->
-      ( if legacy then Error_monad.return ()
-      else Lwt.return (well_formed_entrypoints ~root_name arg_type) )
+      Lwt.return
+        ( if legacy then ok_unit
+        else well_formed_entrypoints ~root_name arg_type )
       >>=? fun () ->
-      trace
-        (Ill_formed_type (Some "storage", canonical_code, location storage_type))
-        (Lwt.return @@ parse_storage_ty ctxt ~legacy storage_type)
+      Lwt.return
+      @@ record_trace
+           (Ill_formed_type
+              (Some "storage", canonical_code, location storage_type))
+           (parse_storage_ty ctxt ~legacy storage_type)
       >>=? fun (Ex_ty storage_type, ctxt) ->
       let arg_annot =
         default_annot
@@ -4841,11 +4845,11 @@ and parse_contract :
               entrypoint
               ctxt
               loc
-            >>? fun (ctxt, entrypoint, arg) ->
+            >|? fun (ctxt, entrypoint, arg) ->
             let contract : arg typed_contract =
               (arg, (contract, entrypoint))
             in
-            ok (ctxt, contract) ) )
+            (ctxt, contract) ) )
 
 (* Same as the one above, but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -4878,9 +4882,9 @@ and parse_contract_for_script :
             >>? fun ctxt -> ok (ctxt, None) )
   | (Some _, _) ->
       Lwt.return @@ Gas.consume ctxt Typecheck_costs.cycle
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       (* An implicit account on any other entrypoint is not a valid contract. *)
-      return (ctxt, None)
+      (ctxt, None)
   | (None, _) -> (
       (* Originated account *)
       Contract.exists ctxt contract
@@ -5047,16 +5051,18 @@ let parse_code :
   >>=? fun (code, ctxt) ->
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
-  trace
-    (Ill_formed_type (Some "parameter", code, location arg_type))
-    (Lwt.return (parse_parameter_ty ctxt ~legacy arg_type))
+  Lwt.return
+  @@ record_trace
+       (Ill_formed_type (Some "parameter", code, location arg_type))
+       (parse_parameter_ty ctxt ~legacy arg_type)
   >>=? fun (Ex_ty arg_type, ctxt) ->
-  ( if legacy then return ()
-  else Lwt.return (well_formed_entrypoints ~root_name arg_type) )
+  Lwt.return
+    (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>=? fun () ->
-  trace
-    (Ill_formed_type (Some "storage", code, location storage_type))
-    (Lwt.return (parse_storage_ty ctxt ~legacy storage_type))
+  Lwt.return
+  @@ record_trace
+       (Ill_formed_type (Some "storage", code, location storage_type))
+       (parse_storage_ty ctxt ~legacy storage_type)
   >>=? fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
@@ -5094,8 +5100,8 @@ let parse_code :
        (arg_type_full, None)
        ret_type_full
        code_field)
-  >>=? fun (code, ctxt) ->
-  return (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
+  >|=? fun (code, ctxt) ->
+  (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5109,9 +5115,10 @@ let parse_storage :
   >>=? fun (storage, ctxt) ->
   trace_eval
     (fun () ->
-      Lwt.return @@ serialize_ty_for_error ctxt storage_type
-      >|=? fun (storage_type, _ctxt) ->
-      Ill_typed_data (None, storage, storage_type))
+      Lwt.return
+        ( serialize_ty_for_error ctxt storage_type
+        >|? fun (storage_type, _ctxt) ->
+        Ill_typed_data (None, storage, storage_type) ))
     (parse_data ?type_logger ctxt ~legacy storage_type (root storage))
 
 let parse_script :
@@ -5124,8 +5131,8 @@ let parse_script :
   parse_code ~legacy ctxt ?type_logger ~code
   >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
   parse_storage ?type_logger ctxt ~legacy storage_type ~storage
-  >>=? fun (storage, ctxt) ->
-  return (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
+  >|=? fun (storage, ctxt) ->
+  (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
 let typecheck_code :
     legacy:bool ->
@@ -5136,16 +5143,18 @@ let typecheck_code :
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
   let type_map = ref [] in
-  trace
-    (Ill_formed_type (Some "parameter", code, location arg_type))
-    (Lwt.return (parse_parameter_ty ctxt ~legacy arg_type))
+  Lwt.return
+  @@ record_trace
+       (Ill_formed_type (Some "parameter", code, location arg_type))
+       (parse_parameter_ty ctxt ~legacy arg_type)
   >>=? fun (Ex_ty arg_type, ctxt) ->
-  ( if legacy then return ()
-  else Lwt.return (well_formed_entrypoints ~root_name arg_type) )
+  Lwt.return
+    (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>=? fun () ->
-  trace
-    (Ill_formed_type (Some "storage", code, location storage_type))
-    (Lwt.return (parse_storage_ty ctxt ~legacy storage_type))
+  Lwt.return
+  @@ record_trace
+       (Ill_formed_type (Some "storage", code, location storage_type))
+       (parse_storage_ty ctxt ~legacy storage_type)
   >>=? fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
@@ -5185,7 +5194,7 @@ let typecheck_code :
       code_field
   in
   trace (Ill_typed_contract (code, !type_map)) result
-  >>=? fun (Lam _, ctxt) -> return (!type_map, ctxt)
+  >|=? fun (Lam _, ctxt) -> (!type_map, ctxt)
 
 let typecheck_data :
     legacy:bool ->
@@ -5194,16 +5203,18 @@ let typecheck_data :
     Script.expr * Script.expr ->
     context tzresult Lwt.t =
  fun ~legacy ?type_logger ctxt (data, exp_ty) ->
-  trace
-    (Ill_formed_type (None, exp_ty, 0))
-    (Lwt.return @@ parse_parameter_ty ctxt ~legacy (root exp_ty))
+  Lwt.return
+  @@ record_trace
+       (Ill_formed_type (None, exp_ty, 0))
+       (parse_parameter_ty ctxt ~legacy (root exp_ty))
   >>=? fun (Ex_ty exp_ty, ctxt) ->
   trace_eval
     (fun () ->
-      Lwt.return @@ serialize_ty_for_error ctxt exp_ty
-      >|=? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty))
+      Lwt.return
+        ( serialize_ty_for_error ctxt exp_ty
+        >|? fun (exp_ty, _ctxt) -> Ill_typed_data (None, data, exp_ty) ))
     (parse_data ?type_logger ctxt ~legacy exp_ty (root data))
-  >>=? fun (_, ctxt) -> return ctxt
+  >|=? fun (_, ctxt) -> ctxt
 
 module Entrypoints_map = Map.Make (String)
 
@@ -5287,40 +5298,40 @@ let rec unparse_data :
   match (ty, a) with
   | (Unit_t _, ()) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.unit)
-      >>=? fun ctxt -> return (Prim (-1, D_Unit, [], []), ctxt)
+      >|=? fun ctxt -> (Prim (-1, D_Unit, [], []), ctxt)
   | (Int_t _, v) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.int v))
-      >>=? fun ctxt -> return (Int (-1, Script_int.to_zint v), ctxt)
+      >|=? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt)
   | (Nat_t _, v) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.int v))
-      >>=? fun ctxt -> return (Int (-1, Script_int.to_zint v), ctxt)
+      >|=? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt)
   | (String_t _, s) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.string s))
-      >>=? fun ctxt -> return (String (-1, s), ctxt)
+      >|=? fun ctxt -> (String (-1, s), ctxt)
   | (Bytes_t _, s) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.bytes s))
-      >>=? fun ctxt -> return (Bytes (-1, s), ctxt)
+      >|=? fun ctxt -> (Bytes (-1, s), ctxt)
   | (Bool_t _, true) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.bool)
-      >>=? fun ctxt -> return (Prim (-1, D_True, [], []), ctxt)
+      >|=? fun ctxt -> (Prim (-1, D_True, [], []), ctxt)
   | (Bool_t _, false) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.bool)
-      >>=? fun ctxt -> return (Prim (-1, D_False, [], []), ctxt)
+      >|=? fun ctxt -> (Prim (-1, D_False, [], []), ctxt)
   | (Timestamp_t _, t) -> (
       Lwt.return (Gas.consume ctxt (Unparse_costs.timestamp t))
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
-          return (Int (-1, Script_timestamp.to_zint t), ctxt)
+          (Int (-1, Script_timestamp.to_zint t), ctxt)
       | Readable -> (
         match Script_timestamp.to_notation t with
         | None ->
-            return (Int (-1, Script_timestamp.to_zint t), ctxt)
+            (Int (-1, Script_timestamp.to_zint t), ctxt)
         | Some s ->
-            return (String (-1, s), ctxt) ) )
+            (String (-1, s), ctxt) ) )
   | (Address_t _, (c, entrypoint)) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.contract)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let entrypoint =
@@ -5331,7 +5342,7 @@ let rec unparse_data :
               Data_encoding.(tup2 Contract.encoding Variable.string)
               (c, entrypoint)
           in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
           let notation =
             match entrypoint with
@@ -5340,10 +5351,10 @@ let rec unparse_data :
             | entrypoint ->
                 Contract.to_b58check c ^ "%" ^ entrypoint
           in
-          return (String (-1, notation), ctxt) )
+          (String (-1, notation), ctxt) )
   | (Contract_t _, (_, (c, entrypoint))) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.contract)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let entrypoint =
@@ -5354,7 +5365,7 @@ let rec unparse_data :
               Data_encoding.(tup2 Contract.encoding Variable.string)
               (c, entrypoint)
           in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
           let notation =
             match entrypoint with
@@ -5363,33 +5374,33 @@ let rec unparse_data :
             | entrypoint ->
                 Contract.to_b58check c ^ "%" ^ entrypoint
           in
-          return (String (-1, notation), ctxt) )
+          (String (-1, notation), ctxt) )
   | (Signature_t _, s) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.signature)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
-          return (String (-1, Signature.to_b58check s), ctxt) )
+          (String (-1, Signature.to_b58check s), ctxt) )
   | (Mutez_t _, v) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.tez)
-      >>=? fun ctxt -> return (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
+      >|=? fun ctxt -> (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
   | (Key_t _, k) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.key)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let bytes =
             Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
           in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
-          return (String (-1, Signature.Public_key.to_b58check k), ctxt) )
+          (String (-1, Signature.Public_key.to_b58check k), ctxt) )
   | (Key_hash_t _, k) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.key_hash)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let bytes =
@@ -5397,9 +5408,9 @@ let rec unparse_data :
               Signature.Public_key_hash.encoding
               k
           in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
-          return (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
+          (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
   | (Operation_t _, (op, _big_map_diff)) ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
@@ -5407,54 +5418,53 @@ let rec unparse_data :
           op
       in
       Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes))
-      >>=? fun ctxt -> return (Bytes (-1, bytes), ctxt)
+      >|=? fun ctxt -> (Bytes (-1, bytes), ctxt)
   | (Chain_id_t _, chain_id) -> (
       Lwt.return (Gas.consume ctxt Unparse_costs.chain_id)
-      >>=? fun ctxt ->
+      >|=? fun ctxt ->
       match mode with
       | Optimized ->
           let bytes =
             Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
           in
-          return (Bytes (-1, bytes), ctxt)
+          (Bytes (-1, bytes), ctxt)
       | Readable ->
-          return (String (-1, Chain_id.to_b58check chain_id), ctxt) )
+          (String (-1, Chain_id.to_b58check chain_id), ctxt) )
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.pair)
       >>=? fun ctxt ->
       unparse_data ctxt mode tl l
       >>=? fun (l, ctxt) ->
       unparse_data ctxt mode tr r
-      >>=? fun (r, ctxt) -> return (Prim (-1, D_Pair, [l; r], []), ctxt)
+      >|=? fun (r, ctxt) -> (Prim (-1, D_Pair, [l; r], []), ctxt)
   | (Union_t ((tl, _), _, _), L l) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.union)
       >>=? fun ctxt ->
       unparse_data ctxt mode tl l
-      >>=? fun (l, ctxt) -> return (Prim (-1, D_Left, [l], []), ctxt)
+      >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
   | (Union_t (_, (tr, _), _), R r) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.union)
       >>=? fun ctxt ->
       unparse_data ctxt mode tr r
-      >>=? fun (r, ctxt) -> return (Prim (-1, D_Right, [r], []), ctxt)
+      >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
   | (Option_t (t, _), Some v) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.some)
       >>=? fun ctxt ->
       unparse_data ctxt mode t v
-      >>=? fun (v, ctxt) -> return (Prim (-1, D_Some, [v], []), ctxt)
+      >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
   | (Option_t _, None) ->
       Lwt.return (Gas.consume ctxt Unparse_costs.none)
-      >>=? fun ctxt -> return (Prim (-1, D_None, [], []), ctxt)
+      >|=? fun ctxt -> (Prim (-1, D_None, [], []), ctxt)
   | (List_t (t, _), items) ->
       fold_left_s
         (fun (l, ctxt) element ->
           Lwt.return (Gas.consume ctxt Unparse_costs.list_element)
           >>=? fun ctxt ->
           unparse_data ctxt mode t element
-          >>=? fun (unparsed, ctxt) -> return (unparsed :: l, ctxt))
+          >|=? fun (unparsed, ctxt) -> (unparsed :: l, ctxt))
         ([], ctxt)
         items.elements
-      >>=? fun (items, ctxt) ->
-      return (Micheline.Seq (-1, List.rev items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
   | (Set_t (t, _), set) ->
       let t = ty_of_comparable_ty t in
       fold_left_s
@@ -5462,10 +5472,10 @@ let rec unparse_data :
           Lwt.return (Gas.consume ctxt Unparse_costs.set_element)
           >>=? fun ctxt ->
           unparse_data ctxt mode t item
-          >>=? fun (item, ctxt) -> return (item :: l, ctxt))
+          >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         (set_fold (fun e acc -> e :: acc) set [])
-      >>=? fun (items, ctxt) -> return (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
       let kt = ty_of_comparable_ty kt in
       fold_left_s
@@ -5475,11 +5485,11 @@ let rec unparse_data :
           unparse_data ctxt mode kt k
           >>=? fun (key, ctxt) ->
           unparse_data ctxt mode vt v
-          >>=? fun (value, ctxt) ->
-          return (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
+          >|=? fun (value, ctxt) ->
+          (Prim (-1, D_Elt, [key; value], []) :: l, ctxt))
         ([], ctxt)
         (map_fold (fun k v acc -> (k, v) :: acc) map [])
-      >>=? fun (items, ctxt) -> return (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = (module Diff); _})
     when Diff.OPS.is_empty (fst Diff.boxed) ->
       return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
@@ -5490,10 +5500,9 @@ let rec unparse_data :
       in
       let vt = Option_t (vt, None) in
       unparse_items ctxt mode kt vt items
-      >>=? fun (items, ctxt) ->
+      >|=? fun (items, ctxt) ->
       let id = Big_map.Id.unparse_to_z id in
-      return
-        (Micheline.Prim (-1, D_Pair, [Int (-1, id); Seq (-1, items)], []), ctxt)
+      (Micheline.Prim (-1, D_Pair, [Int (-1, id); Seq (-1, items)], []), ctxt)
   | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
       let kt = ty_of_comparable_ty kt in
       let items =
@@ -5503,7 +5512,7 @@ let rec unparse_data :
           []
       in
       unparse_items ctxt mode kt vt items
-      >>=? fun (items, ctxt) -> return (Micheline.Seq (-1, items), ctxt)
+      >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt mode original_code
   | (Never_t _, _) ->
@@ -5542,28 +5551,26 @@ and unparse_code ctxt mode =
       unparse_data ctxt mode t data
       >>=? fun (data, ctxt) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 2 annot))
-      >>=? fun ctxt -> return (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
+      >|=? fun ctxt -> (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
   | Seq (loc, items) ->
       fold_left_s
         (fun (l, ctxt) item ->
-          unparse_code ctxt mode item
-          >>=? fun (item, ctxt) -> return (item :: l, ctxt))
+          unparse_code ctxt mode item >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         items
       >>=? fun (items, ctxt) ->
       Lwt.return
         (Gas.consume ctxt (Unparse_costs.seq_cost (List.length items)))
-      >>=? fun ctxt -> return (Micheline.Seq (loc, List.rev items), ctxt)
+      >|=? fun ctxt -> (Micheline.Seq (loc, List.rev items), ctxt)
   | Prim (loc, prim, items, annot) ->
       fold_left_s
         (fun (l, ctxt) item ->
-          unparse_code ctxt mode item
-          >>=? fun (item, ctxt) -> return (item :: l, ctxt))
+          unparse_code ctxt mode item >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
         items
       >>=? fun (items, ctxt) ->
       Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 3 annot))
-      >>=? fun ctxt -> return (Prim (loc, prim, List.rev items, annot), ctxt)
+      >|=? fun ctxt -> (Prim (loc, prim, List.rev items, annot), ctxt)
   | (Int _ | String _ | Bytes _) as atom ->
       return (atom, ctxt)
 
@@ -5595,13 +5602,12 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
     >>? fun ctxt ->
     Gas.consume ctxt (Unparse_costs.prim_cost 1 [])
     >>? fun ctxt -> Gas.consume ctxt (Unparse_costs.prim_cost 1 []) )
-  >>=? fun ctxt ->
-  return
-    ( {
-        code = lazy_expr (strip_locations code);
-        storage = lazy_expr (strip_locations storage);
-      },
-      ctxt )
+  >|=? fun ctxt ->
+  ( {
+      code = lazy_expr (strip_locations code);
+      storage = lazy_expr (strip_locations storage);
+    },
+    ctxt )
 
 let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data
@@ -5615,7 +5621,7 @@ let pack_data ctxt typ data =
   >>=? fun ctxt ->
   let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
   Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
-  >>=? fun ctxt -> return (bytes, ctxt)
+  >|=? fun ctxt -> (bytes, ctxt)
 
 let hash_data ctxt typ data =
   pack_data ctxt typ data
@@ -5624,7 +5630,7 @@ let hash_data ctxt typ data =
   @@ Gas.consume
        ctxt
        (Michelson_v1_gas.Cost_of.Legacy.hash bytes Script_expr_hash.size)
-  >>=? fun ctxt -> return (Script_expr_hash.(hash_bytes [bytes]), ctxt)
+  >|=? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
 
 (* ---------------- Big map -------------------------------------------------*)
 
@@ -5643,8 +5649,7 @@ let big_map_mem ctxt key {id; diff; key_type; _} =
   | (None, Some id) ->
       hash_data ctxt key_type key
       >>=? fun (hash, ctxt) ->
-      Alpha_context.Big_map.mem ctxt id hash
-      >>=? fun (ctxt, res) -> return (res, ctxt)
+      Alpha_context.Big_map.mem ctxt id hash >|=? fun (ctxt, res) -> (res, ctxt)
   | (Some None, _) ->
       return (false, ctxt)
   | (Some (Some _), _) ->
@@ -5665,7 +5670,7 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
           return (None, ctxt)
       | (ctxt, Some value) ->
           parse_data ctxt ~legacy:true value_type (Micheline.root value)
-          >>=? fun (x, ctxt) -> return (Some x, ctxt) )
+          >|=? fun (x, ctxt) -> (Some x, ctxt) )
 
 let big_map_update key value ({diff; _} as map) =
   {map with diff = map_set key value diff}
@@ -5683,8 +5688,8 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       let kid = Lazy_storage.KId.E (Big_map, id) in
       if Ids.mem kid ids then
         Big_map.fresh ~temporary ctxt
-        >>=? fun (ctxt, duplicate) ->
-        return (ctxt, Lazy_storage.Copy {src = id}, duplicate)
+        >|=? fun (ctxt, duplicate) ->
+        (ctxt, Lazy_storage.Copy {src = id}, duplicate)
       else
         (* The first occurrence encountered of a big_map reuses the
              ID. This way, the payer is only charged for the diff.
@@ -5701,10 +5706,10 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
       unparse_ty ctxt key_type
       >>=? fun (kt, ctxt) ->
       unparse_ty ctxt value_type
-      >>=? fun (kv, ctxt) ->
+      >|=? fun (kv, ctxt) ->
       let key_type = Micheline.strip_locations kt in
       let value_type = Micheline.strip_locations kv in
-      return (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id) )
+      (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id) )
   >>=? fun (ctxt, init, id) ->
   map_fold_m
     (fun (key, value) (acc, ctxt) ->
@@ -5720,15 +5725,14 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
           return (None, ctxt)
       | Some x ->
           unparse_data ctxt mode value_type x
-          >>=? fun (node, ctxt) ->
-          return (Some (Micheline.strip_locations node), ctxt) )
-      >>=? fun (value, ctxt) ->
+          >|=? fun (node, ctxt) -> (Some (Micheline.strip_locations node), ctxt)
+      )
+      >|=? fun (value, ctxt) ->
       let diff_item = Big_map.{key; key_hash; value} in
-      return (diff_item :: acc, ctxt))
+      (diff_item :: acc, ctxt))
     diff
     ([], ctxt)
-  >>=? fun (updates, ctxt) ->
-  return (Lazy_storage.Update {init; updates}, id, ctxt)
+  >|=? fun (updates, ctxt) -> (Lazy_storage.Update {init; updates}, id, ctxt)
 
 (**
     Witness flag for whether a type can be populated by a value containing a
@@ -5844,50 +5848,48 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
         return (ctxt, x, ids, acc)
     | (_, Big_map_t (_, _, _), map) ->
         diff_of_big_map ctxt mode ~temporary ~ids map
-        >>=? fun (diff, id, ctxt) ->
+        >|=? fun (diff, id, ctxt) ->
         let (module Map) = map.diff in
         let map = {map with diff = empty_map Map.key_ty; id = Some id} in
         let diff = Lazy_storage.make Big_map id diff in
         let kid = Lazy_storage.KId.E (Big_map, id) in
-        return (ctxt, map, Ids.add kid ids, diff :: acc)
+        (ctxt, map, Ids.add kid ids, diff :: acc)
     | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
         aux ctxt mode ~temporary ids acc tyl xl ~has_lazy_storage:hl
         >>=? fun (ctxt, xl, ids, acc) ->
         aux ctxt mode ~temporary ids acc tyr xr ~has_lazy_storage:hr
-        >>=? fun (ctxt, xr, ids, acc) -> return (ctxt, (xl, xr), ids, acc)
+        >|=? fun (ctxt, xr, ids, acc) -> (ctxt, (xl, xr), ids, acc)
     | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
         aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
-        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, L x, ids, acc)
+        >|=? fun (ctxt, x, ids, acc) -> (ctxt, L x, ids, acc)
     | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
         aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
-        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, R x, ids, acc)
+        >|=? fun (ctxt, x, ids, acc) -> (ctxt, R x, ids, acc)
     | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
         aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
-        >>=? fun (ctxt, x, ids, acc) -> return (ctxt, Some x, ids, acc)
+        >|=? fun (ctxt, x, ids, acc) -> (ctxt, Some x, ids, acc)
     | (List_f has_lazy_storage, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
-            >>=? fun (ctxt, x, ids, acc) ->
-            return (ctxt, list_cons x l, ids, acc))
+            >|=? fun (ctxt, x, ids, acc) -> (ctxt, list_cons x l, ids, acc))
           (ctxt, list_empty, ids, acc)
           l.elements
-        >>=? fun (ctxt, l, ids, acc) ->
+        >|=? fun (ctxt, l, ids, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
-        return (ctxt, reversed, ids, acc)
+        (ctxt, reversed, ids, acc)
     | (Map_f has_lazy_storage, Map_t (_, ty, _), ((module M) as m)) ->
         map_fold_m
           (fun (k, x) (ctxt, m, ids, acc) ->
             Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
             >>=? fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_lazy_storage
-            >>=? fun (ctxt, x, ids, acc) ->
-            return (ctxt, M.OPS.add k x m, ids, acc))
+            >|=? fun (ctxt, x, ids, acc) -> (ctxt, M.OPS.add k x m, ids, acc))
           m
           (ctxt, M.OPS.empty, ids, acc)
-        >>=? fun (ctxt, m, ids, acc) ->
+        >|=? fun (ctxt, m, ids, acc) ->
         let module M = struct
           module OPS = M.OPS
 
@@ -5899,13 +5901,10 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids acc ty x =
 
           let boxed = (m, snd M.boxed)
         end in
-        return
-          ( ctxt,
-            (module M : Boxed_map
-              with type key = M.key
-               and type value = M.value ),
-            ids,
-            acc )
+        ( ctxt,
+          (module M : Boxed_map with type key = M.key and type value = M.value),
+          ids,
+          acc )
     | (_, Option_t (_, _), None) ->
         return (ctxt, None, ids, acc)
     | (_, Never_t _, _) ->
@@ -5987,7 +5986,7 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
   let to_duplicate = Ids.diff to_duplicate to_update in
   extract_lazy_storage_updates ctxt mode ~temporary to_duplicate [] ty v
-  >>=? fun (ctxt, v, alive, diffs) ->
+  >|=? fun (ctxt, v, alive, diffs) ->
   let diffs =
     if temporary then diffs
     else
@@ -5996,9 +5995,9 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
   in
   match diffs with
   | [] ->
-      return (v, None, ctxt)
+      (v, None, ctxt)
   | diffs ->
-      return (v, Some diffs (* do not reverse *), ctxt)
+      (v, Some diffs (* do not reverse *), ctxt)
 
 let find_big_map_unaccounted ctxt ty x ~f =
   let ctxt = Gas.set_unlimited ctxt in

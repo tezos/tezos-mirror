@@ -31,4 +31,4 @@ let init ctxt commitments =
   let init_commitment ctxt Commitment_repr.{blinded_public_key_hash; amount} =
     Storage.Commitments.init ctxt blinded_public_key_hash amount
   in
-  fold_left_s init_commitment ctxt commitments >>=? fun ctxt -> return ctxt
+  fold_left_s init_commitment ctxt commitments

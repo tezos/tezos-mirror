@@ -842,17 +842,17 @@ let prims_of_strings expr =
         >>? fun prim ->
         List.fold_left
           (fun acc arg ->
-            acc >>? fun args -> convert arg >>? fun arg -> ok (arg :: args))
+            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
           (ok [])
           args
-        >>? fun args -> ok (Prim (0, prim, List.rev args, annot))
+        >|? fun args -> Prim (0, prim, List.rev args, annot)
     | Seq (_, args) ->
         List.fold_left
           (fun acc arg ->
-            acc >>? fun args -> convert arg >>? fun arg -> ok (arg :: args))
+            acc >>? fun args -> convert arg >|? fun arg -> arg :: args)
           (ok [])
           args
-        >>? fun args -> ok (Seq (0, List.rev args))
+        >|? fun args -> Seq (0, List.rev args)
   in
   convert (root expr) >>? fun expr -> ok (strip_locations expr)
   [@@coq_axiom "implicit type conversion for expr in the constant cases"]
