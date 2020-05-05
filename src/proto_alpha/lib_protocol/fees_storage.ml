@@ -63,9 +63,10 @@ let origination_burn c =
   let origination_size = Constants_storage.origination_size c in
   let cost_per_byte = Constants_storage.cost_per_byte c in
   (* the origination burn, measured in bytes *)
-  Lwt.return Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
-  >>=? fun to_be_paid ->
-  return (Raw_context.update_allocated_contracts_count c, to_be_paid)
+  Lwt.return
+    ( Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
+    >|? fun to_be_paid ->
+    (Raw_context.update_allocated_contracts_count c, to_be_paid) )
 
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract
@@ -77,8 +78,9 @@ let record_paid_storage_space c contract =
   >>=? fun (to_be_paid, c) ->
   let c = Raw_context.update_storage_space_to_pay c to_be_paid in
   let cost_per_byte = Constants_storage.cost_per_byte c in
-  Lwt.return Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
-  >>=? fun to_burn -> return (c, size, to_be_paid, to_burn)
+  Lwt.return
+    ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
+    >|? fun to_burn -> (c, size, to_be_paid, to_burn) )
 
 let burn_storage_fees c ~storage_limit ~payer =
   let origination_size = Constants_storage.origination_size c in
@@ -107,7 +109,6 @@ let burn_storage_fees c ~storage_limit ~payer =
         Cannot_pay_storage_fee
         ( Contract_storage.must_exist c payer
         >>=? fun () -> Contract_storage.spend c payer to_burn )
-      >>=? fun c -> return c
 
 let check_storage_limit c ~storage_limit =
   if

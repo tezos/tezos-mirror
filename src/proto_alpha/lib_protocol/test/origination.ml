@@ -61,11 +61,11 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   >>=? fun () ->
   (* originated contract has been credited *)
   Assert.balance_was_credited ~loc:__LOC__ (B b) originated Tez.zero credit
-  >>=? fun () ->
+  >|=? fun () ->
   (* TODO spendable or not and delegatable or not if relevant for some
      test. Not the case at the moment, cf. uses of
      register_origination *)
-  return (b, source, originated)
+  (b, source, originated)
 
 (* [test_origination_balances fee credit spendable delegatable]
    takes four optional parameter: fee is the fee that pay if require to create
@@ -210,8 +210,7 @@ let register_contract_get_endorser () =
   Incremental.begin_construction b
   >>=? fun inc ->
   Context.get_endorser (I inc)
-  >>=? fun (account_endorser, _slots) ->
-  return (inc, contract, account_endorser)
+  >|=? fun (account_endorser, _slots) -> (inc, contract, account_endorser)
 
 (*******************)
 (** create multiple originated contracts and
@@ -223,9 +222,7 @@ let n_originations n ?credit ?fee () =
   fold_left_s
     (fun new_contracts _ ->
       register_origination ?fee ?credit ()
-      >>=? fun (_b, _source, new_contract) ->
-      let contracts = new_contract :: new_contracts in
-      return contracts)
+      >|=? fun (_b, _source, new_contract) -> new_contract :: new_contracts)
     []
     (1 -- n)
 

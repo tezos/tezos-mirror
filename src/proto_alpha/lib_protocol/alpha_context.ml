@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Misc.Syntax
+
 type t = Raw_context.t
 
 type context = t
@@ -187,8 +189,7 @@ module Big_map = struct
     | None ->
         return (c, None)
     | Some kt ->
-        Storage.Big_map.Value_type.get c id
-        >>=? fun kv -> return (c, Some (kt, kv))
+        Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
 end
 
 module Delegate = Delegate_storage

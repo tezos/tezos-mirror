@@ -27,6 +27,7 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
+open Misc.Syntax
 
 (* ---- Run-time errors -----------------------------------------------------*)
 
@@ -157,7 +158,7 @@ let unparse_stack ctxt (stack, stack_ty) =
         unparse_data ctxt Readable ty v
         >>=? fun (data, _ctxt) ->
         unparse_stack (rest_ty, rest)
-        >>=? fun rest ->
+        >|=? fun rest ->
         let annot =
           match Script_ir_annot.unparse_var_annot annot with
           | [] ->
@@ -168,7 +169,7 @@ let unparse_stack ctxt (stack, stack_ty) =
               assert false
         in
         let data = Micheline.strip_locations data in
-        return ((data, annot) :: rest)
+        (data, annot) :: rest
   in
   unparse_stack (stack_ty, stack)
 
@@ -204,25 +205,24 @@ let rec interp_stack_prefix_preserving_operation :
                     (v7, (v8, (v9, (va, (vb, (vc, (vd, (ve, (vf, rest)))))))))
                   ) ) ) ) ) ) ) ) ->
       interp_stack_prefix_preserving_operation f n rest
-      >>=? fun (rest', result) ->
-      return
-        ( ( v0,
-            ( v1,
-              ( v2,
-                ( v3,
-                  ( v4,
-                    ( v5,
-                      ( v6,
-                        ( v7,
-                          (v8, (v9, (va, (vb, (vc, (vd, (ve, (vf, rest'))))))))
-                        ) ) ) ) ) ) ) ),
-          result )
+      >|=? fun (rest', result) ->
+      ( ( v0,
+          ( v1,
+            ( v2,
+              ( v3,
+                ( v4,
+                  ( v5,
+                    ( v6,
+                      ( v7,
+                        (v8, (v9, (va, (vb, (vc, (vd, (ve, (vf, rest'))))))))
+                      ) ) ) ) ) ) ) ),
+        result )
   | (Prefix (Prefix (Prefix (Prefix n))), (v0, (v1, (v2, (v3, rest))))) ->
       interp_stack_prefix_preserving_operation f n rest
-      >>=? fun (rest', result) -> return ((v0, (v1, (v2, (v3, rest')))), result)
+      >|=? fun (rest', result) -> ((v0, (v1, (v2, (v3, rest')))), result)
   | (Prefix n, (v, rest)) ->
       interp_stack_prefix_preserving_operation f n rest
-      >>=? fun (rest', result) -> return ((v, rest'), result)
+      >|=? fun (rest', result) -> ((v, rest'), result)
   | (Rest, v) ->
       f v
 
@@ -1298,9 +1298,7 @@ let rec step :
       >>=? fun (aft, ()) -> logged_return (aft, ctxt)
   | (Dipn (_n, n', b), stack) ->
       interp_stack_prefix_preserving_operation
-        (fun stk ->
-          step logger ctxt step_constants b stk
-          >>=? fun (res, ctxt') -> return (res, ctxt'))
+        (fun stk -> step logger ctxt step_constants b stk)
         n'
         stack
       >>=? fun (aft, ctxt') -> logged_return (aft, ctxt')
@@ -1326,7 +1324,7 @@ and interp :
   let module Log = (val logger) in
   Log.log_interp ctxt code stack ;
   step logger ctxt step_constants code stack
-  >>=? fun ((ret, ()), ctxt) -> return (ret, ctxt)
+  >|=? fun ((ret, ()), ctxt) -> (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
 let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
@@ -1338,9 +1336,10 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     Lwt.t =
   parse_script ctxt unparsed_script ~legacy:true
   >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt) ->
-  trace
-    (Bad_contract_parameter step_constants.self)
-    (Lwt.return (find_entrypoint arg_type ~root_name entrypoint))
+  Lwt.return
+  @@ record_trace
+       (Bad_contract_parameter step_constants.self)
+       (find_entrypoint arg_type ~root_name entrypoint)
   >>=? fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)
@@ -1366,7 +1365,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     storage
   >>=? fun (storage, big_map_diff, ctxt) ->
   trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
-  >>=? fun (storage, ctxt) ->
+  >|=? fun (storage, ctxt) ->
   let (ops, op_diffs) = List.split ops.elements in
   let big_map_diff =
     match
@@ -1378,7 +1377,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     | diff ->
         Some diff
   in
-  return (Micheline.strip_locations storage, ops, ctxt, big_map_diff)
+  (Micheline.strip_locations storage, ops, ctxt, big_map_diff)
 
 type execution_result = {
   ctxt : context;
@@ -1400,9 +1399,9 @@ let trace ctxt mode step_constants ~script ~entrypoint ~parameter =
     (Micheline.root parameter)
   >>=? fun (storage, operations, ctxt, big_map_diff) ->
   Logger.get_log ()
-  >>=? fun trace ->
+  >|=? fun trace ->
   let trace = Option.unopt ~default:[] trace in
-  return ({ctxt; storage; big_map_diff; operations}, trace)
+  ({ctxt; storage; big_map_diff; operations}, trace)
 
 let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
   let logger = (module No_trace : STEP_LOGGER) in
@@ -1414,5 +1413,5 @@ let execute ctxt mode step_constants ~script ~entrypoint ~parameter =
     ~entrypoint
     script
     (Micheline.root parameter)
-  >>=? fun (storage, operations, ctxt, big_map_diff) ->
-  return {ctxt; storage; big_map_diff; operations}
+  >|=? fun (storage, operations, ctxt, big_map_diff) ->
+  {ctxt; storage; big_map_diff; operations}

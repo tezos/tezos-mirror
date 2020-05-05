@@ -142,11 +142,10 @@ let max_endorsement () =
       Context.Contract.balance (B b) (Contract.implicit_contract delegate)
       >>=? fun balance ->
       Op.endorsement ~delegate (B b) ()
-      >>=? fun op ->
-      return
-        ( delegate :: delegates,
-          Operation.pack op :: ops,
-          (List.length endorser.slots, balance) :: balances ))
+      >|=? fun op ->
+      ( delegate :: delegates,
+        Operation.pack op :: ops,
+        (List.length endorser.slots, balance) :: balances ))
     ([], [], [])
     endorsers
   >>=? fun (delegates, ops, previous_balances) ->
@@ -213,7 +212,7 @@ let consistent_priorities () =
             ~endorsing_power:(List.length endorser.slots)
             endorser.delegate
             balance
-          >>=? fun () -> return (b, used_pkhes))
+          >|=? fun () -> (b, used_pkhes))
     (b, Signature.Public_key_hash.Set.empty)
     priorities
   >>=? fun _b -> return_unit
@@ -487,8 +486,7 @@ let not_enough_for_deposit () =
   Context.init 5 ~endorsers_per_block:1
   >>=? fun (b_init, contracts) ->
   Error_monad.map_s
-    (fun c ->
-      Context.Contract.manager (B b_init) c >>=? fun m -> return (m, c))
+    (fun c -> Context.Contract.manager (B b_init) c >|=? fun m -> (m, c))
     contracts
   >>=? fun managers ->
   Block.bake b_init

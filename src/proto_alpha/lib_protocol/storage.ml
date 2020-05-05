@@ -320,8 +320,7 @@ module Big_map = struct
               (Z)
 
     let incr ctxt =
-      get ctxt
-      >>=? fun i -> set ctxt (Z.succ i) >>=? fun ctxt -> return (ctxt, i)
+      get ctxt >>=? fun i -> set ctxt (Z.succ i) >|=? fun ctxt -> (ctxt, i)
 
     let init ctxt = init ctxt Z.zero
   end

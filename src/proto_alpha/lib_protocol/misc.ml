@@ -90,4 +90,12 @@ let rec remove_elem_from_list nb = function
 module Syntax = struct
   (* To be upstreamed in environment v1 *)
   let ( >|=? ) = ( >>|? )
+
+  let ok_unit = Ok ()
+
+  let ok_none = Ok None
+
+  let[@inline] ok_some x = Ok (Some x)
+
+  let error_unless cond exn = if cond then ok_unit else error exn
 end

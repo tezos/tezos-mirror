@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Misc.Syntax
 
 module S = struct
   let path = RPC_path.(open_root / "votes")
@@ -96,13 +97,13 @@ let register () =
   register0 S.current_proposal (fun ctxt () () ->
       (* this would be better implemented using get_option in get_current_proposal *)
       Vote.get_current_proposal ctxt
-      >>= function
+      >|= function
       | Ok p ->
-          return_some p
+          ok_some p
       | Error (Raw_context.Storage_error (Missing_key _) :: _) ->
-          return_none
+          ok_none
       | Error _ as e ->
-          Lwt.return e)
+          e)
 
 let ballots ctxt block = RPC_context.make_call0 S.ballots ctxt block () ()
 

@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Misc.Syntax
 
 (** Returns the proposal submitted by the most delegates.
     Returns None in case of a tie, if proposal quorum is below required
@@ -95,7 +96,7 @@ let check_approval_and_update_participation_ema ctxt =
     Int32.(div (add (mul 8l participation_ema) (mul 2l participation)) 10l)
   in
   Vote.set_participation_ema ctxt new_participation_ema
-  >>=? fun ctxt -> return (ctxt, outcome)
+  >|=? fun ctxt -> (ctxt, outcome)
 
 (** Implements the state machine of the amendment procedure.
     Note that [freeze_listings], that computes the vote weight of each delegate,
@@ -138,8 +139,7 @@ let start_new_voting_period ctxt =
         Vote.get_current_proposal ctxt
         >>=? fun proposal ->
         fork_test_chain ctxt proposal expiration
-        >>= fun ctxt ->
-        Vote.set_current_period_kind ctxt Testing >>=? fun ctxt -> return ctxt
+        >>= fun ctxt -> Vote.set_current_period_kind ctxt Testing
       else
         Vote.clear_current_proposal ctxt
         >>=? fun ctxt ->
@@ -148,9 +148,7 @@ let start_new_voting_period ctxt =
         Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt -> return ctxt
   | Testing ->
       Vote.freeze_listings ctxt
-      >>=? fun ctxt ->
-      Vote.set_current_period_kind ctxt Promotion_vote
-      >>=? fun ctxt -> return ctxt
+      >>=? fun ctxt -> Vote.set_current_period_kind ctxt Promotion_vote
   | Promotion_vote ->
       check_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
@@ -286,7 +284,6 @@ let record_proposals ctxt delegate proposals =
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals
-        >>=? fun ctxt -> return ctxt
       else fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote ->
       fail Unexpected_proposal

@@ -110,9 +110,7 @@ let reveal ctxt level nonce =
   fail_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Unexpected_nonce
-  >>=? fun () ->
-  Storage.Seed.Nonce.set ctxt level (Revealed nonce)
-  >>=? fun ctxt -> return ctxt
+  >>=? fun () -> Storage.Seed.Nonce.set ctxt level (Revealed nonce)
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash : Nonce_hash.t;
