@@ -96,8 +96,8 @@ let burn_storage_fees c ~storage_limit ~payer =
   if Compare.Z.(remaining < Z.zero) then fail Operation_quota_exceeded
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
-    Lwt.return Tez_repr.(cost_per_byte *? Z.to_int64 consumed)
-    >>=? fun to_burn ->
+    Tez_repr.(cost_per_byte *? Z.to_int64 consumed)
+    >>?= fun to_burn ->
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
       (* If the payer was was deleted by transferring all its balance, and no space was used,

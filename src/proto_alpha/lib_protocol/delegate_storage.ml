@@ -280,8 +280,8 @@ let credit_frozen_deposit ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_deposit ctxt contract cycle
   >>=? fun old_amount ->
-  Lwt.return Tez_repr.(old_amount +? amount)
-  >>=? fun new_amount ->
+  Tez_repr.(old_amount +? amount)
+  >>?= fun new_amount ->
   Storage.Contract.Frozen_deposits.init_set (ctxt, contract) cycle new_amount
   >>= fun ctxt ->
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
@@ -293,11 +293,10 @@ let freeze_deposit ctxt delegate amount =
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Balance.get ctxt contract
   >>=? fun balance ->
-  Lwt.return
-    (record_trace
-       (Balance_too_low_for_deposit {delegate; deposit = amount; balance})
-       Tez_repr.(balance -? amount))
-  >>=? fun new_balance ->
+  record_trace
+    (Balance_too_low_for_deposit {delegate; deposit = amount; balance})
+    Tez_repr.(balance -? amount)
+  >>?= fun new_balance ->
   Storage.Contract.Balance.set ctxt contract new_balance
   >>=? fun ctxt -> credit_frozen_deposit ctxt delegate cycle amount
 
@@ -309,8 +308,8 @@ let credit_frozen_fees ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_fees ctxt contract cycle
   >>=? fun old_amount ->
-  Lwt.return Tez_repr.(old_amount +? amount)
-  >>=? fun new_amount ->
+  Tez_repr.(old_amount +? amount)
+  >>?= fun new_amount ->
   Storage.Contract.Frozen_fees.init_set (ctxt, contract) cycle new_amount
   >>= fun ctxt ->
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
@@ -343,8 +342,8 @@ let credit_frozen_rewards ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_rewards ctxt contract cycle
   >>=? fun old_amount ->
-  Lwt.return Tez_repr.(old_amount +? amount)
-  >>=? fun new_amount ->
+  Tez_repr.(old_amount +? amount)
+  >>?= fun new_amount ->
   Storage.Contract.Frozen_rewards.init_set (ctxt, contract) cycle new_amount
   >>= fun ctxt ->
   Storage.Delegates_with_frozen_balance.add (ctxt, cycle) delegate >|= ok
@@ -377,12 +376,12 @@ let unfreeze ctxt delegate cycle =
   >>=? fun rewards ->
   Storage.Contract.Balance.get ctxt contract
   >>=? fun balance ->
-  Lwt.return Tez_repr.(deposit +? fees)
-  >>=? fun unfrozen_amount ->
-  Lwt.return Tez_repr.(unfrozen_amount +? rewards)
-  >>=? fun unfrozen_amount ->
-  Lwt.return Tez_repr.(balance +? unfrozen_amount)
-  >>=? fun balance ->
+  Tez_repr.(deposit +? fees)
+  >>?= fun unfrozen_amount ->
+  Tez_repr.(unfrozen_amount +? rewards)
+  >>?= fun unfrozen_amount ->
+  Tez_repr.(balance +? unfrozen_amount)
+  >>?= fun balance ->
   Storage.Contract.Balance.set ctxt contract balance
   >>=? fun ctxt ->
   Roll_storage.Delegate.add_amount ctxt delegate rewards
@@ -470,8 +469,8 @@ let cycle_end ctxt last_cycle unrevealed =
         (ctxt, unfrozen_cycle)
         ~init:(Ok (ctxt, balance_updates))
         ~f:(fun delegate acc ->
-          Lwt.return acc
-          >>=? fun (ctxt, bus) ->
+          acc
+          >>?= fun (ctxt, bus) ->
           unfreeze ctxt delegate unfrozen_cycle
           >|=? fun (ctxt, balance_updates) -> (ctxt, balance_updates @ bus))
       >>=? fun (ctxt, balance_updates) ->
@@ -481,8 +480,8 @@ let cycle_end ctxt last_cycle unrevealed =
         ctxt
         ~init:(Ok (ctxt, []))
         ~f:(fun delegate acc ->
-          Lwt.return acc
-          >>=? fun (ctxt, deactivated) ->
+          acc
+          >>?= fun (ctxt, deactivated) ->
           Storage.Contract.Delegate_desactivation.get
             ctxt
             (Contract_repr.implicit_contract delegate)

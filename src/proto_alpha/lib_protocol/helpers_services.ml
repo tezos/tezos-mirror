@@ -370,8 +370,8 @@ module Scripts = struct
           | Some gas ->
               Gas.set_limit ctxt gas
         in
-        Lwt.return (parse_packable_ty ctxt ~legacy:true (Micheline.root typ))
-        >>=? fun (Ex_ty typ, ctxt) ->
+        parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
+        >>?= fun (Ex_ty typ, ctxt) ->
         parse_data ctxt ~legacy:true typ (Micheline.root expr)
         >>=? fun (data, ctxt) ->
         Script_ir_translator.pack_data ctxt typ data
@@ -389,11 +389,11 @@ module Scripts = struct
                 {source; fee; counter; operation; gas_limit; storage_limit}) =
             op
           in
-          Lwt.return (Gas.check_limit ctxt gas_limit)
-          >>=? fun () ->
+          Gas.check_limit ctxt gas_limit
+          >>?= fun () ->
           let ctxt = Gas.set_limit ctxt gas_limit in
-          Lwt.return (Fees.check_storage_limit ctxt storage_limit)
-          >>=? fun () ->
+          Fees.check_storage_limit ctxt storage_limit
+          >>?= fun () ->
           Contract.must_be_allocated ctxt (Contract.implicit_contract source)
           >>=? fun () ->
           Contract.check_counter_increment ctxt source counter
@@ -513,14 +513,15 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        Lwt.return
-          ( parse_toplevel ~legacy expr
-          >>? fun (arg_type, _, _, root_name) ->
-          parse_parameter_ty ctxt ~legacy arg_type
-          >>? fun (Ex_ty arg_type, _) ->
-          Script_ir_translator.find_entrypoint ~root_name arg_type entrypoint
-          )
-        >>=? fun (_f, Ex_ty ty) ->
+        parse_toplevel ~legacy expr
+        >>? (fun (arg_type, _, _, root_name) ->
+              parse_parameter_ty ctxt ~legacy arg_type
+              >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.find_entrypoint
+                ~root_name
+                arg_type
+                entrypoint)
+        >>?= fun (_f, Ex_ty ty) ->
         unparse_ty ctxt ty
         >|=? fun (ty_node, _) -> Micheline.strip_locations ty_node) ;
     register0 S.list_entrypoints (fun ctxt () expr ->
@@ -532,14 +533,14 @@ module Scripts = struct
           >>? fun (arg_type, _, _, root_name) ->
           parse_parameter_ty ctxt ~legacy arg_type
           >>? fun (Ex_ty arg_type, _) ->
-          Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
-        >|=? fun (unreachable_entrypoint, map) ->
-        ( unreachable_entrypoint,
-          Entrypoints_map.fold
-            (fun entry (_, ty) acc ->
-              (entry, Micheline.strip_locations ty) :: acc)
-            map
-            [] ))
+          Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+          >|? fun (unreachable_entrypoint, map) ->
+          ( unreachable_entrypoint,
+            Entrypoints_map.fold
+              (fun entry (_, ty) acc ->
+                (entry, Micheline.strip_locations ty) :: acc)
+              map
+              [] ) ))
 
   let run_code ctxt block ?gas ?(entrypoint = "default") ~script ~storage
       ~input ~amount ~balance ~chain_id ~source ~payer =
@@ -844,15 +845,15 @@ module Parse = struct
     | None ->
         failwith "Cant_parse_protocol_data"
     | Some protocol_data ->
-        return protocol_data
+        protocol_data
 
   let register () =
     let open Services_registration in
     register0 S.operations (fun _ctxt () (operations, check) ->
         map_s
           (fun raw ->
-            Lwt.return (parse_operation raw)
-            >>=? fun op ->
+            parse_operation raw
+            >>?= fun op ->
             ( match check with
             | Some true ->
                 return_unit (* FIXME *)
@@ -863,7 +864,7 @@ module Parse = struct
             >|=? fun () -> op)
           operations) ;
     register0_noctxt S.block (fun () raw_block ->
-        parse_protocol_data raw_block.protocol_data)
+        return @@ parse_protocol_data raw_block.protocol_data)
 
   let operations ctxt block ?check operations =
     RPC_context.make_call0 S.operations ctxt block () (operations, check)

@@ -1578,11 +1578,14 @@ let merge_branches :
       in
       trace_eval
         unmatched_branches
-        ( Lwt.return (merge_stacks ~legacy loc ctxt 1 aftbt aftbf)
-        >|=? fun (Eq, merged_stack, ctxt) ->
-        ( Typed
-            (branch {dbt with aft = merged_stack} {dbf with aft = merged_stack}),
-          ctxt ) )
+        (Lwt.return
+           ( merge_stacks ~legacy loc ctxt 1 aftbt aftbf
+           >|? fun (Eq, merged_stack, ctxt) ->
+           ( Typed
+               (branch
+                  {dbt with aft = merged_stack}
+                  {dbf with aft = merged_stack}),
+             ctxt ) ))
   | (Failed {descr = descrt}, Failed {descr = descrf}) ->
       let descr ret = branch (descrt ret) (descrf ret) in
       return (Failed {descr}, ctxt)

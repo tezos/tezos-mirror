@@ -256,8 +256,8 @@ let rec longer_than l n =
           longer_than rest (n - 1)
 
 let record_proposals ctxt delegate proposals =
-  (match proposals with [] -> fail Empty_proposal | _ :: _ -> return_unit)
-  >>=? fun () ->
+  (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
+  >>?= fun () ->
   Vote.get_current_period_kind ctxt
   >>=? function
   | Proposal ->

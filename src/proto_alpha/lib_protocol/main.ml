@@ -248,7 +248,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
         block_header.protocol_data.contents
         block_delay
         included_endorsements
-      >>=? fun () ->
+      >>?= fun () ->
       Alpha_context.Vote.get_current_period_kind ctxt
       >|=? fun voting_period_kind ->
       let ctxt = Alpha_context.finalize ctxt in

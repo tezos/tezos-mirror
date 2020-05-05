@@ -182,9 +182,8 @@ let register () =
     | None ->
         raise Not_found
     | Some (_, value_type) -> (
-        Lwt.return
-          (parse_packable_ty ctxt ~legacy:true (Micheline.root value_type))
-        >>=? fun (Ex_ty value_type, ctxt) ->
+        parse_packable_ty ctxt ~legacy:true (Micheline.root value_type)
+        >>?= fun (Ex_ty value_type, ctxt) ->
         Big_map.get_opt ctxt id key
         >>=? fun (_ctxt, value) ->
         match value with
@@ -244,14 +243,15 @@ let register () =
           let open Script_ir_translator in
           Script.force_decode_in_context ctxt expr
           >>?= fun (expr, _) ->
-          Lwt.return
-            ( parse_toplevel ~legacy expr
-            >>? fun (arg_type, _, _, root_name) ->
-            parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
-            Script_ir_translator.find_entrypoint ~root_name arg_type entrypoint
-            )
-          >>= function
+          parse_toplevel ~legacy expr
+          >>? (fun (arg_type, _, _, root_name) ->
+                parse_parameter_ty ctxt ~legacy arg_type
+                >>? fun (Ex_ty arg_type, _) ->
+                Script_ir_translator.find_entrypoint
+                  ~root_name
+                  arg_type
+                  entrypoint)
+          |> function
           | Ok (_f, Ex_ty ty) ->
               unparse_ty ctxt ty
               >|=? fun (ty_node, _) -> Micheline.strip_locations ty_node
@@ -267,30 +267,32 @@ let register () =
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
-          Script.force_decode_in_context ctxt expr
-          >>?= fun (expr, _) ->
           Lwt.return
-            ( parse_toplevel ~legacy expr
-            >>? fun (arg_type, _, _, root_name) ->
-            parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
-            Script_ir_translator.list_entrypoints ~root_name arg_type ctxt )
-          >|=? fun (unreachable_entrypoint, map) ->
-          ( unreachable_entrypoint,
-            Entrypoints_map.fold
-              (fun entry (_, ty) acc ->
-                (entry, Micheline.strip_locations ty) :: acc)
-              map
-              [] )) ;
+            ( Script.force_decode_in_context ctxt expr
+            >>? fun (expr, _) ->
+            parse_toplevel ~legacy expr
+            >>? (fun (arg_type, _, _, root_name) ->
+                  parse_parameter_ty ctxt ~legacy arg_type
+                  >>? fun (Ex_ty arg_type, _) ->
+                  Script_ir_translator.list_entrypoints
+                    ~root_name
+                    arg_type
+                    ctxt)
+            >|? fun (unreachable_entrypoint, map) ->
+            ( unreachable_entrypoint,
+              Entrypoints_map.fold
+                (fun entry (_, ty) acc ->
+                  (entry, Micheline.strip_locations ty) :: acc)
+                map
+                [] ) )) ;
   register1 S.contract_big_map_get_opt (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
-      Lwt.return
-        (Script_ir_translator.parse_packable_ty
-           ctxt
-           ~legacy:true
-           (Micheline.root key_type))
-      >>=? fun (Ex_ty key_type, ctxt) ->
+      Script_ir_translator.parse_packable_ty
+        ctxt
+        ~legacy:true
+        (Micheline.root key_type)
+      >>?= fun (Ex_ty key_type, ctxt) ->
       Script_ir_translator.parse_data
         ctxt
         ~legacy:true
@@ -330,7 +332,7 @@ let register () =
           | false ->
               return_none )
       | None ->
-          return None )
+          return_none )
       >>=? fun counter ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
