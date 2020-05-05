@@ -110,7 +110,7 @@ module type EVENT_DEFINITION = sig
      want short messages, and [~short: false] when they want detailed ones.
      Short messages should contain information which is not available in the
      event encoding, or that looks nice when inlined in the message. *)
-  val pp : ?short:bool -> Format.formatter -> t -> unit
+  val pp : short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 

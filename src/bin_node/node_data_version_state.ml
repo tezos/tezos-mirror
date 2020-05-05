@@ -102,7 +102,7 @@ module Definition = struct
                | Upgrade_status (s, cv, av) -> Some (s, cv, av) | _ -> None)
              (fun (s, cv, av) -> Upgrade_status (s, cv, av)) ]
 
-  let pp ?short:_ ppf (status : t) =
+  let pp ~short:_ ppf (status : t) =
     Format.fprintf ppf "%a" status_pp status.data
 
   let doc = "Node data version status."

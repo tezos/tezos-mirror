@@ -93,7 +93,7 @@ module Seq_validator_events = struct
                  | Validation_success (bh, st) -> Some (bh, st) | _ -> None)
                (fun (bh, st) -> Validation_success (bh, st)) ]
 
-    let pp ?short:_ ppf (status : t) =
+    let pp ~short:_ ppf (status : t) =
       Format.fprintf ppf "%a" status_pp status.data
 
     let doc = "Sequential block validator status."
@@ -241,7 +241,7 @@ module External_validator_events = struct
                (function Request_result (r, st) -> Some (r, st) | _ -> None)
                (fun (r, st) -> Request_result (r, st)) ]
 
-    let pp ?short:_ ppf (status : t) =
+    let pp ~short:_ ppf (status : t) =
       Format.fprintf ppf "%a" status_pp status.data
 
     let doc = "External block validator status."

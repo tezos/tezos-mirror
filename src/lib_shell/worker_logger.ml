@@ -162,7 +162,7 @@ struct
       let v0_encoding = status_encoding in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ?short:_ ppf (status : t) =
+    let pp ~short:_ ppf (status : t) =
       Format.fprintf ppf "%a" (pp Static.worker_name) status.data
 
     let doc = "Worker status."

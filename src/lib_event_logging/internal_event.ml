@@ -138,7 +138,7 @@ module type EVENT_DEFINITION = sig
 
   val doc : string
 
-  val pp : ?short:bool -> Format.formatter -> t -> unit
+  val pp : short:bool -> Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
@@ -353,7 +353,7 @@ module Generic = struct
 
         method doc = M.doc
 
-        method pp fmt () = M.pp fmt ev
+        method pp fmt () = M.pp ~short:false fmt ev
 
         method json = Data_encoding.Json.construct M.encoding ev
       end
@@ -657,7 +657,7 @@ module Simple = struct
     in
     find_variable_begin [] 0 0 |> List.rev
 
-  let pp_log_message ?(short = false) (msg : msg_atom list) fmt fields =
+  let pp_log_message ~short (msg : msg_atom list) fmt fields =
     (* Add a boolean reference to each field telling whether the field was used. *)
     let fields = List.map (fun field -> (field, ref false)) fields in
     Format.fprintf fmt "@[<hov 2>" ;
@@ -720,7 +720,7 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt () = pp_log_message ?short parsed_msg fmt []
+      let pp ~short fmt () = pp_log_message ~short parsed_msg fmt []
 
       let encoding = with_version ~name Data_encoding.unit
 
@@ -740,9 +740,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt f1 =
+      let pp ~short fmt f1 =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [Parameter (f1_name, f1_enc, f1, pp1)]
@@ -766,9 +766,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2) =
+      let pp ~short fmt (f1, f2) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -798,9 +798,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3) =
+      let pp ~short fmt (f1, f2, f3) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -834,9 +834,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3, f4) =
+      let pp ~short fmt (f1, f2, f3, f4) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -875,9 +875,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3, f4, f5) =
+      let pp ~short fmt (f1, f2, f3, f4, f5) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -919,9 +919,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3, f4, f5, f6) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -968,9 +968,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3, f4, f5, f6, f7) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -1020,9 +1020,9 @@ module Simple = struct
 
       let name = name
 
-      let pp ?short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
+      let pp ~short fmt (f1, f2, f3, f4, f5, f6, f7, f8) =
         pp_log_message
-          ?short
+          ~short
           parsed_msg
           fmt
           [ Parameter (f1_name, f1_enc, f1, pp1);
@@ -1164,7 +1164,7 @@ module Legacy_logging = struct
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ?short:_ ppf {message; _} =
+      let pp ~short:_ ppf {message; _} =
         let open Format in
         fprintf ppf "%s" message
 
@@ -1307,7 +1307,7 @@ module Error_event = struct
       in
       With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ?short:_ f x =
+    let pp ~short:_ f x =
       Format.fprintf
         f
         "%s:@ %s"
@@ -1360,7 +1360,7 @@ module Debug_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ?short:_ ppf {message; attachment} =
+    let pp ~short:_ ppf {message; attachment} =
       let open Format in
       fprintf ppf "%s:@ %s@ %a" name message Data_encoding.Json.pp attachment
 
@@ -1414,7 +1414,7 @@ module Lwt_worker_event = struct
     let encoding =
       Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-    let pp ?short:_ ppf {name; event} =
+    let pp ~short:_ ppf {name; event} =
       let open Format in
       fprintf
         ppf
