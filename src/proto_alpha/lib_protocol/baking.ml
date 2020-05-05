@@ -154,8 +154,8 @@ let earlier_predecessor_timestamp ctxt level =
   if Compare.Int32.(gap < 1l) then
     failwith "Baking.earlier_block_timestamp: past block."
   else
-    Lwt.return (Period.mult (Int32.pred gap) step)
-    >>=? fun delay -> Lwt.return Timestamp.(current_timestamp +? delay)
+    Period.mult (Int32.pred gap) step
+    >>? fun delay -> Timestamp.(current_timestamp +? delay)
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp
