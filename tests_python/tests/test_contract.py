@@ -1,11 +1,13 @@
 import os
 import re
+
 import pytest
-from tools.paths import CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, \
-    all_contracts, all_legacy_contracts
+
+from client.client import Client
 from tools import utils
 from tools.constants import IDENTITIES
-from client.client import Client
+from tools.paths import (CONTRACT_PATH, ILLTYPED_CONTRACT_PATH, all_contracts,
+                         all_legacy_contracts)
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -244,12 +246,27 @@ class TestContracts:
 
     @pytest.mark.parametrize("contract", all_legacy_contracts())
     def test_deprecated_typecheck_breaks(self, client, contract):
-        with utils.assert_run_failure(r'Use of deprecated instruction'):
-            client.typecheck(os.path.join(CONTRACT_PATH, contract))
+        if contract in ["legacy/create_contract.tz",
+                        "legacy/create_contract_flags.tz",
+                        "legacy/create_contract_rootname.tz"]:
+            with utils.assert_run_failure(r'ill-typed script'):
+                client.typecheck(os.path.join(CONTRACT_PATH, contract))
+        else:
+            with utils.assert_run_failure(r'Use of deprecated instruction'):
+                client.typecheck(os.path.join(CONTRACT_PATH, contract))
 
     @pytest.mark.parametrize("contract", all_legacy_contracts())
     def test_deprecated_typecheck_in_legacy(self, client, contract):
-        client.typecheck(os.path.join(CONTRACT_PATH, contract), legacy=True)
+        if contract in ["legacy/create_contract.tz",
+                        "legacy/create_contract_flags.tz",
+                        "legacy/create_contract_rootname.tz"]:
+            with utils.assert_run_failure(r'ill-typed script'):
+                client.typecheck(os.path.join(CONTRACT_PATH, contract),
+                                 legacy=True)
+        else:
+            with utils.assert_run_failure(r'Use of deprecated instruction'):
+                client.typecheck(os.path.join(CONTRACT_PATH, contract),
+                                 legacy=True)
 
     @pytest.mark.parametrize("contract,error_pattern", [
         # operations cannot be PACKed
