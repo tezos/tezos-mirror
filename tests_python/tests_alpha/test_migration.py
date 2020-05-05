@@ -49,6 +49,23 @@ DEPOSIT_RECEIPTS = [
         "change": "512000000",
     },
 ]
+# in Alpha protocol, the "origin" field is added
+ALPHA_DEPOSIT_RECEIPTS = [
+    {
+        "kind": "contract",
+        "contract": BAKER_PKH,
+        "change": "-512000000",
+        "origin": "block",
+    },
+    {
+        "kind": "freezer",
+        "category": "deposits",
+        "delegate": BAKER_PKH,
+        "cycle": 0,
+        "change": "512000000",
+        "origin": "block",
+    },
+]
 MIGRATION_RECEIPTS: List[object] = []
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
@@ -73,7 +90,6 @@ NODE_CONFIG = {
 
 @pytest.fixture(scope="class")
 def client(sandbox):
-
     sandbox.add_node(0, node_config=NODE_CONFIG)
     delay = datetime.timedelta(seconds=3600 * 24 * 365)
     sandbox.client(0).activate_protocol_json(PROTO_A, PARAMETERS, delay=delay)
@@ -83,16 +99,7 @@ def client(sandbox):
 
 @pytest.mark.incremental
 class TestMigration:
-    """Test migration from PROTO_A to PROTO_B.
-
-    After migration, test snapshots:
-        - node0: activate 007, migrate to alpha, bake, export snapshot full
-                 and rolling and terminate
-        - node1: import full, bake
-        - node2: import rolling, sync, bake
-        - node3: reconstruct full, sync, bake
-        - all 4 are synced
-    """
+    """Test migration from PROTO_A to PROTO_B."""
 
     def test_init(self, client):
         # 1: genesis block
@@ -130,7 +137,7 @@ class TestMigration:
         # check that migration balance update appears in receipts
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == (
-            DEPOSIT_RECEIPTS + MIGRATION_RECEIPTS
+            MIGRATION_RECEIPTS + ALPHA_DEPOSIT_RECEIPTS
         )
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
@@ -139,7 +146,7 @@ class TestMigration:
         # 5: second block of PROTO_B
         client.bake(BAKER, BAKE_ARGS)
         metadata = client.get_metadata()
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        assert metadata['balance_updates'] == ALPHA_DEPOSIT_RECEIPTS
 
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
         # # to export rolling snapshot, we need to be at level > 60
