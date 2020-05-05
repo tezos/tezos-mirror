@@ -101,11 +101,13 @@ let () =
     ~pp:(fun ppf (contract, exp, found) ->
       Format.fprintf
         ppf
-        "Counter %s not yet reached for contract %a (expected %s)"
-        (Z.to_string found)
+        "Counter %a not yet reached for contract %a (expected %a)"
+        Z.pp
+        found
         Contract_repr.pp
         contract
-        (Z.to_string exp))
+        Z.pp
+        exp)
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)
@@ -121,11 +123,13 @@ let () =
     ~pp:(fun ppf (contract, exp, found) ->
       Format.fprintf
         ppf
-        "Counter %s already used for contract %a (expected %s)"
-        (Z.to_string found)
+        "Counter %a already used for contract %a (expected %a)"
+        Z.pp
+        found
         Contract_repr.pp
         contract
-        (Z.to_string exp))
+        Z.pp
+        exp)
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)

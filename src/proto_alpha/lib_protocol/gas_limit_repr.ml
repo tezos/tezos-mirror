@@ -54,7 +54,7 @@ let pp ppf = function
   | Unaccounted ->
       Format.fprintf ppf "unaccounted"
   | Limited {remaining} ->
-      Format.fprintf ppf "%s units remaining" (Z.to_string remaining)
+      Format.fprintf ppf "%a units remaining" Z.pp remaining
 
 let cost_encoding =
   let open Data_encoding in
@@ -75,13 +75,19 @@ let pp_cost ppf {allocations; steps; reads; writes; bytes_read; bytes_written}
     =
   Format.fprintf
     ppf
-    "(steps: %s, allocs: %s, reads: %s (%s bytes), writes: %s (%s bytes))"
-    (Z.to_string steps)
-    (Z.to_string allocations)
-    (Z.to_string reads)
-    (Z.to_string bytes_read)
-    (Z.to_string writes)
-    (Z.to_string bytes_written)
+    "(steps: %a, allocs: %a, reads: %a (%a bytes), writes: %a (%a bytes))"
+    Z.pp
+    steps
+    Z.pp
+    allocations
+    Z.pp
+    reads
+    Z.pp
+    bytes_read
+    Z.pp
+    writes
+    Z.pp
+    bytes_written
 
 type error += Block_quota_exceeded (* `Temporary *)
 
