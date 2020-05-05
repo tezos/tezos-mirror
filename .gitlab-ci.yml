@@ -447,6 +447,12 @@ integration:mempool:
     - poetry run pytest tests/test_mempool.py -s --log-dir=tmp
   stage: test
 
+integration:migration:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_migration.py -s --log-dir=tmp
+  stage: test
+
 integration:mockup:
   <<: *integration_python_definition
   script:
