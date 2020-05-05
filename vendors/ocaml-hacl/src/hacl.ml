@@ -283,9 +283,13 @@ module Secretbox = struct
     "ml_NaCl_crypto_secretbox_open_detached" [@@noalloc]
 
   let box ~key ~nonce ~msg ~cmsg =
+    if Bigstring.length msg < 32 then
+      invalid_arg "Secretbox.box: msg must be at least 32 bytes long";
     box cmsg msg nonce key
 
   let box_open ~key ~nonce ~cmsg ~msg =
+    if Bigstring.length cmsg < 32 then
+      invalid_arg "Secretbox.box_open: cmsg must be at least 32 bytes long";
     let mac = Bigstring.sub cmsg boxzerobytes boxzerobytes in
     match box_open msg cmsg mac nonce key with
     | 0 -> true
@@ -386,6 +390,8 @@ module Box = struct
     "ml_NaCl_crypto_box_easy_afternm" [@@noalloc]
 
   let box ~k:(Ck k) ~nonce ~msg ~cmsg =
+    if Bigstring.length msg < 32 then
+      invalid_arg "Box.box: msg must be at least 32 bytes long";
     box_easy_afternm cmsg msg nonce k
 
   (* msg -> cmsg -> n -> k -> int *)
@@ -394,6 +400,9 @@ module Box = struct
     "ml_NaCl_crypto_box_open_easy_afternm" [@@noalloc]
 
   let box_open ~k:(Ck k) ~nonce ~cmsg ~msg =
+    (* Ciphertext must contain 16 padding bytes + 16 hmac bytes. *)
+    if Bigstring.length cmsg < 32 then
+      invalid_arg "Box.box_open: cmsg must be at least 32 bytes long";
     match box_open_easy_afternm msg cmsg nonce k with
     | 0 -> true
     | _ -> false

@@ -46,6 +46,8 @@ type error += Decipher_error
 
 type error += Invalid_message_size
 
+type error += Invalid_incoming_ciphertext_size
+
 type error += Encoding_error
 
 type error += Rejected_socket_connection
@@ -91,6 +93,19 @@ let () =
     Data_encoding.empty
     (function Invalid_message_size -> Some () | _ -> None)
     (fun () -> Invalid_message_size) ;
+  (* Invalid incoming ciphertext size *)
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_socket.invalid_incoming_ciphertext_size"
+    ~title:"Invalid incoming ciphertext size"
+    ~description:"The announced size for the incoming ciphertext is invalid."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The announced size for the incoming ciphertext is invalid.")
+    Data_encoding.empty
+    (function Invalid_incoming_ciphertext_size -> Some () | _ -> None)
+    (fun () -> Invalid_incoming_ciphertext_size) ;
   (* Encoding error *)
   register_error_kind
     `Permanent
