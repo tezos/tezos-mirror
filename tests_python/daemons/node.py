@@ -1,11 +1,12 @@
-from typing import Dict, List, Tuple, Optional
-import sys
-import subprocess
+import json
 import os
-import tempfile
 import shutil
-from . import utils
+import subprocess
+import sys
+import tempfile
+from typing import Dict, List, Optional, Tuple
 
+from . import utils
 
 # Timeout before killing a node which doesn't react to SIGTERM
 TERM_TIMEOUT = 10
@@ -60,6 +61,7 @@ class Node:
 
     def __init__(self,
                  node: str,
+                 config: dict = None,
                  expected_pow: float = 0.0,
                  node_dir: str = None,
                  use_tls: Tuple[str, str] = None,
@@ -84,9 +86,14 @@ class Node:
         assert os.path.isfile(node), f'{node} not a file'
         assert node_dir is None or os.path.isdir(node_dir), (f'{node_dir} not '
                                                              f'a dir')
-        if params is None:
-            params = ["--network=sandbox"]
+        if config is None or 'network' not in config:
+            if params is None:
+                params = ['--network', 'sandbox']
+            elif '--network' not in params:
+                params = params + ['--network', 'sandbox']
 
+        # the given config will be applied in :func:`init_config`
+        self.config = config
         self.log_file = log_file
         self._temp_dir = node_dir is None
         if node_dir is None:
@@ -100,7 +107,9 @@ class Node:
         self._run_called_before = False
         singleprocess_opt = ['--singleprocess'] if singleprocess else []
         node_run = [node, 'run', '--data-dir', node_dir,
-                    '--no-bootstrap-peers'] + singleprocess_opt + params
+                    '--no-bootstrap-peers'] + singleprocess_opt
+        if params:
+            node_run.extend(params)
 
         if peers is not None:
             for peer in peers:
@@ -141,7 +150,9 @@ class Node:
                        '--data-dir', self.node_dir,
                        '--net-addr', f'127.0.0.1:{self.p2p_port}',
                        '--rpc-addr', f'127.0.0.1:{self.rpc_port}',
-                       '--expected-pow', str(self.expected_pow)] + self._params
+                       '--expected-pow', str(self.expected_pow)]
+        if self._params:
+            node_config += self._params
 
         if self.use_tls:
             # We can't create tezos.crt/tezos.key here
@@ -151,6 +162,17 @@ class Node:
                              f'{self.node_dir}/tezos.key')]
 
         _run_and_print(node_config)
+
+        if self.config is not None:
+            config_file = os.path.join(self.node_dir, 'config.json')
+            # update the config file with the given config
+            with open(config_file, 'r+') as file:
+                config = dict(json.loads(file.read()))
+                config.update(self.config)
+                # overwrite the contents
+                file.seek(0)
+                file.write(json.dumps(config))
+                file.truncate()
 
     def init_id(self):
         node_identity = [self.node,
