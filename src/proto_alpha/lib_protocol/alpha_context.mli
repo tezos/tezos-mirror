@@ -443,10 +443,10 @@ module Script : sig
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
 
   val force_decode_in_context :
-    context -> lazy_expr -> (expr * context) tzresult Lwt.t
+    context -> lazy_expr -> (expr * context) tzresult
 
   val force_bytes_in_context :
-    context -> lazy_expr -> (bytes * context) tzresult Lwt.t
+    context -> lazy_expr -> (bytes * context) tzresult
 
   val unit_parameter : lazy_expr
 end

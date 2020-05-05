@@ -1318,7 +1318,7 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
     (parse_data ctxt ~legacy:false arg_type (box arg))
   >>=? fun (arg, ctxt) ->
   Script.force_decode_in_context ctxt unparsed_script.code
-  >>=? fun (script_code, ctxt) ->
+  >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>=? fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt storage_type storage

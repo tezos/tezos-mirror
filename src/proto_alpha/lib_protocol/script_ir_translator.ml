@@ -5080,7 +5080,7 @@ and parse_contract :
                 error (No_such_entrypoint entrypoint) )
       | Some code ->
           Script.force_decode_in_context ctxt code
-          >>=? fun (code, ctxt) ->
+          >>?= fun (code, ctxt) ->
           Lwt.return
             ( parse_toplevel ~legacy:true code
             >>? fun (arg_type, _, _, root_name) ->
@@ -5152,7 +5152,7 @@ and parse_contract_for_script :
               assert false
           | Some code ->
               Script.force_decode_in_context ctxt code
-              >>=? fun (code, ctxt) ->
+              >>?= fun (code, ctxt) ->
               (* can only fail because of gas *)
               Lwt.return
                 ( match parse_toplevel ~legacy:true code with
@@ -5297,7 +5297,7 @@ let parse_code :
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code
-  >>=? fun (code, ctxt) ->
+  >>?= fun (code, ctxt) ->
   Lwt.return @@ parse_toplevel ~legacy code
   >>=? fun (arg_type, storage_type, code_field, root_name) ->
   Lwt.return
@@ -5361,7 +5361,7 @@ let parse_storage :
     ('storage * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type ~storage ->
   Script.force_decode_in_context ctxt storage
-  >>=? fun (storage, ctxt) ->
+  >>?= fun (storage, ctxt) ->
   trace_eval
     (fun () ->
       Lwt.return
