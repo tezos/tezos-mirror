@@ -133,23 +133,7 @@ struct
     let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
   end
 
-  module Z = struct
-    include Z
-
-    let to_bits ?(pad_to = 0) z =
-      let bits = to_bits z in
-      let len = Pervasives.((numbits z + 7) / 8) in
-      let full_len = Tezos_stdlib.Compare.Int.max pad_to len in
-      if full_len = 0 then Bytes.create 0
-      else
-        let res = Bytes.create full_len in
-        Bytes.fill res 0 full_len '\000' ;
-        Bytes.blit_string bits 0 res 0 len ;
-        res
-
-    let of_bits bytes = of_bits (Bytes.to_string bytes)
-  end
-
+  module Z = Z
   module Lwt = Lwt
   module Lwt_list = Lwt_list
   module Uri = Uri
