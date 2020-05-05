@@ -85,6 +85,9 @@ val shift_right : t -> int -> t
 (** Gives a human-readable, decimal string representation of the argument. *)
 val to_string : t -> string
 
+(** Prints the argument on the specified formatter. *)
+val pp : Format.formatter -> t -> unit
+
 (** Converts a string to an integer.
     An optional [-] prefix indicates a negative number, while a [+]
     prefix is ignored.

@@ -143,6 +143,8 @@ struct
         res
 
     let of_bits bytes = of_bits (Bytes.to_string bytes)
+
+    let pp = pp_print
   end
 
   module Lwt = Lwt
