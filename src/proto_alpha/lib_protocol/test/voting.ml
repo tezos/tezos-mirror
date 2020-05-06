@@ -304,9 +304,9 @@ let test_successful_vote num_delegates () =
         del
         Protocol_hash.zero
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     delegates_p2
   >>=? fun operations ->
@@ -317,9 +317,9 @@ let test_successful_vote num_delegates () =
     del1
     Protocol_hash.zero
     {
-      yays_per_roll = 0l;
-      nays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-      passes_per_roll = 0l;
+      yays_per_roll = 0;
+      nays_per_roll = Constants.fixed.votes_per_roll;
+      passes_per_roll = 0;
     }
   >>=? fun op ->
   Block.bake ~operations:[op] b
@@ -364,10 +364,9 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Missing delegate" __LOC__
                  | Some (_, ballot) ->
                      if
-                       ballot.yays_per_roll
-                       = Int32.of_int Constants.fixed.votes_per_roll
-                       && ballot.nays_per_roll = 0l
-                       && ballot.passes_per_roll = 0l
+                       ballot.yays_per_roll = Constants.fixed.votes_per_roll
+                       && ballot.nays_per_roll = 0
+                       && ballot.passes_per_roll = 0
                      then return_unit
                      else failwith "%s - Wrong ballot" __LOC__)
                delegates_p2)
@@ -468,9 +467,9 @@ let test_successful_vote num_delegates () =
         del
         Protocol_hash.zero
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     delegates_p4
   >>=? fun operations ->
@@ -509,10 +508,9 @@ let test_successful_vote num_delegates () =
                      failwith "%s - Missing delegate" __LOC__
                  | Some (_, ballot) ->
                      if
-                       ballot.yays_per_roll
-                       = Int32.of_int Constants.fixed.votes_per_roll
-                       && ballot.nays_per_roll = 0l
-                       && ballot.passes_per_roll = 0l
+                       ballot.yays_per_roll = Constants.fixed.votes_per_roll
+                       && ballot.nays_per_roll = 0
+                       && ballot.passes_per_roll = 0
                      then return_unit
                      else failwith "%s - Wrong ballot" __LOC__)
                delegates_p4)
@@ -625,9 +623,9 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
         del
         Protocol_hash.zero
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     voters_without_quorum
   >>=? fun operations ->
@@ -707,9 +705,9 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
         del
         Protocol_hash.zero
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     voters
   >>=? fun operations ->
@@ -757,9 +755,9 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
         del
         Protocol_hash.zero
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     voters_without_quorum
   >>=? fun operations ->
@@ -1028,9 +1026,9 @@ let test_supermajority_in_testing_vote supermajority () =
         del
         proposal
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     yays_delegates
   >>=? fun operations_yays ->
@@ -1041,9 +1039,9 @@ let test_supermajority_in_testing_vote supermajority () =
         del
         proposal
         {
-          yays_per_roll = 0l;
-          nays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          passes_per_roll = 0l;
+          yays_per_roll = 0;
+          nays_per_roll = Constants.fixed.votes_per_roll;
+          passes_per_roll = 0;
         })
     nays_delegates
   >>=? fun operations_nays ->
@@ -1159,9 +1157,9 @@ let test_quorum_capped_maximum num_delegates () =
         del
         protocol
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     voters
   >>=? fun operations ->
@@ -1234,9 +1232,9 @@ let test_quorum_capped_minimum num_delegates () =
         del
         protocol
         {
-          yays_per_roll = Int32.of_int Constants.fixed.votes_per_roll;
-          nays_per_roll = 0l;
-          passes_per_roll = 0l;
+          yays_per_roll = Constants.fixed.votes_per_roll;
+          nays_per_roll = 0;
+          passes_per_roll = 0;
         })
     voters
   >>=? fun operations ->
