@@ -158,38 +158,15 @@ type config = {
   enable_testchain : bool;
 }
 
-and peer_validator_limits = Peer_validator.limits = {
-  new_head_request_timeout : Time.System.Span.t;
-  block_header_timeout : Time.System.Span.t;
-  block_operations_timeout : Time.System.Span.t;
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
-
-and prevalidator_limits = Prevalidator.limits = {
-  max_refused_operations : int;
-  operation_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-  operations_batch_size : int;
-}
-
-and block_validator_limits = Block_validator.limits = {
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
-
-and chain_validator_limits = Chain_validator.limits = {
-  bootstrap_threshold : int;
-  worker_limits : Worker_types.limits;
-}
-
 let default_block_validator_limits =
+  let open Block_validator in
   {
     protocol_timeout = Time.System.Span.of_seconds_exn 120.;
     worker_limits = {backlog_size = 1000; backlog_level = Internal_event.Debug};
   }
 
 let default_prevalidator_limits =
+  let open Prevalidator in
   {
     operation_timeout = Time.System.Span.of_seconds_exn 10.;
     max_refused_operations = 1000;
@@ -198,6 +175,7 @@ let default_prevalidator_limits =
   }
 
 let default_peer_validator_limits =
+  let open Peer_validator in
   {
     block_header_timeout = Time.System.Span.of_seconds_exn 300.;
     block_operations_timeout = Time.System.Span.of_seconds_exn 300.;
@@ -207,6 +185,7 @@ let default_peer_validator_limits =
   }
 
 let default_chain_validator_limits =
+  let open Chain_validator in
   {
     bootstrap_threshold = 4;
     worker_limits = {backlog_size = 1000; backlog_level = Internal_event.Info};

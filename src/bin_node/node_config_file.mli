@@ -77,10 +77,10 @@ and rpc = {
 and tls = {cert : string; key : string}
 
 and shell = {
-  block_validator_limits : Node.block_validator_limits;
-  prevalidator_limits : Node.prevalidator_limits;
-  peer_validator_limits : Node.peer_validator_limits;
-  chain_validator_limits : Node.chain_validator_limits;
+  block_validator_limits : Block_validator.limits;
+  prevalidator_limits : Prevalidator.limits;
+  peer_validator_limits : Peer_validator.limits;
+  chain_validator_limits : Chain_validator.limits;
   history_mode : History_mode.t option;
 }
 

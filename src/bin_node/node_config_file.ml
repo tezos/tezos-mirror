@@ -281,10 +281,10 @@ and rpc = {
 and tls = {cert : string; key : string}
 
 and shell = {
-  block_validator_limits : Node.block_validator_limits;
-  prevalidator_limits : Node.prevalidator_limits;
-  peer_validator_limits : Node.peer_validator_limits;
-  chain_validator_limits : Node.chain_validator_limits;
+  block_validator_limits : Block_validator.limits;
+  prevalidator_limits : Prevalidator.limits;
+  peer_validator_limits : Peer_validator.limits;
+  chain_validator_limits : Chain_validator.limits;
   history_mode : History_mode.t option;
 }
 
@@ -732,7 +732,7 @@ let timeout_encoding = Time.System.Span.encoding
 let block_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Node.protocol_timeout; worker_limits} ->
+    (fun {Block_validator.protocol_timeout; worker_limits} ->
       (protocol_timeout, worker_limits))
     (fun (protocol_timeout, worker_limits) ->
       {protocol_timeout; worker_limits})
@@ -749,7 +749,7 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun { Node.operation_timeout;
+    (fun { Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
            worker_limits } ->
@@ -785,7 +785,7 @@ let peer_validator_limits_encoding =
   let open Data_encoding in
   let default_limits = default_shell.peer_validator_limits in
   conv
-    (fun { Node.block_header_timeout;
+    (fun { Peer_validator.block_header_timeout;
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
@@ -832,7 +832,7 @@ let peer_validator_limits_encoding =
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Node.bootstrap_threshold; worker_limits} ->
+    (fun {Chain_validator.bootstrap_threshold; worker_limits} ->
       (bootstrap_threshold, worker_limits))
     (fun (bootstrap_threshold, worker_limits) ->
       {bootstrap_threshold; worker_limits})

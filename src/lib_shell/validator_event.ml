@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-[@@@ocaml.warning "-30"]
+(** Declares logging events for [validator] *)
 
-type t
+include Internal_event.Simple
 
-type config = {
-  genesis : Genesis.t;
-  chain_name : Distributed_db_version.Name.t;
-  sandboxed_chain_name : Distributed_db_version.Name.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
-  patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
-  p2p : (P2p.config * P2p.limits) option;
-  checkpoint : Block_header.t option;
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  enable_testchain : bool;
-      (** If [false], testchain related messages will be ignored. *)
-}
+let section = ["node"; "validator"]
 
-val default_peer_validator_limits : Peer_validator.limits
+let activate_chain =
+  declare_1
+    ~section
+    ~name:"activate_chain"
+    ~msg:"activate chain {chain}"
+    ~level:Notice
+    ("chain", Chain_id.encoding)
 
-val default_prevalidator_limits : Prevalidator.limits
+let shutdown_block_validator =
+  declare_0
+    ~section
+    ~name:"shutdown_block_validator"
+    ~msg:"shutting down the block validator"
+    ~level:Notice
+    ()
 
-val default_block_validator_limits : Block_validator.limits
-
-val default_chain_validator_limits : Chain_validator.limits
-
-val create :
-  ?sandboxed:bool ->
-  ?sandbox_parameters:Data_encoding.json ->
-  singleprocess:bool ->
-  config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  History_mode.t option ->
-  t tzresult Lwt.t
-
-val shutdown : t -> unit Lwt.t
-
-val build_rpc_directory : t -> unit RPC_directory.t
+let shutdown_chain_validator =
+  declare_1
+    ~section
+    ~name:"shutdown_chain_validator"
+    ~msg:"shutting down the chain validator {chain}"
+    ~level:Notice
+    ("chain", Chain_id.encoding)

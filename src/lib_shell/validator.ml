@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.validator"
-end)
-
 type t = {
   state : State.t;
   db : Distributed_db.t;
@@ -70,11 +66,7 @@ let create state db peer_validator_limits block_validator_limits
 
 let activate v ~start_prevalidator ~validator_process chain_state =
   let chain_id = State.Chain.id chain_state in
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "activate chain %a" -% t event "active_chain"
-        -% a State_logging.chain_id chain_id)
+  Validator_event.(emit activate_chain) chain_id
   >>= fun () ->
   match Chain_id.Table.find_opt v.active_chains chain_id with
   | Some chain ->
@@ -149,21 +141,14 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
 
 let shutdown {active_chains; block_validator; _} =
   let block_validator_job =
-    lwt_log_notice
-      Tag.DSL.(
-        fun f -> f "Shutting down the block validator..." -% t event "shutdown")
+    Validator_event.(emit shutdown_block_validator) ()
     >>= fun () -> Block_validator.shutdown block_validator
   in
   let chain_validator_jobs =
     List.of_seq
     @@ Seq.map
          (fun (id, nv) ->
-           lwt_log_notice
-             Tag.DSL.(
-               fun f ->
-                 f "Shutting down the chain validator %a..."
-                 -% t event "shutdown"
-                 -% a State_logging.chain_id id)
+           Validator_event.(emit shutdown_chain_validator) id
            >>= fun () -> Chain_validator.shutdown nv)
          (Chain_id.Table.to_seq active_chains)
   in
