@@ -216,28 +216,28 @@ let rec reward_for_priority reward_per_prio prio =
       else reward_for_priority rest (pred prio)
 
 let baking_reward ctxt ~block_priority ~included_endorsements =
-  fail_unless Compare.Int.(block_priority >= 0) Incorrect_priority
-  >>=? fun () ->
-  fail_unless
+  error_unless Compare.Int.(block_priority >= 0) Incorrect_priority
+  >>? fun () ->
+  error_unless
     Compare.Int.(
       included_endorsements >= 0
       && included_endorsements <= Constants.endorsers_per_block ctxt)
     Incorrect_number_of_endorsements
-  >>=? fun () ->
+  >>? fun () ->
   let reward_per_endorsement =
     reward_for_priority
       (Constants.baking_reward_per_endorsement ctxt)
       block_priority
   in
-  Lwt.return Tez.(reward_per_endorsement *? Int64.of_int included_endorsements)
+  Tez.(reward_per_endorsement *? Int64.of_int included_endorsements)
 
 let endorsing_reward ctxt ~block_priority num_slots =
-  fail_unless Compare.Int.(block_priority >= 0) Incorrect_priority
-  >>=? fun () ->
+  error_unless Compare.Int.(block_priority >= 0) Incorrect_priority
+  >>? fun () ->
   let reward_per_endorsement =
     reward_for_priority (Constants.endorsement_reward ctxt) block_priority
   in
-  Lwt.return Tez.(reward_per_endorsement *? Int64.of_int num_slots)
+  Tez.(reward_per_endorsement *? Int64.of_int num_slots)
 
 let baking_priorities c level =
   let rec f priority =
