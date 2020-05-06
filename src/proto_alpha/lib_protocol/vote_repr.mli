@@ -30,10 +30,6 @@ type proposal = Protocol_hash.t
 (** votes are split into fractions for yay, nay, or pass, where these fractions
    have to add up to the constant votes_per_roll. *)
 
-type ballot = {
-  yays_per_roll : int32;
-  nays_per_roll : int32;
-  passes_per_roll : int32;
-}
+type ballot = {yays_per_roll : int; nays_per_roll : int; passes_per_roll : int}
 
 val ballot_encoding : ballot Data_encoding.t

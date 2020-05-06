@@ -1359,9 +1359,9 @@ let commands version () =
                 ~dry_run
                 proposal
                 {
-                  yays_per_roll = Int32.of_int number_of_yays;
-                  nays_per_roll = Int32.of_int number_of_nays;
-                  passes_per_roll = Int32.of_int number_of_passes;
+                  yays_per_roll = number_of_yays;
+                  nays_per_roll = number_of_nays;
+                  passes_per_roll = number_of_passes;
                 }
               >>=? fun _res -> return_unit);
       command

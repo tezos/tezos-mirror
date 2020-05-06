@@ -909,9 +909,9 @@ module Vote : sig
   val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
   type ballot = {
-    yays_per_roll : int32;
-    nays_per_roll : int32;
-    passes_per_roll : int32;
+    yays_per_roll : int;
+    nays_per_roll : int;
+    passes_per_roll : int;
   }
 
   val ballot_encoding : ballot Data_encoding.t

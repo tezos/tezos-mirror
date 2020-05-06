@@ -26,11 +26,7 @@
 
 type proposal = Protocol_hash.t
 
-type ballot = {
-  yays_per_roll : int32;
-  nays_per_roll : int32;
-  passes_per_roll : int32;
-}
+type ballot = {yays_per_roll : int; nays_per_roll : int; passes_per_roll : int}
 
 let ballot_encoding =
   let open Data_encoding in
@@ -40,12 +36,12 @@ let ballot_encoding =
     (fun (yays_per_roll, nays_per_roll, passes_per_roll) ->
       let open Constants_repr in
       if
-        Compare.Int32.( = )
-          Int32.(add (add yays_per_roll nays_per_roll) passes_per_roll)
-          (Int32.of_int fixed.votes_per_roll)
+        Compare.Int.( = )
+          (yays_per_roll + nays_per_roll + passes_per_roll)
+          fixed.votes_per_roll
       then {yays_per_roll; nays_per_roll; passes_per_roll}
       else invalid_arg "ballot_encoding")
   @@ obj3
-       (req "yays_per_roll" int32)
-       (req "nays_per_roll" int32)
-       (req "passes_per_roll" int32)
+       (req "yays_per_roll" uint16)
+       (req "nays_per_roll" uint16)
+       (req "passes_per_roll" uint16)

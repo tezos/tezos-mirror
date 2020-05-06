@@ -86,9 +86,9 @@ let get_ballots ctxt =
         >>? fun ballots ->
         ok
           {
-            yay = allocate ballot.yays_per_roll ballots.yay;
-            nay = allocate ballot.nays_per_roll ballots.nay;
-            pass = allocate ballot.passes_per_roll ballots.pass;
+            yay = allocate (Int32.of_int ballot.yays_per_roll) ballots.yay;
+            nay = allocate (Int32.of_int ballot.nays_per_roll) ballots.nay;
+            pass = allocate (Int32.of_int ballot.passes_per_roll) ballots.pass;
           } ))
     ~init:(ok {yay = 0l; nay = 0l; pass = 0l})
 
