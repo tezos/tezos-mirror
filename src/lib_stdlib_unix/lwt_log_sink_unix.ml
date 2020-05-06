@@ -165,7 +165,7 @@ module Output = struct
   let pp fmt output = Format.fprintf fmt "%s" (to_string output)
 end
 
-let default_template = "$(date) - $(section): $(message)"
+let default_template = "$(date).$(milliseconds) - $(section): $(message)"
 
 type cfg = {
   output : Output.t;
