@@ -1,3 +1,5 @@
+.. _testing:
+
 Overview of Testing in Tezos
 ============================
 
@@ -432,3 +434,9 @@ typechecking <https://github.com/aantron/bisect_ppx/issues/319>`_. For those
 pretty rare cases, either: change the order of arguments (`fun ?x y z` rather
 than `fun y ?x z`), add an explicit parameter at call site (`f y ?x:None`
 rather than `f y`), or add a wrapper function (`fun z -> f y z`).
+
+Conventions
+-----------
+
+Regardless of the framework, each new test must have a comment (typically
+a file header comment) explaining briefly what it is testing and how.

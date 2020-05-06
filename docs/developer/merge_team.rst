@@ -33,6 +33,10 @@ reviewer to work on the MR.
 
   - Explain how you tested your patch (or why you didn't).
   - Give instructions to reproduce the bug or to test the new feature.
+  - As much as possible, provide automatic tests in the CI.
+    Make sure the new code is covered by the tests execution using
+    ``bisect_ppx``. The available testing frameworks, tools and testing
+    conventions are documented :ref:`here <testing>`.
 
 - *Divide and conquer*: it is easier to merge several simple merge
   requests than a big one.
@@ -217,4 +221,9 @@ The code for the bot is at
 work-in-progress and new warnings and comments will appear little by little.
 We welcome specific issues or contributions there too.
 
+Coding guidelines
+~~~~~~~~~~~~~~~~~
 
+- The Merge-Request Bot may complain about TODOs but they aren't strictly
+  forbidden. They alert the reader that some code is a short-term solution
+  but could be improved in the future.
