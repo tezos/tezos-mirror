@@ -1075,7 +1075,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Global.get_block_priority ctxt
         >>=? fun block_priority ->
         Baking.endorsing_reward ctxt ~block_priority gap
-        >>=? fun reward ->
+        >>?= fun reward ->
         Delegate.freeze_rewards ctxt delegate reward
         >|=? fun ctxt ->
         let level = Level.from_raw ctxt level in
@@ -1411,7 +1411,7 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
     ctxt
     ~block_priority:protocol_data.priority
     ~included_endorsements
-  >>=? fun reward ->
+  >>?= fun reward ->
   add_rewards ctxt reward
   >>=? fun ctxt ->
   Signature.Public_key_hash.Map.fold
