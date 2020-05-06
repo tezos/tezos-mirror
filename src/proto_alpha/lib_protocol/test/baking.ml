@@ -220,14 +220,14 @@ let test_rewards_formulas_equivalence () =
         ctxt
         ~block_priority
         ~included_endorsements:endorsing_power
-      >>= wrap
+      |> wrap
       >>=? fun reward1 ->
       Context.get_baking_reward (B b) ~priority:block_priority ~endorsing_power
       >>=? fun reward2 ->
       Assert.equal_tez ~loc:__LOC__ reward1 reward2
       >>=? fun () ->
       Baking.endorsing_reward ctxt ~block_priority endorsing_power
-      >>= wrap
+      |> wrap
       >>=? fun reward1 ->
       Context.get_endorsing_reward
         (B b)
