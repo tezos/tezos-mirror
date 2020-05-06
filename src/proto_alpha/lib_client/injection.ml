@@ -589,7 +589,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
               "Estimated gas: %s units (will add 100000 for safety)"
               (Z.to_string gas)
             >>= fun () ->
-            return (Z.min (Z.add gas (Z.of_int 100000)) gas_limit)
+            return (Z.min (Z.add gas (Z.of_int 100_000)) gas_limit)
         else return c.gas_limit )
         >>=? fun gas_limit ->
         ( if c.storage_limit < Z.zero || storage_limit <= c.storage_limit then
