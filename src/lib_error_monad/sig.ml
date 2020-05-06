@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -174,6 +174,18 @@ module type MONAD = sig
   (** Successful result *)
   val ok : 'a -> 'a tzresult
 
+  val ok_unit : unit tzresult
+
+  val ok_none : 'a option tzresult
+
+  val ok_some : 'a -> 'a option tzresult
+
+  val ok_nil : 'a list tzresult
+
+  val ok_true : bool tzresult
+
+  val ok_false : bool tzresult
+
   (** Successful return *)
   val return : 'a -> 'a tzresult Lwt.t
 
@@ -201,23 +213,51 @@ module type MONAD = sig
   (** Erroneous return *)
   val fail : error -> 'a tzresult Lwt.t
 
-  (** Non-Lwt bind operator *)
+  (** Infix operators for monadic binds/maps. All operators follow this naming
+      convention:
+      - the first character is [>]
+      - the second character is [>] for [bind] and [|] for [map]
+      - the next character is [=] for Lwt or [?] for Error
+      - the next character (if present) is [=] for Lwt or [?] for Error, it is
+      only used for operator that are within both monads.
+
+      There is an exception to this pattern: [>>|?]. It is a combined map
+      operator and it should be [>|=?] according to the pattern. This is kept
+      as-is for backwards compatibility.
+  *)
+
+  (** Lwt's bind reexported. Following Lwt's convention, in this operator and
+      the ones below, [=] indicate we operate within Lwt. *)
+  val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  (** Lwt's map reexported. The [|] indicates a map rather than a bind. *)
+  val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+
+  (** Non-Lwt bind operator. In this operator and the ones below, [?] indicates
+      that we operate within the error monad. *)
   val ( >>? ) : 'a tzresult -> ('a -> 'b tzresult) -> 'b tzresult
 
-  (** Bind operator *)
+  (** Non-Lwt map operator. *)
+  val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
+
+  (** Combined bind operator. The [=?] indicates that the operator acts within
+      the combined error-lwt monad. *)
   val ( >>=? ) :
     'a tzresult Lwt.t -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
 
-  (** Lwt's bind reexported *)
-  val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-  val ( >|= ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-
-  (** To operator *)
+  (** Combined map operator. *)
   val ( >>|? ) : 'a tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
 
-  (** Non-Lwt to operator *)
-  val ( >|? ) : 'a tzresult -> ('a -> 'b) -> 'b tzresult
+  (** Injecting bind operator. This is for transitioning from the simple Error
+      monad to the combined Error-Lwt monad.
+
+      Note the order of the character: it starts with the error monad marker [?]
+      and has the Lwt monad marker later. This hints at the role of the operator
+      to transition into Lwt. *)
+  val ( >>?= ) : 'a tzresult -> ('a -> 'b tzresult Lwt.t) -> 'b tzresult Lwt.t
+
+  (** Injecting map operator. *)
+  val ( >|?= ) : 'a tzresult -> ('a -> 'b Lwt.t) -> 'b tzresult Lwt.t
 
   (** Enrich an error report (or do nothing on a successful result) manually *)
   val record_trace : error -> 'a tzresult -> 'a tzresult
@@ -232,6 +272,11 @@ module type MONAD = sig
   (** Same as trace, for unevaluated Lwt error *)
   val trace_eval :
     (unit -> error tzresult Lwt.t) -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+
+  (** Error on failed assertion *)
+  val error_unless : bool -> error -> unit tzresult
+
+  val error_when : bool -> error -> unit tzresult
 
   (** Erroneous return on failed assertion *)
   val fail_unless : bool -> error -> unit tzresult Lwt.t
@@ -256,6 +301,8 @@ module type MONAD = sig
   (** {2 In-monad list iterators} *)
 
   (** A {!List.iter} in the monad *)
+  val iter : ('a -> unit tzresult) -> 'a list -> unit tzresult
+
   val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
 
   val iter_p : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
@@ -263,12 +310,14 @@ module type MONAD = sig
   val iteri_p :
     (int -> 'a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
 
+  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val iter2_p :
     ('a -> 'b -> unit tzresult Lwt.t) ->
     'a list ->
     'b list ->
     unit tzresult Lwt.t
 
+  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val iteri2_p :
     (int -> 'a -> 'b -> unit tzresult Lwt.t) ->
     'a list ->
@@ -276,6 +325,10 @@ module type MONAD = sig
     unit tzresult Lwt.t
 
   (** A {!List.map} in the monad *)
+  val map : ('a -> 'b tzresult) -> 'a list -> 'b list tzresult
+
+  val mapi : (int -> 'a -> 'b tzresult) -> 'a list -> 'b list tzresult
+
   val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
   val rev_map_s :
@@ -289,16 +342,24 @@ module type MONAD = sig
   val mapi_p :
     (int -> 'a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
-  (** A {!List.map2} in the monad *)
+  (** A {!List.map2} in the monad.
+
+      @raise [Invalid_argument] if provided two lists of different lengths. *)
   val map2 :
     ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
 
+  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
+  val mapi2 :
+    (int -> 'a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+
+  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val map2_s :
     ('a -> 'b -> 'c tzresult Lwt.t) ->
     'a list ->
     'b list ->
     'c list tzresult Lwt.t
 
+  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
   val mapi2_s :
     (int -> 'a -> 'b -> 'c tzresult Lwt.t) ->
     'a list ->
@@ -313,6 +374,8 @@ module type MONAD = sig
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
   (** A {!List.filter} in the monad *)
+  val filter : ('a -> bool tzresult) -> 'a list -> 'a list tzresult
+
   val filter_s :
     ('a -> bool tzresult Lwt.t) -> 'a list -> 'a list tzresult Lwt.t
 

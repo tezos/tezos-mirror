@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -81,23 +81,35 @@ struct
 
   let ( >>= ) = Lwt.( >>= )
 
-  let return v = Lwt.return_ok v
+  let ok v = Ok v
 
-  let return_unit = Lwt.return (Ok ())
+  let ok_unit = Ok ()
 
-  let return_none = Lwt.return (Ok None)
+  let ok_none = Ok None
 
-  let return_some x = Lwt.return (Ok (Some x))
+  let ok_some x = Ok (Some x)
 
-  let return_nil = Lwt.return (Ok [])
+  let ok_nil = Ok []
 
-  let return_true = Lwt.return (Ok true)
+  let ok_true = Ok true
 
-  let return_false = Lwt.return (Ok false)
+  let ok_false = Ok false
 
   let error s = Error [s]
 
-  let ok v = Ok v
+  let return v = Lwt.return_ok v
+
+  let return_unit = Lwt.return ok_unit
+
+  let return_none = Lwt.return ok_none
+
+  let return_some x = Lwt.return (Ok (Some x))
+
+  let return_nil = Lwt.return ok_nil
+
+  let return_true = Lwt.return ok_true
+
+  let return_false = Lwt.return ok_false
 
   let fail s = Lwt.return_error [s]
 
@@ -106,11 +118,33 @@ struct
   let ( >>=? ) v f =
     v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
 
+  let ( >>?= ) v f = match v with Error _ as e -> Lwt.return e | Ok v -> f v
+
+  let ( >|?= ) v f =
+    match v with Error _ as e -> Lwt.return e | Ok v -> f v >>= Lwt.return_ok
+
   let ( >>|? ) v f = v >>=? fun v -> Lwt.return_ok (f v)
 
   let ( >|= ) = Lwt.( >|= )
 
   let ( >|? ) v f = v >>? fun v -> Ok (f v)
+
+  let rec map f l =
+    match l with
+    | [] ->
+        ok_nil
+    | h :: t ->
+        f h >>? fun rh -> map f t >>? fun rt -> Ok (rh :: rt)
+
+  let mapi f l =
+    let rec mapi f i l =
+      match l with
+      | [] ->
+          ok_nil
+      | h :: t ->
+          f i h >>? fun rh -> mapi f (i + 1) t >>? fun rt -> Ok (rh :: rt)
+    in
+    mapi f 0 l
 
   let rec map_s f l =
     match l with
@@ -203,11 +237,24 @@ struct
   let rec map2 f l1 l2 =
     match (l1, l2) with
     | ([], []) ->
-        Ok []
+        ok_nil
     | (_ :: _, []) | ([], _ :: _) ->
         invalid_arg "Error_monad.map2"
     | (h1 :: t1, h2 :: t2) ->
         f h1 h2 >>? fun rh -> map2 f t1 t2 >>? fun rt -> Ok (rh :: rt)
+
+  let mapi2 f l1 l2 =
+    let rec mapi2 i f l1 l2 =
+      match (l1, l2) with
+      | ([], []) ->
+          ok_nil
+      | (_ :: _, []) | ([], _ :: _) ->
+          invalid_arg "Error_monad.mapi2"
+      | (h1 :: t1, h2 :: t2) ->
+          f i h1 h2
+          >>? fun rh -> mapi2 (i + 1) f t1 t2 >>? fun rt -> Ok (rh :: rt)
+    in
+    mapi2 0 f l1 l2
 
   let rec filter_map_s f l =
     match l with
@@ -231,6 +278,15 @@ struct
         >>=? function
         | None -> tt | Some rh -> tt >>=? fun rt -> return (rh :: rt) )
 
+  let rec filter f l =
+    match l with
+    | [] ->
+        ok_nil
+    | h :: t -> (
+        f h
+        >>? function
+        | true -> filter f t >>? fun t -> Ok (h :: t) | false -> filter f t )
+
   let rec filter_s f l =
     match l with
     | [] ->
@@ -250,6 +306,9 @@ struct
     | h :: t -> (
         let jh = f h and t = filter_p f t in
         jh >>=? function false -> t | true -> t >>=? fun t -> return (h :: t) )
+
+  let rec iter f l =
+    match l with [] -> ok_unit | h :: t -> f h >>? fun () -> iter f t
 
   let rec iter_s f l =
     match l with [] -> return_unit | h :: t -> f h >>=? fun () -> iter_s f t
@@ -285,7 +344,7 @@ struct
           >>= fun tl_res ->
           match (tx_res, tl_res) with
           | (Ok (), Ok ()) ->
-              Lwt.return (Ok ())
+              Lwt.return ok_unit
           | (Error exn1, Error exn2) ->
               Lwt.return (Error (exn1 @ exn2))
           | (Ok (), Error exn) | (Error exn, Ok ()) ->
@@ -383,6 +442,10 @@ struct
         mk_err () >>=? fun err -> Lwt.return_error (err :: errs)
     | ok ->
         Lwt.return ok
+
+  let error_unless cond exn = if cond then ok_unit else error exn
+
+  let error_when cond exn = if cond then error exn else ok_unit
 
   let fail_unless cond exn = if cond then return_unit else fail exn
 
