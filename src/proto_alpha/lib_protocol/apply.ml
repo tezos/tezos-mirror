@@ -1353,7 +1353,7 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header
   >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header
-  >>=? fun () ->
+  >>?= fun () ->
   Baking.check_baking_rights
     ctxt
     block_header.protocol_data.contents

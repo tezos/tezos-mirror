@@ -118,7 +118,7 @@ val check_proof_of_work_stamp :
 
 (** check if the gap between the fitness of the current context
     and the given block is within the protocol parameters *)
-val check_fitness_gap : context -> Block_header.t -> unit tzresult Lwt.t
+val check_fitness_gap : context -> Block_header.t -> unit tzresult
 
 val dawn_of_a_new_cycle : context -> Cycle.t option tzresult Lwt.t
 
