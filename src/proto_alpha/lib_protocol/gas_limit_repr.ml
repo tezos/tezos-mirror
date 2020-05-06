@@ -106,11 +106,9 @@ let step_cost n = Z.mul step_weight (Z.of_int n)
 
 let free = Z.zero
 
-let read_bytes_cost n =
-  Z.add (Z.mul read_base_weight Z.one) (Z.mul byte_read_weight n)
+let read_bytes_cost n = Z.add read_base_weight (Z.mul byte_read_weight n)
 
-let write_bytes_cost n =
-  Z.add (Z.mul write_base_weight Z.one) (Z.mul byte_written_weight n)
+let write_bytes_cost n = Z.add write_base_weight (Z.mul byte_written_weight n)
 
 let ( +@ ) x y = Z.add x y
 
