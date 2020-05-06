@@ -354,12 +354,12 @@ let max_fitness_gap _ctxt = 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in
-  Lwt.return (Fitness.to_int64 block.shell.fitness)
-  >>=? fun announced_fitness ->
+  Fitness.to_int64 block.shell.fitness
+  >>? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
-    fail (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
-  else return_unit
+    error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
+  else ok_unit
 
 let last_of_a_cycle ctxt l =
   Compare.Int32.(
