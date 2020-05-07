@@ -202,7 +202,7 @@ val parse_ty :
   (ex_ty * context) tzresult
 
 val unparse_ty :
-  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult Lwt.t
+  context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
 
 val parse_toplevel :
   legacy:bool ->
