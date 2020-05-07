@@ -717,7 +717,7 @@ let () =
     (function Missing_signature -> Some () | _ -> None)
     (fun () -> Missing_signature)
 
-let check_signature_sync (type kind) key chain_id
+let check_signature (type kind) key chain_id
     ({shell; protocol_data} : kind operation) =
   let check ~watermark contents signature =
     let unsigned_operation =
@@ -742,9 +742,6 @@ let check_signature_sync (type kind) key chain_id
       check ~watermark:Generic_operation (Contents_list contents) signature
   | ((Cons _ as contents), Some signature) ->
       check ~watermark:Generic_operation (Contents_list contents) signature
-
-let check_signature pk chain_id op =
-  Lwt.return (check_signature_sync pk chain_id op)
 
 let hash_raw = Operation.hash
 

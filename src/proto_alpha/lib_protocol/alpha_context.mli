@@ -1203,9 +1203,6 @@ module Operation : sig
   type error += Invalid_signature (* `Permanent *)
 
   val check_signature :
-    public_key -> Chain_id.t -> _ operation -> unit tzresult Lwt.t
-
-  val check_signature_sync :
     public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t

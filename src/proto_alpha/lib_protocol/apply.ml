@@ -818,7 +818,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
      change in the future, allowing several managers to group-sign a
      sequence of transactions.  *)
   Operation.check_signature public_key chain_id raw_operation
-  >>=? fun () ->
+  >>?= fun () ->
   Contract.increment_counter ctxt source
   >>=? fun ctxt ->
   Contract.spend ctxt (Contract.implicit_contract source) fee
@@ -1249,7 +1249,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       Roll.delegate_pubkey ctxt source
       >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation
-      >>=? fun () ->
+      >>?= fun () ->
       let level = Level.current ctxt in
       fail_unless
         Voting_period.(level.voting_period = period)
@@ -1261,7 +1261,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       Roll.delegate_pubkey ctxt source
       >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation
-      >>=? fun () ->
+      >>?= fun () ->
       let level = Level.current ctxt in
       fail_unless
         Voting_period.(level.voting_period = period)
