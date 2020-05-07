@@ -52,14 +52,12 @@ check_opam_lint:
 check_linting:
   <<: *build_definition
   script:
-    - src/tooling/lint.sh check.ci
-    - src/tooling/lint.sh check_scripts
-    - src/tooling/lint.sh check.ocamlformat
+    - make check-linting
 
 check_python_linting:
   <<: *build_definition
   script:
-    - make test-lint
+    - make check-python-linting
 
 check_python_types:
   <<: *build_definition

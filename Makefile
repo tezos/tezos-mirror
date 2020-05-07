@@ -133,11 +133,16 @@ test: test_protocol_compile
 	@dune build @runtest_dune_template @runtest @runtest_flextesa
 	@./scripts/check_opam_test.sh
 
-.PHONY: test-lint
-test-lint:
-	@dune build @runtest_lint
-	make -C tests_python lint_all
+.PHONY: check-linting check-python-linting
+
+check-linting:
+	@src/tooling/lint.sh check.ci
 	@src/tooling/lint.sh check_scripts
+	@src/tooling/lint.sh check.ocamlformat
+	@dune build @runtest_lint
+
+check-python-linting:
+	@make -C tests_python lint_all
 
 .PHONY: fmt
 fmt:
