@@ -237,26 +237,27 @@ let register () =
       match expr with
       | None ->
           raise Not_found
-      | Some expr -> (
+      | Some expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
           let open Script_ir_translator in
-          Script.force_decode_in_context ctxt expr
-          >>?= fun (expr, _) ->
-          parse_toplevel ~legacy expr
-          >>? (fun (arg_type, _, _, root_name) ->
-                parse_parameter_ty ctxt ~legacy arg_type
-                >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.find_entrypoint
-                  ~root_name
-                  arg_type
-                  entrypoint)
-          |> function
-          | Ok (_f, Ex_ty ty) ->
-              unparse_ty ctxt ty
-              >|=? fun (ty_node, _) -> Micheline.strip_locations ty_node
-          | Error _ ->
-              raise Not_found )) ;
+          Lwt.return
+            ( Script.force_decode_in_context ctxt expr
+            >>? fun (expr, _) ->
+            parse_toplevel ~legacy expr
+            >>? (fun (arg_type, _, _, root_name) ->
+                  parse_parameter_ty ctxt ~legacy arg_type
+                  >>? fun (Ex_ty arg_type, _) ->
+                  Script_ir_translator.find_entrypoint
+                    ~root_name
+                    arg_type
+                    entrypoint)
+            |> function
+            | Ok (_f, Ex_ty ty) ->
+                unparse_ty ctxt ty
+                >|? fun (ty_node, _) -> Micheline.strip_locations ty_node
+            | Error _ ->
+                raise Not_found )) ;
   register1 S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v
       >>=? fun (_, expr) ->

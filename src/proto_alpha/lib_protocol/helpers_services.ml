@@ -513,17 +513,18 @@ module Scripts = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ~legacy expr
-        >>? (fun (arg_type, _, _, root_name) ->
-              parse_parameter_ty ctxt ~legacy arg_type
-              >>? fun (Ex_ty arg_type, _) ->
-              Script_ir_translator.find_entrypoint
-                ~root_name
-                arg_type
-                entrypoint)
-        >>?= fun (_f, Ex_ty ty) ->
-        unparse_ty ctxt ty
-        >|=? fun (ty_node, _) -> Micheline.strip_locations ty_node) ;
+        Lwt.return
+          ( parse_toplevel ~legacy expr
+          >>? (fun (arg_type, _, _, root_name) ->
+                parse_parameter_ty ctxt ~legacy arg_type
+                >>? fun (Ex_ty arg_type, _) ->
+                Script_ir_translator.find_entrypoint
+                  ~root_name
+                  arg_type
+                  entrypoint)
+          >>? fun (_f, Ex_ty ty) ->
+          unparse_ty ctxt ty
+          >|? fun (ty_node, _) -> Micheline.strip_locations ty_node )) ;
     register0 S.list_entrypoints (fun ctxt () expr ->
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in

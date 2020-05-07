@@ -932,7 +932,7 @@ let rec step :
       unparse_data ctxt Optimized capture_ty capture
       >>=? fun (const_expr, ctxt) ->
       unparse_ty ctxt capture_ty
-      >>=? fun (ty_expr, ctxt) ->
+      >>?= fun (ty_expr, ctxt) ->
       match full_arg_ty with
       | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
           let arg_stack_ty = Item_t (arg_ty, Empty_t, None) in
@@ -1108,12 +1108,12 @@ let rec step :
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     (delegate, (credit, (init, rest))) ) ->
       unparse_ty ctxt param_type
-      >>=? fun (unparsed_param_type, ctxt) ->
+      >>?= fun (unparsed_param_type, ctxt) ->
       let unparsed_param_type =
         Script_ir_translator.add_field_annot root_name None unparsed_param_type
       in
       unparse_ty ctxt storage_type
-      >>=? fun (unparsed_storage_type, ctxt) ->
+      >>?= fun (unparsed_storage_type, ctxt) ->
       let code =
         Micheline.strip_locations
           (Seq
