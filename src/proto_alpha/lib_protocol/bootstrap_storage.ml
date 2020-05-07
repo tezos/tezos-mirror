@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Misc
+open Misc.Syntax
 
 let init_account ctxt
     ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
@@ -42,7 +43,7 @@ let init_account ctxt
 let init_contract ~typecheck ctxt
     ({delegate; amount; script} : Parameters_repr.bootstrap_contract) =
   Contract_storage.fresh_contract_from_current_nonce ctxt
-  >>=? fun (ctxt, contract) ->
+  >>?= fun (ctxt, contract) ->
   typecheck ctxt script
   >>=? fun (script, ctxt) ->
   Contract_storage.raw_originate

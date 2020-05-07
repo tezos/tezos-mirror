@@ -545,8 +545,8 @@ let must_be_allocated c contract =
 let list c = Storage.Contract.list c
 
 let fresh_contract_from_current_nonce c =
-  Lwt.return (Raw_context.increment_origination_nonce c)
-  >|=? fun (c, nonce) -> (c, Contract_repr.originated_contract nonce)
+  Raw_context.increment_origination_nonce c
+  >|? fun (c, nonce) -> (c, Contract_repr.originated_contract nonce)
 
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Lwt.return (Raw_context.origination_nonce ctxt_since)

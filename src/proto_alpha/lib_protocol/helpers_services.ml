@@ -189,7 +189,7 @@ module Scripts = struct
     let open Services_registration in
     let originate_dummy_contract ctxt script =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
-      Contract.fresh_contract_from_current_nonce ctxt
+      Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
       >>=? fun (ctxt, dummy_contract) ->
       let balance =
         match Tez.of_mutez 4_000_000_000_000L with
@@ -204,7 +204,7 @@ module Scripts = struct
         ~balance
         ~delegate:None
         ~script:(script, None)
-      >|=? fun ctxt -> (ctxt, dummy_contract)
+      >>=? fun ctxt -> return (ctxt, dummy_contract)
     in
     register0
       S.run_code

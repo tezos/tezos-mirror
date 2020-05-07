@@ -752,8 +752,7 @@ module Contract : sig
 
   val unset_origination_nonce : context -> context
 
-  val fresh_contract_from_current_nonce :
-    context -> (context * t) tzresult Lwt.t
+  val fresh_contract_from_current_nonce : context -> (context * t) tzresult
 
   val originated_from_current_nonce :
     since:context -> until:context -> contract list tzresult Lwt.t
