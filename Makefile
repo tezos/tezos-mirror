@@ -63,7 +63,10 @@ ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
 endif
 
-PROTOCOLS := $(wildcard src/proto_*)
+# List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
+TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
+PROTOCOLS=$(patsubst %/lib_protocol/TEZOS_PROTOCOL,%,${TEZOS_PROTOCOL_FILES})
+
 DUNE_INCS=$(patsubst %,%/lib_protocol/dune.inc, ${PROTOCOLS})
 
 .PHONY: generate_dune
