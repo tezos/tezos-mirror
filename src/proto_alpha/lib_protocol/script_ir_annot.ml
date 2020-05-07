@@ -174,10 +174,11 @@ let merge_var_annot : var_annot option -> var_annot option -> var_annot option
       if String.equal a1 a2 then annot1 else None
 
 let error_unexpected_annot loc annot =
-  match annot with [] -> ok () | _ :: _ -> error (Unexpected_annotation loc)
-
-let fail_unexpected_annot loc annot =
-  Lwt.return (error_unexpected_annot loc annot)
+  match annot with
+  | [] ->
+      ok_unit
+  | _ :: _ ->
+      error (Unexpected_annotation loc)
 
 (* Check that the predicate p holds on all s.[k] for k >= i *)
 let string_iter p s i =

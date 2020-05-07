@@ -132,9 +132,6 @@ val merge_var_annot : var_annot option -> var_annot option -> var_annot option
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : int -> 'a list -> unit tzresult
 
-(** Same as {!error_unexpected_annot} in Lwt. *)
-val fail_unexpected_annot : int -> 'a list -> unit tzresult Lwt.t
-
 (** Parse a type annotation only. *)
 val parse_type_annot : int -> string list -> type_annot option tzresult
 
