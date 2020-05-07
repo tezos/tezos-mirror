@@ -630,7 +630,7 @@ end
 
 module Required_endorsements = struct
   let required_endorsements ctxt block_delay =
-    return (Baking.minimum_allowed_endorsements ctxt ~block_delay)
+    Baking.minimum_allowed_endorsements ctxt ~block_delay
 
   module S = struct
     type t = {block_delay : Period.t}
@@ -657,7 +657,7 @@ module Required_endorsements = struct
   let register () =
     let open Services_registration in
     register0 S.required_endorsements (fun ctxt {block_delay} () ->
-        required_endorsements ctxt block_delay)
+        return @@ required_endorsements ctxt block_delay)
 
   let get ctxt block block_delay =
     RPC_context.make_call0 S.required_endorsements ctxt block {block_delay} ()
