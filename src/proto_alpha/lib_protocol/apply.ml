@@ -545,7 +545,7 @@ let apply_manager_operation_content :
           | true ->
               return (ctxt, [], false)
           | false ->
-              Fees.origination_burn ctxt
+              Lwt.return (Fees.origination_burn ctxt)
               >|=? fun (ctxt, origination_burn) ->
               ( ctxt,
                 [(Delegate.Contract payer, Delegate.Debited origination_burn)],
@@ -700,7 +700,7 @@ let apply_manager_operation_content :
         ~script:(script, big_map_diff)
       >>=? fun ctxt ->
       Fees.origination_burn ctxt
-      >>=? fun (ctxt, origination_burn) ->
+      >>?= fun (ctxt, origination_burn) ->
       Fees.record_paid_storage_space ctxt contract
       >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
       let result =
