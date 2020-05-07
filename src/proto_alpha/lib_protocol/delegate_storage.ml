@@ -447,10 +447,8 @@ let cycle_end ctxt last_cycle unrevealed =
   | None ->
       return (ctxt, [])
   | Some revealed_cycle ->
-      List.fold_left
-        (fun acc (u : Nonce_storage.unrevealed) ->
-          acc
-          >>=? fun (ctxt, balance_updates) ->
+      fold_left_s
+        (fun (ctxt, balance_updates) (u : Nonce_storage.unrevealed) ->
           burn_fees ctxt u.delegate revealed_cycle u.fees
           >>=? fun ctxt ->
           burn_rewards ctxt u.delegate revealed_cycle u.rewards
@@ -461,7 +459,7 @@ let cycle_end ctxt last_cycle unrevealed =
                 (Rewards (u.delegate, revealed_cycle), Debited u.rewards) ]
           in
           (ctxt, bus @ balance_updates))
-        (return (ctxt, []))
+        (ctxt, [])
         unrevealed )
   >>=? fun (ctxt, balance_updates) ->
   match Cycle_repr.sub last_cycle preserved with
