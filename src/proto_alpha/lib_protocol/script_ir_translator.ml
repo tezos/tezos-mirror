@@ -1859,9 +1859,11 @@ let rec parse_data :
     Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let fail_parse_data () = parse_data_error () >>?= fail in
+  let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body =
     trace_eval (fun () -> Lwt.return @@ parse_data_error ()) body
   in
+  let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
   let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
       =
     let length = List.length items in
@@ -1912,9 +1914,9 @@ let rec parse_data :
         Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((() : a), ctxt)
         )
   | (Unit_t _, Prim (loc, D_Unit, l, _)) ->
-      traced (fail (Invalid_arity (loc, D_Unit, 0, List.length l)))
+      traced_fail (Invalid_arity (loc, D_Unit, 0, List.length l))
   | (Unit_t _, expr) ->
-      traced (fail (unexpected expr [] Constant_namespace [D_Unit]))
+      traced_fail (unexpected expr [] Constant_namespace [D_Unit])
   (* Booleans *)
   | (Bool_t _, Prim (loc, D_True, [], annot)) ->
       Lwt.return
@@ -1927,9 +1929,9 @@ let rec parse_data :
         >>? fun () ->
         Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt) )
   | (Bool_t _, Prim (loc, ((D_True | D_False) as c), l, _)) ->
-      traced (fail (Invalid_arity (loc, c, 0, List.length l)))
+      traced_fail (Invalid_arity (loc, c, 0, List.length l))
   | (Bool_t _, expr) ->
-      traced (fail (unexpected expr [] Constant_namespace [D_True; D_False]))
+      traced_fail (unexpected expr [] Constant_namespace [D_True; D_False])
   (* Strings *)
   | (String_t _, String (_, v)) ->
       Gas.consume ctxt (Typecheck_costs.string (String.length v))
@@ -1946,14 +1948,14 @@ let rec parse_data :
       if check_printable_ascii (String.length v - 1) then return (v, ctxt)
       else fail_parse_data ()
   | (String_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [String_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [String_kind], kind expr))
   (* Byte sequences *)
   | (Bytes_t _, Bytes (_, v)) ->
       Lwt.return
         ( Gas.consume ctxt (Typecheck_costs.string (MBytes.length v))
         >|? fun ctxt -> (v, ctxt) )
   | (Bytes_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   (* Integers *)
   | (Int_t _, Int (_, v)) ->
       Lwt.return
@@ -1967,9 +1969,9 @@ let rec parse_data :
         return (Script_int.abs v, ctxt)
       else fail_parse_data ()
   | (Int_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Int_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   | (Nat_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Int_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   (* Tez amounts *)
   | (Mutez_t _, Int (_, v)) -> (
       Gas.consume ctxt Typecheck_costs.tez
@@ -1984,7 +1986,7 @@ let rec parse_data :
             return (tez, ctxt)
       with _ -> fail_parse_data () )
   | (Mutez_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Int_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Int_kind], kind expr))
   (* Timestamps *)
   | (Timestamp_t _, Int (_, v))
   (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
@@ -2000,9 +2002,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Timestamp_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Int_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Int_kind], kind expr))
   (* IDs *)
   | (Key_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
@@ -2025,9 +2026,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Key_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   | (Key_hash_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
       Gas.consume ctxt Typecheck_costs.key_hash
@@ -2048,9 +2048,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Key_hash_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Signatures *)
   | (Signature_t _, Bytes (_, bytes)) (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature
@@ -2069,9 +2068,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Signature_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Operations *)
   | (Operation_t _, _) ->
       (* operations cannot appear in parameters or storage,
@@ -2095,9 +2093,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Chain_id_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Addresses *)
   | (Address_t _, Bytes (loc, bytes)) (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.contract
@@ -2127,24 +2124,23 @@ let rec parse_data :
       >>?= fun ctxt ->
       ( match String.index_opt s '%' with
       | None ->
-          return (s, "default")
+          ok (s, "default")
       | Some pos -> (
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then fail (Entrypoint_name_too_long name)
+          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
           else
             match (String.sub s 0 pos, name) with
             | (_, "default") ->
-                traced (fail (Unexpected_annotation loc))
+                traced_no_lwt (error (Unexpected_annotation loc))
             | addr_and_name ->
-                return addr_and_name ) )
-      >>=? fun (addr, entrypoint) ->
+                ok addr_and_name ) )
+      >>?= fun (addr, entrypoint) ->
       Lwt.return
         (Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt))
   | (Address_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Contracts *)
   | (Contract_t (ty, _), Bytes (loc, bytes))
   (* As unparsed with [Optimized]. *) -> (
@@ -2176,26 +2172,25 @@ let rec parse_data :
       >>?= fun ctxt ->
       ( match String.index_opt s '%' with
       | None ->
-          return (s, "default")
+          ok (s, "default")
       | Some pos -> (
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then fail (Entrypoint_name_too_long name)
+          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
           else
             match (String.sub s 0 pos, name) with
             | (_, "default") ->
-                traced (fail (Unexpected_annotation loc))
+                traced_no_lwt @@ error (Unexpected_annotation loc)
             | addr_and_name ->
-                return addr_and_name ) )
-      >>=? fun (addr, entrypoint) ->
-      traced (Lwt.return (Contract.of_b58check addr))
-      >>=? fun c ->
+                ok addr_and_name ) )
+      >>?= fun (addr, entrypoint) ->
+      traced_no_lwt (Contract.of_b58check addr)
+      >>?= fun c ->
       parse_contract ~legacy ctxt loc ty c ~entrypoint
       >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt)
   | (Contract_t _, expr) ->
-      traced
-        (fail
-           (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr))
   (* Pairs *)
   | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, [va; vb], annot))
     ->
@@ -2210,7 +2205,7 @@ let rec parse_data :
   | (Pair_t _, Prim (loc, D_Pair, l, _)) ->
       fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
   | (Pair_t _, expr) ->
-      traced (fail (unexpected expr [] Constant_namespace [D_Pair]))
+      traced_fail (unexpected expr [] Constant_namespace [D_Pair])
   (* Unions *)
   | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
@@ -2231,7 +2226,7 @@ let rec parse_data :
   | (Union_t _, Prim (loc, D_Right, l, _)) ->
       fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
   | (Union_t _, expr) ->
-      traced (fail (unexpected expr [] Constant_namespace [D_Left; D_Right]))
+      traced_fail (unexpected expr [] Constant_namespace [D_Left; D_Right])
   (* Lambdas *)
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
       Gas.consume ctxt Typecheck_costs.lambda
@@ -2246,7 +2241,7 @@ let rec parse_data :
            tr
            script_instr
   | (Lambda_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Options *)
   | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
@@ -2265,7 +2260,7 @@ let rec parse_data :
   | (Option_t _, Prim (loc, D_None, l, _)) ->
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
   | (Option_t _, expr) ->
-      traced (fail (unexpected expr [] Constant_namespace [D_Some; D_None]))
+      traced_fail (unexpected expr [] Constant_namespace [D_Some; D_None])
   (* Lists *)
   | (List_t (t, _ty_name), Seq (_loc, items)) ->
       traced
@@ -2278,7 +2273,7 @@ let rec parse_data :
            items
            (list_empty, ctxt)
   | (List_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
       let length = List.length vs in
@@ -2311,12 +2306,12 @@ let rec parse_data :
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
   | (Set_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Maps *)
   | (Map_t (tk, tv, _ty_name), (Seq (_, vs) as expr)) ->
       parse_items ?type_logger ctxt expr tk tv vs (fun x -> x)
   | (Map_t _, expr) ->
-      traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
+      traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   | (Big_map_t (tk, tv, _ty_name), (Seq (_loc, vs) as expr)) ->
       parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
       >>|? fun (diff, ctxt) ->
@@ -2326,7 +2321,7 @@ let rec parse_data :
       Big_map.exists ctxt id
       >>=? function
       | (_, None) ->
-          traced (fail (Invalid_big_map (loc, id)))
+          traced_fail (Invalid_big_map (loc, id))
       | (ctxt, Some (btk, btv)) ->
           Lwt.return
             ( parse_comparable_ty ctxt (Micheline.root btk)
@@ -2346,8 +2341,8 @@ let rec parse_data :
                 },
                 ctxt ) ) )
   | (Big_map_t (_tk, _tv, _), expr) ->
-      traced
-        (fail (Invalid_kind (location expr, [Seq_kind; Int_kind], kind expr)))
+      traced_fail
+        (Invalid_kind (location expr, [Seq_kind; Int_kind], kind expr))
 
 and parse_comparable_data :
     type a.
