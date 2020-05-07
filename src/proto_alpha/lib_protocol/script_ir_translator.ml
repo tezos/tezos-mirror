@@ -1864,8 +1864,8 @@ let rec parse_data :
         >>=? fun ctxt ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
-            (if legacy then return () else fail_unexpected_annot loc annot)
-            >>=? fun () ->
+            (if legacy then ok_unit else error_unexpected_annot loc annot)
+            >>?= fun () ->
             parse_comparable_data ?type_logger ctxt key_type k
             >>=? fun (k, ctxt) ->
             parse_data ?type_logger ctxt ~legacy value_type v
@@ -1895,8 +1895,8 @@ let rec parse_data :
   match (ty, script_data) with
   (* Unit *)
   | (Unit_t _, Prim (loc, D_Unit, [], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.unit)
       >|=? fun ctxt -> ((() : a), ctxt)
   | (Unit_t _, Prim (loc, D_Unit, l, _)) ->
@@ -1905,13 +1905,13 @@ let rec parse_data :
       traced (fail (unexpected expr [] Constant_namespace [D_Unit]))
   (* Booleans *)
   | (Bool_t _, Prim (loc, D_True, [], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
       >|=? fun ctxt -> (true, ctxt)
   | (Bool_t _, Prim (loc, D_False, [], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
       >|=? fun ctxt -> (false, ctxt)
   | (Bool_t _, Prim (loc, ((D_True | D_False) as c), l, _)) ->
@@ -2187,8 +2187,8 @@ let rec parse_data :
   (* Pairs *)
   | (Pair_t ((ta, _, _), (tb, _, _), _), Prim (loc, D_Pair, [va; vb], annot))
     ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.pair)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy ta va
@@ -2201,8 +2201,8 @@ let rec parse_data :
       traced (fail (unexpected expr [] Constant_namespace [D_Pair]))
   (* Unions *)
   | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tl v
@@ -2210,8 +2210,8 @@ let rec parse_data :
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
       fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.union)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tr v
@@ -2237,8 +2237,8 @@ let rec parse_data :
       traced (fail (Invalid_kind (location expr, [Seq_kind], kind expr)))
   (* Options *)
   | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.some)
       >>=? fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy t v
@@ -2246,8 +2246,8 @@ let rec parse_data :
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
-      (if legacy then return () else fail_unexpected_annot loc annot)
-      >>=? fun () ->
+      (if legacy then ok_unit else error_unexpected_annot loc annot)
+      >>?= fun () ->
       Lwt.return (Gas.consume ctxt Typecheck_costs.none)
       >|=? fun ctxt -> (None, ctxt)
   | (Option_t _, Prim (loc, D_None, l, _)) ->
@@ -2481,7 +2481,7 @@ and parse_instr :
   match (script_instr, stack_ty) with
   (* stack ops *)
   | (Prim (loc, I_DROP, [], annot), Item_t (_, rest, _)) ->
-      ( fail_unexpected_annot loc annot >>=? fun () -> typed ctxt loc Drop rest
+      ( error_unexpected_annot loc annot >>?= fun () -> typed ctxt loc Drop rest
         : (bef judgement * context) tzresult Lwt.t )
   | (Prim (loc, I_DROP, [n], result_annot), whole_stack) ->
       Lwt.return (parse_uint30 n)
@@ -2503,8 +2503,8 @@ and parse_instr :
             >>=? fun (whole_stack, _ctxt) ->
             fail (Bad_stack (loc, I_DROP, whole_n, whole_stack))
       in
-      fail_unexpected_annot loc result_annot
-      >>=? fun () ->
+      error_unexpected_annot loc result_annot
+      >>?= fun () ->
       make_proof_argument whole_n whole_stack
       >>=? fun (Dropn_proof_argument (n', stack_after_drops, _aft)) ->
       typed ctxt loc (Dropn (whole_n, n')) stack_after_drops
@@ -2535,8 +2535,8 @@ and parse_instr :
       in
       Lwt.return (parse_uint30 n)
       >>=? fun n ->
-      fail_unexpected_annot loc result_annot
-      >>=? fun () ->
+      error_unexpected_annot loc result_annot
+      >>?= fun () ->
       make_proof_argument n stack
       >>=? fun (Dig_proof_argument (n', (x, stack_annot), aft)) ->
       typed ctxt loc (Dig (n, n')) (Item_t (x, aft, stack_annot))
@@ -2567,22 +2567,22 @@ and parse_instr :
             >>=? fun (whole_stack, _ctxt) ->
             fail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
       in
-      fail_unexpected_annot loc result_annot
-      >>=? fun () ->
+      error_unexpected_annot loc result_annot
+      >>?= fun () ->
       make_proof_argument whole_n x stack_annot whole_stack
       >>=? fun (Dug_proof_argument (n', (), aft)) ->
       typed ctxt loc (Dug (whole_n, n')) aft
   | (Prim (loc, I_DUG, [_], result_annot), (Empty_t as stack)) ->
-      fail_unexpected_annot loc result_annot
-      >>=? fun () ->
+      error_unexpected_annot loc result_annot
+      >>?= fun () ->
       serialize_stack_for_error ctxt stack
       >>=? fun (stack, _ctxt) -> fail (Bad_stack (loc, I_DUG, 1, stack))
   | (Prim (loc, I_DUG, (([] | _ :: _ :: _) as l), _), _) ->
       fail (Invalid_arity (loc, I_DUG, 1, List.length l))
   | ( Prim (loc, I_SWAP, [], annot),
       Item_t (v, Item_t (w, rest, stack_annot), cur_top_annot) ) ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       typed
         ctxt
         loc
@@ -2620,8 +2620,8 @@ and parse_instr :
       >>=? fun () ->
       check_kind [Seq_kind] bf
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let annot = gen_access_annot option_annot default_some_annot in
       parse_instr ?type_logger tc_context ctxt ~legacy bt rest
       >>=? fun (btr, ctxt) ->
@@ -2722,8 +2722,8 @@ and parse_instr :
       >>=? fun () ->
       check_kind [Seq_kind] bf
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let left_annot =
         gen_access_annot union_annot l_field ~default:default_left_annot
       in
@@ -2771,8 +2771,8 @@ and parse_instr :
       >>=? fun () ->
       check_kind [Seq_kind] bf
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let hd_annot = gen_access_annot list_annot default_hd_annot in
       let tl_annot = gen_access_annot list_annot default_tl_annot in
       parse_instr
@@ -2833,8 +2833,8 @@ and parse_instr :
       Item_t (List_t (elt, _), rest, list_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let elt_annot = gen_access_annot list_annot default_elt_annot in
       parse_instr
         ?type_logger
@@ -2870,8 +2870,8 @@ and parse_instr :
       Item_t (Set_t (comp_elt, _), rest, set_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let elt_annot = gen_access_annot set_annot default_elt_annot in
       let elt = ty_of_comparable_ty comp_elt in
       parse_instr
@@ -2982,8 +2982,8 @@ and parse_instr :
       Item_t (Map_t (comp_elt, element_ty, _), rest, _map_annot) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let k_name = field_to_var_annot default_key_annot in
       let e_name = field_to_var_annot default_elt_annot in
       let key = ty_of_comparable_ty comp_elt in
@@ -3143,8 +3143,8 @@ and parse_instr :
       >>=? fun () ->
       check_kind [Seq_kind] bf
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       parse_instr ?type_logger tc_context ctxt ~legacy bt rest
       >>=? fun (btr, ctxt) ->
       parse_instr ?type_logger tc_context ctxt ~legacy bf rest
@@ -3156,8 +3156,8 @@ and parse_instr :
       (Item_t (Bool_t _, rest, _stack_annot) as stack) ) -> (
       check_kind [Seq_kind] body
       >>=? fun () ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       parse_instr ?type_logger tc_context ctxt ~legacy body rest
       >>=? fun (judgement, ctxt) ->
       match judgement with
@@ -3259,8 +3259,8 @@ and parse_instr :
         (Apply capture_ty)
         (Item_t (Lambda_t (arg_ty, ret, lam_annot), rest, annot))
   | (Prim (loc, I_DIP, [code], annot), Item_t (v, rest, stack_annot)) -> (
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       check_kind [Seq_kind] code
       >>=? fun () ->
       parse_instr
@@ -3307,8 +3307,8 @@ and parse_instr :
       in
       Lwt.return (parse_uint30 n)
       >>=? fun n ->
-      fail_unexpected_annot loc result_annot
-      >>=? fun () ->
+      error_unexpected_annot loc result_annot
+      >>?= fun () ->
       make_proof_argument n tc_context stack
       >>=? fun (Dipn_proof_argument (n', (new_ctxt, descr), aft)) ->
       (* TODO: which context should be used in the next line? new_ctxt or the old ctxt? *)
@@ -3318,8 +3318,8 @@ and parse_instr :
            However, DIP {code} is equivalent to DIP 1 {code} so hinting at an arity of 2 makes sense. *)
       fail (Invalid_arity (loc, I_DIP, 2, List.length l))
   | (Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest, _)) ->
-      fail_unexpected_annot loc annot
-      >>=? fun () ->
+      error_unexpected_annot loc annot
+      >>?= fun () ->
       let descr aft = {loc; instr = Failwith v; bef = stack_ty; aft} in
       log_stack ctxt loc stack_ty Empty_t
       >>=? fun () -> return ctxt (Failed {descr})
