@@ -614,7 +614,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
   Contract.increment_counter ctxt source
   >>=? fun ctxt ->
   Contract.spend ctxt (Contract.implicit_contract source) fee
-  >>=? fun ctxt -> add_fees ctxt fee
+  >>=? fun ctxt -> Lwt.return @@ add_fees ctxt fee
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :
@@ -892,13 +892,14 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       let seed_nonce_revelation_tip =
         Constants.seed_nonce_revelation_tip ctxt
       in
-      add_rewards ctxt seed_nonce_revelation_tip
-      >|=? fun ctxt ->
-      ( ctxt,
-        Single_result
-          (Seed_nonce_revelation_result
-             [ ( Rewards (baker, level.cycle),
-                 Credited seed_nonce_revelation_tip ) ]) )
+      Lwt.return
+        ( add_rewards ctxt seed_nonce_revelation_tip
+        >|? fun ctxt ->
+        ( ctxt,
+          Single_result
+            (Seed_nonce_revelation_result
+               [ ( Rewards (baker, level.cycle),
+                   Credited seed_nonce_revelation_tip ) ]) ) )
   | Single (Double_endorsement_evidence _ as evidence) ->
       Cheating_proofs.prove_double_endorsement ctxt chain_id evidence
       >>=? fun (level, delegate) ->
@@ -918,7 +919,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
       in
       add_rewards ctxt reward
-      >>=? fun ctxt ->
+      >>?= fun ctxt ->
       Delegate.Proof.add ctxt delegate level.level
       >|=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
@@ -949,7 +950,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
       in
       add_rewards ctxt reward
-      >>=? fun ctxt ->
+      >>?= fun ctxt ->
       Delegate.Proof.add ctxt delegate level.level
       >|=? fun ctxt ->
       let current_cycle = (Level.current ctxt).cycle in
@@ -1144,14 +1145,14 @@ let finalize_application ctxt protocol_data delegate ~block_delay
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit
-  >>=? fun ctxt ->
+  >>?= fun ctxt ->
   Baking.baking_reward
     ctxt
     ~block_priority:protocol_data.priority
     ~included_endorsements
   >>?= fun reward ->
   add_rewards ctxt reward
-  >>=? fun ctxt ->
+  >>?= fun ctxt ->
   Signature.Public_key_hash.Map.fold
     (fun delegate deposit ctxt ->
       ctxt >>=? fun ctxt -> Delegate.freeze_deposit ctxt delegate deposit)

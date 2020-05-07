@@ -133,11 +133,10 @@ let internal_nonce_already_recorded ctxt k =
 let set_current_fitness ctxt fitness = {ctxt with fitness}
 
 let add_fees ctxt fees =
-  Lwt.return Tez_repr.(ctxt.fees +? fees) >|=? fun fees -> {ctxt with fees}
+  Tez_repr.(ctxt.fees +? fees) >|? fun fees -> {ctxt with fees}
 
 let add_rewards ctxt rewards =
-  Lwt.return Tez_repr.(ctxt.rewards +? rewards)
-  >|=? fun rewards -> {ctxt with rewards}
+  Tez_repr.(ctxt.rewards +? rewards) >|? fun rewards -> {ctxt with rewards}
 
 let add_deposit ctxt delegate deposit =
   let previous =
@@ -147,8 +146,8 @@ let add_deposit ctxt delegate deposit =
     | None ->
         Tez_repr.zero
   in
-  Lwt.return Tez_repr.(previous +? deposit)
-  >|=? fun deposit ->
+  Tez_repr.(previous +? deposit)
+  >|? fun deposit ->
   let deposits =
     Signature.Public_key_hash.Map.add delegate deposit ctxt.deposits
   in
