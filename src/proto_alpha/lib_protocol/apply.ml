@@ -824,7 +824,7 @@ let precheck_manager_contents (type kind) ctxt chain_id raw_operation
   Contract.increment_counter ctxt source
   >>=? fun ctxt ->
   Contract.spend ctxt (Contract.implicit_contract source) fee
-  >>=? fun ctxt -> add_fees ctxt fee
+  >>=? fun ctxt -> Lwt.return (add_fees ctxt fee)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :
@@ -1100,13 +1100,14 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       let seed_nonce_revelation_tip =
         Constants.seed_nonce_revelation_tip ctxt
       in
-      add_rewards ctxt seed_nonce_revelation_tip
-      >|=? fun ctxt ->
-      ( ctxt,
-        Single_result
-          (Seed_nonce_revelation_result
-             [ ( Rewards (baker, level.cycle),
-                 Credited seed_nonce_revelation_tip ) ]) )
+      Lwt.return
+        ( add_rewards ctxt seed_nonce_revelation_tip
+        >|? fun ctxt ->
+        ( ctxt,
+          Single_result
+            (Seed_nonce_revelation_result
+               [ ( Rewards (baker, level.cycle),
+                   Credited seed_nonce_revelation_tip ) ]) ) )
   | Single (Double_endorsement_evidence {op1; op2}) -> (
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | (Single (Endorsement e1), Single (Endorsement e2))
@@ -1144,7 +1145,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
         in
         add_rewards ctxt reward
-        >>=? fun ctxt ->
+        >>?= fun ctxt ->
         let current_cycle = (Level.current ctxt).cycle in
         return
           ( ctxt,
@@ -1216,17 +1217,18 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       let reward =
         match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
       in
-      add_rewards ctxt reward
-      >|=? fun ctxt ->
-      let current_cycle = (Level.current ctxt).cycle in
-      ( ctxt,
-        Single_result
-          (Double_baking_evidence_result
-             (Delegate.cleanup_balance_updates
-                [ (Deposits (delegate, level.cycle), Debited balance.deposit);
-                  (Fees (delegate, level.cycle), Debited balance.fees);
-                  (Rewards (delegate, level.cycle), Debited balance.rewards);
-                  (Rewards (baker, current_cycle), Credited reward) ])) )
+      Lwt.return
+        ( add_rewards ctxt reward
+        >|? fun ctxt ->
+        let current_cycle = (Level.current ctxt).cycle in
+        ( ctxt,
+          Single_result
+            (Double_baking_evidence_result
+               (Delegate.cleanup_balance_updates
+                  [ (Deposits (delegate, level.cycle), Debited balance.deposit);
+                    (Fees (delegate, level.cycle), Debited balance.fees);
+                    (Rewards (delegate, level.cycle), Debited balance.rewards);
+                    (Rewards (baker, current_cycle), Credited reward) ])) ) )
   | Single (Activate_account {id = pkh; activation_code}) -> (
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
@@ -1406,14 +1408,14 @@ let finalize_application ctxt protocol_data delegate ~block_delay =
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit
-  >>=? fun ctxt ->
+  >>?= fun ctxt ->
   Baking.baking_reward
     ctxt
     ~block_priority:protocol_data.priority
     ~included_endorsements
   >>?= fun reward ->
   add_rewards ctxt reward
-  >>=? fun ctxt ->
+  >>?= fun ctxt ->
   Signature.Public_key_hash.Map.fold
     (fun delegate deposit ctxt ->
       ctxt >>=? fun ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
