@@ -1867,8 +1867,8 @@ let rec parse_data :
     let length = List.length items in
     fold_left_s
       (fun (last_value, map, ctxt) item ->
-        Lwt.return (Gas.consume ctxt (Typecheck_costs.map_element length))
-        >>=? fun ctxt ->
+        Gas.consume ctxt (Typecheck_costs.map_element length)
+        >>?= fun ctxt ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
             (if legacy then ok_unit else error_unexpected_annot loc annot)
@@ -1877,17 +1877,21 @@ let rec parse_data :
             >>=? fun (k, ctxt) ->
             parse_data ?type_logger ctxt ~legacy value_type v
             >>=? fun (v, ctxt) ->
-            ( match last_value with
-            | Some value ->
-                if Compare.Int.(0 <= compare_comparable key_type value k) then
-                  if Compare.Int.(0 = compare_comparable key_type value k) then
-                    fail (Duplicate_map_keys (loc, strip_locations expr))
-                  else fail (Unordered_map_keys (loc, strip_locations expr))
-                else return_unit
-            | None ->
-                return_unit )
-            >|=? fun () ->
-            (Some k, map_update k (Some (item_wrapper v)) map, ctxt)
+            Lwt.return
+              ( ( match last_value with
+                | Some value ->
+                    if Compare.Int.(0 <= compare_comparable key_type value k)
+                    then
+                      if Compare.Int.(0 = compare_comparable key_type value k)
+                      then
+                        error (Duplicate_map_keys (loc, strip_locations expr))
+                      else
+                        error (Unordered_map_keys (loc, strip_locations expr))
+                    else ok_unit
+                | None ->
+                    ok_unit )
+              >|? fun () ->
+              (Some k, map_update k (Some (item_wrapper v)) map, ctxt) )
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
@@ -1902,33 +1906,34 @@ let rec parse_data :
   match (ty, script_data) with
   (* Unit *)
   | (Unit_t _, Prim (loc, D_Unit, [], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.unit)
-      >|=? fun ctxt -> ((() : a), ctxt)
+      Lwt.return
+        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        >>? fun () ->
+        Gas.consume ctxt Typecheck_costs.unit >|? fun ctxt -> ((() : a), ctxt)
+        )
   | (Unit_t _, Prim (loc, D_Unit, l, _)) ->
       traced (fail (Invalid_arity (loc, D_Unit, 0, List.length l)))
   | (Unit_t _, expr) ->
       traced (fail (unexpected expr [] Constant_namespace [D_Unit]))
   (* Booleans *)
   | (Bool_t _, Prim (loc, D_True, [], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
-      >|=? fun ctxt -> (true, ctxt)
+      Lwt.return
+        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        >>? fun () ->
+        Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (true, ctxt) )
   | (Bool_t _, Prim (loc, D_False, [], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.bool)
-      >|=? fun ctxt -> (false, ctxt)
+      Lwt.return
+        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        >>? fun () ->
+        Gas.consume ctxt Typecheck_costs.bool >|? fun ctxt -> (false, ctxt) )
   | (Bool_t _, Prim (loc, ((D_True | D_False) as c), l, _)) ->
       traced (fail (Invalid_arity (loc, c, 0, List.length l)))
   | (Bool_t _, expr) ->
       traced (fail (unexpected expr [] Constant_namespace [D_True; D_False]))
   (* Strings *)
   | (String_t _, String (_, v)) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.string (String.length v)))
-      >>=? fun ctxt ->
+      Gas.consume ctxt (Typecheck_costs.string (String.length v))
+      >>?= fun ctxt ->
       let rec check_printable_ascii i =
         if Compare.Int.(i < 0) then true
         else
@@ -1944,17 +1949,19 @@ let rec parse_data :
       traced (fail (Invalid_kind (location expr, [String_kind], kind expr)))
   (* Byte sequences *)
   | (Bytes_t _, Bytes (_, v)) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.string (MBytes.length v)))
-      >|=? fun ctxt -> (v, ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Typecheck_costs.string (MBytes.length v))
+        >|? fun ctxt -> (v, ctxt) )
   | (Bytes_t _, expr) ->
       traced (fail (Invalid_kind (location expr, [Bytes_kind], kind expr)))
   (* Integers *)
   | (Int_t _, Int (_, v)) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
-      >|=? fun ctxt -> (Script_int.of_zint v, ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Typecheck_costs.z v)
+        >|? fun ctxt -> (Script_int.of_zint v, ctxt) )
   | (Nat_t _, Int (_, v)) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
-      >>=? fun ctxt ->
+      Gas.consume ctxt (Typecheck_costs.z v)
+      >>?= fun ctxt ->
       let v = Script_int.of_zint v in
       if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
         return (Script_int.abs v, ctxt)
@@ -1965,11 +1972,10 @@ let rec parse_data :
       traced (fail (Invalid_kind (location expr, [Int_kind], kind expr)))
   (* Tez amounts *)
   | (Mutez_t _, Int (_, v)) -> (
-      Lwt.return
-        ( Gas.consume ctxt Typecheck_costs.tez
-        >>? fun ctxt ->
-        Gas.consume ctxt Michelson_v1_gas.Cost_of.Legacy.z_to_int64 )
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.tez
+      >>? (fun ctxt ->
+            Gas.consume ctxt Michelson_v1_gas.Cost_of.Legacy.z_to_int64)
+      >>?= fun ctxt ->
       try
         match Tez.of_mutez (Z.to_int64 v) with
         | None ->
@@ -1982,11 +1988,12 @@ let rec parse_data :
   (* Timestamps *)
   | (Timestamp_t _, Int (_, v))
   (* As unparsed with [Optimized] or out of bounds [Readable]. *) ->
-      Lwt.return (Gas.consume ctxt (Typecheck_costs.z v))
-      >|=? fun ctxt -> (Script_timestamp.of_zint v, ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Typecheck_costs.z v)
+        >|? fun ctxt -> (Script_timestamp.of_zint v, ctxt) )
   | (Timestamp_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.string_timestamp)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.string_timestamp
+      >>?= fun ctxt ->
       match Script_timestamp.of_string s with
       | Some v ->
           return (v, ctxt)
@@ -1999,8 +2006,8 @@ let rec parse_data :
   (* IDs *)
   | (Key_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
-      Lwt.return (Gas.consume ctxt Typecheck_costs.key)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.key
+      >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes
       with
@@ -2010,8 +2017,8 @@ let rec parse_data :
           fail_parse_data () )
   | (Key_t _, String (_, s)) -> (
       (* As unparsed with [Readable]. *)
-      Lwt.return (Gas.consume ctxt Typecheck_costs.key)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.key
+      >>?= fun ctxt ->
       match Signature.Public_key.of_b58check_opt s with
       | Some k ->
           return (k, ctxt)
@@ -2023,8 +2030,8 @@ let rec parse_data :
            (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
   | (Key_hash_t _, Bytes (_, bytes)) -> (
       (* As unparsed with [Optimized]. *)
-      Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.key_hash
+      >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
       with
@@ -2033,8 +2040,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Key_hash_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.key_hash)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.key_hash
+      >>?= fun ctxt ->
       match Signature.Public_key_hash.of_b58check_opt s with
       | Some k ->
           return (k, ctxt)
@@ -2046,16 +2053,16 @@ let rec parse_data :
            (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
   (* Signatures *)
   | (Signature_t _, Bytes (_, bytes)) (* As unparsed with [Optimized]. *) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.signature)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.signature
+      >>?= fun ctxt ->
       match Data_encoding.Binary.of_bytes Signature.encoding bytes with
       | Some k ->
           return (k, ctxt)
       | None ->
           fail_parse_data () )
   | (Signature_t _, String (_, s)) (* As unparsed with [Readable]. *) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.signature)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.signature
+      >>?= fun ctxt ->
       match Signature.of_b58check_opt s with
       | Some s ->
           return (s, ctxt)
@@ -2072,16 +2079,16 @@ let rec parse_data :
       assert false
   (* Chain_ids *)
   | (Chain_id_t _, Bytes (_, bytes)) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.chain_id)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.chain_id
+      >>?= fun ctxt ->
       match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
       | Some k ->
           return (k, ctxt)
       | None ->
           fail_parse_data () )
   | (Chain_id_t _, String (_, s)) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.chain_id)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.chain_id
+      >>?= fun ctxt ->
       match Chain_id.of_b58check_opt s with
       | Some s ->
           return (s, ctxt)
@@ -2093,8 +2100,8 @@ let rec parse_data :
            (Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)))
   (* Addresses *)
   | (Address_t _, Bytes (loc, bytes)) (* As unparsed with [Optimized]. *) -> (
-      Lwt.return (Gas.consume ctxt Typecheck_costs.contract)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.contract
+      >>?= fun ctxt ->
       match
         Data_encoding.Binary.of_bytes
           Data_encoding.(tup2 Contract.encoding Variable.string)
@@ -2116,8 +2123,8 @@ let rec parse_data :
       | None ->
           fail_parse_data () )
   | (Address_t _, String (loc, s)) (* As unparsed with [Readable]. *) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.contract)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.contract
+      >>?= fun ctxt ->
       ( match String.index_opt s '%' with
       | None ->
           return (s, "default")
@@ -2132,8 +2139,8 @@ let rec parse_data :
             | addr_and_name ->
                 return addr_and_name ) )
       >>=? fun (addr, entrypoint) ->
-      Lwt.return (Contract.of_b58check addr)
-      >|=? fun c -> ((c, entrypoint), ctxt)
+      Lwt.return
+        (Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt))
   | (Address_t _, expr) ->
       traced
         (fail
@@ -2194,8 +2201,8 @@ let rec parse_data :
     ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.pair)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.pair
+      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy ta va
       >>=? fun (va, ctxt) ->
       parse_data ?type_logger ctxt ~legacy tb vb
@@ -2208,8 +2215,8 @@ let rec parse_data :
   | (Union_t ((tl, _), _, _), Prim (loc, D_Left, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.union)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.union
+      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tl v
       >|=? fun (v, ctxt) -> (L v, ctxt)
   | (Union_t _, Prim (loc, D_Left, l, _)) ->
@@ -2217,8 +2224,8 @@ let rec parse_data :
   | (Union_t (_, (tr, _), _), Prim (loc, D_Right, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.union)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.union
+      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy tr v
       >|=? fun (v, ctxt) -> (R v, ctxt)
   | (Union_t _, Prim (loc, D_Right, l, _)) ->
@@ -2227,8 +2234,8 @@ let rec parse_data :
       traced (fail (unexpected expr [] Constant_namespace [D_Left; D_Right]))
   (* Lambdas *)
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.lambda)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.lambda
+      >>?= fun ctxt ->
       traced
       @@ parse_returning
            Lambda
@@ -2244,17 +2251,17 @@ let rec parse_data :
   | (Option_t (t, _), Prim (loc, D_Some, [v], annot)) ->
       (if legacy then ok_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.some)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.some
+      >>?= fun ctxt ->
       traced @@ parse_data ?type_logger ctxt ~legacy t v
       >|=? fun (v, ctxt) -> (Some v, ctxt)
   | (Option_t _, Prim (loc, D_Some, l, _)) ->
       fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | (Option_t (_, _), Prim (loc, D_None, [], annot)) ->
-      (if legacy then ok_unit else error_unexpected_annot loc annot)
-      >>?= fun () ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.none)
-      >|=? fun ctxt -> (None, ctxt)
+      Lwt.return
+        ( (if legacy then ok_unit else error_unexpected_annot loc annot)
+        >>? fun () ->
+        Gas.consume ctxt Typecheck_costs.none >|? fun ctxt -> (None, ctxt) )
   | (Option_t _, Prim (loc, D_None, l, _)) ->
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
   | (Option_t _, expr) ->
@@ -2264,8 +2271,8 @@ let rec parse_data :
       traced
       @@ fold_right_s
            (fun v (rest, ctxt) ->
-             Lwt.return (Gas.consume ctxt Typecheck_costs.list_element)
-             >>=? fun ctxt ->
+             Gas.consume ctxt Typecheck_costs.list_element
+             >>?= fun ctxt ->
              parse_data ?type_logger ctxt ~legacy t v
              >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
            items
@@ -2278,25 +2285,28 @@ let rec parse_data :
       traced
       @@ fold_left_s
            (fun (last_value, set, ctxt) v ->
-             Lwt.return (Gas.consume ctxt (Typecheck_costs.set_element length))
-             >>=? fun ctxt ->
+             Gas.consume ctxt (Typecheck_costs.set_element length)
+             >>?= fun ctxt ->
              parse_comparable_data ?type_logger ctxt t v
              >>=? fun (v, ctxt) ->
-             ( match last_value with
-             | Some value ->
-                 if Compare.Int.(0 <= compare_comparable t value v) then
-                   if Compare.Int.(0 = compare_comparable t value v) then
-                     fail (Duplicate_set_values (loc, strip_locations expr))
-                   else fail (Unordered_set_values (loc, strip_locations expr))
-                 else return_unit
-             | None ->
-                 return_unit )
-             >>=? fun () ->
              Lwt.return
-               (Gas.consume
-                  ctxt
-                  (Michelson_v1_gas.Cost_of.Legacy.set_update v false set))
-             >|=? fun ctxt -> (Some v, set_update v true set, ctxt))
+               ( ( match last_value with
+                 | Some value ->
+                     if Compare.Int.(0 <= compare_comparable t value v) then
+                       if Compare.Int.(0 = compare_comparable t value v) then
+                         error
+                           (Duplicate_set_values (loc, strip_locations expr))
+                       else
+                         error
+                           (Unordered_set_values (loc, strip_locations expr))
+                     else ok_unit
+                 | None ->
+                     ok_unit )
+               >>? fun () ->
+               Gas.consume
+                 ctxt
+                 (Michelson_v1_gas.Cost_of.Legacy.set_update v false set)
+               >|? fun ctxt -> (Some v, set_update v true set, ctxt) ))
            (None, empty_set t, ctxt)
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
