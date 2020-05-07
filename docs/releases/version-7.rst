@@ -70,6 +70,10 @@ To update from sources::
   eval $(opam env)
   make
 
+If you were using a previous version, you may need to manually remove the
+``src/proto_demo`` directory. Otherwise you may get an error about
+a ``TEZOS_PROTOCOL`` file that cannot be built.
+
 If you are using Docker instead, use the ``v7.0`` Docker images of Tezos.
 
 Changelog
