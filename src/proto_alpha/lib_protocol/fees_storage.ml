@@ -63,10 +63,9 @@ let origination_burn c =
   let origination_size = Constants_storage.origination_size c in
   let cost_per_byte = Constants_storage.cost_per_byte c in
   (* the origination burn, measured in bytes *)
-  Lwt.return
-    ( Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
-    >|? fun to_be_paid ->
-    (Raw_context.update_allocated_contracts_count c, to_be_paid) )
+  Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
+  >|? fun to_be_paid ->
+  (Raw_context.update_allocated_contracts_count c, to_be_paid)
 
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract

@@ -324,11 +324,12 @@ let apply_manager_operation_content :
           | true ->
               return (ctxt, [], false)
           | false ->
-              Fees.origination_burn ctxt
-              >|=? fun (ctxt, origination_burn) ->
-              ( ctxt,
-                [(Receipt.Contract payer, Receipt.Debited origination_burn)],
-                true ) ) )
+              Lwt.return
+                ( Fees.origination_burn ctxt
+                >|? fun (ctxt, origination_burn) ->
+                ( ctxt,
+                  [(Receipt.Contract payer, Receipt.Debited origination_burn)],
+                  true ) ) ) )
       >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract)
                ->
       Contract.credit ctxt destination amount
@@ -487,7 +488,7 @@ let apply_manager_operation_content :
         ~script:(script, lazy_storage_diff)
       >>=? fun ctxt ->
       Fees.origination_burn ctxt
-      >>=? fun (ctxt, origination_burn) ->
+      >>?= fun (ctxt, origination_burn) ->
       Fees.record_paid_storage_space ctxt contract
       >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
       let result =

@@ -1236,7 +1236,7 @@ type packed_internal_operation =
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
 module Fees : sig
-  val origination_burn : context -> (context * Tez.t) tzresult Lwt.t
+  val origination_burn : context -> (context * Tez.t) tzresult
 
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
