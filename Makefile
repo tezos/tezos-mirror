@@ -20,7 +20,7 @@ DOCKER_DEPS_IMAGE_VERSION := ${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := minimal--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COVERAGE_OUTPUT := _coverage_output
-MERLIN_INSTALLED := $(shell opam list merlin --installed --silent; echo $$?)
+MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
