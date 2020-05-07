@@ -189,3 +189,14 @@ def sandbox_multibranch(log_dir, request):
         # this assertion checks that daemons (baker, endorser, node...) didn't
         # fail unexpected.
         assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
+
+
+def pytest_collection_modifyitems(config, items):
+    '''Adapted from pytest-fixture-marker: adds the regression marker
+    to all tests that use the regtest fixture.
+    '''
+    # pylint: disable=unused-argument
+
+    for item in items:
+        if 'regtest' in item.fixturenames:
+            item.add_marker('regression')
