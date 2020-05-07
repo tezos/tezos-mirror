@@ -58,6 +58,10 @@ See :ref:`howtoget` for more information.
 Update Instructions
 -------------------
 
+This new version requires at least opam version 2.0.1 to compile.
+If you get an error from opam that says that option ``--silent`` is
+unknown, it means you need to upgrade opam (see https://opam.ocaml.org/doc/Install.html).
+
 To update from sources::
 
   git fetch
