@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Test_utils
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =

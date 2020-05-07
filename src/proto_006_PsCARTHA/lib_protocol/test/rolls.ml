@@ -26,7 +26,6 @@
 open Protocol
 open Alpha_context
 open Test_tez
-open Test_utils
 
 let account_pair = function [a1; a2] -> (a1, a2) | _ -> assert false
 

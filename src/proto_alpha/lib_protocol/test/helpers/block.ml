@@ -334,7 +334,6 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   in
   (* Check there is at least one roll *)
   ( try
-      let open Test_utils in
       fold_left_s
         (fun acc (_, amount) ->
           Environment.wrap_error @@ Tez_repr.( +? ) acc amount
