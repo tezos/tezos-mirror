@@ -3,6 +3,32 @@
 Version 7.0
 ===========
 
+New Versioning Scheme
+---------------------
+
+Starting from this release, we are using a new versioning scheme to name
+our releases. Each release is now named "Version X.Y" where X is the major
+version number and Y is the minor version number. Minor releases mostly
+backport bug fixes into previous major releases.
+
+Before releasing a new version, we publish release candidates.
+For instance, before releasing 7.0 we published 7.0~rc1, the first release
+candidate for version 7.0. Once release candidates have been out
+long enough to be sufficiently tested and are considered stable,
+we publish actual releases. For instance, 7.0~rc1 was published
+April 15th 2020, and 7.0 was published May 5th 2020.
+
+Additionnally, we provide a ``latest-release`` branch which will always
+be equal to the latest release. Release candidates are not considered
+to be releases in this sense, so ``latest-release`` will never
+point to a release candidate. In other words, ``latest-release`` points
+to the latest stable release. Currently, it thus points to version 7.0.
+
+If you are used to the ``mainnet`` and ``mainnet-staging`` branches,
+you can consider release candidates to be the new ``mainnet-staging``
+branches, and the ``latest-release`` branch to be the new ``mainnet``
+branch.
+
 Multinetwork Node
 -----------------
 
