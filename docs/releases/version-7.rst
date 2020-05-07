@@ -29,6 +29,14 @@ you can consider release candidates to be the new ``mainnet-staging``
 branches, and the ``latest-release`` branch to be the new ``mainnet``
 branch.
 
+Note for Remote Signer Users
+----------------------------
+
+Note for users of ``tezos-signer``: the 7.0 client, baker, endorser
+and accuser need the 7.0 signer to work. They are in particular not
+compatible with the ``mainnet`` version of ``tezos-signer``. So remember to
+update your remote signer too!
+
 Multinetwork Node
 -----------------
 
