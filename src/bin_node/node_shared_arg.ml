@@ -229,7 +229,9 @@ module Term = struct
        directories are created if necessary."
     in
     Arg.(
-      value & opt (some string) None & info ~docs ~doc ~docv:"DIR" ["data-dir"])
+      value
+      & opt (some string) None
+      & info ~docs ~doc ~docv:"DIR" ["data-dir"; "d"])
 
   let config_file =
     let doc = "The main configuration file." in
