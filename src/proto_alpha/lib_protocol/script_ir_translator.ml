@@ -4544,10 +4544,11 @@ and parse_contract_for_script :
             Gas.consume ctxt Typecheck_costs.cycle
             >>? fun ctxt -> ok (ctxt, None) )
   | (Some _, _) ->
-      Lwt.return @@ Gas.consume ctxt Typecheck_costs.cycle
-      >|=? fun ctxt ->
-      (* An implicit account on any other entrypoint is not a valid contract. *)
-      (ctxt, None)
+      Lwt.return
+        ( Gas.consume ctxt Typecheck_costs.cycle
+        >|? fun ctxt ->
+        (* An implicit account on any other entrypoint is not a valid contract. *)
+        (ctxt, None) )
   | (None, _) -> (
       (* Originated account *)
       Contract.exists ctxt contract
@@ -4586,11 +4587,11 @@ and parse_contract_for_script :
                         entrypoint
                         ctxt
                         loc
-                      >>? fun (ctxt, entrypoint, arg) ->
+                      >|? fun (ctxt, entrypoint, arg) ->
                       let contract : arg typed_contract =
                         (arg, (contract, entrypoint))
                       in
-                      ok (ctxt, Some contract)
+                      (ctxt, Some contract)
                     with
                     | Ok res ->
                         ok res
@@ -4598,7 +4599,7 @@ and parse_contract_for_script :
                         (* overapproximation by checking if targ = targ,
                                                        can only fail because of gas *)
                         merge_types ~legacy ctxt loc targ targ
-                        >>? fun (Eq, _, ctxt) -> ok (ctxt, None) ) ) ) ) )
+                        >|? fun (Eq, _, ctxt) -> (ctxt, None) ) ) ) ) )
 
 and parse_toplevel :
     legacy:bool ->
@@ -4714,19 +4715,16 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   parse_toplevel ~legacy code
   >>?= fun (arg_type, storage_type, code_field, root_name) ->
-  Lwt.return
-  @@ record_trace
-       (Ill_formed_type (Some "parameter", code, location arg_type))
-       (parse_parameter_ty ctxt ~legacy arg_type)
-  >>=? fun (Ex_ty arg_type, ctxt) ->
-  Lwt.return
-    (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
-  >>=? fun () ->
-  Lwt.return
-  @@ record_trace
-       (Ill_formed_type (Some "storage", code, location storage_type))
-       (parse_storage_ty ctxt ~legacy storage_type)
-  >>=? fun (Ex_ty storage_type, ctxt) ->
+  record_trace
+    (Ill_formed_type (Some "parameter", code, location arg_type))
+    (parse_parameter_ty ctxt ~legacy arg_type)
+  >>?= fun (Ex_ty arg_type, ctxt) ->
+  (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+  >>?= fun () ->
+  record_trace
+    (Ill_formed_type (Some "storage", code, location storage_type))
+    (parse_storage_ty ctxt ~legacy storage_type)
+  >>?= fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -4804,19 +4802,16 @@ let typecheck_code :
   parse_toplevel ~legacy code
   >>?= fun (arg_type, storage_type, code_field, root_name) ->
   let type_map = ref [] in
-  Lwt.return
-  @@ record_trace
-       (Ill_formed_type (Some "parameter", code, location arg_type))
-       (parse_parameter_ty ctxt ~legacy arg_type)
-  >>=? fun (Ex_ty arg_type, ctxt) ->
-  Lwt.return
-    (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
-  >>=? fun () ->
-  Lwt.return
-  @@ record_trace
-       (Ill_formed_type (Some "storage", code, location storage_type))
-       (parse_storage_ty ctxt ~legacy storage_type)
-  >>=? fun (Ex_ty storage_type, ctxt) ->
+  record_trace
+    (Ill_formed_type (Some "parameter", code, location arg_type))
+    (parse_parameter_ty ctxt ~legacy arg_type)
+  >>?= fun (Ex_ty arg_type, ctxt) ->
+  (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
+  >>?= fun () ->
+  record_trace
+    (Ill_formed_type (Some "storage", code, location storage_type))
+    (parse_storage_ty ctxt ~legacy storage_type)
+  >>?= fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -4864,10 +4859,10 @@ let typecheck_data :
     context tzresult Lwt.t =
  fun ?type_logger ctxt (data, exp_ty) ->
   let legacy = false in
-  trace
+  record_trace
     (Ill_formed_type (None, exp_ty, 0))
-    (Lwt.return @@ parse_parameter_ty ctxt ~legacy (root exp_ty))
-  >>=? fun (Ex_ty exp_ty, ctxt) ->
+    (parse_parameter_ty ctxt ~legacy (root exp_ty))
+  >>?= fun (Ex_ty exp_ty, ctxt) ->
   trace_eval
     (fun () ->
       Lwt.return
@@ -4953,173 +4948,192 @@ let rec unparse_data :
     a ->
     (Script.node * context) tzresult Lwt.t =
  fun ctxt mode ty a ->
-  Lwt.return (Gas.consume ctxt Unparse_costs.cycle)
-  >>=? fun ctxt ->
+  Gas.consume ctxt Unparse_costs.cycle
+  >>?= fun ctxt ->
   match (ty, a) with
   | (Unit_t _, ()) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.unit)
-      >|=? fun ctxt -> (Prim (-1, D_Unit, [], []), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.unit
+        >|? fun ctxt -> (Prim (-1, D_Unit, [], []), ctxt) )
   | (Int_t _, v) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.int v))
-      >|=? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.int v)
+        >|? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt) )
   | (Nat_t _, v) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.int v))
-      >|=? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.int v)
+        >|? fun ctxt -> (Int (-1, Script_int.to_zint v), ctxt) )
   | (String_t _, s) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.string s))
-      >|=? fun ctxt -> (String (-1, s), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.string s)
+        >|? fun ctxt -> (String (-1, s), ctxt) )
   | (Bytes_t _, s) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.bytes s))
-      >|=? fun ctxt -> (Bytes (-1, s), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.bytes s)
+        >|? fun ctxt -> (Bytes (-1, s), ctxt) )
   | (Bool_t _, true) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.bool)
-      >|=? fun ctxt -> (Prim (-1, D_True, [], []), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.bool
+        >|? fun ctxt -> (Prim (-1, D_True, [], []), ctxt) )
   | (Bool_t _, false) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.bool)
-      >|=? fun ctxt -> (Prim (-1, D_False, [], []), ctxt)
-  | (Timestamp_t _, t) -> (
-      Lwt.return (Gas.consume ctxt (Unparse_costs.timestamp t))
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          (Int (-1, Script_timestamp.to_zint t), ctxt)
-      | Readable -> (
-        match Script_timestamp.to_notation t with
-        | None ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.bool
+        >|? fun ctxt -> (Prim (-1, D_False, [], []), ctxt) )
+  | (Timestamp_t _, t) ->
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.timestamp t)
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
             (Int (-1, Script_timestamp.to_zint t), ctxt)
-        | Some s ->
-            (String (-1, s), ctxt) ) )
-  | (Address_t _, (c, entrypoint)) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.contract)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let entrypoint =
-            match entrypoint with "default" -> "" | name -> name
-          in
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Data_encoding.(tup2 Contract.encoding Variable.string)
-              (c, entrypoint)
-          in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          let notation =
-            match entrypoint with
-            | "default" ->
-                Contract.to_b58check c
-            | entrypoint ->
-                Contract.to_b58check c ^ "%" ^ entrypoint
-          in
-          (String (-1, notation), ctxt) )
-  | (Contract_t _, (_, (c, entrypoint))) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.contract)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let entrypoint =
-            match entrypoint with "default" -> "" | name -> name
-          in
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Data_encoding.(tup2 Contract.encoding Variable.string)
-              (c, entrypoint)
-          in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          let notation =
-            match entrypoint with
-            | "default" ->
-                Contract.to_b58check c
-            | entrypoint ->
-                Contract.to_b58check c ^ "%" ^ entrypoint
-          in
-          (String (-1, notation), ctxt) )
-  | (Signature_t _, s) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.signature)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          (String (-1, Signature.to_b58check s), ctxt) )
+        | Readable -> (
+          match Script_timestamp.to_notation t with
+          | None ->
+              (Int (-1, Script_timestamp.to_zint t), ctxt)
+          | Some s ->
+              (String (-1, s), ctxt) ) )
+  | (Address_t _, (c, entrypoint)) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.contract
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let entrypoint =
+              match entrypoint with "default" -> "" | name -> name
+            in
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn
+                Data_encoding.(tup2 Contract.encoding Variable.string)
+                (c, entrypoint)
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            let notation =
+              match entrypoint with
+              | "default" ->
+                  Contract.to_b58check c
+              | entrypoint ->
+                  Contract.to_b58check c ^ "%" ^ entrypoint
+            in
+            (String (-1, notation), ctxt) )
+  | (Contract_t _, (_, (c, entrypoint))) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.contract
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let entrypoint =
+              match entrypoint with "default" -> "" | name -> name
+            in
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn
+                Data_encoding.(tup2 Contract.encoding Variable.string)
+                (c, entrypoint)
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            let notation =
+              match entrypoint with
+              | "default" ->
+                  Contract.to_b58check c
+              | entrypoint ->
+                  Contract.to_b58check c ^ "%" ^ entrypoint
+            in
+            (String (-1, notation), ctxt) )
+  | (Signature_t _, s) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.signature
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn Signature.encoding s
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            (String (-1, Signature.to_b58check s), ctxt) )
   | (Mutez_t _, v) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.tez)
-      >|=? fun ctxt -> (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
-  | (Key_t _, k) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.key)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
-          in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          (String (-1, Signature.Public_key.to_b58check k), ctxt) )
-  | (Key_hash_t _, k) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.key_hash)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Signature.Public_key_hash.encoding
-              k
-          in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.tez
+        >|? fun ctxt -> (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt) )
+  | (Key_t _, k) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.key
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            (String (-1, Signature.Public_key.to_b58check k), ctxt) )
+  | (Key_hash_t _, k) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.key_hash
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn
+                Signature.Public_key_hash.encoding
+                k
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            (String (-1, Signature.Public_key_hash.to_b58check k), ctxt) )
   | (Operation_t _, (op, _big_map_diff)) ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Operation.internal_operation_encoding
           op
       in
-      Lwt.return (Gas.consume ctxt (Unparse_costs.operation bytes))
-      >|=? fun ctxt -> (Bytes (-1, bytes), ctxt)
-  | (Chain_id_t _, chain_id) -> (
-      Lwt.return (Gas.consume ctxt Unparse_costs.chain_id)
-      >|=? fun ctxt ->
-      match mode with
-      | Optimized ->
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
-          in
-          (Bytes (-1, bytes), ctxt)
-      | Readable ->
-          (String (-1, Chain_id.to_b58check chain_id), ctxt) )
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.operation bytes)
+        >|? fun ctxt -> (Bytes (-1, bytes), ctxt) )
+  | (Chain_id_t _, chain_id) ->
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.chain_id
+        >|? fun ctxt ->
+        match mode with
+        | Optimized ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+            in
+            (Bytes (-1, bytes), ctxt)
+        | Readable ->
+            (String (-1, Chain_id.to_b58check chain_id), ctxt) )
   | (Pair_t ((tl, _, _), (tr, _, _), _), (l, r)) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.pair)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Unparse_costs.pair
+      >>?= fun ctxt ->
       unparse_data ctxt mode tl l
       >>=? fun (l, ctxt) ->
       unparse_data ctxt mode tr r
       >|=? fun (r, ctxt) -> (Prim (-1, D_Pair, [l; r], []), ctxt)
   | (Union_t ((tl, _), _, _), L l) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.union)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Unparse_costs.union
+      >>?= fun ctxt ->
       unparse_data ctxt mode tl l
       >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
   | (Union_t (_, (tr, _), _), R r) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.union)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Unparse_costs.union
+      >>?= fun ctxt ->
       unparse_data ctxt mode tr r
       >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
   | (Option_t (t, _), Some v) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.some)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Unparse_costs.some
+      >>?= fun ctxt ->
       unparse_data ctxt mode t v
       >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
   | (Option_t _, None) ->
-      Lwt.return (Gas.consume ctxt Unparse_costs.none)
-      >|=? fun ctxt -> (Prim (-1, D_None, [], []), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt Unparse_costs.none
+        >|? fun ctxt -> (Prim (-1, D_None, [], []), ctxt) )
   | (List_t (t, _), items) ->
       fold_left_s
         (fun (l, ctxt) element ->
-          Lwt.return (Gas.consume ctxt Unparse_costs.list_element)
-          >>=? fun ctxt ->
+          Gas.consume ctxt Unparse_costs.list_element
+          >>?= fun ctxt ->
           unparse_data ctxt mode t element
           >|=? fun (unparsed, ctxt) -> (unparsed :: l, ctxt))
         ([], ctxt)
@@ -5129,8 +5143,8 @@ let rec unparse_data :
       let t = ty_of_comparable_ty t in
       fold_left_s
         (fun (l, ctxt) item ->
-          Lwt.return (Gas.consume ctxt Unparse_costs.set_element)
-          >>=? fun ctxt ->
+          Gas.consume ctxt Unparse_costs.set_element
+          >>?= fun ctxt ->
           unparse_data ctxt mode t item
           >|=? fun (item, ctxt) -> (item :: l, ctxt))
         ([], ctxt)
@@ -5140,8 +5154,8 @@ let rec unparse_data :
       let kt = ty_of_comparable_ty kt in
       fold_left_s
         (fun (l, ctxt) (k, v) ->
-          Lwt.return (Gas.consume ctxt Unparse_costs.map_element)
-          >>=? fun ctxt ->
+          Gas.consume ctxt Unparse_costs.map_element
+          >>?= fun ctxt ->
           unparse_data ctxt mode kt k
           >>=? fun (key, ctxt) ->
           unparse_data ctxt mode vt v
@@ -5184,14 +5198,15 @@ and unparse_code ctxt mode =
   let legacy = true in
   function
   | Prim (loc, I_PUSH, [ty; data], annot) ->
-      Lwt.return (parse_packable_ty ctxt ~legacy ty)
-      >>=? fun (Ex_ty t, ctxt) ->
+      parse_packable_ty ctxt ~legacy ty
+      >>?= fun (Ex_ty t, ctxt) ->
       parse_data ctxt ~legacy t data
       >>=? fun (data, ctxt) ->
       unparse_data ctxt mode t data
       >>=? fun (data, ctxt) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 2 annot))
-      >|=? fun ctxt -> (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.prim_cost 2 annot)
+        >|? fun ctxt -> (Prim (loc, I_PUSH, [ty; data], annot), ctxt) )
   | Seq (loc, items) ->
       fold_left_s
         (fun (l, ctxt) item ->
@@ -5200,8 +5215,8 @@ and unparse_code ctxt mode =
         items
       >>=? fun (items, ctxt) ->
       Lwt.return
-        (Gas.consume ctxt (Unparse_costs.seq_cost (List.length items)))
-      >|=? fun ctxt -> (Micheline.Seq (loc, List.rev items), ctxt)
+        ( Gas.consume ctxt (Unparse_costs.seq_cost (List.length items))
+        >|? fun ctxt -> (Micheline.Seq (loc, List.rev items), ctxt) )
   | Prim (loc, prim, items, annot) ->
       fold_left_s
         (fun (l, ctxt) item ->
@@ -5209,8 +5224,9 @@ and unparse_code ctxt mode =
         ([], ctxt)
         items
       >>=? fun (items, ctxt) ->
-      Lwt.return (Gas.consume ctxt (Unparse_costs.prim_cost 3 annot))
-      >|=? fun ctxt -> (Prim (loc, prim, List.rev items, annot), ctxt)
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.prim_cost 3 annot)
+        >|? fun ctxt -> (Prim (loc, prim, List.rev items, annot), ctxt) )
   | (Int _ | String _ | Bytes _) as atom ->
       return (atom, ctxt)
 
@@ -5241,13 +5257,14 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
     Gas.consume ctxt (Unparse_costs.prim_cost 1 [])
     >>? fun ctxt ->
     Gas.consume ctxt (Unparse_costs.prim_cost 1 [])
-    >>? fun ctxt -> Gas.consume ctxt (Unparse_costs.prim_cost 1 []) )
-  >|=? fun ctxt ->
-  ( {
-      code = lazy_expr (strip_locations code);
-      storage = lazy_expr (strip_locations storage);
-    },
-    ctxt )
+    >>? fun ctxt ->
+    Gas.consume ctxt (Unparse_costs.prim_cost 1 [])
+    >|? fun ctxt ->
+    ( {
+        code = lazy_expr (strip_locations code);
+        storage = lazy_expr (strip_locations storage);
+      },
+      ctxt ) )
 
 let pack_data ctxt typ data =
   unparse_data ctxt Optimized typ data
@@ -5257,20 +5274,21 @@ let pack_data ctxt typ data =
       expr_encoding
       (Micheline.strip_locations unparsed)
   in
-  Gas.consume ctxt (Script.serialized_cost bytes)
-  >>?= fun ctxt ->
-  let bytes = MBytes.concat "" [MBytes.of_string "\005"; bytes] in
-  Lwt.return @@ Gas.consume ctxt (Script.serialized_cost bytes)
-  >|=? fun ctxt -> (bytes, ctxt)
+  Lwt.return
+    ( Gas.consume ctxt (Script.serialized_cost bytes)
+    >>? fun ctxt ->
+    let bytes = MBytes.concat "" [MBytes.of_string "\005"; bytes] in
+    Gas.consume ctxt (Script.serialized_cost bytes)
+    >|? fun ctxt -> (bytes, ctxt) )
 
 let hash_data ctxt typ data =
   pack_data ctxt typ data
   >>=? fun (bytes, ctxt) ->
   Lwt.return
-  @@ Gas.consume
-       ctxt
-       (Michelson_v1_gas.Cost_of.Legacy.hash bytes Script_expr_hash.size)
-  >|=? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
+    ( Gas.consume
+        ctxt
+        (Michelson_v1_gas.Cost_of.Legacy.hash bytes Script_expr_hash.size)
+    >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt) )
 
 (* ---------------- Big map -------------------------------------------------*)
 
@@ -5359,8 +5377,8 @@ let diff_of_big_map ctxt mode ~temporary ~ids {id; key_type; value_type; diff}
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   fold_left_s
     (fun (acc, ctxt) (key, value) ->
-      Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-      >>=? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.cycle
+      >>?= fun ctxt ->
       hash_data ctxt key_type key
       >>=? fun (diff_key_hash, ctxt) ->
       unparse_data ctxt mode key_type key
@@ -5467,8 +5485,8 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
       has_big_map:a has_big_map ->
       (context * a * Ids.t * Contract.big_map_diff list) tzresult Lwt.t =
    fun ctxt mode ~temporary ids acc ty x ~has_big_map ->
-    Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-    >>=? fun ctxt ->
+    Gas.consume ctxt Typecheck_costs.cycle
+    >>?= fun ctxt ->
     match (has_big_map, ty, x) with
     | (False_f, _, _) ->
         return (ctxt, x, ids, acc)
@@ -5495,8 +5513,8 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
     | (List_f has_big_map, List_t (ty, _), l) ->
         fold_left_s
           (fun (ctxt, l, ids, acc) x ->
-            Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-            >>=? fun ctxt ->
+            Gas.consume ctxt Typecheck_costs.cycle
+            >>?= fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >|=? fun (ctxt, x, ids, acc) -> (ctxt, list_cons x l, ids, acc))
           (ctxt, list_empty, ids, acc)
@@ -5507,8 +5525,8 @@ let extract_big_map_updates ctxt mode ~temporary ids acc ty x =
     | (Map_f has_big_map, Map_t (_, ty, _), (module M)) ->
         fold_left_s
           (fun (ctxt, m, ids, acc) (k, x) ->
-            Lwt.return (Gas.consume ctxt Typecheck_costs.cycle)
-            >>=? fun ctxt ->
+            Gas.consume ctxt Typecheck_costs.cycle
+            >>?= fun ctxt ->
             aux ctxt mode ~temporary ids acc ty x ~has_big_map
             >|=? fun (ctxt, x, ids, acc) -> (ctxt, M.OPS.add k x m, ids, acc))
           (ctxt, M.OPS.empty, ids, acc)
