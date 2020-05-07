@@ -274,7 +274,7 @@ let check_endorsement_rights ctxt chain_id (op : Kind.endorsement Operation.t)
   match
     Signature.Public_key_hash.Map.fold (* no find_first *)
       (fun pkh (pk, slots, used) acc ->
-        match Operation.check_signature_sync pk chain_id op with
+        match Operation.check_signature pk chain_id op with
         | Error _ ->
             acc
         | Ok () ->
