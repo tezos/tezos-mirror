@@ -475,10 +475,10 @@ let apply_manager_operation_content :
           (* The preorigination field is only used to early return
                  the address of an originated contract in Michelson.
                  It cannot come from the outside. *)
-          return (ctxt, contract)
+          ok (ctxt, contract)
       | None ->
           Contract.fresh_contract_from_current_nonce ctxt )
-      >>=? fun (ctxt, contract) ->
+      >>?= fun (ctxt, contract) ->
       Contract.originate
         ctxt
         contract

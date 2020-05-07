@@ -1141,7 +1141,7 @@ let rec step :
       >>=? fun (storage, ctxt) ->
       let storage = Micheline.strip_locations storage in
       Contract.fresh_contract_from_current_nonce ctxt
-      >>=? fun (ctxt, contract) ->
+      >>?= fun (ctxt, contract) ->
       let operation =
         Origination
           {
@@ -1155,8 +1155,8 @@ let rec step :
               };
           }
       in
-      Lwt.return (fresh_internal_nonce ctxt)
-      >>=? fun (ctxt, nonce) ->
+      fresh_internal_nonce ctxt
+      >>?= fun (ctxt, nonce) ->
       logged_return
         ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},

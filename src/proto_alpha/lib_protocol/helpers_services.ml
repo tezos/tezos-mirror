@@ -224,7 +224,7 @@ module Scripts = struct
     let originate_dummy_contract ctxt script balance =
       let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
       Contract.fresh_contract_from_current_nonce ctxt
-      >>=? fun (ctxt, dummy_contract) ->
+      >>?= fun (ctxt, dummy_contract) ->
       Contract.originate
         ctxt
         dummy_contract
