@@ -24,6 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** One role of this module is to export read-through [REQUESTER] services.
+    These services allow client code to lookup resources identified by their
+    hashes. Resources are protocols, operations, block_header, operation_hashes
+    and operations. Values are first looked up locally, in [State], or are
+    requested to peers.
+
+    An exported [REQUESTER] service is implemented by a [FULL_REQUESTER] and
+    [P2p_reader] workers working together. Resources are requested via a
+    [FULL_REQUESTER.fetch], which uses a callback send function.
+    The [P2p_reader] listen for requested values and notify the
+    [FULL_REQUESTER].
+
+                            P2P_READER  <---- receives --- ... Peers
+                               |
+                             notify
+                               |
+                               \/
+    REQUESTER  ---fetch---->  FULL_REQUESTER  --- request ---> ... Peers
+                               |
+                               \/
+                              STATE
+  *)
+
 module Logging = Internal_event.Legacy_logging.Make (struct
   let name = "node.distributed_db"
 end)
@@ -153,6 +176,8 @@ let activate
               send = raw_try_send p2p;
             }
         in
+        (* whenever a new chain is activated, requesters are created for all
+           resources managed by this chain *)
         let operation_db =
           Distributed_db_requester.Raw_operation.create
             ~global_input:global_db.operation_input
@@ -304,6 +329,12 @@ let watch_block_header {block_input; _} = Lwt_watcher.create_stream block_input
 let watch_operation {operation_input; _} =
   Lwt_watcher.create_stream operation_input
 
+(** This functor is used to export [Requester.REQUESTER] modules outside of this
+    module. Thanks to the [Kind] module, requesters are accessed using
+    [chain_db] type, and the [Distributed_db_requester.Raw_*.t] type remains
+    private to this module. This also ensures that the
+    [Distributed_db_requester.Raw_*.t] has been properly created before it is
+    possible to use it *)
 module Make
     (Table : Requester.REQUESTER) (Kind : sig
       type t

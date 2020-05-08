@@ -24,6 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module creates FULL_REQUESTER modules for several resources.
+    Protocols, operation, block_header, operation_hashes, operations.
+
+    To do so, it instanciates the `Requester.Make` functor using the P2p layer
+    for sending request, and a `State.t` or `State.Chain.t` for storage. *)
+
 module Message = Distributed_db_message
 
 type 'a request_param = {
@@ -87,7 +93,11 @@ module Raw_operations :
   EXTENDED_REQUESTER_2
     with type key = Block_hash.t * int
      and type request_param = unit request_param
+    (* root of merkle tree for this block, used to check the notified
+        value. *)
      and type param = Operation_list_list_hash.t
      and type store = State.Chain.t
      and type value = Operation.t list
+    (* notified value contain the queried value, plus the merkle tree hashes
+          needed to recompute the merkle tree root. *)
      and type notified_value = Operation.t list * Operation_list_list_hash.path

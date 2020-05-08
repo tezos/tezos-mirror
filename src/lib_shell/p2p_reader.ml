@@ -50,17 +50,22 @@ type chain_db = {
 
 type t = {
   p2p : p2p;
-  gid : P2p_peer.Id.t;
+  gid : P2p_peer.Id.t;  (** remote peer id *)
   conn : connection;
   peer_active_chains : chain_db Chain_id.Table.t;
+      (** chains known to be active for the remote peer *)
   disk : State.t;
   canceler : Lwt_canceler.t;
   mutable worker : unit Lwt.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
   active_chains : chain_db Chain_id.Table.t;
+      (** All chains managed by this peer **)
   unregister : unit -> unit;
 }
 
+(* performs [f chain_db] if the chain is active where [chain_db] is the
+   chain_db corresponding to this chain id. Activates [chain_id] for the
+   remote peer if not active yet. *)
 let may_activate state chain_id f =
   match Chain_id.Table.find_opt state.peer_active_chains chain_id with
   | Some chain_db ->
@@ -78,7 +83,9 @@ let may_activate state chain_id f =
         Peer_metadata.incr meta Unactivated_chain ;
         Lwt.return_unit )
 
-(* check if the chain advertized by a peer is (still) active *)
+(* performs [f chain_db] if the chain is active for the remote peer
+   and [chain_db] is the chain_db corresponding to this chain id, otherwise
+   does nothing (simply update peer metadata). *)
 let may_handle state chain_id f =
   match Chain_id.Table.find_opt state.peer_active_chains chain_id with
   | None ->
@@ -88,6 +95,8 @@ let may_handle state chain_id f =
   | Some chain_db ->
       f chain_db
 
+(* performs [f chain_db] if [chain_id] is active and [chain_db] is the
+   chain_db corresponding to this chain id. *)
 let may_handle_global state chain_id f =
   match Chain_id.Table.find_opt state.active_chains chain_id with
   | None ->

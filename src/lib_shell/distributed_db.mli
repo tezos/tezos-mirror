@@ -24,7 +24,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Shell - High-level API for the Gossip network and local storage. *)
+(** Tezos Shell - High-level API for the Gossip network and local storage.
+
+    It provides functions to query *static* resources such as blocks headers,
+    operations, and functions to access dynamic resources such as heads and
+    chains.
+
+    Several chains (mainchain, testchain, ...) can be managed independently.
+    First a chain is activated using [activate], which provides a
+    [chain_db] from which it is possible to access resources.
+    Eventually the chain is deactivated using [deactivate].
+
+    Static resources are accessible via "Requester" modules ([Block_header],
+    [Operation], [Operations], [Protocol]). These modules act as read-through
+    caches in front of the local storage [State] and the p2p layer. They
+    centralize concurrent requests, and cache results in memory. They don't
+    update [State] directly.
+
+    For instance, from a block_header hash, one can fetch the actual block
+    header using [Block_header.fetch], then the block operations with
+    [Operations.fetch].
+    *)
 
 module Message = Distributed_db_message
 
@@ -42,20 +62,22 @@ val shutdown : t -> unit Lwt.t
 
 (** {1 Network database} *)
 
-(** An instance of the distributed DB for a given chain (mainchain,
-    current testchain, ...) *)
+(** An instance of the distributed DB for a given chain *)
 type chain_db
 
-(** Activate a given chain. The node will notify its neighbors that
-    it now handles the given chain and that it expects notification
-    for new head or new operations. *)
+(** The first call to [activate t chain] activates [chain], creates a [chain_db]
+    and sends a [Get_current_branch chain_id] message to all neighbors,
+    where [chain_id] is the identifier of [chain]. This informs the neighbors
+    that this node expects notifications for new heads/mempools. Subsequent
+    calls simply return the existing [chain_db]. *)
 val activate : t -> State.Chain.t -> chain_db
 
 (** Look for the database of an active chain. *)
 val get_chain : t -> Chain_id.t -> chain_db option
 
-(** Deactivate a given chain. The node will notify its neighbors
-    that it does not care anymore about this chain. *)
+(** [deactivate chain_db] sends a [Deactivate chain_id] message to all active
+    neighbors for this chain. This notifies them that this node isn't interested
+    in messages for this chain *)
 val deactivate : chain_db -> unit Lwt.t
 
 (** Register all the possible callback from the distributed DB to the
@@ -68,7 +90,6 @@ val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 (** Greylist a given peer. *)
 val greylist : chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
-(** Various accessors. *)
 val chain_state : chain_db -> State.Chain.t
 
 val db : chain_db -> db
@@ -84,20 +105,25 @@ val get_peer_metadata : chain_db -> P2p_peer.Id.t -> Peer_metadata.t
 (** {1 Sending messages} *)
 
 module Request : sig
-  (** Send to a given peer, or to all known active peers for the
-      chain, a friendly request "Hey, what's your current branch
-      ?". The expected answer is a [Block_locator.t.]. *)
+  (** [current_branch chain_db ?peer ()] sends a [Get_current_branch chain_id]
+       message to [peer], or if [peer] isn't specified, to all known active
+       peers for this chain. [chain_id] is the identifier for
+      [chain_db]. Expected answer is a [Current_branch] message. *)
   val current_branch : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
-  (** Send to a given peer, or to all known active peers for the
-      given chain, a friendly request "Hey, what's your current
-      branch ?". The expected answer is a [Block_locator.t.]. *)
+  (** [current_header chain_db ?peer ()] sends  a [Get_Current_head chain_id]
+      to a given peer, or to all known active peers for this chain.
+      [chain_id] is the identifier for [chain_db]. Expected answer is a
+      [Get_current_head] message *)
   val current_head : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 end
 
 module Advertise : sig
-  (** Notify a given peer, or all known active peers for the
-      chain, of a new head and possibly of new operations. *)
+  (** [current_head chain_db ?peer ?mempool head] sends a
+      [Current_head (chain_id, head_header, mempool)] message to [peer],
+      or if [peer] isn't specified, to all known active peers for this chain.
+      If  [mempool] isn't specified, or if remote peer has disabled its mempool,
+      [mempool] is empty. [chain_id] is the identifier for this [chain_db]. *)
   val current_head :
     chain_db ->
     ?peer:P2p_peer.Id.t ->
@@ -105,8 +131,11 @@ module Advertise : sig
     State.Block.t ->
     unit
 
-  (** Notify a given peer, or all known active peers for the
-      chain, of a new head and its sparse history. *)
+  (** [current_branch ?peer chain_db] sends a
+      [Current_branch (chain_id, locator)] message to [peer], or if [peer] is
+      not specified, to all known active peers for this chain.
+      [locator] is constructed based on the seed
+      [(remote_peer_id, this_peer_id)]. *)
   val current_branch : ?peer:P2p_peer.Id.t -> chain_db -> unit Lwt.t
 end
 
@@ -128,7 +157,13 @@ end
 val read_block_header :
   db -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
-(** Index of all the operations of a given block (per validation pass). *)
+(** Index of all the operations of a given block (per validation pass).
+
+    For instance, [fetch chain_db (block_hash, validation_pass)
+    operation_list_list_hash] queries the operation requester to get all the
+    operations for block [block_hash] and validation pass [validation_pass].
+    It returns a list of operation, guaranteed to be valid with respect to
+    [operation_list_list_hash] (root of merkle tree for this block). *)
 module Operations :
   Requester.REQUESTER
     with type t := chain_db
