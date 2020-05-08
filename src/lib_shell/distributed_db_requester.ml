@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Logging = Internal_event.Legacy_logging.Make (struct
-  let name = "node.distributed_db_cache"
+  let name = "node.distributed_db_requester"
 end)
 
 module Message = Distributed_db_message
@@ -136,7 +136,7 @@ end)
     Table.create ?global_input request_param disk
 
   let shutdown t =
-    Logging.lwt_log_notice "Shutting down the cache..."
+    Logging.lwt_log_notice "Shutting down the requester..."
     >>= fun () -> Table.shutdown t
 end
 
