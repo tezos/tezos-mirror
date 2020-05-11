@@ -172,3 +172,21 @@ You can now edit the files ``bootstrap-accounts.json`` and
      create mockup for protocol \
      --protocol-constants protocol-constants.json \
      --bootstrap-accounts bootstrap-accounts.json
+
+
+Chain id
+--------
+
+The `chain id` is one particular chain parameter that is also accessible from
+the command line at mockup creation.
+
+For that, you need to use the `chain-id-seed` command-line switch, which will in
+turn initialize a valid `chain id`. The mockup creation command now becomes
+
+::
+    tezos-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+      --base-dir /tmp/mockup create mockup --chain-id-seed myseed
+
+
+Among the response output to this command, there is a valid chain id
+`Chain id is NetXi1dwBfm6F4Y` initialized from your input.
