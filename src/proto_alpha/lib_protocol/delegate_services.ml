@@ -229,17 +229,11 @@ let register () =
       >>= fun delegates ->
       match q with
       | {active = true; inactive = false} ->
-          filter_map_s
-            (fun pkh ->
-              Delegate.deactivated ctxt pkh
-              >>=? function true -> return_none | false -> return_some pkh)
+          filter_s
+            (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
             delegates
       | {active = false; inactive = true} ->
-          filter_map_s
-            (fun pkh ->
-              Delegate.deactivated ctxt pkh
-              >>=? function false -> return_none | true -> return_some pkh)
-            delegates
+          filter_s (fun pkh -> Delegate.deactivated ctxt pkh) delegates
       | _ ->
           return delegates) ;
   register1 S.info (fun ctxt pkh () () ->

@@ -610,10 +610,8 @@ let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   >>=? fun since ->
   Lwt.return (Raw_context.origination_nonce ctxt_until)
   >>=? fun until ->
-  filter_map_s
-    (fun contract ->
-      exists ctxt_until contract
-      >>=? function true -> return_some contract | false -> return_none)
+  filter_s
+    (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
 
 let check_counter_increment c manager counter =
