@@ -139,8 +139,7 @@ let register_two_contracts () =
 let two_nth_of_balance incr contract nth =
   Context.Contract.balance (I incr) contract
   >>=? fun balance ->
-  Tez.( /? ) balance nth
-  >>?= fun res -> Tez.( *? ) res 2L >>?= fun balance -> return balance
+  Lwt.return (Tez.( /? ) balance nth >>? fun res -> Tez.( *? ) res 2L)
 
 (********************)
 (** Single transfer *)

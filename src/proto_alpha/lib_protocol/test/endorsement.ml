@@ -276,11 +276,9 @@ let reward_retrieval_two_endorsers () =
     (B b)
     (Contract.implicit_contract endorser2.delegate)
   >>=? fun balance2 ->
-  Lwt.return
-    Tez.(
-      endorsement_security_deposit
-      *? Int64.of_int (List.length endorser1.slots))
-  >>=? fun security_deposit1 ->
+  Tez.(
+    endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots))
+  >>?= fun security_deposit1 ->
   (* endorser1 endorses the genesis block in cycle 0 *)
   Op.endorsement ~delegate:endorser1.delegate (B b) ()
   >>=? fun operation1 ->
@@ -333,11 +331,9 @@ let reward_retrieval_two_endorsers () =
   in
   let endorser2 = List.find same_endorser2 endorsers in
   (* No exception raised: in sandboxed mode endorsers do not change between blocks *)
-  Lwt.return
-    Tez.(
-      endorsement_security_deposit
-      *? Int64.of_int (List.length endorser2.slots))
-  >>=? fun security_deposit2 ->
+  Tez.(
+    endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
+  >>?= fun security_deposit2 ->
   (* endorser2 endorses the last block in cycle 0 *)
   Op.endorsement ~delegate:endorser2.delegate (B b) ()
   >>=? fun operation2 ->
@@ -445,7 +441,7 @@ let invalid_endorsement_level () =
   Context.init 5
   >>=? fun (b, _) ->
   Context.get_level (B b)
-  >>=? fun genesis_level ->
+  >>?= fun genesis_level ->
   Block.bake b
   >>=? fun b ->
   Op.endorsement ~level:genesis_level (B b) ()
@@ -595,10 +591,10 @@ let test_fitness_gap () =
   >>=? fun (b, _) ->
   ( match Fitness_repr.to_int64 b.header.shell.fitness with
   | Ok fitness ->
-      return (Int64.to_int fitness)
+      Int64.to_int fitness
   | Error _ ->
       assert false )
-  >>=? fun fitness ->
+  |> fun fitness ->
   Context.get_endorser (B b)
   >>=? fun (delegate, _slots) ->
   Op.endorsement ~delegate (B b) ()
@@ -608,10 +604,10 @@ let test_fitness_gap () =
   >>=? fun b ->
   ( match Fitness_repr.to_int64 b.header.shell.fitness with
   | Ok new_fitness ->
-      return (Int64.to_int new_fitness - fitness)
+      Int64.to_int new_fitness - fitness
   | Error _ ->
       assert false )
-  >>=? fun res ->
+  |> fun res ->
   (* in Emmy+, the fitness increases by 1, so the difference between
      the fitness at level 1 and at level 0 is 1, independently if the
      number fo endorsements (here 1) *)

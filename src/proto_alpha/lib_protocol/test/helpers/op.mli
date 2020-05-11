@@ -86,13 +86,13 @@ val double_endorsement :
   Context.t ->
   Kind.endorsement Operation.t ->
   Kind.endorsement Operation.t ->
-  Operation.packed tzresult Lwt.t
+  Operation.packed
 
 val double_baking :
   Context.t ->
   Block_header.block_header ->
   Block_header.block_header ->
-  Operation.packed tzresult Lwt.t
+  Operation.packed
 
 val activation :
   Context.t ->
@@ -110,7 +110,7 @@ val combine_operations :
 
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation :
-  Context.t -> Raw_level.t -> Nonce.t -> Operation.packed tzresult Lwt.t
+  Context.t -> Raw_level.t -> Nonce.t -> Operation.packed
 
 (** Propose a list of protocol hashes during the approval voting *)
 val proposals :

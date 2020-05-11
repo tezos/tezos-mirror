@@ -338,8 +338,8 @@ let test_successful_vote num_delegates () =
           false)
   >>=? fun () ->
   (* Allocate votes from weight (rolls) of active delegates *)
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls_p2
-  >>=? fun rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p2
+  |> fun rolls_sum ->
   (* # of Yay rolls in ballots matches votes of the delegates *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
@@ -467,8 +467,8 @@ let test_successful_vote num_delegates () =
   >>=? fun operations ->
   Block.bake ~operations b
   >>=? fun b ->
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls_p4
-  >>=? fun rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p4
+  |> fun rolls_sum ->
   (* # of Yays in ballots matches rolls of the delegate *)
   Context.Vote.get_ballots (B b)
   >>=? fun v ->
@@ -537,8 +537,8 @@ let test_successful_vote num_delegates () =
 let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
     participation_ema =
   let expected_quorum = expected_qr_num participation_ema in
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l active_rolls
-  >|=? fun active_rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l active_rolls
+  |> fun active_rolls_sum ->
   let rec loop delegates rolls sum selected =
     match (delegates, rolls) with
     | ([], []) ->
@@ -562,10 +562,10 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
     + (pr_num * participation) )
     / den
   in
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l rolls
-  >>=? fun rolls_sum ->
-  fold_left_s (fun v acc -> return Int32.(add v acc)) 0l voter_rolls
-  >|=? fun voter_rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls
+  |> fun rolls_sum ->
+  List.fold_left (fun acc v -> Int32.(add v acc)) 0l voter_rolls
+  |> fun voter_rolls_sum ->
   let participation =
     Int32.to_int voter_rolls_sum * percent_mul / Int32.to_int rolls_sum
   in
@@ -603,7 +603,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
   Context.Vote.get_participation_ema b
   >>=? fun participation_ema ->
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
-  >>=? fun voters ->
+  |> fun voters ->
   (* take the first two voters out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
   get_rolls b voters_without_quorum __LOC__
@@ -637,7 +637,7 @@ let test_not_enough_quorum_in_testing_vote num_delegates () =
     rolls_p2
     voters_rolls_in_testing_vote
     initial_participation_ema
-  >>=? fun expected_participation_ema ->
+  |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b
   >>=? fun new_participation_ema ->
   (* assert the formula to calculate participation_ema is correct *)
@@ -676,7 +676,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Context.Vote.get_participation_ema b
   >>=? fun participation_ema ->
   get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
-  >>=? fun voters ->
+  |> fun voters ->
   (* all voters vote, for yays;
        no nays, so supermajority is satisfied *)
   let open Alpha_context in
@@ -715,7 +715,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Context.Vote.get_participation_ema b
   >>=? fun participation_ema ->
   get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4 participation_ema
-  >>=? fun voters ->
+  |> fun voters ->
   (* take the first voter out so there cannot be quorum *)
   let voters_without_quorum = List.tl voters in
   get_rolls b voters_without_quorum __LOC__
@@ -741,7 +741,7 @@ let test_not_enough_quorum_in_promotion_vote num_delegates () =
   Block.bake_n (Int32.to_int blocks_per_voting_period - 1) b
   >>=? fun b ->
   get_expected_participation_ema rolls_p4 voter_rolls initial_participation_ema
-  >>=? fun expected_participation_ema ->
+  |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b
   >>=? fun new_participation_ema ->
   (* assert the formula to calculate participation_ema is correct *)

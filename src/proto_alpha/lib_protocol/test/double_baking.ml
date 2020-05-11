@@ -34,17 +34,16 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  return
-  @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-       bakers
+  List.find
+    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+    bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let baker_1 = List.hd bakers in
   get_first_different_baker baker_1 (List.tl bakers)
-  >|=? fun baker_2 -> (baker_1, baker_2)
+  |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
@@ -79,7 +78,7 @@ let valid_double_baking_evidence () =
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~policy:(Excluding [priority_0_baker]) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
@@ -102,7 +101,7 @@ let same_blocks () =
   Block.bake b
   >>=? fun ba ->
   Op.double_baking (B ba) ba.header ba.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation ba
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -122,7 +121,7 @@ let different_levels () =
   Block.bake blk_b
   >>=? fun blk_b_2 ->
   Op.double_baking (B blk_a) blk_a.header blk_b_2.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -139,7 +138,7 @@ let too_early_double_baking_evidence () =
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B b) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -160,7 +159,7 @@ let too_late_double_baking_evidence () =
   Block.bake_until_n_cycle_end (preserved_cycles + 1) blk_a
   >>=? fun blk ->
   Op.double_baking (B blk) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -181,7 +180,7 @@ let different_delegates () =
   Block.bake ~policy:(By_account baker_2) b
   >>=? fun blk_b ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -206,7 +205,7 @@ let wrong_signer () =
   header_custom_signer baker_1 baker_2 b
   >>=? fun header_b ->
   Op.double_baking (B blk_a) blk_a.header header_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -227,13 +226,13 @@ let double_injection_double_baking_evidence () =
   Block.bake_until_cycle_end blk_a
   >>=? fun blk ->
   Op.double_baking (B blk) blk_a.header blk_b.header
-  >>=? fun evidence ->
+  |> fun evidence ->
   Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk
   >>=? fun blk ->
   Block.bake_until_cycle_end blk
   >>=? fun blk ->
   Op.double_baking (B blk) blk_b.header blk_a.header
-  >>=? fun evidence ->
+  |> fun evidence ->
   Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
@@ -252,13 +251,13 @@ let unrequired_evidence_injected () =
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun evidence ->
+  |> fun evidence ->
   Block.bake blk_a
   >>=? fun blk ->
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun evidence_2 ->
+  |> fun evidence_2 ->
   Block.bake ~policy:(Excluding [baker]) ~operation:evidence blk_a
   >>=? fun blk ->
   Block.bake ~policy:(Excluding [baker]) ~operation:evidence_2 blk
@@ -294,9 +293,9 @@ let outdated_proof_has_been_cleaned () =
   block_fork ~policy:(By_account baker) contracts blk
   >>=? fun (blk_a, blk_b) ->
   Context.get_level (B blk_a)
-  >>=? fun cheat_level ->
+  >>?= fun cheat_level ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
-  >>=? fun evidence ->
+  |> fun evidence ->
   Block.bake_until_n_cycle_end preserved_cycles blk_a
   >>=? fun blk ->
   Block.bake_n (Int32.to_int blocks_per_cycle - 2) blk

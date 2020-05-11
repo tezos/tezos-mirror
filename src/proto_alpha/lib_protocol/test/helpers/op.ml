@@ -46,18 +46,19 @@ let endorsement ?delegate ?level ctxt ?(signing_context = ctxt) () =
   >>=? fun delegate_pkh ->
   Account.find delegate_pkh
   >>=? fun delegate ->
-  ( match level with
-  | None ->
-      Context.get_level ctxt
-  | Some level ->
-      return level )
-  >|=? fun level ->
-  let op = Single (Endorsement {level}) in
-  sign
-    ~watermark:Signature.(Endorsement Chain_id.zero)
-    delegate.sk
-    signing_context
-    op
+  Lwt.return
+    ( ( match level with
+      | None ->
+          Context.get_level ctxt
+      | Some level ->
+          ok level )
+    >|? fun level ->
+    let op = Single (Endorsement {level}) in
+    sign
+      ~watermark:Signature.(Endorsement Chain_id.zero)
+      delegate.sk
+      signing_context
+      op )
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
@@ -99,7 +100,7 @@ let combine_operations ?public_key ?counter ~source ctxt
   >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   Context.Contract.is_manager_key_revealed ctxt source
-  >>=? (function
+  >|=? (function
          | false ->
              let reveal_op =
                Manager_operation
@@ -112,9 +113,9 @@ let combine_operations ?public_key ?counter ~source ctxt
                    storage_limit = Z.zero;
                  }
              in
-             return (Some (Contents reveal_op), Z.succ counter)
+             (Some (Contents reveal_op), Z.succ counter)
          | true ->
-             return (None, counter))
+             (None, counter))
   >|=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
   let operations =
@@ -247,12 +248,8 @@ let origination ?counter ?delegate ~script ?(preorigination = None) ?public_key
   (op, originated_contract op)
 
 let miss_signed_endorsement ?level ctxt =
-  ( match level with
-  | None ->
-      Context.get_level ctxt
-  | Some level ->
-      return level )
-  >>=? fun level ->
+  (match level with None -> Context.get_level ctxt | Some level -> ok level)
+  >>?= fun level ->
   Context.get_endorser ctxt
   >>=? fun (real_delegate_pkh, _slots) ->
   let delegate = Account.find_alternate real_delegate_pkh in
@@ -302,32 +299,29 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
 let double_endorsement ctxt op1 op2 =
   let contents = Single (Double_endorsement_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
-  return
-    {
-      shell = {branch};
-      protocol_data = Operation_data {contents; signature = None};
-    }
+  {
+    shell = {branch};
+    protocol_data = Operation_data {contents; signature = None};
+  }
 
 let double_baking ctxt bh1 bh2 =
   let contents = Single (Double_baking_evidence {bh1; bh2}) in
   let branch = Context.branch ctxt in
-  return
-    {
-      shell = {branch};
-      protocol_data = Operation_data {contents; signature = None};
-    }
+  {
+    shell = {branch};
+    protocol_data = Operation_data {contents; signature = None};
+  }
 
 let seed_nonce_revelation ctxt level nonce =
-  return
-    {
-      shell = {branch = Context.branch ctxt};
-      protocol_data =
-        Operation_data
-          {
-            contents = Single (Seed_nonce_revelation {level; nonce});
-            signature = None;
-          };
-    }
+  {
+    shell = {branch = Context.branch ctxt};
+    protocol_data =
+      Operation_data
+        {
+          contents = Single (Seed_nonce_revelation {level; nonce});
+          signature = None;
+        };
+  }
 
 let proposals ctxt (pkh : Contract.t) proposals =
   Context.Contract.pkh pkh

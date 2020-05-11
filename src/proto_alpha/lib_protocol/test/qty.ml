@@ -151,9 +151,9 @@ let tests =
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       f ()
-      >>= function
+      >|= function
       | Ok () ->
-          Lwt.return_unit
+          ()
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
 

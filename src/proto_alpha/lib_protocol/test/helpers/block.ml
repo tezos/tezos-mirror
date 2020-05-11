@@ -191,11 +191,10 @@ module Forge = struct
     let level = Int32.succ pred.header.shell.level in
     ( match Fitness_repr.to_int64 pred.header.shell.fitness with
     | Ok old_fitness ->
-        return
-          (Fitness_repr.from_int64 (Int64.add (Int64.of_int 1) old_fitness))
+        Fitness_repr.from_int64 (Int64.add (Int64.of_int 1) old_fitness)
     | Error _ ->
         assert false )
-    >>=? fun fitness ->
+    |> fun fitness ->
     Alpha_services.Helpers.current_level ~offset:1l rpc_ctxt pred
     >|=? (function
            | {expected_commitment = true; _} ->

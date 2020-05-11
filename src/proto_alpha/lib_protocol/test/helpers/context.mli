@@ -32,7 +32,7 @@ type t = B of Block.t | I of Incremental.t
 
 val branch : t -> Block_hash.t
 
-val get_level : t -> Raw_level.t tzresult Lwt.t
+val get_level : t -> Raw_level.t tzresult
 
 val get_endorsers :
   t -> Alpha_services.Delegate.Endorsing_rights.t list tzresult Lwt.t
