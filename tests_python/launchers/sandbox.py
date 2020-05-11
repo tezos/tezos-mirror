@@ -169,6 +169,8 @@ class Sandbox:
         params = params + ['--network=sandbox']
         peers_rpc = [self.p2p + p for p in peers]
         node_bin = self._wrap_path(NODE, branch)
+        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
+        local_client = self._wrap_path(CLIENT, branch)
         node = Node(node_bin, self.sandbox_file,
                     p2p_port=p2p_node, rpc_port=rpc_node,
                     peers=peers_rpc, log_file=log_file, params=params,
@@ -193,54 +195,21 @@ class Sandbox:
                 node.snapshot_import(snapshot,
                                      ['--network=sandbox'] + sandboxed_import)
         node.run()
-
-        # FIXME: use_tls is a tuple, bool(use_tls) gives UB. See
-        # https://gitlab.com/tezos/tezos/-/issues/771
-        client = self.get_new_client(node=node,
-                                     branch=branch,
-                                     use_tls=bool(use_tls),
-                                     client_factory=client_factory,
-                                     config_client=config_client)
-
-        self.nodes[node_id] = node
-        self.clients[node_id] = client
-
-    def get_new_client(self,
-                       node: Node,
-                       branch: str = "",
-                       use_tls: bool = False,
-                       client_factory: Callable = Client,
-                       config_client: bool = True):
-        """
-        Create a new client for a node.
-            node (Node): the node the client should be initialised for
-            branch (str): sub-dir where to lookup the node and client
-                          binary, default = "". Allows execution of different
-                          versions of nodes.
-            use_tls (bool): use TLS
-            client_factory (Callable): the constructor of clients. Defaults to
-                                       Client. Allows e.g. regression testing.
-            config_client (bool): initialize client with sandbox identities,
-                                  default=True
-        """
-        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
-        local_client = self._wrap_path(CLIENT, branch)
         client = client_factory(local_client, local_admin_client,
-                                rpc_port=node.rpc_port, use_tls=use_tls)
-        # don't wait for confirmation
-        client.run(['-w', 'none', 'config', 'update'])
+                                rpc_port=rpc_node, use_tls=bool(use_tls))
 
         if not client.check_node_listening():
-            assert node.poll() is None, \
-                '# Node on port {node.rpc_port} failed at startup'
+            assert node.poll() is None, '# Node {node_id} failed at startup'
             node.kill()
-            assert False, \
-                f"# Node on port {node.rpc_port} isn't responding to RPC"
+            assert False, f"# Node {node_id} isn't responding to RPC"
 
+        # don't wait for confirmation
+        client.run(['-w', 'none', 'config', 'update'])
         if config_client:
             for name, iden in self.identities.items():
                 client.import_secret_key(name, iden['secret'])
-        return client
+        self.nodes[node_id] = node
+        self.clients[node_id] = client
 
     def add_baker(self,
                   node_id: int,
