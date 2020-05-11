@@ -184,16 +184,7 @@ def test_create_mockup_custom_bootstrap_accounts(mockup_client):
         assert names_sent == names_witnessed
 
 
-# Note: this test should break once it's merged with
-# https://gitlab.com/tezos/tezos/-/merge_requests/1760
-# When !1760 is merged, the error output will be more explicit
-# hence the error output should change and this test should break.
 @pytest.mark.client
-@pytest.mark.skip("depends on !1760")
-# Test is skipped for now because it depends
-# on https://gitlab.com/tezos/tezos/-/merge_requests/1760 in particular
-# the following commit:
-# https://gitlab.com/tezos/tezos/-/merge_requests/1760/diffs?commit_id=781b9748da4f4305a1baa3d82e15362761293be0
 def test_transfer_bad_base_dir(mockup_client):
     """ Executes `tezos-client --base-dir /tmp/mdir create mockup`
         when /tmp/mdir looks like a dubious base directory.
