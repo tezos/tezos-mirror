@@ -32,8 +32,7 @@ let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
 
 let level = function B b -> b.header.shell.level | I i -> Incremental.level i
 
-let get_level ctxt =
-  level ctxt |> Raw_level.of_int32 |> Environment.wrap_error |> Lwt.return
+let get_level ctxt = level ctxt |> Raw_level.of_int32 |> Environment.wrap_error
 
 let rpc_ctxt =
   object

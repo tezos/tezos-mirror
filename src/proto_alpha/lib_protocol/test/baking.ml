@@ -41,7 +41,7 @@ let test_cycle () =
   Block.bake_until_cycle_end b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun curr_level ->
+  >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal
@@ -52,11 +52,11 @@ let test_cycle () =
   >>=? fun () ->
   (* Tests that [bake_n n] bakes [n] blocks. *)
   Context.get_level (B b)
-  >>=? fun l ->
+  >>?= fun l ->
   Block.bake_n 10 b
   >>=? fun b ->
   Context.get_level (B b)
-  >>=? fun curr_level ->
+  >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal

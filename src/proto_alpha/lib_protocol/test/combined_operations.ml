@@ -140,17 +140,15 @@ let multiple_origination_and_delegation () =
   >>?= fun origination_burn ->
   Tez.(origination_burn *? Int64.of_int n)
   >>?= fun origination_total_cost ->
-  Lwt.return
-    ( Tez.( *? ) Op.dummy_script_cost 10L
-    >>? Tez.( +? ) (Tez.of_int (10 * n))
-    >>? Tez.( +? ) origination_total_cost )
-  >>=? fun total_cost ->
+  Tez.( *? ) Op.dummy_script_cost 10L
+  >>? Tez.( +? ) (Tez.of_int (10 * n))
+  >>? Tez.( +? ) origination_total_cost
+  >>?= fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
   iter_s
     (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Tez.of_int 10))
     new_contracts
-  >>=? fun () -> return_unit
 
 let expect_balance_too_low = function
   | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->

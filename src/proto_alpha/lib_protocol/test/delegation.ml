@@ -308,9 +308,9 @@ let delegate_to_bootstrap_by_origination ~fee () =
   (* 0.257tz *)
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Lwt.return
-    (Tez.( +? ) fee origination_burn >>? Tez.( +? ) Op.dummy_script_cost)
-  >>=? fun total_fee ->
+  Tez.( +? ) fee origination_burn
+  >>? Tez.( +? ) Op.dummy_script_cost
+  >>?= fun total_fee ->
   if fee > balance then
     Incremental.add_operation i op
     >>= fun err ->
@@ -501,8 +501,8 @@ let unregistered_delegate_key_init_origination ~fee () =
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Lwt.return (Tez.( +? ) fee origination_burn)
-  >>=? fun _total_fee ->
+  Tez.( +? ) fee origination_burn
+  >>?= fun _total_fee ->
   (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap
   >>=? fun balance ->
@@ -714,8 +714,8 @@ let unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   >>=? fun _ ->
   (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Lwt.return Tez.(credit +? amount)
-  >>=? fun balance ->
+  Tez.(credit +? amount)
+  >>?= fun balance ->
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit
   >>=? fun init_credit ->
   Incremental.add_operation i init_credit
@@ -775,8 +775,8 @@ let unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   >>=? fun _ ->
   (* initial credit for the delegated contract *)
   let credit = Tez.of_int 10 in
-  Lwt.return Tez.(credit +? amount)
-  >>=? fun balance ->
+  Tez.(credit +? amount)
+  >>?= fun balance ->
   Op.transaction ~fee:Tez.zero (I i) bootstrap impl_contract credit
   >>=? fun init_credit ->
   Incremental.add_operation i init_credit

@@ -139,7 +139,7 @@ let check_property prop () =
   let result = prop ctxt in
   match result with
   | Ok None ->
-      return ()
+      return_unit
   | Ok (Some (cost1, cost2)) ->
       let msg =
         Format.asprintf

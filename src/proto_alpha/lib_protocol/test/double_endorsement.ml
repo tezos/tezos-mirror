@@ -34,17 +34,16 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  return
-  @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-       bakers
+  List.find
+    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+    bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
-  >>=? fun bakers ->
+  >|=? fun bakers ->
   let baker_1 = List.hd bakers in
   get_first_different_baker baker_1 (List.tl bakers)
-  >|=? fun baker_2 -> (baker_1, baker_2)
+  |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
@@ -82,12 +81,12 @@ let valid_double_endorsement_evidence () =
   >>=? fun blk_a ->
   (* Block.bake ~operations:[endorsement_b] blk_b >>=? fun _ -> *)
   Op.double_endorsement (B blk_a) endorsement_a endorsement_b
-  >>=? fun operation ->
+  |> fun operation ->
   (* Bake with someone different than the bad endorser *)
   Context.get_bakers (B blk_a)
   >>=? fun bakers ->
   get_first_different_baker delegate bakers
-  >>=? fun baker ->
+  |> fun baker ->
   Block.bake ~policy:(By_account baker) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
@@ -113,7 +112,7 @@ let invalid_double_endorsement () =
   Block.bake ~operation:(Operation.pack endorsement) b
   >>=? fun b ->
   Op.double_endorsement (B b) endorsement endorsement
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -136,7 +135,7 @@ let too_early_double_endorsement_evidence () =
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
   Op.double_endorsement (B b) endorsement_a endorsement_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -166,7 +165,7 @@ let too_late_double_endorsement_evidence () =
     (1 -- (preserved_cycles + 1))
   >>=? fun blk ->
   Op.double_endorsement (B blk) endorsement_a endorsement_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -200,7 +199,7 @@ let different_delegates () =
   Block.bake ~operation:(Operation.pack e_b) blk_b
   >>=? fun _ ->
   Op.double_endorsement (B blk_b) e_a e_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -232,7 +231,7 @@ let wrong_delegate () =
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
   Op.double_endorsement (B blk_b) endorsement_a endorsement_b
-  >>=? fun operation ->
+  |> fun operation ->
   Block.bake ~operation blk_b
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function

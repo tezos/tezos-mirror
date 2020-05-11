@@ -101,9 +101,9 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ~timestamp
     ~protocol_data
     ()
-  >>= fun state ->
-  Lwt.return (Environment.wrap_error state)
-  >|=? fun state ->
+  >|= fun state ->
+  Environment.wrap_error state
+  >|? fun state ->
   {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
 
 let detect_script_failure :
@@ -151,11 +151,11 @@ let add_operation ?expect_failure st op =
   let open Apply_results in
   apply_operation st.state op
   >>= fun x ->
-  Lwt.return (Environment.wrap_error x)
-  >>=? function
+  Environment.wrap_error x
+  >>?= function
   | (state, (Operation_metadata result as metadata)) ->
-      Lwt.return @@ detect_script_failure result
-      >>= fun result ->
+      detect_script_failure result
+      |> fun result ->
       ( match expect_failure with
       | None ->
           Lwt.return result
@@ -183,9 +183,9 @@ let add_operation ?expect_failure st op =
 
 let finalize_block st =
   finalize_block st.state
-  >>= fun x ->
-  Lwt.return (Environment.wrap_error x)
-  >|=? fun (result, _) ->
+  >|= fun x ->
+  Environment.wrap_error x
+  >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute

@@ -51,12 +51,11 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
              _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Lwt.return
-    ( Tez.( +? ) credit block_security_deposit
-    >>? Tez.( +? ) fee
-    >>? Tez.( +? ) origination_burn
-    >>? Tez.( +? ) Op.dummy_script_cost )
-  >>=? fun total_fee ->
+  Tez.( +? ) credit block_security_deposit
+  >>? Tez.( +? ) fee
+  >>? Tez.( +? ) origination_burn
+  >>? Tez.( +? ) Op.dummy_script_cost
+  >>?= fun total_fee ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) source source_balance total_fee
   >>=? fun () ->
   (* originated contract has been credited *)
@@ -100,12 +99,11 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
              _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Lwt.return
-    ( Tez.( +? ) credit block_security_deposit
-    >>? Tez.( +? ) fee
-    >>? Tez.( +? ) origination_burn
-    >>? Tez.( +? ) Op.dummy_script_cost )
-  >>=? fun total_fee ->
+  Tez.( +? ) credit block_security_deposit
+  >>? Tez.( +? ) fee
+  >>? Tez.( +? ) origination_burn
+  >>? Tez.( +? ) Op.dummy_script_cost
+  >>?= fun total_fee ->
   Block.bake ~operation b
   >>=? fun b ->
   (* check that after the block has been baked the source contract
@@ -125,8 +123,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
 let two_nth_of_balance incr contract nth =
   Context.Contract.balance (I incr) contract
   >>=? fun balance ->
-  Tez.( /? ) balance nth
-  >>?= fun res -> Tez.( *? ) res 2L >>?= fun balance -> return balance
+  Lwt.return (Tez.( /? ) balance nth >>? fun res -> Tez.( *? ) res 2L)
 
 (*******************)
 (** Basic test *)
@@ -173,8 +170,8 @@ let not_tez_in_contract_to_pay_fee () =
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
   Context.Contract.balance (I inc) contract_1
   >>=? fun balance ->
-  Lwt.return @@ Tez.( -? ) balance Tez.one
-  >>=? fun amount ->
+  Tez.( -? ) balance Tez.one
+  >>?= fun amount ->
   Op.transaction (I inc) contract_1 contract_2 amount
   >>=? fun operation ->
   Incremental.add_operation inc operation
