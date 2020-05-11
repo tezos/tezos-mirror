@@ -118,6 +118,6 @@ let check_storage_limit c ~storage_limit =
       > (Raw_context.constants c).hard_storage_limit_per_operation)
     || Compare.Z.(storage_limit < Z.zero)
   then error Storage_limit_too_high
-  else ok ()
+  else ok_unit
 
 let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c

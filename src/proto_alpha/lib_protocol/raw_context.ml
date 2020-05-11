@@ -215,7 +215,7 @@ let check_gas_limit ctxt remaining =
     Compare.Z.(remaining > ctxt.constants.hard_gas_limit_per_operation)
     || Compare.Z.(remaining < Z.zero)
   then error Gas_limit_too_high
-  else ok ()
+  else ok_unit
 
 let set_gas_limit ctxt remaining =
   {ctxt with operation_gas = Limited {remaining}}

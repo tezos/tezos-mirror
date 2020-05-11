@@ -103,6 +103,8 @@ module Syntax = struct
 
   let error_unless cond exn = if cond then ok_unit else error exn
 
+  let error_when cond exn = if cond then error exn else ok_unit
+
   let rec filter_s f l =
     match l with
     | [] ->

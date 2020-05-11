@@ -1624,22 +1624,36 @@ let check_packable ~legacy loc root =
         error (Unexpected_big_map loc)
     | Operation_t _ ->
         error (Unexpected_operation loc)
-    | Unit_t _
-    | Int_t _
-    | Nat_t _
-    | Signature_t _
-    | String_t _
-    | Bytes_t _
-    | Mutez_t _
-    | Key_hash_t _
-    | Key_t _
-    | Timestamp_t _
-    | Address_t _
-    | Bool_t _
-    | Chain_id_t _
-    | Set_t (_, _)
+    | Unit_t _ ->
+        ok_unit
+    | Int_t _ ->
+        ok_unit
+    | Nat_t _ ->
+        ok_unit
+    | Signature_t _ ->
+        ok_unit
+    | String_t _ ->
+        ok_unit
+    | Bytes_t _ ->
+        ok_unit
+    | Mutez_t _ ->
+        ok_unit
+    | Key_hash_t _ ->
+        ok_unit
+    | Key_t _ ->
+        ok_unit
+    | Timestamp_t _ ->
+        ok_unit
+    | Address_t _ ->
+        ok_unit
+    | Bool_t _ ->
+        ok_unit
+    | Chain_id_t _ ->
+        ok_unit
+    | Set_t (_, _) ->
+        ok_unit
     | Lambda_t (_, _, _) ->
-        ok ()
+        ok_unit
     | Pair_t ((l_ty, _, _), (r_ty, _, _), _) ->
         check l_ty >>? fun () -> check r_ty
     | Union_t ((l_ty, _), (r_ty, _), _) ->
@@ -1651,7 +1665,7 @@ let check_packable ~legacy loc root =
     | Map_t (_, elt_ty, _) ->
         check elt_ty
     | Contract_t (_, _) when legacy ->
-        ok ()
+        ok_unit
     | Contract_t (_, _) ->
         error (Unexpected_contract loc)
   in
@@ -1829,11 +1843,11 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
           (Entrypoints.singleton name, true)
     in
     let (first_unreachable, all) = check full [] reachable (None, init) in
-    if not (Entrypoints.mem "default" all) then ok ()
+    if not (Entrypoints.mem "default" all) then ok_unit
     else
       match first_unreachable with
       | None ->
-          ok ()
+          ok_unit
       | Some path ->
           error (Unreachable_entrypoint path)
   with

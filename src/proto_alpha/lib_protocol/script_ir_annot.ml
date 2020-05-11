@@ -145,7 +145,7 @@ let merge_type_annot :
  fun ~legacy annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) ->
-      ok None
+      ok_none
   | (Some (Type_annot a1), Some (Type_annot a2)) ->
       if legacy || String.equal a1 a2 then ok annot1
       else error (Inconsistent_annotations (":" ^ a1, ":" ^ a2))
@@ -158,7 +158,7 @@ let merge_field_annot :
  fun ~legacy annot1 annot2 ->
   match (annot1, annot2) with
   | (None, None) | (Some _, None) | (None, Some _) ->
-      ok None
+      ok_none
   | (Some (Field_annot a1), Some (Field_annot a2)) ->
       if legacy || String.equal a1 a2 then ok annot1
       else error (Inconsistent_annotations ("%" ^ a1, "%" ^ a2))
@@ -183,14 +183,15 @@ let error_unexpected_annot loc annot =
 let string_iter p s i =
   let len = String.length s in
   let rec aux i =
-    if Compare.Int.(i >= len) then ok () else p s.[i] >>? fun () -> aux (i + 1)
+    if Compare.Int.(i >= len) then ok_unit
+    else p s.[i] >>? fun () -> aux (i + 1)
   in
   aux i
 
 (* Valid annotation characters as defined by the allowed_annot_char function from lib_micheline/micheline_parser *)
 let check_char loc = function
   | 'a' .. 'z' | 'A' .. 'Z' | '_' | '.' | '%' | '@' | '0' .. '9' ->
-      ok ()
+      ok_unit
   | _ ->
       error (Unexpected_annotation loc)
 
@@ -210,7 +211,7 @@ let parse_annots loc ?(allow_special_var = false)
     let len = String.length s in
     ( if Compare.Int.(len > max_annot_length) then
       error (Unexpected_annotation loc)
-    else ok () )
+    else ok_unit )
     >>? fun () ->
     if Compare.Int.(len = 1) then ok @@ (wrap None :: acc)
     else
@@ -253,7 +254,7 @@ let parse_annots loc ?(allow_special_var = false)
               acc
         | _ ->
             error (Unexpected_annotation loc))
-    (ok [])
+    ok_nil
     l
   >|? List.rev
 
@@ -298,7 +299,7 @@ let classify_annot loc l :
 
 let get_one_annot loc = function
   | [] ->
-      ok None
+      ok_none
   | [a] ->
       ok a
   | _ ->
@@ -366,7 +367,7 @@ let extract_field_annot :
       let (field_annot, annot) = extract_first [] annot in
       ( match field_annot with
       | None ->
-          ok None
+          ok_none
       | Some field_annot ->
           parse_field_annot loc [field_annot] )
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
@@ -378,9 +379,9 @@ let check_correct_field :
  fun f1 f2 ->
   match (f1, f2) with
   | (None, _) | (_, None) ->
-      ok ()
+      ok_unit
   | (Some (Field_annot s1), Some (Field_annot s2)) ->
-      if String.equal s1 s2 then ok ()
+      if String.equal s1 s2 then ok_unit
       else error (Inconsistent_field_annotations ("%" ^ s1, "%" ^ s2))
 
 let parse_var_annot :
