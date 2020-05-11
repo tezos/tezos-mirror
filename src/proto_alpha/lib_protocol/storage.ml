@@ -25,7 +25,7 @@
 
 open Storage_functors
 
-module Int = struct
+module UInt16 = struct
   type t = int
 
   let encoding = Data_encoding.uint16
@@ -81,7 +81,7 @@ module Block_priority =
     (struct
       let name = ["block_priority"]
     end)
-    (Int)
+    (UInt16)
 
 (** Contracts handling *)
 
@@ -543,7 +543,7 @@ module Cycle = struct
       (struct
         let name = ["roll_snapshot"]
       end)
-      (Int)
+      (UInt16)
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
@@ -787,7 +787,7 @@ module Vote = struct
            let name = ["proposals_count"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (Int)
+         (UInt16)
 
   module Ballots =
     Make_indexed_data_storage
