@@ -158,6 +158,49 @@ class Sandbox:
         self.nodes[node_id] = node
         return node
 
+    def _instanciate_client(self,
+                            rpc_port: int,
+                            use_tls: Tuple[str, str] = None,
+                            branch: str = "",
+                            client_factory: Callable = Client):
+        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
+        local_client = self._wrap_path(CLIENT, branch)
+        client = client_factory(local_client, local_admin_client,
+                                rpc_port=rpc_port, use_tls=use_tls)
+        return client
+
+    def get_new_client(self,
+                       node: Node,
+                       use_tls: Tuple[str, str] = None,
+                       branch: str = "",
+                       client_factory: Callable = Client,
+                       config_client: bool = True):
+        """
+        Create a new client for a node.
+            node (Node): the node the client should be initialised for
+            use_tls (Tuple[str, str]): use TLS
+            branch (str): sub-dir where to lookup the node and client
+                            binary, default = "". Allows execution of different
+                            versions of nodes.
+            client_factory (Callable): the constructor of clients. Defaults to
+                                        Client. Allows e.g. regression testing.
+            config_client (bool): initialize client with sandbox identities,
+                                    default=True
+
+        This client isn't registered in the Sandbox. It means the caller
+        has to perform the cleanup itself by calling the client cleanup method.
+
+        TODO: we probably want to be able to register more than one client for
+              a given node, so that the sandbox context manager can properly
+              clean up all resources.
+        """
+        client = self._instanciate_client(node.rpc_port,
+                                          use_tls,
+                                          branch,
+                                          client_factory)
+        self.init_client(client, node, config_client)
+        return client
+
     def register_client(self,
                         node_id: int,
                         rpc_port: int,
@@ -167,10 +210,10 @@ class Sandbox:
         """Instantiate a Client and add it to the sandbox manager"""
         error_msg = f'Already a client for id={node_id}'
         assert node_id not in self.clients, error_msg
-        local_admin_client = self._wrap_path(CLIENT_ADMIN, branch)
-        local_client = self._wrap_path(CLIENT, branch)
-        client = client_factory(local_client, local_admin_client,
-                                rpc_port=rpc_port, use_tls=bool(use_tls))
+        client = self._instanciate_client(rpc_port,
+                                          use_tls,
+                                          branch,
+                                          client_factory)
         self.clients[node_id] = client
         return client
 
