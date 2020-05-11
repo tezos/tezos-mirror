@@ -233,8 +233,7 @@ let test_rewards_formulas_equivalence () =
         (B b)
         ~priority:block_priority
         ~endorsing_power
-      >>=? fun reward2 ->
-      Assert.equal_tez ~loc:__LOC__ reward1 reward2 >>=? fun () -> return_unit)
+      >>=? fun reward2 -> Assert.equal_tez ~loc:__LOC__ reward1 reward2)
     ranges
 
 let tests =

@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Misc.Syntax
 
 type cost_kind =
   | Atomic_step
@@ -94,7 +95,7 @@ let free_neutral since =
     Z.equal
       (Gas.consumed ~since:ctxt ~until:branch1)
       (Gas.consumed ~since:ctxt ~until:branch2)
-  then Ok None
+  then ok_none
   else Ok (Some (cost, Gas.free))
 
 let consume_commutes since =
@@ -112,12 +113,12 @@ let consume_commutes since =
     Z.equal
       (Gas.consumed ~since:ctxt ~until:branch1)
       (Gas.consumed ~since:ctxt ~until:branch2)
-  then Ok None
+  then ok_none
   else Ok (Some (cost1, cost2))
 
 let rec loop_check check n ctxt =
   let open Environment.Error_monad in
-  if n = 0 then Ok None
+  if n = 0 then ok_none
   else
     check ctxt
     >>? function
