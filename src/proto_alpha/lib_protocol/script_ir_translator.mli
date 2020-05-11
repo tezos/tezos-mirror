@@ -303,10 +303,7 @@ type big_map_ids
 val no_big_map_id : big_map_ids
 
 val collect_big_maps :
-  context ->
-  'a Script_typed_ir.ty ->
-  'a ->
-  (big_map_ids * context) tzresult Lwt.t
+  context -> 'a Script_typed_ir.ty -> 'a -> (big_map_ids * context) tzresult
 
 val list_of_big_map_ids : big_map_ids -> Z.t list
 

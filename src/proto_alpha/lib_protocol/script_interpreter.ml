@@ -1052,7 +1052,7 @@ let rec step :
   | (Transfer_tokens, (p, (amount, ((tp, (destination, entrypoint)), rest))))
     ->
       collect_big_maps ctxt tp p
-      >>=? fun (to_duplicate, ctxt) ->
+      >>?= fun (to_duplicate, ctxt) ->
       let to_update = no_big_map_id in
       extract_big_map_diff
         ctxt
@@ -1130,7 +1130,7 @@ let rec step :
                     Prim (0, K_code, [code], []) ] ))
       in
       collect_big_maps ctxt storage_type init
-      >>=? fun (to_duplicate, ctxt) ->
+      >>?= fun (to_duplicate, ctxt) ->
       let to_update = no_big_map_id in
       extract_big_map_diff
         ctxt
@@ -1197,7 +1197,7 @@ let rec step :
                  Prim (0, K_code, [code], []) ] ))
       in
       collect_big_maps ctxt storage_type init
-      >>=? fun (to_duplicate, ctxt) ->
+      >>?= fun (to_duplicate, ctxt) ->
       let to_update = no_big_map_id in
       extract_big_map_diff
         ctxt
@@ -1344,9 +1344,9 @@ let execute logger ctxt mode step_constants ~entrypoint unparsed_script arg :
   Script.force_decode_in_context ctxt unparsed_script.code
   >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_big_maps ctxt arg_type arg
-  >>=? fun (to_duplicate, ctxt) ->
+  >>?= fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_big_maps ctxt storage_type storage
-  >>=? fun (to_update, ctxt) ->
+  >>?= fun (to_update, ctxt) ->
   trace
     (Runtime_contract_error (step_constants.self, script_code))
     (interp logger ctxt step_constants code (arg, storage))

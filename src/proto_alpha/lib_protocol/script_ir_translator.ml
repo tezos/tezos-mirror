@@ -5604,7 +5604,7 @@ let collect_big_maps ctxt ty x =
    (* TODO: fix injectivity of types *)
   in
   let has_big_map = has_big_map ty in
-  Lwt.return (collect ctxt ty x ~has_big_map no_big_map_id)
+  collect ctxt ty x ~has_big_map no_big_map_id
 
 let extract_big_map_diff ctxt mode ~temporary ~to_duplicate ~to_update ty v =
   let to_duplicate = Ids.diff to_duplicate to_update in

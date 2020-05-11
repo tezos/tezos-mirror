@@ -314,7 +314,7 @@ let register () =
             ctxt
             script.storage_type
             script.storage
-          >>=? fun (ids, _ctxt) ->
+          >>?= fun (ids, _ctxt) ->
           let ids = Script_ir_translator.list_of_big_map_ids ids in
           let rec find = function
             | [] ->
