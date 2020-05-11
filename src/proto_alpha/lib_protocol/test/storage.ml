@@ -127,7 +127,7 @@ let must_failwith f_prog error =
     let _ = f_prog () in
     Alcotest.fail "Unexpected successful result "
   with exc ->
-    if exc = error then Lwt.return ()
+    if exc = error then Lwt.return_unit
     else Alcotest.fail "Unexpected error result "
 
 let register_single_data () =

@@ -68,7 +68,7 @@ let test_bad_contract_parameter () =
         "incorrect field in Bad_contract_parameter"
         default_source
         source' ;
-      return ()
+      return_unit
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 

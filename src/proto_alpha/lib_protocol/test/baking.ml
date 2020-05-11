@@ -234,8 +234,7 @@ let test_rewards_formulas_equivalence () =
         (B b)
         ~priority:block_priority
         ~endorsing_power
-      >>=? fun reward2 ->
-      Assert.equal_tez ~loc:__LOC__ reward1 reward2 >>=? fun () -> return_unit)
+      >>=? fun reward2 -> Assert.equal_tez ~loc:__LOC__ reward1 reward2)
     ranges
 
 let test_bake_n_cycles n () =
@@ -243,7 +242,7 @@ let test_bake_n_cycles n () =
   let policy = By_priority 0 in
   Context.init 1
   >>=? fun (block, _contracts) ->
-  Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
+  Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return_unit
 
 (* gets the voting power *)
 let get_voting_power block pkhash =
