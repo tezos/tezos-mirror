@@ -110,10 +110,10 @@ let for_cycle ctxt cycle =
     | Some oldest ->
         oldest
   in
-  fail_unless
+  error_unless
     Cycle_repr.(oldest <= cycle && cycle <= latest)
     (Unknown {oldest; cycle; latest})
-  >>=? fun () -> Storage.Seed.For_cycle.get ctxt cycle
+  >>?= fun () -> Storage.Seed.For_cycle.get ctxt cycle
 
 let clear_cycle c cycle = Storage.Seed.For_cycle.delete c cycle
 

@@ -188,8 +188,8 @@ module Random = struct
     in
     Storage.Roll.Owner.snapshot_exists c (cycle, index)
     >>= fun snapshot_exists ->
-    fail_unless snapshot_exists (No_roll_snapshot_for_cycle cycle)
-    >>=? fun () -> loop sequence
+    error_unless snapshot_exists (No_roll_snapshot_for_cycle cycle)
+    >>?= fun () -> loop sequence
 end
 
 let baking_rights_owner c level ~priority =
