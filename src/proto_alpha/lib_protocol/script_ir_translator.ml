@@ -6265,14 +6265,13 @@ let rec fold_lazy_storage :
 
 let collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
-  Lwt.return
-  @@ fold_lazy_storage
-       ~f:(fun id acc -> Ids.add id acc)
-       ~init:no_lazy_storage_id
-       ctxt
-       ty
-       x
-       ~has_lazy_storage
+  fold_lazy_storage
+    ~f:(fun id acc -> Ids.add id acc)
+    ~init:no_lazy_storage_id
+    ctxt
+    ty
+    x
+    ~has_lazy_storage
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
@@ -6294,7 +6293,7 @@ let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
 let find_big_map_unaccounted ctxt ty x ~f =
   let ctxt = Gas.set_unlimited ctxt in
   collect_lazy_storage ctxt ty x
-  >>=? fun (lazy_storage_ids, _ctxt) ->
+  >>?= fun (lazy_storage_ids, _ctxt) ->
   let rec find_in_ids = function
     | [] ->
         return_none

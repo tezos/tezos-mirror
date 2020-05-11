@@ -451,7 +451,7 @@ let apply_manager_operation_content :
         ctxt
         parsed_script.storage_type
         parsed_script.storage
-      >>=? fun (to_duplicate, ctxt) ->
+      >>?= fun (to_duplicate, ctxt) ->
       let to_update = Script_ir_translator.no_lazy_storage_id in
       Script_ir_translator.extract_lazy_storage_diff
         ctxt

@@ -319,7 +319,7 @@ val collect_lazy_storage :
   context ->
   'a Script_typed_ir.ty ->
   'a ->
-  (lazy_storage_ids * context) tzresult Lwt.t
+  (lazy_storage_ids * context) tzresult
 
 val find_big_map_unaccounted :
   context ->
