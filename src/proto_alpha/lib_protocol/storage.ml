@@ -219,25 +219,22 @@ module Contract = struct
     let remove = I.remove
 
     let consume_deserialize_gas ctxt value =
-      Lwt.return
-      @@ ( Raw_context.check_enough_gas
-             ctxt
-             (Script_repr.minimal_deserialize_cost value)
-         >>? fun () ->
-         Script_repr.force_decode value
-         >>? fun (_value, value_cost) ->
-         Raw_context.consume_gas ctxt value_cost )
+      Raw_context.check_enough_gas
+        ctxt
+        (Script_repr.minimal_deserialize_cost value)
+      >>? fun () ->
+      Script_repr.force_decode value
+      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
 
     let consume_serialize_gas ctxt value =
-      Lwt.return
-      @@ ( Script_repr.force_bytes value
-         >>? fun (_value, value_cost) ->
-         Raw_context.consume_gas ctxt value_cost )
+      Script_repr.force_bytes value
+      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
 
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value)
+      Lwt.return
+        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let get_option ctxt contract =
       I.get_option ctxt contract
@@ -246,11 +243,13 @@ module Contract = struct
       | None ->
           return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value_opt)
+          Lwt.return
+            ( consume_deserialize_gas ctxt value
+            >|? fun ctxt -> (ctxt, value_opt) )
 
     let set ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.set ctxt contract value
+      >>?= fun ctxt -> I.set ctxt contract value
 
     let set_option ctxt contract value_opt =
       match value_opt with
@@ -258,15 +257,15 @@ module Contract = struct
           I.set_option ctxt contract None
       | Some value ->
           consume_serialize_gas ctxt value
-          >>=? fun ctxt -> I.set_option ctxt contract value_opt
+          >>?= fun ctxt -> I.set_option ctxt contract value_opt
 
     let init ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.init ctxt contract value
+      >>?= fun ctxt -> I.init ctxt contract value
 
     let init_set ctxt contract value =
       consume_serialize_gas ctxt value
-      >>=? fun ctxt -> I.init_set ctxt contract value
+      >>?= fun ctxt -> I.init_set ctxt contract value
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -463,13 +462,13 @@ module Big_map = struct
     let init_set = I.init_set
 
     let consume_deserialize_gas ctxt value =
-      Lwt.return
-      @@ Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
+      Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 
     let get ctxt contract =
       I.get ctxt contract
       >>=? fun (ctxt, value) ->
-      consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value)
+      Lwt.return
+        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let get_option ctxt contract =
       I.get_option ctxt contract
@@ -478,7 +477,9 @@ module Big_map = struct
       | None ->
           return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|=? fun ctxt -> (ctxt, value_opt)
+          Lwt.return
+            ( consume_deserialize_gas ctxt value
+            >|? fun ctxt -> (ctxt, value_opt) )
   end
 end
 
