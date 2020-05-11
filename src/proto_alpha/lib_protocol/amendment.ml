@@ -276,10 +276,10 @@ let record_proposals ctxt delegate proposals =
       if in_listings then
         Vote.recorded_proposal_count_for_delegate ctxt delegate
         >>=? fun count ->
-        fail_when
+        error_when
           (longer_than proposals (Constants.max_proposals_per_delegate - count))
           Too_many_proposals
-        >>=? fun () ->
+        >>?= fun () ->
         fold_left_s
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
@@ -294,14 +294,14 @@ let record_ballot ctxt delegate proposal ballot =
   | Testing_vote | Promotion_vote ->
       Vote.get_current_proposal ctxt
       >>=? fun current_proposal ->
-      fail_unless
+      error_unless
         (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal
-      >>=? fun () ->
+      >>?= fun () ->
       Vote.has_recorded_ballot ctxt delegate
       >>= fun has_ballot ->
-      fail_when has_ballot Unauthorized_ballot
-      >>=? fun () ->
+      error_when has_ballot Unauthorized_ballot
+      >>?= fun () ->
       Vote.in_listings ctxt delegate
       >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot

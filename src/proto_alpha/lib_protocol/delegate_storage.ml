@@ -277,12 +277,12 @@ let registered c delegate =
 let init ctxt contract delegate =
   known ctxt delegate
   >>=? fun known_delegate ->
-  fail_unless known_delegate (Roll_storage.Unregistered_delegate delegate)
-  >>=? fun () ->
+  error_unless known_delegate (Roll_storage.Unregistered_delegate delegate)
+  >>?= fun () ->
   registered ctxt delegate
   >>=? fun is_registered ->
-  fail_unless is_registered (Roll_storage.Unregistered_delegate delegate)
-  >>=? fun () ->
+  error_unless is_registered (Roll_storage.Unregistered_delegate delegate)
+  >>?= fun () ->
   Storage.Contract.Delegate.init ctxt contract delegate
   >>=? fun ctxt -> link ctxt contract delegate
 
@@ -345,10 +345,10 @@ let set c contract delegate =
         >>=? fun () ->
         Storage.Contract.Balance.mem c contract
         >>= fun exists ->
-        fail_when
+        error_when
           (self_delegation && not exists)
           (Empty_delegate_account delegate)
-        >>=? fun () ->
+        >>?= fun () ->
         unlink c contract
         >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate
