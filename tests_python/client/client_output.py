@@ -352,7 +352,12 @@ class CreateMockup:
 
     def __init__(self, client_stdout: str, client_stderr: str, exit_code):
 
-        if re.search(r"^\S+ is not a directory\.$", client_stderr) is not None:
+        self.exit_code = exit_code
+        self.create_mockup_result = None
+
+        is_not_dir_pattern = re.compile(r"^\S+ is not a directory\.$",
+                                        re.MULTILINE)
+        if re.search(is_not_dir_pattern, client_stderr) is not None:
             self.create_mockup_result = 'is_not_dir'
             if exit_code != 1:
                 raise InvalidExitCode(exit_code)

@@ -51,8 +51,8 @@ def test_create_mockup_file_exists(mockup_client):
     with tempfile.NamedTemporaryFile(prefix='tezos-client.') as tmp_file:
         mockup_client.set_base_dir(tmp_file.name)
         res = mockup_client.create_mockup(protocol=_PROTO,
-                                          check=False).create_mockup_result
-        assert res == 'is_not_dir'
+                                          check=False)
+        assert res.exit_code == 1 and res.create_mockup_result == 'is_not_dir'
 
 
 @pytest.mark.client
