@@ -27,17 +27,17 @@ open Tezos_clic
 
 let protocol_constants_arg =
   Clic.arg
-    ~doc:"A JSON file that contains protocol constants to set."
+    ~doc:"a JSON file that contains protocol constants to set."
     ~long:"protocol-constants"
-    ~placeholder:"FILE"
+    ~placeholder:"path"
     (Clic.parameter (fun _ x -> return x))
 
 let bootstrap_accounts_arg =
   Clic.arg
     ~doc:
-      "A JSON file that contains definitions of bootstrap accounts to create."
+      "a JSON file that contains definitions of bootstrap accounts to create."
     ~long:"bootstrap-accounts"
-    ~placeholder:"FILE"
+    ~placeholder:"path"
     (Clic.parameter (fun _ x -> return x))
 
 let load_json_file (cctxt : Protocol_client_context.full) json_file =
