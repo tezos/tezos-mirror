@@ -355,40 +355,29 @@ class CreateMockup:
         self.exit_code = exit_code
         self.create_mockup_result = None
 
-        is_not_dir_pattern = re.compile(r"^\S+ is not a directory\.$",
-                                        re.MULTILINE)
-        if re.search(is_not_dir_pattern, client_stderr) is not None:
-            self.create_mockup_result = 'is_not_dir'
-            if exit_code != 1:
-                raise InvalidExitCode(exit_code)
-            return
+        # an element of outputs contains:
+        # - a pattern that we expect the output to contain
+        # - the output channel itself (stdout/stderr)
+        #   aka, where to look for the pattern
+        # - the result to set in self.create_mockup_result
+        # - the expected exit code of the test
+        outputs = [
+            (r"^\S+ is not a directory\.$", client_stderr, "is_not_dir", 1),
+            (r"^  \S+ is not empty, please specify a fresh base directory$",
+             client_stderr, "dir_not_empty", 1),
+            (r"^  \S+ is already initialized as a mockup directory$",
+             client_stderr, "already_initialized", 1),
+            (r"^created mockup client base dir in \S+$", client_stdout, "ok",
+             0),
+        ]
 
-        dir_not_empty_pattern =\
-            re.compile(
-                r"^  \S+ is not empty, please specify a fresh base directory$",
-                re.MULTILINE)
-
-        if re.search(dir_not_empty_pattern, client_stderr) is not None:
-            self.create_mockup_result = 'dir_not_empty'
-            if exit_code != 1:
-                raise InvalidExitCode(exit_code)
-            return
-
-        already_initialized_pattern =\
-            re.compile(r"^  \S+ is already initialized as a mockup directory$",
-                       re.MULTILINE)
-
-        if re.search(already_initialized_pattern, client_stderr) is not None:
-            self.create_mockup_result = 'already_initialized'
-            if exit_code != 1:
-                raise InvalidExitCode(exit_code)
-            return
-
-        ok_pattern = re.compile(r"^created mockup client base dir in \S+$",
-                                re.MULTILINE)
-
-        if re.search(ok_pattern, client_stdout) is not None:
-            self.create_mockup_result = 'ok'
-            if exit_code != 0:
-                raise InvalidExitCode(exit_code)
-            return
+        for outp in outputs:
+            pattern = re.compile(outp[0], re.MULTILINE)
+            out_channel = outp[1]
+            result_code = outp[2]
+            expected_exit_code = outp[3]
+            if re.search(pattern, out_channel) is not None:
+                self.create_mockup_result = result_code
+                if exit_code != expected_exit_code:
+                    raise InvalidExitCode(exit_code)
+                return
