@@ -591,24 +591,41 @@ let test_full_requester_test_notify_memory_duplicate _ () =
 
 (* Test notifying a value that has not been fetched. The notification should be
    ignored. *)
-let test_full_requester_test_pending_requests () =
+let test_full_requester_test_pending_requests _ () =
   let req = init_full_requester () in
+  let check_pending_count msg count =
+    (check int) msg count (Test_Requester.pending_requests req)
+  in
+  let with_request key k =
+    Lwt.join
+      [ Test_Requester.fetch req key precheck_pass >|= ignore;
+        (* Ensure that the request is registered before [k] is scheduled. *)
+        Lwt_main.yield () >>= k ]
+  in
+  (* Variant of [with_request] for requests that are never satisfied. When [k]
+     returns, the request is left pending. *)
+  let with_unmet_request key k =
+    Lwt.choose
+      [ ( Test_Requester.fetch req key precheck_pass
+        >|= fun _ -> Alcotest.fail "Request should not have been satisfied" );
+        Lwt_main.yield () >>= k ]
+  in
   (* Fetch value  *)
-  (check int) "0 pending requests" 0 (Test_Requester.pending_requests req) ;
-  ignore (Test_Requester.fetch req "foo" precheck_pass) ;
-  (check int) "1 pending requests" 1 (Test_Requester.pending_requests req) ;
-  ignore (Test_Requester.fetch req "bar" precheck_pass) ;
-  (check int) "2 pending requests" 2 (Test_Requester.pending_requests req) ;
-  ignore (Test_Requester.fetch req "bar" precheck_pass) ;
-  (check int)
-    "still 2 pending requests"
-    2
-    (Test_Requester.pending_requests req) ;
-  Test_Requester.clear_or_cancel req "foo" ;
-  (check int)
-    "back to 1 pending requests"
-    1
-    (Test_Requester.pending_requests req)
+  check_pending_count "0 pending requests" 0 ;
+  let foo_cancelled : unit Lwt.t =
+    with_request "foo"
+    @@ fun () ->
+    check_pending_count "1 pending requests" 1 ;
+    with_unmet_request "bar"
+    @@ fun () ->
+    check_pending_count "2 pending requests" 2 ;
+    with_unmet_request "bar"
+    @@ fun () ->
+    check_pending_count "still 2 pending requests" 2 ;
+    Lwt.return (Test_Requester.clear_or_cancel req "foo")
+  in
+  foo_cancelled
+  >|= fun () -> check_pending_count "back to 1 pending requests" 1
 
 (** Test memory_table_length *)
 
@@ -739,7 +756,7 @@ let () =
             "test notify: disk duplicate"
             `Quick
             test_full_requester_test_notify_disk_duplicate;
-          Alcotest_lwt.test_case_sync
+          Alcotest_lwt.test_case
             "test pending_requests"
             `Quick
             test_full_requester_test_pending_requests;
