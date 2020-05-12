@@ -127,8 +127,10 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract =
     >>= function
     | Ok (Some ty) ->
         return (("default", ty) :: entrypoints)
-    | _ ->
+    | Ok None ->
         return entrypoints
+    | Error _ as err ->
+        Lwt.return err
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
@@ -143,8 +145,10 @@ let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
     >>= function
     | Ok (Some ty) ->
         return (("default", ty) :: entrypoints)
-    | _ ->
+    | Ok None ->
         return entrypoints
+    | Error _ as err ->
+        Lwt.return err
   else return entrypoints
 
 let print_entrypoints_list (cctxt : #Client_context.printer)
