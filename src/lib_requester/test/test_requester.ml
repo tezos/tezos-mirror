@@ -549,6 +549,7 @@ let test_full_requester_test_notify_valid _ () =
   >>= fun () ->
   Test_Requester.known req "foo"
   >>= lwt_assert_true "fetched value is now known"
+  >>= Lwt_unix.yield (* Ensure that [f1] is scheduled *)
   >>= fun () -> lwt_assert_true "promise is resolved" (is_resolved f1)
 
 (* Test notifying a value that has not been fetched. The notification should be
