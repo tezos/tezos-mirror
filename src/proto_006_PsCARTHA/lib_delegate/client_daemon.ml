@@ -50,7 +50,13 @@ let await_bootstrapped_node (cctxt : #Protocol_client_context.full) =
   cctxt#message "Waiting for the node to be synchronized with its peers..."
   >>= fun () ->
   retry cctxt ~tries:5 ~delay:1. Shell_services.Monitor.bootstrapped cctxt
-  >>=? fun _ -> cctxt#message "Node synchronized." >>= fun () -> return_unit
+  >>=? fun (block_stream, _stopper) ->
+  let rec waiting_loop () =
+    Lwt_stream.get block_stream
+    >>= function None -> Lwt.return_unit | Some _ -> waiting_loop ()
+  in
+  waiting_loop ()
+  >>= fun () -> cctxt#message "Node synchronized." >>= fun () -> return_unit
 
 let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     ~cleanup_nonces =
