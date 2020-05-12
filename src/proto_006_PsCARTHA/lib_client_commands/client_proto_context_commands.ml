@@ -63,10 +63,19 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data ->
       Lwt.return_some data
 
-let file_parameter =
+let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
-      if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
-      else return p)
+      match String.split ~limit:1 ':' p with
+      | ["text"; text] ->
+          return (Ezjsonm.from_string text)
+      | ["file"; path] ->
+          Lwt_utils_unix.Json.read_file path
+      | _ -> (
+          if Sys.file_exists p then Lwt_utils_unix.Json.read_file p
+          else
+            try return (Ezjsonm.from_string p)
+            with Ezjsonm.Parse_error _ ->
+              failwith "Neither an existing file nor valid JSON: '%s'" p ))
 
 let data_parameter =
   Clic.parameter (fun _ data ->
@@ -959,19 +968,17 @@ let commands version () =
           @@ param
                ~name:"activation_key"
                ~desc:
-                 "Activate an Alphanet/Zeronet faucet account from the \
-                  downloaded JSON file."
-               file_parameter
+                 "Activate an Alphanet/Zeronet faucet account from the JSON \
+                  (file or directly inlined)."
+               json_file_or_text_parameter
           @@ stop )
-          (fun (force, encrypted) name activation_key_file cctxt ->
+          (fun (force, encrypted) name activation_json cctxt ->
             Secret_key.of_fresh cctxt force name
             >>=? fun name ->
-            Lwt_utils_unix.Json.read_file activation_key_file
-            >>=? fun json ->
             match
               Data_encoding.Json.destruct
                 Client_proto_context.activation_key_encoding
-                json
+                activation_json
             with
             | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
                 Format.kasprintf
@@ -980,7 +987,7 @@ let commands version () =
                   (fun ppf -> Data_encoding.Json.print_error ppf)
                   exn
                   Data_encoding.Json.pp
-                  json
+                  activation_json
             | key ->
                 activate_account
                   cctxt
