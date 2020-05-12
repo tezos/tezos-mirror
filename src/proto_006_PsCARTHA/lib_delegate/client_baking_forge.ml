@@ -602,7 +602,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   let anonymous = List.nth operations anonymous_index in
   let managers = List.nth operations managers_index in
   let validate_operation inc op =
-    add_operation inc op
+    protect (fun () -> add_operation inc op)
     >>= function
     | Error errs ->
         lwt_debug
