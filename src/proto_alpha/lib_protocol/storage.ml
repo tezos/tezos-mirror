@@ -43,7 +43,7 @@ module Z = struct
   let encoding = Data_encoding.z
 end
 
-module Int_index = struct
+module Int31_index = struct
   type t = int
 
   let path_length = 1
@@ -535,7 +535,7 @@ module Cycle = struct
          (struct
            let name = ["last_roll"]
          end))
-         (Int_index)
+         (Int31_index)
       (Roll_repr)
 
   module Roll_snapshot =
