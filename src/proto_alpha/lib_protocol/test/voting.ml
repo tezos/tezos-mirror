@@ -1246,46 +1246,89 @@ let get_voting_power block pkhash =
   Context.get_voting_power ctxt pkhash
 
 let test_voting_power_updated_each_voting_period () =
-  (* Create two accounts with 80.000 tezos each, this is, 10 rolls *)
-  let initial_balance = 80_000_000_000L in
-  Context.init ~initial_balances:[initial_balance; initial_balance] 2
+  let open Test_tez.Tez in
+  (* Create three accounts with different amounts *)
+  Context.init
+    ~initial_balances:[80_000_000_000L; 48_000_000_000L; 4_000_000_000_000L]
+    3
   >>=? fun (block, contracts) ->
+  let con1 = List.nth contracts 0 in
+  let con2 = List.nth contracts 1 in
+  let _con3 = List.nth contracts 2 in
+  (* Retrieve balance of con1 *)
+  Context.Contract.balance (B block) con1
+  >>=? fun balance1 ->
+  Assert.equal_tez ~loc:__LOC__ balance1 (of_mutez_exn 80_000_000_000L)
+  >>=? fun _ ->
+  (* Retrieve balance of con2 *)
+  Context.Contract.balance (B block) con2
+  >>=? fun balance2 ->
+  Assert.equal_tez ~loc:__LOC__ balance2 (of_mutez_exn 48_000_000_000L)
+  >>=? fun _ ->
   (* Retrieve constants blocks_per_voting_period and tokens_per_roll *)
   Context.get_constants (B block)
   >>=? fun {parametric = {blocks_per_voting_period; tokens_per_roll; _}; _} ->
-  (* Assert that both bakers have voting power of 10 rolls *)
+  (* Get the key hashes of the bakers *)
   Context.get_bakers (B block)
   >>=? fun bakers ->
-  let baker1 = List.nth bakers 0 in
+  let baker1 = List.nth bakers 2 in
   let baker2 = List.nth bakers 1 in
+  let _baker3 = List.nth bakers 0 in
+  (* Auxiliary assert_voting_power *)
   let assert_voting_power n block baker =
     get_voting_power block baker
     >>=? fun voting_power ->
     Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
   in
-  assert_voting_power 10 block baker1
+  (* Assert voting power is equal to the balance divided by tokens_per_roll *)
+  let power1 =
+    Int64.(to_int (div (to_mutez balance1) (to_mutez tokens_per_roll)))
+  in
+  assert_voting_power power1 block baker1
   >>=? fun _ ->
-  assert_voting_power 10 block baker2
+  (* Assert voting power is equal to the balance divided by tokens_per_roll *)
+  let power2 =
+    Int64.(to_int (div (to_mutez balance2) (to_mutez tokens_per_roll)))
+  in
+  assert_voting_power power2 block baker2
   >>=? fun _ ->
-  (* Transfer tokes_per_roll, i.e. one roll, from one baker to the other *)
-  let con1 = List.nth contracts 0 in
-  let con2 = List.nth contracts 1 in
-  let amount = tokens_per_roll in
+  (* Create policy that excludes baker1 and baker2 from baking *)
+  let policy = Block.Excluding [baker1; baker2] in
+  (* Transfer tokens_per_roll * num_rolls from baker1 to baker2 *)
+  let num_rolls = 5L in
+  tokens_per_roll *? num_rolls
+  >>?= fun amount ->
   Op.transaction (B block) con1 con2 amount
-  >>=? fun op ->
-  (* Bake the transaction containing the transfer operation *)
-  Block.bake ~operations:[op] block
+  >>=? fun _op ->
+  (* Bake the block containing the transaction *)
+  Block.bake ~policy ~operations:[_op] block
   >>=? fun block ->
-  (* Bake until the end of the current ovting period *)
-  Block.bake_n (Int32.to_int blocks_per_voting_period) block
+  (* Retrieve balance of con1 *)
+  Context.Contract.balance (B block) con1
+  >>=? fun balance1 ->
+  (* Assert balance has changed by tokens_per_roll * num_rolls *)
+  tokens_per_roll *? num_rolls
+  >>?= fun rolls ->
+  of_mutez_exn 80_000_000_000L -? rolls
+  >>?= Assert.equal_tez ~loc:__LOC__ balance1
+  >>=? fun _ ->
+  (* Retrieve balance of con2 *)
+  Context.Contract.balance (B block) con2
+  >>=? fun balance2 ->
+  (* Assert balance has changed by tokens_per_roll * num_rolls *)
+  tokens_per_roll *? num_rolls
+  >>?= fun rolls ->
+  of_mutez_exn 48_000_000_000L +? rolls
+  >>?= Assert.equal_tez ~loc:__LOC__ balance2
+  >>=? fun _ ->
+  (*  Bake until next voting period (init block and one block baked already) *)
+  Block.bake_n ~policy Int32.(to_int (sub blocks_per_voting_period 2l)) block
   >>=? fun block ->
-  (* Assert voting power of both bakers have changed by one roll *)
-  Context.get_bakers (B block)
-  >>=? fun bakers ->
-  let baker1 = List.nth bakers 0 in
-  let baker2 = List.nth bakers 1 in
-  assert_voting_power 9 block baker1
-  >>=? fun _ -> assert_voting_power 11 block baker2
+  (* Assert voting power has changed by num_rolls *)
+  assert_voting_power (Int.sub power1 (Int64.to_int num_rolls)) block baker1
+  >>=? fun _ ->
+  (* Assert voting power has changed by num_rolls *)
+  assert_voting_power (Int.add power2 (Int64.to_int num_rolls)) block baker2
 
 let tests =
   [ Test.tztest "voting successful_vote" `Quick (test_successful_vote 137);
