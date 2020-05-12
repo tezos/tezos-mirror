@@ -244,18 +244,19 @@ let () =
 let init_logs = lazy (Internal_event_unix.init ())
 
 let wrap n f =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lazy.force init_logs
-      >>= fun () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+  Alcotest.test_case n `Quick (fun () ->
+      Lwt_main.run
+        ( Lazy.force init_logs
+        >>= fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p.io-scheduler",
@@ -271,4 +272,3 @@ let () =
                 !port
                 !delay
                 !clients) ] ) ]
-  |> Lwt_main.run

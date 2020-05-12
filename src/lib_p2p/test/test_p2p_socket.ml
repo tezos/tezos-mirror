@@ -270,22 +270,23 @@ module Crypto_test = struct
   let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
 
   let wrap () =
-    Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
-        let msg = Bytes.of_string "test" in
-        write_chunk out_fd data msg
-        >>= fun _ ->
-        read_chunk in_fd data
-        >>= function
-        | Ok res when Bytes.equal msg res ->
-            Lwt.return_unit
-        | Ok res ->
-            Format.kasprintf
-              Stdlib.failwith
-              "Error : %s <> %s"
-              (Bytes.to_string res)
-              (Bytes.to_string msg)
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+    Alcotest.test_case "ACK" `Quick (fun () ->
+        Lwt_main.run
+          (let msg = Bytes.of_string "test" in
+           write_chunk out_fd data msg
+           >>= fun _ ->
+           read_chunk in_fd data
+           >>= function
+           | Ok res when Bytes.equal msg res ->
+               Lwt.return_unit
+           | Ok res ->
+               Format.kasprintf
+                 Stdlib.failwith
+                 "Error : %s <> %s"
+                 (Bytes.to_string res)
+                 (Bytes.to_string msg)
+           | Error error ->
+               Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 end
 
 module Low_level = struct
@@ -595,21 +596,22 @@ let spec =
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lazy.force init_logs
-      >>= fun () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+  Alcotest.test_case n `Quick (fun () ->
+      Lwt_main.run
+        ( Lazy.force init_logs
+        >>= fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
-  Alcotest_lwt.run
+  Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p-connection.",
@@ -623,7 +625,6 @@ let main () =
           wrap "close-on-write" Close_on_write.run;
           wrap "garbled-data" Garbled_data.run;
           Crypto_test.wrap () ] ) ]
-  |> Lwt_main.run
 
 let () =
   Sys.catch_break true ;

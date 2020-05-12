@@ -952,15 +952,16 @@ let spec =
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      Lazy.force init_logs
-      >>= fun () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_error error)
+  Alcotest.test_case n `Quick (fun () ->
+      Lwt_main.run
+        ( Lazy.force init_logs
+        >>= fun () ->
+        f ()
+        >>= function
+        | Ok () ->
+            Lwt.return_unit
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
@@ -968,7 +969,7 @@ let main () =
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in
   let points = List.map (fun port -> (!addr, port)) ports in
-  Alcotest_lwt.run
+  Alcotest.run
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p-connection-pool",
@@ -981,7 +982,6 @@ let main () =
               Overcrowded.run_mixed_versions points);
           wrap "no-common-network-protocol" (fun _ ->
               No_common_network.run points) ] ) ]
-  |> Lwt_main.run
 
 let () =
   Sys.catch_break true ;
