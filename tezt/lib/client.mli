@@ -1,0 +1,96 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Run Tezos client commands. *)
+
+(** Tezos client states. *)
+type t
+
+(** Create a client.
+
+    The standard output and standard error output of the node will
+    be logged with prefix [name] and color [color].
+
+    Default [base_dir] is a temporary directory
+    which is always the same for each [name].
+
+    The node argument is used to know which port to give to the client with [-P].
+    This node can be overridden for each command, as a client is not actually tied
+    to a node. Most commands require a node to be specified (either with [create]
+    or with the command itself). *)
+val create :
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?node:Node.t ->
+  unit ->
+  t
+
+(** {2 Admin Client Commands} *)
+
+module Admin : sig
+  (** Run tezos-admin-client commands. *)
+
+  (** Connect a node to another peer. *)
+  val connect_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+end
+
+(** {2 Regular Client Commands} *)
+
+(** Run [tezos-client import secret key]. *)
+val import_secret_key : ?node:Node.t -> t -> Constant.key -> unit Lwt.t
+
+(** Run [tezos-client activate protocol].
+
+    If [timestamp] is not specified explicitely, it is set to [now -. timestamp_delay].
+    Default value for [timestamp_delay] is 365 days, which allows to bake plenty of blocks
+    before their timestamp reach the present (at which point one would have to wait
+    between each block so that peers do not reject them for being in the future). *)
+val activate_protocol :
+  ?node:Node.t ->
+  ?protocol:Constant.protocol ->
+  ?fitness:int ->
+  ?key:string ->
+  ?timestamp:string ->
+  ?timestamp_delay:float ->
+  t ->
+  unit Lwt.t
+
+(** Run [tezos-client bake for].
+
+    Default [key] is {!Constant.bootstrap1.alias}. *)
+val bake_for :
+  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
+
+(** {2 High-Level Functions} *)
+
+(** Create a client and import all secret keys listed in {!Constant.all_secret_keys}. *)
+val init :
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?node:Node.t ->
+  unit ->
+  t Lwt.t
