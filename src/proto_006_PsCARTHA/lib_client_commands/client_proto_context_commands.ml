@@ -772,14 +772,13 @@ let commands version () =
          burn_cap_arg
          entrypoint_arg)
       ( prefixes ["call"]
+      @@ ContractAlias.destination_param
+           ~name:"dst"
+           ~desc:"name/literal of the destination contract"
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
-      @@ prefix "to"
-      @@ ContractAlias.destination_param
-           ~name:"dst"
-           ~desc:"name/literal of the destination contract"
       @@ stop )
       (fun ( fee,
              dry_run,
@@ -796,8 +795,8 @@ let commands version () =
              fee_cap,
              burn_cap,
              entrypoint )
-           (_, source)
            (_, destination)
+           (_, source)
            cctxt ->
         let amount = Tez.zero in
         transfer_command
