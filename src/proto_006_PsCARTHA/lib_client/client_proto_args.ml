@@ -177,12 +177,6 @@ let entrypoint_arg =
     ~doc:"entrypoint of the smart contract"
     string_parameter
 
-let spendable_switch =
-  switch
-    ~long:"spendable"
-    ~doc:"allow the manager to spend the contract's tokens"
-    ()
-
 let force_switch =
   switch
     ~long:"force"
@@ -200,9 +194,6 @@ let minimal_timestamp_switch =
       "Use the minimal timestamp instead of the current date as timestamp of \
        the baked block."
     ()
-
-let delegatable_switch =
-  switch ~long:"delegatable" ~doc:"allow future delegate change" ()
 
 let tez_format =
   "Text format: `DDDDDDD.DDDDDD`.\n\
