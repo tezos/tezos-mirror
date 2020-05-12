@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PeerLRUCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
-  ( val Ringo.set_maker ~replacement:LRU ~overflow:Strong ~accounting:Sloppy
+module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
+  ( val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
       : Ringo.SET_MAKER )
     (P2p_peer.Id)
 
@@ -111,7 +111,7 @@ end)
 
 type t = {
   mutable greylist_ips : IpSet.t;
-  greylist_peers : PeerLRUCache.t;
+  greylist_peers : PeerFIFOCache.t;
   banned_ips : unit IpTable.t;
   banned_peers : unit P2p_peer.Table.t;
 }
@@ -119,7 +119,7 @@ type t = {
 let create size =
   {
     greylist_ips = IpSet.empty;
-    greylist_peers = PeerLRUCache.create size;
+    greylist_peers = PeerFIFOCache.create size;
     banned_ips = IpTable.create 53;
     banned_peers = P2p_peer.Table.create 53;
   }
@@ -138,17 +138,17 @@ let unban_addr acl addr =
    its ip address banned, but not its ID. *)
 let banned_peer acl peer_id =
   P2p_peer.Table.mem acl.banned_peers peer_id
-  || PeerLRUCache.mem acl.greylist_peers peer_id
+  || PeerFIFOCache.mem acl.greylist_peers peer_id
 
 let unban_peer acl peer_id =
   P2p_peer.Table.remove acl.banned_peers peer_id ;
-  PeerLRUCache.remove acl.greylist_peers peer_id
+  PeerFIFOCache.remove acl.greylist_peers peer_id
 
 let clear acl =
   acl.greylist_ips <- IpSet.empty ;
   P2p_peer.Table.clear acl.banned_peers ;
   IpTable.clear acl.banned_ips ;
-  PeerLRUCache.clear acl.greylist_peers
+  PeerFIFOCache.clear acl.greylist_peers
 
 module IPGreylist = struct
   let add acl addr time =
@@ -181,7 +181,7 @@ module PeerBlacklist = struct
 end
 
 module PeerGreylist = struct
-  let add acl peer_id = PeerLRUCache.add acl.greylist_peers peer_id
+  let add acl peer_id = PeerFIFOCache.add acl.greylist_peers peer_id
 
-  let mem acl peer_id = PeerLRUCache.mem acl.greylist_peers peer_id
+  let mem acl peer_id = PeerFIFOCache.mem acl.greylist_peers peer_id
 end
