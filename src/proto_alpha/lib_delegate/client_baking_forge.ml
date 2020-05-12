@@ -33,11 +33,6 @@ end)
 
 open Logging
 
-(* Just proving a point *)
-let[@warning "-32"] time_protocol__is__protocol_time :
-    Alpha_context.Timestamp.t -> Time.Protocol.t =
- fun x -> x
-
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
