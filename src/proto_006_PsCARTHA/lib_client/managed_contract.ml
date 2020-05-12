@@ -170,6 +170,45 @@ let d_unit =
 let t_unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
 
+let build_lambda_for_implicit ~delegate ~amount =
+  let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
+  Format.asprintf
+    "{ DROP ; NIL operation ;PUSH key_hash 0x%s; IMPLICIT_ACCOUNT;PUSH mutez \
+     %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"
+    delegate
+    (Tez.to_mutez amount)
+
+let build_lambda_for_originated ~destination ~entrypoint ~amount
+    ~parameter_type ~parameter =
+  let destination =
+    Data_encoding.Binary.to_bytes_exn Contract.encoding destination
+  in
+  let amount = Tez.to_mutez amount in
+  let (`Hex destination) = MBytes.to_hex destination in
+  let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
+  if parameter_type = t_unit then
+    Format.asprintf
+      "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
+       ASSERT_SOME;PUSH mutez %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"
+      destination
+      entrypoint
+      Michelson_v1_printer.print_expr
+      parameter_type
+      amount
+  else
+    Format.asprintf
+      "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
+       ASSERT_SOME;PUSH mutez %Ld ;PUSH %a %a;TRANSFER_TOKENS ; CONS }"
+      destination
+      entrypoint
+      Michelson_v1_printer.print_expr
+      parameter_type
+      amount
+      Michelson_v1_printer.print_expr
+      parameter_type
+      Michelson_v1_printer.print_expr
+      parameter
+
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ~source ~src_pk ~src_sk ~contract ~destination
     ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
@@ -177,59 +216,49 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
     Lwt.t =
   ( match Alpha_context.Contract.is_implicit destination with
-  | None -> (
+  | Some delegate when entrypoint = "default" ->
+      return @@ build_lambda_for_implicit ~delegate ~amount
+  | Some _ ->
+      cctxt#error
+        "Implicit accounts have no entrypoints. (targeted entrypoint %%%s on \
+         contract %a)"
+        entrypoint
+        Contract.pp
+        destination
+  | None ->
       Michelson_v1_entrypoints.contract_entrypoint_type
         cctxt
         ~chain
         ~block
         ~contract:destination
         ~entrypoint
-      >>=? function
+      >>=? (function
+             | None ->
+                 cctxt#error
+                   "Contract %a has no entrypoint named %s"
+                   Contract.pp
+                   destination
+                   entrypoint
+             | Some parameter_type ->
+                 return parameter_type)
+      >>=? fun parameter_type ->
+      ( match arg with
+      | Some arg ->
+          Lwt.return @@ Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression arg
+          >>=? fun {expanded = arg; _} -> return_some arg
       | None ->
-          cctxt#error
-            "Contract %a has no entrypoint named %s"
-            Contract.pp
-            destination
-            entrypoint
-      | Some parameter_type ->
-          return parameter_type )
-  | Some _ when entrypoint = "default" ->
-      return t_unit (* if contract is implicit, parameter type is unit *)
-  | _ ->
-      cctxt#error
-        "Implicit accounts have no entrypoints. (targeted entrypoint %%%s on \
-         contract %a)"
-        entrypoint
-        Contract.pp
-        destination )
-  >>=? fun parameter_type ->
-  ( match arg with
-  | Some arg ->
-      Lwt.return @@ Micheline_parser.no_parsing_error
-      @@ Michelson_v1_parser.parse_expression arg
-      >>=? fun {expanded = arg; _} -> return_some arg
-  | None ->
-      return_none )
-  >>=? fun parameters ->
-  let parameters = Option.unopt ~default:d_unit parameters in
-  let lambda =
-    let destination =
-      Data_encoding.Binary.to_bytes_exn Contract.encoding destination
-    in
-    let (`Hex destination) = MBytes.to_hex destination in
-    Format.asprintf
-      "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
-       ASSERT_SOME;PUSH mutez %Ld ;PUSH %a %a;TRANSFER_TOKENS ; CONS }"
-      destination
-      (match entrypoint with "default" -> "" | s -> "%" ^ s)
-      Michelson_v1_printer.print_expr
-      parameter_type
-      (Tez.to_mutez amount)
-      Michelson_v1_printer.print_expr
-      parameter_type
-      Michelson_v1_printer.print_expr
-      parameters
-  in
+          return_none )
+      >>=? fun parameter ->
+      let parameter = Option.unopt ~default:d_unit parameter in
+      return
+      @@ build_lambda_for_originated
+           ~destination
+           ~entrypoint
+           ~amount
+           ~parameter_type
+           ~parameter )
+  >>=? fun lambda ->
   parse lambda
   >>=? fun parameters ->
   let entrypoint = "do" in
