@@ -1834,5 +1834,6 @@ let history_mode {global_data; _} =
       >|= Option.unopt_assert ~loc:__POS__)
 
 let close {global_data; _} =
-  Shared.use global_data (fun {global_store; _} ->
-      Store.close global_store ; Lwt.return_unit)
+  Shared.use global_data (fun {global_store; context_index; _} ->
+      Store.close global_store ;
+      Context.close context_index)

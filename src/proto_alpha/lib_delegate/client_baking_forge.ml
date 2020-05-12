@@ -1555,10 +1555,14 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   in
   let timeout_k cctxt state () =
     bake cctxt ~user_activated_upgrades ~chain state
-    >>=? fun () ->
-    (* Stopping the timeout and waiting for the next block *)
-    state.best_slot <- None ;
-    return_unit
+    >>= function
+    | Error err ->
+        (* Close the context properly. *)
+        Context.close state.index >>= fun () -> Lwt.return (Error err)
+    | Ok () ->
+        (* Stopping the timeout and waiting for the next block *)
+        state.best_slot <- None ;
+        return_unit
   in
   Client_baking_scheduling.main
     ~name:"baker"
