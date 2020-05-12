@@ -6,9 +6,7 @@ from launchers.sandbox import Sandbox
 @pytest.fixture(scope="class")
 def sandbox():
     """Example of sandbox fixture."""
-    with Sandbox(paths.TEZOS_HOME,
-                 constants.IDENTITIES,
-                 constants.GENESIS_PK) as sandbox:
+    with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)

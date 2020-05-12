@@ -12,9 +12,7 @@ SENDER_SK = constants.IDENTITIES['bootstrap1']['secret'][len('unencrypted:'):]
 
 
 def scenario():
-    with Sandbox(paths.TEZOS_HOME,
-                 constants.IDENTITIES,
-                 constants.GENESIS_PK) as sandbox:
+    with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         # Launch node running protocol alpha
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))

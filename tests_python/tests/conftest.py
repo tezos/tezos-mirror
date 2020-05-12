@@ -73,7 +73,6 @@ def sandbox(log_dir):
     # log_dir is None if not provided on command-line
     with Sandbox(paths.TEZOS_HOME,
                  constants.IDENTITIES,
-                 constants.GENESIS_PK,
                  log_dir=log_dir) as sandbox:
         yield sandbox
         assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
@@ -182,7 +181,6 @@ def sandbox_multibranch(log_dir, request):
 
     with SandboxMultiBranch(paths.TEZOS_BINARIES,
                             constants.IDENTITIES,
-                            constants.GENESIS_PK,
                             num_peers=num_peers,
                             log_dir=log_dir,
                             branch_map=branch_map) as sandbox:

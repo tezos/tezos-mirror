@@ -41,7 +41,6 @@ class Node:
     Typical use.
 
     node = Node(node_bin,
-                sandbox_file,
                 p2p_port=p2p_node,
                 rpc_port=rpc_node,
                 peers=peers_rpc,
@@ -61,7 +60,6 @@ class Node:
 
     def __init__(self,
                  node: str,
-                 sandbox_file: str = None,
                  expected_pow: float = 0.0,
                  node_dir: str = None,
                  use_tls: Tuple[str, str] = None,
@@ -82,8 +80,6 @@ class Node:
         Creates a temporary node directory unless provided  by caller.
         Generate node identity.
         """
-        if sandbox_file:
-            assert os.path.isfile(sandbox_file), f'{sandbox_file} not a file'
         assert os.path.isfile(node), f'{node} not a file'
         assert node_dir is None or os.path.isdir(node_dir), (f'{node_dir} not '
                                                              f'a dir')
@@ -102,13 +98,8 @@ class Node:
         self._params = params
         self._run_called_before = False
 
-        node_run = [node,
-                    'run',
-                    '--data-dir', node_dir,
-                    '--no-bootstrap-peers']
-        if sandbox_file:
-            node_run.append(f'--sandbox={sandbox_file}')
-        node_run.extend(params)
+        node_run = [node, 'run', '--data-dir', node_dir,
+                    '--no-bootstrap-peers'] + params
 
         if peers is not None:
             for peer in peers:

@@ -1,8 +1,5 @@
 from typing import Dict, List, Tuple, Callable
-import json
 import os
-import shutil
-import tempfile
 import time
 
 from client.client import Client
@@ -15,7 +12,6 @@ CLIENT = 'tezos-client'
 CLIENT_ADMIN = 'tezos-admin-client'
 BAKER = 'tezos-baker'
 ENDORSER = 'tezos-endorser'
-TMP_DIR_PREFIX = 'tezos-sandbox.'
 
 
 class Sandbox:
@@ -55,7 +51,6 @@ class Sandbox:
     def __init__(self,
                  binaries_path: str,
                  identities: Dict[str, Dict[str, str]],
-                 genesis_pk: str,
                  rpc: int = 18730,
                  p2p: int = 19730,
                  num_peers: int = 45,
@@ -65,7 +60,6 @@ class Sandbox:
             binaries_path (str): path to the binaries (client, node, baker,
                 endorser). Typically, this parameter is TEZOS_HOME.
             identities (dict): identities known to all clients.
-            genesis_pk (str): genesis activation public key
             rpc (int): base RPC port
             p2p (int): base P2P port
             num_peers (int): max number of peers
@@ -97,17 +91,8 @@ class Sandbox:
         self.endorsers = {}  # type: Dict[str, Dict[int, Endorser]]
         self.counter = 0
         self.logs = []  # type: List[str]
-        self.sandbox_dir = None
-        self.sandbox_file = None
-        self._genesis_pk = genesis_pk
 
     def __enter__(self):
-        """Create and initialize node dir"""
-        sandbox_dir = tempfile.mkdtemp(prefix=TMP_DIR_PREFIX)
-        self.sandbox_dir = sandbox_dir
-        self.sandbox_file = f'{sandbox_dir}/sandbox_file.json'
-        with open(self.sandbox_file, 'w+') as file:
-            file.write(json.dumps({'genesis_pubkey': self._genesis_pk}))
         return self
 
     def register_node(self, node_id: int,
@@ -128,7 +113,6 @@ class Sandbox:
         tezos-node run
            --data-dir TMP_DIR
            --no-bootstrap-peers
-           --sandbox=SANDBOX_FILE
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
            --private-mode # if private is True
         """
@@ -152,10 +136,9 @@ class Sandbox:
         params = params + ['--network=sandbox']
         peers_rpc = [self.p2p + p for p in peers]
         node_bin = self._wrap_path(NODE, branch)
-        node = Node(node_bin, self.sandbox_file, node_dir=node_dir,
-                    p2p_port=p2p_node, rpc_port=rpc_node,
-                    peers=peers_rpc, log_file=log_file, params=params,
-                    log_levels=log_levels, use_tls=use_tls)
+        node = Node(node_bin, node_dir=node_dir, p2p_port=p2p_node,
+                    rpc_port=rpc_node, peers=peers_rpc, log_file=log_file,
+                    params=params, log_levels=log_levels, use_tls=use_tls)
 
         self.nodes[node_id] = node
         return node
@@ -221,24 +204,11 @@ class Sandbox:
 
     def init_node(self, node, snapshot, reconstruct):
         """Generate node id and import snapshot """
-        if snapshot is None:
-            node.init_id()
-            node.init_config()
-        else:
-            assert_msg = ("The attribute sandbox_file can not be None. "
-                          "Please verify you wrapped the call to this method "
-                          " inside a with statement")
-            assert self.sandbox_file is not None, assert_msg
-            node.init_id()
-            node.init_config()
-            sandboxed_import = [f'--sandbox', self.sandbox_file]
-            if reconstruct:
-                node.snapshot_import(snapshot,
-                                     ['--reconstruct', '--network=sandbox'] +
-                                     sandboxed_import)
-            else:
-                node.snapshot_import(snapshot,
-                                     ['--network=sandbox'] + sandboxed_import)
+        node.init_id()
+        node.init_config()
+        if snapshot is not None:
+            params = ['--reconstruct'] if reconstruct else []
+            node.snapshot_import(snapshot, params)
 
     def init_client(self,
                     client,
@@ -298,7 +268,6 @@ class Sandbox:
         tezos-node run
            --data-dir TMP_DIR
            --no-bootstrap-peers
-           --sandbox=SANDBOX_FILE
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
            --private-mode # if private is True
 
@@ -488,7 +457,6 @@ class Sandbox:
                 endorser.terminate_or_kill()
         for client in self.clients.values():
             client.cleanup()
-        shutil.rmtree(self.sandbox_dir)
 
     def are_daemons_alive(self) -> bool:
         """ Returns True iff all started daemons/nodes are still alive.
@@ -538,7 +506,6 @@ class SandboxMultiBranch(Sandbox):
     def __init__(self,
                  binaries_path: str,
                  identities: Dict[str, Dict[str, str]],
-                 genesis_pk: str,
                  branch_map: Dict[int, str],
                  rpc: int = 18730,
                  p2p: int = 19730,
@@ -547,7 +514,6 @@ class SandboxMultiBranch(Sandbox):
         """Same semantics as Sandbox class, plus a `branch_map` parameter"""
         super().__init__(binaries_path,
                          identities,
-                         genesis_pk,
                          rpc,
                          p2p,
                          num_peers,

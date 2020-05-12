@@ -27,7 +27,6 @@ def forge_block_header_data(protocol_data):
 def main():
     with Sandbox(paths.TEZOS_HOME,
                  constants.IDENTITIES,
-                 constants.GENESIS_PK,
                  log_dir='tmp') as sandbox:
         # launch a sandbox node
         sandbox.add_node(0, params=constants.NODE_PARAMS)
