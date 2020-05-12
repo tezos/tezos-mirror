@@ -28,6 +28,20 @@ include Internal_event.Legacy_logging.Make_semantic (struct
 end)
 
 open Logging
+open Protocol_client_context
+
+type error += Node_connection_lost
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"client_baking_scheduling.node_connection_lost"
+    ~title:"Node connection lost"
+    ~description:"The connection with the node was lost."
+    ~pp:(fun fmt () -> Format.fprintf fmt "Lost connection with the node")
+    Data_encoding.empty
+    (function Node_connection_lost -> Some () | _ -> None)
+    (fun () -> Node_connection_lost)
 
 let sleep_until time =
   (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
@@ -122,7 +136,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
               f "Connection to node lost, %s exiting."
               -% t event "daemon_connection_lost"
               -% s worker_tag name)
-        >>= fun () -> return_unit
+        >>= fun () -> fail Node_connection_lost
     | `Event (Some (Ok event)) ->
         (* new event: cancel everything and execute callback *)
         last_get_event := None ;
