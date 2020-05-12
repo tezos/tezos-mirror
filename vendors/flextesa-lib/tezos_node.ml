@@ -11,7 +11,7 @@ type t =
     peers: int list
   ; exec: Tezos_executable.t
   ; protocol: Tezos_protocol.t
-  ; history_mode: [`Full | `Archive | `Rolling] option
+  ; history_mode: [`Archive | `Full of int | `Rolling of int] option
   ; single_process: bool
   ; cors_origin: string option
   ; custom_network: custom_network option }
@@ -99,8 +99,12 @@ module Config_file = struct
                 [ ( "history_mode"
                   , match h with
                     | `Archive -> string "archive"
-                    | `Full -> string "full"
-                    | `Rolling -> string "rolling" ) ] ) ] in
+                    | `Full off ->
+                        dict [("full", dict [("additional_cycles", int off)])]
+                    | `Rolling off ->
+                        dict
+                          [("rolling", dict [("additional_cycles", int off)])]
+                  ) ] ) ] in
     let network =
       Option.value_map t.custom_network
         ~default:[("network", `O default_network)]
@@ -218,7 +222,8 @@ module History_modes = struct
     let open Cmdliner in
     let open Term in
     let history_mode_converter =
-      Arg.enum [("archive", `Archive); ("full", `Full); ("rolling", `Rolling)]
+      Arg.enum
+        [("archive", `Archive); ("full", `Full 5); ("rolling", `Rolling 5)]
     in
     let docs =
       Manpage_builder.section state ~rank:2 ~name:"NODE HISTORY MODES"
