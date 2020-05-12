@@ -1,3 +1,35 @@
+# Version 7.1
+
+## Source Compilation
+
+- The `Makefile` now ignores directories with no `lib_protocol/TEZOS_PROTOCOL`
+  files when listing protocols to compile. This fixes an error where `make` complained
+  that it had no rule to build `TEZOS_PROTOCOL` for directories that Git
+  does not completely remove when switching branches.
+
+- One can now use opam 2.0.0 again. In version 7.0, an error saying that it did not know
+  about option `--silent` was emitted.
+
+- The repository no longer contains file names which are longer than 140 characters.
+  Longer file names prevented users from checking out version 7.0 on encrypted
+  file systems in particular.
+
+- Fixed an issue causing `make build-deps` to sometimes fail after an update of
+  the digestif external library.
+
+## Client
+
+- Optimized the LAMBDA which is built when injecting manager operations.
+
+- Fixed a bug which caused the wrong entrypoint (`set_delegate` instead of
+  `remove_delegate`) from being used in some cases when setting delegates.
+
+- Command `activate account ... with` can now be given a JSON value directly
+  as an argument instead of only a filename.
+
+- Syntax for command `call from <SRC> to <DST>` has been fixed to match
+  the one for `proto_alpha`. It should now be called as `call <DST> from <SRC>`.
+
 # Version 7.0
 
 ## Multinetwork
