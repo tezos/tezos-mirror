@@ -46,30 +46,22 @@ let rec retry (cctxt : #Protocol_client_context.full) ~delay ~factor ~tries f x
   | Error _ as err ->
       Lwt.return err
 
-let retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
-  (* Wait less the first time the daemon is launched. *)
-  Client_confirmations.wait_for_bootstrapped
-    ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
-    cctxt
-  >>=? fun _ ->
-  let rec loop () =
-    f ()
-    >>= function
-    | Ok () ->
-        return_unit
-    | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
-        cctxt#warning
-          "Lost connection with the node. Retrying to establish connection..."
-        >>= fun () ->
-        (* Wait forever when the node stops responding... *)
-        Client_confirmations.wait_for_bootstrapped
-          cctxt
-          ~retry:(retry cctxt ~delay:10. ~factor:1. ~tries:max_int)
-        >>=? fun () -> loop ()
-    | Error err ->
-        cctxt#error "Unexpected error: %a. Exiting..." pp_print_error err
-  in
-  loop ()
+let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
+  f ()
+  >>= function
+  | Ok () ->
+      return_unit
+  | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
+      cctxt#warning
+        "Lost connection with the node. Retrying to establish connection..."
+      >>= fun () ->
+      (* Wait forever when the node stops responding... *)
+      Client_confirmations.wait_for_bootstrapped
+        ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:max_int)
+        cctxt
+      >>=? fun () -> retry_on_disconnection cctxt f
+  | Error err ->
+      cctxt#error "Unexpected error: %a. Exiting..." pp_print_error err
 
 let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     ~cleanup_nonces =
@@ -128,7 +120,8 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
   >>=? fun () -> cctxt#message "Test chain forked." >>= fun () -> return_unit
 
 module Endorser = struct
-  let run (cctxt : #Protocol_client_context.full) ~chain ~delay delegates =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
+      delegates =
     let process () =
       ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
       else return_unit )
@@ -142,13 +135,17 @@ module Endorser = struct
       >>= fun () ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream
     in
-    retry_on_disconnection cctxt process
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      cctxt
+    >>=? fun () ->
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
 module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ~chain ~context_path delegates =
+      ~chain ~context_path ~keep_alive delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -174,11 +171,16 @@ module Baker = struct
         delegates
         block_stream
     in
-    retry_on_disconnection cctxt process
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      cctxt
+    >>=? fun () ->
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
 module Accuser = struct
-  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
+      ~keep_alive =
     let process () =
       ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
       else return_unit )
@@ -196,5 +198,9 @@ module Accuser = struct
         ~preserved_levels
         valid_blocks_stream
     in
-    retry_on_disconnection cctxt process
+    Client_confirmations.wait_for_bootstrapped
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      cctxt
+    >>=? fun () ->
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end
