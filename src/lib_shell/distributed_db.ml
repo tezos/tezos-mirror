@@ -558,7 +558,8 @@ module P2p_reader = struct
         Lwt.async (fun () ->
             let meta = P2p.get_peer_metadata db.p2p gid in
             Peer_metadata.incr meta (Sent_request Branch) ;
-            P2p.send db.p2p conn (Get_current_branch chain_id)))
+            P2p.send db.p2p conn (Get_current_branch chain_id)
+            >>= fun _ -> Lwt.return_unit))
       db.active_chains ;
     state.worker <-
       Lwt_utils.worker
@@ -662,7 +663,9 @@ let activate ({p2p; active_chains; _} as global_db) chain_state =
         }
       in
       P2p.iter_connections p2p (fun _peer_id conn ->
-          Lwt.async (fun () -> P2p.send p2p conn (Get_current_branch chain_id))) ;
+          Lwt.async (fun () ->
+              P2p.send p2p conn (Get_current_branch chain_id)
+              >>= fun _ -> Lwt.return_unit)) ;
       Chain_id.Table.add active_chains chain_id chain ;
       chain
   | Some chain ->
@@ -677,7 +680,9 @@ let deactivate chain_db =
   P2p_peer.Table.iter
     (fun _peer_id reader ->
       P2p_reader.deactivate reader chain_db ;
-      Lwt.async (fun () -> P2p.send p2p reader.conn (Deactivate chain_id)))
+      Lwt.async (fun () ->
+          P2p.send p2p reader.conn (Deactivate chain_id)
+          >>= fun _ -> Lwt.return_unit))
     chain_db.active_connections ;
   Distributed_db_requester.Raw_operation.shutdown chain_db.operation_db
   >>= fun () ->

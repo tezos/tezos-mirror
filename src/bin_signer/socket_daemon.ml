@@ -132,7 +132,8 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
                   ~require_auth
                   cctxt
                   cfd)
-              (fun () -> Lwt_utils_unix.safe_close cfd))) ;
+              (fun () -> Lwt_utils_unix.safe_close cfd))
+        >>= fun _ -> Lwt.return_unit) ;
     loop fd
   in
   Lwt_list.map_p loop fds >>= return

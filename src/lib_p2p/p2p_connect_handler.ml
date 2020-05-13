@@ -540,7 +540,8 @@ let accept t fd point =
         with_timeout
           ~canceler
           (Systime_os.sleep t.config.authentication_timeout)
-          (fun canceler -> authenticate t canceler fd point))
+          (fun canceler -> authenticate t canceler fd point)
+        >>= fun _ -> Lwt.return_unit)
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with

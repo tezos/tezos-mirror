@@ -25,7 +25,7 @@
 
 open Error_monad
 
-let () = Lwt_unix.set_default_async_method Async_none
+let () = Lwt_unix.set_default_async_method Async_none [@@ocaml.warning "-3"]
 
 let section = Lwt_log.Section.make "process"
 

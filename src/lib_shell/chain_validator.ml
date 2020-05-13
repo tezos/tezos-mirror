@@ -499,35 +499,43 @@ let on_launch start_prevalidator w _ parameters =
       notify_branch =
         (fun peer_id locator ->
           Lwt.async (fun () ->
-              with_activated_peer_validator w peer_id
+              ( with_activated_peer_validator w peer_id
               @@ fun pv ->
               Peer_validator.notify_branch pv locator ;
-              return_unit));
+              return_unit )
+              >>= fun _ -> Lwt.return_unit));
       notify_head =
         (fun peer_id block ops ->
           Lwt.async (fun () ->
               with_activated_peer_validator w peer_id (fun pv ->
                   Peer_validator.notify_head pv block ;
                   return_unit)
-              >>=? fun () ->
-              (* TODO notify prevalidator only if head is known ??? *)
-              match nv.prevalidator with
-              | Some prevalidator ->
-                  Prevalidator.notify_operations prevalidator peer_id ops
-                  >>= fun () -> return_unit
-              | None ->
-                  return_unit));
+              >>=? (fun () ->
+                     (* TODO notify prevalidator only if head is known ??? *)
+                     match nv.prevalidator with
+                     | Some prevalidator ->
+                         Prevalidator.notify_operations
+                           prevalidator
+                           peer_id
+                           ops
+                         >>= fun () -> return_unit
+                     | None ->
+                         return_unit)
+              >>= fun _ -> Lwt.return_unit));
       disconnection =
         (fun peer_id ->
           Lwt.async (fun () ->
               let nv = Worker.state w in
               match P2p_peer.Error_table.find_opt nv.active_peers peer_id with
               | None ->
-                  return_unit
-              | Some pv ->
+                  Lwt.return_unit
+              | Some pv -> (
                   pv
-                  >>=? fun pv ->
-                  Peer_validator.shutdown pv >>= fun () -> return_unit));
+                  >>= function
+                  | Error _ ->
+                      Lwt.return_unit
+                  | Ok pv ->
+                      Peer_validator.shutdown pv )));
     } ;
   return nv
 
