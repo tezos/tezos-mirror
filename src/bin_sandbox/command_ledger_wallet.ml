@@ -401,13 +401,13 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
       \            }\n\
       \        };"
     in
-    let tmp = Filename.temp_file "manager" ".tz" in
+    let tmp = Caml.Filename.temp_file "manager" ".tz" in
     System.write_file state tmp ~content:manager_tz_script
     >>= fun () ->
     let origination =
       let opt = Option.value_map ~default:[] in
       ["--wait"; "none"; "originate"; "contract"; name]
-      @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon -> [])
+      @ (match protocol_kind with `Athens -> ["for"; from] | `Babylon | `Carthage -> [])
       @ [ "transferring";
           "350";
           "from";
@@ -522,7 +522,7 @@ let manager_tz_delegation_tests state ~client ~ledger_key ~ledger_account
           ~client
           ~f:(fun _ proc ->
             find_and_print_signature_hash
-              ~display_expectation:(protocol_kind = `Babylon)
+              ~display_expectation:Poly.(protocol_kind = `Babylon)
               state
               proc)
           command
