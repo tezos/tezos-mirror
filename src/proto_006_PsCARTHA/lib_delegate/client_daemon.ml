@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec retry (cctxt : #Protocol_client_context.full) ~delay ~tries f x =
+let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+    ~tries f x =
   f x
   >>= function
   | Ok _ as r ->
@@ -41,9 +42,34 @@ let rec retry (cctxt : #Protocol_client_context.full) ~delay ~tries f x =
       | `Killed ->
           Lwt.return err
       | `Continue ->
-          retry cctxt ~delay:(delay *. 1.5) ~tries:(tries - 1) f x )
+          let next_delay = delay *. factor in
+          let delay =
+            Option.unopt_map
+              ~default:next_delay
+              ~f:(fun max_delay -> Float.min next_delay max_delay)
+              max_delay
+          in
+          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x )
   | Error _ as err ->
       Lwt.return err
+
+let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
+  f ()
+  >>= function
+  | Ok () ->
+      return_unit
+  | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
+      cctxt#warning
+        "Lost connection with the node. Retrying to establish connection..."
+      >>= fun () ->
+      (* Wait forever when the node stops responding... *)
+      Client_confirmations.wait_for_bootstrapped
+        ~retry:
+          (retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
+        cctxt
+      >>=? fun () -> retry_on_disconnection cctxt f
+  | Error err ->
+      cctxt#error "Unexpected error: %a. Exiting..." pp_print_error err
 
 let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     ~cleanup_nonces =
@@ -65,8 +91,7 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
       when Protocol_hash.equal Protocol.hash protocol ->
         let abort_daemon () =
           cctxt#message
-            "Test chain's expiration date reached (%a)... Stopping the \
-             daemon.@."
+            "Test chain's expiration date reached (%a)... Stopping the daemon."
             Time.Protocol.pp_hum
             expiration_date
           >>= fun () ->
@@ -103,76 +128,87 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
   >>=? fun () -> cctxt#message "Test chain forked." >>= fun () -> return_unit
 
 module Endorser = struct
-  let run (cctxt : #Protocol_client_context.full) ~chain ~delay delegates =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
+      delegates =
+    let process () =
+      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
+      else return_unit )
+      >>=? fun () ->
+      Client_baking_blocks.monitor_heads
+        ~next_protocols:(Some [Protocol.hash])
+        cctxt
+        chain
+      >>=? fun block_stream ->
+      cctxt#message "Endorser started."
+      >>= fun () ->
+      Client_baking_endorsement.create cctxt ~delay delegates block_stream
+    in
     Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
-    >>=? fun _ ->
-    ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
-    else return_unit )
     >>=? fun () ->
-    Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [Protocol.hash])
-      cctxt
-      chain
-    >>=? fun block_stream ->
-    cctxt#message "Endorser started."
-    >>= fun () ->
-    Client_baking_endorsement.create cctxt ~delay delegates block_stream
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
 module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ~chain ~context_path delegates =
+      ~chain ~context_path ~keep_alive delegates =
+    let process () =
+      Config_services.user_activated_upgrades cctxt
+      >>=? fun user_activated_upgrades ->
+      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
+      else return_unit )
+      >>=? fun () ->
+      Client_baking_blocks.monitor_heads
+        ~next_protocols:(Some [Protocol.hash])
+        cctxt
+        chain
+      >>=? fun block_stream ->
+      cctxt#message "Baker started."
+      >>= fun () ->
+      Client_baking_forge.create
+        cctxt
+        ~user_activated_upgrades
+        ?minimal_fees
+        ?minimal_nanotez_per_gas_unit
+        ?minimal_nanotez_per_byte
+        ?max_priority
+        ~chain
+        ~context_path
+        delegates
+        block_stream
+    in
     Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
-    >>=? fun _ ->
-    Config_services.user_activated_upgrades cctxt
-    >>=? fun user_activated_upgrades ->
-    ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-    else return_unit )
     >>=? fun () ->
-    Client_baking_blocks.monitor_heads
-      ~next_protocols:(Some [Protocol.hash])
-      cctxt
-      chain
-    >>=? fun block_stream ->
-    cctxt#message "Baker started."
-    >>= fun () ->
-    Client_baking_forge.create
-      cctxt
-      ~user_activated_upgrades
-      ?minimal_fees
-      ?minimal_nanotez_per_gas_unit
-      ?minimal_nanotez_per_byte
-      ?max_priority
-      ~chain
-      ~context_path
-      delegates
-      block_stream
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
 module Accuser = struct
-  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels =
+  let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
+      ~keep_alive =
+    let process () =
+      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
+      else return_unit )
+      >>=? fun () ->
+      Client_baking_blocks.monitor_valid_blocks
+        ~next_protocols:(Some [Protocol.hash])
+        cctxt
+        ~chains:[chain]
+        ()
+      >>=? fun valid_blocks_stream ->
+      cctxt#message "Accuser started."
+      >>= fun () ->
+      Client_baking_denunciation.create
+        cctxt
+        ~preserved_levels
+        valid_blocks_stream
+    in
     Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~tries:5 ~delay:1.)
+      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
-    >>=? fun _ ->
-    ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-    else return_unit )
     >>=? fun () ->
-    Client_baking_blocks.monitor_valid_blocks
-      ~next_protocols:(Some [Protocol.hash])
-      cctxt
-      ~chains:[chain]
-      ()
-    >>=? fun valid_blocks_stream ->
-    cctxt#message "Accuser started."
-    >>= fun () ->
-    Client_baking_denunciation.create
-      cctxt
-      ~preserved_levels
-      valid_blocks_stream
+    if keep_alive then retry_on_disconnection cctxt process else process ()
 end

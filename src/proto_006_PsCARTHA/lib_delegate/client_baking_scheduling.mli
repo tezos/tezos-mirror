@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Node_connection_lost
+
 val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
 val wait_for_first_event :

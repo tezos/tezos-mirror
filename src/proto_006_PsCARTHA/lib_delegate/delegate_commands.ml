@@ -77,6 +77,15 @@ let block_param t =
     (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
     t
 
+let keep_alive_arg =
+  Clic.switch
+    ~doc:
+      "Keep the daemon process alive: when the connection with the node is \
+       lost, the daemon periodically tries to reach it."
+    ~short:'K'
+    ~long:"keep-alive"
+    ()
+
 let delegate_commands () =
   let open Clic in
   [ command
@@ -238,12 +247,13 @@ let baker_commands () =
   [ command
       ~group
       ~desc:"Launch the baker daemon."
-      (args5
+      (args6
          pidfile_arg
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
-         minimal_nanotez_per_byte_arg)
+         minimal_nanotez_per_byte_arg
+         keep_alive_arg)
       ( prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"context_path"
@@ -254,7 +264,8 @@ let baker_commands () =
              max_priority,
              minimal_fees,
              minimal_nanotez_per_gas_unit,
-             minimal_nanotez_per_byte )
+             minimal_nanotez_per_byte,
+             keep_alive )
            node_path
            delegates
            cctxt ->
@@ -272,6 +283,7 @@ let baker_commands () =
           ~minimal_nanotez_per_byte
           ?max_priority
           ~context_path:(Filename.concat node_path "context")
+          ~keep_alive
           (List.map snd delegates)) ]
 
 let endorser_commands () =
@@ -285,9 +297,9 @@ let endorser_commands () =
   [ command
       ~group
       ~desc:"Launch the endorser daemon"
-      (args2 pidfile_arg endorsement_delay_arg)
+      (args3 pidfile_arg endorsement_delay_arg keep_alive_arg)
       (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
-      (fun (pidfile, endorsement_delay) delegates cctxt ->
+      (fun (pidfile, endorsement_delay, keep_alive) delegates cctxt ->
         may_lock_pidfile pidfile
         >>=? fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
@@ -308,6 +320,7 @@ let endorser_commands () =
           cctxt
           ~chain:cctxt#chain
           ~delay:endorsement_delay
+          ~keep_alive
           delegates_no_duplicates) ]
 
 let accuser_commands () =
@@ -321,10 +334,13 @@ let accuser_commands () =
   [ command
       ~group
       ~desc:"Launch the accuser daemon"
-      (args2 pidfile_arg preserved_levels_arg)
+      (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
-      (fun (pidfile, preserved_levels) cctxt ->
+      (fun (pidfile, preserved_levels, keep_alive) cctxt ->
         may_lock_pidfile pidfile
         >>=? fun () ->
-        Client_daemon.Accuser.run ~chain:cctxt#chain ~preserved_levels cctxt)
-  ]
+        Client_daemon.Accuser.run
+          cctxt
+          ~chain:cctxt#chain
+          ~preserved_levels
+          ~keep_alive) ]
