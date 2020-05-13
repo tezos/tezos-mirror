@@ -31,9 +31,14 @@ module Map : Map.S with type key = string
     ignoring slashes at the beginning and end of string. *)
 val split_path : string -> string list
 
-(** Splits a string on a delimiter character, grouping multiple
-    delimiters, and ignoring delimiters at the beginning and end of
-    string, if [limit] is passed, stops after [limit] split(s). *)
+(** Splits a string on a delimiter character. If [dup] is set to [true],
+    groups multiple delimiters and strips delimiters at the
+    beginning and end of string. If [limit] is passed, stops after [limit]
+    split(s). [dups] defaults to [true] and [limit] defaults to [max_int].
+    Examples:
+    - split ~dup:true ',' ",hello,,world,"] returns ["hello"; "world"]
+    - split ~dup:false ',' ",,hello,world,,"] returns [","; "hello"; "world"; ","]
+ *)
 val split : char -> ?dup:bool -> ?limit:int -> string -> string list
 
 (** [true] if input has prefix *)

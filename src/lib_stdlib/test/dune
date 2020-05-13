@@ -1,5 +1,6 @@
 (executables
  (names test_tzList
+        test_tzString
         test_lwt_pipe)
  (libraries tezos-stdlib
             alcotest
@@ -11,11 +12,16 @@
 (alias
  (name buildtest)
  (deps test_tzList.exe
+       test_tzString.exe
        test_lwt_pipe.exe))
 
 (alias
  (name runtest_tzList)
  (action (run %{exe:test_tzList.exe})))
+
+(alias
+ (name runtest_tzString)
+ (action (run %{exe:test_tzString.exe})))
 
 (alias
  (name runtest_lwt_pipe)
@@ -25,7 +31,15 @@
  (name runtest)
  (package tezos-stdlib)
  (deps (alias runtest_tzList)
+       (alias runtest_tzString)
        (alias runtest_lwt_pipe)))
+
+(alias
+ (name buildweaknesstest)
+ (deps test_ring_weakness.exe))
+(alias
+ (name runweaknesstest)
+ (action (setenv OCAMLRUNPARAM "o=20,h=16,s=16,i=2" (run %{exe:test_ring_weakness.exe}))))
 
 (alias
  (name runtest_lint)
