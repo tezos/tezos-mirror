@@ -417,6 +417,12 @@ integration:injection:
     - poetry run pytest tests/test_injection.py -s --log-dir=tmp
   stage: test
 
+integration:keccak:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_keccak.py -s --log-dir=tmp
+  stage: test
+
 integration:many_bakers:
   <<: *integration_python_definition
   script:
@@ -499,6 +505,12 @@ integration:rpc:
   <<: *integration_python_definition
   script:
     - poetry run pytest tests/test_rpc.py -s --log-dir=tmp
+  stage: test
+
+integration:sha3:
+  <<: *integration_python_definition
+  script:
+    - poetry run pytest tests/test_sha3.py -s --log-dir=tmp
   stage: test
 
 integration:tls:
