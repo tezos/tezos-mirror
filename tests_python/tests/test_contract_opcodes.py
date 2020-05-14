@@ -646,7 +646,17 @@ class TestContractOpcodes:
 
             # Test VOTING_POWER
             ('voting_power.tz', '(Pair 0 0)', f'"{PUBLIC_KEY}"',
-             '(Pair 500 2500)')
+             '(Pair 500 2500)'),
+
+            # Test KECCAK
+            ('keccak.tz', 'None', f'0x{b"Hello, world!".hex()}',
+             '(Some 0xb6e16d27ac5ab427a7f68900ac5559ce2' +
+             '72dc6c37c82b3e052246c82244c50e4)'),
+
+            # Test SHA3
+            ('sha3.tz', 'None', f'0x{b"Hello, world!".hex()}',
+             '(Some 0xf345a219da005ebe9c1a1eaad97bbf38' +
+             'a10c8473e41d0af7fb617caa0c6aa722)')
         ])
     def test_contract_input_output(self,
                                    client_regtest: ClientRegression,
