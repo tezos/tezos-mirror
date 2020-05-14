@@ -558,6 +558,10 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.voting_power
   | (Total_voting_power, _) ->
       Interp_costs.total_voting_power
+  | (Keccak, (bytes, _)) ->
+      Interp_costs.keccak bytes
+  | (Sha3, (bytes, _)) ->
+      Interp_costs.sha3 bytes
 
 let rec step_bounded :
     type b a.
@@ -1272,6 +1276,12 @@ let rec step_bounded :
       Vote.get_total_voting_power ctxt
       >>=? fun (ctxt, rolls) ->
       logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
+  | (Keccak, (bytes, rest)) ->
+      let hash = Raw_hashes.keccak256 bytes in
+      logged_return ((hash, rest), ctxt)
+  | (Sha3, (bytes, rest)) ->
+      let hash = Raw_hashes.sha3_256 bytes in
+      logged_return ((hash, rest), ctxt)
 
 let step :
     type b a.

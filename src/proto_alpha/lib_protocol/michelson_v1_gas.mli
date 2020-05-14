@@ -195,6 +195,10 @@ module Cost_of : sig
 
     val total_voting_power : Gas.cost
 
+    val keccak : bytes -> Gas.cost
+
+    val sha3 : bytes -> Gas.cost
+
     val neq : Gas.cost
 
     val nop : Gas.cost
