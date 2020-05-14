@@ -48,7 +48,7 @@ class TestMultiNodeStorageReconstruction:
     # requested as non-pruned blocks
     def test_request_all_blocks_as_not_pruned(self, sandbox, session):
         for i in range(session['head_level']):
-            assert utils.get_block_per_level(sandbox.client(1), i)
+            assert utils.get_block_at_level(sandbox.client(1), i)
 
     # Test the reconstruct command on a full storage
     def test_reconstruct_command(self, sandbox, session):
@@ -72,7 +72,7 @@ class TestMultiNodeStorageReconstruction:
         # We must fail while requesting those pruned blocks
         for i in range(1, session['snapshot_level']):
             with pytest.raises(Exception):
-                utils.get_block_per_level(sandbox.client(2), i)
+                utils.get_block_at_level(sandbox.client(2), i)
 
     def test_reconstruct_the_storage(self, sandbox):
         # Stop, reconstruct the storage and restart the node
@@ -85,4 +85,4 @@ class TestMultiNodeStorageReconstruction:
     def test_available_blocks(self, sandbox, session):
         # We should now success requesting those reconstructed blocks
         for i in range(session['head_level']):
-            assert utils.get_block_per_level(sandbox.client(2), i)
+            assert utils.get_block_at_level(sandbox.client(2), i)
