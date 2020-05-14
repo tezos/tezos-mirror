@@ -280,6 +280,11 @@ module Cost_of = struct
     (* model N_Is_nat *)
     let cost_N_Is_nat = Z.of_int 80
 
+    (* model N_Keccak *)
+    let cost_N_Keccak size =
+      let open Z_syntax in
+      Z.of_int 4_000 + (Z.of_int 30 * Z.of_int size)
+
     (* model N_Left *)
     let cost_N_Left = Z.of_int 80
 
@@ -416,6 +421,11 @@ module Cost_of = struct
     let cost_N_Sha256 size =
       let open Z_syntax in
       Z.of_int 500 + (Z.of_int 5 * Z.of_int size)
+
+    (* model N_Sha3 *)
+    let cost_N_Sha3 size =
+      let open Z_syntax in
+      Z.of_int 500 + (Z.of_int 32 * Z.of_int size)
 
     (* model N_Sha512 *)
     let cost_N_Sha512 size =
@@ -847,6 +857,10 @@ module Cost_of = struct
     let voting_power = atomic_step_cost cost_N_Voting_power
 
     let total_voting_power = atomic_step_cost cost_N_Total_voting_power
+
+    let keccak b = atomic_step_cost (cost_N_Keccak (Bytes.length b))
+
+    let sha3 b = atomic_step_cost (cost_N_Sha3 (Bytes.length b))
 
     let neq = atomic_step_cost cost_N_Neq
 

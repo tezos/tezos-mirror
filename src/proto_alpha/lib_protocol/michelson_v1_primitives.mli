@@ -135,6 +135,8 @@ type prim =
   | I_NEVER
   | I_VOTING_POWER
   | I_TOTAL_VOTING_POWER
+  | I_KECCAK
+  | I_SHA3
   | T_bool
   | T_contract
   | T_int

@@ -454,6 +454,10 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Total_voting_power ->
       0
+  | Keccak ->
+      0
+  | Sha3 ->
+      0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -4397,6 +4401,14 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_KECCAK, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Keccak (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA3, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      parse_var_annot loc annot
+      >>?= fun annot ->
+      typed ctxt loc Sha3 (Item_t (Bytes_t None, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -4459,7 +4471,9 @@ and parse_instr :
             | I_CHAIN_ID
             | I_NEVER
             | I_VOTING_POWER
-            | I_TOTAL_VOTING_POWER ) as name ),
+            | I_TOTAL_VOTING_POWER
+            | I_KECCAK
+            | I_SHA3 ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4597,7 +4611,9 @@ and parse_instr :
             | I_LOOP_LEFT
             | I_UNPACK
             | I_CONTRACT
-            | I_NEVER ) as name ),
+            | I_NEVER
+            | I_KECCAK
+            | I_SHA3 ) as name ),
           _,
           _ ),
       stack ) ->
@@ -4710,7 +4726,9 @@ and parse_instr :
              I_LAMBDA;
              I_NEVER;
              I_VOTING_POWER;
-             I_TOTAL_VOTING_POWER ]
+             I_TOTAL_VOTING_POWER;
+             I_KECCAK;
+             I_SHA3 ]
 
 and parse_contract :
     type arg.
