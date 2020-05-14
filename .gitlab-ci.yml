@@ -888,6 +888,11 @@ opam:tezos-lmdb:
   variables:
     package: tezos-lmdb
 
+opam:tezos-lwt-result-stdlib:
+  <<: *opam_definition
+  variables:
+    package: tezos-lwt-result-stdlib
+
 opam:tezos-mempool-006-PsCARTHA:
   <<: *opam_definition
   variables:
