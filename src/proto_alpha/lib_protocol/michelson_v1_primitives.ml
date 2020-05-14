@@ -136,6 +136,8 @@ type prim =
   | I_NEVER
   | I_VOTING_POWER
   | I_TOTAL_VOTING_POWER
+  | I_KECCAK
+  | I_SHA3
   | T_bool
   | T_contract
   | T_int
@@ -225,6 +227,7 @@ let namespace = function
   | I_INT
   | I_ISNAT
   | I_ITER
+  | I_KECCAK
   | I_LAMBDA
   | I_LE
   | I_LEFT
@@ -256,6 +259,7 @@ let namespace = function
   | I_SET_DELEGATE
   | I_SHA256
   | I_SHA512
+  | I_SHA3
   | I_SIZE
   | I_SLICE
   | I_SOME
@@ -515,6 +519,10 @@ let string_of_prim = function
       "VOTING_POWER"
   | I_TOTAL_VOTING_POWER ->
       "TOTAL_VOTING_POWER"
+  | I_KECCAK ->
+      "KECCAK"
+  | I_SHA3 ->
+      "SHA3"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -669,6 +677,8 @@ let prim_of_string = function
       ok I_IF_NONE
   | "INT" ->
       ok I_INT
+  | "KECCAK" ->
+      ok I_KECCAK
   | "LAMBDA" ->
       ok I_LAMBDA
   | "LE" ->
@@ -713,6 +723,8 @@ let prim_of_string = function
       ok I_PUSH
   | "RIGHT" ->
       ok I_RIGHT
+  | "SHA3" ->
+      ok I_SHA3
   | "SIZE" ->
       ok I_SIZE
   | "SOME" ->
@@ -1002,7 +1014,9 @@ let prim_encoding =
          ("NEVER", I_NEVER);
          ("UNPAIR", I_UNPAIR);
          ("VOTING_POWER", I_VOTING_POWER);
-         ("TOTAL_VOTING_POWER", I_TOTAL_VOTING_POWER)
+         ("TOTAL_VOTING_POWER", I_TOTAL_VOTING_POWER);
+         ("KECCAK", I_KECCAK);
+         ("SHA3", I_SHA3)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
         ]
 

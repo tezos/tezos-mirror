@@ -298,7 +298,9 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
   | ChainId
   | Never
   | Voting_power
-  | Total_voting_power ->
+  | Total_voting_power
+  | Keccak
+  | Sha3 ->
       0
 
 (* ---- Error helpers -------------------------------------------------------*)
@@ -4195,6 +4197,14 @@ and parse_instr :
       Lwt.return @@ parse_var_annot loc annot
       >>=? fun annot ->
       typed ctxt loc Sha512 (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_KECCAK, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Keccak (Item_t (Bytes_t None, rest, annot))
+  | (Prim (loc, I_SHA3, [], annot), Item_t (Bytes_t _, rest, _)) ->
+      Lwt.return @@ parse_var_annot loc annot
+      >>=? fun annot ->
+      typed ctxt loc Sha3 (Item_t (Bytes_t None, rest, annot))
   | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
       fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
@@ -4301,7 +4311,9 @@ and parse_instr :
             | I_ADDRESS
             | I_NEVER
             | I_VOTING_POWER
-            | I_TOTAL_VOTING_POWER ) as name ),
+            | I_TOTAL_VOTING_POWER
+            | I_KECCAK
+            | I_SHA3 ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4416,7 +4428,9 @@ and parse_instr :
             | I_GT
             | I_LE
             | I_GE
-            | I_NEVER ) as name ),
+            | I_NEVER
+            | I_KECCAK
+            | I_SHA3 ) as name ),
           _,
           _ ),
       stack ) ->
@@ -4526,7 +4540,9 @@ and parse_instr :
              I_LAMBDA;
              I_NEVER;
              I_VOTING_POWER;
-             I_TOTAL_VOTING_POWER ]
+             I_TOTAL_VOTING_POWER;
+             I_KECCAK;
+             I_SHA3 ]
 
 and parse_contract :
     type arg.

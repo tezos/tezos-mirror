@@ -353,6 +353,14 @@ module Cost_of = struct
       let bytes = Bytes.length b in
       atomic_step_cost (409 + ((bytes lsr 1) + (bytes lsr 4)))
 
+    let hash_keccak b =
+      (* TODO: assign gas price *)
+      atomic_step_cost (10 + Bytes.length b)
+
+    let hash_sha3 b =
+      (* TODO: assign gas price *)
+      atomic_step_cost (10 + Bytes.length b)
+
     let steps_to_quota = atomic_step_cost 10
 
     let source = atomic_step_cost 10
@@ -765,6 +773,10 @@ module Cost_of = struct
       | Voting_power ->
           alloc_cost 1
       | Total_voting_power ->
+          alloc_cost 1
+      | Keccak ->
+          alloc_cost 1
+      | Sha3 ->
           alloc_cost 1
   end
 
