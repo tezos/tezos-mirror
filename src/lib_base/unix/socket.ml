@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -168,7 +168,7 @@ let send fd encoding message =
 let recv ?timeout fd encoding =
   let header_buf = Bytes.create size_of_length_of_message_payload in
   protect (fun () ->
-      Lwt_utils_unix.read_bytes
+      Lwt_utils_unix.read_bytes_with_timeout
         ?timeout
         ~len:size_of_length_of_message_payload
         fd
@@ -177,7 +177,8 @@ let recv ?timeout fd encoding =
   >>=? fun () ->
   let len = Tezos_stdlib.TzEndian.get_uint16 header_buf 0 in
   let buf = Bytes.create len in
-  protect (fun () -> Lwt_utils_unix.read_bytes ?timeout ~len fd buf >|= ok)
+  protect (fun () ->
+      Lwt_utils_unix.read_bytes_with_timeout ?timeout ~len fd buf >|= ok)
   >>=? fun () ->
   let buf = Bytes.unsafe_to_string buf in
   match Data_encoding.Binary.read encoding buf 0 len with

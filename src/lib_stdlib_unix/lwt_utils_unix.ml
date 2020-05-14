@@ -43,40 +43,81 @@ let () =
 
 let default_net_timeout = ref (Ptime.Span.of_int_s 8)
 
-let read_bytes ?(timeout = !default_net_timeout) ?(pos = 0) ?len fd buf =
+let read_bytes_with_timeout ?(timeout = !default_net_timeout) ?file_offset
+    ?(pos = 0) ?len fd buf =
   let buflen = Bytes.length buf in
   let len = match len with None -> buflen - pos | Some l -> l in
   if pos < 0 || pos + len > buflen then invalid_arg "read_bytes" ;
-  let rec inner pos len =
+  let rec inner nb_read pos len =
     if len = 0 then Lwt.return_unit
     else
+      let reader =
+        match file_offset with
+        | None ->
+            Lwt_unix.read
+        | Some fo ->
+            Lwt_unix.pread ~file_offset:(fo + nb_read)
+      in
       Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
-          Lwt_unix.read fd buf pos len)
+          reader fd buf pos len)
       >>= function
       | 0 ->
           Lwt.fail End_of_file
           (* other endpoint cleanly closed its connection *)
-      | nb_read ->
-          inner (pos + nb_read) (len - nb_read)
+      | nb_read' ->
+          inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
   in
-  inner pos len
+  inner 0 pos len
 
-let write_bytes ?(pos = 0) ?len descr buf =
+let read_bytes ?file_offset ?(pos = 0) ?len fd buf =
+  let buflen = Bytes.length buf in
+  let len = match len with None -> buflen - pos | Some l -> l in
+  if pos < 0 || pos + len > buflen then invalid_arg "read_bytes" ;
+  let rec inner nb_read pos len =
+    if len = 0 then Lwt.return_unit
+    else
+      let reader =
+        match file_offset with
+        | None ->
+            Lwt_unix.read
+        | Some fo ->
+            Lwt_unix.pread ~file_offset:(fo + nb_read)
+      in
+      reader fd buf pos len
+      >>= function
+      | 0 ->
+          Lwt.fail End_of_file
+      | nb_read' ->
+          inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
+  in
+  inner 0 pos len
+
+let write_bytes ?file_offset ?(pos = 0) ?len descr buf =
   let buflen = Bytes.length buf in
   let len = match len with None -> buflen - pos | Some l -> l in
   if pos < 0 || pos + len > buflen then invalid_arg "write_bytes" ;
-  let rec inner pos len =
+  let rec inner nb_written pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_unix.write descr buf pos len
+      let writer =
+        match file_offset with
+        | None ->
+            Lwt_unix.write
+        | Some fo ->
+            Lwt_unix.pwrite ~file_offset:(fo + nb_written)
+      in
+      writer descr buf pos len
       >>= function
       | 0 ->
           Lwt.fail End_of_file
           (* other endpoint cleanly closed its connection *)
-      | nb_written ->
-          inner (pos + nb_written) (len - nb_written)
+      | nb_written' ->
+          inner
+            (nb_written + nb_written')
+            (pos + nb_written')
+            (len - nb_written')
   in
-  inner pos len
+  inner 0 pos len
 
 let write_string ?(pos = 0) ?len descr buf =
   let len = match len with None -> String.length buf - pos | Some l -> l in
