@@ -116,11 +116,11 @@ class TestManager:
         amount = 10.001
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'bootstrap2', 'manager',
-                        ['--gas-limit', f'{128 * 15450 + 108}'])
+                        ['--gas-limit', f'{1000 * 15450 + 108}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.001797 + 0.000001
+        fee = 0.001797 + 0.000002
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
         assert (balance_bootstrap - fee_mutez - amount_mutez
@@ -132,7 +132,7 @@ class TestManager:
         amount = 10.1
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'bootstrap2',
-                        ['--gas-limit', f'{128 * 26350 + 12}'])
+                        ['--gas-limit', f'{1000 * 26350 + 12}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
@@ -149,7 +149,7 @@ class TestManager:
         amount = 10
         amount_mutez = utils.mutez_of_tez(amount)
         client.transfer(amount, 'manager', 'manager2',
-                        ['--gas-limit', f'{128 * 44950 + 112}'])
+                        ['--gas-limit', f'{1000 * 44950 + 112}'])
         client.bake('bootstrap5', BAKE_ARGS)
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
@@ -368,7 +368,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', f'{128 * 8000}', '--burn-cap', '10']
+        args = ['-G', f'{1000 * 8000}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):

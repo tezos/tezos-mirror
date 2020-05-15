@@ -32,7 +32,7 @@ def scenario():
                                         "source": SENDER_ID,
                                         "fee": "0",
                                         "counter": str(int(counter) + 1),
-                                        "gas_limit": "51200000",
+                                        "gas_limit": "400000000",
                                         "storage_limit": "60000",
                                         "amount": '1000',
                                         "destination": RECEIVER_ID}]}
